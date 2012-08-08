@@ -1,0 +1,152 @@
+/*Copyright 2010-2012 Streams Lab Michal Widera
+
+  RESTRICTED RIGHTS LEGEND
+  Use, duplication or disclosure by any commercial industry (public or
+  private), private individual or by any Government Agency without an
+  expressed written consent of release from Streams Lab Michal Widera
+  is subject to restriction of the Rights.
+
+  Manufacturer is:
+      Streams Lab Michal Widera
+      Reymonta str. 56/1
+      Poland, Zabrze, 41-800
+      (+48) 606 995 918
+
+$Rev:: 43            $:  Revision of last commit
+$Author:: widera     $:  Author of last commit
+$Date:: 2012-08-03 0#$:  Date of last commit
+$Id:: SelfTest.cpp 4#$:  Id of last commit
+*/
+#include "stdafx.h"
+
+#include "QStruct.h"
+#include "dbstream.h"
+
+template < class T >
+void testMatch( T & fn1 , T & fn2 , UR::dbStream & str )
+{
+    T cp1( fn1 ) , cp2 ( fn2 );
+
+    bool bOk( cp1 == cp2 ) ;
+
+    if ( ! str.resultValid )
+    {
+        std::cerr << "NA   " ;
+        str.resultValid = true ;
+    }
+    else
+    {
+        if ( bOk ) std::cerr << "ok   " ;
+        else       std::cerr << "FAIL " ;
+    }
+
+    std::cerr 
+        << cp1 
+        << " " 
+        << cp2 
+        << " " ;    
+
+	std::cerr << std::endl ;
+}
+
+
+//Testing area of executor - to call c:\>executor -t
+void iTest()
+{
+    using namespace UR ;
+
+    list < string > schema ;
+    schema.push_back( "pole1" );
+    schema.push_back( "pole2" );
+    schema.push_back( "pole3" );
+
+    dbStream str1( "testowy1" , schema );
+
+    str1[ "pole1" ] = complex< R >( R(3,4) , R(1,2) ) ;
+    str1[ "pole2" ] = R(3,4) ;
+    str1[ "pole3" ] = 2 ;
+
+    std::cerr << "---------------------------------\t record(0)" << endl ;
+    std::cerr << "str1[ \"pole1\" ] =" << str1[ "pole1" ] << endl ;
+    std::cerr << "str1[ \"pole2\" ] =" << str1[ "pole2" ] << endl ;
+    std::cerr << "str1[ \"pole3\" ] =" << str1[ "pole3" ] << endl ;
+
+    std::cerr << "STORE" << endl ;
+
+    str1.store();
+
+    str1[ "pole1" ] = complex< R >( R(99,1) , R(1,1) ) ;
+    str1[ "pole2" ] = R(98,1) ;
+    str1[ "pole3" ] = 97 ;
+
+    std::cerr << "---------------------------------\t record(1)" << endl ;
+    std::cerr << "str1[ \"pole1\" ] =" << str1[ "pole1" ] << endl ;
+    std::cerr << "str1[ \"pole2\" ] =" << str1[ "pole2" ] << endl ;
+    std::cerr << "str1[ \"pole3\" ] =" << str1[ "pole3" ] << endl ;
+
+    complex< R > test1 = boost::get< complex< R > > ( str1[ "pole1" ] );
+    R test2            = boost::get< R >            ( str1[ "pole2" ] );
+    int test3          = boost::get< int >          ( str1[ "pole3" ] );
+
+    std::cerr << "---------------------------------\t index/name" << endl ;
+
+    testMatch( str1[ "pole1" ] ,  str1[ 0 ] , str1 );
+    testMatch( str1[ "pole2" ] ,  str1[ 1 ] , str1 );
+    testMatch( str1[ "pole3" ] ,  str1[ 2 ] , str1 );
+
+    std::cerr << "---------------------------------\t store issue" << endl ;
+
+    std::cerr << "before store:" << str1[ 0 ] << "," << str1[ 1 ] << "," << str1[ 2 ] << endl ;
+    std::cerr << "before store:" << str1.get(0)[ 0 ] << "," << str1.get(0)[ 1 ] << "," << str1.get(0)[ 2 ] << endl ;
+
+    std::cerr << "STORE" << endl ;
+
+    str1.store();        //potem juz nie ma str1["pole1"] - dostep tylko przez get
+
+    std::cerr << "after store:" << str1[ 0 ] << "," << str1[ 1 ] << "," << str1[ 2 ] << endl ;
+    std::cerr << "after store:" << str1.get(0)[ 0 ] << "," << str1.get(0)[ 1 ] << "," << str1.get(0)[ 2 ] << endl ;
+
+    std::cerr << "---------------------------------\t position" << endl ;
+    std::cerr << "str1.get( \"pole1\" , 1 ) = " << str1.get( "pole1" , 1 ) << endl ;
+    std::cerr << "str1.get( \"pole1\" , 0 ) = " << str1.get( "pole1" , 0 ) << endl ;
+
+
+    std::cerr << "---------------------------------\t offset = 0" << endl ;
+
+    //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
+    //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
+    //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
+
+    std::cerr << "---------------------------------\t offset = 1" << endl ;
+
+    //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
+    //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
+    //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
+
+    std::cerr << "---------------------------------\t offset = 0" << endl ;
+
+    //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
+    //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
+    //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
+
+    std::cerr << "---------------------------------\t offset = 1" << endl ;
+
+    //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
+    //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
+    //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
+
+    std::cerr << "---------------------------------\t local test" << endl ;
+
+    std::cerr << "by one" << endl ;
+    std::cerr << "str1.get(1)[ 2 ] = " << str1.get(1)[ 2 ] << endl ;
+    std::cerr << "str1[ 2 ]        = " << str1[ 2 ] << endl ;
+    std::cerr << "str1.get(0)[ 2 ] = " << str1.get(0)[ 2 ] << endl ;
+
+    std::cerr << "---------------------------------\t test result invalid (NA expected)" << endl ;
+
+    //testMatch( str1.get(2)[ 0 ] , str1.get( "pole1", 2 ) , str1 );
+    //testMatch( str1.get(2)[ 1 ] , str1.get( "pole2", 2 ) , str1 );
+    //testMatch( str1.get(2)[ 2 ] , str1.get( "pole3", 2 ) , str1 );
+
+    std::cerr << "--------------------------------------------------------------" << endl ;
+}
