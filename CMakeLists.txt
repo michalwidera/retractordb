@@ -21,7 +21,7 @@
 #How to debug:
 #note: Add -DCMAKE_BUILD_TYPE=Debug into "arguments"
 #field of qt creator to create and run debug code
-#BOOST_ROOT to enviroment
+#BOOST_ROOT to enviroment 
 #
 
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR )
