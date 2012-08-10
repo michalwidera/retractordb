@@ -873,10 +873,10 @@ int main(int argc, char* argv[])
         {
             cout << "regression test procedure call" << "\n";
             if ( vm.count("parser2") )
-                parser_v2( "regtest" , "regtest" );
+                return ( parser_v2( "regtest" , "regtest" ) != "OK" );
             else
-                parser( "regtest" , "regtest" );
-            return 1;
+                return ( parser( "regtest" , "regtest" ) != "OK" );
+            return 1; //proforma fail
         }
 
         string sQueryFile = vm["queryfile"].as< string >() ;    //plik z zapytaniamia

@@ -793,13 +793,15 @@ string parser( string sPlikDanych, string sPlikWynikowy )
 
     if ( sPlikDanych == "regtest" )
     {
-        string str[] = { "transaction 0.5" ,
+        string str[] = { "transaction 0.5,1" ,
            "declare a INTEGER stream core0, 1" ,
            "select core0[1,1],core0 stream str1 from core0" } ;
 
         for ( int i = 0 ; i < 3 ; i++ )
         {
             do_reset();
+            cerr << "testing:" << str[i] << endl ;
+
             if ( !parse( str[i].c_str() , g , space_p ).full )
             {
                 clog << "compiler:" << str[i].c_str() << endl ;
