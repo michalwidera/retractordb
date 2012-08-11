@@ -65,10 +65,7 @@ int terminal()
 
     rlutil::CursorHider hideCursor ;
 
-    std::vector <char> line ;
-
-    REP(i,tc) line.push_back(32) ;
-    line.push_back(0);
+    string line ;
 
     int pos = 0 ;
     int k(0);
@@ -128,28 +125,34 @@ int terminal()
                 k = k_ ;
             }
 
-            if ( k == 8 || k == 127)
+            if ( k == 8 || k == 127) //backspace
             {
                 pos -- ;
-                line[pos%tc] = 32 ;
+                line.resize( pos );
             }
-            else
+            else //ascii char
             {
                 if ( k >= 32 && k <= 126 )
                 {
                     //add char to line
-                    line[pos%tc] = k ;
+                    line.append( 1 , k );
+                    //line[pos%tc] = k ;
                     pos ++;
                 }
             };
 
             rlutil::locate( 1 , 1 );
-            REP(i,tc) printf("%c" , line[i] );
+            printf("%s" , line.c_str() );
+
         }
         rlutil::locate( pos+1 , 1 );
-        printf("_");
+        printf("_ ");
 
         k = 0 ;
+
+        if ( line == "quit" )
+            break ;
+
     }
 
     return 0 ;
