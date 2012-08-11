@@ -49,6 +49,8 @@ int kchain = 0;
 
 void showkey( int k )
 {
+    return ;
+
     if ( k != 0 )
     {
     rlutil::locate( 1 , 2  + kchain );
@@ -69,6 +71,8 @@ int terminal()
 
     int pos = 0 ;
     int k(0);
+
+    int curline(1); //aktualna lina w ktorej wprowadzamy tekst
 
     while(true)
     {
@@ -141,17 +145,29 @@ int terminal()
                 }
             };
 
-            rlutil::locate( 1 , 1 );
+            rlutil::locate( 1 , curline );
             printf("%s" , line.c_str() );
 
         }
-        rlutil::locate( pos+1 , 1 );
-        printf("_ ");
+        rlutil::locate( pos+1 , curline );
+        printf("_ ");   //to trzeba poprawic - ta spacja
 
         k = 0 ;
 
         if ( line == "quit" )
             break ;
+
+        if ( line == "dir" )
+        {
+            REP( n , 5 )
+            {
+                rlutil::locate( 1 , curline + n + 1 );
+                printf("test dir");
+            }
+            curline += 5 + 1 ;
+            line = "" ;
+            pos = 0 ;
+        }
 
     }
 
