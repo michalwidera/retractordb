@@ -806,6 +806,8 @@ void dumpInstance( std::string sOutFile )
     cerr << "Dump:      \t" << sOutFile << endl ;
 }
 
+std::streambuf *oldbuf = std::clog.rdbuf(out.rdbuf());
+
 int main(int argc, char* argv[])
 {
     //Intro
@@ -984,7 +986,9 @@ int main(int argc, char* argv[])
 
 
         clog << "Stop\n" ;
+
         if (vm.count("log")) clog.rdbuf(0);  //metoda na wylaczenie clog - crash patch
+        if (oldbuf) std::clog.rdbuf(oldbuf);
     }
     catch(std::exception& e)
     {
