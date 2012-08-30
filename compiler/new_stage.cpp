@@ -1,12 +1,16 @@
-/**
-* Copyright : All rights reserved
-* Author    : Michal Widera
-* File      : new_stage.cpp
-* Contents  : Parser for stream queries - Database FRONT-END (DML - Data Manipulation Language)
-* Created   : 2006.09.19
-* Authors    : Michal Widera
-* Last change date: $Date: 2012-07-15 00:04:49 +0400 (Sun, 15 Jul 2012) $
-* Last change by  : $Author: developer $
+/*Copyright 2010-2012 Streams Lab Michal Widera
+
+  RESTRICTED RIGHTS LEGEND
+  Use, duplication or disclosure by any commercial industry (public or
+  private), private individual or by any Government Agency without an
+  expressed written consent of release from Streams Lab Michal Widera
+  is subject to restriction of the Rights.
+
+  Manufacturer is:
+      Streams Lab Michal Widera
+      Reymonta str. 56/1
+      Poland, Zabrze, 41-800
+      (+48) 606 995 918
 */
 #include "stdafx.h"
 

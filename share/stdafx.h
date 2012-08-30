@@ -1,4 +1,4 @@
-/*Copyright 2011 Streams Lab Michal Widera
+/*Copyright 2010-2012 Streams Lab Michal Widera
 
   RESTRICTED RIGHTS LEGEND
   Use, duplication or disclosure by any commercial industry (public or
@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 2             $:  Revision of last commit
-$Author:: developer  $:  Author of last commit
-$Date:: 2012-07-15 0#$:  Date of last commit
-$Id:: stdafx.h 2 201#$:  Id of last commit
 */
 #pragma once
 // stdafx.h : include file for standard system include files,

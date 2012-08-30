@@ -1,4 +1,3 @@
-
 /*Copyright 2010-2012 Streams Lab Michal Widera
 
   RESTRICTED RIGHTS LEGEND
@@ -12,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 18            $:  Revision of last commit
-$Author:: developer  $:  Author of last commit
-$Date:: 2012-07-30 0#$:  Date of last commit
-$Id:: dbstream.h 18 #$:  Id of last commit
 */
 #pragma once
 
