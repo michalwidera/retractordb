@@ -795,11 +795,11 @@ string parser( string sPlikDanych, string sPlikWynikowy )
         for ( int i = 0 ; i < 3 ; i++ )
         {
             do_reset();
-            cerr << "testing:" << str[i] << endl ;
+            cout << "testing:" << str[i] << endl ;
 
             if ( !parse( str[i].c_str() , g , space_p ).full )
             {
-                cerr << "compiler:" << str[i].c_str() << endl ;
+                cout << "compiler:" << str[i].c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
             }
         }
@@ -815,7 +815,7 @@ string parser( string sPlikDanych, string sPlikWynikowy )
             do_reset();
             if ( ! parse( str.c_str() , g , space_p ).full )
             {
-                cerr << "compiler:" << str.c_str() << endl ;
+                cout << "compiler:" << str.c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
             }
         }

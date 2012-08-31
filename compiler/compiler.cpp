@@ -987,10 +987,13 @@ int main(int argc, char* argv[])
 
         cout << "Stop\n" ;
 
-        if (vm.count("log")) clog.rdbuf(0);  //metoda na wylaczenie clog - crash patch
+        //if (vm.count("log")) clog.rdbuf(0);  //metoda na wylaczenie clog - crash patch
+
+        clog.rdbuf(oldbuf);
     }
     catch(std::exception& e)
     {
+        clog.rdbuf(oldbuf);
         cerr << e.what() << "\n";
         return 1;
     }
