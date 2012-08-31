@@ -824,16 +824,23 @@ string parser( string sPlikDanych, string sPlikWynikowy )
     assert( ! stk.empty() );
     stk.pop();
 
-
     //zapisanie skompilowanych zapytan na dysku
     {
+        cout << "utworzenie obiektow serializacji" << endl ;
+
         const config configInstance2( configInstance_parser ) ;
         const qTree coreInstance2( coreInstance_parser ) ;
 
         std::ofstream ofs( sPlikWynikowy.c_str() );
         boost::archive::text_oarchive oa(ofs);
 
-        cout << "zapis na dysku pliku:" << sPlikWynikowy << endl ;
+        if ( ! ofs.good() )
+        {
+            cerr << "materializacja serializacji nie utworzona" << endl ;
+            throw std::invalid_argument("Runtime Error.");
+        }
+
+        cout << "zapis na dysku - serializacja:" << sPlikWynikowy << endl ;
         oa << configInstance2 ;
         oa << coreInstance2 ;
         cout << "zapis na dysku zakonczony" << endl ;
