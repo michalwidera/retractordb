@@ -870,13 +870,14 @@ int main(int argc, char* argv[])
         {
             int retcode = 0 ; //zalozenie porazki
 
-            cout << "poczatek testu regresyjnego" << std::endl ;
+            cout << "poczatek testu regresyjnego" << endl ;
 
             if ( vm.count("parser2") )
                 retcode = parser_v2( "regtest" , "regtest" ) != "OK" ;
             else
                 retcode = parser( "regtest" , "regtest" ) != "OK" ;
-            cout << "koniec testu regresyjnego" << std::endl ;
+
+            cout << "koniec testu regresyjnego" << endl ;
 
             clog.rdbuf(oldbuf);
 

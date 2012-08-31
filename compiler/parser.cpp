@@ -824,7 +824,6 @@ string parser( string sPlikDanych, string sPlikWynikowy )
     assert( ! stk.empty() );
     stk.pop();
 
-    cout << "zapis na dysku pliku:" << sPlikWynikowy << std::endl ;
 
     //zapisanie skompilowanych zapytan na dysku
     {
@@ -834,11 +833,11 @@ string parser( string sPlikDanych, string sPlikWynikowy )
         std::ofstream ofs( sPlikWynikowy.c_str() );
         boost::archive::text_oarchive oa(ofs);
 
+        cout << "zapis na dysku pliku:" << sPlikWynikowy << endl ;
         oa << configInstance2 ;
         oa << coreInstance2 ;
+        cout << "zapis na dysku zakonczony" << endl ;
     }
-
-    cout << "zapis na dysku zakonczony" << std::endl ;
 
     return string("OK");
 }
