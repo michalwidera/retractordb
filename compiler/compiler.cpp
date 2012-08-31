@@ -873,9 +873,9 @@ int main(int argc, char* argv[])
             cout << "poczatek testu regresyjnego" << endl ;
 
             if ( vm.count("parser2") )
-                retcode = parser_v2( "regtest" , "regtest" ) != "OK" ;
+                retcode = parser_v2( "regtest" , "testfile" ) != "OK" ;
             else
-                retcode = parser( "regtest" , "regtest" ) != "OK" ;
+                retcode = parser( "regtest" , "testfile" ) != "OK" ;
 
             cout << "koniec testu regresyjnego" << endl ;
 

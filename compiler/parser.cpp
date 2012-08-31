@@ -835,7 +835,7 @@ string parser( string sPlikDanych, string sPlikWynikowy )
 
         if ( ! ofs.good() )
         {
-            cerr << "plik dla serializacji nie utworzony" << endl ;
+            cerr << "plik dla serializacji nie utworzony:" << sPlikWynikowy << endl ;
             throw std::invalid_argument("Runtime Error.");
         }
 
