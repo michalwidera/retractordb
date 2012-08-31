@@ -868,12 +868,19 @@ int main(int argc, char* argv[])
 
         if (vm.count("regtest"))
         {
-            cout << "regression test procedure call" << "\n";
+            int retcode = 0 ; //zalozenie porazki
+
+            cout << "poczatek testu regresyjnego" << std::endl ;
+
             if ( vm.count("parser2") )
-                return ( parser_v2( "regtest" , "regtest" ) != "OK" );
+                retcode = parser_v2( "regtest" , "regtest" ) != "OK" ;
             else
-                return ( parser( "regtest" , "regtest" ) != "OK" );
-            return 1; //proforma fail
+                retcode = parser( "regtest" , "regtest" ) != "OK" ;
+            cout << "koniec testu regresyjnego" << std::endl ;
+
+            clog.rdbuf(oldbuf);
+
+            return retcode;
         }
 
         string sQueryFile = vm["queryfile"].as< string >() ;    //plik z zapytaniamia
