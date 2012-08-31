@@ -40,7 +40,7 @@ dbStream::dbStream( string streamName , list < string > schema ) :
     pRawData( new char[ frameSize ] ),
     resultValid( true )
 {
-    cerr << ":" << streamName << endl ;
+    //cerr << ":" << streamName << endl ;
     cbuf.DefBlock( streamName , frameSize , BF );   //Deklaracja bloku w systemie strumieniowym
 };
 

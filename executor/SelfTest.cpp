@@ -31,17 +31,17 @@ void testMatch( T & fn1 , T & fn2 , UR::dbStream & str )
     }
     else
     {
-        if ( bOk ) std::cerr << "ok   " ;
+        if ( bOk ) std::cout << "ok   " ;
         else       std::cerr << "FAIL " ;
     }
 
-    std::cerr 
+    std::cout
         << cp1 
         << " " 
         << cp2 
         << " " ;    
 
-	std::cerr << std::endl ;
+    std::cout << std::endl ;
 }
 
 
@@ -84,7 +84,7 @@ void iTest()
     R test2            = boost::get< R >            ( str1[ "pole2" ] );
     int test3          = boost::get< int >          ( str1[ "pole3" ] );
 
-    std::cerr << "---------------------------------\t index/name" << endl ;
+    cout << "---------------------------------\t index/name" << endl ;
 
     testMatch( str1[ "pole1" ] ,  str1[ 0 ] , str1 );
     testMatch( str1[ "pole2" ] ,  str1[ 1 ] , str1 );
