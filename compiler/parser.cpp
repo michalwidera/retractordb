@@ -799,7 +799,7 @@ string parser( string sPlikDanych, string sPlikWynikowy )
 
             if ( !parse( str[i].c_str() , g , space_p ).full )
             {
-                cout << "compiler:" << str[i].c_str() << endl ;
+                cerr << "compiler:" << str[i].c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
             }
         }
@@ -815,7 +815,7 @@ string parser( string sPlikDanych, string sPlikWynikowy )
             do_reset();
             if ( ! parse( str.c_str() , g , space_p ).full )
             {
-                cout << "compiler:" << str.c_str() << endl ;
+                cerr << "compiler:" << str.c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
             }
         }
@@ -823,6 +823,8 @@ string parser( string sPlikDanych, string sPlikWynikowy )
 
     assert( ! stk.empty() );
     stk.pop();
+
+    cout << "zapis na dysku pliku:" << sPlikWynikowy << std::endl ;
 
     //zapisanie skompilowanych zapytan na dysku
     {
@@ -834,8 +836,9 @@ string parser( string sPlikDanych, string sPlikWynikowy )
 
         oa << configInstance2 ;
         oa << coreInstance2 ;
-
     }
+
+    cout << "zapis na dysku zakonczony" << std::endl ;
 
     return string("OK");
 }
