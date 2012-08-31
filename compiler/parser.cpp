@@ -832,11 +832,18 @@ string parser( string sPlikDanych, string sPlikWynikowy )
         const qTree coreInstance2( coreInstance_parser ) ;
 
         std::ofstream ofs( sPlikWynikowy.c_str() );
+
+        if ( ! ofs.good() )
+        {
+            cerr << "plik dla serializacji nie utworzony" << endl ;
+            throw std::invalid_argument("Runtime Error.");
+        }
+
         boost::archive::text_oarchive oa(ofs);
 
         if ( ! ofs.good() )
         {
-            cerr << "materializacja serializacji nie utworzona" << endl ;
+            cerr << "podlaczenie serializacji do pliku zawiodlo" << endl ;
             throw std::invalid_argument("Runtime Error.");
         }
 
