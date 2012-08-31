@@ -44,6 +44,24 @@ void testMatch( T & fn1 , T & fn2 , UR::dbStream & str )
     std::cout << std::endl ;
 }
 
+template < class T >
+void testMatch( T fn1 , T fn2 )
+{
+    bool bOk( fn1 == fn2 ) ;
+
+    {
+        if ( bOk ) std::cout << "ok   " ;
+        else       std::cerr << "FAIL " ;
+    }
+
+    std::cout
+        << fn1
+        << " "
+        << fn2
+        << " " ;
+
+    std::cout << std::endl ;
+}
 
 //Testing area of executor - to call c:\>executor -t
 void iTest()
@@ -109,27 +127,27 @@ void iTest()
 
     cout << "---------------------------------\t offset = 0" << endl ;
 
-    //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
-    //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
-    //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
+    testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) );
+    testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) );
+    testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) );
 
     cout << "---------------------------------\t offset = 1" << endl ;
 
-    //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
-    //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
-    //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
+    testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) );
+    testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) );
+    testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) );
 
     cout << "---------------------------------\t offset = 0" << endl ;
 
-    //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
-    //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
-    //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
+    testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) );
+    testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) );
+    testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) );
 
     cout << "---------------------------------\t offset = 1" << endl ;
 
-    //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
-    //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
-    //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
+    testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) );
+    testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) );
+    testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) );
 
     cout << "---------------------------------\t local test" << endl ;
 
@@ -137,12 +155,6 @@ void iTest()
     cout << "str1.get(1)[ 2 ] = " << str1.get(1)[ 2 ] << endl ;
     cout << "str1[ 2 ]        = " << str1[ 2 ] << endl ;
     cout << "str1.get(0)[ 2 ] = " << str1.get(0)[ 2 ] << endl ;
-
-    cout << "---------------------------------\t test result invalid (NA expected)" << endl ;
-
-    //testMatch( str1.get(2)[ 0 ] , str1.get( "pole1", 2 ) , str1 );
-    //testMatch( str1.get(2)[ 1 ] , str1.get( "pole2", 2 ) , str1 );
-    //testMatch( str1.get(2)[ 2 ] , str1.get( "pole3", 2 ) , str1 );
 
     cout << "---------------------------------\t" << endl ;
 }
