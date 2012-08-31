@@ -49,6 +49,7 @@ void testMatch( T & fn1 , T & fn2 , UR::dbStream & str )
 void iTest()
 {
     using namespace UR ;
+    using namespace std ;
 
     list < string > schema ;
     schema.push_back( "pole1" );
@@ -61,12 +62,12 @@ void iTest()
     str1[ "pole2" ] = R(3,4) ;
     str1[ "pole3" ] = 2 ;
 
-    std::cerr << "---------------------------------\t record(0)" << endl ;
-    std::cerr << "str1[ \"pole1\" ] =" << str1[ "pole1" ] << endl ;
-    std::cerr << "str1[ \"pole2\" ] =" << str1[ "pole2" ] << endl ;
-    std::cerr << "str1[ \"pole3\" ] =" << str1[ "pole3" ] << endl ;
+    cout << "---------------------------------\t record(0)" << endl ;
+    cout << "str1[ \"pole1\" ] =" << str1[ "pole1" ] << endl ;
+    cout << "str1[ \"pole2\" ] =" << str1[ "pole2" ] << endl ;
+    cout << "str1[ \"pole3\" ] =" << str1[ "pole3" ] << endl ;
 
-    std::cerr << "STORE" << endl ;
+    cout << "STORE" << endl ;
 
     str1.store();
 
@@ -74,10 +75,10 @@ void iTest()
     str1[ "pole2" ] = R(98,1) ;
     str1[ "pole3" ] = 97 ;
 
-    std::cerr << "---------------------------------\t record(1)" << endl ;
-    std::cerr << "str1[ \"pole1\" ] =" << str1[ "pole1" ] << endl ;
-    std::cerr << "str1[ \"pole2\" ] =" << str1[ "pole2" ] << endl ;
-    std::cerr << "str1[ \"pole3\" ] =" << str1[ "pole3" ] << endl ;
+    cout << "---------------------------------\t record(1)" << endl ;
+    cout << "str1[ \"pole1\" ] =" << str1[ "pole1" ] << endl ;
+    cout << "str1[ \"pole2\" ] =" << str1[ "pole2" ] << endl ;
+    cout << "str1[ \"pole3\" ] =" << str1[ "pole3" ] << endl ;
 
     complex< R > test1 = boost::get< complex< R > > ( str1[ "pole1" ] );
     R test2            = boost::get< R >            ( str1[ "pole2" ] );
@@ -89,59 +90,59 @@ void iTest()
     testMatch( str1[ "pole2" ] ,  str1[ 1 ] , str1 );
     testMatch( str1[ "pole3" ] ,  str1[ 2 ] , str1 );
 
-    std::cerr << "---------------------------------\t store issue" << endl ;
+    cout << "---------------------------------\t store issue" << endl ;
 
-    std::cerr << "before store:" << str1[ 0 ] << "," << str1[ 1 ] << "," << str1[ 2 ] << endl ;
-    std::cerr << "before store:" << str1.get(0)[ 0 ] << "," << str1.get(0)[ 1 ] << "," << str1.get(0)[ 2 ] << endl ;
+    cout << "before store:" << str1[ 0 ] << "," << str1[ 1 ] << "," << str1[ 2 ] << endl ;
+    cout << "before store:" << str1.get(0)[ 0 ] << "," << str1.get(0)[ 1 ] << "," << str1.get(0)[ 2 ] << endl ;
 
-    std::cerr << "STORE" << endl ;
+    cout << "STORE" << endl ;
 
     str1.store();        //potem juz nie ma str1["pole1"] - dostep tylko przez get
 
-    std::cerr << "after store:" << str1[ 0 ] << "," << str1[ 1 ] << "," << str1[ 2 ] << endl ;
-    std::cerr << "after store:" << str1.get(0)[ 0 ] << "," << str1.get(0)[ 1 ] << "," << str1.get(0)[ 2 ] << endl ;
+    cout << "after store:" << str1[ 0 ] << "," << str1[ 1 ] << "," << str1[ 2 ] << endl ;
+    cout << "after store:" << str1.get(0)[ 0 ] << "," << str1.get(0)[ 1 ] << "," << str1.get(0)[ 2 ] << endl ;
 
-    std::cerr << "---------------------------------\t position" << endl ;
-    std::cerr << "str1.get( \"pole1\" , 1 ) = " << str1.get( "pole1" , 1 ) << endl ;
-    std::cerr << "str1.get( \"pole1\" , 0 ) = " << str1.get( "pole1" , 0 ) << endl ;
+    cout << "---------------------------------\t position" << endl ;
+    cout << "str1.get( \"pole1\" , 1 ) = " << str1.get( "pole1" , 1 ) << endl ;
+    cout << "str1.get( \"pole1\" , 0 ) = " << str1.get( "pole1" , 0 ) << endl ;
 
 
-    std::cerr << "---------------------------------\t offset = 0" << endl ;
-
-    //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
-    //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
-    //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
-
-    std::cerr << "---------------------------------\t offset = 1" << endl ;
-
-    //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
-    //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
-    //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
-
-    std::cerr << "---------------------------------\t offset = 0" << endl ;
+    cout << "---------------------------------\t offset = 0" << endl ;
 
     //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
     //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
     //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
 
-    std::cerr << "---------------------------------\t offset = 1" << endl ;
+    cout << "---------------------------------\t offset = 1" << endl ;
 
     //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
     //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
     //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
 
-    std::cerr << "---------------------------------\t local test" << endl ;
+    cout << "---------------------------------\t offset = 0" << endl ;
 
-    std::cerr << "by one" << endl ;
-    std::cerr << "str1.get(1)[ 2 ] = " << str1.get(1)[ 2 ] << endl ;
-    std::cerr << "str1[ 2 ]        = " << str1[ 2 ] << endl ;
-    std::cerr << "str1.get(0)[ 2 ] = " << str1.get(0)[ 2 ] << endl ;
+    //testMatch( str1.get(0)[ 0 ] , str1.get( "pole1", 0 ) , str1 );
+    //testMatch( str1.get(0)[ 1 ] , str1.get( "pole2", 0 ) , str1 );
+    //testMatch( str1.get(0)[ 2 ] , str1.get( "pole3", 0 ) , str1 );
 
-    std::cerr << "---------------------------------\t test result invalid (NA expected)" << endl ;
+    cout << "---------------------------------\t offset = 1" << endl ;
+
+    //testMatch( str1.get(1)[ 0 ] , str1.get( "pole1", 1 ) , str1 );
+    //testMatch( str1.get(1)[ 1 ] , str1.get( "pole2", 1 ) , str1 );
+    //testMatch( str1.get(1)[ 2 ] , str1.get( "pole3", 1 ) , str1 );
+
+    cout << "---------------------------------\t local test" << endl ;
+
+    cout << "by one" << endl ;
+    cout << "str1.get(1)[ 2 ] = " << str1.get(1)[ 2 ] << endl ;
+    cout << "str1[ 2 ]        = " << str1[ 2 ] << endl ;
+    cout << "str1.get(0)[ 2 ] = " << str1.get(0)[ 2 ] << endl ;
+
+    cout << "---------------------------------\t test result invalid (NA expected)" << endl ;
 
     //testMatch( str1.get(2)[ 0 ] , str1.get( "pole1", 2 ) , str1 );
     //testMatch( str1.get(2)[ 1 ] , str1.get( "pole2", 2 ) , str1 );
     //testMatch( str1.get(2)[ 2 ] , str1.get( "pole3", 2 ) , str1 );
 
-    std::cerr << "--------------------------------------------------------------" << endl ;
+    cout << "---------------------------------\t" << endl ;
 }

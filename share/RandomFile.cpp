@@ -37,6 +37,7 @@ CRandomFile::CRandomFile( string murExt , const bool destroyOnDestructor ) :
 
     if ( getenv("TMP") != NULL ) TMP_PATH = getenv("TMP") ;
     else if ( getenv("TEMP") != NULL ) TMP_PATH = getenv("TEMP") ;
+    else if ( getenv("HOME") != NULL ) TMP_PATH = getenv("HOME") ;
     else throw std::out_of_range("No TEMP/TMP var - set enviroment");
 
     assert( TMP_PATH != "" );
