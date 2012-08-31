@@ -803,19 +803,19 @@ void dumpInstance( std::string sOutFile )
     oa << configInstance2 ;
     oa << coreInstance2 ;
 
-    cerr << "Dump:      \t" << sOutFile << endl ;
+    cout << "Dump:      \t" << sOutFile << endl ;
 }
 
-std::streambuf *oldbuf = NULL ;
+std::streambuf *oldbuf = std::clog.rdbuf(clog.rdbuf()); ;
 
 int main(int argc, char* argv[])
 {
     //Intro
-    cerr << "Parser/Compiler - parser and reductor of query plans.\n";
+    cout << "Parser/Compiler - parser and reductor of query plans.\n";
     string revision(  "$Rev: 2 $" );  //This string is svn keyword
     std::replace( revision.begin() , revision.end() , '$' , ' ' );
     revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-    cerr <<
+    cout <<
             "used compiler tag:" + string(COMPILER) +
             "," + revision <<
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
@@ -863,7 +863,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            clog.rdbuf(0);  //metoda na wylaczenie clog
+            clog.rdbuf(NULL);  //metoda na wylaczenie clog
         }
 
         if (vm.count("regtest"))
@@ -924,16 +924,16 @@ int main(int argc, char* argv[])
                         querySubset << str << "\n" ;
                     lineNr ++ ;
                 }
-                cerr << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl ;
+                cout << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl ;
             }
         }
         if ( vm.count("parser2") )
         {
-            cerr << "Parsing v2 ...\t" << parser_v2( sQueryFile , sLinkFile ) << endl ;
+            cout << "Parsing v2 ...\t" << parser_v2( sQueryFile , sLinkFile ) << endl ;
         }
         else
         {
-            cerr << "Parsing v1 ...\t" << parser( sQueryFile , sLinkFile ) << endl ;
+            cout << "Parsing v1 ...\t" << parser( sQueryFile , sLinkFile ) << endl ;
         }
 
         //
@@ -950,19 +950,19 @@ int main(int argc, char* argv[])
 
         int dAfterParserSize((int)coreInstance.size());
 
-        cerr << "Reduction: \t" << simplifyLProgram() << endl ;
+        cout << "Reduction: \t" << simplifyLProgram() << endl ;
 
         string sOutFileLog2   = vm["outfile"].as< string >() + ".lg2" ;      //default query.qry
         dumpInstance( sOutFileLog2 );
 
-        cerr << "Intervals: \t" << intervalCounter() << endl ;
-        cerr << "Schema:    \t" << prepareFields() << endl ;
-        cerr << "References:\t" << convertReferences() << endl ;
+        cout << "Intervals: \t" << intervalCounter() << endl ;
+        cout << "Schema:    \t" << prepareFields() << endl ;
+        cout << "References:\t" << convertReferences() << endl ;
 
         int dAfterCompilingSize((int)coreInstance.size());
 
-        cerr << "Size in:   \t" << dAfterParserSize << endl ;
-        cerr << "Size out:  \t" << dAfterCompilingSize << endl ;
+        cout << "Size in:   \t" << dAfterParserSize << endl ;
+        cout << "Size out:  \t" << dAfterCompilingSize << endl ;
 
         dumpInstance( sOutFile );
 
@@ -977,7 +977,7 @@ int main(int argc, char* argv[])
             sSize = string( " + " ) + string( s.str() ) ;
         }
 
-        cerr << "Report:"
+        cout << "Report:"
              << sQueryFile
              << " => "
              << sOutFile
@@ -985,7 +985,7 @@ int main(int argc, char* argv[])
              << endl ;
 
 
-        clog << "Stop\n" ;
+        cout << "Stop\n" ;
 
         if (vm.count("log")) clog.rdbuf(0);  //metoda na wylaczenie clog - crash patch
     }
