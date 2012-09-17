@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 2             $:  Revision of last commit
-$Author:: developer  $:  Author of last commit
-$Date:: 2012-07-15 0#$:  Date of last commit
-$Id:: RandomFile.cpp#$:  Id of last commit
 */
 #include "stdafx.h"
 
@@ -42,6 +37,7 @@ CRandomFile::CRandomFile( string murExt , const bool destroyOnDestructor ) :
 
     if ( getenv("TMP") != NULL ) TMP_PATH = getenv("TMP") ;
     else if ( getenv("TEMP") != NULL ) TMP_PATH = getenv("TEMP") ;
+    else if ( getenv("HOME") != NULL ) TMP_PATH = getenv("HOME") ;
     else throw std::out_of_range("No TEMP/TMP var - set enviroment");
 
     assert( TMP_PATH != "" );

@@ -1,1 +1,0 @@
-svn propset svn:keywords "Rev Date Author Id" compiler/* dumper/* executor/* share/* stage/* console/*

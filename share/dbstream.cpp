@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 43            $:  Revision of last commit
-$Author:: widera     $:  Author of last commit
-$Date:: 2012-08-03 0#$:  Date of last commit
-$Id:: dbstream.cpp 4#$:  Id of last commit
 */
 #include "stdafx.h"
 
@@ -45,7 +40,7 @@ dbStream::dbStream( string streamName , list < string > schema ) :
     pRawData( new char[ frameSize ] ),
     resultValid( true )
 {
-    cerr << ":" << streamName << endl ;
+    //cerr << ":" << streamName << endl ;
     cbuf.DefBlock( streamName , frameSize , BF );   //Deklaracja bloku w systemie strumieniowym
 };
 

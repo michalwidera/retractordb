@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 36            $:  Revision of last commit
-$Author:: widera     $:  Author of last commit
-$Date:: 2012-07-31 2#$:  Date of last commit
-$Id:: IPhStrMgr.h 36#$:  Id of last commit
 */
 #pragma once
 

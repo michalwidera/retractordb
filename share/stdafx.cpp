@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 2             $:  Revision of last commit
-$Author:: developer  $:  Author of last commit
-$Date:: 2012-07-15 0#$:  Date of last commit
-$Id:: stdafx.cpp 2 2#$:  Id of last commit
 */
 // stdafx.cpp : source file that includes just the standard includes
 // streamsdb.pch will be the pre-compiled header

@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 2             $:  Revision of last commit
-$Author:: developer  $:  Author of last commit
-$Date:: 2012-07-15 0#$:  Date of last commit
-$Id:: parser.cpp 2 2#$:  Id of last commit
 */
 #include "stdafx.h"
 
@@ -800,11 +795,11 @@ string parser( string sPlikDanych, string sPlikWynikowy )
         for ( int i = 0 ; i < 3 ; i++ )
         {
             do_reset();
-            cerr << "testing:" << str[i] << endl ;
+            cout << "testing:" << str[i] << endl ;
 
             if ( !parse( str[i].c_str() , g , space_p ).full )
             {
-                clog << "compiler:" << str[i].c_str() << endl ;
+                cerr << "compiler:" << str[i].c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
             }
         }
@@ -820,7 +815,7 @@ string parser( string sPlikDanych, string sPlikWynikowy )
             do_reset();
             if ( ! parse( str.c_str() , g , space_p ).full )
             {
-                clog << "compiler:" << str.c_str() << endl ;
+                cerr << "compiler:" << str.c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
             }
         }
@@ -831,15 +826,31 @@ string parser( string sPlikDanych, string sPlikWynikowy )
 
     //zapisanie skompilowanych zapytan na dysku
     {
+        cout << "utworzenie obiektow serializacji" << endl ;
+
         const config configInstance2( configInstance_parser ) ;
         const qTree coreInstance2( coreInstance_parser ) ;
 
         std::ofstream ofs( sPlikWynikowy.c_str() );
+
+        if ( ! ofs.good() )
+        {
+            cerr << "plik dla serializacji nie utworzony:" << sPlikWynikowy << endl ;
+            throw std::invalid_argument("Runtime Error.");
+        }
+
         boost::archive::text_oarchive oa(ofs);
 
+        if ( ! ofs.good() )
+        {
+            cerr << "podlaczenie serializacji do pliku zawiodlo" << endl ;
+            throw std::invalid_argument("Runtime Error.");
+        }
+
+        cout << "zapis na dysku - serializacja:" << sPlikWynikowy << endl ;
         oa << configInstance2 ;
         oa << coreInstance2 ;
-
+        cout << "zapis na dysku zakonczony" << endl ;
     }
 
     return string("OK");

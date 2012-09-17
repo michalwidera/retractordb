@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev:: 17            $:  Revision of last commit
-$Author:: developer  $:  Author of last commit
-$Date:: 2012-07-29 2#$:  Date of last commit
-$Id:: Buffer.cpp 17 #$:  Id of last commit
 */
 #include "stdafx.h"
 
@@ -491,7 +486,7 @@ template <class IDTYPE>
 template <class STREAM>
 	CBlock<STREAM>::CBlock( const CBlock<STREAM> &x )
 {
-	LOCKBYMUTEX ;
+//	LOCKBYMUTEX ;
 
 	pImpl.reset( new STREAM );
 	frameSize = x.frameSize ;
@@ -519,7 +514,7 @@ template <class STREAM>
 template <class STREAM>
 	CBlock<STREAM>::~CBlock()
 {
-	LOCKBYMUTEX ;
+//	LOCKBYMUTEX ;
 	frameCount = 0 ;
 	firstFrame = 0 ;
 }
@@ -527,9 +522,9 @@ template <class STREAM>
 template <class STREAM>
 	void CBlock<STREAM>::PutBlock( ARRAY_POINTER pBlockBuffer , long count )
 {
-	LOCKBYMUTEX ;
-
 	assert( pBlockBuffer.get() != NULL ) ;
+
+    LOCKBYMUTEX ;
 
 	pImpl->seekp(0,STREAM::end);
 	pImpl->write( pBlockBuffer.get() , frameSize * count );
@@ -540,9 +535,9 @@ template <class STREAM>
 template <class STREAM>
 	long CBlock<STREAM>::GetBlock( long position , ARRAY_POINTER pBlockBuffer )
 {
-	LOCKBYMUTEX ;
-
 	assert( pBlockBuffer.get() != NULL ) ;
+
+    LOCKBYMUTEX ;
 
 	pImpl->sync();
     if ( position >= 0 )
@@ -635,6 +630,7 @@ template <class STREAM>
 	long CBlock<STREAM>::SyncToDisk()
 {
 	LOCKBYMUTEX ;
+
 	pImpl->sync();
 	return frameCount ;
 }
@@ -772,9 +768,9 @@ template < typename STREAM >
 template < typename STREAM >
 	void CCycBlock <STREAM>::PutBlock( ARRAY_POINTER pBlockBuffer , long count )
 {
-	LOCKBYMUTEX ;
-
 	assert ( count == 1 );	/** Trzeba przemyslec i napisac dla przypadku > 1 */
+
+    LOCKBYMUTEX ;
 
 	if ( lastblockCnt == 0 )
 	{ //Just In Time activation - (lub size() == 0)

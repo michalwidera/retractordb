@@ -11,11 +11,6 @@
       Reymonta str. 56/1
       Poland, Zabrze, 41-800
       (+48) 606 995 918
-
-$Rev::$:  Revision of last commit
-$Author::$:  Author of last commit
-$Date::$:  Date of last commit
-$Id::$:  Id of last commit
 */
 #include "stdafx.h"
 
