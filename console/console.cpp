@@ -89,13 +89,13 @@ int terminal()
                     if ( k == 67 )
                     {
                         if ( pos <= 80 ) pos ++ ;
-                        k = 0 ;  -- sprawdzic
+                        k = 0 ; // -- sprawdzic
                     }
 
                     if ( k == 68 )
                     {
                         if ( pos > 0 ) pos -- ;
-                        k = 0 ;  -- sprawdzic
+                        k = 0 ; //  -- sprawdzic
                     }
                 }
 
