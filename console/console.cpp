@@ -57,6 +57,22 @@ void showkey( int k )
     }
 }
 
+int keytest()
+{
+    while(true)
+    {
+        if (kbhit())
+        {
+            int k = getch();
+            showkey(k);
+
+            if ( k == 13 || k == 10 ) { break ; }
+        }
+    }
+
+    return 0 ;
+}
+
 int terminal()
 {
     rlutil::cls();
@@ -81,6 +97,11 @@ int terminal()
 
             if ( k == 27 ) // linux part
             {
+                //jest kicha pod liux - na chwile obecna
+                //naciskam klawisz i nic, dopiero nastpny nacisniety
+                //przywoluje poprzedni - i tak w kolko. Jakas porazka.
+                //inwestygacja konieczna.
+                //linux development i testowanie konsoli na chwila obecna zawieszam
                 k = getch();
                 showkey(k);
 
@@ -139,8 +160,6 @@ int terminal()
                 }
             };
         }
-
-        showkey(k);
 
         if ( k != 0 )
         {
@@ -201,7 +220,8 @@ int main(int argc, char* argv[])
         po::options_description desc("Dozwolone opcja");
         desc.add_options()
                 ("infile,i", po::value<string>(&sInputFile)->default_value("data.in"), "nazwa pliku z danymi")
-                ("help,h", "program options")
+                ("test,t", "test code")
+                ("help,h", "program options")                
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
@@ -216,7 +236,11 @@ int main(int argc, char* argv[])
         {
             cerr << desc << endl ;
             return 1;
-        }        
+        }
+        else if ( vm.count("test"))
+        {
+            return keytest();
+        }
         else
             return terminal();
 
