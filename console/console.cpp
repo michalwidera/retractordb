@@ -61,13 +61,13 @@ int keytest()
 {
     while(true)
     {
-        if (kbhit())
-        {
+        //if (kbhit())
+        //{
             int k = getch();
             showkey(k);
 
             if ( k == 13 || k == 10 ) { break ; }
-        }
+        //}
     }
 
     return 0 ;
