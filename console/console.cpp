@@ -65,7 +65,7 @@ int terminal()
     rlutil::CursorHider hideCursor ;
 
     int pos = 0 ;
-    int k(0);
+    int k = -1 ;
 
     int curline(1); //aktualna lina w ktorej wprowadzamy tekst
 
@@ -88,19 +88,19 @@ int terminal()
 
                     if ( k == 67 )
                     {
-                        pos ++ ;
-                        k = 0 ;
+                        if ( pos <= 80 ) pos ++ ;
+                        //k = 0 ;  -- sprawdzic
                     }
 
                     if ( k == 68 )
                     {
-                        pos -- ;
-                        k = 0 ;
+                        if ( pos > 0 ) pos -- ;
+                        //k = 0 ;  -- sprawdzic
                     }
                 }
 
             }
-            if ( k == 13 || k == 10 ) break ;
+            if ( k == 13 || k == 10 ) { k = -1 ; break ; }
 
             if ( k == 224 ) //control sequence
             {
@@ -110,21 +110,20 @@ int terminal()
 
                 if ( k == 75 ) //left arrow
                 {
-                    pos -- ;
+                    if ( pos > 0 ) pos -- ;
                 }
 
                 if ( k == 77 )  //right arrow
                 {
-                    pos ++ ;
+                    if ( pos <= 80 ) pos ++ ;
                 }
 
                 k = k_ ;
             }
 
             if ( k == 8 || k == 127) //backspace
-            {
-                //strncpy( line + pos , line + pos + 1 , 80 - pos);
-                pos -- ;
+            {                
+                if ( pos > 0 ) pos -- ;
                 REP( i , 80 - pos ) line[pos+i] = line[pos+i+1];
             }
             else //ascii char
@@ -135,7 +134,10 @@ int terminal()
                     line[pos++] = k ;
                 }
             };
+        }
 
+        if ( k != 0 )
+        {
             rlutil::locate( 1 , curline );
             REP(i,80)
             {
@@ -149,7 +151,10 @@ int terminal()
         k = 0 ;
 
         if ( ! strcmp( line , "quit" ) )
+        {
+            k = -1 ;
             break ;
+        }
 
         if ( ! strcmp( line , "dir" ) )
         {
@@ -161,6 +166,7 @@ int terminal()
             curline += 5 + 1 ;
             REP(i,80) line[i] = 0 ;
             pos = 0 ;
+            k = -1 ;
         }
 
     }
