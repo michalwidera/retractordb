@@ -46,7 +46,7 @@ int kchain = 0;
 
 void showkey( int k )
 {
-    return ;
+//    return ;
 
     if ( k != 0 )
     {
@@ -77,14 +77,17 @@ int terminal()
         if (kbhit())
         {
             k = getch();
+            showkey(k);
 
-            if ( k == 27 )
+            if ( k == 27 ) // linux part
             {
                 k = getch();
+                showkey(k);
 
                 if ( k == 91 )
                 {
                     k = getch();
+                    showkey(k);
 
                     if ( k == 67 )
                     {
@@ -102,11 +105,12 @@ int terminal()
             }
             if ( k == 13 || k == 10 ) { k = -1 ; break ; }
 
-            if ( k == 224 ) //control sequence
+            if ( k == 224 ) //control sequence - windows
             {
                 int k_ = k ;
 
                 k = getch();
+                showkey(k);
 
                 if ( k == 75 ) //left arrow
                 {
