@@ -74,8 +74,10 @@ int terminal()
 
     while(true)
     {
-        if (kbhit())
+        if (k=kbhit())
         {
+            showkey(k);
+
             k = getch();
             showkey(k);
 
