@@ -45,17 +45,20 @@
  * 10-sep-2006     Let kb_getc() work right under certain Unix/Linux flavors
  *
  *************************************************************************** */
-
+int main_kbhit();
 #ifdef __cplusplus
   extern "C" {
 #endif
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#ifdef linux
 #include <termios.h>
 #include <unistd.h>
-#include <errno.h>
+
 
 #ifndef STDIN_FILENO
   #define STDIN_FILENO 0
@@ -229,27 +232,59 @@ kb_getc_w(void)
   }
   return ch;
 }
+#else
+  unsigned char
+  kb_getc_w(void) {} ;
 
+  unsigned char
+  kb_getc(void)  {} ;
+
+  int
+  set_tty_cooked() {};
+
+  int
+  set_tty_cbreak() {};
+
+  int
+  set_tty_raw(void) {};
+
+#include <windows.h>
+
+void usleep(int waitTime) {
+    __int64 time1 = 0, time2 = 0, freq = 0;
+
+    QueryPerformanceCounter((LARGE_INTEGER *) &time1);
+    QueryPerformanceFrequency((LARGE_INTEGER *)&freq);
+
+    do {
+        QueryPerformanceCounter((LARGE_INTEGER *) &time2);
+    } while((time2-time1) < waitTime);
+}
+#endif /* linux */
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #define TEST
 #ifdef TEST
 
 void echo(unsigned char ch);
 
-static enum 
-{ 
-  CH_ONLY, CH_HEX 
+static enum
+{
+  CH_ONLY, CH_HEX
 } how_echo = CH_ONLY;
 
-int 
-main(int argc, char * argv[])
+int main_kbhit()
 {
   unsigned char ch;
 
   printf("Test Unix single-character input.\n");
 
   set_tty_raw();         /* set up character-at-a-time */
-  
+
   while (1)              /* wait here for a typed char */
   {
     usleep(20000);       /* 1/50th second: thanks, Floyd! */
@@ -281,8 +316,3 @@ echo(unsigned char ch)
 }
 
 #endif /* test */
-
-
-#ifdef __cplusplus
-}
-#endif

@@ -199,6 +199,8 @@ int terminal()
     return 0 ;
 }
 
+extern int main_kbhit();
+
 int main(int argc, char* argv[])
 {
     //Intro
@@ -239,6 +241,7 @@ int main(int argc, char* argv[])
         }
         else if ( vm.count("test"))
         {
+            return main_kbhit();
             return keytest();
         }
         else

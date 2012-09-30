@@ -156,6 +156,7 @@ set(SOURCES_STAGE
 )
 set(SOURCES_CONSOLE
   console/console.cpp
+  console/kbhit_lnx.cpp
   share/inputFileInstance.cpp
   share/QStruct.cpp
   share/stdafx.cpp
