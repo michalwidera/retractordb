@@ -15,6 +15,8 @@
 
 #include "stdafx.h"
 
+#include <ctime>
+
 #include <QStruct.h>
 
 #include "rlutil.h"
@@ -58,35 +60,31 @@ void showkey( int k )
 int terminal()
 {
     rlutil::cls();
-    rlutil::locate( 1, 35 ); std::cout << "Data Stream Management System Console" << std::endl ;
+    //rlutil::locate( 1, 35 ); std::cout << "Data Stream Management System Console" << std::endl ;
 
     rlutil::CursorHider hideCursor ;
-
-    string line ;
 
     int pos = 0 ;
     int k(0);
 
     int curline(1); //aktualna lina w ktorej wprowadzamy tekst
 
+    char line[80]; //linia edytowana
+    REP(i,80) line[i] = 0 ;
+
     while(true)
     {
         if (kbhit())
         {
-
             k = getch();
-
-            showkey(k);
 
             if ( k == 27 )
             {
                 k = getch();
-                showkey(k);
 
                 if ( k == 91 )
                 {
                     k = getch();
-                    showkey(k);
 
                     if ( k == 67 )
                     {
@@ -109,7 +107,6 @@ int terminal()
                 int k_ = k ;
 
                 k = getch();
-                showkey(k);
 
                 if ( k == 75 ) //left arrow
                 {
@@ -126,33 +123,35 @@ int terminal()
 
             if ( k == 8 || k == 127) //backspace
             {
+                //strncpy( line + pos , line + pos + 1 , 80 - pos);
                 pos -- ;
-                line.resize( pos );
+                REP( i , 80 - pos ) line[pos+i] = line[pos+i+1];
             }
             else //ascii char
             {
                 if ( k >= 32 && k <= 126 )
                 {
-                    //add char to line
-                    line.append( 1 , k );
-                    //line[pos%tc] = k ;
-                    pos ++;
+                    REPD( i , 80-pos ) line[pos+i+1] = line[pos+i];
+                    line[pos++] = k ;
                 }
             };
 
             rlutil::locate( 1 , curline );
-            printf("%s" , line.c_str() );
-
+            REP(i,80)
+            {
+                if ( i == pos )
+                    printf("_");
+                else
+                    printf("%c" , line[i] );
+            }
         }
-        rlutil::locate( pos+1 , curline );
-        printf("_ ");   //to trzeba poprawic - ta spacja
 
         k = 0 ;
 
-        if ( line == "quit" )
+        if ( ! strcmp( line , "quit" ) )
             break ;
 
-        if ( line == "dir" )
+        if ( ! strcmp( line , "dir" ) )
         {
             REP( n , 5 )
             {
@@ -160,7 +159,7 @@ int terminal()
                 printf("test dir");
             }
             curline += 5 + 1 ;
-            line = "" ;
+            REP(i,80) line[i] = 0 ;
             pos = 0 ;
         }
 
