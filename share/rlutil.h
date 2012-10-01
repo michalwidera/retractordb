@@ -581,7 +581,7 @@ struct CursorHider {
 	CursorHider() { hidecursor(); }
 	~CursorHider() { showcursor(); }
 };
-
+#endif
 
 
 #ifndef WIN32
@@ -808,4 +808,4 @@ struct ttyRawer {
 #endif
 
 } // namespace rlutil
-#endif
+
