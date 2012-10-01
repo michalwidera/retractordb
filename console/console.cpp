@@ -168,7 +168,12 @@ int terminal()
                 if ( i == pos )
                     printf("_");
                 else
-                    printf("%c" , line[i] );
+                {
+                    if ( line[i] >= 32 && k <= 126 )
+                        printf("%c" , line[i] );
+                    else
+                        printf(" ");
+                }
             }
 
         }
