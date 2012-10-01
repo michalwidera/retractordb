@@ -584,7 +584,7 @@ struct CursorHider {
 
 
 
-#ifdef linux
+#ifndef WIN32
 
 #ifndef STDIN_FILENO
   #define STDIN_FILENO 0
