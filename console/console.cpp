@@ -46,7 +46,7 @@ int kchain = 0;
 
 void showkey( int k )
 {
-//    return ;
+    return ;
 
     if ( k != 0 )
     {
@@ -75,8 +75,13 @@ int keytest()
 
 int terminal()
 {
+    setbuf(stdout, NULL);
+
     rlutil::cls();
-    //rlutil::locate( 1, 35 ); std::cout << "Data Stream Management System Console" << std::endl ;
+    rlutil::locate( 1 , 2 );
+    printf("Data Stream Management System Console");
+    rlutil::locate( 1 , 1 );
+    printf("_");
 
     rlutil::CursorHider hideCursor ;
     rlutil::ttyRawer ttyRaw ;
@@ -87,9 +92,7 @@ int terminal()
     int curline(1); //aktualna lina w ktorej wprowadzamy tekst
 
     char line[80]; //linia edytowana
-    REP(i,80) line[i] = 0 ;
-
-    setbuf(stdout, NULL);
+    REP(i,80) line[i] = 32 ;    //wypelniam spacjami
 
     while(true)
     {
@@ -180,13 +183,13 @@ int terminal()
 
         k = 0 ;
 
-        if ( ! strcmp( line , "quit" ) )
+        if ( ! strncmp( line , "quit" , strlen("quit") ) )
         {
             k = -1 ;
             break ;
         }
 
-        if ( ! strcmp( line , "dir" ) )
+        if ( ! strncmp( line , "dir" , strlen("dir") ) )
         {
             REP( n , 5 )
             {
