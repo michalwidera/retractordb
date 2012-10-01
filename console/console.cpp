@@ -89,6 +89,8 @@ int terminal()
     char line[80]; //linia edytowana
     REP(i,80) line[i] = 0 ;
 
+    setbuf(stdout, NULL);
+
     while(true)
     {
         if ( k = rlutil::kb_getc() )
@@ -168,6 +170,7 @@ int terminal()
                 else
                     printf("%c" , line[i] );
             }
+
         }
 
         k = 0 ;
