@@ -1,4 +1,7 @@
 #pragma once
+/** Adaptacja zewnetrzych bibliotek - plik zawiera rozne kawalki kodu z sieci
+ */
+
 /**
  * File: rlutil.h
  *
@@ -583,6 +586,55 @@ struct CursorHider {
 };
 #endif
 
+//orginalne zrodlo pochodzi/zosta³o pobrane z tej strony
+
+/* ***************************************************************************
+ *
+ *          Copyright 1992-2005 by Pete Wilson All Rights Reserved
+ *           50 Staples Street : Lowell Massachusetts 01851 : USA
+ *        http://www.pwilson.net/   pete at pwilson dot net   +1 978-454-4547
+ *
+ * This item is free software: you can redistribute it and/or modify it as
+ * long as you preserve this copyright notice. Pete Wilson prepared this item
+ * hoping it might be useful, but it has NO WARRANTY WHATEVER, not even any
+ * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ *************************************************************************** */
+
+/* ***************************************************************************
+ *
+ *                          KBHIT.C
+ *
+ * Based on the work of W. Richard Stevens in "Advanced Programming in
+ *   the Unix Environment," Addison-Wesley; and of Floyd Davidson.
+ *
+ * Contains these functions:
+ *
+ *  To set the TTY mode:
+ *     tty_set_raw() Unix setup to read a character at a time.
+ *     tty_set_cooked() Unix setup to reverse tty_set_raw()
+ *
+ *  To read keyboard input:
+ *     kb_getc()      keyboard get character, NON-BLOCKING. If a char
+ *                      has been typed, return it. Else return 0.
+ *     kb_getc_w()    kb get char with wait: BLOCKING. Wait for a char
+ *                      to be typed and return it.
+ *
+ *  How to use:
+ *     tty_set_raw()  set the TTY mode to read one char at a time.
+ *     kb_getc()      read chars one by one.
+ *     tty_set_cooked() VERY IMPORTANT: restore cooked mode when done.
+ *
+ * Revision History:
+ *
+ *     DATE                  DESCRIPTION
+ * -----------    --------------------------------------------
+ * 12-jan-2002     new
+ * 20-aug-2002     cleanup
+ * 24-nov-2003     Fixed kb_getc() so that it really is non blocking(JH)
+ * 10-sep-2006     Let kb_getc() work right under certain Unix/Linux flavors
+ *
+ *************************************************************************** */
 
 #ifndef WIN32
 
@@ -656,7 +708,7 @@ set_tty_cbreak()
   i = tcgetattr (STDIN_FILENO, &termattr);
   if (i < 0)
   {
-    printf("tcgetattr() returned %d for fildes=%d\n",i,STDIN_FILENO);
+    printf("tcgetattr() zwraca %d dla pliku=%d\n",i,STDIN_FILENO);
     perror ("");
     return -1;
   }
@@ -670,7 +722,7 @@ set_tty_cbreak()
   i = tcsetattr (STDIN_FILENO, TCSANOW, &termattr);
   if (i < 0)
   {
-    printf("tcsetattr() returned %d for fildes=%d\n",i,STDIN_FILENO);
+    printf("tcsetattr() zwraca %d dla pliku=%d\n",i,STDIN_FILENO);
     perror ("");
     return -1;
   }
