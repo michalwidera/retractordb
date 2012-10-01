@@ -63,7 +63,7 @@ int keytest()
     {
         //if (kbhit())
         //{
-            int k = getch();
+            int k = rlutil::kb_getc();
             showkey(k);
 
             if ( k == 13 || k == 10 ) { break ; }
@@ -91,9 +91,8 @@ int terminal()
 
     while(true)
     {
-        if (kbhit())
-        {
-            k = getch();
+        if ( k = rlutil::kb_getc() )
+        {            
             showkey(k);
 
             if ( k == 27 ) // linux part
