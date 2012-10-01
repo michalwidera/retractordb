@@ -169,7 +169,7 @@ int terminal()
                     printf("_");
                 else
                 {
-                    if ( line[i] >= 32 && k <= 126 )
+                    if ( line[i] >= 32 && line[i] <= 126 )
                         printf("%c" , line[i] );
                     else
                         printf(" ");
