@@ -159,10 +159,7 @@ int terminal()
                     line[pos++] = k ;
                 }
             };
-        }
 
-        if ( k != 0 )
-        {
             rlutil::locate( 1 , curline );
             REP(i,80)
             {
