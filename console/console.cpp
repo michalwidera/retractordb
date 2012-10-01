@@ -79,6 +79,7 @@ int terminal()
     //rlutil::locate( 1, 35 ); std::cout << "Data Stream Management System Console" << std::endl ;
 
     rlutil::CursorHider hideCursor ;
+    rlutil::ttyRawer ttyRaw ;
 
     int pos = 0 ;
     int k = -1 ;
@@ -199,8 +200,6 @@ int terminal()
     return 0 ;
 }
 
-extern int main_kbhit();
-
 int main(int argc, char* argv[])
 {
     //Intro
@@ -241,7 +240,6 @@ int main(int argc, char* argv[])
         }
         else if ( vm.count("test"))
         {
-            return main_kbhit();
             return keytest();
         }
         else
