@@ -193,6 +193,7 @@ kb_getc(void)
   int i;
   unsigned char ch;
   ssize_t size;
+  usleep(20000);
 /*  termattr.c_cc[VMIN] = 0; */ /* uncomment if needed */
   i = tcsetattr (STDIN_FILENO, TCSANOW, &termattr);
   size = read (STDIN_FILENO, &ch, 1);
@@ -218,7 +219,7 @@ kb_getc_w(void)
 {
   unsigned char ch;
   size_t size;
-
+  usleep(20000);
   while (1)
   {
 
@@ -233,20 +234,7 @@ kb_getc_w(void)
   return ch;
 }
 #else
-  unsigned char
-  kb_getc_w(void) {} ;
-
-  unsigned char
-  kb_getc(void)  {} ;
-
-  int
-  set_tty_cooked() {};
-
-  int
-  set_tty_cbreak() {};
-
-  int
-  set_tty_raw(void) {};
+#include <conio.h>
 
 #include <windows.h>
 
@@ -260,11 +248,47 @@ void usleep(int waitTime) {
         QueryPerformanceCounter((LARGE_INTEGER *) &time2);
     } while((time2-time1) < waitTime);
 }
+
+
+unsigned char
+kb_getc_w(void)
+{
+    return getch();
+} ;
+
+unsigned char
+kb_getc(void)
+{
+    usleep(20000);
+    if ( !kbhit() )
+        return getch();
+    else
+        return 0 ;
+} ;
+
+int
+set_tty_cooked() {};
+
+int
+set_tty_cbreak() {};
+
+int
+set_tty_raw(void) {};
+
 #endif /* linux */
 
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/// Class: ttyRawer
+/// RAII OOP wrapper for kbhit tty raw>.
+struct ttyRawer {
+    ttyRawer() { set_tty_raw(); }
+    ~ttyRawer() { set_tty_cooked(); }
+};
 #endif
 
 #define TEST
@@ -283,15 +307,13 @@ int main_kbhit()
 
   printf("Test Unix single-character input.\n");
 
-  set_tty_raw();         /* set up character-at-a-time */
+  ttyRawer rawer ;
 
   while (1)              /* wait here for a typed char */
   {
-    usleep(20000);       /* 1/50th second: thanks, Floyd! */
     ch = kb_getc();      /* char typed by user? */
     if (0x03 == ch)      /* might be control-C */
     {
-      set_tty_cooked();  /* control-C, restore normal TTY mode */
       return 1;          /* and get out */
     }
     echo(ch);            /* not control-C, echo it */
@@ -316,3 +338,6 @@ echo(unsigned char ch)
 }
 
 #endif /* test */
+
+
+
