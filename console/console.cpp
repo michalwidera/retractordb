@@ -73,6 +73,36 @@ int keytest()
     return 0 ;
 }
 
+enum { QUIT_CMD , DIR_CMD , NO_CMD } ;
+
+int processCommand( char * commandStr )
+{
+    if ( ! strncmp( commandStr , "quit" , strlen("quit") ) )
+        return QUIT_CMD ;
+    else
+    if ( ! strncmp( commandStr , "dir" , strlen("dir") ) )
+        return DIR_CMD ;
+    else
+    return NO_CMD ;
+}
+
+void printLine( int curline , int pos , char * line )
+{
+    rlutil::locate( 1 , curline );
+    REP(i,80)
+    {
+        if ( i == pos )
+            printf("_");
+        else
+        {
+            if ( line[i] >= 32 && line[i] <= 126 )
+                printf("%c" , line[i] );
+            else
+                printf(" ");
+        }
+    }
+}
+
 int terminal()
 {
     setbuf(stdout, NULL);
@@ -88,25 +118,43 @@ int terminal()
 
     int pos = 0 ;
     int k = -1 ;
+    int command = NO_CMD ;
 
     int curline(1); //aktualna lina w ktorej wprowadzamy tekst
 
     char line[80]; //linia edytowana
-    REP(i,80) line[i] = 32 ;    //wypelniam spacjami
+    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
 
     while(true)
     {
+        if ( k != 0 )
+            printLine( curline , pos , line );
+
+        k = 0;
+
+        if ( command == QUIT_CMD )
+        {
+            break ;
+        }
+        else if ( command == DIR_CMD )
+        {
+            REP( n , 5 )
+            {
+                rlutil::locate( 1 , curline + n );
+                printf("test dir");
+            }
+            curline += 5 ;
+            REP(i,80) line[i] = 32 ;
+            command = NO_CMD ;
+            printLine( curline , pos , line );
+        }
+
         if ( k = rlutil::kb_getc() )
         {            
             showkey(k);
 
             if ( k == 27 ) // linux part
             {
-                //jest kicha pod liux - na chwile obecna
-                //naciskam klawisz i nic, dopiero nastpny nacisniety
-                //przywoluje poprzedni - i tak w kolko. Jakas porazka.
-                //inwestygacja konieczna.
-                //linux development i testowanie konsoli na chwila obecna zawieszam
                 k = getch();
                 showkey(k);
 
@@ -118,18 +166,26 @@ int terminal()
                     if ( k == 67 )
                     {
                         pos ++ ;
-                        k = -1 ; // -- sprawdzic
+                        k = -1 ;
                     }
 
                     if ( k == 68 )
                     {
                         pos -- ;
-                        k = -1 ; //  -- sprawdzic
+                        k = -1 ;
                     }
                 }
 
             }
-            if ( k == 13 || k == 10 ) { k = -1 ; break ; }
+            if ( k == 13 || k == 10 )
+            {
+                k = -1 ;
+                pos = 0;
+                command = processCommand( line );
+                printLine( curline , -1 , line );
+                REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+                curline += 1 ;
+            }
 
             if ( k == 224 ) //control sequence - windows
             {
@@ -164,44 +220,7 @@ int terminal()
                     line[pos++] = k ;
                 }
             };
-
-            rlutil::locate( 1 , curline );
-            REP(i,80)
-            {
-                if ( i == pos )
-                    printf("_");
-                else
-                {
-                    if ( line[i] >= 32 && line[i] <= 126 )
-                        printf("%c" , line[i] );
-                    else
-                        printf(" ");
-                }
-            }
-
         }
-
-        k = 0 ;
-
-        if ( ! strncmp( line , "quit" , strlen("quit") ) )
-        {
-            k = -1 ;
-            break ;
-        }
-
-        if ( ! strncmp( line , "dir" , strlen("dir") ) )
-        {
-            REP( n , 5 )
-            {
-                rlutil::locate( 1 , curline + n + 1 );
-                printf("test dir");
-            }
-            curline += 5 + 1 ;
-            REP(i,80) line[i] = 0 ;
-            pos = 0 ;
-            k = -1 ;
-        }
-
     }
 
     return 0 ;
