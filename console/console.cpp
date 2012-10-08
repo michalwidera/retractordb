@@ -23,6 +23,8 @@
 #include <cstdio>
 #include <vector>
 
+#include <boost/regex.hpp>
+
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
@@ -61,13 +63,25 @@ int keytest()
 
 enum { QUIT_CMD , DIR_CMD , NO_CMD } ;
 
+
+
+std::string tableName ;
+
 int processCommand( char * commandStr )
 {
-    if ( ! strncmp( commandStr , "quit" , strlen("quit") ) )
+    boost::regex matchDirCmd("\\s*dir\\s*(\\w*).*");
+    boost::regex matchQuitCmd("quit.*");
+
+    boost::cmatch what;
+
+    if ( regex_match(commandStr,what,matchQuitCmd)  )
         return QUIT_CMD ;
     else
-    if ( ! strncmp( commandStr , "dir" , strlen("dir") ) )
+    if ( regex_match(commandStr,what,matchDirCmd) )
+    {
+        tableName = what[1].str() ;
         return DIR_CMD ;
+    }
     else
         return NO_CMD ;
 }
@@ -87,6 +101,19 @@ void printLine( int curline , int pos , char * line )
                 printf(" ");
         }
     }
+}
+
+void dir_cmd( int &curline , int pos , char * line )
+{
+    REP( n , 5 )
+    {
+        rlutil::locate( 1 , curline + n );
+        printf("test dir %d str:%s rnd:%d",n,tableName.c_str(),rand());
+    }
+    tableName = "" ;
+    curline += 5 ;
+    REP(i,80) line[i] = 32 ;
+    printLine( curline , pos , line );
 }
 
 int terminal()
@@ -140,7 +167,7 @@ int terminal()
                 }
 
             }
-            else if ( k == 13 || k == 10 )   //hit enter
+            else if ( k == 13 || k == 10 )   //hit enter i przetwarzenie komendy
             {
                 k = -1 ;
                 pos = 0;
@@ -213,15 +240,8 @@ int terminal()
             }
             else if ( command == DIR_CMD )
             {
-                REP( n , 5 )
-                {
-                    rlutil::locate( 1 , curline + n );
-                    printf("test dir %d",n);
-                }
-                curline += 5 ;
-                REP(i,80) line[i] = 32 ;
+                dir_cmd( curline , pos , line );
                 command = NO_CMD ;
-                printLine( curline , pos , line );
             }
         }
     }
