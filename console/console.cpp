@@ -44,19 +44,6 @@ extern "C" {
 int tc = rlutil::tcols() - 1 ;
 int kchain = 0;
 
-void showkey( int k )
-{
-    return ;
-
-    if ( k != 0 )
-    {
-    rlutil::locate( 1 , 2  + kchain );
-    printf("%d  ",k);
-    kchain += 1 ;
-    kchain %= 10 ;  //dziesiec ostatnich
-    }
-}
-
 int keytest()
 {
     while(true)
@@ -64,7 +51,6 @@ int keytest()
         //if (kbhit())
         //{
             int k = rlutil::kb_getc();
-            showkey(k);
 
             if ( k == 13 || k == 10 ) { break ; }
         //}
@@ -83,7 +69,7 @@ int processCommand( char * commandStr )
     if ( ! strncmp( commandStr , "dir" , strlen("dir") ) )
         return DIR_CMD ;
     else
-    return NO_CMD ;
+        return NO_CMD ;
 }
 
 void printLine( int curline , int pos , char * line )
@@ -108,9 +94,12 @@ int terminal()
     setbuf(stdout, NULL);
 
     rlutil::cls();
-    rlutil::locate( 1 , 2 );
-    printf("Data Stream Management System Console");
     rlutil::locate( 1 , 1 );
+    printf("Data Stream Management System Console");
+
+    int curline(2); //aktualna lina w ktorej wprowadzamy tekst
+
+    rlutil::locate( 1 , curline );
     printf("_");
 
     rlutil::CursorHider hideCursor ;
@@ -120,48 +109,22 @@ int terminal()
     int k = -1 ;
     int command = NO_CMD ;
 
-    int curline(1); //aktualna lina w ktorej wprowadzamy tekst
-
     char line[80]; //linia edytowana
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
 
     while(true)
     {
+        k = rlutil::kb_getc() ;
+
         if ( k != 0 )
-            printLine( curline , pos , line );
-
-        k = 0;
-
-        if ( command == QUIT_CMD )
-        {
-            break ;
-        }
-        else if ( command == DIR_CMD )
-        {
-            REP( n , 5 )
-            {
-                rlutil::locate( 1 , curline + n );
-                printf("test dir");
-            }
-            curline += 5 ;
-            REP(i,80) line[i] = 32 ;
-            command = NO_CMD ;
-            printLine( curline , pos , line );
-        }
-
-        if ( k = rlutil::kb_getc() )
         {            
-            showkey(k);
-
             if ( k == 27 ) // linux part
             {
                 k = getch();
-                showkey(k);
 
                 if ( k == 91 )
                 {
                     k = getch();
-                    showkey(k);
 
                     if ( k == 67 )
                     {
@@ -177,49 +140,89 @@ int terminal()
                 }
 
             }
-            if ( k == 13 || k == 10 )
+            else if ( k == 13 || k == 10 )   //hit enter
             {
                 k = -1 ;
                 pos = 0;
-                command = processCommand( line );
-                printLine( curline , -1 , line );
-                REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-                curline += 1 ;
+                command = processCommand( line );  //rozpoznanie komendy
+                if ( command != NO_CMD )
+                {
+                    printLine( curline , -1 , line );
+                    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+                    curline += 1 ;
+                }
+                printf("\a");   //beep
             }
-
-            if ( k == 224 ) //control sequence - windows
+            else if ( k == 224 ) //control sequence - windows
             {
                 int k_ = k ;
 
                 k = getch();
-                showkey(k);
 
                 if ( k == 75 ) //left arrow
                 {
+                    assert( pos >= 0 );
+
                     if ( pos > 0 ) pos -- ;
                 }
 
                 if ( k == 77 )  //right arrow
                 {
+                    assert( pos <= 81 );
+
                     if ( pos <= 80 ) pos ++ ;
                 }
 
                 k = k_ ;
             }
-
-            if ( k == 8 || k == 127) //backspace
-            {                
+            else if ( k == 8 || k == 127) //backspace
+            {
                 if ( pos > 0 ) pos -- ;
-                REP( i , 80 - pos ) line[pos+i] = line[pos+i+1];
+                REP( i , 80 - pos )
+                {
+
+                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                    assert( pos +i >= 0    && pos +i    <= 80 );
+
+                    line[pos+i] = line[pos+i+1];
+
+                }
             }
             else //ascii char
             {
                 if ( k >= 32 && k <= 126 )
                 {
-                    REPD( i , 80-pos ) line[pos+i+1] = line[pos+i];
+                    REPD( i , 80-pos )
+                    {
+                        assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                        assert( pos +i >= 0    && pos +i    <= 80 );
+
+                        line[pos+i+1] = line[pos+i];
+                    }
+
+                    assert( pos + 1 <= 80 );
                     line[pos++] = k ;
                 }
             };
+
+            printLine( curline , pos , line );
+
+            if ( command == QUIT_CMD )
+            {
+                break ;
+            }
+            else if ( command == DIR_CMD )
+            {
+                REP( n , 5 )
+                {
+                    rlutil::locate( 1 , curline + n );
+                    printf("test dir %d",n);
+                }
+                curline += 5 ;
+                REP(i,80) line[i] = 32 ;
+                command = NO_CMD ;
+                printLine( curline , pos , line );
+            }
         }
     }
 

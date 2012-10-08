@@ -834,7 +834,7 @@ unsigned char
 kb_getc(void)
 {
     usleep(20000);
-    if ( !kbhit() )
+    if ( kbhit() )
         return getch();
     else
         return 0 ;
