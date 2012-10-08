@@ -135,7 +135,7 @@ void processRegisteredQueries()
         REP( n , r.linecnt )
         {
             rlutil::locate( 1 , r.linebeg + n );
-            printf("test dir %d str:%s rnd:%d",n,tableName.c_str(),rand());
+            printf("test dir %d str:%s rnd:%d",n,r.streamName.c_str(),rand());
         }
     }
 }
