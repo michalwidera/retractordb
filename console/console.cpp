@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <boost/regex.hpp>
+#include <boost/foreach.hpp>
 
 using namespace std ;
 using namespace boost ;
@@ -64,6 +65,16 @@ int keytest()
 enum { QUIT_CMD , DIR_CMD , NO_CMD } ;
 
 
+struct record
+{
+    string command ;     //issued command
+    string streamName ;  //nazwa strumienia z systemu
+    int linebeg ;        //linia od ktorej sie zaczyna wyswietlanie
+    int linecnt ;        //ilosc linii do wyswietlenia
+    int timing ;         //tutaj potem rational
+};
+
+std::vector <record> queryVect ;
 
 std::string tableName ;
 
@@ -103,17 +114,30 @@ void printLine( int curline , int pos , char * line )
     }
 }
 
-void dir_cmd( int &curline , int pos , char * line )
+void register_dir_cmd( int &curline , int pos , char * line )
 {
-    REP( n , 5 )
-    {
-        rlutil::locate( 1 , curline + n );
-        printf("test dir %d str:%s rnd:%d",n,tableName.c_str(),rand());
-    }
-    tableName = "" ;
+    record recordInstance ;
+    recordInstance.command = line ;
+    recordInstance.linebeg = curline ;
+    recordInstance.linecnt = 5 ;
+    recordInstance.streamName = tableName ;
+    queryVect.push_back( recordInstance );
+
     curline += 5 ;
     REP(i,80) line[i] = 32 ;
-    printLine( curline , pos , line );
+    tableName = "" ;
+}
+
+void processRegisteredQueries()
+{
+    BOOST_FOREACH( record r , queryVect )
+    {
+        REP( n , r.linecnt )
+        {
+            rlutil::locate( 1 , r.linebeg + n );
+            printf("test dir %d str:%s rnd:%d",n,tableName.c_str(),rand());
+        }
+    }
 }
 
 int terminal()
@@ -240,10 +264,13 @@ int terminal()
             }
             else if ( command == DIR_CMD )
             {
-                dir_cmd( curline , pos , line );
+                register_dir_cmd( curline , pos , line );
+                printLine( curline , pos , line );
                 command = NO_CMD ;
             }
         }
+
+        processRegisteredQueries();
     }
 
     return 0 ;
