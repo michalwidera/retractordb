@@ -160,7 +160,7 @@ int terminal()
     int k = -1 ;
     int command = NO_CMD ;
 
-    char line[80]; //linia edytowana
+    char line[81]; //linia edytowana
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
 
     while(true)
