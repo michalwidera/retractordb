@@ -25,6 +25,7 @@
 
 #include <boost/regex.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 using namespace std ;
 using namespace boost ;
@@ -62,7 +63,7 @@ int keytest()
     return 0 ;
 }
 
-enum { QUIT_CMD , DIR_CMD , NO_CMD } ;
+enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD } ;
 
 
 struct record
@@ -77,11 +78,13 @@ struct record
 std::vector <record> queryVect ;
 
 std::string tableName ;
+int linecnt = -1 ;
 
 int processCommand( char * commandStr )
 {
-    boost::regex matchDirCmd("\\s*dir\\s*(\\w*).*");
+    boost::regex matchDirCmd("\\s*dir\\s*(\\w*)\\s*(\\d*).*");
     boost::regex matchQuitCmd("quit.*");
+    boost::regex matchClsCmd("cls.*");
 
     boost::cmatch what;
 
@@ -91,9 +94,22 @@ int processCommand( char * commandStr )
     if ( regex_match(commandStr,what,matchDirCmd) )
     {
         tableName = what[1].str() ;
+        try {
+            linecnt = lexical_cast<int>( what[2].str() );
+        }
+        catch(const bad_lexical_cast &e)
+        {
+            linecnt = -1 ;
+           //ok - no cast - get default
+        }
+
         return DIR_CMD ;
     }
     else
+    if ( regex_match(commandStr,what,matchClsCmd) )
+    {
+        return CLS_CMD ;
+    }
         return NO_CMD ;
 }
 
@@ -119,13 +135,34 @@ void register_dir_cmd( int &curline , int pos , char * line )
     record recordInstance ;
     recordInstance.command = line ;
     recordInstance.linebeg = curline ;
-    recordInstance.linecnt = 5 ;
+
+    if ( linecnt == -1 )
+    {
+        recordInstance.linecnt = 5 ;
+        curline += 5 ;
+    }
+    else
+    {
+        recordInstance.linecnt = linecnt ;
+        curline += linecnt ;
+    }
+
     recordInstance.streamName = tableName ;
     queryVect.push_back( recordInstance );
 
-    curline += 5 ;
+
     REP(i,80) line[i] = 32 ;
     tableName = "" ;
+    linecnt = -1 ;
+}
+
+void clearRegisteredQueries()
+{
+    rlutil::cls();
+    rlutil::locate( 1 , 1 );
+    printf("Data Stream Management System Console");
+
+    queryVect.clear();
 }
 
 void processRegisteredQueries()
@@ -265,6 +302,15 @@ int terminal()
             else if ( command == DIR_CMD )
             {
                 register_dir_cmd( curline , pos , line );
+                printLine( curline , pos , line );
+                command = NO_CMD ;
+            }
+            else if ( command == CLS_CMD )
+            {
+                clearRegisteredQueries();
+                REP(i,80) line[i] = 32 ;
+                pos = 0 ;
+                curline = 2 ;
                 printLine( curline , pos , line );
                 command = NO_CMD ;
             }
