@@ -43,28 +43,15 @@ extern "C" {
     config configInstance ;
 }
 
-#define waitkey std::cout << "Press any key to continue..." << std::endl; rlutil::anykey()
-
 int tc = rlutil::tcols() - 1 ;
 int kchain = 0;
 
-int keytest()
-{
-    while(true)
-    {
-        //if (kbhit())
-        //{
-            int k = rlutil::kb_getc();
+const int defaultLinieCount = 5 ;
 
-            if ( k == 13 || k == 10 ) { break ; }
-        //}
-    }
+const char* welcomeString = "Ready." ;
 
-    return 0 ;
-}
-
+//identyfikatory wewnetrzne polecen dostepnych z konsolis
 enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD } ;
-
 
 struct record
 {
@@ -78,7 +65,7 @@ struct record
 std::vector <record> queryVect ;
 
 std::string tableName ;
-int linecnt = -1 ;
+int linecnt = defaultLinieCount ;
 
 int processCommand( char * commandStr )
 {
@@ -98,9 +85,8 @@ int processCommand( char * commandStr )
             linecnt = lexical_cast<int>( what[2].str() );
         }
         catch(const bad_lexical_cast &e)
-        {
-            linecnt = -1 ;
-           //ok - no cast - get default
+        {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
+            linecnt = defaultLinieCount ;
         }
 
         return DIR_CMD ;
@@ -136,31 +122,22 @@ void register_dir_cmd( int &curline , int pos , char * line )
     recordInstance.command = line ;
     recordInstance.linebeg = curline ;
 
-    if ( linecnt == -1 )
-    {
-        recordInstance.linecnt = 5 ;
-        curline += 5 ;
-    }
-    else
-    {
-        recordInstance.linecnt = linecnt ;
-        curline += linecnt ;
-    }
+    recordInstance.linecnt = linecnt ;
+    curline += linecnt ;
 
     recordInstance.streamName = tableName ;
     queryVect.push_back( recordInstance );
 
-
-    REP(i,80) line[i] = 32 ;
+    REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
     tableName = "" ;
-    linecnt = -1 ;
+    linecnt = defaultLinieCount ;
 }
 
 void clearRegisteredQueries()
 {
     rlutil::cls();
     rlutil::locate( 1 , 1 );
-    printf("Data Stream Management System Console");
+    printf( welcomeString );
 
     queryVect.clear();
 }
@@ -179,26 +156,24 @@ void processRegisteredQueries()
 
 int terminal()
 {
-    setbuf(stdout, NULL);
-
-    rlutil::cls();
-    rlutil::locate( 1 , 1 );
-    printf("Data Stream Management System Console");
-
-    int curline(2); //aktualna lina w ktorej wprowadzamy tekst
-
-    rlutil::locate( 1 , curline );
-    printf("_");
+    setbuf(stdout, NULL);   //niebuforowany printf
 
     rlutil::CursorHider hideCursor ;
     rlutil::ttyRawer ttyRaw ;
 
+    rlutil::cls();
+    rlutil::locate( 1 , 1 );
+    printf( welcomeString );
+
+    char line[81]; //linia edytowana
+    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
     int pos = 0 ;
     int k = -1 ;
     int command = NO_CMD ;
 
-    char line[81]; //linia edytowana
-    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+    int curline(2); //aktualna lina w ktorej wprowadzamy tekst
+
+    printLine( curline , 0 , line );
 
     while(true)
     {
@@ -305,10 +280,10 @@ int terminal()
                 printLine( curline , pos , line );
                 command = NO_CMD ;
             }
-            else if ( command == CLS_CMD )
+            else if ( command == CLS_CMD )  //wyczyszczenie ekranu
             {
                 clearRegisteredQueries();
-                REP(i,80) line[i] = 32 ;
+                REP(i,80) line[i] = ' ' ;
                 pos = 0 ;
                 curline = 2 ;
                 printLine( curline , pos , line );
@@ -343,7 +318,6 @@ int main(int argc, char* argv[])
         po::options_description desc("Dozwolone opcja");
         desc.add_options()
                 ("infile,i", po::value<string>(&sInputFile)->default_value("data.in"), "nazwa pliku z danymi")
-                ("test,t", "test code")
                 ("help,h", "program options")                
                 ;
 
@@ -359,10 +333,6 @@ int main(int argc, char* argv[])
         {
             cerr << desc << endl ;
             return 1;
-        }
-        else if ( vm.count("test"))
-        {
-            return keytest();
         }
         else
             return terminal();
