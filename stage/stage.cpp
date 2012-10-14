@@ -393,6 +393,21 @@ int server()
     return 0 ;
 }
 
+struct A {
+    virtual int ala( float a ) { printf("a"); } ;
+};
+
+struct B : public A {
+    virtual int ala( int a , int b ) { printf("b"); } ;
+};
+
+int main_class()
+{
+    B instance ;
+    instance.A::ala(1);
+    instance.ala( 1 , 1 );
+    return 0 ;
+}
 int main(int argc, char* argv[])
 {
     //Intro
@@ -420,6 +435,7 @@ int main(int argc, char* argv[])
                 ("server,s","server test")
                 ("client,c","client test")
                 ("rlutil,l","rlutil test")
+                ("classtest,z","class test")
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
@@ -445,6 +461,8 @@ int main(int argc, char* argv[])
             return client();
         else if ( vm.count("rlutil"))
             return main_rlutil();
+        else if ( vm.count("classtest"))
+            return main_class();
         else
             throw std::out_of_range("wybierz odpowiedni parametr/test");
     }

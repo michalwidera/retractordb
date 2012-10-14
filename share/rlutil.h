@@ -30,6 +30,8 @@
  */
 
 
+#define UBUNTU
+
 /// Define: RLUTIL_USE_ANSI
 /// Define this to use ANSI escape sequences also on Windows
 /// (defaults to using WinAPI instead).
@@ -772,10 +774,14 @@ kb_getc(void)
   unsigned char ch;
   ssize_t size;
   usleep(20000);
-/*  termattr.c_cc[VMIN] = 0; */ /* uncomment if needed */
+#ifdef UBUNTU
+  termattr.c_cc[VMIN] = 0;  /* uncomment if needed */
+#endif
   i = tcsetattr (STDIN_FILENO, TCSANOW, &termattr);
   size = read (STDIN_FILENO, &ch, 1);
-/*  termattr.c_cc[VMIN] = 1; */ /* uncomment if needed */
+#ifdef UBUNTU
+  termattr.c_cc[VMIN] = 1;  /* uncomment if needed */
+#endif
   i = tcsetattr (STDIN_FILENO, TCSANOW, &termattr);
   if (size == 0)
   {
