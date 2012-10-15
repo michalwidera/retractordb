@@ -427,11 +427,11 @@ void dumpQHierarchy()
 int main(int argc, char* argv[])
 {
 	//Intro
-	cerr << "Dumper - decoder of qry files.\n";
+    cout << "Dumper - decoder of qry files.\n";
 	string revision(  "$Rev: 43 $" );  //This string is svn keyword
 	std::replace( revision.begin() , revision.end() , '$' , ' ' );
 	revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-	cerr <<
+    cout <<
 		"used compiler tag:" + string(COMPILER) +
 		"," + revision <<
 		", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
@@ -473,7 +473,7 @@ int main(int argc, char* argv[])
 
 	string sPlikDanych = vm["infile"].as< string >() ;
 
-	cerr << "Input :" << sPlikDanych << endl ;
+    cout << "Input :" << sPlikDanych << endl ;
 
 	//
 	// Main Algorithm body
@@ -496,7 +496,7 @@ int main(int argc, char* argv[])
 		sPlikDanychDump = filename + ".dmp" ;
 		}
 
-		cerr << "Dump  :" << sPlikDanychDump << endl ;
+        cerr << "Dump  :" << sPlikDanychDump << endl ;
 
 		dumpStreamData( cout , sPlikDanychDump ) ;
 	}
