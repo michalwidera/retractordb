@@ -196,16 +196,18 @@ int mainFromWin32(int argc, char* argv[])
 	string sInputFile ;
 	string sLimit ;
 	string sQuery ;
-	string sDumpFile ;    
+    string sDumpFile ;
+    int iTimeLimitCnt ;
 
     po::options_description desc("Obslugiwane opcje programu");
 	desc.add_options()
         ("help,h", "opcje programu")
         ("limit,l", po::value<string>(&sLimit)->default_value( "none" ), "limit (query,decl,none)")
         ("infile,i", po::value<string>(&sInputFile)->default_value("query.qry"), "nazwa pliku z danymi")
-		("query,q" , po::value<string>(&sQuery) , "query name to test" )
-        ("display,s" , po::value<string>(&sQuery) , "display sigle query in process" )
+        ("query,q" , po::value<string>(&sQuery) , "wskazuje zapytanie do testu" )
+        ("display,s" , po::value<string>(&sQuery) , "wyswietla pojedyncze zapytanie" )
 		("dump,d", po::value<string>(&sDumpFile)->default_value("query.dmp"), "stream dump file")
+        ("tlimitqry,m" , po::value<int>(&iTimeLimitCnt)->default_value(0) , "limit zapytan, 0 - no limit" )
         ("test,t" , "obszar testowy executora" )
 		;
 
@@ -314,6 +316,14 @@ int mainFromWin32(int argc, char* argv[])
 	R prev_interval(0);
 	while( ! _kbhit() )
 	{
+        if ( iTimeLimitCnt != 0 )
+        {
+            if ( iTimeLimitCnt != 1 )
+                iTimeLimitCnt -- ;
+            else
+                break ;
+        }
+
 		R nextTimeSlot( tl.getNextTimeSlot() );
 		R interval( nextTimeSlot * 1000 );
 		int ms ( rational_cast<int> ( interval - prev_interval ) ) ; // miliseconds
@@ -342,7 +352,8 @@ int mainFromWin32(int argc, char* argv[])
 	// Koniec glownej petli przetwarzania
 	//
 
-	_getch(); //no wait ... feed key from kbhit
+    if ( iTimeLimitCnt != 1 )
+        _getch(); //no wait ... feed key from kbhit
 
 	proc.saveStreamsToFile( sDumpFile );
     cout << "Dump  :" << sDumpFile << endl ;
