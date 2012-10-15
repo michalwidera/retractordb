@@ -116,9 +116,9 @@ void showAwaitedStreams( TimeLine & tl ,
 	set< string > strSet = getAwaitedStreamsSet( tl , eLimit );
 	BOOST_FOREACH( const string & str , strSet )
       if ( streamName == "" )
-		cerr << "-" << getSeqNr(str) << "-" ;
+        cout << "-" << getSeqNr(str) << "-" ;
       else if ( streamName == str )
-        cerr << "-" << getSeqNr(str) << "-" ;
+        cout << "-" << getSeqNr(str) << "-" ;
 }
 
 #ifndef WIN32
