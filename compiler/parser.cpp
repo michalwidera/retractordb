@@ -808,6 +808,11 @@ string parser( string sPlikDanych, string sPlikWynikowy )
     {
         ifstream input( sPlikDanych.c_str() );
 
+        if ( ! input.is_open() )
+        {
+            throw std::out_of_range("Brak pliku z zapytaniami do przetworzenia.");
+        }
+
         string str;
         while ( getline( input, str ) )
         {

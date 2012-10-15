@@ -57,7 +57,7 @@ R deltaDehashMod( const R & arg1 , const R & arg2 )
     clog << "DehashMod\n" ;
 
     if ( arg1 == arg2 )
-        throw std::out_of_range("Delta are equal in DehashMod - undefinied.");
+        throw std::out_of_range("Niezdefiniowana operacja - identyczne delty w operacji Dehash");
 
     return (arg1*arg2)/abs(arg1-arg2);
 }
@@ -440,7 +440,7 @@ list < field > combine( string sName1 , string sName2 , command_id cmd )
                 getQuery( sName1 ).lSchema.size() !=
                 getQuery( sName2 ).lSchema.size()
                 )
-            throw std::invalid_argument("hash operation require same schematics");
+            throw std::invalid_argument("Operacja hash wymaga tych samych schematow w argumentachf");
 
         //cerr << sName1 << "-" << sName2 << endl ;
 
@@ -497,7 +497,7 @@ list < field > combine( string sName1 , string sName2 , command_id cmd )
         lRetVal = schema ;
     }
     else
-        throw std::invalid_argument("not supported command on stack");
+        throw std::invalid_argument("Na stosie pojawila sie niezdefiniowana operacja");
 
 
     //Tutaj sa dodawne do pol metody wykonania poprzez
@@ -652,14 +652,14 @@ string convertReferences()
                                 }
 
                                 if ( offset1 == q1.lSchema.size() )
-                                    throw std::out_of_range("ref-converstion - schema found, field not found");
+                                    throw std::out_of_range("Blad w trakcie konwersji referencji - schemat jest a pola nie ma");
 
                                 break ;
                             }
                         }
                     }
                     else
-                        throw std::out_of_range("no match in ref-converstion ID1");
+                        throw std::out_of_range("Brak spasowania konwersji referencji ID1");
 
                     break ;
 
@@ -676,7 +676,7 @@ string convertReferences()
                         t = token( PUSH_ID , complex< R > ( offset1 , 0 ) , schema ) ;
                     }
                     else
-                        throw std::out_of_range("no match in ref-converstion ID2");
+                        throw std::out_of_range("Brak spasowania konwersji referencji ID2");
 
                     break ;
 
@@ -758,7 +758,7 @@ string convertReferences()
                             throw std::logic_error("Brak pola o danej nazwie w schemacie strumienia");
                     }
                     else
-                        throw std::out_of_range("no match in ref-converstion ID3");
+                        throw std::out_of_range("Brak spasowania konwersji referencji ID3");
 
                     break ;
 
@@ -777,7 +777,7 @@ string convertReferences()
                         t = token( PUSH_ID , complex< R > ( offset1 , offset2 ) , schema ) ;
                     }
                     else
-                        throw std::out_of_range("no match in ref-converstion ID4");
+                        throw std::out_of_range("Brak spasowania konwersji referencji ID4");
 
                     break ;
                 }
@@ -811,12 +811,12 @@ std::streambuf *oldbuf = std::clog.rdbuf(clog.rdbuf()); ;
 int main(int argc, char* argv[])
 {
     //Intro
-    cout << "Parser/Compiler - parser and reductor of query plans.\n";
+    cout << "Parser/Compiler - parser i reduktor planow zapytan.\n";
     string revision(  "$Rev: 2 $" );  //This string is svn keyword
     std::replace( revision.begin() , revision.end() , '$' , ' ' );
     revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
     cout <<
-            "used compiler tag:" + string(COMPILER) +
+            "Znacznik kompilatora:" + string(COMPILER) +
             "," + revision <<
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
             std::endl ;
@@ -829,14 +829,14 @@ int main(int argc, char* argv[])
         string sOutputFile ;
         string sInputFile ;
 
-        po::options_description desc("Allowed options");
+        po::options_description desc("Dostepne opcje");
         desc.add_options()
-                ("help,h", "program options")
-                ("queryfile,q" , po::value<string>(&sInputFile)->default_value("query.txt"), "query input file")
-                ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "output data file")
-                ("regtest,t","regression test call")
-                ("parser2,v","use second parser")
-                ("log,g","use log for debug queries")
+                ("help,h", "Opcje programu")
+                ("queryfile,q" , po::value<string>(&sInputFile)->default_value("query.txt"), "plik z zapytaniem")
+                ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "plik wynikowy")
+                ("regtest,t","test regresyjny")
+                ("parser2,v","wybor alternatywnego parsera")
+                ("log,g","utworzenie raportu translacji - debuglog")
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
@@ -856,9 +856,9 @@ int main(int argc, char* argv[])
         if (vm.count("log"))
         {
             p_ofs.reset( new ofstream("compiler.log") ) ;
-            if ( ! p_ofs ) throw std::out_of_range("no log file created");
+            if ( ! p_ofs ) throw std::out_of_range("nie utworzono raportu (debuglog)");
             clog.rdbuf( p_ofs->rdbuf());
-            cout << "Log file active\n";
+            cout << "Debuglog aktywny.\n";
             clog << "Start\n";
         }
         else
@@ -932,16 +932,17 @@ int main(int argc, char* argv[])
                         querySubset << str << "\n" ;
                     lineNr ++ ;
                 }
-                cout << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl ;
+                cout << "Podzbior ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl ;
             }
         }
+
         if ( vm.count("parser2") )
         {
-            cout << "Parsing v2 ...\t" << parser_v2( sQueryFile , sLinkFile ) << endl ;
+            cout << "Parser v2 ...\t" << parser_v2( sQueryFile , sLinkFile ) << endl ;
         }
         else
         {
-            cout << "Parsing v1 ...\t" << parser( sQueryFile , sLinkFile ) << endl ;
+            cout << "Parser v1 ...\t" << parser( sQueryFile , sLinkFile ) << endl ;
         }
 
         //
@@ -953,24 +954,29 @@ int main(int argc, char* argv[])
         ia >> configInstance ;
         ia >> coreInstance ;
 
+        if ( coreInstance.size() == 0 )
+        {
+            throw std::out_of_range("Brak rozpoznanych zapytan do przetworzenia.");
+        }
+
         string sOutFileLog1   = vm["outfile"].as< string >() + ".lg1" ;      //default query.qry
         dumpInstance( sOutFileLog1 );
 
         int dAfterParserSize((int)coreInstance.size());
 
-        cout << "Reduction: \t" << simplifyLProgram() << endl ;
+        cout << "Redukcja:  \t" << simplifyLProgram() << endl ;
 
         string sOutFileLog2   = vm["outfile"].as< string >() + ".lg2" ;      //default query.qry
         dumpInstance( sOutFileLog2 );
 
-        cout << "Intervals: \t" << intervalCounter() << endl ;
-        cout << "Schema:    \t" << prepareFields() << endl ;
-        cout << "References:\t" << convertReferences() << endl ;
+        cout << "Inerwaly:  \t" << intervalCounter() << endl ;
+        cout << "Schemat:   \t" << prepareFields() << endl ;
+        cout << "Referencje:\t" << convertReferences() << endl ;
 
         int dAfterCompilingSize((int)coreInstance.size());
 
-        cout << "Size in:   \t" << dAfterParserSize << endl ;
-        cout << "Size out:  \t" << dAfterCompilingSize << endl ;
+        cout << "Rozmiar we:\t" << dAfterParserSize << endl ;
+        cout << "Rozmiar wy:\t" << dAfterCompilingSize << endl ;
 
         dumpInstance( sOutFile );
 
@@ -985,7 +991,7 @@ int main(int argc, char* argv[])
             sSize = string( " + " ) + string( s.str() ) ;
         }
 
-        cout << "Report:"
+        cout << "Raport:"
              << sQueryFile
              << " => "
              << sOutFile

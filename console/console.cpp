@@ -137,7 +137,7 @@ void clearRegisteredQueries()
 {
     rlutil::cls();
     rlutil::locate( 1 , 1 );
-    printf( welcomeString );
+    printf( "%s" , welcomeString );
 
     queryVect.clear();
 }
@@ -163,7 +163,7 @@ int terminal()
 
     rlutil::cls();
     rlutil::locate( 1 , 1 );
-    printf( welcomeString );
+    printf( "%s" , welcomeString );
 
     char line[81]; //linia edytowana
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
