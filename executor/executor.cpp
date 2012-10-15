@@ -354,6 +354,8 @@ int mainFromWin32(int argc, char* argv[])
 
     if ( iTimeLimitCnt != 1 )
         _getch(); //no wait ... feed key from kbhit
+    else
+        cout << "Wyczerpany limit zapytan (-m) oczekiwanie zakonczyl martwa petle." << endl ;
 
 	proc.saveStreamsToFile( sDumpFile );
     cout << "Dump  :" << sDumpFile << endl ;
