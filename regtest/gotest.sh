@@ -1,3 +1,5 @@
+#/bin/sh
+#skrypt do testu regresyjnego pod liuxem
 if ! ./xcompiler -t ; then exit 1 ; fi 
 if ! ./xexecutor -t ; then exit 1 ; fi 
 if ! ./xcompiler -q regtest/query-lnx.txt ; then exit 1 ; fi 
