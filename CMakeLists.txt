@@ -89,6 +89,7 @@ set(SOURCES_EXECUTOR
   executor/executor.cpp
   executor/CRSMath.cpp
   executor/IPhStrMgr.cpp
+  executor/NetServer.cpp
   share/Buffer.cpp
   share/dbstream.cpp
   share/QStruct.cpp
