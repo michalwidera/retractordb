@@ -255,7 +255,9 @@ int mainFromWin32(int argc, char* argv[])
 	if (vm.count("query"))
 	{
         cout << "Query :" << sQuery << "\n";
-        std::cout << "Waiting for any key ..." << std::endl ;
+
+        if ( iTimeLimitCnt == 0 )
+            std::cout << "Waiting for any key ..." << std::endl ;
 
 		R prev_interval(0);
 		R timeSlot( coreInstance.getDelta( sQuery ) );
