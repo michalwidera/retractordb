@@ -19,6 +19,7 @@
 #include "dbstream.h"
 #include "Processor.h"
 #include "IPhHead.h"
+#include "NetServer.h"
 
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
@@ -301,10 +302,8 @@ int mainFromWin32(int argc, char* argv[])
     //
     asio::io_service ios;
 
-    /* te funkcje obiekty dopiero napisac
     tcp_server server1(ios);
     udp_server server2(ios);
-    */
 
     thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 

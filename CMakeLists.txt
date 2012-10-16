@@ -102,6 +102,7 @@ if(WIN32)
   set(SOURCES_EXECUTOR ${SOURCES_EXECUTOR}
         executor/Processor.h
         executor/IPhStrMgr.h
+        executor/NetServer.h
         share/dbstream.h
         share/IPhHead.h
 	share/QStruct.h 
