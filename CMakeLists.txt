@@ -71,12 +71,12 @@ if (WIN32 AND __COMPILER_GNU)
     add_definitions( -DBOOST_THREAD_USE_LIB )
     add_definitions( -D_WIN32_WINNT=0x0601  )
 
-    #
-    # wersje release bez tej opcji !!!
-    #
-    add_definitions(-DCMAKE_BUILD_TYPE=Debug )
-
 endif (WIN32 AND __COMPILER_GNU)
+
+#
+# wersje release bez tej opcji !!!
+#
+add_definitions(-DCMAKE_BUILD_TYPE=Debug )
 
 add_definitions(
   -D_CONSOLE
@@ -89,6 +89,7 @@ set(SOURCES_EXECUTOR
   executor/executor.cpp
   executor/CRSMath.cpp
   executor/IPhStrMgr.cpp
+  executor/NetServer.cpp
   share/Buffer.cpp
   share/dbstream.cpp
   share/QStruct.cpp
@@ -101,6 +102,7 @@ if(WIN32)
   set(SOURCES_EXECUTOR ${SOURCES_EXECUTOR}
         executor/Processor.h
         executor/IPhStrMgr.h
+        executor/NetServer.h
         share/dbstream.h
         share/IPhHead.h
 	share/QStruct.h 
@@ -151,6 +153,8 @@ set(SOURCES_STAGE
   regtest/query.txt
   regtest/gotest.bat
   regtest/prepare_runtime_enviroment.bat
+  regtest/gotest.sh
+  regtest/query-lnx.txt
   share/rlutil.h
   stage/test.cpp
 )
@@ -168,8 +172,9 @@ set(SOURCES_STAGE_1
 )
 set(SOURCES_TEST
   regtest/query.txt
-  regtest/gotest.bat
   regtest/gotest.sh
+  regtest/query-lnx.txt
+  regtest/gotest.bat
   regtest/prepare_runtime_enviroment.bat
 )
 
