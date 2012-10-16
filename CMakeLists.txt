@@ -151,6 +151,8 @@ set(SOURCES_STAGE
   regtest/query.txt
   regtest/gotest.bat
   regtest/prepare_runtime_enviroment.bat
+  regtest/gotest.sh
+  regtest/query-lnx.txt
   share/rlutil.h
   stage/test.cpp
 )
@@ -168,8 +170,9 @@ set(SOURCES_STAGE_1
 )
 set(SOURCES_TEST
   regtest/query.txt
-  regtest/gotest.bat
   regtest/gotest.sh
+  regtest/query-lnx.txt
+  regtest/gotest.bat
   regtest/prepare_runtime_enviroment.bat
 )
 
