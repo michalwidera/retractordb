@@ -71,12 +71,12 @@ if (WIN32 AND __COMPILER_GNU)
     add_definitions( -DBOOST_THREAD_USE_LIB )
     add_definitions( -D_WIN32_WINNT=0x0601  )
 
-    #
-    # wersje release bez tej opcji !!!
-    #
-    add_definitions(-DCMAKE_BUILD_TYPE=Debug )
-
 endif (WIN32 AND __COMPILER_GNU)
+
+#
+# wersje release bez tej opcji !!!
+#
+add_definitions(-DCMAKE_BUILD_TYPE=Debug )
 
 add_definitions(
   -D_CONSOLE
