@@ -50,7 +50,7 @@ void tcp_connection::handle_write()
 
 
 tcp_server::tcp_server(boost::asio::io_service& io_service)
-    : acceptor_(io_service, tcp::endpoint(tcp::v4(), 13))
+    : acceptor_(io_service, tcp::endpoint(tcp::v4(), 1971 ))
 {
     start_accept();
 }
@@ -78,7 +78,7 @@ void tcp_server::handle_accept(tcp_connection::pointer new_connection,
 }
 
 udp_server::udp_server(boost::asio::io_service& io_service)
-    : socket_(io_service, udp::endpoint(udp::v4(), 13))
+    : socket_(io_service, udp::endpoint(udp::v4(), 1971 ))
 {
     start_receive();
 }
