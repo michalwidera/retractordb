@@ -133,6 +133,10 @@ private:
   {
     if (!error || error == boost::asio::error::message_size)
     {
+      std::string data(recv_buffer_.begin(), recv_buffer_.end());
+
+      cout << data << endl ;
+
       boost::shared_ptr<std::string> message(
           new std::string(make_daytime_string()));
 
@@ -143,8 +147,9 @@ private:
     }
   }
 
-  void handle_send(boost::shared_ptr<std::string> /*message*/)
+  void handle_send(boost::shared_ptr<std::string> message)
   {
+     //cout << * message.get() << endl ;
   }
 
   udp::socket socket_;
