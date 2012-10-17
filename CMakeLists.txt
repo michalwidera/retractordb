@@ -203,5 +203,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} )
     target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
 
+    add_custom_target( chmod ALL 
+	COMMAND chmod +x regtest/gotest.sh 
+    )
+    
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
