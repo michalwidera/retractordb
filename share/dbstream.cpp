@@ -31,6 +31,11 @@ void saveStreamsToFile( const string filename )
     cbuf.Save( filename.c_str() );
 }
 
+void Dump( std::ostream &os )
+{
+    cbuf.Dump( os , NULL );
+}
+
 dbStream::dbStream( string streamName , list < string > schema ) :
     streamName( streamName ) ,
     schema( schema ) ,
@@ -164,4 +169,5 @@ varfield getFromRawData( shared_array< char > pRawData , int position )
     memcpy( & retVal , p + ( position * sizeof( varfield ) ), sizeof( varfield ) );
     return retVal ;
 }
+
 };

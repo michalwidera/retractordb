@@ -209,6 +209,7 @@ int mainFromWin32(int argc, char* argv[])
         ("display,s" , po::value<string>(&sQuery) , "wyswietla pojedyncze zapytanie" )
 		("dump,d", po::value<string>(&sDumpFile)->default_value("query.dmp"), "stream dump file")
         ("tlimitqry,m" , po::value<int>(&iTimeLimitCnt)->default_value(0) , "limit zapytan, 0 - no limit" )
+        ("waterfall,f" , "wyswietlanie danych")
         ("test,t" , "obszar testowy executora" )
 		;
 
@@ -330,16 +331,20 @@ int mainFromWin32(int argc, char* argv[])
 		int ms ( rational_cast<int> ( interval - prev_interval ) ) ; // miliseconds
 		prev_interval = interval ;
 
-        std::cout << ms << "\t" ;
+        if ( vm.count("waterfall") )
+        {
+            std::cout << ms << "\t" ;
+            showAwaitedStreams( tl ,
+                                lLimitVal ,
+                                vm.count("display") ? sQuery : "" );
 
-        showAwaitedStreams( tl ,
-                            lLimitVal ,
-                            vm.count("display") ? sQuery : "" );
+            std::cout << std::endl ;
+        }
 
 		proc.processRows( getAwaitedStreamsSet( tl , lLimitVal ) );
         //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
 
-        std::cout << std::endl ;
+
 		usleep( ms ) ;
 	}
 
@@ -360,6 +365,8 @@ int mainFromWin32(int argc, char* argv[])
 
 	proc.saveStreamsToFile( sDumpFile );
     cout << "Dump  :" << sDumpFile << endl ;
+    UR::Dump( std::cout );
+
 	}
 	catch(std::exception& e)
 	{

@@ -92,11 +92,14 @@ namespace UR {
         /** Metoda diagnostyczna - docelowo do schowania/usuniecia. Pobiera
         dane inna droga, wolniej ale bez calego mpShadow i mpStrVal
         */
-        varfield get( string fieldName , int offset = 0 );
+        varfield get( string fieldName , int offset = 0 );    
     };
 
     void saveStreamsToFile( const string filename ) ;
     varfield getFromRawData( shared_array< char > pRawData , int position );
+
+    /** Raportowanie tekstowe stanu cbuffera */
+    void Dump( std::ostream &os );
 }
 
 #endif // DBSTREAM_H
