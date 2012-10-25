@@ -21,9 +21,7 @@ using namespace QS ;
 extern "C" qTree coreInstance ;
 extern "C" config configInstance ;
 
-
 namespace QS {
-
 
     Processor::Processor()
     {
