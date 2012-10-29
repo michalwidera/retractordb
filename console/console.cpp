@@ -154,6 +154,9 @@ void processRegisteredQueries()
     }
 }
 
+//
+// Glowna procedura terminala z petla zdarzen
+//
 int terminal()
 {
     setbuf(stdout, NULL);   //niebuforowany printf
@@ -189,13 +192,13 @@ int terminal()
                 {
                     k = getch();
 
-                    if ( k == 67 )
+                    if ( k == 67 ) //strzalka w prawo
                     {
                         pos ++ ;
                         k = -1 ;
                     }
 
-                    if ( k == 68 )
+                    if ( k == 68 ) //strzalka w lewo
                     {
                         pos -- ;
                         k = -1 ;
