@@ -153,6 +153,7 @@ set(SOURCES_STAGE
   regtest/query.txt
   regtest/gotest.bat
   regtest/prepare_runtime_enviroment.bat
+  regtest/gocheck.sh
   regtest/gotest.sh
   regtest/query-lnx.txt
   share/rlutil.h
@@ -202,6 +203,10 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries( xconsole ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
     target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} )
     target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
+
+    add_custom_target( chmod ALL 
+	COMMAND chmod +x regtest/gocheck.sh 
+    )
 
     add_custom_target( chmod ALL 
 	COMMAND chmod +x regtest/gotest.sh 
