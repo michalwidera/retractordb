@@ -310,7 +310,7 @@ int mainFromWin32(int argc, char* argv[])
 
     thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    
 
-    std::cout << "net server thread started." << std::endl ;
+    std::cout << "Watek serwera sieciowego wystartowal" << std::endl ;
 
 	//
 	// Glowna petla przetwarzania danych
@@ -320,7 +320,9 @@ int mainFromWin32(int argc, char* argv[])
     // jesli ta wartosc jest 0 - to znaczy ze czekamy na klawisz, inaczej watchdog
     //
     if ( iTimeLimitCnt == 0 )
-        std::cout << "Waiting for any key to stop..." << std::endl ;
+        std::cout << "Nacisnij dowolny klawisz aby przerwac." << std::endl ;
+    else
+        std::cout << "Po wyczerpaniu limitu zapytan (-m) oczekiwany jest koniec petli." << std::endl ;
 
     //head.prepareSharedArea();
 	R prev_interval(0);
