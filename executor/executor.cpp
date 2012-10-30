@@ -298,7 +298,7 @@ int mainFromWin32(int argc, char* argv[])
 
 	TimeLine tl( getListFromCore( lLimitVal ) );
 
-    std::cout << "Waiting for any key ..." << std::endl ;
+
 
     //
     // Uruchomienie watku odpowiedzialnego za transmisje sieciowa
@@ -308,11 +308,19 @@ int mainFromWin32(int argc, char* argv[])
     tcp_server server1(ios);
     udp_server server2(ios);
 
-    thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
+    thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    
+
+    std::cout << "net server thread started." << std::endl ;
 
 	//
 	// Glowna petla przetwarzania danych
 	//
+
+    //
+    // jesli ta wartosc jest 0 - to znaczy ze czekamy na klawisz, inaczej watchdog
+    //
+    if ( iTimeLimitCnt == 0 )
+        std::cout << "Waiting for any key to stop..." << std::endl ;
 
     //head.prepareSharedArea();
 	R prev_interval(0);
