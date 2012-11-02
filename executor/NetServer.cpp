@@ -24,6 +24,9 @@ std::string make_daytime_string()
     return ctime(&now);
 }
 
+//
+// ------ tcp_connection
+//
 
 tcp::socket& tcp_connection::socket()
 {
@@ -48,6 +51,9 @@ void tcp_connection::handle_write()
 }
 
 
+//
+//   --------- tcp_server
+//
 
 tcp_server::tcp_server(boost::asio::io_service& io_service)
     : acceptor_(io_service, tcp::endpoint(tcp::v4(), 1971 ))
@@ -76,6 +82,11 @@ void tcp_server::handle_accept(tcp_connection::pointer new_connection,
 
     start_accept();
 }
+
+
+//
+//    ------------- udp_server
+//
 
 udp_server::udp_server(boost::asio::io_service& io_service)
     : socket_(io_service, udp::endpoint(udp::v4(), 1971 ))

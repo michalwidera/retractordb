@@ -27,6 +27,9 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include <boost/asio.hpp>
+#include <boost/thread.hpp>
+
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
