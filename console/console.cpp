@@ -30,6 +30,10 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
+#include <boost/iostreams/device/file.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <istream>
+
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
@@ -165,19 +169,29 @@ void processRegisteredQueries()
     }
 }
 
+int command = NO_CMD ;
+int pos = 0 ;
+int k = -1 ;
+char line[81]; //linia edytowana
+int curline(2); //aktualna lina w ktorej wprowadzamy tekst
+bool stopLoop(false);
+
+bool processRequests() ; //deklaracja funkcji
+
+//
+// Zestawienie polaczenia
+//
+namespace dbNet {
+boost::asio::io_service io_service;
+tcp::resolver resolver(io_service);
+tcp::socket socket(io_service);
+}
+
 //
 // Glowna procedura terminala z petla zdarzen
 //
 int terminal()
 {
-    //
-    // Zestawienie polaczenia
-    //
-    boost::asio::io_service io_service;
-    tcp::resolver resolver(io_service);
-    tcp::socket socket(io_service);
-
-
     setbuf(stdout, NULL);   //niebuforowany printf
 
     rlutil::CursorHider hideCursor ;
@@ -187,13 +201,7 @@ int terminal()
     rlutil::locate( 1 , 1 );
     printf( "%s" , welcomeString );
 
-    char line[81]; //linia edytowana
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-    int pos = 0 ;
-    int k = -1 ;
-    int command = NO_CMD ;
-
-    int curline(2); //aktualna lina w ktorej wprowadzamy tekst
 
     printLine( curline , 0 , line );
 
@@ -292,44 +300,59 @@ int terminal()
 
             printLine( curline , pos , line );
 
-            if ( command == QUIT_CMD )
-            {
-                break ;
-            }
-            else if ( command == DIR_CMD )
-            {
-                register_dir_cmd( curline , pos , line );
-                printLine( curline , pos , line );
-                command = NO_CMD ;
-            }
-            else if ( command == CLS_CMD )  //wyczyszczenie ekranu
-            {
-                clearRegisteredQueries();
-                REP(i,80) line[i] = ' ' ;
-                pos = 0 ;
-                curline = 2 ;
-                printLine( curline , pos , line );
-                command = NO_CMD ;
-            }
-            else if ( command == CONNECT_CMD )
-            {
-                boost::asio::connect
-                        (
-                            socket ,
-                            resolver.resolve
-                            (
-                                tcp::resolver::query( "localhost" ,
-                                                      boost::lexical_cast< std::string >(1971)
-                                                     )
-                            )
-                        );
-            }
+            processRequests() ;
+
+            if ( stopLoop ) break ;
         }
 
         processRegisteredQueries();
     }
 
     return 0 ;
+}
+
+bool processRequests()
+{
+    using namespace dbNet ;
+
+    if ( command == QUIT_CMD )
+    {
+        stopLoop = true ;
+        return true ;
+    }
+    else if ( command == DIR_CMD )
+    {
+        register_dir_cmd( curline , pos , line );
+        printLine( curline , pos , line );
+        command = NO_CMD ;
+        return true ;
+    }
+    else if ( command == CLS_CMD )  //wyczyszczenie ekranu
+    {
+        clearRegisteredQueries();
+        REP(i,80) line[i] = ' ' ;
+        pos = 0 ;
+        curline = 2 ;
+        printLine( curline , pos , line );
+        command = NO_CMD ;
+        return true ;
+    }
+    else if ( command == CONNECT_CMD )
+    {
+        boost::asio::connect
+                (
+                    dbNet::socket ,
+                    resolver.resolve
+                    (
+                        tcp::resolver::query( "localhost" ,
+                                              boost::lexical_cast< std::string >(1971)
+                                              )
+                        )
+                    );
+        return true ;
+    }
+
+    return false ;
 }
 
 int main(int argc, char* argv[])
@@ -352,7 +375,7 @@ int main(int argc, char* argv[])
 
         po::options_description desc("Dozwolone opcja");
         desc.add_options()
-                ("infile,i", po::value<string>(&sInputFile)->default_value("data.in"), "nazwa pliku z danymi")
+                ("infile,i", po::value<string>(&sInputFile) , "z poleceniami")
                 ("help,h", "program options")                
                 ;
 
@@ -368,6 +391,33 @@ int main(int argc, char* argv[])
         {
             cerr << desc << endl ;
             return 1;
+        }
+        if (vm.count("infile"))
+        {
+            cout << "Load file:" << sInputFile << endl ;
+            std::ifstream s( sInputFile.c_str() );
+            if(s)
+            {
+                 boost::iostreams::stream<boost::iostreams::file_source>
+                    file( sInputFile.c_str() );
+                 std::string rline;
+                 while (std::getline(file, rline))
+                 {
+                     strcpy( line , rline.c_str() );
+                     cout << ":" << line ;
+                     command = processCommand( line );
+                     if ( processRequests() )
+                         cout << ",OK" << endl ;
+                     else
+                         cout << ",?" << endl ;
+                 }
+            }
+            else
+            {
+                cerr << "no input file." << endl ;
+                return 1 ;
+            }
+            return 0;
         }
         else
             return terminal();
