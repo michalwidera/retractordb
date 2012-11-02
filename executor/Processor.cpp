@@ -49,8 +49,6 @@ namespace QS {
 
     void Processor::processRows( set < string > inSet )
     {
-        bool again( false );
-
         BOOST_FOREACH ( query q , coreInstance )
         {
             //Odrzucamy wiersze ktore nie wchodza tym razem do przeliczeñ
@@ -78,10 +76,6 @@ namespace QS {
                 if ( resultValidFlag )
                 {
                     (*storage[ q.id ])[ cnt ] = value ;
-                }
-                else
-                {
-                    again = true ;
                 }
                 cnt ++ ;
             }

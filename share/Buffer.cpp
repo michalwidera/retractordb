@@ -71,7 +71,9 @@ public:
 	long frameCount ;   /**< Ilosæ ramek w bloku */
 	long firstFrame ;   /**< Wskaznik pierwszej ramki w bloku (pro forma w celu uzgodnienia typow z CycBlock) */
 
-	IBlock ( long frameSize = 0 ) {}
+    IBlock ( long frameSize = 0 )
+        : frameSize(frameSize) , frameCount(0) , firstFrame(0)
+        {}
 	IBlock (const IBlock&);           //allow copying
 	virtual ~IBlock() {}  ;
 

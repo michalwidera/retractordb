@@ -314,21 +314,19 @@ void dumpQFieldsProgram()
 
 	BOOST_FOREACH ( query q , coreInstance )
 	{
-	int loccnt(0);
-
-	BOOST_FOREACH ( field f , q.lSchema )
-	{
-		BOOST_FOREACH ( token t , f.lProgram )
-		{
-		cout << q.id  << "\t" ;
-		cout << f.getFieldNameSet()  << "\t" ;
-		cout << t.getStrTokenName() << "\t" ;
-		cout << t.getValue() ;
-		if ( t.getStrTokenName() == "PUSH_ID" )
-			cout << " " << t.getCRValue() ;
-		cout << endl ;
-		}
-	}
+    BOOST_FOREACH ( field f , q.lSchema )
+    {
+        BOOST_FOREACH ( token t , f.lProgram )
+        {
+        cout << q.id  << "\t" ;
+        cout << f.getFieldNameSet()  << "\t" ;
+        cout << t.getStrTokenName() << "\t" ;
+        cout << t.getValue() ;
+        if ( t.getStrTokenName() == "PUSH_ID" )
+            cout << " " << t.getCRValue() ;
+        cout << endl ;
+        }
+    }
 	}
 }
 
