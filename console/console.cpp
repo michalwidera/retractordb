@@ -34,6 +34,8 @@ using namespace std ;
 using namespace boost ;
 using namespace QS ;
 
+using boost::asio::ip::tcp ;
+
 #include <cassert>
 
 #define FOR(i,a,b) for(int i=(a);i<(b);++i)
@@ -54,7 +56,7 @@ const int defaultLinieCount = 5 ;
 const char* welcomeString = "Ready." ;
 
 //identyfikatory wewnetrzne polecen dostepnych z konsolis
-enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD } ;
+enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD , CONNECT_CMD } ;
 
 struct record
 {
@@ -75,6 +77,7 @@ int processCommand( char * commandStr )
     boost::regex matchDirCmd("\\s*dir\\s*(\\w*)\\s*(\\d*).*");
     boost::regex matchQuitCmd("quit.*");
     boost::regex matchClsCmd("cls.*");
+    boost::regex matchConnectCmd("connect.*");
 
     boost::cmatch what;
 
@@ -98,6 +101,11 @@ int processCommand( char * commandStr )
     if ( regex_match(commandStr,what,matchClsCmd) )
     {
         return CLS_CMD ;
+    }
+    else
+    if ( regex_match(commandStr,what,matchConnectCmd) )
+    {
+        return CONNECT_CMD ;
     }
         return NO_CMD ;
 }
@@ -162,6 +170,14 @@ void processRegisteredQueries()
 //
 int terminal()
 {
+    //
+    // Zestawienie polaczenia
+    //
+    boost::asio::io_service io_service;
+    tcp::resolver resolver(io_service);
+    tcp::socket socket(io_service);
+
+
     setbuf(stdout, NULL);   //niebuforowany printf
 
     rlutil::CursorHider hideCursor ;
@@ -295,6 +311,19 @@ int terminal()
                 printLine( curline , pos , line );
                 command = NO_CMD ;
             }
+            else if ( command == CONNECT_CMD )
+            {
+                boost::asio::connect
+                        (
+                            socket ,
+                            resolver.resolve
+                            (
+                                tcp::resolver::query( "localhost" ,
+                                                      boost::lexical_cast< std::string >(1971)
+                                                     )
+                            )
+                        );
+            }
         }
 
         processRegisteredQueries();
@@ -343,7 +372,7 @@ int main(int argc, char* argv[])
         else
             return terminal();
 
-    }
+    }    
     catch(std::exception& e)
     {
         cerr << e.what() << "\n";
