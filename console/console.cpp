@@ -182,6 +182,8 @@ bool processRequests() ; //deklaracja funkcji
 // Zestawienie polaczenia
 //
 namespace dbNet {
+string sHostName ;
+
 boost::asio::io_service io_service;
 tcp::resolver resolver(io_service);
 tcp::socket socket(io_service);
@@ -334,15 +336,17 @@ bool processRequests()
     else if ( command == CONNECT_CMD )
     {
         boost::asio::connect
+        (
+            dbNet::socket ,
+            resolver.resolve
+            (
+                tcp::resolver::query
                 (
-                    dbNet::socket ,
-                    resolver.resolve
-                    (
-                        tcp::resolver::query( "localhost" ,
-                                              boost::lexical_cast< std::string >(1971)
-                                              )
-                        )
-                    );
+                    sHostName ,
+                    boost::lexical_cast< std::string >(1971)
+                )
+            )
+        );
         return true ;
     }
 
@@ -370,7 +374,8 @@ int main(int argc, char* argv[])
         po::options_description desc("Dozwolone opcja");
         desc.add_options()
                 ("infile,i", po::value<string>(&sInputFile) , "z poleceniami")
-                ("help,h", "program options")                
+                ("server,s", po::value<string>(&dbNet::sHostName)->default_value("localhost") , "nazwa serwera")
+                ("help,h", "program options")
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
