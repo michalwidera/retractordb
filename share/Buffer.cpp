@@ -100,10 +100,10 @@ template <class STREAM>
 
 public:
 
-	CBlock( const CBlock<STREAM> &x ) ; /**< Konstruktor kopiujacy Uwaga! Z uwagi na operacje kopiowania niszczacego pwartosc - nastepuje konwersja wskaznikow i zniszczenie wartosci przekazywanej. @param obiekt do skopiowania */
-	CBlock( long frameSize = 0 ) ;      /** Konstruktor - Tworzy na stercie obiekt typu strzam. - musi byc bez mutexu! bo siadzie @param frameSize dlugosc ramki */
+    CBlock( const CBlock<STREAM> &x ) ; /**< Konstruktor kopiujacy Uwaga! Z uwagi na operacje kopiowania niszczacego pwartosc - nastepuje konwersja wskaznikow i zniszczenie wartosci przekazywanej. param obiekt do skopiowania */
+    CBlock( long frameSize = 0 ) ;      /**< Konstruktor - Tworzy na stercie obiekt typu strzam. - musi byc bez mutexu! bo siadzie @param frameSize dlugosc ramki */
 
-	virtual ~CBlock() ;                 /** Destruktor klasy - zabezpieczony przed konflikatmi wielowatkowymi jedna du¿a sekcja krytyczna */
+    virtual ~CBlock() ;                 /**< Destruktor klasy - zabezpieczony przed konflikatmi wielowatkowymi jedna du¿a sekcja krytyczna */
 	void PutBlock( ARRAY_POINTER pBlockBuffer , long count ) ; /**< Umieszczenie ramki w bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) jesli w buforze pBlockBuffer jest wiecej ramek count okresla ta ilosc @param pBlockBuffer wskaznik do bufora @param count ilosc ramek w buforze - w Buffer.h default parametr = 1 */
 	long GetBlock( long position , ARRAY_POINTER pBlockBuffer ) ; /**< Pobranie ramki od d³ugoœci framesize z bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) @param position pozycja do pobrania ze strumienia @param pBlockBuffer wskaznik do bufora @return ilosc odczytanych danych */
 	long GetByteSize() ;                /**< Funkcja zwraca iloœæ bajtów w bloku @return ilosc bajtow w strumieniu */
