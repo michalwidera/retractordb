@@ -242,10 +242,10 @@ int terminal()
                 command = processCommand( line );  //rozpoznanie komendy
                 if ( command != NO_CMD )
                 {
-                    printLine( curline , -1 , line );
-                    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+                    printLine( curline , -1 , line );    
                     curline += 1 ;
                 }
+                REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
                 processRequests() ;
                 printf("\a");   //beep
             }
