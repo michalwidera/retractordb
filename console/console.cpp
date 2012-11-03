@@ -274,34 +274,27 @@ int terminal()
                 if ( pos > 0 ) pos -- ;
                 REP( i , 80 - pos )
                 {
-
                     assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
                     assert( pos +i >= 0    && pos +i    <= 80 );
 
                     line[pos+i] = line[pos+i+1];
-
                 }
             }
-            else //ascii char
+            else if ( k >= 32 && k <= 126 ) //ascii char
             {
-                if ( k >= 32 && k <= 126 )
+                REPD( i , 80-pos )
                 {
-                    REPD( i , 80-pos )
-                    {
-                        assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
-                        assert( pos +i >= 0    && pos +i    <= 80 );
+                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                    assert( pos +i >= 0    && pos +i    <= 80 );
 
-                        line[pos+i+1] = line[pos+i];
-                    }
-
-                    assert( pos + 1 <= 80 );
-                    line[pos++] = k ;
+                    line[pos+i+1] = line[pos+i];
                 }
-            };
+
+                assert( pos + 1 <= 80 );
+                line[pos++] = k ;
+            }
 
             printLine( curline , pos , line );
-
-
 
             if ( stopLoop ) break ;
         }
