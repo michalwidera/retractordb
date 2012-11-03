@@ -244,6 +244,7 @@ int terminal()
                     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
                     curline += 1 ;
                 }
+                processRequests() ;
                 printf("\a");   //beep
             }
             else if ( k == 224 ) //control sequence - windows
@@ -300,7 +301,7 @@ int terminal()
 
             printLine( curline , pos , line );
 
-            processRequests() ;
+
 
             if ( stopLoop ) break ;
         }
