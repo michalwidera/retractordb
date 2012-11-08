@@ -158,6 +158,7 @@ set(SOURCES_STAGE
   regtest/query-lnx.txt
   share/rlutil.h
   stage/test.cpp
+  stage/test_bpt.cpp
 )
 set(SOURCES_CONSOLE
   console/console.cpp
@@ -170,7 +171,9 @@ set(SOURCES_STAGE_1
   share/stdafx.cpp
   share/rlutil.h
   stage/test.cpp
+  stage/test_bpt.cpp
 )
+
 set(SOURCES_TEST
   regtest/query.txt
   regtest/gotest.sh
@@ -204,13 +207,13 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} )
     target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
 
-    add_custom_target( check ALL 
-	COMMAND chmod +x regtest/gocheck.sh 
-    )
+#    add_custom_target( check ALL
+#	COMMAND chmod +x regtest/gocheck.sh
+#    )
 
-    add_custom_target( chmod ALL 
-	COMMAND chmod +x regtest/gotest.sh 
-    )
+#    add_custom_target( chmod ALL
+#	COMMAND chmod +x regtest/gotest.sh
+#    )
     
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 

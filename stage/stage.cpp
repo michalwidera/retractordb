@@ -48,6 +48,7 @@ extern "C" {
 }
 
 extern int main_rlutil() ;
+extern int main_bpt() ;
 
 /*==========================================
   =                FSM TESTING             =
@@ -490,6 +491,7 @@ int main(int argc, char* argv[])
                 ("client,c","client test")
                 ("rlutil,l","rlutil test")
                 ("classtest,z","class test")
+                ("tree,t","tree test")
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
@@ -517,6 +519,8 @@ int main(int argc, char* argv[])
             return main_rlutil();
         else if ( vm.count("classtest"))
             return main_class();
+        else if ( vm.count("tree"))
+            return main_bpt();
         else
             throw std::out_of_range("wybierz odpowiedni parametr/test");
     }

@@ -28,6 +28,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include <boost/asio.hpp>
+#include <boost/config.hpp>
 #include <boost/thread.hpp>
 
 #include <boost/iostreams/device/file.hpp>
