@@ -347,6 +347,13 @@ bool processRequests()
                 )
             )
         );
+
+        array<char,128> buf = { 'h' , 0 };
+        system::error_code error ;
+
+        dbNet::socket.write_some( asio::buffer( buf ) , error );
+        dbNet::socket.read_some( asio::buffer(buf) , error );
+
         return true ;
     }
 
