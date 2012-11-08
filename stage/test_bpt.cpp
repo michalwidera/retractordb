@@ -95,6 +95,9 @@ void debug_settings::save(const std::string &filename)
     // Write property tree to XML file
     write_xml(filename, pt);
 
+    // Write property tree to cout file
+    write_xml( std::cout , pt);
+
 }
 
 int main_bpt()
@@ -102,9 +105,9 @@ int main_bpt()
     try
     {
         debug_settings ds;
-        ds.load("debug_settings.xml");
+        ds.load("regtest/debug_settings.xml");
         ds.save("debug_settings_out.xml");
-        std::cout << "Success\n";
+        std::cout << "\nSuccess\n";
     }
     catch (std::exception &e)
     {
