@@ -132,24 +132,35 @@ int main_netthread( int *arg )
 
     for (;;)
     {
-    std::cout << "s2" << std::endl ;
-      tcp::iostream stream;
-      boost::system::error_code ec;
-//      stream.expires_from_now( boost::posix_time::seconds(2));
-      acceptor.accept(*stream.rdbuf(), ec);
-    std::cout << "s3" << std::endl ;
-      if (!ec)
-      {
-          write_xml(std::cout, pt );
-          write_xml(stream, pt);
-          boost::this_thread::yield();
-      }
-      std::cout << "1" ;
+        {
+            tcp::iostream stream;
+            if (!stream)
+            {
+                std::cout << "fail tcp::iostream ..." << std::endl ;
+                continue ;
+            }
+            boost::system::error_code ec;
+            //stream.expires_from_now( boost::posix_time::seconds());
+            acceptor.accept(*stream.rdbuf(), ec);
+            if (!ec)
+            {
+                write_xml(std::cout, pt );
+                try {
+                write_xml(stream, pt);
+                }
+                catch (std::exception& e)
+                {
+                  std::cerr << "exception catch2:" << e.what() << std::endl;
+                }
+                boost::this_thread::yield();
+            }
+        }
+        std::cout << "next for ..." << std::endl ;
     }
   }
   catch (std::exception& e)
   {
-    std::cerr << e.what() << std::endl;
+    std::cerr << "exception catch:" << e.what() << std::endl;
   }
 
   return 0;
