@@ -49,7 +49,7 @@ extern "C" {
 
 extern int main_rlutil() ;
 extern int main_bpt() ;
-
+extern int main_bpt_client() ;
 /*==========================================
   =                FSM TESTING             =
   ==========================================*/
@@ -439,7 +439,7 @@ int client(int argc, char* argv[])
     boost::asio::io_service io_service;
 
     udp::resolver resolver(io_service);
-    udp::resolver::query query(udp::v4(), argv[2], "daytime");
+    udp::resolver::query query(udp::v4(), argv[2], "daytime" );
     udp::endpoint receiver_endpoint = *resolver.resolve(query);
 
     udp::socket socket(io_service);
@@ -492,6 +492,7 @@ int main(int argc, char* argv[])
                 ("rlutil,l","rlutil test")
                 ("classtest,z","class test")
                 ("tree,t","tree test")
+                ("ctree,e","client tree test")
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
@@ -521,6 +522,8 @@ int main(int argc, char* argv[])
             return main_class();
         else if ( vm.count("tree"))
             return main_bpt();
+        else if ( vm.count("ctree"))
+            return main_bpt_client();
         else
             throw std::out_of_range("wybierz odpowiedni parametr/test");
     }

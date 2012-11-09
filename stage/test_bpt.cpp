@@ -20,6 +20,13 @@
 #include <set>
 #include <exception>
 #include <iostream>
+#include <conio.h>
+
+#include <boost/thread.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/asio.hpp>
+
+using boost::asio::ip::tcp;
 
 struct debug_settings
 {
@@ -100,14 +107,95 @@ void debug_settings::save(const std::string &filename)
 
 }
 
-int main_bpt()
+int main_netthread( int *arg )
+{
+
+    // Create empty property tree object
+    using boost::property_tree::ptree;
+    ptree pt;
+
+    // Put log filename in property tree
+    pt.put("debug.filename", "id" );
+
+    // Put debug level in property tree
+    pt.put("debug.level", 10 );
+
+    // Put debug level in property tree
+    pt.put("debug.level", 'd' );
+
+  try
+  {
+    boost::asio::io_service io_service;
+
+    tcp::endpoint endpoint(tcp::v4(), 1971);
+    tcp::acceptor acceptor(io_service, endpoint);
+
+    for (;;)
+    {
+    std::cout << "s2" << std::endl ;
+      tcp::iostream stream;
+      boost::system::error_code ec;
+//      stream.expires_from_now( boost::posix_time::seconds(2));
+      acceptor.accept(*stream.rdbuf(), ec);
+    std::cout << "s3" << std::endl ;
+      if (!ec)
+      {
+          write_xml(std::cout, pt );
+          write_xml(stream, pt);
+          boost::this_thread::yield();
+      }
+      std::cout << "1" ;
+    }
+  }
+  catch (std::exception& e)
+  {
+    std::cerr << e.what() << std::endl;
+  }
+
+  return 0;
+}
+
+int main_bpt_client()
 {
     try
     {
+        tcp::iostream s( "localhost", "1971");
+        if (!s)
+        {
+            std::cout << "Unable to connect: " << s.error().message() << std::endl;
+            return 1;
+        }
+        s.expires_from_now(boost::posix_time::seconds(60));
+
+        std::string line;
+        std::getline(s, line);
+        std::cout << line << std::endl;
+    }
+    catch (std::exception& e)
+    {
+        std::cout << "Exception: " << e.what() << "\n";
+        return 1 ;
+    }
+    return 0;
+}
+
+int main_bpt()
+{
+    using namespace boost ;
+    try
+    {
         debug_settings ds;
+#ifndef WIN32
         ds.load("regtest/debug_settings.xml");
+#endif
         ds.save("debug_settings_out.xml");
-        std::cout << "\nSuccess\n";
+        std::cout << "\nSuccess?\n";
+
+        int arg ;
+        thread bt(bind(&main_netthread, &arg));  //puszczenie serwisu w watku
+
+        std::cout << "Any key..." << std::endl ;
+        _getch(); //no wait ... feed key from kbhit
     }
     catch (std::exception &e)
     {
