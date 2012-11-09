@@ -12,6 +12,7 @@
       Poland, Zabrze, 41-800
       (+48) 606 995 918
 */
+#include "stdafx.h"
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -20,7 +21,6 @@
 #include <set>
 #include <exception>
 #include <iostream>
-#include <conio.h>
 
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
@@ -182,6 +182,7 @@ int main_bpt_client()
 int main_bpt()
 {
     using namespace boost ;
+    using namespace std;
     try
     {
         debug_settings ds;
@@ -189,17 +190,18 @@ int main_bpt()
         ds.load("regtest/debug_settings.xml");
 #endif
         ds.save("debug_settings_out.xml");
-        std::cout << "\nSuccess?\n";
+        cout << "\nSuccess?\n";
 
         int arg ;
         thread bt(bind(&main_netthread, &arg));  //puszczenie serwisu w watku
 
-        std::cout << "Any key..." << std::endl ;
-        _getch(); //no wait ... feed key from kbhit
+        cout << "Press enter to terminate whenever you want!" << endl;
+        string request;
+        getline(cin, request);
     }
     catch (std::exception &e)
     {
-        std::cout << "Error: " << e.what() << "\n";
+        cout << "Error: " << e.what() << "\n";
     }
     return 0;
 }
