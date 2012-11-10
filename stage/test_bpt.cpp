@@ -179,8 +179,12 @@ int main_bpt_client()
         s.expires_from_now(boost::posix_time::seconds(60));
 
         std::string line;
-        std::getline(s, line);
-        std::cout << line << std::endl;
+        while(1)
+        {
+            std::getline(s, line);
+            if ( !s ) break ;
+            std::cout << "server rsp:" << line << std::endl;
+        }
     }
     catch (std::exception& e)
     {
