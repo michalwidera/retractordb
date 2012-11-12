@@ -159,6 +159,7 @@ set(SOURCES_STAGE
   share/rlutil.h
   stage/test.cpp
   stage/test_bpt.cpp
+  stage/server.cpp
 )
 set(SOURCES_CONSOLE
   console/console.cpp

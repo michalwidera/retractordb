@@ -27,6 +27,7 @@
 #include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
+using namespace std ;
 
 struct debug_settings
 {
@@ -107,84 +108,126 @@ void debug_settings::save(const std::string &filename)
 
 }
 
-int main_netthread( int *arg )
+namespace dbNet {
+string sHostName = "localhost" ;
+
+boost::asio::io_service io_service;
+tcp::resolver resolver(io_service);
+tcp::socket socket(io_service);
+}
+const int max_length = 1024;
+
+typedef boost::shared_ptr<tcp::socket> socket_ptr;
+
+int main_bpt_server_thread( int *arg )
 {
 
     // Create empty property tree object
     using boost::property_tree::ptree;
     ptree pt;
+    pt.put("server.filename", "id" );
+    pt.put("server.level", 10 );
+    pt.put("server.response", 'd' );
 
-    // Put log filename in property tree
-    pt.put("debug.filename", "id" );
-
-    // Put debug level in property tree
-    pt.put("debug.level", 10 );
-
-    // Put debug level in property tree
-    pt.put("debug.level", 'd' );
-
-  try
-  {
-    boost::asio::io_service io_service;
-
-    tcp::endpoint endpoint(tcp::v4(), 1971);
-    tcp::acceptor acceptor(io_service, endpoint);
-
-    for (;;)
+    try
     {
-        {
-            tcp::iostream stream;
-            if (!stream)
-            {
-                std::cout << "fail tcp::iostream ..." << std::endl ;
-                continue ;
-            }
-            boost::system::error_code ec;
-            //stream.expires_from_now( boost::posix_time::seconds());
-            acceptor.accept(*stream.rdbuf(), ec);
-            if (!ec)
-            {
-                write_xml(std::cout, pt );
-                try {
-                write_xml(stream, pt);
-                }
-                catch (std::exception& e)
-                {
-                  std::cerr << "exception catch2:" << e.what() << std::endl;
-                }
-                boost::this_thread::yield();
-            }
-        }
-        std::cout << "next for ..." << std::endl ;
-    }
-  }
-  catch (std::exception& e)
-  {
-    std::cerr << "exception catch:" << e.what() << std::endl;
-  }
+        tcp::acceptor acceptor(
+                    dbNet::io_service,
+                    tcp::endpoint(tcp::v4(), 1971)
+                    );
 
-  return 0;
+        for (;;)
+        {
+
+            try
+            {
+                socket_ptr sock(new tcp::socket(dbNet::io_service));
+                acceptor.accept(*sock);
+
+                for (;;)
+                {
+                  char data[max_length];
+
+                  boost::system::error_code error;
+                  size_t length = sock->read_some(boost::asio::buffer(data), error);
+                  if (error == boost::asio::error::eof)
+                    break; // Connection closed cleanly by peer.
+                  else if (error)
+                    throw boost::system::system_error(error); // Some other error.
+
+                  std::cerr << data << std::endl ;
+
+                  boost::asio::write(*sock, boost::asio::buffer(data, length));
+                }
+            }
+            catch (std::exception& e)
+            {
+                std::cerr << "exception catch2:" << e.what() << std::endl;
+            }
+
+            boost::this_thread::yield();
+
+            std::cout << "next for ..." << std::endl ;
+        }
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "exception catch:" << e.what() << std::endl;
+    }
+
+    return 0;
 }
 
 int main_bpt_client()
 {
+    using namespace dbNet ;
+
+    using boost::property_tree::ptree;
+    ptree pt_request;
+    pt_request.put("debug.querytest", "id" );
+
+    ptree pt_response ;
+
     try
     {
-        tcp::iostream s( "localhost", "1971");
-        if (!s)
-        {
-            std::cout << "Unable to connect: " << s.error().message() << std::endl;
-            return 1;
-        }
-        s.expires_from_now(boost::posix_time::seconds(60));
+        boost::asio::connect
+                (
+                    dbNet::socket ,
+                    resolver.resolve
+                    (
+                        tcp::resolver::query
+                        (
+                            sHostName ,
+                            boost::lexical_cast< std::string >(1971)
+                            )
+                        )
+                    );
 
-        std::string line;
-        while(1)
-        {
-            std::getline(s, line);
-            if ( !s ) break ;
-            std::cout << "server rsp:" << line << std::endl;
-        }
+        boost::asio::streambuf request;
+        std::ostream request_stream(&request);
+        write_xml( request_stream , pt_request );
+        request_stream << "\r\n\r\n";
+
+        //wyslanie zapytania do serwera
+        boost::asio::write( dbNet::socket, request);
+
+        //a tu zbieramy odpowiedz
+        boost::asio::streambuf response;
+        std::istream response_stream(&response);
+        boost::asio::read_until( dbNet::socket, response, "\r\n" );
+        read_xml( response_stream , pt_response );
+
+        //zrzut na ekran
+        write_xml( std::cerr , pt_response );
+
+        // Read until EOF, writing data to output as we go.
+        boost::system::error_code error;
+        while (boost::asio::read(dbNet::socket, response,
+                                 boost::asio::transfer_at_least(1), error))
+            std::cout << &response;
+        if (error != boost::asio::error::eof)
+            throw boost::system::system_error(error);
+
     }
     catch (std::exception& e)
     {
@@ -194,7 +237,7 @@ int main_bpt_client()
     return 0;
 }
 
-int main_bpt()
+int main_bpt_server()
 {
     using namespace boost ;
     using namespace std;
@@ -208,7 +251,7 @@ int main_bpt()
         cout << "\nSuccess?\n";
 
         int arg ;
-        thread bt(bind(&main_netthread, &arg));  //puszczenie serwisu w watku
+        thread bt(bind(&main_bpt_server_thread, &arg));  //puszczenie serwisu w watku
 
         cout << "Press enter to terminate whenever you want!" << endl;
         string request;

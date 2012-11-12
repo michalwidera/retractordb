@@ -48,7 +48,7 @@ extern "C" {
 }
 
 extern int main_rlutil() ;
-extern int main_bpt() ;
+extern int main_bpt_server() ;
 extern int main_bpt_client() ;
 /*==========================================
   =                FSM TESTING             =
@@ -491,7 +491,7 @@ int main(int argc, char* argv[])
                 ("client,c","client test")
                 ("rlutil,l","rlutil test")
                 ("classtest,z","class test")
-                ("tree,t","tree test")
+                ("tree,t","server tree test")
                 ("ctree,e","client tree test")
                 ;
 
@@ -521,7 +521,7 @@ int main(int argc, char* argv[])
         else if ( vm.count("classtest"))
             return main_class();
         else if ( vm.count("tree"))
-            return main_bpt();
+            return main_bpt_server();
         else if ( vm.count("ctree"))
             return main_bpt_client();
         else
