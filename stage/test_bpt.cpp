@@ -26,6 +26,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/asio.hpp>
 
+
 using boost::asio::ip::tcp;
 using namespace std ;
 
@@ -108,13 +109,12 @@ void debug_settings::save(const std::string &filename)
 
 }
 
-namespace dbNet {
 string sHostName = "localhost" ;
 
-boost::asio::io_service io_service;
-tcp::resolver resolver(io_service);
-tcp::socket socket(io_service);
-}
+boost::asio::io_service io_serviceInst;
+tcp::resolver resolverInst(io_serviceInst);
+tcp::socket socketInst(io_serviceInst);
+
 const int max_length = 1024;
 
 typedef boost::shared_ptr<tcp::socket> socket_ptr;
@@ -132,7 +132,7 @@ int main_bpt_server_thread( int *arg )
     try
     {
         tcp::acceptor acceptor(
-                    dbNet::io_service,
+                    io_serviceInst,
                     tcp::endpoint(tcp::v4(), 1971)
                     );
 
@@ -141,7 +141,7 @@ int main_bpt_server_thread( int *arg )
 
             try
             {
-                socket_ptr sock(new tcp::socket(dbNet::io_service));
+                socket_ptr sock(new tcp::socket(io_serviceInst));
                 acceptor.accept(*sock);
 
                 for (;;)
@@ -155,7 +155,7 @@ int main_bpt_server_thread( int *arg )
                   else if (error)
                     throw boost::system::system_error(error); // Some other error.
 
-                  std::cerr << data << std::endl ;
+                  std::cerr << data << std::endl << std::flush ;
 
                   boost::asio::write(*sock, boost::asio::buffer(data, length));
                 }
@@ -180,20 +180,19 @@ int main_bpt_server_thread( int *arg )
 
 int main_bpt_client()
 {
-    using namespace dbNet ;
-
     using boost::property_tree::ptree;
     ptree pt_request;
     pt_request.put("debug.querytest", "id" );
 
     ptree pt_response ;
 
+    /*
     try
     {
         boost::asio::connect
                 (
-                    dbNet::socket ,
-                    resolver.resolve
+                    socketInst ,
+                    resolverInst.resolve
                     (
                         tcp::resolver::query
                         (
@@ -209,12 +208,12 @@ int main_bpt_client()
         request_stream << "\r\n\r\n";
 
         //wyslanie zapytania do serwera
-        boost::asio::write( dbNet::socket, request);
+        boost::asio::write( socketInst, request);
 
         //a tu zbieramy odpowiedz
         boost::asio::streambuf response;
         std::istream response_stream(&response);
-        boost::asio::read_until( dbNet::socket, response, "\r\n" );
+        boost::asio::read_until( socketInst, response, "\r\n" );
         read_xml( response_stream , pt_response );
 
         //zrzut na ekran
@@ -222,7 +221,7 @@ int main_bpt_client()
 
         // Read until EOF, writing data to output as we go.
         boost::system::error_code error;
-        while (boost::asio::read(dbNet::socket, response,
+        while (boost::asio::read(socketInst, response,
                                  boost::asio::transfer_at_least(1), error))
             std::cout << &response;
         if (error != boost::asio::error::eof)
@@ -234,7 +233,150 @@ int main_bpt_client()
         std::cout << "Exception: " << e.what() << "\n";
         return 1 ;
     }
+    */
+
+    try
+    {
+      boost::asio::io_service io_service;
+
+      tcp::resolver resolver(io_service);
+      tcp::resolver::query query(tcp::v4(), "localhost", "1971" );
+      tcp::resolver::iterator iterator = resolver.resolve(query);
+
+      tcp::socket s(io_service);
+      boost::asio::connect(s, iterator);
+
+      using namespace std; // For strlen.
+      std::cout << "Enter message: ";
+      char request[max_length];
+      std::cin.getline(request, max_length);
+      size_t request_length = strlen(request);
+      boost::asio::write(s, boost::asio::buffer(request, request_length));
+
+      char reply[max_length];
+      size_t reply_length = boost::asio::read(s,
+          boost::asio::buffer(reply, request_length));
+      std::cout << "Reply is: ";
+      std::cout.write(reply, reply_length);
+      std::cout << "\n";
+    }
+    catch (std::exception& e)
+    {
+      std::cerr << "Exception: " << e.what() << "\n";
+    }
+
     return 0;
+}
+
+class session
+{
+public:
+  session(boost::asio::io_service& io_service)
+    : socket_(io_service)
+  {
+  }
+
+  tcp::socket& socket()
+  {
+    return socket_;
+  }
+
+  void start()
+  {
+    socket_.async_read_some(boost::asio::buffer(data_, max_length),
+        boost::bind(&session::handle_read, this,
+          boost::asio::placeholders::error,
+          boost::asio::placeholders::bytes_transferred));
+  }
+
+private:
+  void handle_read(const boost::system::error_code& error,
+      size_t bytes_transferred)
+  {
+    if (!error)
+    {
+      strcpy( data_ , "dupa");
+      //bytes_transferred += 4 ;
+
+      boost::asio::async_write(socket_,
+          boost::asio::buffer(data_, bytes_transferred),
+          boost::bind(&session::handle_write, this,
+            boost::asio::placeholders::error));
+    }
+
+    else
+    {
+      delete this;
+    }
+  }
+
+  void handle_write(const boost::system::error_code& error)
+  {
+    if (!error)
+    {
+      socket_.async_read_some(boost::asio::buffer(data_, max_length),
+          boost::bind(&session::handle_read, this,
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::bytes_transferred));
+    }
+    else
+    {
+      delete this;
+    }
+  }
+
+  tcp::socket socket_;
+  enum { max_length = 1024 };
+  char data_[max_length];
+};
+
+class server {
+
+public:
+  server(boost::asio::io_service& io_service)
+    : io_service_(io_service),
+      acceptor_(io_service, tcp::endpoint(tcp::v4(), 1971))
+  {
+    start_accept();
+  }
+
+private:
+  void start_accept()
+  {
+    session* new_session = new session(io_service_);
+    acceptor_.async_accept(new_session->socket(),
+        boost::bind(&server::handle_accept, this, new_session,
+          boost::asio::placeholders::error));
+  }
+
+  void handle_accept(session* new_session,
+      const boost::system::error_code& error)
+  {
+      if (!error)
+      {
+          new_session->start();
+      }
+      else
+      {
+          delete new_session;
+      }
+
+
+    start_accept();
+  }
+
+  boost::asio::io_service& io_service_;
+  tcp::acceptor acceptor_;
+};
+
+int server_thread()
+{
+    boost::asio::io_service io_service;
+
+    using namespace std; // For atoi.
+    server s(io_service);
+
+    io_service.run();
 }
 
 int main_bpt_server()
@@ -250,8 +392,7 @@ int main_bpt_server()
         ds.save("debug_settings_out.xml");
         cout << "\nSuccess?\n";
 
-        int arg ;
-        thread bt(bind(&main_bpt_server_thread, &arg));  //puszczenie serwisu w watku
+        thread bt(bind(&server_thread));  //puszczenie serwisu w watku
 
         cout << "Press enter to terminate whenever you want!" << endl;
         string request;
