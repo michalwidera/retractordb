@@ -303,10 +303,12 @@ int mainFromWin32(int argc, char* argv[])
     //
     // Uruchomienie watku odpowiedzialnego za transmisje sieciowa
     //
+
+
     asio::io_service ios;
 
     tcp_server server1(ios);
-    udp_server server2(ios);
+    //udp_server server2(ios);
 
     thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    
 

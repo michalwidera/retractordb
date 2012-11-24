@@ -17,107 +17,127 @@
 
 #include "NetServer.h"
 
-std::string make_daytime_string()
+#include <string>
+#include <set>
+#include <exception>
+#include <iostream>
+#include <istream>
+#include <ostream>
+#include <string>
+#include <sstream>
+
+#include <boost/thread.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/asio.hpp>
+
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+#include <boost/foreach.hpp>
+
+using boost::asio::ip::tcp;
+using namespace std ;
+
+session::session(boost::asio::io_service& io_service)
+: socket_(io_service)
 {
-    using namespace std; // For time_t, time and ctime;
-    time_t now = time(0);
-    return ctime(&now);
 }
 
-//
-// ------ tcp_connection
-//
-
-tcp::socket& tcp_connection::socket()
+tcp::socket& session::socket()
 {
     return socket_;
 }
 
-void tcp_connection::start()
+void session::start()
 {
-    message_ = make_daytime_string();
-
-    boost::asio::async_write(socket_, boost::asio::buffer(message_),
-                             boost::bind(&tcp_connection::handle_write, shared_from_this()));
+socket_.async_read_some(boost::asio::buffer(data_, max_length),
+    boost::bind(&session::handle_read, this,
+      boost::asio::placeholders::error,
+      boost::asio::placeholders::bytes_transferred));
 }
 
-tcp_connection::tcp_connection(boost::asio::io_service& io_service)
-    : socket_(io_service)
+void session::handle_read(const boost::system::error_code& error,
+  size_t bytes_transferred)
 {
+  if (!error)
+  {
+      //
+      // tutaj jest interpretowany protokol
+      //
+
+      // Create empty property tree object
+      using boost::property_tree::ptree;
+      ptree pt;
+
+      {
+      std::stringstream strstream;
+      strstream << data_ ;
+      read_xml( strstream , pt );
+      }
+
+      pt.put("debug.level", 50 );
+
+      std::stringstream strstream;
+      write_xml( strstream , pt );
+
+      //
+      // tutaj jest wysylana odpowiedz po interpretacji protokolu
+      //
+
+      boost::asio::async_write(socket_,
+         boost::asio::buffer( strstream.str().c_str() , strstream.str().length() ),
+         boost::bind(&session::handle_write, this,
+            boost::asio::placeholders::error));
+  }
+  else
+  {
+      delete this;
+  }
 }
 
-void tcp_connection::handle_write()
+void session::handle_write(const boost::system::error_code& error)
 {
+    if (!error)
+    {
+      socket_.close();
+      socket_.async_read_some(boost::asio::buffer(data_, max_length),
+          boost::bind(&session::handle_read, this,
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::bytes_transferred));
+    }
+    else
+    {
+      delete this;
+    }
 }
-
-
-//
-//   --------- tcp_server
-//
 
 tcp_server::tcp_server(boost::asio::io_service& io_service)
-    : acceptor_(io_service, tcp::endpoint(tcp::v4(), 1971 ))
+: io_service_(io_service),
+  acceptor_(io_service, tcp::endpoint(tcp::v4(), 1971))
 {
-    start_accept();
+start_accept();
 }
 
 
 void tcp_server::start_accept()
 {
-    tcp_connection::pointer new_connection =
-            tcp_connection::create(acceptor_.get_io_service());
-
-    acceptor_.async_accept(new_connection->socket(),
-                           boost::bind(&tcp_server::handle_accept, this, new_connection,
-                                       boost::asio::placeholders::error));
+    session* new_session = new session(io_service_);
+    acceptor_.async_accept(new_session->socket(),
+        boost::bind(&tcp_server::handle_accept, this, new_session,
+          boost::asio::placeholders::error));
 }
 
-void tcp_server::handle_accept(tcp_connection::pointer new_connection,
-                               const boost::system::error_code& error)
+void tcp_server::handle_accept(session* new_session,
+  const boost::system::error_code& error)
 {
-    if (!error)
-    {
-        new_connection->start();
-    }
+  if (!error)
+  {
+      new_session->start();
+  }
+  else
+  {
+      delete new_session;
+  }
 
-    start_accept();
+  start_accept();
 }
-
-
-//
-//    ------------- udp_server
-//
-
-udp_server::udp_server(boost::asio::io_service& io_service)
-    : socket_(io_service, udp::endpoint(udp::v4(), 1971 ))
-{
-    start_receive();
-}
-
-void udp_server::start_receive()
-{
-    socket_.async_receive_from(
-                boost::asio::buffer(recv_buffer_), remote_endpoint_,
-                boost::bind(&udp_server::handle_receive, this,
-                            boost::asio::placeholders::error));
-}
-
-void udp_server::handle_receive(const boost::system::error_code& error)
-{
-    if (!error || error == boost::asio::error::message_size)
-    {
-        boost::shared_ptr<std::string> message(
-                    new std::string(make_daytime_string()));
-
-        socket_.async_send_to(boost::asio::buffer(*message), remote_endpoint_,
-                              boost::bind(&udp_server::handle_send, this, message));
-
-        start_receive();
-    }
-}
-
-void udp_server::handle_send(boost::shared_ptr<std::string> /*message*/)
-{
-}
-
 
