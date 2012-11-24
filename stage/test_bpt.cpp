@@ -150,7 +150,6 @@ int main_bpt_client()
         // Form the request. We specify the "Connection: close" header so that the
         // server will close the socket after transmitting the response. This will
         // allow us to treat all data up until the EOF as the content.
-        {
         boost::asio::streambuf request;
         std::ostream request_stream(&request);
 
@@ -161,7 +160,6 @@ int main_bpt_client()
 
         // Send the request.
         boost::asio::write(socket, request);
-        }
 
         //
         //response part
@@ -183,9 +181,8 @@ int main_bpt_client()
 
             // Read until EOF, writing data to output as we go.
             boost::system::error_code error;
-            size_t ret ;
-            while (ret = boost::asio::read(socket, response,
-                                     boost::asio::transfer_at_least(1), error))
+            while (boost::asio::read(socket, response,
+                             boost::asio::transfer_at_least(1), error))
             {
                 if ( error == boost::asio::error::eof )
                     break ;
@@ -233,24 +230,23 @@ private:
   void handle_read(const boost::system::error_code& error,
       size_t bytes_transferred)
   {
-    if (!error)
-    {
-        if ( !strcmp(data_,"dupa") )
-        {
-            strcpy( data_ , "b1ada");
-            bytes_transferred = strlen("b1ada") ;
-        }
+      if (!error)
+      {
+          if ( !strcmp(data_,"dupa") )
+          {
+              strcpy( data_ , "b1ada");
+              bytes_transferred = strlen("b1ada") ;
+          }
 
-      boost::asio::async_write(socket_,
-          boost::asio::buffer(data_, bytes_transferred),
-          boost::bind(&session::handle_write, this,
-            boost::asio::placeholders::error));      
-    }
-
-    else
-    {
-      delete this;
-    }
+          boost::asio::async_write(socket_,
+             boost::asio::buffer(data_, bytes_transferred),
+             boost::bind(&session::handle_write, this,
+                boost::asio::placeholders::error));
+      }
+      else
+      {
+          delete this;
+      }
   }
 
   void handle_write(const boost::system::error_code& error)
