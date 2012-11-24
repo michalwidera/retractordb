@@ -112,15 +112,7 @@ void debug_settings::save(const std::string &filename)
 
 }
 
-string sHostName = "localhost" ;
-
-boost::asio::io_service io_serviceInst;
-tcp::resolver resolverInst(io_serviceInst);
-tcp::socket socketInst(io_serviceInst);
-
 const int max_length = 1024;
-
-typedef boost::shared_ptr<tcp::socket> socket_ptr;
 
 int main_bpt_client()
 {
