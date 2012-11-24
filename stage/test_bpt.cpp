@@ -122,65 +122,6 @@ const int max_length = 1024;
 
 typedef boost::shared_ptr<tcp::socket> socket_ptr;
 
-int main_bpt_server_thread( int *arg )
-{
-
-    // Create empty property tree object
-    using boost::property_tree::ptree;
-    ptree pt;
-    pt.put("server.filename", "id" );
-    pt.put("server.level", 10 );
-    pt.put("server.response", 'd' );
-
-    try
-    {
-        tcp::acceptor acceptor(
-                    io_serviceInst,
-                    tcp::endpoint(tcp::v4(), 1971)
-                    );
-
-        for (;;)
-        {
-
-            try
-            {
-                socket_ptr sock(new tcp::socket(io_serviceInst));
-                acceptor.accept(*sock);
-
-                for (;;)
-                {
-                  char data[max_length];
-
-                  boost::system::error_code error;
-                  size_t length = sock->read_some(boost::asio::buffer(data), error);
-                  if (error == boost::asio::error::eof)
-                    break; // Connection closed cleanly by peer.
-                  else if (error)
-                    throw boost::system::system_error(error); // Some other error.
-
-                  std::cerr << data << std::endl << std::flush ;
-
-                  boost::asio::write(*sock, boost::asio::buffer(data, length));
-                }
-            }
-            catch (std::exception& e)
-            {
-                std::cerr << "exception catch2:" << e.what() << std::endl;
-            }
-
-            boost::this_thread::yield();
-
-            std::cout << "next for ..." << std::endl ;
-        }
-    }
-    catch (std::exception& e)
-    {
-        std::cerr << "exception catch:" << e.what() << std::endl;
-    }
-
-    return 0;
-}
-
 int main_bpt_client()
 {
     using boost::property_tree::ptree;
