@@ -21,6 +21,7 @@
 #include <istream>
 #include <ostream>
 #include <string>
+#include <sstream>
 
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
@@ -120,8 +121,6 @@ int main_bpt_client()
     ptree pt_request;
     pt_request.put("debug.querytest", "id" );
 
-    ptree pt_response ;
-
     try
     {
         boost::asio::io_service io_service;
@@ -134,6 +133,7 @@ int main_bpt_client()
         std::cout << "Enter message: ";
         char request_tbl[max_length];
         std::cin.getline(request_tbl, max_length);
+         pt_request.put("debug.message", request_tbl );
 
         //
         //request part
@@ -145,10 +145,7 @@ int main_bpt_client()
         boost::asio::streambuf request;
         std::ostream request_stream(&request);
 
-        if ( !strcmp( request_tbl , "xml") )
-            write_xml( request_stream , pt_request );
-        else
-            request_stream << request_tbl ;
+        write_xml( request_stream , pt_request );
 
         // Send the request.
         boost::asio::write(socket, request);
@@ -224,14 +221,31 @@ private:
   {
       if (!error)
       {
-          if ( !strcmp(data_,"dupa") )
+          //
+          // tutaj jest interpretowany protokol
+          //
+
+          // Create empty property tree object
+          using boost::property_tree::ptree;
+          ptree pt;
+
           {
-              strcpy( data_ , "b1ada");
-              bytes_transferred = strlen("b1ada") ;
+          std::stringstream strstream;
+          strstream << data_ ;
+          read_xml( strstream , pt );
           }
 
+          pt.put("debug.level", 50 );
+
+          std::stringstream strstream;
+          write_xml( strstream , pt );
+
+          //
+          // tutaj jest wysylana odpowiedz po interpretacji protokolu
+          //
+
           boost::asio::async_write(socket_,
-             boost::asio::buffer(data_, bytes_transferred),
+             boost::asio::buffer( strstream.str().c_str() , strstream.str().length() ),
              boost::bind(&session::handle_write, this,
                 boost::asio::placeholders::error));
       }
