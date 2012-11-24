@@ -14,18 +14,21 @@
 */
 #include "stdafx.h"
 
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/foreach.hpp>
 #include <string>
 #include <set>
 #include <exception>
 #include <iostream>
+#include <istream>
+#include <ostream>
+#include <string>
 
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/asio.hpp>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+#include <boost/foreach.hpp>
 
 using boost::asio::ip::tcp;
 using namespace std ;
@@ -180,6 +183,90 @@ int main_bpt_server_thread( int *arg )
 
 int main_bpt_client()
 {
+    try
+    {
+        boost::asio::io_service io_service;
+
+        // Get a list of endpoints corresponding to the server name.
+        tcp::resolver resolver(io_service);
+
+        tcp::resolver::query query(tcp::v4(), "localhost", "1971" );
+        tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+
+        // Try each endpoint until we successfully establish a connection.
+        tcp::socket socket(io_service);
+        boost::asio::connect(socket, endpoint_iterator);
+
+        std::cout << "Enter message: ";
+        char request_tbl[max_length];
+        std::cin.getline(request_tbl, max_length);
+
+        //
+        //request part
+        //
+
+        // Form the request. We specify the "Connection: close" header so that the
+        // server will close the socket after transmitting the response. This will
+        // allow us to treat all data up until the EOF as the content.
+        {
+        boost::asio::streambuf request;
+        std::ostream request_stream(&request);
+        request_stream << request_tbl ;
+
+        // Send the request.
+        boost::asio::write(socket, request);
+        }
+        std::cerr << "wrote Test" << std::endl ;
+        //
+        //response part
+        //
+
+        // Read the response status line. The response streambuf will automatically
+        // grow to accommodate the entire line. The growth may be limited by passing
+        // a maximum size to the streambuf constructor.
+        boost::asio::streambuf response;
+
+        // Check that response is OK.
+        std::istream response_stream(&response);
+
+        if (response_stream)
+        {
+            // Write whatever content we already have to output.
+            if (response.size() > 0)
+                std::cout << &response;
+
+            std::cerr << "got from srv, now the rest" << std::endl ;
+
+            // Read until EOF, writing data to output as we go.
+            boost::system::error_code error;
+            size_t ret ;
+            while (ret = boost::asio::read(socket, response,
+                                     boost::asio::transfer_at_least(1), error))
+            {
+                if ( error == boost::asio::error::eof )
+                    break ;
+                std::cout << &response;
+                std::cerr << "." << ret << "." << error << ".";
+            }
+
+            if (error != boost::asio::error::eof)
+                throw boost::system::system_error(error);
+        }
+        else
+        {
+            std::cout << "Invalid response" << std::endl ;
+        }
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "exception catch:" << e.what() << std::endl;
+    }
+
+    return 0;
+}
+
+int main_bpt_client_prev()
+{
     using boost::property_tree::ptree;
     ptree pt_request;
     pt_request.put("debug.querytest", "id" );
@@ -237,6 +324,8 @@ int main_bpt_client()
 
     try
     {
+      using boost::asio::ip::tcp;
+
       boost::asio::io_service io_service;
 
       tcp::resolver resolver(io_service);
@@ -246,12 +335,46 @@ int main_bpt_client()
       tcp::socket s(io_service);
       boost::asio::connect(s, iterator);
 
+//
+//request part
+//
+      boost::asio::streambuf request;
+      std::ostream request_stream(&request);
+
+      /*
       using namespace std; // For strlen.
       std::cout << "Enter message: ";
-      char request[max_length];
-      std::cin.getline(request, max_length);
-      size_t request_length = strlen(request);
-      boost::asio::write(s, boost::asio::buffer(request, request_length));
+      char request_tbl[max_length];
+      std::cin.getline(request_tbl, max_length);
+      //size_t request_length = strlen(request_tbl);
+      //boost::asio::write(s, boost::asio::buffer(request_tbl, request_length));
+      */
+
+      request_stream << "request_tbl" ;
+
+      // Send the request.
+//      boost::asio::write(socket, request_stream);
+
+//
+//response
+//
+      /*
+      // Read the response status line. The response streambuf will automatically
+      // grow to accommodate the entire line. The growth may be limited by passing
+      // a maximum size to the streambuf constructor.
+      boost::asio::streambuf response;
+
+      // Check that response is OK.
+      std::istream response_stream(&response);
+
+      // Read until EOF, writing data to output as we go.
+      boost::system::error_code error;
+      while (boost::asio::read(socket, response,
+            boost::asio::transfer_at_least(1), error))
+        std::cout << &response;
+      if (error != boost::asio::error::eof)
+        throw boost::system::system_error(error);
+
 
       char reply[max_length];
       size_t reply_length = boost::asio::read(s,
@@ -259,6 +382,7 @@ int main_bpt_client()
       std::cout << "Reply is: ";
       std::cout.write(reply, reply_length);
       std::cout << "\n";
+      */
     }
     catch (std::exception& e)
     {
@@ -295,13 +419,16 @@ private:
   {
     if (!error)
     {
-      strcpy( data_ , "dupa");
-      //bytes_transferred += 4 ;
+        if ( !strcmp(data_,"dupa") )
+        {
+            strcpy( data_ , "b1ada");
+            bytes_transferred = strlen("b1ada") ;
+        }
 
       boost::asio::async_write(socket_,
           boost::asio::buffer(data_, bytes_transferred),
           boost::bind(&session::handle_write, this,
-            boost::asio::placeholders::error));
+            boost::asio::placeholders::error));      
     }
 
     else
@@ -314,10 +441,11 @@ private:
   {
     if (!error)
     {
+      socket_.close();
       socket_.async_read_some(boost::asio::buffer(data_, max_length),
           boost::bind(&session::handle_read, this,
             boost::asio::placeholders::error,
-            boost::asio::placeholders::bytes_transferred));
+            boost::asio::placeholders::bytes_transferred));      
     }
     else
     {
