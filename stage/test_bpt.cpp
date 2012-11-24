@@ -183,19 +183,20 @@ int main_bpt_server_thread( int *arg )
 
 int main_bpt_client()
 {
+    using boost::property_tree::ptree;
+    ptree pt_request;
+    pt_request.put("debug.querytest", "id" );
+
+    ptree pt_response ;
+
     try
     {
         boost::asio::io_service io_service;
-
-        // Get a list of endpoints corresponding to the server name.
-        tcp::resolver resolver(io_service);
-
-        tcp::resolver::query query(tcp::v4(), "localhost", "1971" );
-        tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-
-        // Try each endpoint until we successfully establish a connection.
         tcp::socket socket(io_service);
-        boost::asio::connect(socket, endpoint_iterator);
+        boost::asio::connect(socket,
+                             tcp::resolver(io_service).resolve(
+                                 tcp::resolver::query(
+                                     tcp::v4(), "localhost", "1971" )));
 
         std::cout << "Enter message: ";
         char request_tbl[max_length];
@@ -211,12 +212,16 @@ int main_bpt_client()
         {
         boost::asio::streambuf request;
         std::ostream request_stream(&request);
-        request_stream << request_tbl ;
+
+        if ( !strcmp( request_tbl , "xml") )
+            write_xml( request_stream , pt_request );
+        else
+            request_stream << request_tbl ;
 
         // Send the request.
         boost::asio::write(socket, request);
         }
-        std::cerr << "wrote Test" << std::endl ;
+
         //
         //response part
         //
@@ -235,8 +240,6 @@ int main_bpt_client()
             if (response.size() > 0)
                 std::cout << &response;
 
-            std::cerr << "got from srv, now the rest" << std::endl ;
-
             // Read until EOF, writing data to output as we go.
             boost::system::error_code error;
             size_t ret ;
@@ -246,7 +249,6 @@ int main_bpt_client()
                 if ( error == boost::asio::error::eof )
                     break ;
                 std::cout << &response;
-                std::cerr << "." << ret << "." << error << ".";
             }
 
             if (error != boost::asio::error::eof)
@@ -260,133 +262,6 @@ int main_bpt_client()
     catch (std::exception& e)
     {
         std::cerr << "exception catch:" << e.what() << std::endl;
-    }
-
-    return 0;
-}
-
-int main_bpt_client_prev()
-{
-    using boost::property_tree::ptree;
-    ptree pt_request;
-    pt_request.put("debug.querytest", "id" );
-
-    ptree pt_response ;
-
-    /*
-    try
-    {
-        boost::asio::connect
-                (
-                    socketInst ,
-                    resolverInst.resolve
-                    (
-                        tcp::resolver::query
-                        (
-                            sHostName ,
-                            boost::lexical_cast< std::string >(1971)
-                            )
-                        )
-                    );
-
-        boost::asio::streambuf request;
-        std::ostream request_stream(&request);
-        write_xml( request_stream , pt_request );
-        request_stream << "\r\n\r\n";
-
-        //wyslanie zapytania do serwera
-        boost::asio::write( socketInst, request);
-
-        //a tu zbieramy odpowiedz
-        boost::asio::streambuf response;
-        std::istream response_stream(&response);
-        boost::asio::read_until( socketInst, response, "\r\n" );
-        read_xml( response_stream , pt_response );
-
-        //zrzut na ekran
-        write_xml( std::cerr , pt_response );
-
-        // Read until EOF, writing data to output as we go.
-        boost::system::error_code error;
-        while (boost::asio::read(socketInst, response,
-                                 boost::asio::transfer_at_least(1), error))
-            std::cout << &response;
-        if (error != boost::asio::error::eof)
-            throw boost::system::system_error(error);
-
-    }
-    catch (std::exception& e)
-    {
-        std::cout << "Exception: " << e.what() << "\n";
-        return 1 ;
-    }
-    */
-
-    try
-    {
-      using boost::asio::ip::tcp;
-
-      boost::asio::io_service io_service;
-
-      tcp::resolver resolver(io_service);
-      tcp::resolver::query query(tcp::v4(), "localhost", "1971" );
-      tcp::resolver::iterator iterator = resolver.resolve(query);
-
-      tcp::socket s(io_service);
-      boost::asio::connect(s, iterator);
-
-//
-//request part
-//
-      boost::asio::streambuf request;
-      std::ostream request_stream(&request);
-
-      /*
-      using namespace std; // For strlen.
-      std::cout << "Enter message: ";
-      char request_tbl[max_length];
-      std::cin.getline(request_tbl, max_length);
-      //size_t request_length = strlen(request_tbl);
-      //boost::asio::write(s, boost::asio::buffer(request_tbl, request_length));
-      */
-
-      request_stream << "request_tbl" ;
-
-      // Send the request.
-//      boost::asio::write(socket, request_stream);
-
-//
-//response
-//
-      /*
-      // Read the response status line. The response streambuf will automatically
-      // grow to accommodate the entire line. The growth may be limited by passing
-      // a maximum size to the streambuf constructor.
-      boost::asio::streambuf response;
-
-      // Check that response is OK.
-      std::istream response_stream(&response);
-
-      // Read until EOF, writing data to output as we go.
-      boost::system::error_code error;
-      while (boost::asio::read(socket, response,
-            boost::asio::transfer_at_least(1), error))
-        std::cout << &response;
-      if (error != boost::asio::error::eof)
-        throw boost::system::system_error(error);
-
-
-      char reply[max_length];
-      size_t reply_length = boost::asio::read(s,
-          boost::asio::buffer(reply, request_length));
-      std::cout << "Reply is: ";
-      std::cout.write(reply, reply_length);
-      std::cout << "\n";
-      */
-    }
-    catch (std::exception& e)
-    {
-      std::cerr << "Exception: " << e.what() << "\n";
     }
 
     return 0;
