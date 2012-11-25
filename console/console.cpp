@@ -417,7 +417,7 @@ bool processRequests()
     }
     else if ( command == CONNECT_CMD )
     {
-        ptree pt = netClient( "get") ;
+        ptree pt = netClient( "get" ) ;
 
         BOOST_FOREACH(ptree::value_type &v,
                     pt.get_child("db.stream"))

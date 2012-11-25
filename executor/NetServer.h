@@ -44,6 +44,10 @@ class tcp_server {
 public:
     typedef boost::property_tree::ptree ptree ;
 
+    /** Konstruktor
+      @param io_service obiekt nadrzedny
+      @param wskaznik na funkcje interpretujaca komendy sieciowe
+      */
     tcp_server(boost::asio::io_service& io_service ,
                boost::function< ptree( ptree )> onCommandProcessFn );
 };

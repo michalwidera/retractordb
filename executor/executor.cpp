@@ -126,12 +126,15 @@ void showAwaitedStreams( TimeLine & tl ,
 
 ptree commandProcessor( ptree ptInval )
 {
-    ptree retval ;
+    ptree ptRetval ;
 
-    BOOST_FOREACH( const query & it , coreInstance )
-        retval.put( string("db.stream.")+it.id , it.id );
+    string command = ptInval.get("db.message" , "" ) ;
 
-    return retval ; //sub for a while
+    if ( command == "get" )
+        BOOST_FOREACH( const query & it , coreInstance )
+            ptRetval.put( string("db.stream.")+it.id , it.id );
+
+    return ptRetval ; //sub for a while
 }
 
 #ifndef WIN32
