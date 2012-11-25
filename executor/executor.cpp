@@ -42,6 +42,8 @@ enum limits {
 	noLimits
 };
 
+typedef boost::property_tree::ptree ptree ;
+
 void iTest();
 
 bool bBreakOnLimits( int dProgSize , limits eLimit )
@@ -120,6 +122,16 @@ void showAwaitedStreams( TimeLine & tl ,
         cout << "-" << getSeqNr(str) << "-" ;
       else if ( streamName == str )
         cout << "-" << getSeqNr(str) << "-" ;
+}
+
+ptree commandProcessor( ptree ptInval )
+{
+    ptree retval ;
+
+    BOOST_FOREACH( const query & it , coreInstance )
+        retval.put( string("db.stream.")+it.id , it.id );
+
+    return retval ; //sub for a while
 }
 
 #ifndef WIN32
@@ -307,7 +319,7 @@ int mainFromWin32(int argc, char* argv[])
 
     asio::io_service ios;
 
-    tcp_server server1(ios);
+    tcp_server server1(ios,&commandProcessor);
     //udp_server server2(ios);
 
     thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    

@@ -37,6 +37,10 @@
 using boost::asio::ip::tcp;
 using namespace std ;
 
+typedef boost::property_tree::ptree ptree ;
+
+boost::function< ptree( ptree )> onCommandProcess ;
+
 session::session(boost::asio::io_service& io_service)
 : socket_(io_service)
 {
@@ -74,8 +78,13 @@ void session::handle_read(const boost::system::error_code& error,
       read_xml( strstream , pt );
       }
 
-      pt.put("db.stream.first", "dupa" );
-      pt.put("db.stream.second", 60 );
+      if ( !onCommandProcess )  //safe
+          throw std::out_of_range("cos nie tak - wolanie pustego wskaznika");
+
+      pt = onCommandProcess( pt );
+
+//      pt.put("db.stream.first", "dupa" );
+//      pt.put("db.stream.second", 60 );
 
       std::stringstream strstream;
       write_xml( strstream , pt );
@@ -111,11 +120,13 @@ void session::handle_write(const boost::system::error_code& error)
     }
 }
 
-tcp_server::tcp_server(boost::asio::io_service& io_service)
+tcp_server::tcp_server(boost::asio::io_service& io_service,
+                       boost::function< ptree( ptree )> onCommandProcessFn )
 : io_service_(io_service),
   acceptor_(io_service, tcp::endpoint(tcp::v4(), 1971))
 {
-start_accept();
+    onCommandProcess = onCommandProcessFn ;
+    start_accept();
 }
 
 

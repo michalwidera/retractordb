@@ -2,39 +2,50 @@
 #define NETSERVER_H
 
 #include <boost/asio.hpp>
+#include <boost/function.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+/**
+  * Klasa odpowiedzialna za obsluge sesji - tworzona przez tcp_server
+  * nie uzywana na zewnatrz - trzeba by chyba ja schowac
+  */
 class session
 {
+
+    enum { max_length = 1024 };     //
+    char data_[max_length];         //To mi sie nie podoba - trzeba sprawdzic czy przypadkiem nie ma jakis auto-buforow w asio
+
+    boost::asio::ip::tcp::socket socket_;
+
+    void handle_read(const boost::system::error_code& error,
+                     size_t bytes_transferred);
+
+    void handle_write(const boost::system::error_code& error);
+
 public:
-  session(boost::asio::io_service& io_service) ;
 
-  boost::asio::ip::tcp::socket& socket();
-  void start();
-
-private:
-  void handle_read(const boost::system::error_code& error,
-      size_t bytes_transferred);
-
-  void handle_write(const boost::system::error_code& error);
-
-  boost::asio::ip::tcp::socket socket_;
-  enum { max_length = 1024 };
-  char data_[max_length];
+    session(boost::asio::io_service& io_service) ;
+    boost::asio::ip::tcp::socket& socket();
+    void start();
 };
 
+/**
+  * Klasa odpowiedzialna obsluge polaczenia
+  */
 class tcp_server {
 
+    boost::asio::io_service& io_service_;
+    boost::asio::ip::tcp::acceptor acceptor_;
+
+    void start_accept();
+    void handle_accept(session* new_session,
+                       const boost::system::error_code& error);
+
 public:
-  tcp_server(boost::asio::io_service& io_service);
+    typedef boost::property_tree::ptree ptree ;
 
-private:
-  void start_accept();
-  void handle_accept(session* new_session,
-      const boost::system::error_code& error);
-
-  boost::asio::io_service& io_service_;
-  boost::asio::ip::tcp::acceptor acceptor_;
+    tcp_server(boost::asio::io_service& io_service ,
+               boost::function< ptree( ptree )> onCommandProcessFn );
 };
 
 #endif // NETSERVER_H
