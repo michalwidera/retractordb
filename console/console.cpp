@@ -35,11 +35,15 @@
 #include <boost/iostreams/stream.hpp>
 #include <istream>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
 
 using boost::asio::ip::tcp ;
+using boost::property_tree::ptree;
 
 #include <cassert>
 
@@ -308,6 +312,83 @@ int terminal()
     return 0 ;
 }
 
+const int max_length = 1024;
+
+ptree netClient( string netCommand )
+{
+    ptree pt_response ; //Zwracana wartosc/odpowiedz przez funkcje
+    ptree pt_request;   //Tutaj konstruowane jest pytanie
+
+    pt_request.put("db.query", "hello" ); //potem to wywalic
+
+    try
+    {
+        boost::asio::io_service io_service;
+        tcp::socket socket(io_service);
+        boost::asio::connect(socket,
+                             tcp::resolver(io_service).resolve(
+                                 tcp::resolver::query(
+                                     tcp::v4(), "localhost", "1971" )));
+
+        pt_request.put("db.message", netCommand );
+
+        //
+        //request part
+        //
+
+        // Form the request. We specify the "Connection: close" header so that the
+        // server will close the socket after transmitting the response. This will
+        // allow us to treat all data up until the EOF as the content.
+        boost::asio::streambuf request;
+        std::ostream request_stream(&request);
+
+        write_xml( request_stream , pt_request );
+
+        // Send the request.
+        boost::asio::write(socket, request);
+
+        //
+        //response part
+        //
+
+        // Read the response status line. The response streambuf will automatically
+        // grow to accommodate the entire line. The growth may be limited by passing
+        // a maximum size to the streambuf constructor.
+        boost::asio::streambuf response;
+
+        // Check that response is OK.
+        std::istream response_stream(&response);
+
+        if (response_stream)
+        {
+            // Read until EOF, writing data to output as we go.
+            boost::system::error_code error;
+            while (boost::asio::read(socket, response,
+                             boost::asio::transfer_at_least(1), error))
+            {
+                if ( error == boost::asio::error::eof )
+                    break ;
+            }
+
+            if (error != boost::asio::error::eof)
+                throw boost::system::system_error(error);
+
+            read_xml( response_stream , pt_response );
+        }
+        else
+        {
+            pt_response.put("error.response" , "invalid" );
+        }
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "exception catch:" << e.what() << std::endl;
+        pt_response.put("error.response" , e.what() );
+    }
+
+    return pt_response ;
+}
+
 bool processRequests()
 {
     using namespace dbNet ;
@@ -336,28 +417,23 @@ bool processRequests()
     }
     else if ( command == CONNECT_CMD )
     {
-        boost::asio::connect
-        (
-            dbNet::socket ,
-            resolver.resolve
-            (
-                tcp::resolver::query
-                (
-                    sHostName ,
-                    boost::lexical_cast< std::string >(1971)
-                )
-            )
-        );
+        ptree pt = netClient( "get") ;
 
-        array<char,128> buf = { 'h' , 0 };
-        system::error_code error ;
+        BOOST_FOREACH(ptree::value_type &v,
+                    pt.get_child("db.stream"))
+        {
+            REP(i,80) line[i] = ' ' ;
+            strcpy( line , v.second.data().c_str() );
+            printLine( curline , -1 , line );
+            curline += 1 ;
+        }
 
-        dbNet::socket.write_some( asio::buffer( buf ) , error );
-        dbNet::socket.read_some( asio::buffer(buf) , error );
+        REP(i,80) line[i] = ' ' ;
+        printLine( curline , pos , line );
 
-        return true ;
+        command = NO_CMD ;      
+        return true ;        
     }
-
     return false ;
 }
 

@@ -74,7 +74,8 @@ void session::handle_read(const boost::system::error_code& error,
       read_xml( strstream , pt );
       }
 
-      pt.put("debug.level", 50 );
+      pt.put("db.stream.first", "dupa" );
+      pt.put("db.stream.second", 60 );
 
       std::stringstream strstream;
       write_xml( strstream , pt );
