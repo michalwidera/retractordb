@@ -389,7 +389,7 @@ int inline nb_getch() {
 /// Function: getANSIColor
 /// Return ANSI color escape sequence for specified number 0-15.
 ///
-/// See Color Codes
+/// Color Codes need
 RLUTIL_STRING_T getANSIColor(const int c) {
 	switch (c) {
 		case 0 : return ANSI_BLACK;
@@ -415,7 +415,7 @@ RLUTIL_STRING_T getANSIColor(const int c) {
 /// Function: setColor
 /// Change color specified by number (Windows / QBasic colors).
 ///
-/// See Color Codes
+/// Color Codes need
 void inline setColor(int c) {
 #if defined(WIN32) && !defined(RLUTIL_USE_ANSI)
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
