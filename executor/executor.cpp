@@ -138,6 +138,7 @@ ptree commandProcessor( ptree ptInval )
 }
 
 #ifndef WIN32
+//to sie kompiluje pod Linux
 
 #include <termios.h>
 #include <unistd.h>
