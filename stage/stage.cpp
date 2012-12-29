@@ -395,11 +395,11 @@ int server()
 }
 
 struct A {
-    virtual int ala( float a ) { printf("a"); } ;
+    virtual int ala( float a ) { printf("a"); return 1 ; } ;
 };
 
 struct B : public A {
-    virtual int ala( int a , int b ) { printf("b"); } ;
+    virtual int ala( int a , int b ) { printf("b");  return 1 ; } ;
 };
 
 int main_class()

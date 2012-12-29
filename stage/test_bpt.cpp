@@ -323,6 +323,7 @@ int server_thread()
     server s(io_service);
 
     io_service.run();
+	return 1 ;
 }
 
 int main_bpt_server()
@@ -338,7 +339,7 @@ int main_bpt_server()
         ds.save("debug_settings_out.xml");
         cout << "\nSuccess?\n";
 
-        thread bt(bind(&server_thread));  //puszczenie serwisu w watku
+        thread bt(boost::bind(&server_thread));  //puszczenie serwisu w watku
 
         cout << "Press enter to terminate whenever you want!" << endl;
         string request;

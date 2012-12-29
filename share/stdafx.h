@@ -78,6 +78,8 @@ typedef boost::rational<int> R ;
 #endif
 
 #ifdef _MSC_VER
+#define WIN32_LEAN_AND_MEAN
+#define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #define usleep Sleep
 #else

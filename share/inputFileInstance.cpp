@@ -31,7 +31,7 @@ void inputFileInstance::goBegin()
 inputFileInstance::inputFileInstance( std::string inputFileName )
     : len(0) , curPos(0)
 {
-    shared_ptr< ifstream > ps( new ifstream( inputFileName.c_str() , ios::binary ) ) ;
+    boost::shared_ptr< ifstream > ps( new ifstream( inputFileName.c_str() , ios::binary ) ) ;
     psFile = ps ;
 
     if ( ! psFile.get() )

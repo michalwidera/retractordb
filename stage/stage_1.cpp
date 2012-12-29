@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
     tcp_server server1(ios);
     udp_server server2(ios);
 
-    thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
+    thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 
     cout << "Press enter to terminate whenever you want!" << endl;
     string request;

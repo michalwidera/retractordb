@@ -326,7 +326,7 @@ int mainFromWin32(int argc, char* argv[])
     tcp_server server1(ios,&commandProcessor);
     //udp_server server2(ios);
 
-    thread bt(bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    
+    thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    
 
     std::cout << "Watek serwera sieciowego wystartowal" << std::endl ;
 

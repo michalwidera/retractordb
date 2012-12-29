@@ -847,13 +847,13 @@ kb_getc(void)
 } ;
 
 int
-set_tty_cooked() {};
+set_tty_cooked() { return 0 ; };
 
 int
-set_tty_cbreak() {};
+set_tty_cbreak() { return 0 ; };
 
 int
-set_tty_raw(void) {};
+set_tty_raw(void) { return 0 ; };
 #endif /* linux */
 
 #ifdef __cplusplus
