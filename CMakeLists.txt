@@ -199,14 +199,20 @@ add_executable( xstage ${SOURCES_STAGE} )
 add_executable( xstage_1 ${SOURCES_STAGE_1} )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+    IF (Boost_FOUND)
+       INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
+       ADD_DEFINITIONS( "-DHAS_BOOST" )
+    ENDIF()
+
     find_package( Threads )
 
-    target_link_libraries( xexecutor ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
-    target_link_libraries( xcompiler ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
-    target_link_libraries( xdumper ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
-    target_link_libraries( xconsole ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
-    target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} )
-    target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} )
+    target_link_libraries( xexecutor ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xcompiler ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xdumper ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xconsole ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
 
     add_custom_target( check ALL
         COMMAND chmod +x regtest/gocheck.sh
