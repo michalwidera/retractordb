@@ -77,8 +77,8 @@ public:
 	IBlock (const IBlock&);           //allow copying
 	virtual ~IBlock() {}  ;
 
-	void PutBlock( ARRAY_POINTER pBlockBuffer , long count ) ;
-	long GetBlock( long position , ARRAY_POINTER pBlockBuffer ) ;
+    void PutBlock( arrayPointer_t pBlockBuffer , long count ) ;
+    long GetBlock( long position , arrayPointer_t pBlockBuffer ) ;
 	long GetByteSize() ;
 	void Save( std::ostream& strout ) ;
 	void Load( std::istream& strin ) ;
@@ -104,8 +104,8 @@ public:
     CBlock( long frameSize = 0 ) ;      /**< Konstruktor - Tworzy na stercie obiekt typu strzam. - musi byc bez mutexu! bo siadzie parametr frameSize dlugosc ramki */
 
     virtual ~CBlock() ;                 /**< Destruktor klasy - zabezpieczony przed konflikatmi wielowatkowymi jedna du¿a sekcja krytyczna */
-	void PutBlock( ARRAY_POINTER pBlockBuffer , long count ) ; /**< Umieszczenie ramki w bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) jesli w buforze pBlockBuffer jest wiecej ramek count okresla ta ilosc @param pBlockBuffer wskaznik do bufora @param count ilosc ramek w buforze - w Buffer.h default parametr = 1 */
-	long GetBlock( long position , ARRAY_POINTER pBlockBuffer ) ; /**< Pobranie ramki od d³ugoœci framesize z bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) @param position pozycja do pobrania ze strumienia @param pBlockBuffer wskaznik do bufora @return ilosc odczytanych danych */
+    void PutBlock( arrayPointer_t pBlockBuffer , long count ) ; /**< Umieszczenie ramki w bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) jesli w buforze pBlockBuffer jest wiecej ramek count okresla ta ilosc @param pBlockBuffer wskaznik do bufora @param count ilosc ramek w buforze - w Buffer.h default parametr = 1 */
+    long GetBlock( long position , arrayPointer_t pBlockBuffer ) ; /**< Pobranie ramki od d³ugoœci framesize z bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) @param position pozycja do pobrania ze strumienia @param pBlockBuffer wskaznik do bufora @return ilosc odczytanych danych */
 	long GetByteSize() ;                /**< Funkcja zwraca iloœæ bajtów w bloku @return ilosc bajtow w strumieniu */
 	void Save( std::ostream& strout ) ; /**< Funkcja zapisuje blok do wskazanego strumienia (tzn. pliku) - zapisanie powoduje utrwalnie stanu @param strout strumien wyjsciowy */
 	void Load( std::istream& strin ) ;  /**< Funkcja odczytuje blok ze wskazanego strumieni (tzn. pliku) @param strin strumien wejsciowy */
@@ -124,8 +124,8 @@ public:
 	virtual ~CRecord() ;
 	void DefBlock( long blockID , long frameSize ) ;
 	void DelBlock( long blockID ) ;
-	void PutBlock( long blockID, ARRAY_POINTER pBlockBuffer , long count ) ;
-	long GetBlock( long blockID, long position , ARRAY_POINTER pBlockBuffer  )	;
+    void PutBlock( long blockID, arrayPointer_t pBlockBuffer , long count ) ;
+    long GetBlock( long blockID, long position , arrayPointer_t pBlockBuffer  )	;
 	BLOCK & RefBlock( long blockID )	;
 	typename CRecord::iterator find( long blockID ) ;
 	void Save( std::ostream& stream ) ;
@@ -159,8 +159,8 @@ public:
 
 	long GetByteSize();             /**< Funkcja zwraca iloœæ bajtów w bloku @return ilosc bajtow w strumieniu */
 	virtual ~CCycBlock() ;          /**< Destruktor - czysci mape */
-	void PutBlock( ARRAY_POINTER pBlockBuffer , long count ) ;
-	long GetBlock( long position , ARRAY_POINTER pBlockBuffer ) ;
+    void PutBlock( arrayPointer_t pBlockBuffer , long count ) ;
+    long GetBlock( long position , arrayPointer_t pBlockBuffer ) ;
 	void Save( std::ostream& strout ) ;
 	void Load( std::istream& strin ) ;
 	long SyncToDisk() ;             /**< Funkcja zrzuca blok na dysk i zwraca ile bylo ramek w trakcie zrzutu @return ilosc ramek w strumieniu w trakcie zrzutu */
@@ -196,16 +196,16 @@ public:
 	virtual ~CBufferImpl() ;                    /**< Destruktor - assert zbêdny/shared_ptr? */
 	void Load( const char * filename ) ;    /**< Odczytanie CBufferImpl z pliku */
 	void Save( const char * filename ) ;    /**< Zapisanie CBufferImpl do pliku */
-	void PutBlock( IDTYPE blockID, ARRAY_POINTER pBlockBuffer , long count = 1 ) ;  /**< Umieszczenie ramki w zadanym Bloku (przed t¹ operacj¹ pamiêtaæ ¿e raz trzeba DefBlock lub Load) */
-    long GetBlock( IDTYPE blockID, long position, ARRAY_POINTER pBlockBuffer ) ; /**< Pobranie ramki */
+    void PutBlock( IDTYPE blockID, arrayPointer_t pBlockBuffer , long count = 1 ) ;  /**< Umieszczenie ramki w zadanym Bloku (przed t¹ operacj¹ pamiêtaæ ¿e raz trzeba DefBlock lub Load) */
+    long GetBlock( IDTYPE blockID, long position, arrayPointer_t pBlockBuffer ) ; /**< Pobranie ramki */
 	void DefBlock( IDTYPE blockID, long frameSize , BlockType btType = BF , long aux1 = 0 , long aux2 = 0) ; /**< Zdefiniowanie bloku Jeœli BCF - Cykliczny binarny plik to aux1 - iloœc podplików, aux2 - iloœæ ramek w podpliku	Jeœli BCM - j.w. else aux1,aux2 musi byc 0 ! */
 	void DelBlock( IDTYPE blockID )  ;      /**< Usuniêcie bloku */
 	long GetLen( IDTYPE blockID )  ;        /**< Zwrócenie iloœci ramek */
 	long GetSizeOfFrame( IDTYPE blockID ) ; /**< Zwrócenie d³ugoœci pojedyñczej ramki */
 	long GetSizeOfBlock( IDTYPE blockID , long firstFrm=0 , long lastFrm=-1 ) ; /**< Zwrócenie d³ugoœci w bajtach ca³ego bloku */
 	void Clear() ;                          /**< Obciêcie - wyczyszczenie - Truncate */
-	void DecycleBlockType( IDTYPE blockID , ARRAY_POINTER pBlockBuffer ) ; /**< Rozpiêcie cyklu - zmiana typu - z typu Cyklicznego na typ p³aski */
-	void MemorizeBlockType( IDTYPE blockID , ARRAY_POINTER pBlockBuffer ) ; /**< Przpisanie bloku do pamiêci */
+    void DecycleBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer ) ; /**< Rozpiêcie cyklu - zmiana typu - z typu Cyklicznego na typ p³aski */
+    void MemorizeBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer ) ; /**< Przpisanie bloku do pamiêci */
 	long syncToDisk(IDTYPE blockID ) ;      /** Funkcja zatwierdza strumien na dysku @return zwraca dlugosc strumienia w ramkach */
 	void Dump( std::ostream &os , std::set < string > * pQset ) ;         /** Do celów testowych i raportowych */
 };
@@ -320,7 +320,7 @@ template <class IDTYPE>
 }
 
 template <class IDTYPE>
-	void CBufferImpl<IDTYPE>::PutBlock( IDTYPE blockID, ARRAY_POINTER pBlockBuffer , long count )
+    void CBufferImpl<IDTYPE>::PutBlock( IDTYPE blockID, arrayPointer_t pBlockBuffer , long count )
 {
 	MAP_SWICH ( PutBlock( eval(blockID) , pBlockBuffer , count ) , ; ) ;
 }
@@ -328,7 +328,7 @@ template <class IDTYPE>
 template <class IDTYPE>
 	long CBufferImpl<IDTYPE>::GetBlock( IDTYPE blockID,
 						long position,
-						ARRAY_POINTER pBlockBuffer )
+                        arrayPointer_t pBlockBuffer )
 {
 	MAP_SWICH ( GetBlock( eval(blockID)  , position, pBlockBuffer ) , return )
 		return 0 ; //proforma
@@ -409,7 +409,7 @@ blok[eval(blockID)] = TYPE2 ;\
 		  }
 
 template <class IDTYPE>
-	void CBufferImpl<IDTYPE>::DecycleBlockType( IDTYPE blockID , ARRAY_POINTER pBlockBuffer )
+    void CBufferImpl<IDTYPE>::DecycleBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer )
 {
 	if ( blok[eval(blockID)] == BF ) return ;
 	if ( blok[eval(blockID)] == BM ) return ;
@@ -418,7 +418,7 @@ template <class IDTYPE>
 }
 
 template <class IDTYPE>
-	void CBufferImpl<IDTYPE>::MemorizeBlockType( IDTYPE blockID , ARRAY_POINTER pBlockBuffer )
+    void CBufferImpl<IDTYPE>::MemorizeBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer )
 {
 	if ( blok[eval(blockID)] == BCM ) return ;
 	if ( blok[eval(blockID)] == BM ) return ;
@@ -522,7 +522,7 @@ template <class STREAM>
 }
 
 template <class STREAM>
-	void CBlock<STREAM>::PutBlock( ARRAY_POINTER pBlockBuffer , long count )
+    void CBlock<STREAM>::PutBlock( arrayPointer_t pBlockBuffer , long count )
 {
 	assert( pBlockBuffer.get() != NULL ) ;
 
@@ -535,7 +535,7 @@ template <class STREAM>
 }
 
 template <class STREAM>
-	long CBlock<STREAM>::GetBlock( long position , ARRAY_POINTER pBlockBuffer )
+    long CBlock<STREAM>::GetBlock( long position , arrayPointer_t pBlockBuffer )
 {
 	assert( pBlockBuffer.get() != NULL ) ;
 
@@ -668,13 +668,13 @@ template < typename BLOCK >
 }
 
 template < typename BLOCK >
-	void CRecord<BLOCK>::PutBlock( long blockID, ARRAY_POINTER pBlockBuffer , long count )
+    void CRecord<BLOCK>::PutBlock( long blockID, arrayPointer_t pBlockBuffer , long count )
 {
 	RefBlock( blockID ).PutBlock( pBlockBuffer , count ) ;
 }
 
 template < typename BLOCK >
-	long CRecord<BLOCK>::GetBlock( long blockID, long position , ARRAY_POINTER pBlockBuffer  )
+    long CRecord<BLOCK>::GetBlock( long blockID, long position , arrayPointer_t pBlockBuffer  )
 {
 	return RefBlock( blockID ).GetBlock( position , pBlockBuffer );
 }
@@ -768,7 +768,7 @@ template < typename STREAM >
 /*	Swiadomy i przemyslany brak konstruktora kopiujacego ! => JIT/Shallow Copy required !*/
 
 template < typename STREAM >
-	void CCycBlock <STREAM>::PutBlock( ARRAY_POINTER pBlockBuffer , long count )
+    void CCycBlock <STREAM>::PutBlock( arrayPointer_t pBlockBuffer , long count )
 {
 	assert ( count == 1 );	/** Trzeba przemyslec i napisac dla przypadku > 1 */
 
@@ -799,7 +799,7 @@ template < typename STREAM >
 };
 
 template < typename STREAM >
-	long CCycBlock <STREAM>::GetBlock( long position , ARRAY_POINTER pBlockBuffer )
+    long CCycBlock <STREAM>::GetBlock( long position , arrayPointer_t pBlockBuffer )
 {
 	LOCKBYMUTEX ;
 
@@ -919,7 +919,7 @@ template <class IDTYPE>
 template <class IDTYPE>
 	void CBuffer<IDTYPE>::PutBlock (
 		IDTYPE blockID,
-		ARRAY_POINTER pBlockBuffer ,
+        arrayPointer_t pBlockBuffer ,
 		long count
 		)
 {
@@ -930,7 +930,7 @@ template <class IDTYPE>
 	long CBuffer<IDTYPE>::GetBlock(
 		IDTYPE blockID,
 		long position,
-		ARRAY_POINTER pBlockBuffer )
+        arrayPointer_t pBlockBuffer )
 {
 	return pImpl->GetBlock( blockID , position , pBlockBuffer );
 }
@@ -985,7 +985,7 @@ template <class IDTYPE>
 template <class IDTYPE>
 	void CBuffer<IDTYPE>::DecycleBlockType(
 		IDTYPE blockID ,
-		ARRAY_POINTER pBlockBuffer )
+        arrayPointer_t pBlockBuffer )
 {
 	pImpl->DecycleBlockType( blockID , pBlockBuffer );
 }
@@ -993,7 +993,7 @@ template <class IDTYPE>
 template <class IDTYPE>
 	void CBuffer<IDTYPE>::MemorizeBlockType(
 		IDTYPE blockID ,
-		ARRAY_POINTER pBlockBuffer )
+        arrayPointer_t pBlockBuffer )
 {
 	pImpl->MemorizeBlockType( blockID , pBlockBuffer ) ;
 }
