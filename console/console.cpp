@@ -13,6 +13,18 @@
       (+48) 606 995 918
 */
 
+/*
+ * Za³o¿enia projektowe programu konsoli u¿ytkownika
+ * Konsola:
+ * 1. jest najprostszym interfejsem u¿ytkownika dla systemu zarz¹dzania danymi
+ * 2. udostêpnima dane na bie¿¹co, zgodnie ze zmianami danych w bazie
+ * 3. dane raz wyswietlone ulegaj¹ póŸniejszym zmianom (bie¿¹cej aktualizacji)
+ * 4. komunikuje siê z baz¹ uzgodnionym protoko³em sieciowym
+ * 5. jest przenoœna pomiêdzy systemami (Lin/Win)
+ * 6. dzia³a w œrodowisku tekstowym
+ * TODO: WeŸ siê w garœæ to posprz¹taj ten bajzel tutaj
+ */
+
 #include "stdafx.h"
 
 #include <ctime>
@@ -60,12 +72,14 @@ extern "C" {
 int tc = rlutil::tcols() - 1 ;
 int kchain = 0;
 
+//Domysla ilosc linii odpowiedzi na polecenie dir
 const int defaultLinieCount = 5 ;
 
+//Takie tam z Atari/C64
 const char* welcomeString = "Ready." ;
 
 //identyfikatory wewnetrzne polecen dostepnych z konsolis
-enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD , CONNECT_CMD } ;
+enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD , CONNECT_CMD , HELP_CMD } ;
 
 struct record
 {
@@ -87,6 +101,7 @@ int processCommand( char * commandStr )
     boost::regex matchQuitCmd("quit.*");
     boost::regex matchClsCmd("cls.*");
     boost::regex matchConnectCmd("connect.*");
+    boost::regex matchHelpCmd("help.*");
 
     boost::cmatch what;
 
@@ -96,7 +111,8 @@ int processCommand( char * commandStr )
     if ( regex_match(commandStr,what,matchDirCmd) )
     {
         tableName = what[1].str() ;
-        try {
+        try
+        {
             linecnt = lexical_cast<int>( what[2].str() );
         }
         catch(const bad_lexical_cast &e)
@@ -116,7 +132,12 @@ int processCommand( char * commandStr )
     {
         return CONNECT_CMD ;
     }
-        return NO_CMD ;
+    else
+    if ( regex_match(commandStr,what,matchHelpCmd) )
+    {
+        return HELP_CMD ;
+    }
+    return NO_CMD ;
 }
 
 void printLine( int curline , int pos , char * line )
@@ -205,11 +226,15 @@ int terminal()
     rlutil::ttyRawer ttyRaw ;
 
     rlutil::cls();
-    rlutil::locate( 1 , 1 );
+    rlutil::locate( 1 , 2 );
+
+    printf( "%s" , "  **** STREAMS LAB DATABASE CONSOLE V1 ****" );
+
+    rlutil::locate( 1 , 4 );
     printf( "%s" , welcomeString );
 
+    curline = 5 ;
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-
     printLine( curline , 0 , line );
 
     while(true)
@@ -433,6 +458,15 @@ bool processRequests()
 
         command = NO_CMD ;      
         return true ;        
+    }
+    else if ( command == HELP_CMD )
+    {
+        strcpy( line , "cls, quit, connect, dir [co][ile] (all case sensitive)" );
+        printLine( curline , -1 , line );
+        curline += 1 ;
+        REP(i,80) line[i] = ' ' ;
+        command = NO_CMD ;
+        return true ;
     }
     return false ;
 }
