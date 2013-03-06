@@ -157,6 +157,7 @@ set(SOURCES_STAGE
   regtest/gotest.sh
   regtest/query-lnx.txt
   share/rlutil.h
+  share/fsmtemplate.h
   stage/test.cpp
   stage/test_bpt.cpp
   stage/server.cpp

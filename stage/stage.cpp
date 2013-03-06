@@ -15,27 +15,16 @@
 
 #include "stdafx.h"
 
-#include <boost/mpl/fold.hpp>
-#include <boost/mpl/filter_view.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <vector>
-#include <ctime>
-#include <boost/mpl/vector.hpp>
-
-#include <boost/mpl/placeholders.hpp>
-#include <boost/mpl/assert.hpp>
 #include <boost/static_assert.hpp>
 
+#include <fsmtemplate.h>
 #include <inputFileInstance.h>
 #include <QStruct.h>
-
-#include <boost/any.hpp>
-
-
 
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
+using namespace fsm ;
 
 //namespace mpl = boost::mpl;
 using namespace boost::mpl::placeholders;
@@ -50,165 +39,18 @@ extern "C" {
 extern int main_rlutil() ;
 extern int main_bpt_server() ;
 extern int main_bpt_client() ;
-/*==========================================
-  =                FSM TESTING             =
-  ==========================================*/
-
-template<
-    class Transition
-  , class Next
->
-struct event_dispatcher
-{
-    typedef typename Transition::fsm_t fsm_t;
-    typedef typename Transition::event event;
-
-    static int dispatch(
-        fsm_t& fsm, int state, event const& e)
-    {
-        if (state == Transition::current_state)
-        {
-            Transition::execute(fsm, e);
-            return Transition::next_state;
-        }
-        else // przejœcie do nastêpnego wêz³a w ³añcuchu
-        {
-            return Next::dispatch(fsm, state, e);
-        }
-    }
-};
 
 
-
-template <class Derived> class state_machine;
-
-struct default_event_dispatcher
-{
-    template<class FSM, class Event>
-    static int dispatch(
-        state_machine<FSM>& m, int state, Event const& e)
-    {
-        return m.call_no_transition(state, e);
-    }
-};
-
-
-    template<class Table, class Event>
-    struct generate_dispatcher;
-
-template<class Derived>
-class state_machine
-{
-    // ...
- protected:
-    template<
-        int CurrentState
-      , class Event
-      , int NextState
-      , void (Derived::*action)(Event const&)
-    >
-    struct row
-    {
-        // do póŸniejszego u¿ycia przez metaprogam
-        static int const current_state = CurrentState;
-        static int const next_state = NextState;
-        typedef Event event;
-        typedef Derived fsm_t;
-
-        // wykonanie akcji przejœcia
-        static void execute(Derived& fsm, Event const& e)
-        {
-            (fsm.*action)(e);
-        }
-    };
-
-
-    friend class default_event_dispatcher;
-
-    template <class Event>
-    int call_no_transition(int state, Event const& e)
-    {
-        return static_cast<Derived*>(this)  // rzutowanie w dó³ z CRTP
-                   ->no_transition(state, e);
-    }
-    //
-public:
-
-template<class Event>
-int process_event(Event const& evt)
-{
-    // wygenerowanie typu dyspozytora
-    typedef typename generate_dispatcher<
-        typename Derived::transition_table, Event
-    >::type dispatcher;
-
-    // rozdzielenie zdarzenia
-    this->state = dispatcher::dispatch(
-        *static_cast<Derived*>(this)        // rzutowanie w dó³ z CRTP
-      , this->state
-      , evt
-    );
-
-    // zwrócenie nowego stanu
-    return this->state;
-}
-
-// ...
- protected:
-    state_machine()
-      : state(Derived::initial_state)
-    {
-    }
-
- private:
-    int state;
-// ...
-
-// ...
- public:
-    template <class Event>
-    int no_transition(int state, Event const& e)
-    {
-        assert(false);
-        return state;
-    }
-// ...
-////
-  };
-
-
-// pobranie zdarzenia powiazanego z transakcj¹
-template <class Transition>
-struct transition_event
-{
-    typedef typename Transition::event type;
-};
-
-template<class Table, class Event>
-struct generate_dispatcher
-  : mpl::fold<
-        mpl::filter_view<   // wybranie wierszy wyzwalanych przez Event
-            Table
-          , boost::is_same<Event, transition_event<_1> >
-        >
-      , default_event_dispatcher
-      , event_dispatcher<_2,_1>
-    >
-{};
-
-
-
-  struct play {};
-  struct open_close {};
-  struct cd_detected {
+struct play {};
+struct open_close {};
+struct cd_detected {
     cd_detected(char const*, std::vector<std::clock_t> const&) {}
-  };
-  #ifdef __GNUC__ // w którym pause wydaje siê mieæ predefiniowane znaczenie
-  # define pause pause_
-  #endif
-  struct pause {};
-  struct stop {};
-
+};
+#ifdef __GNUC__ // w którym pause wydaje siê mieæ predefiniowane znaczenie
+# define pause pause_
+#endif
+struct pause {};
+struct stop {};
 
 // konkretna implementacja automatu
 class player : public state_machine<player>
@@ -308,7 +150,6 @@ int fsmTest(){
 
     return 0;
 }
-
 
 map < string , inputFileInstance > gFileMap ;
 
