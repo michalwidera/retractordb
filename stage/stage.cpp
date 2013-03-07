@@ -52,13 +52,10 @@ struct stop {};
 // konkretna implementacja automatu
 class player : public state_machine<player>
 {
- private:
     // lista stanów
     enum states {
-        Empty, Open, Stopped, Playing, Paused
-      , initial_state = Empty
+        Empty, Open, Stopped, Playing, Paused, initial_state = Empty
     };
-
 
     void start_playback(play const&);
     void open_drawer(open_close const&);
@@ -96,23 +93,6 @@ class player : public state_machine<player>
     //  +---------+-------------+---------+---------------------+
 
     > {};
-
-/*
-typedef
-
-    event_dispatcher <
-    //  +---------+-------------+---------+---------------------+
-    row < Stopped , play        , Playing , &p::start_playback  >
-    //  +---------+-------------+---------+---------------------+
-    , event_dispatcher <
-    //  +---------+-------------+---------+---------------------+
-    row < Paused  , play        , Playing , &p::resume_playback >
-    //  +---------+-------------+---------+---------------------+
-    , default_event_dispatcher
-    >
-    > dummy;
-*/
-
 };
 
 void player::start_playback(play const&){ std::cerr << "start "; }
