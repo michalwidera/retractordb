@@ -20,6 +20,7 @@
 #include <fsmtemplate.h>
 #include <inputFileInstance.h>
 #include <QStruct.h>
+#include <ctime>
 
 using namespace std ;
 using namespace boost ;
@@ -40,6 +41,7 @@ extern int main_rlutil() ;
 extern int main_bpt_server() ;
 extern int main_bpt_client() ;
 
+#ifdef __TEST
 
 struct play {};
 struct open_close {};
@@ -128,6 +130,12 @@ int fsmTest(){
     return 0;
 }
 
+
+#else
+int fsmTest(){
+  return 0 ;
+}
+#endif
 map < string , inputFileInstance > gFileMap ;
 
 int fileTest()

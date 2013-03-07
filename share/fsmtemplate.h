@@ -24,20 +24,14 @@
 #ifndef FSMTEMPLATE_H
 #define FSMTEMPLATE_H
 
-#include "stdafx.h"
-
 #include <boost/mpl/fold.hpp>
 #include <boost/mpl/filter_view.hpp>
 #include <boost/type_traits/is_same.hpp>
-#include <vector>
-#include <ctime>
 #include <boost/mpl/vector.hpp>
-
 #include <boost/mpl/placeholders.hpp>
 #include <boost/mpl/assert.hpp>
-#include <boost/static_assert.hpp>
-
-#include <boost/any.hpp>
+#include <cassert>
+#include <vector>
 
 namespace fsm {
 

@@ -27,6 +27,107 @@
 #include "rlutil.h"
 #include <cstdio>
 
+
+#define FSM_TEST_OFF
+//-----fsm test start - testowanie zale¿noœci
+#ifndef FSM_TEST_OFF
+
+#include <fsmtemplate.h>
+using namespace fsm ;
+#include <ctime>
+
+
+
+
+struct play {};
+struct open_close {};
+struct cd_detected {
+    cd_detected(char const*, std::vector<std::clock_t> const&) {}
+};
+struct pauze {};
+struct stop {};
+
+// konkretna implementacja automatu
+class player : public state_machine<player>
+{
+    // lista stanów
+    enum states {
+        Empty, Open, Stopped, Playing, Paused, initial_state = Empty
+    };
+
+    void start_playback(play const&);
+    void open_drawer(open_close const&);
+    void close_drawer(open_close const&);
+    void store_cd_info(cd_detected const&);
+    void stop_playback(stop const&);
+    void pause_playback(pauze const&);
+    void resume_playback(play const&);
+    void stop_and_open(open_close const&);
+
+    friend class state_machine<player>;
+
+    typedef player p; // upraszcza zapis tabeli przejœæ
+
+    // tabela przejœæ
+    struct transition_table : mpl::vector11<
+
+    //    Aktualny   Zdarzenie    Nastêpny      Akcja
+    //  +---------+-------------+---------+---------------------+
+    row < Stopped , play        , Playing , &p::start_playback  >,
+    row < Stopped , open_close  , Open    , &p::open_drawer     >,
+    //  +---------+-------------+---------+---------------------+
+    row < Open    , open_close  , Empty   , &p::close_drawer    >,
+    //  +---------+-------------+---------+---------------------+
+    row < Empty   , open_close  , Open    , &p::open_drawer     >,
+    row < Empty   , cd_detected , Stopped , &p::store_cd_info   >,
+    //  +---------+-------------+---------+---------------------+
+    row < Playing , stop        , Stopped , &p::stop_playback   >,
+    row < Playing , pauze       , Paused  , &p::pause_playback  >,
+    row < Playing , open_close  , Open    , &p::stop_and_open   >,
+    //  +---------+-------------+---------+---------------------+
+    row < Paused  , play        , Playing , &p::resume_playback >,
+    row < Paused  , stop        , Stopped , &p::stop_playback   >,
+    row < Paused  , open_close  , Open    , &p::stop_and_open   >
+    //  +---------+-------------+---------+---------------------+
+
+    > {};
+};
+
+void player::start_playback(play const&){ std::cerr << "start "; }
+void player::open_drawer(open_close const&){ std::cerr << "open "; }
+void player::close_drawer(open_close const&){ std::cerr << "close "; }
+void player::store_cd_info(cd_detected const&){ std::cerr << "store "; }
+void player::stop_playback(stop const&){ std::cerr << "stop ";}
+void player::pause_playback(const pauze &){ std::cerr << "pause ";}
+void player::resume_playback(play const&){ std::cerr << "resume "; }
+void player::stop_and_open(open_close const&){ std::cerr << "stop-open ";}
+
+int fsmTest2(){
+    std::cerr << "*Program main body - start*" << std::endl ;
+
+    player pl;                      // egzemplarz automatu
+
+    pl.process_event(open_close()); // u¿ytkownik otwiera odtwarzacz CD
+    pl.process_event(open_close()); // wk³ada CD i zamyka tackê
+    pl.process_event(               // nastêpuje wykrywanie p³yty CD
+        cd_detected(
+             "louie, louie"
+           , std::vector<std::clock_t>( /* d³ugoœci œcie¿ek */ )
+        )
+    );
+    pl.process_event(play());       // itd.
+    pl.process_event(pauze());
+    pl.process_event(play());
+    pl.process_event(stop());
+
+    std::cerr << std::endl ;
+    std::cerr << "*Program main body - stop*" << std::endl ;
+
+    return 0;
+}
+#endif
+//-----fst test stop
+
 #define waitkey std::cout << "Press any key to continue..." << std::endl; rlutil::anykey()
 
 int main_rlutil() {
