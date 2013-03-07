@@ -28,7 +28,7 @@ using namespace QS ;
 using namespace fsm ;
 
 //namespace mpl = boost::mpl;
-using namespace boost::mpl::placeholders;
+//using namespace boost::mpl::placeholders;
 
 #include <cassert>
 

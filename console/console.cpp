@@ -27,6 +27,8 @@
 
 #include "stdafx.h"
 
+#include <fsmtemplate.h>
+
 #include <ctime>
 
 #include <QStruct.h>
@@ -50,10 +52,10 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 
-
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
+using namespace fsm ;
 
 using boost::asio::ip::tcp ;
 using boost::property_tree::ptree;
