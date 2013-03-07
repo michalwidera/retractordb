@@ -46,10 +46,7 @@ struct open_close {};
 struct cd_detected {
     cd_detected(char const*, std::vector<std::clock_t> const&) {}
 };
-#ifdef __GNUC__ // w którym pause wydaje siê mieæ predefiniowane znaczenie
-# define pause pause_
-#endif
-struct pause {};
+struct pauze {};
 struct stop {};
 
 // konkretna implementacja automatu
@@ -63,24 +60,17 @@ class player : public state_machine<player>
     };
 
 
-    #ifdef __MWERKS__
-     public: // Obejœcie b³êdu z Codewarrior.  Testowane dla 0x3202
-    #endif
-
     void start_playback(play const&);
     void open_drawer(open_close const&);
     void close_drawer(open_close const&);
     void store_cd_info(cd_detected const&);
     void stop_playback(stop const&);
-    void pause_playback(pause const&);
+    void pause_playback(pauze const&);
     void resume_playback(play const&);
     void stop_and_open(open_close const&);
 
+    friend class state_machine<player>;
 
-    #ifdef __MWERKS__
-       private:
-    #endif
-          friend class state_machine<player>;
     typedef player p; // upraszcza zapis tabeli przejœæ
 
     // tabela przejœæ
@@ -97,7 +87,7 @@ class player : public state_machine<player>
     row < Empty   , cd_detected , Stopped , &p::store_cd_info   >,
     //  +---------+-------------+---------+---------------------+
     row < Playing , stop        , Stopped , &p::stop_playback   >,
-    row < Playing , pause       , Paused  , &p::pause_playback  >,
+    row < Playing , pauze       , Paused  , &p::pause_playback  >,
     row < Playing , open_close  , Open    , &p::stop_and_open   >,
     //  +---------+-------------+---------+---------------------+
     row < Paused  , play        , Playing , &p::resume_playback >,
@@ -106,16 +96,23 @@ class player : public state_machine<player>
     //  +---------+-------------+---------+---------------------+
 
     > {};
+
+/*
 typedef
 
-event_dispatcher<
-    row<Stopped, play, Playing, &player::start_playback>
-  , event_dispatcher<
-        row<Paused, play, Playing, &player::resume_playback>
-      , default_event_dispatcher
+    event_dispatcher <
+    //  +---------+-------------+---------+---------------------+
+    row < Stopped , play        , Playing , &p::start_playback  >
+    //  +---------+-------------+---------+---------------------+
+    , event_dispatcher <
+    //  +---------+-------------+---------+---------------------+
+    row < Paused  , play        , Playing , &p::resume_playback >
+    //  +---------+-------------+---------+---------------------+
+    , default_event_dispatcher
     >
->
- dummy;
+    > dummy;
+*/
+
 };
 
 void player::start_playback(play const&){ std::cerr << "start "; }
@@ -123,7 +120,7 @@ void player::open_drawer(open_close const&){ std::cerr << "open "; }
 void player::close_drawer(open_close const&){ std::cerr << "close "; }
 void player::store_cd_info(cd_detected const&){ std::cerr << "store "; }
 void player::stop_playback(stop const&){ std::cerr << "stop ";}
-void player::pause_playback(pause const&){ std::cerr << "pause ";}
+void player::pause_playback(const pauze &){ std::cerr << "pause ";}
 void player::resume_playback(play const&){ std::cerr << "resume "; }
 void player::stop_and_open(open_close const&){ std::cerr << "stop-open ";}
 
@@ -141,7 +138,7 @@ int fsmTest(){
         )
     );
     pl.process_event(play());       // itd.
-    pl.process_event(pause());
+    pl.process_event(pauze());
     pl.process_event(play());
     pl.process_event(stop());
 
