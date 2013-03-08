@@ -27,8 +27,6 @@
 
 #include "stdafx.h"
 
-#include <fsmtemplate.h>
-
 #include <ctime>
 
 #include <QStruct.h>
@@ -52,10 +50,12 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 
+#include <boost/range/algorithm.hpp>
+#include <boost/range/adaptor/map.hpp>
+
 using namespace std ;
 using namespace boost ;
 using namespace QS ;
-using namespace fsm ;
 
 using boost::asio::ip::tcp ;
 using boost::property_tree::ptree;
@@ -71,6 +71,7 @@ extern "C" {
     qTree coreInstance ;
     config configInstance ;
 }
+
 
 int tc = rlutil::tcols() - 1 ;
 int kchain = 0;
@@ -98,8 +99,14 @@ std::vector <record> queryVect ;
 std::string tableName ;
 int linecnt = defaultLinieCount ;
 
+enum cmd_e { Dir , Quit , Cls , Connect , Help }  ;
+
+std::map < cmd_e, boost::regex > commands ;
+
 int processCommand( char * commandStr )
 {
+    using namespace boost::adaptors;
+
     boost::regex matchDirCmd("\\s*dir\\s*(\\w*)\\s*(\\d*).*");
     boost::regex matchQuitCmd("quit.*");
     boost::regex matchClsCmd("cls.*");
@@ -108,39 +115,39 @@ int processCommand( char * commandStr )
 
     boost::cmatch what;
 
-    if ( regex_match(commandStr,what,matchQuitCmd)  )
-        return QUIT_CMD ;
-    else
-    if ( regex_match(commandStr,what,matchDirCmd) )
-    {
-        tableName = what[1].str() ;
-        try
-        {
-            linecnt = lexical_cast<int>( what[2].str() );
-        }
-        catch(const bad_lexical_cast &e)
-        {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
-            linecnt = defaultLinieCount ;
-        }
+    cmd_e cmd ;
 
-        return DIR_CMD ;
-    }
-    else
-    if ( regex_match(commandStr,what,matchClsCmd) )
+    BOOST_FOREACH( cmd_e i, commands | map_keys )
+       if ( regex_match(commandStr,what,commands[i] ) ) cmd = i ;
+
+    switch ( cmd )
     {
+    case Quit:
+        return QUIT_CMD ;
+    case Dir:
+        {
+            tableName = what[1].str() ;
+            try
+            {
+                linecnt = lexical_cast<int>( what[2].str() );
+            }
+            catch(const bad_lexical_cast &e)
+            {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
+                linecnt = defaultLinieCount ;
+            }
+
+            return DIR_CMD ;
+        }
+        break ;
+    case Cls:
         return CLS_CMD ;
-    }
-    else
-    if ( regex_match(commandStr,what,matchConnectCmd) )
-    {
+    case Connect:
         return CONNECT_CMD ;
-    }
-    else
-    if ( regex_match(commandStr,what,matchHelpCmd) )
-    {
+    case Help:
         return HELP_CMD ;
+    default:
+        return NO_CMD ;
     }
-    return NO_CMD ;
 }
 
 void printLine( int curline , int pos , char * line )
@@ -239,6 +246,14 @@ int terminal()
     curline = 5 ;
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
     printLine( curline , 0 , line );
+
+    // ---- inicjacja tablicy poleceñ
+    commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
+    commands[ Quit ] = boost::regex("quit.*") ;
+    commands[ Cls ] = boost::regex("cls.*") ;
+    commands[ Connect ] = boost::regex("connect.*") ;
+    commands[ Help ] = boost::regex("help.*") ;
+    // ----
 
     while(true)
     {
