@@ -82,9 +82,6 @@ const int defaultLinieCount = 5 ;
 //Takie tam z Atari/C64
 const char* welcomeString = "Ready." ;
 
-//identyfikatory wewnetrzne polecen dostepnych z konsolis
-enum { NO_CMD , QUIT_CMD , DIR_CMD , CLS_CMD , CONNECT_CMD , HELP_CMD } ;
-
 struct record
 {
     string command ;     //issued command
@@ -96,52 +93,24 @@ struct record
 
 std::vector <record> queryVect ;
 
+boost::cmatch what;
 std::string tableName ;
 int linecnt = defaultLinieCount ;
 
-enum cmd_e { Dir , Quit , Cls , Connect , Help }  ;
+enum cmd_e { Dir , Quit , Cls , Connect , Help , NoCmd }  ;
 
 std::map < cmd_e, boost::regex > commands ;
 
-int processCommand( char * commandStr )
+cmd_e processCommand( char * commandStr )
 {
     using namespace boost::adaptors;
-
-    boost::cmatch what;
 
     cmd_e cmd ;
 
     BOOST_FOREACH( cmd_e i, commands | map_keys )
-       if ( regex_match(commandStr,what,commands[i] ) ) cmd = i ;
+       if ( regex_match(commandStr,what,commands[i] ) ) return i ;
 
-    switch ( cmd )
-    {
-    case Quit:
-        return QUIT_CMD ;
-    case Dir:
-        {
-            tableName = what[1].str() ;
-            try
-            {
-                linecnt = lexical_cast<int>( what[2].str() );
-            }
-            catch(const bad_lexical_cast &e)
-            {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
-                linecnt = defaultLinieCount ;
-            }
-
-            return DIR_CMD ;
-        }
-        break ;
-    case Cls:
-        return CLS_CMD ;
-    case Connect:
-        return CONNECT_CMD ;
-    case Help:
-        return HELP_CMD ;
-    default:
-        return NO_CMD ;
-    }
+    return NoCmd ;
 }
 
 void printLine( int curline , int pos , char * line )
@@ -199,7 +168,7 @@ void processRegisteredQueries()
     }
 }
 
-int command = NO_CMD ;
+cmd_e command = NoCmd ;
 int pos = 0 ;
 int k = -1 ;
 char line[81]; //linia edytowana
@@ -282,7 +251,7 @@ int terminal()
                 k = -1 ;
                 pos = 0;
                 command = processCommand( line );  //rozpoznanie komendy
-                if ( command != NO_CMD )
+                if ( command != NoCmd )
                 {
                     printLine( curline , -1 , line );    
                     curline += 1 ;
@@ -430,57 +399,70 @@ bool processRequests()
 {
     using namespace dbNet ;
 
-    if ( command == QUIT_CMD )
+    switch ( command )
     {
-        stopLoop = true ;
-        return true ;
-    }
-    else if ( command == DIR_CMD )
-    {
-        register_dir_cmd( curline , pos , line );
-        printLine( curline , pos , line );
-        command = NO_CMD ;
-        return true ;
-    }
-    else if ( command == CLS_CMD )  //wyczyszczenie ekranu
-    {
-        clearRegisteredQueries();
-        REP(i,80) line[i] = ' ' ;
-        pos = 0 ;
-        curline = 2 ;
-        printLine( curline , pos , line );
-        command = NO_CMD ;
-        return true ;
-    }
-    else if ( command == CONNECT_CMD )
-    {
-        ptree pt = netClient( "get" ) ;
-
-        BOOST_FOREACH(ptree::value_type &v,
-                    pt.get_child("db.stream"))
+    case Quit:
         {
+            stopLoop = true ;
+            return true ;
+        }
+    case Dir:
+        {
+            tableName = what[1].str() ;
+            try
+            {
+                linecnt = lexical_cast<int>( what[2].str() );
+            }
+            catch(const bad_lexical_cast &e)
+            {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
+                linecnt = defaultLinieCount ;
+            }
+            register_dir_cmd( curline , pos , line );
+            printLine( curline , pos , line );
+            command = NoCmd ;
+            return true ;
+        }
+    case Cls:
+        {
+            clearRegisteredQueries();
             REP(i,80) line[i] = ' ' ;
-            strcpy( line , v.second.data().c_str() );
+            pos = 0 ;
+            curline = 2 ;
+            printLine( curline , pos , line );
+            command = NoCmd ;
+            return true ;
+        }
+    case Connect:
+        {
+            ptree pt = netClient( "get" ) ;
+
+            BOOST_FOREACH(ptree::value_type &v,
+                          pt.get_child("db.stream"))
+            {
+                REP(i,80) line[i] = ' ' ;
+                strcpy( line , v.second.data().c_str() );
+                printLine( curline , -1 , line );
+                curline += 1 ;
+            }
+
+            REP(i,80) line[i] = ' ' ;
+            printLine( curline , pos , line );
+
+            command = NoCmd ;
+            return true ;
+        }
+    case Help:
+        {
+            strcpy( line , "cls, quit, connect, dir [co][ile] (all case sensitive)" );
             printLine( curline , -1 , line );
             curline += 1 ;
+            REP(i,80) line[i] = ' ' ;
+            command = NoCmd ;
+            return true ;
         }
-
-        REP(i,80) line[i] = ' ' ;
-        printLine( curline , pos , line );
-
-        command = NO_CMD ;      
-        return true ;        
+    default :
+        return false ;
     }
-    else if ( command == HELP_CMD )
-    {
-        strcpy( line , "cls, quit, connect, dir [co][ile] (all case sensitive)" );
-        printLine( curline , -1 , line );
-        curline += 1 ;
-        REP(i,80) line[i] = ' ' ;
-        command = NO_CMD ;
-        return true ;
-    }
-    return false ;
 }
 
 int main(int argc, char* argv[])
