@@ -206,14 +206,6 @@ int terminal()
     REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
     printLine( curline , 0 , line );
 
-    // ---- inicjacja tablicy poleceñ
-    commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-    commands[ Quit ] = boost::regex("quit.*") ;
-    commands[ Cls ] = boost::regex("cls.*") ;
-    commands[ Connect ] = boost::regex("connect.*") ;
-    commands[ Help ] = boost::regex("help.*") ;
-    // ----
-
     while(true)
     {
         k = rlutil::kb_getc() ;
@@ -483,6 +475,14 @@ int main(int argc, char* argv[])
         po::store(po::command_line_parser(argc, argv).
                   options(desc).positional(p).run(), vm);
         po::notify(vm);
+
+        // ---- inicjacja tablicy poleceñ
+        commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
+        commands[ Quit ] = boost::regex("quit.*") ;
+        commands[ Cls ] = boost::regex("cls.*") ;
+        commands[ Connect ] = boost::regex("connect.*") ;
+        commands[ Help ] = boost::regex("help.*") ;
+        // ----
 
         if (vm.count("help"))
         {
