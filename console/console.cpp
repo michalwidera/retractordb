@@ -257,7 +257,8 @@ int terminal()
                     curline += 1 ;
                 }
                 REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-                processRequests() ;
+                if ( processRequests() )
+                    command = NoCmd ;
                 printf("\a");   //beep
             }
             else if ( k == 224 ) //control sequence - windows
