@@ -419,7 +419,6 @@ bool processRequests()
             }
             register_dir_cmd( curline , pos , line );
             printLine( curline , pos , line );
-            command = NoCmd ;
             return true ;
         }
     case Cls:
@@ -429,7 +428,6 @@ bool processRequests()
             pos = 0 ;
             curline = 2 ;
             printLine( curline , pos , line );
-            command = NoCmd ;
             return true ;
         }
     case Connect:
@@ -447,8 +445,6 @@ bool processRequests()
 
             REP(i,80) line[i] = ' ' ;
             printLine( curline , pos , line );
-
-            command = NoCmd ;
             return true ;
         }
     case Help:
@@ -457,7 +453,6 @@ bool processRequests()
             printLine( curline , -1 , line );
             curline += 1 ;
             REP(i,80) line[i] = ' ' ;
-            command = NoCmd ;
             return true ;
         }
     default :
@@ -518,7 +513,10 @@ int main(int argc, char* argv[])
                      cout << ":" << line ;
                      command = processCommand( line );
                      if ( processRequests() )
+                     {
+                         command = NoCmd ;
                          cout << ",OK" << endl ;
+                     }
                      else
                          cout << ",?" << endl ;
                  }
