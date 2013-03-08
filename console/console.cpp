@@ -94,7 +94,6 @@ struct record
 std::vector <record> queryVect ;
 
 boost::cmatch what;
-std::string tableName ;
 int linecnt = defaultLinieCount ;
 
 enum cmd_e { Dir , Quit , Cls , Connect , Help , NoCmd }  ;
@@ -130,7 +129,7 @@ void printLine( int curline , int pos , char * line )
     }
 }
 
-void register_dir_cmd( int &curline , int pos , char * line )
+void register_dir_cmd( int &curline , int pos , char * line , string tableName )
 {
     record recordInstance ;
     recordInstance.command = line ;
@@ -143,7 +142,6 @@ void register_dir_cmd( int &curline , int pos , char * line )
     queryVect.push_back( recordInstance );
 
     REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
-    tableName = "" ;
     linecnt = defaultLinieCount ;
 }
 
@@ -409,7 +407,6 @@ bool processRequests()
         }
     case Dir:
         {
-            tableName = what[1].str() ;
             try
             {
                 linecnt = lexical_cast<int>( what[2].str() );
@@ -418,7 +415,7 @@ bool processRequests()
             {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
                 linecnt = defaultLinieCount ;
             }
-            register_dir_cmd( curline , pos , line );
+            register_dir_cmd( curline , pos , line , what[1].str() );
             printLine( curline , pos , line );
             return true ;
         }
@@ -465,12 +462,7 @@ int main(int argc, char* argv[])
 {
     //Intro
     cerr << "Console - konsola systemu.\n";
-    string revision(  "$Rev: 68 $" );  //This string is svn keyword
-    std::replace( revision.begin() , revision.end() , '$' , ' ' );
-    revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-    cerr <<
-            "used compiler tag:" + string(COMPILER) +
-            "," + revision <<
+    cerr << "used compiler tag:" + string(COMPILER) +
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
             std::endl ;
 

@@ -195,17 +195,12 @@ usleep (unsigned int usecs)
 int mainFromWin32(int argc, char* argv[])
 #endif
 {
-    cout << "Executor - egzekutor planow zapytan tworzonych przez kompilator.\n";
-	string revision(  "$Rev: 55 $" );  //This string is svn keyword
-	replace( revision.begin() , revision.end() , '$' , ' ' );
-	revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-    cout <<
-        "Tag kompilatora:" + string(COMPILER) +
-		"," + revision <<
+    cerr << "Executor - egzekutor planow zapytan tworzonych przez kompilator.\n";
+    cerr << "used compiler tag:" + string(COMPILER) +
 #ifdef _CONSOLE
-		", CTS:" << string( __TIMESTAMP__ ) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
+            ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
 #endif
-		endl ;
+            std::endl ;
 
 	try {
 	namespace po = boost::program_options;

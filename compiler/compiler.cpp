@@ -811,13 +811,8 @@ std::streambuf *oldbuf = std::clog.rdbuf(clog.rdbuf()); ;
 int main(int argc, char* argv[])
 {
     //Intro
-    cout << "Parser/Compiler - parser i reduktor planow zapytan.\n";
-    string revision(  "$Rev: 2 $" );  //This string is svn keyword
-    std::replace( revision.begin() , revision.end() , '$' , ' ' );
-    revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-    cout <<
-            "Znacznik kompilatora:" + string(COMPILER) +
-            "," + revision <<
+    cerr << "Parser/Compiler - parser i reduktor planow zapytan.\n";
+    cerr << "used compiler tag:" + string(COMPILER) +
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
             std::endl ;
 
