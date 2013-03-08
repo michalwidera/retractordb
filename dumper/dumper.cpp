@@ -425,15 +425,10 @@ void dumpQHierarchy()
 int main(int argc, char* argv[])
 {
 	//Intro
-    cout << "Dumper - decoder of qry files.\n";
-	string revision(  "$Rev: 43 $" );  //This string is svn keyword
-	std::replace( revision.begin() , revision.end() , '$' , ' ' );
-	revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-    cout <<
-		"used compiler tag:" + string(COMPILER) +
-		"," + revision <<
-		", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
-		std::endl ;
+    cerr << "Dumper - decoder of qry files.\n";
+    cerr << "used compiler tag:" + string(COMPILER) +
+            ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
+            std::endl ;
 
 	try {
 	namespace po = boost::program_options;

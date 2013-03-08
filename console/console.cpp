@@ -104,8 +104,6 @@ cmd_e processCommand( char * commandStr )
 {
     using namespace boost::adaptors;
 
-    cmd_e cmd ;
-
     BOOST_FOREACH( cmd_e i, commands | map_keys )
        if ( regex_match(commandStr,what,commands[i] ) ) return i ;
 

@@ -285,12 +285,7 @@ int main(int argc, char* argv[])
 {
     //Intro
     cerr << "Stage - staging area of database algorithms.\n";
-    string revision(  "$Rev: 38 $" );  //This string is svn keyword
-    std::replace( revision.begin() , revision.end() , '$' , ' ' );
-    revision.erase( std::remove( revision.begin() , revision.end() , ' ' ) , revision.end()) ; //erase-remove idiom
-    cerr <<
-            "used compiler tag:" + string(COMPILER) +
-            "," + revision <<
+    cerr << "used compiler tag:" + string(COMPILER) +
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
             std::endl ;
 
