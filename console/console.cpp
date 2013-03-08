@@ -107,12 +107,6 @@ int processCommand( char * commandStr )
 {
     using namespace boost::adaptors;
 
-    boost::regex matchDirCmd("\\s*dir\\s*(\\w*)\\s*(\\d*).*");
-    boost::regex matchQuitCmd("quit.*");
-    boost::regex matchClsCmd("cls.*");
-    boost::regex matchConnectCmd("connect.*");
-    boost::regex matchHelpCmd("help.*");
-
     boost::cmatch what;
 
     cmd_e cmd ;
