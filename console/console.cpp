@@ -84,233 +84,29 @@ const char* welcomeString = "Ready." ;
 
 struct record
 {
-    string command ;     //issued command
+    string commandTxt ;     //issued command
     string streamName ;  //nazwa strumienia z systemu
     int linebeg ;        //linia od ktorej sie zaczyna wyswietlanie
     int linecnt ;        //ilosc linii do wyswietlenia
     int timing ;         //tutaj potem rational
 };
 
-std::vector <record> queryVect ;
-
-boost::cmatch what;
-int linecnt = defaultLinieCount ;
-
-enum cmd_e { Dir , Quit , Cls , Connect , Help , NoCmd }  ;
-
-std::map < cmd_e, boost::regex > commands ;
-
-cmd_e processCommand( char * commandStr )
-{
-    using namespace boost::adaptors;
-
-    BOOST_FOREACH( cmd_e i, commands | map_keys )
-       if ( regex_match(commandStr,what,commands[i] ) ) return i ;
-
-    return NoCmd ;
-}
-
-void printLine( int curline , int pos , char * line )
-{
-    rlutil::locate( 1 , curline );
-    REP(i,80)
-    {
-        if ( i == pos )
-            printf("_");
-        else
-        {
-            if ( line[i] >= 32 && line[i] <= 126 )
-                printf("%c" , line[i] );
-            else
-                printf(" ");
-        }
-    }
-}
-
-void register_dir_cmd( int &curline , int pos , char * line , string tableName )
-{
-    record recordInstance ;
-    recordInstance.command = line ;
-    recordInstance.linebeg = curline ;
-
-    recordInstance.linecnt = linecnt ;
-    curline += linecnt ;
-
-    recordInstance.streamName = tableName ;
-    queryVect.push_back( recordInstance );
-
-    REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
-    linecnt = defaultLinieCount ;
-}
-
-void clearRegisteredQueries()
-{
-    rlutil::cls();
-    rlutil::locate( 1 , 1 );
-    printf( "%s" , welcomeString );
-
-    queryVect.clear();
-}
-
-void processRegisteredQueries()
-{
-    BOOST_FOREACH( record r , queryVect )
-    {
-        REP( n , r.linecnt )
-        {
-            rlutil::locate( 1 , r.linebeg + n );
-            printf("test dir %d str:%s rnd:%d",n,r.streamName.c_str(),rand());
-        }
-    }
-}
-
-cmd_e command = NoCmd ;
-int pos = 0 ;
-int k = -1 ;
-char line[81]; //linia edytowana
-int curline(2); //aktualna lina w ktorej wprowadzamy tekst
-bool stopLoop(false);
-
-bool processRequests() ; //deklaracja funkcji
-
 //
 // Zestawienie polaczenia
 //
 namespace dbNet {
-string sHostName ;
+    string sHostName ;
 
-boost::asio::io_service io_service;
-tcp::resolver resolver(io_service);
-tcp::socket socket(io_service);
+    boost::asio::io_service io_service;
+    tcp::resolver resolver(io_service);
+    tcp::socket socket(io_service);
 }
 
-//
-// Glowna procedura terminala z petla zdarzen
-//
-int terminal()
-{
-    setbuf(stdout, NULL);   //niebuforowany printf
-
-    rlutil::CursorHider hideCursor ;
-    rlutil::ttyRawer ttyRaw ;
-
-    rlutil::cls();
-    rlutil::locate( 1 , 2 );
-
-    printf( "%s" , "  **** STREAMS LAB DATABASE CONSOLE V1 ****" );
-
-    rlutil::locate( 1 , 4 );
-    printf( "%s" , welcomeString );
-
-    curline = 5 ;
-    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-    printLine( curline , 0 , line );
-
-    while(true)
-    {
-        k = rlutil::kb_getc() ;
-
-        if ( k != 0 )
-        {            
-            if ( k == 27 ) // linux part
-            {
-                k = getch();
-
-                if ( k == 91 )
-                {
-                    k = getch();
-
-                    if ( k == 67 ) //strzalka w prawo
-                    {
-                        pos ++ ;
-                        k = -1 ;
-                    }
-
-                    if ( k == 68 ) //strzalka w lewo
-                    {
-                        pos -- ;
-                        k = -1 ;
-                    }
-                }
-
-            }
-            else if ( k == 13 || k == 10 )   //hit enter i przetwarzenie komendy
-            {
-                k = -1 ;
-                pos = 0;
-                command = processCommand( line );  //rozpoznanie komendy
-                if ( command != NoCmd )
-                {
-                    printLine( curline , -1 , line );    
-                    curline += 1 ;
-                }
-                REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-                if ( processRequests() )
-                    command = NoCmd ;
-                printf("\a");   //beep
-            }
-            else if ( k == 224 ) //control sequence - windows
-            {
-                int k_ = k ;
-
-                k = getch();
-
-                if ( k == 75 ) //left arrow
-                {
-                    assert( pos >= 0 );
-
-                    if ( pos > 0 ) pos -- ;
-                }
-
-                if ( k == 77 )  //right arrow
-                {
-                    assert( pos <= 81 );
-
-                    if ( pos <= 80 ) pos ++ ;
-                }
-
-                k = k_ ;
-            }
-            else if ( k == 8 || k == 127) //backspace
-            {
-                if ( pos > 0 ) pos -- ;
-                REP( i , 80 - pos )
-                {
-                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
-                    assert( pos +i >= 0    && pos +i    <= 80 );
-
-                    line[pos+i] = line[pos+i+1];
-                }
-            }
-            else if ( k >= 32 && k <= 126 ) //ascii char
-            {
-                REPD( i , 80-pos )
-                {
-                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
-                    assert( pos +i >= 0    && pos +i    <= 80 );
-
-                    line[pos+i+1] = line[pos+i];
-                }
-
-                assert( pos + 1 <= 80 );
-                line[pos++] = k ;
-            }
-
-            printLine( curline , pos , line );
-
-            if ( stopLoop ) break ;
-        }
-
-        processRegisteredQueries();
-    }
-
-    return 0 ;
-}
-
-const int max_length = 1024;
 
 ptree netClient( string netCommand )
 {
+    const int max_length = 1024;
+
     ptree pt_response ; //Zwracana wartosc/odpowiedz przez funkcje
     ptree pt_request;   //Tutaj konstruowane jest pytanie
 
@@ -384,7 +180,252 @@ ptree netClient( string netCommand )
     return pt_response ;
 }
 
-bool processRequests()
+enum cmd_e { Quit , Dir , Cls , Connect , Help , NoCmd }  ;
+
+class termClass {
+
+    std::vector <record> queryVect ;
+
+    boost::cmatch what;
+
+    std::map < cmd_e, boost::regex > commands ;
+
+    int pos ;
+    int k ;
+    char line[81]; //linia edytowana
+    int curline; //aktualna lina w ktorej wprowadzamy tekst
+    bool stopLoop;
+
+    int terminal();
+
+    void printLine( int curline , int pos , char * line );
+    cmd_e processCommand( char * commandStr );
+    bool processRequests(cmd_e command) ; //deklaracja funkcji
+
+    void register_dir_cmd( int &curline , int pos , char * line , string tableName , int l );
+    void clearRegisteredQueries();
+    void processRegisteredQueries();
+
+
+public:
+    termClass( bool stopLoop = true )
+        : stopLoop(stopLoop),
+          pos(0) ,
+          k(-1),
+          curline(2)
+    {
+        // ---- inicjacja tablicy poleceñ
+        commands[ Quit ] = boost::regex("quit.*") ;
+        commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
+        commands[ Cls ] = boost::regex("cls.*") ;
+        commands[ Connect ] = boost::regex("connect.*") ;
+        commands[ Help ] = boost::regex("help.*") ;
+        // ----
+
+        if ( !stopLoop ) postMortemRetCode = terminal();
+        else postMortemRetCode = 0 ;
+    }
+
+    int postMortemRetCode ;
+
+    ~termClass() {} ;
+
+    bool issueCommand( char * commandStr )
+    {
+        return processRequests( processCommand ( commandStr ) );
+    }
+};
+
+cmd_e termClass::processCommand( char * commandStr )
+{
+    assert( commands.size() != 0 );
+
+    using namespace boost::adaptors;
+
+    BOOST_FOREACH( cmd_e i, commands | map_keys )
+       if ( regex_match(commandStr,what,commands[i] ) )
+        {
+            return i ;
+        }
+
+    return NoCmd ;
+}
+
+void termClass::printLine( int curline , int pos , char * line )
+{
+    rlutil::locate( 1 , curline );
+    REP(i,80)
+    {
+        if ( i == pos )
+            printf("_");
+        else
+        {
+            if ( line[i] >= 32 && line[i] <= 126 )
+                printf("%c" , line[i] );
+            else
+                printf(" ");
+        }
+    }
+}
+
+void termClass::register_dir_cmd( int &curline , int pos , char * line , string tableName , int l )
+{
+    record recordInstance ;
+    recordInstance.commandTxt = line ;
+    recordInstance.linebeg = curline ;
+
+    recordInstance.linecnt = l ;
+    curline += l ;
+
+    recordInstance.streamName = tableName ;
+    queryVect.push_back( recordInstance );
+
+    REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
+}
+
+void termClass::clearRegisteredQueries()
+{
+    rlutil::cls();
+    rlutil::locate( 1 , 1 );
+    printf( "%s" , welcomeString );
+
+    queryVect.clear();
+}
+
+void termClass::processRegisteredQueries()
+{
+    BOOST_FOREACH( record r , queryVect )
+    {
+        REP( n , r.linecnt )
+        {
+            rlutil::locate( 1 , r.linebeg + n );
+            printf("test dir %d str:%s rnd:%d",n,r.streamName.c_str(),rand());
+        }
+    }
+}
+
+//
+// Glowna procedura terminala z petla zdarzen
+//
+int termClass::terminal()
+{
+    setbuf(stdout, NULL);   //niebuforowany printf
+
+    rlutil::CursorHider hideCursor ;
+    rlutil::ttyRawer ttyRaw ;
+
+    rlutil::cls();
+    rlutil::locate( 1 , 2 );
+
+    printf( "%s" , "  **** STREAMS LAB DATABASE CONSOLE V1 ****" );
+
+    rlutil::locate( 1 , 4 );
+    printf( "%s" , welcomeString );
+
+    curline = 5 ;
+    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+    printLine( curline , 0 , line );
+
+    while(true)
+    {
+        k = rlutil::kb_getc() ;
+
+        if ( k != 0 )
+        {            
+            if ( k == 27 ) // linux part
+            {
+                k = getch();
+
+                if ( k == 91 )
+                {
+                    k = getch();
+
+                    if ( k == 67 ) //strzalka w prawo
+                    {
+                        pos ++ ;
+                        k = -1 ;
+                    }
+
+                    if ( k == 68 ) //strzalka w lewo
+                    {
+                        pos -- ;
+                        k = -1 ;
+                    }
+                }
+
+            }
+            else if ( k == 13 || k == 10 )   //hit enter i przetwarzenie komendy
+            {
+                k = -1 ;
+                pos = 0;
+                curline += 1 ;
+                if ( processRequests( processCommand( line ) ) )
+                {
+                    printLine( curline , 0 , line );
+                }
+                REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+                printf("\a");   //beep
+            }
+            else if ( k == 224 ) //control sequence - windows
+            {
+                int k_ = k ;
+
+                k = getch();
+
+                if ( k == 75 ) //left arrow
+                {
+                    assert( pos >= 0 );
+
+                    if ( pos > 0 ) pos -- ;
+                }
+
+                if ( k == 77 )  //right arrow
+                {
+                    assert( pos <= 81 );
+
+                    if ( pos <= 80 ) pos ++ ;
+                }
+
+                k = k_ ;
+            }
+            else if ( k == 8 || k == 127) //backspace
+            {
+                if ( pos > 0 ) pos -- ;
+                REP( i , 80 - pos )
+                {
+                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                    assert( pos +i >= 0    && pos +i    <= 80 );
+
+                    line[pos+i] = line[pos+i+1];
+                }
+            }
+            else if ( k >= 32 && k <= 126 ) //ascii char
+            {
+                REPD( i , 80-pos )
+                {
+                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                    assert( pos +i >= 0    && pos +i    <= 80 );
+
+                    line[pos+i+1] = line[pos+i];
+                }
+
+                assert( pos + 1 <= 80 );
+                line[pos++] = k ;
+            }
+
+            printLine( curline , pos , line );
+
+            if ( stopLoop ) break ;
+        }
+
+        processRegisteredQueries();
+    }
+
+    return 0 ;
+}
+
+
+bool termClass::processRequests( cmd_e command )
 {
     using namespace dbNet ;
 
@@ -397,16 +438,17 @@ bool processRequests()
         }
     case Dir:
         {
+            int l ;
             try
             {
-                linecnt = lexical_cast<int>( what[2].str() );
+                l = lexical_cast<int>( what[2].str() );
             }
             catch(const bad_lexical_cast &e)
             {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
-                linecnt = defaultLinieCount ;
+                l = defaultLinieCount ;
             }
-            register_dir_cmd( curline , pos , line , what[1].str() );
-            printLine( curline , pos , line );
+
+            register_dir_cmd( curline , pos + 2 , line , what[1].str() , l );
             return true ;
         }
     case Cls:
@@ -476,14 +518,6 @@ int main(int argc, char* argv[])
                   options(desc).positional(p).run(), vm);
         po::notify(vm);
 
-        // ---- inicjacja tablicy poleceñ
-        commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-        commands[ Quit ] = boost::regex("quit.*") ;
-        commands[ Cls ] = boost::regex("cls.*") ;
-        commands[ Connect ] = boost::regex("connect.*") ;
-        commands[ Help ] = boost::regex("help.*") ;
-        // ----
-
         if (vm.count("help"))
         {
             cerr << desc << endl ;
@@ -500,16 +534,18 @@ int main(int argc, char* argv[])
                  std::string rline;
                  while (std::getline(file, rline))
                  {
+                     char line[81]; //linia edytowana
                      strcpy( line , rline.c_str() );
                      cout << ":" << line ;
-                     command = processCommand( line );
-                     if ( processRequests() )
+                     termClass termClassInstance ;
+                     if ( termClassInstance.issueCommand(line) )
                      {
-                         command = NoCmd ;
                          cout << ",OK" << endl ;
                      }
                      else
+                     {
                          cout << ",?" << endl ;
+                     }
                  }
             }
             else
@@ -520,7 +556,10 @@ int main(int argc, char* argv[])
             return 0;
         }
         else
-            return terminal();
+        {
+            termClass instance(false);
+            return instance.postMortemRetCode ;
+        }
 
     }    
     catch(std::exception& e)
