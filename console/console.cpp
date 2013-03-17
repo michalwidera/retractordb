@@ -358,11 +358,9 @@ int termClass::terminal()
             {
                 k = -1 ;
                 pos = 0;
+                printLine( curline , -1 , line );
                 curline += 1 ;
-                if ( processRequests( processCommand( line ) ) )
-                {
-                    printLine( curline , 0 , line );
-                }
+                processRequests( processCommand( line ) ) ;
                 REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
                 printf("\a");   //beep
             }
