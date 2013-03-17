@@ -29,7 +29,7 @@
 
 #include <ctime>
 
-#include <QStruct.h>
+//#include <QStruct.h>
 
 #include "rlutil.h"
 #include <cstdio>
@@ -55,7 +55,6 @@
 
 using namespace std ;
 using namespace boost ;
-using namespace QS ;
 
 using boost::asio::ip::tcp ;
 using boost::property_tree::ptree;
@@ -66,12 +65,6 @@ using boost::property_tree::ptree;
 #define FORD(i,a,b) for(int i=(b)-1;i>=(a);--i)
 #define REP(i,n) FOR(i,0,n)
 #define REPD(i,n) FORD(i,0,n)
-
-extern "C" {
-    qTree coreInstance ;
-    config configInstance ;
-}
-
 
 int tc = rlutil::tcols() - 1 ;
 int kchain = 0;

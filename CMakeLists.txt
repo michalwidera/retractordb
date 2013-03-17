@@ -164,8 +164,6 @@ set(SOURCES_STAGE
 )
 set(SOURCES_CONSOLE
   console/console.cpp
-  share/inputFileInstance.cpp
-  share/QStruct.cpp
   share/stdafx.cpp
 )
 set(SOURCES_STAGE_1
