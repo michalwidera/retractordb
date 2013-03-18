@@ -102,4 +102,14 @@ typedef boost::rational<int> R ;
 #error Visual C++ .NET 2002 Compiler not supported
 #endif 
 
+
+// Szybkie prototypowanie - toolset
+#ifndef STDAFX_FAST_PROTOTYPE
+#define STDAFX_FAST_PROTOTYPE
+#define FOR(i,a,b) for(int i=(a);i<(b);++i)
+#define FORD(i,a,b) for(int i=(b)-1;i>=(a);--i)
+#define REP(i,n) FOR(i,0,n)
+#define REPD(i,n) FORD(i,0,n)
+#endif
+
 #endif

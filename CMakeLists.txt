@@ -164,6 +164,8 @@ set(SOURCES_STAGE
 )
 set(SOURCES_CONSOLE
   console/console.cpp
+  console/continiousterminal.cpp
+  console/continiousterminal.h
   share/stdafx.cpp
 )
 set(SOURCES_STAGE_1

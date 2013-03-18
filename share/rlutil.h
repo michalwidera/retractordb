@@ -28,7 +28,8 @@
  *>
  *>0. You just DO WHAT THE FUCK YOU WANT TO.
  */
-
+#ifndef RLUTIL_TOOL_ONCE
+#define RLUTIL_TOOL_ONCE
 
 #define UBUNTU
 
@@ -867,3 +868,4 @@ struct ttyRawer {
 
 } // namespace rlutil
 
+#endif
