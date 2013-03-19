@@ -49,7 +49,7 @@ class ContiniousTerminal {
     void printLine( int curline , int pos , char * line );
     cmd_e processCommand( char * commandStr );
     bool processRequests(cmd_e command) ;
-    void register_dir_cmd( int &curline , int pos , char * line , std::string tableName , int l );
+    void registerDirCmd( int &curline , int pos , char * line , std::string tableName , int l );
     void clearRegisteredQueries();
     void processRegisteredQueries();
 

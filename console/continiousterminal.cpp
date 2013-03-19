@@ -110,7 +110,7 @@ void ContiniousTerminal::printLine( int curline , int pos , char * line )
     }
 }
 
-void ContiniousTerminal::register_dir_cmd( int &curline , int pos , char * line , string tableName , int l )
+void ContiniousTerminal::registerDirCmd( int &curline , int pos , char * line , string tableName , int l )
 {
     record recordInstance ;
     recordInstance.commandTxt = line ;
@@ -288,7 +288,7 @@ bool ContiniousTerminal::processRequests( cmd_e command )
                 l = defaultLinieCount ;
             }
 
-            register_dir_cmd( curline , pos + 2 , line , what[1].str() , l );
+            registerDirCmd( curline , pos + 2 , line , what[1].str() , l );
             return true ;
         }
     case Cls:
