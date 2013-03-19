@@ -57,10 +57,28 @@ const char* welcomeString = "Ready." ;
 int tc = rlutil::tcols() - 1 ;
 int kchain = 0;
 
-
-
 //deklaracja
 ptree netClient( string netCommand );
+
+
+ContiniousTerminal::ContiniousTerminal( bool stopLoop )
+    : stopLoop(stopLoop),
+      pos(0) ,
+      curline(2)
+{
+    // ---- inicjacja tablicy poleceñ
+    commands[ Quit ] = boost::regex("quit.*") ;
+    commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
+    commands[ Cls ] = boost::regex("cls.*") ;
+    commands[ Connect ] = boost::regex("connect.*") ;
+    commands[ Help ] = boost::regex("help.*") ;
+    // ----
+
+    if ( !stopLoop ) postMortemRetCode = terminal();
+    else postMortemRetCode = 0 ;
+}
+
+
 
 cmd_e ContiniousTerminal::processCommand( char * commandStr )
 {
@@ -133,6 +151,8 @@ void ContiniousTerminal::processRegisteredQueries()
 //
 int ContiniousTerminal::terminal()
 {
+    int k ;
+
     setbuf(stdout, NULL);   //niebuforowany printf
 
     rlutil::CursorHider hideCursor ;

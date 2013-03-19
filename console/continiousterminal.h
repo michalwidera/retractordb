@@ -23,14 +23,12 @@
 
 enum cmd_e { Quit , Dir , Cls , Connect , Help , NoCmd }  ;
 
-using namespace std;
-
 class ContiniousTerminal {
 
     struct record
     {
-        string commandTxt ;     //issued command
-        string streamName ;  //nazwa strumienia z systemu
+        std::string commandTxt ;     //issued command
+        std::string streamName ;  //nazwa strumienia z systemu
         int linebeg ;        //linia od ktorej sie zaczyna wyswietlanie
         int linecnt ;        //ilosc linii do wyswietlenia
         int timing ;         //tutaj potem rational
@@ -42,38 +40,22 @@ class ContiniousTerminal {
 
     std::map < cmd_e, boost::regex > commands ;
 
-    int pos ;
-    int k ;
-    char line[81]; //linia edytowana
-    int curline; //aktualna lina w ktorej wprowadzamy tekst
-    bool stopLoop;
+    int pos ;       //<pozycja kursora 0..80
+    char line[81];  //< edytowana linia
+    int curline;    //< aktualna lina w ktorej wprowadzamy tekst
+    bool stopLoop;  //< true - i wychodzimy z petli terminal
 
     int terminal();
     void printLine( int curline , int pos , char * line );
     cmd_e processCommand( char * commandStr );
     bool processRequests(cmd_e command) ;
-    void register_dir_cmd( int &curline , int pos , char * line , string tableName , int l );
+    void register_dir_cmd( int &curline , int pos , char * line , std::string tableName , int l );
     void clearRegisteredQueries();
     void processRegisteredQueries();
 
 public:
-    ContiniousTerminal( bool stopLoop = true )
-        : stopLoop(stopLoop),
-          pos(0) ,
-          k(-1),
-          curline(2)
-    {
-        // ---- inicjacja tablicy poleceñ
-        commands[ Quit ] = boost::regex("quit.*") ;
-        commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-        commands[ Cls ] = boost::regex("cls.*") ;
-        commands[ Connect ] = boost::regex("connect.*") ;
-        commands[ Help ] = boost::regex("help.*") ;
-        // ----
 
-        if ( !stopLoop ) postMortemRetCode = terminal();
-        else postMortemRetCode = 0 ;
-    }
+    ContiniousTerminal( bool stopLoop = true );
 
     int postMortemRetCode ;
 
