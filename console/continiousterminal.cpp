@@ -278,17 +278,10 @@ bool ContiniousTerminal::processRequests( cmd_e command )
         }
     case Dir:
         {
-            int l ;
-            try
-            {
-                l = lexical_cast<int>( what[2].str() );
-            }
-            catch(const bad_lexical_cast &e)
-            {   //ten catch jest oczekiwany - nie zawsze zostanie podany ten arg.
-                l = defaultLinieCount ;
-            }
-
-            registerDirCmd( curline , pos + 2 , line , what[1].str() , l );
+            registerDirCmd
+                    ( curline , pos + 2 , line , what[1].str() ,
+                    ( what.size()>1 ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount
+                    ) ;
             return true ;
         }
     case Cls:
