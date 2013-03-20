@@ -132,6 +132,8 @@ void ContiniousTerminal::clearRegisteredQueries()
     printf( "%s" , welcomeString );
 
     queryVect.clear();
+
+    REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
 }
 
 void ContiniousTerminal::processRegisteredQueries()
@@ -279,15 +281,16 @@ bool ContiniousTerminal::processRequests( cmd_e command )
     case Dir:
         {
             registerDirCmd
-                    ( curline , pos + 2 , line , what[1].str() ,
-                    ( what.size()>1 ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount
+                    ( curline , pos + 2 , line ,
+                    ( what[1].str() != "" ) ? what[1].str() : "default" ,
+                    ( what[2].str() != "" ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount
                     ) ;
             return true ;
         }
     case Cls:
         {
             clearRegisteredQueries();
-            REP(i,80) line[i] = ' ' ;
+
             pos = 0 ;
             curline = 2 ;
             printLine( curline , pos , line );
