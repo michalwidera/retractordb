@@ -27,26 +27,14 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <boost/asio.hpp>
-#include <boost/config.hpp>
-#include <boost/thread.hpp>
-
-#include <boost/iostreams/device/file.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <istream>
-
 #include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
 
+//zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
 
 using namespace std ;
 using namespace boost ;
-
-using boost::asio::ip::tcp ;
-using boost::property_tree::ptree;
-
 
 //Domysla ilosc linii odpowiedzi na polecenie dir
 const int defaultLinieCount = 5 ;
@@ -54,12 +42,8 @@ const int defaultLinieCount = 5 ;
 //Takie tam z Atari/C64
 const char* welcomeString = "Ready." ;
 
-int tc = rlutil::tcols() - 1 ;
-int kchain = 0;
-
 //deklaracja
-ptree netClient( string netCommand );
-
+boost::property_tree::ptree netClient( string netCommand );
 
 ContiniousTerminal::ContiniousTerminal( bool stopLoop )
     : stopLoop(stopLoop),
@@ -298,6 +282,7 @@ bool ContiniousTerminal::processRequests( cmd_e command )
         }
     case Connect:
         {
+            using boost::property_tree::ptree ;
             ptree pt = netClient( "get" ) ;
 
             BOOST_FOREACH(ptree::value_type &v,
