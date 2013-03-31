@@ -45,29 +45,24 @@ public:
     // dostep do zbioru nazw strumieni danych
     //
 
-    int
-    size();
-    /**< zwraca ilosc przetwarzanych/zarejestrowanych w systemie strumieni danych */
+    /** zwraca ilosc przetwarzanych/zarejestrowanych w systemie strumieni danych */
+    int size();
 
-    stream
-    descriptor( int pos );
-    /**< pos[0..getStreamCount()-1] - zwraca nazwe i szybkosc strumienia z tablicy jesli odwolamy sie do strumienia poza tablica zwraca ciag pusty */
+    /** pos[0..getStreamCount()-1] - zwraca nazwe i szybkosc strumienia z tablicy jesli odwolamy sie do strumienia poza tablica zwraca ciag pusty */
+    stream descriptor( int pos );
 
     //
     // dostep do danych w strumieniach
     //
 
-    int
-    size( std::string streamName );
-    /**< biezaca ilosc rekordow w strumieniu */
+    /** biezaca ilosc rekordow w strumieniu */
+    int size( std::string streamName );
 
-    std::list< column >
-    schema( std::string streamName );
-    /**< zwrot schematu */
+    /** zwrot schematu */
+    std::list< column > schema( std::string streamName );
 
-    bool
-    record( boost::shared_array< char > pRawData , std::string StreamName , int rPos );
-    /**< pobranie rekordu ze strumienia, rPos = 0 <- biezacy */
+    /** pobranie rekordu ze strumienia, rPos = 0 <- biezacy */
+    bool record( boost::shared_array< char > pRawData , std::string StreamName , int rPos );
 
 };
 
