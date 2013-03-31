@@ -67,10 +67,10 @@ set< R > getListFromCore( limits eLimit = noLimits )
 
 	BOOST_FOREACH( query it , coreInstance )
 	{
-	if ( bBreakOnLimits( it.lProgram.size() , eLimit ) )
-		continue ;
+        if ( bBreakOnLimits( it.lProgram.size() , eLimit ) )
+            continue ;
 
-	lstTimeIntervals.insert( it.rInterval );
+        lstTimeIntervals.insert( it.rInterval );
 	}
 
 	return lstTimeIntervals ;
@@ -84,13 +84,13 @@ void dumpCore( std::ostream & xout , limits eLimit = noLimits )
 
 	BOOST_FOREACH( const query & it , coreInstance )
 	{
-	if ( bBreakOnLimits( it.lProgram.size() , eLimit ) )
-		continue ;
+        if ( bBreakOnLimits( it.lProgram.size() , eLimit ) )
+            continue ;
 
-	xout << getSeqNr( it.id ) << "\t";
-	xout << it.rInterval << "\t";
-	xout << it.id  ;
-	xout << endl ;
+        xout << getSeqNr( it.id ) << "\t";
+        xout << it.rInterval << "\t";
+        xout << it.id  ;
+        xout << endl ;
 	}
 }
 
@@ -146,29 +146,29 @@ ptree commandProcessor( ptree ptInval )
 
 int _kbhit(void)
 {
-  struct termios oldt, newt;
-  int ch;
-  int oldf;
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
 
-  tcgetattr(STDIN_FILENO, &oldt);
-  newt = oldt;
-  newt.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-  oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-  fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
 
-  ch = getchar();
+    ch = getchar();
 
-  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-  fcntl(STDIN_FILENO, F_SETFL, oldf);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
 
-  if(ch != EOF)
-  {
-    ungetc(ch, stdin);
-    return 1;
-  }
+    if(ch != EOF)
+    {
+        ungetc(ch, stdin);
+        return 1;
+    }
 
-  return 0;
+    return 0;
 }
 
 int _getch()
@@ -221,7 +221,7 @@ int mainFromWin32(int argc, char* argv[])
         ("dump,d", po::value<string>(&sDumpFile)->default_value("query.dmp"), "plik z zrzutem strumienia")
         ("tlimitqry,m" , po::value<int>(&iTimeLimitCnt)->default_value(0) , "limit zapytan, 0 - no limit" )
         ("waterfall,f" , "wyswietlanie danych")
-        ("test,t" , "obszar testowy executora" )
+        ("test,t" , "unit testy" )
 		;
 
 	po::positional_options_description p;       //Assume that infile is the first option
@@ -277,16 +277,16 @@ int mainFromWin32(int argc, char* argv[])
 
 		while( ! _kbhit() )
 		{
-        std::cout << timeSlot << "\t" ;
-        std::cout << proc.getRowValue( sQuery );
+            std::cout << timeSlot << "\t" ;
+            std::cout << proc.getRowValue( sQuery );
 
-        BOOST_FOREACH ( string s , getQuery( sQuery ).getDepStreamNameList() )
-            std::cout << "," << s ;
+            BOOST_FOREACH ( string s , getQuery( sQuery ).getDepStreamNameList() )
+                std::cout << "," << s ;
 
-        std::cout << std::endl ;
+            std::cout << std::endl ;
 
-		int ms ( rational_cast<int>( interval ) ) ; // miliseconds
-		usleep( ms ) ;
+            int ms ( rational_cast<int>( interval ) ) ; // miliseconds
+            usleep( ms ) ;
 		}
 
 		_getch(); //no wait ... feed key from kbhit
