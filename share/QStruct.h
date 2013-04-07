@@ -202,7 +202,7 @@ namespace QS {
         query( R rInterval , string id ) ;
         query() ;
 
-		list< string > getSchema() ;
+        list< string > getFieldNamesList() ;
 
 		string id ;                         /**< nazwa strumienia/zapytania */
         string filename ;                   /**< nazwa pliku skojarzona ze strumieniem. dot. deklaracji*/

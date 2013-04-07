@@ -31,7 +31,7 @@ namespace QS {
         {
             if ( storage.find(q.id) == storage.end() )
                 storage[ q.id ] =
-                boost::shared_ptr< UR::dbStream >( new dbStream( q.id , q.getSchema() ) ) ;
+                boost::shared_ptr< UR::dbStream >( new dbStream( q.id , q.getFieldNamesList() ) ) ;
             else
                ; //strumien o takiej nazwie juz istnieje w systemie
 

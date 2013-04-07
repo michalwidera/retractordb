@@ -332,7 +332,7 @@ bool operator<(const query &lhs,const query &rhs) { return lhs.rInterval < rhs.r
 	query::query()
 	{}
 
-    list< string > query::getSchema()
+    list< string > query::getFieldNamesList()
     {
         list < string > schema ;
 

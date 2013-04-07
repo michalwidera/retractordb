@@ -138,7 +138,7 @@ ptree commandProcessor( ptree ptInval )
     {
         string streamName = ptInval.get("db.stream" , "" ) ;
 
-        BOOST_FOREACH( string s , coreInstance[streamName].getSchema() )
+        BOOST_FOREACH( string s , coreInstance[streamName].getFieldNamesList() )
         {
             ptRetval.put( string("db.filed.")+s , s );
         }

@@ -227,7 +227,7 @@ string intervalCounter()
                 // push_val 5 -> szerokosc_okna
                 // stream agse 3 -> skok_okna
                 R delta_zrodla =  coreInstance.getDelta( t1.getValue() ) ;
-                R dlugosc_schematu_zrodla = getQuery( t1.getValue() ).getSchema().size() ;
+                R dlugosc_schematu_zrodla = getQuery( t1.getValue() ).getFieldNamesList().size() ;
                 R szerokosc_okna =  t2.getCRValue().real() ;
                 R skok_okna =  op.getCRValue().real() ;
                 delta = delta_zrodla ;
