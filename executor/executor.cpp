@@ -134,6 +134,17 @@ ptree commandProcessor( ptree ptInval )
         BOOST_FOREACH( const query & it , coreInstance )
             ptRetval.put( string("db.stream.")+it.id , it.id );
 
+    if ( command == "detail" )
+    {
+        string streamName = ptInval.get("db.stream" , "" ) ;
+
+        list< string > schema = coreInstance[streamName].getSchema() ;
+        BOOST_FOREACH( string s , schema )
+        {
+            ptRetval.put( string("db.filed.")+s , s );
+        }
+    }
+
     return ptRetval ; //sub for a while
 }
 

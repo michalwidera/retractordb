@@ -227,6 +227,9 @@ namespace QS {
     /** potrzebne do sortowania (ustalenia relacji porzadku wzgledem interwalu czasowego) w qTree */
     bool operator<(const query &lhs,const query &rhs) ;
 
+    query & getQuery( string query_name );              /**< Funkcja zwraca referencje do zapytania */
+    int getSeqNr( string query_name ) ;                 /**< Funkcja zwraca numer kolejny w zbiorze qTree */
+
     /** Deklaracja typu qTree - uporzadkowanego wzgledem czasów wykoniania zbioru strumeni */
 	class qTree : 
 		public vector < query > 
@@ -243,11 +246,10 @@ namespace QS {
 
 	public:
 
+        query & operator[] ( string query_name ) { return getQuery( query_name ) ; } ;
         void sort() { std::sort( begin() , end() ) ; }; /**< Sortowanie wzgledem delty - patrz zdefiniowany operator */
         void tsort() ;                                  /**< Sortowanie topologiczne */
         R getDelta( string query_name ) ;               /**< Funkcja zwraca interwal czasu (rInterval) dla zadanego strumienia */
    };
 
-    query & getQuery( string query_name );              /**< Funkcja zwraca referencje do zapytania */
-    int getSeqNr( string query_name ) ;                 /**< Funkcja zwraca numer kolejny w zbiorze qTree */
 }
