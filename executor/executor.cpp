@@ -138,8 +138,6 @@ ptree commandProcessor( ptree ptInval )
     {
         string streamName = ptInval.get("db.argument" , "" ) ;
 
-        cerr << streamName << endl ;
-
         assert( streamName != "" );
 
         BOOST_FOREACH( string s , coreInstance[streamName].getFieldNamesList() )
