@@ -193,6 +193,8 @@ bool operator<(const query &lhs,const query &rhs) { return lhs.rInterval < rhs.r
 
 	query & getQuery( string query_name )
 	{
+        assert ( query_name != "" );
+
 		BOOST_FOREACH ( query & q , coreInstance )
 		{
 			if ( q.id == query_name )

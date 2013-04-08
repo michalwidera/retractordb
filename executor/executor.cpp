@@ -136,11 +136,15 @@ ptree commandProcessor( ptree ptInval )
 
     if ( command == "detail" )
     {
-        string streamName = ptInval.get("db.stream" , "" ) ;
+        string streamName = ptInval.get("db.argument" , "" ) ;
+
+        cerr << streamName << endl ;
+
+        assert( streamName != "" );
 
         BOOST_FOREACH( string s , coreInstance[streamName].getFieldNamesList() )
         {
-            ptRetval.put( string("db.filed.")+s , s );
+            ptRetval.put( string("db.field.")+s , s );
         }
     }
 

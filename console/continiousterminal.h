@@ -21,7 +21,7 @@
 #include <boost/regex.hpp>
 #include <string>
 
-enum cmd_e { Quit , Dir , Cls , Connect , Help , NoCmd }  ;
+enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail ,  NoCmd }  ;
 
 class ContiniousTerminal {
 

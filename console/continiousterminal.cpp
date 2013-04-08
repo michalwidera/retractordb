@@ -43,7 +43,7 @@ const int defaultLinieCount = 5 ;
 const char* welcomeString = "Ready." ;
 
 //deklaracja
-boost::property_tree::ptree netClient( string netCommand );
+boost::property_tree::ptree netClient( string netCommand , string netArgument );
 
 ContiniousTerminal::ContiniousTerminal( bool stopLoop )
     : stopLoop(stopLoop),
@@ -56,6 +56,7 @@ ContiniousTerminal::ContiniousTerminal( bool stopLoop )
     commands[ Cls ] = boost::regex("cls.*") ;
     commands[ Connect ] = boost::regex("connect.*") ;
     commands[ Help ] = boost::regex("help.*") ;
+    commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
     // ----
 
     if ( !stopLoop ) postMortemRetCode = terminal();
@@ -283,7 +284,7 @@ bool ContiniousTerminal::processRequests( cmd_e command )
     case Connect:
         {
             using boost::property_tree::ptree ;
-            ptree pt = netClient( "get" ) ;
+            ptree pt = netClient( "get" , "" ) ;
 
             BOOST_FOREACH(ptree::value_type &v,
                           pt.get_child("db.stream"))
@@ -297,6 +298,24 @@ bool ContiniousTerminal::processRequests( cmd_e command )
             REP(i,80) line[i] = ' ' ;
             printLine( curline , pos , line );
             return true ;
+        }
+    case Detail:
+        {
+        using boost::property_tree::ptree ;
+        ptree pt = netClient( "detail" ,  what[1].str() ) ;
+
+        BOOST_FOREACH(ptree::value_type &v,
+                      pt.get_child("db.field"))
+        {
+            REP(i,80) line[i] = ' ' ;
+            strcpy( line , v.second.data().c_str() );
+            printLine( curline , -1 , line );
+            curline += 1 ;
+        }
+
+        REP(i,80) line[i] = ' ' ;
+        printLine( curline , pos , line );
+        return true ;
         }
     case Help:
         {

@@ -69,7 +69,7 @@ namespace dbNet {
 }
 
 
-ptree netClient( string netCommand )
+ptree netClient( string netCommand , string netArgument )
 {
     const int max_length = 1024;
 
@@ -88,6 +88,9 @@ ptree netClient( string netCommand )
                                      tcp::v4(), "localhost", "1971" )));
 
         pt_request.put("db.message", netCommand );
+
+        if ( netArgument != "" )
+            pt_request.put("db.argument", netArgument );
 
         //
         //request part
