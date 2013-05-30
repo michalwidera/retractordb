@@ -319,7 +319,7 @@ bool ContiniousTerminal::processRequests( cmd_e command )
         }
     case Help:
         {
-            strcpy( line , "cls, quit, connect, dir [co][ile] (all case sensitive)" );
+        strcpy( line , "cls, quit, connect, detail [str], dir [co][ile] (all case sensitive)" );
             printLine( curline , -1 , line );
             curline += 1 ;
             REP(i,80) line[i] = ' ' ;
