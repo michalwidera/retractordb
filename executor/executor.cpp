@@ -331,7 +331,7 @@ int mainFromWin32(int argc, char* argv[])
     asio::io_service ios;
 
     tcp_server server1(ios,&commandProcessor);
-    //udp_server server2(ios);
+    udp_server server2(ios);
 
     thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku    
 

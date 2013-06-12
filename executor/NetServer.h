@@ -6,6 +6,11 @@
 #include <boost/property_tree/ptree.hpp>
 
 /**
+ * Na podstawie:
+ * http://www.boost.org/doc/libs/1_53_0/doc/html/boost_asio/example/echo/
+ */
+
+/**
   * Klasa odpowiedzialna za obsluge sesji - tworzona przez tcp_server
   * nie uzywana na zewnatrz - trzeba by chyba ja schowac
   */
@@ -50,6 +55,28 @@ public:
       */
     tcp_server(boost::asio::io_service& io_service ,
                boost::function< ptree( ptree )> onCommandProcessFn );
+};
+
+/**
+ *  Klasa odpowiedzialna za transmisje strumienia danych
+ */
+class udp_server {
+
+    boost::asio::io_service& io_service_;
+    boost::asio::ip::udp::socket socket_;
+    boost::asio::ip::udp::endpoint sender_endpoint_;
+    enum { max_length = 1024 };
+    char data_[max_length];
+
+public:
+
+    udp_server(boost::asio::io_service& io_service);
+
+    void handle_receive_from(const boost::system::error_code& error,
+          size_t bytes_recvd);
+
+    void handle_send_to(const boost::system::error_code& /*error*/,
+        size_t /*bytes_sent*/);
 };
 
 #endif // NETSERVER_H
