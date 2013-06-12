@@ -80,7 +80,7 @@ cmd_e ContiniousTerminal::processCommand( char * commandStr )
 
 void ContiniousTerminal::printLine( int curline , int pos , char * line )
 {
-    rlutil::locate( 1 , curline );
+    rlutil::locate( 1 , curline );    
     REP(i,80)
     {
         if ( i == pos )
