@@ -281,6 +281,32 @@ int client(int argc, char* argv[])
   return 0;
 }
 
+char realbuffer[4*256];
+char cache[256];
+
+class test
+{
+    char& operator[](int);
+    char& operator &( const char & );
+    char* operator *( const char & );
+};
+
+char& test::operator[]( int n )
+{
+    memcpy( cache , realbuffer , n / 256 );
+    return cache[n % 256];
+}
+
+char& test::operator&( const char & n )
+{
+    return cache[0];
+}
+
+char* test::operator*( const char & n )
+{
+    return &(cache[0]);
+}
+
 int main(int argc, char* argv[])
 {
     //Intro

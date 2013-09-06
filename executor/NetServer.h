@@ -36,6 +36,7 @@ public:
 
 /**
   * Klasa odpowiedzialna obsluge polaczenia
+  * Server TCP
   */
 class tcp_server {
 
@@ -59,6 +60,7 @@ public:
 
 /**
  *  Klasa odpowiedzialna za transmisje strumienia danych
+ *  Server UDP
  */
 class udp_server {
 

@@ -66,6 +66,8 @@ void session::handle_read(const boost::system::error_code& error,
     {
         //
         // tutaj jest interpretowany protokol
+        // czyli rozkladane sa zapytania/polecenia
+        // w xml i wysylane sa odpowiedzi xml
         //
 
         // Create empty property tree object
@@ -120,6 +122,11 @@ void session::handle_write(const boost::system::error_code& error)
     }
 }
 
+//
+// Server TCP - Klasa odpowiedzialna za komunikacje
+// pytanie-odpowiedz
+//
+
 tcp_server::tcp_server(boost::asio::io_service& io_service,
                        boost::function< ptree( ptree )> onCommandProcessFn )
     : io_service_(io_service),
@@ -153,6 +160,10 @@ void tcp_server::handle_accept(session* new_session,
     start_accept();
 }
 
+//
+//  Server UDP - Czesc implementacyjna.
+//  Klasa odpowiedzialna na transmisje strumieni danych
+//
 
 udp_server::udp_server(boost::asio::io_service& io_service)
     : io_service_(io_service),
