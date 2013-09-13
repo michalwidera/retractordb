@@ -45,7 +45,11 @@ class ContiniousTerminal {
     int curline;    //< aktualna lina w ktorej wprowadzamy tekst
     bool stopLoop;  //< true - i wychodzimy z petli terminal
 
+    // funkcja zapewniajaca tryb interaktywny terminala
+    // wewnatrz jest while(true) i czeka na klawisze
+    // jak zlapie enter probuje interpretowac funkcja processCommand
     int terminal();
+
     void printLine( int curline , int pos , char * line );
     cmd_e processCommand( char * commandStr );
     bool processRequests(cmd_e command) ;
@@ -55,6 +59,8 @@ class ContiniousTerminal {
 
 public:
 
+    // stopLoop - jesli true to nie jest uruchamiana petla zdarzen i
+    // terminal nie wchodzi w tryb interaktywny (dla potrzeb czytania danych z pliku)
     ContiniousTerminal( bool stopLoop = true );
 
     int postMortemRetCode ;

@@ -142,14 +142,12 @@ ptree netClient( string netCommand , string netArgument )
     }
     catch (std::exception& e)
     {
-        std::cerr << "exception catch:" << e.what() << std::endl;
+        std::cerr << "exception catch:" << e.what() << std::endl ;
         pt_response.put("error.response" , e.what() );
     }
 
     return pt_response ;
 }
-
-
 
 int main(int argc, char* argv[])
 {
@@ -184,6 +182,9 @@ int main(int argc, char* argv[])
             cerr << desc << endl ;
             return 1;
         }
+
+        // To dziala tylko z Pliku
+
         if (vm.count("infile"))
         {
             cout << "Load file:" << sInputFile << endl ;
@@ -216,11 +217,11 @@ int main(int argc, char* argv[])
             }
             return 0;
         }
-        else
-        {
-            ContiniousTerminal instance(false);
-            return instance.postMortemRetCode ;
-        }
+
+        //Tutaj jest wlasciwe wywolanie terminala w trybie tekstowym
+
+        ContiniousTerminal instance(false);
+        return instance.postMortemRetCode ;
 
     }    
     catch(std::exception& e)
