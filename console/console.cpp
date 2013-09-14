@@ -14,15 +14,15 @@
 */
 
 /*
- * Za³o¿enia projektowe programu konsoli u¿ytkownika
+ * Zalozenia projektowe programu konsoli uzytkownika
  * Konsola:
- * 1. jest najprostszym interfejsem u¿ytkownika dla systemu zarz¹dzania danymi
- * 2. udostêpnima dane na bie¿¹co, zgodnie ze zmianami danych w bazie
- * 3. dane raz wyswietlone ulegaj¹ póŸniejszym zmianom (bie¿¹cej aktualizacji)
- * 4. komunikuje siê z baz¹ uzgodnionym protoko³em sieciowym
- * 5. jest przenoœna pomiêdzy systemami (Lin/Win)
- * 6. dzia³a w œrodowisku tekstowym
- * TODO: WeŸ siê w garœæ to posprz¹taj ten bajzel tutaj
+ * 1. jest najprostszym interfejsem uzytkownika dla systemu zarzadzania danymi
+ * 2. udostepnima dane na biezaco, zgodnie ze zmianami danych w bazie
+ * 3. dane raz wyswietlone ulegaja pozniejszym zmianom (biezacej aktualizacji)
+ * 4. komunikuje sie z baza uzgodnionym protokolem sieciowym
+ * 5. jest przenosna pomiedzy systemami (Lin/Win)
+ * 6. dziala w srodowisku tekstowym
+ * TODO: Wez sie w garsc to posprzataj ten bajzel tutaj
  */
 
 #include "stdafx.h"

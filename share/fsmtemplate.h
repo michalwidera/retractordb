@@ -16,7 +16,7 @@
 /*
  *
  * This code is based on example from:
- * Jêzyk C++. Metaprogramowanie za pomoc¹ szablonów
+ * Jezyk C++. Metaprogramowanie za pomoca szablonow
  * Autorzy: David Abrahams, Aleksey Gurtovoy
  *
  */
@@ -54,7 +54,7 @@ struct event_dispatcher
             Transition::execute(fsm, e);
             return Transition::next_state;
         }
-        else // przejœcie do nastêpnego wêz³a w ³añcuchu
+        else // przejscie do nastepnego wezla w lancuchu
         {
             return Next::dispatch(fsm, state, e);
         }
@@ -138,19 +138,19 @@ public:
 
         // rozdzielenie zdarzenia
         this->state = dispatcher::dispatch(
-                    *static_cast<Derived*>(this)        // rzutowanie w dó³ z CRTP
+                    *static_cast<Derived*>(this)        // rzutowanie w dol z CRTP
                     , this->state
                     , evt
                     );
 
-        // zwrócenie nowego stanu
+        // zwrocenie nowego stanu
         return this->state;
     }
 
 };
 
 
-// pobranie zdarzenia powiazanego z transakcj¹
+// pobranie zdarzenia powiazanego z transakcja
 template <class Transition>
 struct transition_event
 {

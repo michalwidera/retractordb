@@ -426,14 +426,14 @@ string simplifyLProgram()
     return string("OK") ;
 }
 
-//celem tej procedury jest utworzenie rozwiniecie schematów w oparciu o dana komende
+//celem tej procedury jest utworzenie rozwiniecie schematow w oparciu o dana komende
 list < field > combine( string sName1 , string sName2 , command_id cmd )
 {
     clog << "combine()::" << sName1 << "," << sName2 << endl ;
 
     list < field > lRetVal ;
 
-    //Merge schematów dla przypadku z³¹czenia typu hash
+    //Merge schematow dla przypadku zlaczenia typu hash
     if ( cmd == STREAM_HASH )
     {
         if (
@@ -540,8 +540,8 @@ string prepareFields()
         BOOST_FOREACH ( token & t , q.lProgram )
         {
             assert( q.lProgram.size() < 4 ) ;
-            //Padniêcie tej assercji oznacza to ze nie wszystkie strumienie
-            //sa ju¿ po operacji optymalizacji
+            //Padniecie tej assercji oznacza to ze nie wszystkie strumienie
+            //sa juz po operacji optymalizacji
 
             BOOST_FOREACH ( field & f , q.lSchema )
             {
@@ -899,7 +899,7 @@ int main(int argc, char* argv[])
         }
 
         //sprawdzenie czy query file zawiera w pierwszej linii subset[beg,end]
-        //ten sub jest po to zeby dalo sie testowaæ rozne przypadki
+        //ten sub jest po to zeby dalo sie testowac rozne przypadki
         //a plik query.txt byl zawsze w repozytorium
         {
             string str;

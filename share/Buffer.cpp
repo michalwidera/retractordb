@@ -68,7 +68,7 @@ public:
 	boost::crc_32_type result ;
 
 	long frameSize ;    /**< Szerokosc ramki w bajtach */
-	long frameCount ;   /**< Ilosæ ramek w bloku */
+	long frameCount ;   /**< Ilosc ramek w bloku */
 	long firstFrame ;   /**< Wskaznik pierwszej ramki w bloku (pro forma w celu uzgodnienia typow z CycBlock) */
 
     IBlock ( long frameSize = 0 )
@@ -87,9 +87,9 @@ public:
 } ;
 
 /**
-	 * Klasa wzorcowa - atrybutem jest strumieñ danych
-	 * STREAM - mo¿e przyj¹c wartosc CBlock<CRandomFile>,CBlock<strstream>
-	 * Patrz te¿ klasa cyklicznych bloków
+	 * Klasa wzorcowa - atrybutem jest strumien danych
+	 * STREAM - moze przyjac wartosc CBlock<CRandomFile>,CBlock<strstream>
+	 * Patrz tez klasa cyklicznych blokow
 	 * @see CCycBlock
 	 * @short Klasa obslugujaca bloki - pojedynczy strumien w murze
 	 */
@@ -103,13 +103,13 @@ public:
     CBlock( const CBlock<STREAM> &x ) ; /**< Konstruktor kopiujacy Uwaga! Z uwagi na operacje kopiowania niszczacego pwartosc - nastepuje konwersja wskaznikow i zniszczenie wartosci przekazywanej. parametr to obiekt do skopiowania */
     CBlock( long frameSize = 0 ) ;      /**< Konstruktor - Tworzy na stercie obiekt typu strzam. - musi byc bez mutexu! bo siadzie parametr frameSize dlugosc ramki */
 
-    virtual ~CBlock() ;                 /**< Destruktor klasy - zabezpieczony przed konflikatmi wielowatkowymi jedna du¿a sekcja krytyczna */
-    void PutBlock( arrayPointer_t pBlockBuffer , long count ) ; /**< Umieszczenie ramki w bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) jesli w buforze pBlockBuffer jest wiecej ramek count okresla ta ilosc @param pBlockBuffer wskaznik do bufora @param count ilosc ramek w buforze - w Buffer.h default parametr = 1 */
-    long GetBlock( long position , arrayPointer_t pBlockBuffer ) ; /**< Pobranie ramki od d³ugoœci framesize z bloku (wymiar (iloœæ bajtów) ustawia siê w konstruktorze) @param position pozycja do pobrania ze strumienia @param pBlockBuffer wskaznik do bufora @return ilosc odczytanych danych */
-	long GetByteSize() ;                /**< Funkcja zwraca iloœæ bajtów w bloku @return ilosc bajtow w strumieniu */
+    virtual ~CBlock() ;                 /**< Destruktor klasy - zabezpieczony przed konflikatmi wielowatkowymi jedna duza sekcja krytyczna */
+    void PutBlock( arrayPointer_t pBlockBuffer , long count ) ; /**< Umieszczenie ramki w bloku (wymiar (ilosc bajtow) ustawia sie w konstruktorze) jesli w buforze pBlockBuffer jest wiecej ramek count okresla ta ilosc @param pBlockBuffer wskaznik do bufora @param count ilosc ramek w buforze - w Buffer.h default parametr = 1 */
+    long GetBlock( long position , arrayPointer_t pBlockBuffer ) ; /**< Pobranie ramki od dlugosci framesize z bloku (wymiar (ilosc bajtow) ustawia sie w konstruktorze) @param position pozycja do pobrania ze strumienia @param pBlockBuffer wskaznik do bufora @return ilosc odczytanych danych */
+	long GetByteSize() ;                /**< Funkcja zwraca ilosc bajtow w bloku @return ilosc bajtow w strumieniu */
 	void Save( std::ostream& strout ) ; /**< Funkcja zapisuje blok do wskazanego strumienia (tzn. pliku) - zapisanie powoduje utrwalnie stanu @param strout strumien wyjsciowy */
 	void Load( std::istream& strin ) ;  /**< Funkcja odczytuje blok ze wskazanego strumieni (tzn. pliku) @param strin strumien wejsciowy */
-	void Trunc() ;                      /**< Obciêcie bloku (zerowanie) */
+	void Trunc() ;                      /**< Obciecie bloku (zerowanie) */
 	long SyncToDisk() ;                 /**< Funkcja zrzuca blok na dysk i zwraca ile bylo ramek w trakcie zrzutu @return ilosc ramek w strumieniu w trakcie zrzutu */
 };
 
@@ -133,8 +133,8 @@ public:
 };
 
 /**
-	*	Klasa wzorcowa - atrybutem jest strumieñ danych
-	*	STREAM - mo¿e przyj¹c wartosc CCycBlock<CRandomFile>,CCycBlock<strstream>
+	*	Klasa wzorcowa - atrybutem jest strumien danych
+	*	STREAM - moze przyjac wartosc CCycBlock<CRandomFile>,CCycBlock<strstream>
 	*   @short Klasa obslugujaca bloki cykliczne
 	*/
 template <class STREAM>
@@ -157,7 +157,7 @@ public:
 	CCycBlock( long frameSize = 0 );
 	CCycBlock( const CCycBlock<STREAM> &x ) ;
 
-	long GetByteSize();             /**< Funkcja zwraca iloœæ bajtów w bloku @return ilosc bajtow w strumieniu */
+	long GetByteSize();             /**< Funkcja zwraca ilosc bajtow w bloku @return ilosc bajtow w strumieniu */
 	virtual ~CCycBlock() ;          /**< Destruktor - czysci mape */
     void PutBlock( arrayPointer_t pBlockBuffer , long count ) ;
     long GetBlock( long position , arrayPointer_t pBlockBuffer ) ;
@@ -167,10 +167,10 @@ public:
 };
 
 /**
-	 *  Podstawowa klasa obs³uguj¹ca strumienie.
-	 *  CBufferImpl zawiera mapê bloków
-	 *  Bloki identyfikowane s¹ unikalnymi identyfikatorami (identyfikatory nadaje programista)
-	 *  Ka¿dy z bloków mo¿e byæ Plikiem w pamieci, strumieniem dyskowy, Plikiem cyklicznym w pamiêci, strumieniem cyklicznym
+	 *  Podstawowa klasa obslugujaca strumienie.
+	 *  CBufferImpl zawiera mape blokow
+	 *  Bloki identyfikowane sa unikalnymi identyfikatorami (identyfikatory nadaje programista)
+	 *  Kazdy z blokow moze byc Plikiem w pamieci, strumieniem dyskowy, Plikiem cyklicznym w pamieci, strumieniem cyklicznym
 	 *
 	 */
 template <class IDTYPE>
@@ -191,23 +191,23 @@ template <class IDTYPE>
 
 public:
 
-	CBufferImpl();                      /**< Konstruktor - tworzy z ka¿dego po jednym (tworzenie jest opóŸnione - tzn. dopóki nie u¿yte nic siê nie tworzy*/
+	CBufferImpl();                      /**< Konstruktor - tworzy z kazdego po jednym (tworzenie jest opoznione - tzn. dopoki nie uzyte nic sie nie tworzy*/
 
-	virtual ~CBufferImpl() ;                    /**< Destruktor - assert zbêdny/shared_ptr? */
+	virtual ~CBufferImpl() ;                    /**< Destruktor - assert zbedny/shared_ptr? */
 	void Load( const char * filename ) ;    /**< Odczytanie CBufferImpl z pliku */
 	void Save( const char * filename ) ;    /**< Zapisanie CBufferImpl do pliku */
-    void PutBlock( IDTYPE blockID, arrayPointer_t pBlockBuffer , long count = 1 ) ;  /**< Umieszczenie ramki w zadanym Bloku (przed t¹ operacj¹ pamiêtaæ ¿e raz trzeba DefBlock lub Load) */
+    void PutBlock( IDTYPE blockID, arrayPointer_t pBlockBuffer , long count = 1 ) ;  /**< Umieszczenie ramki w zadanym Bloku (przed ta operacja pamietac ze raz trzeba DefBlock lub Load) */
     long GetBlock( IDTYPE blockID, long position, arrayPointer_t pBlockBuffer ) ; /**< Pobranie ramki */
-	void DefBlock( IDTYPE blockID, long frameSize , BlockType btType = BF , long aux1 = 0 , long aux2 = 0) ; /**< Zdefiniowanie bloku Jeœli BCF - Cykliczny binarny plik to aux1 - iloœc podplików, aux2 - iloœæ ramek w podpliku	Jeœli BCM - j.w. else aux1,aux2 musi byc 0 ! */
-	void DelBlock( IDTYPE blockID )  ;      /**< Usuniêcie bloku */
-	long GetLen( IDTYPE blockID )  ;        /**< Zwrócenie iloœci ramek */
-	long GetSizeOfFrame( IDTYPE blockID ) ; /**< Zwrócenie d³ugoœci pojedyñczej ramki */
-	long GetSizeOfBlock( IDTYPE blockID , long firstFrm=0 , long lastFrm=-1 ) ; /**< Zwrócenie d³ugoœci w bajtach ca³ego bloku */
-	void Clear() ;                          /**< Obciêcie - wyczyszczenie - Truncate */
-    void DecycleBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer ) ; /**< Rozpiêcie cyklu - zmiana typu - z typu Cyklicznego na typ p³aski */
-    void MemorizeBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer ) ; /**< Przpisanie bloku do pamiêci */
+	void DefBlock( IDTYPE blockID, long frameSize , BlockType btType = BF , long aux1 = 0 , long aux2 = 0) ; /**< Zdefiniowanie bloku Jesli BCF - Cykliczny binarny plik to aux1 - ilosc podplikow, aux2 - ilosc ramek w podpliku	Jesli BCM - j.w. else aux1,aux2 musi byc 0 ! */
+	void DelBlock( IDTYPE blockID )  ;      /**< Usuniecie bloku */
+	long GetLen( IDTYPE blockID )  ;        /**< Zwrocenie ilosci ramek */
+	long GetSizeOfFrame( IDTYPE blockID ) ; /**< Zwrocenie dlugosci pojedynczej ramki */
+	long GetSizeOfBlock( IDTYPE blockID , long firstFrm=0 , long lastFrm=-1 ) ; /**< Zwrocenie dlugosci w bajtach calego bloku */
+	void Clear() ;                          /**< Obciecie - wyczyszczenie - Truncate */
+    void DecycleBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer ) ; /**< Rozpiecie cyklu - zmiana typu - z typu Cyklicznego na typ plaski */
+    void MemorizeBlockType( IDTYPE blockID , arrayPointer_t pBlockBuffer ) ; /**< Przpisanie bloku do pamieci */
 	long syncToDisk(IDTYPE blockID ) ;      /** Funkcja zatwierdza strumien na dysku @return zwraca dlugosc strumienia w ramkach */
-	void Dump( std::ostream &os , std::set < string > * pQset ) ;         /** Do celów testowych i raportowych */
+	void Dump( std::ostream &os , std::set < string > * pQset ) ;         /** Do celow testowych i raportowych */
 };
 
 //Specjalizacja dla CRandomFile i stringstream
@@ -254,7 +254,7 @@ template <class IDTYPE>
 	recordInCycleMemory.reset( new CRecord< CCycBlock<stringstream> >() );
 }
 
-/** Destruktor - assert zbêdny/shared_ptr?
+/** Destruktor - assert zbedny/shared_ptr?
 	*/
 
 template <class IDTYPE>
@@ -379,7 +379,7 @@ template <class IDTYPE>
 	return 0 ;
 }
 
-/** Zwrócenie d³ugoœci w bajtach ca³ego bloku */
+/** Zwrocenie dlugosci w bajtach calego bloku */
 template <class IDTYPE>
 	long CBufferImpl<IDTYPE>::GetSizeOfBlock( IDTYPE blockID , long firstFrm , long lastFrm )
 {
@@ -743,7 +743,7 @@ template < typename STREAM >
 	lastblockCnt = x.lastblockCnt ;
 };
 
-/** Funkcja zwraca iloœæ bajtów w bloku
+/** Funkcja zwraca ilosc bajtow w bloku
 	*  @return ilosc bajtow w strumieniu
 	*/
 template < typename STREAM >

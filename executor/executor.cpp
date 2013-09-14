@@ -25,7 +25,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/asio.hpp>
 
-//dodatkowy nag³ówek trzeba wczytac jak sie kompiluje pod mingw
+//dodatkowy naglowek trzeba wczytac jak sie kompiluje pod mingw
 //#ifndef  _CONSOLE
 //#include "windows.h"
 //#endif

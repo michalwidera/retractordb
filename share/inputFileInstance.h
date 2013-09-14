@@ -61,7 +61,7 @@ class inputDF :
     std::vector < boost::any > lResult ;
 
     /** wypelniny w konstruktorze wykorzystywanay
-      do sk³adania danych z danych binarynych.
+      do skladania danych z danych binarynych.
       Nakladany schemat na strumien binarny
     */
     std::list < QS::field > lSchema ;
@@ -72,8 +72,8 @@ public:
 
     /**
       * Parametrem konstruktora jest nazwa pliku na dysku
-      * oraz schemat strumienia danych który bêdzie
-      * opisywa³ jego zwartoœæ
+      * oraz schemat strumienia danych ktory bedzie
+      * opisywal jego zwartosc
       */
     inputDF( std::string inputFileName , std::list < QS::field > &lSchema ) ;
 

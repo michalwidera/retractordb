@@ -589,7 +589,7 @@ struct CursorHider {
 };
 #endif
 
-//orginalne zrodlo pochodzi/zosta³o pobrane z tej strony
+//orginalne zrodlo pochodzi/zostalo pobrane z tej strony
 
 /* ***************************************************************************
  *

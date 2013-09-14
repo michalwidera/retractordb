@@ -26,10 +26,10 @@ TimeLine::TimeLine( const SR & inSet ) :
 
     BOOST_FOREACH( R val , inSet )
     {
-        bool isDivided( false );                // Przelacznik/zatrzask - lapie true jak val jest podzielny przez jak¹kolwiek liczbê ze zbioru
-        BOOST_FOREACH( R x , inSet )            // Zadaniem tej funkcji jest wyznaczenie zbioru takiego ¿e i.e. {1, 4, 1/2, 3/4} -> { 1/2 , 3/4 }
+        bool isDivided( false );                // Przelacznik/zatrzask - lapie true jak val jest podzielny przez jakakolwiek liczbe ze zbioru
+        BOOST_FOREACH( R x , inSet )            // Zadaniem tej funkcji jest wyznaczenie zbioru takiego ze i.e. {1, 4, 1/2, 3/4} -> { 1/2 , 3/4 }
                 if ( x < val )                      // poniewaz 1/2 * 2 == 1 , 1 * 4 == 4 and 1/2 * 2 == 1 ale nie istnieje liczba naturalna taka ze 1/2 * NATURAL == 3/4
-        {                                   // czyli usuniecie wszystkich wartosci ktore maj¹ odpowiednik pomno¿ony przez liczbe naturaln¹
+        {                                   // czyli usuniecie wszystkich wartosci ktore maja odpowiednik pomnozony przez liczbe naturalna
             if ( R ( rational_cast<int>( x / val ) , 1 ) == ( x / val ) )
                 isDivided = true  ;
             if ( R ( rational_cast<int>( val / x ) , 1 ) == ( val / x ) )

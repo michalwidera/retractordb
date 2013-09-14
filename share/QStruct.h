@@ -175,7 +175,7 @@ namespace QS {
 		field () ;
 		field ( string sFieldName, list < token > & lProgram, eType fieldType ) ;
 		
-        string getFirstFieldName();  /**< Funkcja zwraca pierwsza nazwê pola */
+        string getFirstFieldName();  /**< Funkcja zwraca pierwsza nazwe pola */
         string getFieldNameSet();    /**< Funkcja zwraca zagreowany w stringu zbior nazw pola (dla celow prezentacyjnych)*/
 	} ;
 
@@ -207,16 +207,16 @@ namespace QS {
 		string id ;                         /**< nazwa strumienia/zapytania */
         string filename ;                   /**< nazwa pliku skojarzona ze strumieniem. dot. deklaracji*/
 		R rInterval ;                       /**< interwal pomiedzy krotkami strumienia */
-		list < field > lSchema ;            /**< Schemat strumienia z³o¿ony z pól */
+		list < field > lSchema ;            /**< Schemat strumienia zlozony z pol */
 		list < token > lProgram ;           /**< Program budowy strumienia */
 
-		bool isDeclaration();               /**< Funkcja zwrcaj¹ca informacjê czy strumieñ jest deklaracj¹*/
+		bool isDeclaration();               /**< Funkcja zwrcajaca informacje czy strumien jest deklaracja*/
 		bool isReductionRequired();         /**< Funkcja zwraca true jestli program budowy strumienia wymaga optymalizacji */
         bool isGenerated();                 /**< Funkcja zwraca true jest program budowy strumienia zostal wygenerowany w trakcie kompilacji */
 
 		field & getField( string sField );
 		
-        /** Funkcja zwraca dostepna liste nazw schematów z poziomu zapytania
+        /** Funkcja zwraca dostepna liste nazw schematow z poziomu zapytania
         funkcja jesli poda jej sie argument zero (domyslny)
         zwroci cala liste strumieni
         jesli jednak poda sie numer - moze zwrocic wskazany, kolejny strumien */
@@ -230,7 +230,7 @@ namespace QS {
     query & getQuery( string query_name );              /**< Funkcja zwraca referencje do zapytania */
     int getSeqNr( string query_name ) ;                 /**< Funkcja zwraca numer kolejny w zbiorze qTree */
 
-    /** Deklaracja typu qTree - uporzadkowanego wzgledem czasów wykoniania zbioru strumeni */
+    /** Deklaracja typu qTree - uporzadkowanego wzgledem czasow wykoniania zbioru strumeni */
 	class qTree : 
 		public vector < query > 
 	{

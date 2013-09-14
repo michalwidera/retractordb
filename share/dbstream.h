@@ -36,11 +36,11 @@ namespace UR {
 
     /**
     Klasa udostepniajaca metody doseptu do danych w strumieniu
-    Przykrywa caly CBuffer w³asn¹ abstrakcja
+    Przykrywa caly CBuffer wlasna abstrakcja
     dostep odpbywa sie poprzez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
     dostep do danych archiwalnych obiekt_strumien.get(1)[1] lub obiekt_strumien.get(1)["nazwa_pola"]
     po wykoaniu store()
-    dane nie s¹ ju¿ dostêpne przez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
+    dane nie sa juz dostepne przez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
     a przygotowane jest miejsce na kolejna krotke
     */
     class dbStream : private boost::noncopyable

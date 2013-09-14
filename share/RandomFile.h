@@ -28,7 +28,7 @@ using std::string ;
 using std::ios ;
 
 /** CRandomFile
-*   Klasa tworz¹ca strumien na dysku o losowej nazwie. 
+*   Klasa tworzaca strumien na dysku o losowej nazwie. 
 *	Nazwa pliku jest tworzona losowo w 
 *	konstruktorze. Utworzone pliki maja charakter tymczasowy i sa
 *	automatycznie usuwane w destruktorze.

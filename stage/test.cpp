@@ -29,7 +29,7 @@
 
 
 #define FSM_TEST_OFF
-//-----fsm test start - testowanie zale¿noœci
+//-----fsm test start - testowanie zaleznosci
 #ifndef FSM_TEST_OFF
 
 #include <fsmtemplate.h>
@@ -50,7 +50,7 @@ struct stop {};
 // konkretna implementacja automatu
 class player : public state_machine<player>
 {
-    // lista stanów
+    // lista stanow
     enum states {
         Empty, Open, Stopped, Playing, Paused, initial_state = Empty
     };
@@ -66,12 +66,12 @@ class player : public state_machine<player>
 
     friend class state_machine<player>;
 
-    typedef player p; // upraszcza zapis tabeli przejœæ
+    typedef player p; // upraszcza zapis tabeli przejsc
 
-    // tabela przejœæ
+    // tabela przejsc
     struct transition_table : mpl::vector11<
 
-    //    Aktualny   Zdarzenie    Nastêpny      Akcja
+    //    Aktualny   Zdarzenie    Nastepny      Akcja
     //  +---------+-------------+---------+---------------------+
     row < Stopped , play        , Playing , &p::start_playback  >,
     row < Stopped , open_close  , Open    , &p::open_drawer     >,
@@ -107,12 +107,12 @@ int fsmTest2(){
 
     player pl;                      // egzemplarz automatu
 
-    pl.process_event(open_close()); // u¿ytkownik otwiera odtwarzacz CD
-    pl.process_event(open_close()); // wk³ada CD i zamyka tackê
-    pl.process_event(               // nastêpuje wykrywanie p³yty CD
+    pl.process_event(open_close()); // uzytkownik otwiera odtwarzacz CD
+    pl.process_event(open_close()); // wklada CD i zamyka tacke
+    pl.process_event(               // nastepuje wykrywanie plyty CD
         cd_detected(
              "louie, louie"
-           , std::vector<std::clock_t>( /* d³ugoœci œcie¿ek */ )
+           , std::vector<std::clock_t>( /* dlugosci sciezek */ )
         )
     );
     pl.process_event(play());       // itd.

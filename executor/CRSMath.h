@@ -32,7 +32,7 @@ namespace CRationalStreamMath {
 	{ 
         typedef set< R > SR ;
         
-        SR sr;                      /**< Zbiór - !posortowanych! Delt */
+        SR sr;                      /**< Zbior - !posortowanych! Delt */
 
     	map < R , long > m_counters ;    /**< Tutaj jest mnoznik z dla wartosci czasu */
 
@@ -42,7 +42,7 @@ namespace CRationalStreamMath {
 	public:
 
 		/** Konstruktor wypenia dziedziczony zbior wartosciami odfiltrowanymi 
-		w trakcie wywo³ania konstruktora toworzona jest lista zawierajaca
+		w trakcie wywolania konstruktora toworzona jest lista zawierajaca
 		minimalne czasy, a usuwane sa te ktore sa wielokrotnoscia innych wartosci
 		Przygotowana lista jest nastepnie brana pod uwage podczas wywolywania
 		getNextTimeSlot	*/
