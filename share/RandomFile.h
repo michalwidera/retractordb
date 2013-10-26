@@ -20,8 +20,6 @@
 #ifdef WIN32
 #include <windows.h>
 #endif
-#include <fstream>
-#include <string>
 
 using std::fstream ;
 using std::string ;
