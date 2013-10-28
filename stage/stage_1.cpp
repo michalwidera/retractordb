@@ -25,11 +25,17 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <boost/date_time.hpp>
+#include <boost/lockfree/queue.hpp>
+#include <boost/atomic.hpp>
+#include <queue>
 
 using namespace boost ;
 using namespace std;
 using boost::asio::ip::tcp;
 using boost::asio::ip::udp;
+
+std::queue<int> qq;
+boost::lockfree::queue<int> qqw(128);
 
 std::string make_daytime_string()
 {
@@ -80,7 +86,7 @@ class tcp_server
 {
 public:
   tcp_server(boost::asio::io_service& io_service)
-    : acceptor_(io_service, tcp::endpoint(tcp::v4(), 13))
+    : acceptor_(io_service, tcp::endpoint(tcp::v4(), 1974 ))
   {
     start_accept();
   }
@@ -114,7 +120,7 @@ class udp_server
 {
 public:
   udp_server(boost::asio::io_service& io_service)
-    : socket_(io_service, udp::endpoint(udp::v4(), 13))
+    : socket_(io_service, udp::endpoint(udp::v4(), 1973 ))
   {
     start_receive();
   }
@@ -156,18 +162,96 @@ private:
   boost::array<char, 1> recv_buffer_;
 };
 
+
+class udp_soserver
+{
+public:
+  udp_soserver(boost::asio::io_service& io_service)
+    : socket_(io_service, udp::endpoint(udp::v4(), 1975 ))
+  {
+    start_send();
+  }
+
+private:
+  void start_send()
+  {
+      cout << "start_send" << endl ;
+
+      int value ;
+
+      cout << "ret " << qq.front() << endl ;
+      qq.pop();
+      cout << "ret " << qq.front() << endl ;
+      qq.pop();
+
+      while (qqw.pop(value));
+      cout << "rez " << value << endl ;
+
+      //boost::this_thread::sleep(boost::posix_time::milliseconds( 1 ));
+      int vaule ;
+      socket_.async_send_to(
+          boost::asio::buffer( &value , sizeof(int) ) , remote_endpoint_,
+          boost::bind(
+                      &udp_soserver::handle_send, this,
+                      boost::asio::placeholders::error , boost::asio::placeholders::bytes_transferred ));
+  }
+
+  void handle_send(
+          const boost::system::error_code& error,
+          std::size_t bytes_transferred )
+  {
+      if (!error || error == boost::asio::error::message_size)
+      {
+          cout << "Send OK" << endl ;
+          start_send();
+      }
+      else
+      {
+ //         cout << "Send FAIL" << endl ;
+      }
+
+  }
+
+  udp::socket socket_;
+  udp::endpoint remote_endpoint_;
+};
+
+
 //http://thisthread.blogspot.com/2011/06/running-ioservice-in-another-thread.html
 int main(int argc, char* argv[])
 {
+
     asio::io_service ios;
+
+    for ( int i = 0 ; i < 100 ; i ++)
+        qq.push( i + 1 );
+    qq.push( 3 );
+
+    cout << "boost::lockfree::queue is ";
+    if (!qqw.is_lock_free())
+        cout << "not ";
+    cout << "lockfree" << endl;
+
+
+    for (int i = 0; i != 100; ++i) {
+        int value = i ;
+        while (!qqw.push(value))
+            ;
+    }
 
     tcp_server server1(ios);
     udp_server server2(ios);
+    udp_soserver server3(ios);
+
 
     thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 
-    cout << "Press enter to terminate whenever you want!" << endl;
+    cout << "Press enter to send sth." << endl;
     string request;
+    getline(cin, request);
+
+
+    cout << "Press enter to terminate whenever you want!!" << endl;
     getline(cin, request);
 
     ios.stop();
