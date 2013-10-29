@@ -184,8 +184,11 @@ private:
       cout << "ret " << qq.front() << endl ;
       qq.pop();
 
-      while (qqw.pop(value));
+      while ( ! qqw.pop(value) );
       cout << "rez " << value << endl ;
+      while ( ! qqw.pop(value) );
+      cout << "rez " << value << endl ;
+
 
       //boost::this_thread::sleep(boost::posix_time::milliseconds( 1 ));
       int vaule ;
@@ -233,23 +236,28 @@ int main(int argc, char* argv[])
     cout << "lockfree" << endl;
 
 
-    for (int i = 0; i != 100; ++i) {
+    for (int i = 100; i != 200; ++i) {
         int value = i ;
         while (!qqw.push(value))
             ;
     }
 
-    tcp_server server1(ios);
-    udp_server server2(ios);
+    int value ;
+    while ( ! qqw.pop(value) );
+    cout << "rez " << value << endl ;
+    while ( ! qqw.pop(value) );
+    cout << "rez " << value << endl ;
+
+
+//    tcp_server server1(ios);
+//    udp_server server2(ios);
     udp_soserver server3(ios);
-
-
-    thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 
     cout << "Press enter to send sth." << endl;
     string request;
     getline(cin, request);
 
+    thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 
     cout << "Press enter to terminate whenever you want!!" << endl;
     getline(cin, request);
