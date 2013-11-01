@@ -51,7 +51,7 @@ namespace QS {
     {
         BOOST_FOREACH ( query q , coreInstance )
         {
-            //Odrzucamy wiersze ktore nie wchodza tym razem do przeliczeñ
+            //Odrzucamy wiersze ktore nie wchodza tym razem do przeliczen
             if ( inSet.find( q.id ) == inSet.end() )
                 continue ;
 
@@ -213,7 +213,7 @@ namespace QS {
                 break ;
 
             case DIVIDE:	
-                //Dzielenie wymiernych liczb urojonych zachowuje siê niezdefiniowanie 
+                //Dzielenie wymiernych liczb urojonych zachowuje sie niezdefiniowanie
                 //- kompilator wylatuje na rationalach
                 //http://pl.wikipedia.org/wiki/Liczby_zespolone
                 {

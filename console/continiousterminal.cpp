@@ -50,7 +50,7 @@ ContiniousTerminal::ContiniousTerminal( bool stopLoop )
       pos(0) ,
       curline(2)
 {
-    // ---- inicjacja tablicy poleceñ
+    // ---- inicjacja tablicy polecen
     commands[ Quit ] = boost::regex("quit.*") ;
     commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
     commands[ Cls ] = boost::regex("cls.*") ;
