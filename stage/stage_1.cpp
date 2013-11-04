@@ -193,10 +193,13 @@ private:
       //boost::this_thread::sleep(boost::posix_time::milliseconds( 1 ));
       int vaule ;
       socket_.async_send_to(
-          boost::asio::buffer( &value , sizeof(int) ) , remote_endpoint_,
-          boost::bind(
-                      &udp_soserver::handle_send, this,
-                      boost::asio::placeholders::error , boost::asio::placeholders::bytes_transferred ));
+          boost::asio::buffer( &value ,
+                               sizeof(int) ) ,
+                               remote_endpoint_,
+                               boost::bind( &udp_soserver::handle_send,
+                                            this,
+                                            boost::asio::placeholders::error ,
+                                            boost::asio::placeholders::bytes_transferred ));
   }
 
   void handle_send(
