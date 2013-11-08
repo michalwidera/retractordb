@@ -1,4 +1,4 @@
-/*Copyright 2010-2012 Streams Lab Michal Widera
+/*Copyright 2010-2014 Streams Lab Michal Widera
 
   RESTRICTED RIGHTS LEGEND
   Use, duplication or disclosure by any commercial industry (public or
