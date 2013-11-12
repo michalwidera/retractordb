@@ -18,7 +18,6 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
-#include <boost/version.hpp>
 
 using namespace QS ;
 using boost::lexical_cast;

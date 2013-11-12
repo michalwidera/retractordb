@@ -62,6 +62,8 @@
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/crc.hpp>
+#include <boost/version.hpp>
+
 //#include <boost/locale.hpp>
 //#include <boost/lexical_cast.hpp>
 

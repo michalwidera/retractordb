@@ -208,11 +208,12 @@ int mainFromWin32(int argc, char* argv[])
 #endif
 {
     cerr << "Executor - egzekutor planow zapytan tworzonych przez kompilator.\n";
-    cerr << "used compiler tag:" + string(COMPILER) +
+    cerr << "Tag kompilatora:" + string(COMPILER) +
 #ifdef _CONSOLE
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
 #endif
             std::endl ;
+    cerr << "Boost wersja:" << BOOST_LIB_VERSION << std::endl ;
 
 	try {
 	namespace po = boost::program_options;
