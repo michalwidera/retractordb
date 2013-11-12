@@ -18,6 +18,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
+#include <boost/version.hpp>
 
 using namespace QS ;
 using boost::lexical_cast;
@@ -812,9 +813,10 @@ int main(int argc, char* argv[])
 {
     //Intro
     cerr << "Parser/Compiler - parser i reduktor planow zapytan.\n";
-    cerr << "used compiler tag:" + string(COMPILER) +
+    cerr << "Tag kompilatora:" + string(COMPILER) +
             ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
             std::endl ;
+    cerr << "Boost wersja:" << BOOST_LIB_VERSION << std::endl ;
 
     try {
         scoped_ptr<ostream> p_ofs;
