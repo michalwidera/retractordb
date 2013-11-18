@@ -188,6 +188,11 @@ set(SOURCES_TEST
   regtest/prepare_runtime_enviroment.bat
 )
 
+set(SOURCES_STAGE_2
+  stage/stage_2.cpp
+  share/stdafx.cpp
+  share/rlutil.h
+)
 
 if(WIN32)
   set(SOURCES_DUMPER ${SOURCES_DUMPER}
@@ -202,6 +207,7 @@ add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xconsole ${SOURCES_CONSOLE} )
 add_executable( xstage ${SOURCES_STAGE} )
 add_executable( xstage_1 ${SOURCES_STAGE_1} )
+add_executable( xstage_2 ${SOURCES_STAGE_2} )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
@@ -218,6 +224,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries( xconsole ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
     target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} -lrt )
     target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xstage_2 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
 
     add_custom_target( check ALL
         COMMAND chmod +x regtest/gocheck.sh

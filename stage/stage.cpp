@@ -17,6 +17,7 @@
 
 #include <boost/static_assert.hpp>
 
+
 #include <fsmtemplate.h>
 #include <inputFileInstance.h>
 #include <QStruct.h>
@@ -383,6 +384,8 @@ int main(int argc, char* argv[])
                 ("tree,t","server tree test")
                 ("ctree,e","client tree test")
                 ("udpclient,x" ,"udp client test")
+                ("u1,u" ,"udp client 1 test")
+                ("s1,v" ,"udp server 1 test")
                 ;
 
         po::positional_options_description p;       //Assume that infile is the first option
