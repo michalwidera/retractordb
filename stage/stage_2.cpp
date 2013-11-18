@@ -28,7 +28,7 @@ try
     udp::socket s(io_service, udp::endpoint(udp::v4(), 0));
 
     udp::resolver resolver(io_service);
-    udp::resolver::query query(udp::v4(), "MyPublicIp", "3002");
+    udp::resolver::query query(udp::v4(), "127.0.0.1", "3002");
     udp::resolver::iterator iterator = resolver.resolve(query);
 
     using namespace std; // For strlen.
@@ -138,7 +138,7 @@ int main_s1()
 int main(int argc, char* argv[])
 {
     //Intro
-    std::cerr << "Stage - staging area of database algorithms.\n";
+    std::cerr << "xstage_2 - staging area of database algorithms.\n";
     std::cerr << "Boost wersja:" << BOOST_LIB_VERSION << std::endl ;
 
     try {
@@ -148,6 +148,7 @@ int main(int argc, char* argv[])
 
         po::options_description desc("Obslugiwane opcje programu");
         desc.add_options()
+                ("help,h", "opcje programu")
                 ("u1,u" ,"udp client 1 test")
                 ("s1,v" ,"udp server 1 test")
                 ;
