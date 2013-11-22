@@ -263,7 +263,7 @@ int main( int argc, char* argv[] )
 
   // Allow other processes to reuse the address, permitting other processes on
   // the same machine to use the multicast address.
-  socket.set_option( udp::socket::reuse_address( true ) );
+  //socket.set_option( udp::socket::reuse_address( true ) );
 
   // Guarantee the loopback is enabled so that multiple processes on the same
   // machine can receive data that originates from the same socket.
