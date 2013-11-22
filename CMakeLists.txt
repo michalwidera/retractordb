@@ -234,5 +234,11 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         COMMAND chmod +x regtest/gotest.sh
     )
     
+    add_custom_target( gohome ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory ~/xdir
+        COMMAND cp x* ~/xdir/
+        COMMAND chmod +x ~/xdir/x*
+    )
+
 endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 

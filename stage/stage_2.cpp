@@ -13,6 +13,7 @@
 //
 //
 
+/*
 using boost::asio::ip::udp;
 
 enum { max_length = 1024 };
@@ -94,8 +95,8 @@ public:
     }
   }
 
-  void handle_send_to(const boost::system::error_code& /*error*/,
-      size_t /*bytes_sent*/)
+  void handle_send_to(const boost::system::error_code& ,
+      size_t )
   {
 
       std::fill(data_, data_ + max_length, 0);
@@ -180,4 +181,104 @@ int main(int argc, char* argv[])
     }
 
     return 0;
+}
+*/
+
+// Standard includes.
+#include <iostream>
+
+// 3rd party includes.
+#include <boost/asio.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/thread.hpp>
+
+void read( boost::asio::ip::udp::socket& socket )
+{
+  boost::asio::ip::udp::endpoint sender;
+  std::vector< char > buffer;
+  std::size_t bytes_readable = 0;
+  while ( true )
+  {
+    // Poll until data is available.
+    while ( !bytes_readable )
+    {
+      // Issue command to socket to get number of bytes readable.
+      boost::asio::socket_base::bytes_readable num_of_bytes_readable( true );
+      socket.io_control( num_of_bytes_readable );
+
+      // Get the value from the command.
+      bytes_readable = num_of_bytes_readable.get();
+
+      // If there is no data available, then sleep.
+      if ( !bytes_readable )
+      {
+        boost::this_thread::sleep( boost::posix_time::seconds( 1 ) );
+      }
+    }
+
+    // Resize the buffer to store all available data.
+    buffer.resize( bytes_readable );
+
+    // Read available data.
+    socket.receive_from(
+      boost::asio::buffer( buffer, bytes_readable ),
+      sender );
+
+    // Extract data from the buffer.
+    std::string message( buffer.begin(), buffer.end() );
+
+    // Output data.
+    std::cout << "Received message: ";
+    std::cout << message << std::endl;
+  }
+}
+
+void write( boost::asio::ip::udp::socket& socket,
+            boost::asio::ip::udp::endpoint& destination )
+{
+  std::string message;
+  for ( unsigned int i = 0; i < 10; ++i )
+  {
+    std::ostringstream stream;
+    stream << i;
+    message = stream.str();
+    socket.send_to( boost::asio::buffer( message ), destination );
+    std::cout << "Sent message: " << message << std::endl;
+  }
+}
+
+int main( int argc, char* argv[] )
+{
+  // Extract command-line arguments.
+  bool receiver = std::string( argv[ 1 ] ) == "receive";
+  boost::asio::ip::address address =
+    boost::asio::ip::address::from_string( argv[ 2 ] );
+  unsigned short port = boost::lexical_cast< unsigned short >( argv[ 3 ] );
+
+  // Create socket.
+  using boost::asio::ip::udp;
+  boost::asio::io_service service;
+  udp::socket socket( service );
+  socket.open( boost::asio::ip::udp::v4() );
+
+  // Allow other processes to reuse the address, permitting other processes on
+  // the same machine to use the multicast address.
+  socket.set_option( udp::socket::reuse_address( true ) );
+
+  // Guarantee the loopback is enabled so that multiple processes on the same
+  // machine can receive data that originates from the same socket.
+  socket.set_option( boost::asio::ip::multicast::enable_loopback( true ) );
+
+  socket.bind( udp::endpoint( boost::asio::ip::address_v4::any(), port ) );
+  udp::endpoint destination( address, port );
+
+  // Join group.
+  namespace ip = boost::asio::ip;
+  socket.set_option( ip::multicast::join_group( address ) );
+
+  // Start read or write loops based on command line options.
+  if ( receiver ) read( socket );
+  else            write( socket, destination );
+
+  return 0;
 }
