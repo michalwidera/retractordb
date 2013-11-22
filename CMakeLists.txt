@@ -234,8 +234,8 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
         COMMAND chmod +x regtest/gotest.sh
     )
     
-    add_custom_command( TARGET gohome
-        POST_BUILD
+    add_custom_target( gohome ALL
+        DEPENDS xexecutor xcompiler xdumper xconsole xstage xstage_1 xstage_2
         COMMAND mkdir -p ~/xdir
         COMMAND cp x* ~/xdir/
         COMMAND chmod +x ~/xdir/x*

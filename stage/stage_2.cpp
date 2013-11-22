@@ -249,11 +249,16 @@ void write( boost::asio::ip::udp::socket& socket,
 
 int main( int argc, char* argv[] )
 {
+  std::cout << "!" ;
+
   // Extract command-line arguments.
   bool receiver = std::string( argv[ 1 ] ) == "receive";
   boost::asio::ip::address address =
     boost::asio::ip::address::from_string( argv[ 2 ] );
   unsigned short port = boost::lexical_cast< unsigned short >( argv[ 3 ] );
+
+
+  std::cout << "0" ;
 
   // Create socket.
   using boost::asio::ip::udp;
@@ -261,20 +266,30 @@ int main( int argc, char* argv[] )
   udp::socket socket( service );
   socket.open( boost::asio::ip::udp::v4() );
 
+  std::cout << "1" ;
+
   // Allow other processes to reuse the address, permitting other processes on
   // the same machine to use the multicast address.
-  //socket.set_option( udp::socket::reuse_address( true ) );
+  socket.set_option( udp::socket::reuse_address( true ) );
+
+  std::cout << "2" ;
 
   // Guarantee the loopback is enabled so that multiple processes on the same
   // machine can receive data that originates from the same socket.
   socket.set_option( boost::asio::ip::multicast::enable_loopback( true ) );
 
+  std::cout << "3" ;
+
   socket.bind( udp::endpoint( boost::asio::ip::address_v4::any(), port ) );
   udp::endpoint destination( address, port );
+
+  std::cout << "4" ;
 
   // Join group.
   namespace ip = boost::asio::ip;
   socket.set_option( ip::multicast::join_group( address ) );
+
+  std::cout << "5" ;
 
   // Start read or write loops based on command line options.
   if ( receiver ) read( socket );
