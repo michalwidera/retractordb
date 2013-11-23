@@ -184,6 +184,11 @@ int main(int argc, char* argv[])
 }
 */
 
+
+//http://stackoverflow.com/questions/7576832/multicast-message-on-same-host-using-boostasio
+
+//http://stackoverflow.com/questions/12708558/c-multiple-multicast-receiver-with-boost-asio
+
 // Standard includes.
 #include <iostream>
 
@@ -251,12 +256,9 @@ int main( int argc, char* argv[] )
 {
   std::cout << "!" ;
 
-  // Extract command-line arguments.
-  bool receiver = std::string( argv[ 1 ] ) == "receive";
-  boost::asio::ip::address address =
-    boost::asio::ip::address::from_string( argv[ 2 ] );
-  unsigned short port = boost::lexical_cast< unsigned short >( argv[ 3 ] );
+  boost::asio::ip::address address = boost::asio::ip::address::from_string( "127.0.0.1" );
 
+  unsigned short port = 55555 ; //boost::lexical_cast< unsigned short >( "55555" );
 
   std::cout << "0" ;
 
@@ -287,13 +289,22 @@ int main( int argc, char* argv[] )
 
   // Join group.
   namespace ip = boost::asio::ip;
-  socket.set_option( ip::multicast::join_group( address ) );
+
+  socket.bind ( boost::asio::ip::udp::endpoint( address, port )  );
+  //socket.set_option(ip::multicast::join_group( address , port ) );
+
+  //socket.set_option( ip::multicast::join_group( address ) );
+
+
+  //socket.set_option(ip::multicast::join_group( address , 55555 ));
+
+  //
 
   std::cout << "5" ;
 
   // Start read or write loops based on command line options.
-  if ( receiver ) read( socket );
-  else            write( socket, destination );
+  if ( std::string( argv[ 1 ] ) == "r" ) read( socket );
+  else                                   write( socket, destination );
 
   return 0;
 }
