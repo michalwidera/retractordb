@@ -9,7 +9,14 @@
 //
 //
 //http://stackoverflow.com/questions/10137925/boost-asio-throws-no-such-device-exception-when-trying-to-join-multicast-group
-//TODO: sudo route add -net 224.0.0.0/4 dev eth0
+//
+//zeby to cholerstwo dzialalo trzeba wydac takie polecenie z konsoli
+//
+//TODO:
+//sudo route add -net 224.0.0.0/4 dev eth0
+//./xstage s 239.255.0.1
+//./xstage r 0.0.0.0 249.255.0.1
+//
 
 #include <iostream>
 #include <sstream>
