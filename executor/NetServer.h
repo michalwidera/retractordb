@@ -60,25 +60,24 @@ public:
 
 /**
  *  Klasa odpowiedzialna za transmisje strumienia danych
- *  Server UDP
+ *  Server UDP multicast
  */
-class udp_server {
 
-    boost::asio::io_service& io_service_;
-    boost::asio::ip::udp::socket socket_;
-    boost::asio::ip::udp::endpoint sender_endpoint_;
-    enum { max_length = 1024 };
-    char data_[max_length];
-
+class udp_server
+{
 public:
+  udp_server(boost::asio::io_service& io_service,
+      const boost::asio::ip::address& multicast_address) ;
 
-    udp_server(boost::asio::io_service& io_service);
+  void handle_send_to(const boost::system::error_code& error);
+  void handle_timeout(const boost::system::error_code& error);
 
-    void handle_receive_from(const boost::system::error_code& error,
-          size_t bytes_recvd);
-
-    void handle_send_to(const boost::system::error_code& /*error*/,
-        size_t /*bytes_sent*/);
+private:
+  boost::asio::ip::udp::endpoint endpoint_;
+  boost::asio::ip::udp::socket socket_;
+  boost::asio::deadline_timer timer_;
+  int message_count_;
+  std::string message_;
 };
 
 #endif // NETSERVER_H
