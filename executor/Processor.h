@@ -20,46 +20,46 @@
 
 namespace QS {
 
-    /** Klasa procesora zapytan */
-    class Processor : private boost::noncopyable
-    {
-        /** Archiwum Strumienia danych - initStorage */
-        std::map< std::string , boost::shared_ptr< UR::dbStream > > storage ;
+  /** Klasa procesora zapytan */
+  class Processor : private boost::noncopyable
+  {
+    /** Archiwum Strumienia danych - initStorage */
+    std::map< std::string , boost::shared_ptr< UR::dbStream > > storage ;
 
-        /** Funkcja zapewniajaca dostep do danych */
-        complex< R > getCRValue( 
-            const field & f ,
-            const query & q ,
-            bool & resultValid /* return information */
-            );
+    /** Funkcja zapewniajaca dostep do danych */
+    complex< R > getCRValue(
+        const field & f ,
+        const query & q ,
+        bool & resultValid /* return information */
+        );
 
-        /** Wskaznik na instancje obiektu core podawanego w konstruktorze */
-        qTree * pCoreInstance ;
+    /** Wskaznik na instancje obiektu core podawanego w konstruktorze */
+    qTree * pCoreInstance ;
 
-        /** zmienna przechowujaca zrodla danych */
-        map < string , inputDF > gFileMap ;
+    /** zmienna przechowujaca zrodla danych */
+    map < string , inputDF > gFileMap ;
 
-    public:
+  public:
 
-        /** Klasa processor zapytan chodzi na core */
-        Processor();
+    /** Klasa processor zapytan chodzi na core */
+    Processor();
 
-        /** Zwraca wartosc ze strumienia - TODO - zmienne typy */
-        complex< R > getValueByOffset( 
-            const string query_name ,   /* in */
-            int schemaOffset ,          /* in */
-            int TimeOffset ,            /* in */
-            bool & resultValid          /* out */
-            );
+    /** Zwraca wartosc ze strumienia - TODO - zmienne typy */
+    complex< R > getValueByOffset(
+        const string query_name ,   /* in */
+        int schemaOffset ,          /* in */
+        int TimeOffset ,            /* in */
+        bool & resultValid          /* out */
+        );
 
-        /** Prezentacja tekstowa zawartosci strumienia */
-        string getRowValue( const string query_name );
+    /** Prezentacja tekstowa zawartosci strumienia */
+    string getRowValue( const string query_name );
 
-        /** Ta funkcja pobiera w odpowiednim momencie dane do przetwarzania */
-        void processRows( set < string > inSet );
+    /** Ta funkcja pobiera w odpowiednim momencie dane do przetwarzania */
+    void processRows( set < string > inSet );
 
-        /** Zrzut zawartosci strumieni do pliku - default query.dmp */
-        void saveStreamsToFile( const string filename );
+    /** Zrzut zawartosci strumieni do pliku - default query.dmp */
+    void saveStreamsToFile( const string filename );
 
-    };
+  };
 }

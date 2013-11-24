@@ -311,7 +311,6 @@ namespace QS {
                     assert( tk.getCRValue().real().denominator() == 1 );
                     assert( tk.getCRValue().imag().denominator() == 1 );
 
-
                     const int offsetInSchema ( rational_cast<int>( tk.getCRValue().real() ) );
                     const int offsetInTime ( rational_cast<int>(  tk.getCRValue().imag() ) );
                     const string schema( tk.getValue() );
@@ -334,15 +333,24 @@ namespace QS {
         }
 
         if ( rStack.size() == 0 )
-        {
+          {
             if ( q.filename.empty() )
+              {
                 return complex<R>( rand()%2 ) ;    //jesli puste - leca randomy, generatory, itp
+              }
             else
+              {
                 return gFileMap[ q.id ].getCR( f ) ;
-        }
-        else if ( rStack.size() == 1 ) return rStack.top() ;
+              }
+          }
+        else if ( rStack.size() == 1 )
+          {
+            return rStack.top() ;
+          }
         else
+          {
             throw std::out_of_range("Thrown/Processor.cpp/getCRValue/Na stosie pozostalo za duzo tokenow");
+          }
 
         return complex<R>(0) ; /* pro forma */
     }
