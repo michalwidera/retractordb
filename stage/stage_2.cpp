@@ -1,73 +1,124 @@
-#include <boost/chrono.hpp>
-#include <cstdlib>
+//
+// sender.cpp
+// ~~~~~~~~~~
+//
+// Copyright (c) 2003-2013 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+//
+// Distributed under the Boost Software License, Version 1.0. (See accompanying
+// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+//
+//
+//http://stackoverflow.com/questions/10137925/boost-asio-throws-no-such-device-exception-when-trying-to-join-multicast-group
+//TODO: sudo route add -net 224.0.0.0/4 dev eth0
+
 #include <iostream>
-#include <boost/bind.hpp>
+#include <sstream>
+#include <string>
 #include <boost/asio.hpp>
-#include <ctime>
-#include <boost/bind.hpp>
+#include "boost/bind.hpp"
+#include "boost/date_time/posix_time/posix_time_types.hpp"
 
-#include "stdafx.h"
-//http://stackoverflow.com/questions/15993180/boost-c-udp-example-can-not-transmit-over-internet
-//
-//
-//
-//
+const short multicast_port = 30001;
+const int max_message_count = 10;
 
-/*
-using boost::asio::ip::udp;
-
-enum { max_length = 1024 };
-
-int main_u1()
-{
-char request[max_length];
-try
-{
-
-    boost::asio::io_service io_service;
-
-    udp::socket s(io_service, udp::endpoint(udp::v4(), 0));
-
-    udp::resolver resolver(io_service);
-    udp::resolver::query query(udp::v4(), "127.0.0.1", "3002");
-    udp::resolver::iterator iterator = resolver.resolve(query);
-
-    using namespace std; // For strlen.
-    std::cout << "Write to me: ";
-    while(1)
-    {
-        std::cin.getline(request, max_length);
-        size_t request_length = strlen(request);
-        s.send_to(boost::asio::buffer(request, request_length), *iterator);
-
-        char reply[max_length];
-        udp::endpoint sender_endpoint;
-        size_t reply_length = s.receive_from(boost::asio::buffer(reply, max_length), sender_endpoint);
-        std::cout << "Say:";
-        std::cout.write(reply, reply_length);
-        std::cout << "\n";
-        std::cout << "Say What?" ;
-    }
-  }
-  catch (std::exception& e)
-  {
-    std::cerr << "Exception: " << e.what() << "\n";
-  }
-  std::cin.getline(request, max_length);
-  return 0;
-}
-
-class server
+class sender
 {
 public:
-  server(boost::asio::io_service& io_service, short port)
-    : io_service_(io_service),
-      socket_(io_service, udp::endpoint( boost::asio::ip::address_v4::any(), port))
+  sender(boost::asio::io_service& io_service,
+      const boost::asio::ip::address& multicast_address)
+    : endpoint_(multicast_address, multicast_port),
+      socket_(io_service, endpoint_.protocol()),
+      timer_(io_service),
+      message_count_(0)
   {
-      std::fill(data_, data_ + max_length, 0);
+    std::ostringstream os;
+    os << "Message " << message_count_++;
+    message_ = os.str();
+
+    socket_.async_send_to(
+        boost::asio::buffer(message_), endpoint_,
+        boost::bind(&sender::handle_send_to, this,
+          boost::asio::placeholders::error));
+  }
+
+  void handle_send_to(const boost::system::error_code& error)
+  {
+    if (!error && message_count_ < max_message_count)
+    {
+      timer_.expires_from_now(boost::posix_time::seconds(1));
+      timer_.async_wait(
+          boost::bind(&sender::handle_timeout, this,
+            boost::asio::placeholders::error));
+    }
+  }
+
+  void handle_timeout(const boost::system::error_code& error)
+  {
+    if (!error)
+    {
+      std::ostringstream os;
+      os << "Message " << message_count_++;
+      message_ = os.str();
+
+      socket_.async_send_to(
+          boost::asio::buffer(message_), endpoint_,
+          boost::bind(&sender::handle_send_to, this,
+            boost::asio::placeholders::error));
+    }
+  }
+
+private:
+  boost::asio::ip::udp::endpoint endpoint_;
+  boost::asio::ip::udp::socket socket_;
+  boost::asio::deadline_timer timer_;
+  int message_count_;
+  std::string message_;
+};
+
+
+//
+// receiver.cpp
+// ~~~~~~~~~~~~
+//
+// Copyright (c) 2003-2013 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+//
+// Distributed under the Boost Software License, Version 1.0. (See accompanying
+// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+//
+
+#include <iostream>
+#include <string>
+#include <boost/asio.hpp>
+#include "boost/bind.hpp"
+
+//const short multicast_port = 30001;
+
+class receiver
+{
+public:
+  receiver(boost::asio::io_service& io_service,
+      const boost::asio::ip::address& listen_address,
+      const boost::asio::ip::address& multicast_address)
+    : socket_(io_service)
+  {
+    // Create the socket so that multiple may be bound to the same address.
+    boost::asio::ip::udp::endpoint listen_endpoint(
+        listen_address, multicast_port);
+    socket_.open(listen_endpoint.protocol());
+    socket_.set_option(boost::asio::ip::udp::socket::reuse_address(true));
+    socket_.bind(boost::asio::ip::udp::endpoint( multicast_address, multicast_port ));
+
+    std::cerr << "0" << std::endl ;
+
+    // Join the multicast group.
+    socket_.set_option(
+        boost::asio::ip::multicast::join_group(multicast_address));
+
+    std::cerr << "1" << std::endl ;
+
     socket_.async_receive_from(
         boost::asio::buffer(data_, max_length), sender_endpoint_,
-        boost::bind(&server::handle_receive_from, this,
+        boost::bind(&receiver::handle_receive_from, this,
           boost::asio::placeholders::error,
           boost::asio::placeholders::bytes_transferred));
   }
@@ -75,236 +126,63 @@ public:
   void handle_receive_from(const boost::system::error_code& error,
       size_t bytes_recvd)
   {
-    if (!error && bytes_recvd > 0)
+    if (!error)
     {
-      std::cout  << "Connection from: " << sender_endpoint_.address().to_string() << " " << sender_endpoint_.port() << std::endl;
+      std::cout.write(data_, bytes_recvd);
+      std::cout << std::endl;
 
-      socket_.async_send_to(
-          boost::asio::buffer(data_, strlen(data_)), sender_endpoint_,
-          boost::bind(&server::handle_send_to, this,
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::bytes_transferred));
-    }
-    else
-    {
       socket_.async_receive_from(
           boost::asio::buffer(data_, max_length), sender_endpoint_,
-          boost::bind(&server::handle_receive_from, this,
+          boost::bind(&receiver::handle_receive_from, this,
             boost::asio::placeholders::error,
             boost::asio::placeholders::bytes_transferred));
     }
-  }
-
-  void handle_send_to(const boost::system::error_code& ,
-      size_t )
-  {
-
-      std::fill(data_, data_ + max_length, 0);
-    socket_.async_receive_from(
-        boost::asio::buffer(data_, max_length), sender_endpoint_,
-        boost::bind(&server::handle_receive_from, this,
-          boost::asio::placeholders::error,
-          boost::asio::placeholders::bytes_transferred));
-
   }
 
 private:
-  boost::asio::io_service& io_service_;
-  udp::socket socket_;
-  udp::endpoint sender_endpoint_;
-  enum { max_length = 300 };
+  boost::asio::ip::udp::socket socket_;
+  boost::asio::ip::udp::endpoint sender_endpoint_;
+  enum { max_length = 1024 };
   char data_[max_length];
 };
 
-int main_s1()
+int main(int argc, char* argv[])
 {
   try
   {
-    std::cout << "Starting server" << std::endl;
-
-    boost::asio::io_service io_service;
-    short port = 3002;
-    using namespace std;
-    server s(io_service, port);
-    std::cout << "Server started. Listening on port:" <<port << std::endl;
-    io_service.run();
+    if ( (argc > 2) && argv[1][0] == 's' )
+      {
+        boost::asio::io_service io_service;
+        sender s(io_service, boost::asio::ip::address::from_string(argv[2]));
+        io_service.run();
+      }
+    else if ( (argc > 2) && argv[1][0] == 'r' )
+      {
+        boost::asio::io_service io_service;
+        receiver r(io_service,
+                   boost::asio::ip::address::from_string(argv[2]),
+                   boost::asio::ip::address::from_string(argv[3]));
+        io_service.run();
+      }
+    else
+      {
+        std::cerr << "Usage: xstage_2 r <listen_address> <multicast_address>\n";
+        std::cerr << "  For IPv4, try:\n";
+        std::cerr << "    receiver 0.0.0.0 239.255.0.1\n";
+        std::cerr << "  For IPv6, try:\n";
+        std::cerr << "    receiver 0::0 ff31::8000:1234\n";
+        std::cerr << "\n" ;
+        std::cerr << "Usage: xstage_2 s <multicast_address>\n";
+        std::cerr << "  For IPv4, try:\n";
+        std::cerr << "    sender 239.255.0.1\n";
+        std::cerr << "  For IPv6, try:\n";
+        std::cerr << "    sender ff31::8000:1234\n";
+      }
   }
   catch (std::exception& e)
   {
     std::cerr << "Exception: " << e.what() << "\n";
   }
-  return 0;
-}
-
-int main(int argc, char* argv[])
-{
-    //Intro
-    std::cerr << "xstage_2 - staging area of database algorithms.\n";
-    std::cerr << "Boost wersja:" << BOOST_LIB_VERSION << std::endl ;
-
-    try {
-        namespace po = boost::program_options;
-
-        std::string sInputFile ;
-
-        po::options_description desc("Obslugiwane opcje programu");
-        desc.add_options()
-                ("help,h", "opcje programu")
-                ("u1,u" ,"udp client 1 test")
-                ("s1,v" ,"udp server 1 test")
-                ;
-
-        po::positional_options_description p;       //Assume that infile is the first option
-        p.add("infile", -1);
-
-        po::variables_map vm;
-        po::store(po::command_line_parser(argc, argv).
-                  options(desc).positional(p).run(), vm);
-        po::notify(vm);
-
-        if (vm.count("help"))
-        {
-            std::cerr << desc << std::endl ;
-            return 1;
-        }
-        else if ( vm.count("u1") )
-            return main_u1();
-        else if ( vm.count("s1") )
-            return main_s1();
-        else
-            throw std::out_of_range("wybierz odpowiedni parametr/test");
-    }
-    catch(std::exception& e)
-    {
-        std::cerr << e.what() << "\n";
-        return 1;
-    }
-
-    return 0;
-}
-*/
-
-
-//http://stackoverflow.com/questions/7576832/multicast-message-on-same-host-using-boostasio
-
-//http://stackoverflow.com/questions/12708558/c-multiple-multicast-receiver-with-boost-asio
-
-// Standard includes.
-#include <iostream>
-
-// 3rd party includes.
-#include <boost/asio.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/thread.hpp>
-
-void read( boost::asio::ip::udp::socket& socket )
-{
-  boost::asio::ip::udp::endpoint sender;
-  std::vector< char > buffer;
-  std::size_t bytes_readable = 0;
-  while ( true )
-  {
-    // Poll until data is available.
-    while ( !bytes_readable )
-    {
-      // Issue command to socket to get number of bytes readable.
-      boost::asio::socket_base::bytes_readable num_of_bytes_readable( true );
-      socket.io_control( num_of_bytes_readable );
-
-      // Get the value from the command.
-      bytes_readable = num_of_bytes_readable.get();
-
-      // If there is no data available, then sleep.
-      if ( !bytes_readable )
-      {
-        boost::this_thread::sleep( boost::posix_time::seconds( 1 ) );
-      }
-    }
-
-    // Resize the buffer to store all available data.
-    buffer.resize( bytes_readable );
-
-    // Read available data.
-    socket.receive_from(
-      boost::asio::buffer( buffer, bytes_readable ),
-      sender );
-
-    // Extract data from the buffer.
-    std::string message( buffer.begin(), buffer.end() );
-
-    // Output data.
-    std::cout << "Received message: ";
-    std::cout << message << std::endl;
-  }
-}
-
-void write( boost::asio::ip::udp::socket& socket,
-            boost::asio::ip::udp::endpoint& destination )
-{
-  std::string message;
-  for ( unsigned int i = 0; i < 10; ++i )
-  {
-    std::ostringstream stream;
-    stream << i;
-    message = stream.str();
-    socket.send_to( boost::asio::buffer( message ), destination );
-    std::cout << "Sent message: " << message << std::endl;
-  }
-}
-
-int main( int argc, char* argv[] )
-{
-  std::cout << "!" ;
-
-  boost::asio::ip::address address = boost::asio::ip::address::from_string( "127.0.0.1" );
-
-  unsigned short port = 55555 ; //boost::lexical_cast< unsigned short >( "55555" );
-
-  std::cout << "0" ;
-
-  // Create socket.
-  using boost::asio::ip::udp;
-  boost::asio::io_service service;
-  udp::socket socket( service );
-  socket.open( boost::asio::ip::udp::v4() );
-
-  std::cout << "1" ;
-
-  // Allow other processes to reuse the address, permitting other processes on
-  // the same machine to use the multicast address.
-  socket.set_option( udp::socket::reuse_address( true ) );
-
-  std::cout << "2" ;
-
-  // Guarantee the loopback is enabled so that multiple processes on the same
-  // machine can receive data that originates from the same socket.
-  socket.set_option( boost::asio::ip::multicast::enable_loopback( true ) );
-
-  std::cout << "3" ;
-
-  socket.bind( udp::endpoint( boost::asio::ip::address_v4::any(), port ) );
-  udp::endpoint destination( address, port );
-
-  std::cout << "4" ;
-
-  // Join group.
-  namespace ip = boost::asio::ip;
-
-  socket.bind ( boost::asio::ip::udp::endpoint( address, port )  );
-  //socket.set_option(ip::multicast::join_group( address , port ) );
-
-  //socket.set_option( ip::multicast::join_group( address ) );
-
-
-  //socket.set_option(ip::multicast::join_group( address , 55555 ));
-
-  //
-
-  std::cout << "5" ;
-
-  // Start read or write loops based on command line options.
-  if ( std::string( argv[ 1 ] ) == "r" ) read( socket );
-  else                                   write( socket, destination );
 
   return 0;
 }
