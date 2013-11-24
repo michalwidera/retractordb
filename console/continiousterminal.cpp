@@ -46,91 +46,91 @@ const char* welcomeString = "Ready." ;
 boost::property_tree::ptree netClient( string netCommand , string netArgument );
 
 ContiniousTerminal::ContiniousTerminal( bool stopLoop )
-    : stopLoop(stopLoop),
-      pos(0) ,
-      curline(2)
+  : stopLoop(stopLoop),
+    pos(0) ,
+    curline(2)
 {
-    // ---- inicjacja tablicy polecen
-    commands[ Quit ] = boost::regex("quit.*") ;
-    commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-    commands[ Cls ] = boost::regex("cls.*") ;
-    commands[ Connect ] = boost::regex("connect.*") ;
-    commands[ Help ] = boost::regex("help.*") ;
-    commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
-    // ----
+  // ---- inicjacja tablicy polecen
+  commands[ Quit ] = boost::regex("quit.*") ;
+  commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
+  commands[ Cls ] = boost::regex("cls.*") ;
+  commands[ Connect ] = boost::regex("connect.*") ;
+  commands[ Help ] = boost::regex("help.*") ;
+  commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
+  // ----
 
-    if ( !stopLoop ) postMortemRetCode = terminal();
-    else postMortemRetCode = 0 ;
+  if ( !stopLoop ) postMortemRetCode = terminal();
+  else postMortemRetCode = 0 ;
 }
 
 
 
 cmd_e ContiniousTerminal::processCommand( char * commandStr )
 {
-    assert( commands.size() != 0 );
+  assert( commands.size() != 0 );
 
-    using namespace boost::adaptors;
+  using namespace boost::adaptors;
 
-    BOOST_FOREACH( cmd_e i, commands | map_keys )
-       if ( regex_match(commandStr,what,commands[i] ) )
-          return i ;
+  BOOST_FOREACH( cmd_e i, commands | map_keys )
+      if ( regex_match(commandStr,what,commands[i] ) )
+      return i ;
 
-    return NoCmd ;
+  return NoCmd ;
 }
 
 void ContiniousTerminal::printLine( int curline , int pos , char * line )
 {
-    rlutil::locate( 1 , curline );    
-    REP(i,80)
-    {
-        if ( i == pos )
-            printf("_");
+  rlutil::locate( 1 , curline );
+  REP(i,80)
+  {
+    if ( i == pos )
+      printf("_");
+    else
+      {
+        if ( line[i] >= 32 && line[i] <= 126 )
+          printf("%c" , line[i] );
         else
-        {
-            if ( line[i] >= 32 && line[i] <= 126 )
-                printf("%c" , line[i] );
-            else
-                printf(" ");
-        }
-    }
+          printf(" ");
+      }
+  }
 }
 
 void ContiniousTerminal::registerDirCmd( int &curline , int pos , char * line , string tableName , int l )
 {
-    record recordInstance ;
-    recordInstance.commandTxt = line ;
-    recordInstance.linebeg = curline ;
+  record recordInstance ;
+  recordInstance.commandTxt = line ;
+  recordInstance.linebeg = curline ;
 
-    recordInstance.linecnt = l ;
-    curline += l ;
+  recordInstance.linecnt = l ;
+  curline += l ;
 
-    recordInstance.streamName = tableName ;
-    queryVect.push_back( recordInstance );
+  recordInstance.streamName = tableName ;
+  queryVect.push_back( recordInstance );
 
-    REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
+  REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
 }
 
 void ContiniousTerminal::clearRegisteredQueries()
 {
-    rlutil::cls();
-    rlutil::locate( 1 , 1 );
-    printf( "%s" , welcomeString );
+  rlutil::cls();
+  rlutil::locate( 1 , 1 );
+  printf( "%s" , welcomeString );
 
-    queryVect.clear();
+  queryVect.clear();
 
-    REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
+  REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
 }
 
 void ContiniousTerminal::processRegisteredQueries()
 {
-    BOOST_FOREACH( record r , queryVect )
+  BOOST_FOREACH( record r , queryVect )
+  {
+    REP( n , r.linecnt )
     {
-        REP( n , r.linecnt )
-        {
-            rlutil::locate( 1 , r.linebeg + n );
-            printf("test dir %d str:%s rnd:%d",n,r.streamName.c_str(),rand());
-        }
+      rlutil::locate( 1 , r.linebeg + n );
+      printf("test dir %d str:%s rnd:%d",n,r.streamName.c_str(),rand());
     }
+  }
 }
 
 //
@@ -138,194 +138,194 @@ void ContiniousTerminal::processRegisteredQueries()
 //
 int ContiniousTerminal::terminal()
 {
-    int k ;
+  int k ;
 
-    setbuf(stdout, NULL);   //niebuforowany printf
+  setbuf(stdout, NULL);   //niebuforowany printf
 
-    rlutil::CursorHider hideCursor ;
-    rlutil::ttyRawer ttyRaw ;
+  rlutil::CursorHider hideCursor ;
+  rlutil::ttyRawer ttyRaw ;
 
-    rlutil::cls();
-    rlutil::locate( 1 , 2 );
+  rlutil::cls();
+  rlutil::locate( 1 , 2 );
 
-    printf( "%s" , "  **** STREAMS LAB DATABASE CONSOLE V1 ****" );
+  printf( "%s" , "  **** STREAMS LAB DATABASE CONSOLE V1 ****" );
 
-    rlutil::locate( 1 , 4 );
-    printf( "%s" , welcomeString );
+  rlutil::locate( 1 , 4 );
+  printf( "%s" , welcomeString );
 
-    curline = 5 ;
-    REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-    printLine( curline , 0 , line );
+  curline = 5 ;
+  REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+  printLine( curline , 0 , line );
 
-    while(true)
+  while(true)
     {
-        k = rlutil::kb_getc() ;
+      k = rlutil::kb_getc() ;
 
-        if ( k != 0 )
+      if ( k != 0 )
         {
-            if ( k == 27 ) // linux part
+          if ( k == 27 ) // linux part
             {
-                k = getch();
+              k = getch();
 
-                if ( k == 91 )
+              if ( k == 91 )
                 {
-                    k = getch();
+                  k = getch();
 
-                    if ( k == 67 ) //strzalka w prawo
+                  if ( k == 67 ) //strzalka w prawo
                     {
-                        pos ++ ;
-                        k = -1 ;
+                      pos ++ ;
+                      k = -1 ;
                     }
 
-                    if ( k == 68 ) //strzalka w lewo
+                  if ( k == 68 ) //strzalka w lewo
                     {
-                        pos -- ;
-                        k = -1 ;
+                      pos -- ;
+                      k = -1 ;
                     }
                 }
 
             }
-            else if ( k == 13 || k == 10 )   //hit enter i przetwarzenie komendy
+          else if ( k == 13 || k == 10 )   //hit enter i przetwarzenie komendy
             {
-                k = -1 ;
-                pos = 0;
-                printLine( curline , -1 , line );
-                curline += 1 ;
-                processRequests( processCommand( line ) ) ;
-                REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
-                printf("\a");   //beep
+              k = -1 ;
+              pos = 0;
+              printLine( curline , -1 , line );
+              curline += 1 ;
+              processRequests( processCommand( line ) ) ;
+              REP(i,80) line[i] = ' ' ;    //wypelniam spacjami
+              printf("\a");   //beep
             }
-            else if ( k == 224 ) //control sequence - windows
+          else if ( k == 224 ) //control sequence - windows
             {
-                int k_ = k ;
+              int k_ = k ;
 
-                k = getch();
+              k = getch();
 
-                if ( k == 75 ) //left arrow
+              if ( k == 75 ) //left arrow
                 {
-                    assert( pos >= 0 );
+                  assert( pos >= 0 );
 
-                    if ( pos > 0 ) pos -- ;
+                  if ( pos > 0 ) pos -- ;
                 }
 
-                if ( k == 77 )  //right arrow
+              if ( k == 77 )  //right arrow
                 {
-                    assert( pos <= 81 );
+                  assert( pos <= 81 );
 
-                    if ( pos <= 80 ) pos ++ ;
+                  if ( pos <= 80 ) pos ++ ;
                 }
 
-                k = k_ ;
+              k = k_ ;
             }
-            else if ( k == 8 || k == 127) //backspace
+          else if ( k == 8 || k == 127) //backspace
             {
-                if ( pos > 0 ) pos -- ;
-                REP( i , 80 - pos )
-                {
-                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
-                    assert( pos +i >= 0    && pos +i    <= 80 );
+              if ( pos > 0 ) pos -- ;
+              REP( i , 80 - pos )
+              {
+                assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                assert( pos +i >= 0    && pos +i    <= 80 );
 
-                    line[pos+i] = line[pos+i+1];
-                }
+                line[pos+i] = line[pos+i+1];
+              }
             }
-            else if ( k >= 32 && k <= 126 ) //ascii char
+          else if ( k >= 32 && k <= 126 ) //ascii char
             {
-                REPD( i , 80-pos )
-                {
-                    assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
-                    assert( pos +i >= 0    && pos +i    <= 80 );
+              REPD( i , 80-pos )
+              {
+                assert( pos +i +1 >= 0 && pos +i +1 <= 80 );
+                assert( pos +i >= 0    && pos +i    <= 80 );
 
-                    line[pos+i+1] = line[pos+i];
-                }
+                line[pos+i+1] = line[pos+i];
+              }
 
-                assert( pos + 1 <= 80 );
-                line[pos++] = k ;
+              assert( pos + 1 <= 80 );
+              line[pos++] = k ;
             }
 
-            printLine( curline , pos , line );
+          printLine( curline , pos , line );
 
-            if ( stopLoop ) break ;
+          if ( stopLoop ) break ;
         }
 
-        processRegisteredQueries();
+      processRegisteredQueries();
     }
 
-    return 0 ;
+  return 0 ;
 }
 
 bool ContiniousTerminal::processRequests( cmd_e command )
 {
 
-    switch ( command )
+  switch ( command )
     {
     case Quit:
-        {
-            stopLoop = true ;
-            return true ;
-        }
+      {
+        stopLoop = true ;
+        return true ;
+      }
     case Dir:
-        {
-            registerDirCmd
-                    ( curline , pos + 2 , line ,
-                    ( what[1].str() != "" ) ? what[1].str() : "default" ,
-                    ( what[2].str() != "" ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount
-                    ) ;
-            return true ;
-        }
+      {
+        registerDirCmd
+            ( curline , pos + 2 , line ,
+              ( what[1].str() != "" ) ? what[1].str() : "default" ,
+              ( what[2].str() != "" ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount
+                                        ) ;
+        return true ;
+      }
     case Cls:
-        {
-            clearRegisteredQueries();
+      {
+        clearRegisteredQueries();
 
-            pos = 0 ;
-            curline = 2 ;
-            printLine( curline , pos , line );
-            return true ;
-        }
+        pos = 0 ;
+        curline = 2 ;
+        printLine( curline , pos , line );
+        return true ;
+      }
     case Connect:
+      {
+        using boost::property_tree::ptree ;
+        ptree pt = netClient( "get" , "" ) ;
+
+        BOOST_FOREACH(ptree::value_type &v,
+                      pt.get_child("db.stream"))
         {
-            using boost::property_tree::ptree ;
-            ptree pt = netClient( "get" , "" ) ;
-
-            BOOST_FOREACH(ptree::value_type &v,
-                          pt.get_child("db.stream"))
-            {
-                REP(i,80) line[i] = ' ' ;
-                strcpy( line , v.second.data().c_str() );
-                printLine( curline , -1 , line );
-                curline += 1 ;
-            }
-
-            REP(i,80) line[i] = ' ' ;
-            printLine( curline , pos , line );
-            return true ;
+          REP(i,80) line[i] = ' ' ;
+          strcpy( line , v.second.data().c_str() );
+          printLine( curline , -1 , line );
+          curline += 1 ;
         }
+
+        REP(i,80) line[i] = ' ' ;
+        printLine( curline , pos , line );
+        return true ;
+      }
     case Detail:
-        {
+      {
         using boost::property_tree::ptree ;
         ptree pt = netClient( "detail" ,  what[1].str() ) ;
 
         BOOST_FOREACH(ptree::value_type &v,
                       pt.get_child("db.field"))
         {
-            REP(i,80) line[i] = ' ' ;
-            strcpy( line , v.second.data().c_str() );
-            printLine( curline , -1 , line );
-            curline += 1 ;
+          REP(i,80) line[i] = ' ' ;
+          strcpy( line , v.second.data().c_str() );
+          printLine( curline , -1 , line );
+          curline += 1 ;
         }
 
         REP(i,80) line[i] = ' ' ;
         printLine( curline , pos , line );
         return true ;
-        }
+      }
     case Help:
-        {
+      {
         strcpy( line , "cls, quit, connect, detail [str], dir [co][ile] (all case sensitive)" );
-            printLine( curline , -1 , line );
-            curline += 1 ;
-            REP(i,80) line[i] = ' ' ;
-            return true ;
-        }
+        printLine( curline , -1 , line );
+        curline += 1 ;
+        REP(i,80) line[i] = ' ' ;
+        return true ;
+      }
     default :
-        return false ;
+      return false ;
     }
 }

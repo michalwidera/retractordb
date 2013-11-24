@@ -31,75 +31,85 @@
 #endif
 
 CRandomFile::CRandomFile( string murExt , const bool destroyOnDestructor ) :
-	destroyOnDestructor( destroyOnDestructor )
+  destroyOnDestructor( destroyOnDestructor )
 {
-    std::string TMP_PATH;
+  std::string TMP_PATH;
 
-    if ( getenv("TMP") != NULL ) TMP_PATH = getenv("TMP") ;
-    else if ( getenv("TEMP") != NULL ) TMP_PATH = getenv("TEMP") ;
-    else if ( getenv("HOME") != NULL ) TMP_PATH = getenv("HOME") ;
-    else throw std::out_of_range("No TEMP/TMP var - set enviroment");
+  if ( getenv("TMP") != NULL ) TMP_PATH = getenv("TMP") ;
+  else if ( getenv("TEMP") != NULL ) TMP_PATH = getenv("TEMP") ;
+  else if ( getenv("HOME") != NULL ) TMP_PATH = getenv("HOME") ;
+  else throw std::out_of_range("No TEMP/TMP var - set enviroment");
 
-    assert( TMP_PATH != "" );
-    assert( murExt != "" );
+  assert( TMP_PATH != "" );
+  assert( murExt != "" );
 
 #ifdef WIN32
-    char randomFilename [MAX_PATH];
-    if ( ! GetTempFileNameA( TMP_PATH.c_str() , murExt.c_str() , 0 , randomFilename ) )
-	throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/WINAPI32 GetTempFileNameA");
-    //assert ( false );
-    //throw runtime_error("WINAPI32 GetTempFileNameFails");
+  char randomFilename [MAX_PATH];
+  if ( ! GetTempFileNameA( TMP_PATH.c_str() , murExt.c_str() , 0 , randomFilename ) )
+    throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/WINAPI32 GetTempFileNameA");
+  //assert ( false );
+  //throw runtime_error("WINAPI32 GetTempFileNameFails");
 #else
-    char randomFilename [MAX_PATH] = "/tmp/stream.XXXXXXXX";
-    if ( mkstemp(randomFilename) == -1 )
-        throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/mkstemp(template)");
+  char randomFilename [MAX_PATH] = "/tmp/stream.XXXXXXXX";
+  if ( mkstemp(randomFilename) == -1 )
+    {
+      throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/mkstemp(template)");
+    }
 #endif
 
-    filename = randomFilename ;
-    open( filename.c_str() , ios::in | ios::out | ios::binary ) ;
-    if ( !good() )
-	//assert ( false );
-	throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/Randomfile nie utworzyl pliku");
+  filename = randomFilename ;
+  open( filename.c_str() , ios::in | ios::out | ios::binary ) ;
+  if ( !good() )
+    {
+      //assert ( false );
+      throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/Randomfile nie utworzyl pliku");
+    }
 }
 
 CRandomFile::~CRandomFile()
 {
-    if ( rdbuf()->is_open() )
-	close();
+  if ( rdbuf()->is_open() )
+    {
+      close();
+    }
 
-    if( destroyOnDestructor )
-	if( remove( filename.c_str() ) )
-	    throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/Randomfile nie skasowal pliku");
-    //assert( false );
-    //throw overflow_error("Randomfile nie skasowal pliku");
+  if( destroyOnDestructor )
+    {
+      if( remove( filename.c_str() ) )
+        {
+          throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/Randomfile nie skasowal pliku");
+        }
+    }
+  //assert( false );
+  //throw overflow_error("Randomfile nie skasowal pliku");
 }
 
 const CRandomFile &CRandomFile::operator << ( string & text )
 {
-    write( text.c_str() , static_cast<long>( text.length() ) );
-    flush();
-    return *this ;
+  write( text.c_str() , static_cast<long>( text.length() ) );
+  flush();
+  return *this ;
 }
 
 #ifdef __REGTEST
 //g++ RandomFile.cpp -D__REGTEST
 int main(int argc, char* argv[])
 {
-    try {
-        std::cerr << "start regression\n";
+  try {
+    std::cerr << "start regression\n";
 
-        CRandomFile *test = new CRandomFile();
-        *test << "test";
-        delete test;
+    CRandomFile *test = new CRandomFile();
+    *test << "test";
+    delete test;
 
-        std::cerr << "stop regression\n";
-        return 1;
-    }
-    catch(std::exception& e)
-    {
-        std::cerr << e.what() << "\n";
-        return 1;
-    }
+    std::cerr << "stop regression\n";
+    return 1;
+  }
+  catch(std::exception& e)
+  {
+    std::cerr << e.what() << "\n";
+    return 1;
+  }
 
 }
 #endif

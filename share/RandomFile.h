@@ -35,17 +35,17 @@ using std::ios ;
 */
 class CRandomFile : public fstream
 {
-	
-	/** Zmienna przechowujaca informacje czy plik powinien zostac zniszczony razem z obiektem */
-	bool destroyOnDestructor ;
+
+  /** Zmienna przechowujaca informacje czy plik powinien zostac zniszczony razem z obiektem */
+  bool destroyOnDestructor ;
 
 public:
 
-	string filename;
-	
-	CRandomFile( string murExt = "mur"  , const bool destroyOnDestructor = true );
-	virtual ~CRandomFile();
-	const CRandomFile &operator << ( string& text );
+  string filename;
+
+  CRandomFile( string murExt = "mur"  , const bool destroyOnDestructor = true );
+  virtual ~CRandomFile();
+  const CRandomFile &operator << ( string& text );
 };
 
 

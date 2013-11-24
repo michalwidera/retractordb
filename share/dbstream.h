@@ -25,16 +25,16 @@
 
 namespace UR {
 
-    using namespace std ;
-    using namespace boost ;
+  using namespace std ;
+  using namespace boost ;
 
-    /** Tego typu sa dane przechowywane w strumieniu */
-    typedef boost::variant< complex< R > , R , int >  varfield ;
+  /** Tego typu sa dane przechowywane w strumieniu */
+  typedef boost::variant< complex< R > , R , int >  varfield ;
 
-    /** To jest typ rekordu w strumieniu */
-    typedef map < string , varfield  >  record ;
+  /** To jest typ rekordu w strumieniu */
+  typedef map < string , varfield  >  record ;
 
-    /**
+  /**
     Klasa udostepniajaca metody doseptu do danych w strumieniu
     Przykrywa caly CBuffer wlasna abstrakcja
     dostep odpbywa sie poprzez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
@@ -43,63 +43,63 @@ namespace UR {
     dane nie sa juz dostepne przez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
     a przygotowane jest miejsce na kolejna krotke
     */
-    class dbStream : private boost::noncopyable
-    {
-        /** Rozmiar ramki w bajtach */
-        int frameSize ;
+  class dbStream : private boost::noncopyable
+  {
+    /** Rozmiar ramki w bajtach */
+    int frameSize ;
 
-        /** Wskaznik na binarne dane uzywany przez cbuffer */
-        shared_array< char >  pRawData ;
+    /** Wskaznik na binarne dane uzywany przez cbuffer */
+    shared_array< char >  pRawData ;
 
-        /** Nazwa strumienia */
-        string streamName ;
+    /** Nazwa strumienia */
+    string streamName ;
 
-        /** Schemat - inaczej - Lista nazw pol zawartych w strumieniu (kazde pole typu varfield) */
-        list < string > schema ;
+    /** Schemat - inaczej - Lista nazw pol zawartych w strumieniu (kazde pole typu varfield) */
+    list < string > schema ;
 
-        /** Dwie zmienne opisujace dane przechowywane w strumieniu , mpStrVal - jest zapisywany
+    /** Dwie zmienne opisujace dane przechowywane w strumieniu , mpStrVal - jest zapisywany
         metoda store, mpShadow jest tylko do odczytu (zapisac mozna ale sie straci)
         mpStrVal - store/read, mpShadow - read */
-        record mpStrVar , mpShadow ;
+    record mpStrVar , mpShadow ;
 
-        /** Ofset - przesuniecie wzgledem poczatku strumienia - jaki obsluguje w danej chiwli klasa metodami []*/
-        int m_offset ;
+    /** Ofset - przesuniecie wzgledem poczatku strumienia - jaki obsluguje w danej chiwli klasa metodami []*/
+    int m_offset ;
 
-        /** Informacja dla metody [] czy odczyt idzie po .get(offset)[] */
-        bool bWasFeedByGet ;
+    /** Informacja dla metody [] czy odczyt idzie po .get(offset)[] */
+    bool bWasFeedByGet ;
 
-    public:
+  public:
 
-        /** Informacja czy zworcone dane maja sens*/
-        bool resultValid ;
+    /** Informacja czy zworcone dane maja sens*/
+    bool resultValid ;
 
-        /** Konstruktor klasy */
-        dbStream( string streamName , list < string > schema ) ;
+    /** Konstruktor klasy */
+    dbStream( string streamName , list < string > schema ) ;
 
-        /** Operatory dostepu - operator po pozycji  */
-        varfield& operator[](const int& _Keyval);
+    /** Operatory dostepu - operator po pozycji  */
+    varfield& operator[](const int& _Keyval);
 
-        /** Operatory dostepu - operator po nazwie w schemacie (wola operator po pozycji)*/
-        varfield& operator[](const string& _Keyval);
+    /** Operatory dostepu - operator po nazwie w schemacie (wola operator po pozycji)*/
+    varfield& operator[](const string& _Keyval);
 
-        /** Metoda zapisujaca dane do strumienia - znikaja tez wartosci z mpStrVal, pozostaja w mpShadow */
-        void store();
+    /** Metoda zapisujaca dane do strumienia - znikaja tez wartosci z mpStrVal, pozostaja w mpShadow */
+    void store();
 
-        /** Pobranie danych ze strumienia z okreslonej pozycji -
+    /** Pobranie danych ze strumienia z okreslonej pozycji -
         use case: str1.get(1)["pole1"] */
-        dbStream & get( int offset = 0 );
+    dbStream & get( int offset = 0 );
 
-        /** Metoda diagnostyczna - docelowo do schowania/usuniecia. Pobiera
+    /** Metoda diagnostyczna - docelowo do schowania/usuniecia. Pobiera
         dane inna droga, wolniej ale bez calego mpShadow i mpStrVal
         */
-        varfield get( string fieldName , int offset = 0 );    
-    };
+    varfield get( string fieldName , int offset = 0 );
+  };
 
-    void saveStreamsToFile( const string filename ) ;
-    varfield getFromRawData( shared_array< char > pRawData , int position );
+  void saveStreamsToFile( const string filename ) ;
+  varfield getFromRawData( shared_array< char > pRawData , int position );
 
-    /** Raportowanie tekstowe stanu cbuffera */
-    void Dump( std::ostream &os );
+  /** Raportowanie tekstowe stanu cbuffera */
+  void Dump( std::ostream &os );
 }
 
 #endif // DBSTREAM_H

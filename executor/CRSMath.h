@@ -19,44 +19,44 @@
 
 namespace CRationalStreamMath {
 
-	using namespace boost ;
+  using namespace boost ;
 
-	using std::set ;
-	using std::map ;
+  using std::set ;
+  using std::map ;
 
-    /**
-	* Ta klasa sluzy do zarzadania czasem dla problemu szeregowania zadan
-	* uwaga: Skomplikowane
-	*/
-    class TimeLine :  private boost::noncopyable
-	{ 
-        typedef set< R > SR ;
-        
-        SR sr;                      /**< Zbior - !posortowanych! Delt */
+  /**
+        * Ta klasa sluzy do zarzadania czasem dla problemu szeregowania zadan
+        * uwaga: Skomplikowane
+        */
+  class TimeLine :  private boost::noncopyable
+  {
+    typedef set< R > SR ;
 
-    	map < R , long > m_counters ;    /**< Tutaj jest mnoznik z dla wartosci czasu */
+    SR sr;                      /**< Zbior - !posortowanych! Delt */
 
-		R ctSlot ;	/**< Tutaj przechowywana jest wartosc aktualnego slotu czasowego
-					ctslot = current time slot */
+    map < R , long > m_counters ;    /**< Tutaj jest mnoznik z dla wartosci czasu */
 
-	public:
+    R ctSlot ;	/**< Tutaj przechowywana jest wartosc aktualnego slotu czasowego
+                                        ctslot = current time slot */
 
-		/** Konstruktor wypenia dziedziczony zbior wartosciami odfiltrowanymi 
-		w trakcie wywolania konstruktora toworzona jest lista zawierajaca
-		minimalne czasy, a usuwane sa te ktore sa wielokrotnoscia innych wartosci
-		Przygotowana lista jest nastepnie brana pod uwage podczas wywolywania
-		getNextTimeSlot	*/
-		TimeLine( const SR & inSet ) ;
+  public:
 
-		/** Funkcja zwraca true jestli dana wartosc delta nalezy do
-		aktualnie wykonywanego time-slota 
-		to nie jest prosta procedura */
-		bool isThisDeltaAwaitCurrentTimeSlot( const R & inDelta ) ;
+    /** Konstruktor wypenia dziedziczony zbior wartosciami odfiltrowanymi
+                w trakcie wywolania konstruktora toworzona jest lista zawierajaca
+                minimalne czasy, a usuwane sa te ktore sa wielokrotnoscia innych wartosci
+                Przygotowana lista jest nastepnie brana pod uwage podczas wywolywania
+                getNextTimeSlot	*/
+    TimeLine( const SR & inSet ) ;
 
-		/** Ta funkcja wyznacza kolejna wartosc ctSlot 
-		wartosc ta okresla jaki jest koleny interwal czasu
-		wynikajacy z szeregu delt strumieni danych 
-		skomplikowanosc algorytmu - wysoka */
-		const R & getNextTimeSlot() ;
-	};
+    /** Funkcja zwraca true jestli dana wartosc delta nalezy do
+                aktualnie wykonywanego time-slota
+                to nie jest prosta procedura */
+    bool isThisDeltaAwaitCurrentTimeSlot( const R & inDelta ) ;
+
+    /** Ta funkcja wyznacza kolejna wartosc ctSlot
+                wartosc ta okresla jaki jest koleny interwal czasu
+                wynikajacy z szeregu delt strumieni danych
+                skomplikowanosc algorytmu - wysoka */
+    const R & getNextTimeSlot() ;
+  };
 }

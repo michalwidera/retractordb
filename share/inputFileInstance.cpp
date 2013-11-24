@@ -58,9 +58,15 @@ T inputFileInstance::get()
     T retVal ;
 
     if ( len == -1 )
+      {
         throw std::out_of_range("no file connected to object");
+      }
 
-    if ( curPos > ( len - sizeof ( T ) ) ) goBegin();
+    if ( curPos > ( len - sizeof ( T ) ) )
+      {
+        goBegin();
+      }
+
     psFile->read(  reinterpret_cast<char*>(&retVal), sizeof retVal ) ;
     curPos += sizeof ( T ) ;
     return retVal ;
@@ -116,33 +122,43 @@ void inputDF::processRow()
 
 complex< R > inputDF::getCR( QS::field f )
 {
-    complex< R > retValue(0) ;
+  complex< R > retValue(0) ;
 
-    int cnt(0);
+  int cnt(0);
 
-    BOOST_FOREACH( field & v , lSchema )
+  BOOST_FOREACH( field & v , lSchema )
+  {
+    if (  v.getFirstFieldName() == f.getFirstFieldName() )
+      {
+        break ;
+      }
+    cnt++ ;
+  }
+
+  if ( lResult.size() == 0 )
     {
-        if (  v.getFirstFieldName() == f.getFirstFieldName() ) break ;
-        cnt++ ;
+      processRow(); //taki patch - bo inaczej wylot
     }
 
-    if ( lResult.size() == 0 )
-        processRow(); //taki patch - bo inaczej wylot
+  assert( lResult.size() != 0 );
 
-    assert( lResult.size() != 0 );
-
-    if ( lResult[ cnt ].type() == typeid(char) )
-        retValue  = any_cast<char>( lResult[ cnt ] );
-    else if ( lResult[ cnt ].type() == typeid(int)  )
-        retValue = any_cast<int>(  lResult[ cnt ] );
-    else if ( lResult[ cnt ].type() == typeid(R)  )
-        retValue = any_cast<R>(  lResult[ cnt ] );
-    else if ( lResult[ cnt ].type() == typeid(complex<R>)  )
-        retValue = any_cast<complex<R> >(  lResult[ cnt ] );
-    else
-        throw std::out_of_range( "getCR/niezdefiniowany typ" );
-    return retValue ;
+  if ( lResult[ cnt ].type() == typeid(char) )
+    {
+      retValue  = any_cast<char>( lResult[ cnt ] );
+    }
+  else if ( lResult[ cnt ].type() == typeid(int)  )
+    {
+      retValue = any_cast<int>(  lResult[ cnt ] );
+    }
+  else if ( lResult[ cnt ].type() == typeid(R)  )
+    {
+      retValue = any_cast<R>(  lResult[ cnt ] );
+    }
+  else if ( lResult[ cnt ].type() == typeid(complex<R>)  )
+    {
+      retValue = any_cast<complex<R> >(  lResult[ cnt ] );
+    }
+  else
+    throw std::out_of_range( "getCR/niezdefiniowany typ" );
+  return retValue ;
 }
-
-
-
