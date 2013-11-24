@@ -109,19 +109,16 @@ public:
     : socket_(io_service)
   {
     // Create the socket so that multiple may be bound to the same address.
-    boost::asio::ip::udp::endpoint listen_endpoint(
-        listen_address, multicast_port);
+    boost::asio::ip::udp::endpoint listen_endpoint( listen_address, multicast_port);
     socket_.open(listen_endpoint.protocol());
     socket_.set_option(boost::asio::ip::udp::socket::reuse_address(true));
+    socket_.set_option(boost::asio::ip::multicast::enable_loopback(true));
+    socket_.set_option(boost::asio::ip::multicast::hops(1));
     socket_.bind(boost::asio::ip::udp::endpoint( multicast_address, multicast_port ));
-
-    std::cerr << "0" << std::endl ;
 
     // Join the multicast group.
     socket_.set_option(
         boost::asio::ip::multicast::join_group(multicast_address));
-
-    std::cerr << "1" << std::endl ;
 
     socket_.async_receive_from(
         boost::asio::buffer(data_, max_length), sender_endpoint_,
@@ -157,13 +154,13 @@ int main(int argc, char* argv[])
 {
   try
   {
-    if ( (argc > 2) && argv[1][0] == 's' )
+    if ( ( argc == 3 ) && argv[1][0] == 's' )
       {
         boost::asio::io_service io_service;
         sender s(io_service, boost::asio::ip::address::from_string(argv[2]));
         io_service.run();
       }
-    else if ( (argc > 2) && argv[1][0] == 'r' )
+    else if ( ( argc == 4 ) && argv[1][0] == 'r' )
       {
         boost::asio::io_service io_service;
         receiver r(io_service,
@@ -173,17 +170,19 @@ int main(int argc, char* argv[])
       }
     else
       {
-        std::cerr << "Usage: xstage_2 r <listen_address> <multicast_address>\n";
-        std::cerr << "  For IPv4, try:\n";
-        std::cerr << "    receiver 0.0.0.0 239.255.0.1\n";
-        std::cerr << "  For IPv6, try:\n";
-        std::cerr << "    receiver 0::0 ff31::8000:1234\n";
+        std::cerr << "FIRST: $sudo route add -net 224.0.0.0/4 dev eth0 \n";
         std::cerr << "\n" ;
-        std::cerr << "Usage: xstage_2 s <multicast_address>\n";
+        std::cerr << "Usage: " << argv[0] << " r <listen_address> <multicast_address>\n";
         std::cerr << "  For IPv4, try:\n";
-        std::cerr << "    sender 239.255.0.1\n";
+        std::cerr << "   " << argv[0] << " r 0.0.0.0 239.255.0.1\n";
         std::cerr << "  For IPv6, try:\n";
-        std::cerr << "    sender ff31::8000:1234\n";
+        std::cerr << "   " << argv[0] << " r 0::0 ff31::8000:1234\n";
+        std::cerr << "\n" ;
+        std::cerr << "Usage: " << argv[0] << " s <multicast_address>\n";
+        std::cerr << "  For IPv4, try:\n";
+        std::cerr << "   " << argv[0] << " s 239.255.0.1\n";
+        std::cerr << "  For IPv6, try:\n";
+        std::cerr << "   " << argv[0] << " s ff31::8000:1234\n";
       }
   }
   catch (std::exception& e)
@@ -193,3 +192,8 @@ int main(int argc, char* argv[])
 
   return 0;
 }
+
+//Reference:
+//http://stackoverflow.com/questions/7576832/multicast-message-on-same-host-using-boostasio
+//http://stackoverflow.com/questions/12708558/c-multiple-multicast-receiver-with-boost-asio
+//http://stackoverflow.com/questions/10137925/boost-asio-throws-no-such-device-exception-when-trying-to-join-multicast-group
