@@ -165,14 +165,9 @@ ptree commandProcessor( ptree ptInval )
 
       assert( streamName != "" );
 
-      BOOST_FOREACH( const query & it , coreInstance )
-      {
-        if ( it.id == streamName )
-          {
-            ptRetval.put( string("db.show") , streamName );
-            coreInstance[streamName].setMulticastStream( true );
-          }
-      }
+      std::cerr << "show:" << streamName << "\n" ;
+
+      coreInstance[streamName].setMulticastStream( true );
     }
 
   return ptRetval ; //sub for a while

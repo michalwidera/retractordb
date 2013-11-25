@@ -57,6 +57,7 @@ ContiniousTerminal::ContiniousTerminal( bool stopLoop )
   commands[ Connect ] = boost::regex("connect.*") ;
   commands[ Help ] = boost::regex("help.*") ;
   commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
+  commands[ Show ] = boost::regex("\\s*show\\s*(\\w*).*") ;
   // ----
 
   if ( !stopLoop ) postMortemRetCode = terminal();
@@ -268,8 +269,7 @@ bool ContiniousTerminal::processRequests( cmd_e command )
         registerDirCmd
             ( curline , pos + 2 , line ,
               ( what[1].str() != "" ) ? what[1].str() : "default" ,
-              ( what[2].str() != "" ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount
-                                        ) ;
+              ( what[2].str() != "" ) ? lexical_cast<int>( what[2].str() ) : defaultLinieCount ) ;
         return true ;
       }
     case Cls:
@@ -299,6 +299,12 @@ bool ContiniousTerminal::processRequests( cmd_e command )
         printLine( curline , pos , line );
         return true ;
       }
+    case Show:
+      {
+        using boost::property_tree::ptree ;
+        ptree pt = netClient( "show" ,  what[1].str() ) ;
+        return true ;
+      }
     case Detail:
       {
         using boost::property_tree::ptree ;
@@ -319,7 +325,7 @@ bool ContiniousTerminal::processRequests( cmd_e command )
       }
     case Help:
       {
-        strcpy( line , "cls, quit, connect, detail [str], dir [co][ile] (all case sensitive)" );
+        strcpy( line , "cls, quit, connect, detail [str], dir [co][ile], show [str] (all case sensitive)" );
         printLine( curline , -1 , line );
         curline += 1 ;
         REP(i,80) line[i] = ' ' ;

@@ -195,7 +195,7 @@ namespace QS {
       ar & rInterval ;
       ar & lSchema ;
       ar & lProgram ;
-      ar & inMulticast ;
+      //ar & inMulticast ;
     }
 
   public:
