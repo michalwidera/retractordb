@@ -25,52 +25,52 @@ enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show ,  NoCmd }  ;
 
 class ContiniousTerminal {
 
-    struct record
-    {
-        std::string commandTxt ;     //issued command
-        std::string streamName ;  //nazwa strumienia z systemu
-        int linebeg ;        //linia od ktorej sie zaczyna wyswietlanie
-        int linecnt ;        //ilosc linii do wyswietlenia
-        int timing ;         //tutaj potem rational
-    };
+  struct record
+  {
+    std::string commandTxt ;     //issued command
+    std::string streamName ;  //nazwa strumienia z systemu
+    int linebeg ;        //linia od ktorej sie zaczyna wyswietlanie
+    int linecnt ;        //ilosc linii do wyswietlenia
+    int timing ;         //tutaj potem rational
+  };
 
-    std::vector <record> queryVect ;
+  std::vector <record> queryVect ;
 
-    boost::cmatch what;
+  boost::cmatch what;
 
-    std::map < cmd_e, boost::regex > commands ;
+  std::map < cmd_e, boost::regex > commands ;
 
-    int pos ;       //<pozycja kursora 0..80
-    char line[81];  //< edytowana linia
-    int curline;    //< aktualna lina w ktorej wprowadzamy tekst
-    bool stopLoop;  //< true - i wychodzimy z petli terminal
+  int pos ;       //<pozycja kursora 0..80
+  char line[81];  //< edytowana linia
+  int curline;    //< aktualna lina w ktorej wprowadzamy tekst
+  bool stopLoop;  //< true - i wychodzimy z petli terminal
 
-    // funkcja zapewniajaca tryb interaktywny terminala
-    // wewnatrz jest while(true) i czeka na klawisze
-    // jak zlapie enter probuje interpretowac funkcja processCommand
-    int terminal();
+  // funkcja zapewniajaca tryb interaktywny terminala
+  // wewnatrz jest while(true) i czeka na klawisze
+  // jak zlapie enter probuje interpretowac funkcja processCommand
+  int terminal();
 
-    void printLine( int curline , int pos , char * line );
-    cmd_e processCommand( char * commandStr );
-    bool processRequests(cmd_e command) ;
-    void registerDirCmd( int &curline , int pos , char * line , std::string tableName , int l );
-    void clearRegisteredQueries();
-    void processRegisteredQueries();
+  void printLine( int curline , int pos , char * line );
+  cmd_e processCommand( char * commandStr );
+  bool processRequests(cmd_e command) ;
+  void registerDirCmd( int &curline , int pos , char * line , std::string tableName , int l );
+  void clearRegisteredQueries();
+  void processRegisteredQueries();
 
 public:
 
-    // stopLoop - jesli true to nie jest uruchamiana petla zdarzen i
-    // terminal nie wchodzi w tryb interaktywny (dla potrzeb czytania danych z pliku)
-    ContiniousTerminal( bool stopLoop = true );
+  // stopLoop - jesli true to nie jest uruchamiana petla zdarzen i
+  // terminal nie wchodzi w tryb interaktywny (dla potrzeb czytania danych z pliku)
+  ContiniousTerminal( bool stopLoop = true );
 
-    int postMortemRetCode ;
+  int postMortemRetCode ;
 
-    ~ContiniousTerminal() {} ;
+  ~ContiniousTerminal() {} ;
 
-    bool issueCommand( char * commandStr )
-    {
-        return processRequests( processCommand ( commandStr ) );
-    }
+  bool issueCommand( char * commandStr )
+  {
+    return processRequests( processCommand ( commandStr ) );
+  }
 };
 
 #endif // CONTINIOUSTERMINAL_H

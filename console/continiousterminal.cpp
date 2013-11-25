@@ -73,8 +73,12 @@ cmd_e ContiniousTerminal::processCommand( char * commandStr )
   using namespace boost::adaptors;
 
   BOOST_FOREACH( cmd_e i, commands | map_keys )
-      if ( regex_match(commandStr,what,commands[i] ) )
-      return i ;
+  {
+    if ( regex_match(commandStr,what,commands[i] ) )
+      {
+        return i ;
+      }
+  }
 
   return NoCmd ;
 }
@@ -85,13 +89,19 @@ void ContiniousTerminal::printLine( int curline , int pos , char * line )
   REP(i,80)
   {
     if ( i == pos )
-      printf("_");
+      {
+        printf("_");
+      }
     else
       {
         if ( line[i] >= 32 && line[i] <= 126 )
-          printf("%c" , line[i] );
+          {
+            printf("%c" , line[i] );
+          }
         else
-          printf(" ");
+          {
+            printf(" ");
+          }
       }
   }
 }
