@@ -130,10 +130,20 @@ ptree commandProcessor( ptree ptInval )
 
   string command = ptInval.get("db.message" , "" ) ;
 
+  //
+  //to polecenie zwraca identyfikatory strumieni
+  //
   if ( command == "get" )
-    BOOST_FOREACH( const query & it , coreInstance )
+    {
+      BOOST_FOREACH( const query & it , coreInstance )
+      {
         ptRetval.put( string("db.stream.")+it.id , it.id );
+      }
+    }
 
+  //
+  //to polecenie zwraca z czego sklada sie strumien
+  //
   if ( command == "detail" )
     {
       string streamName = ptInval.get("db.argument" , "" ) ;
@@ -143,6 +153,25 @@ ptree commandProcessor( ptree ptInval )
       BOOST_FOREACH( string s , coreInstance[streamName].getFieldNamesList() )
       {
         ptRetval.put( string("db.field.")+s , s );
+      }
+    }
+
+  //
+  //to polecenie spowoduje dolaczenie strumienia do listy przesylanych strumieni
+  //
+  if ( command == "show" )
+    {
+      string streamName = ptInval.get("db.argument" , "" ) ;
+
+      assert( streamName != "" );
+
+      BOOST_FOREACH( const query & it , coreInstance )
+      {
+        if ( it.id == streamName )
+          {
+            ptRetval.put( string("db.show") , streamName );
+            coreInstance[streamName].setMulticastStream( true );
+          }
       }
     }
 

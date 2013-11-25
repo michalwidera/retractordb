@@ -35,9 +35,9 @@ namespace UR {
   typedef map < string , varfield  >  record ;
 
   /**
-    Klasa udostepniajaca metody doseptu do danych w strumieniu
+    Klasa udostepniajaca metody dostepu do danych w strumieniu
     Przykrywa caly CBuffer wlasna abstrakcja
-    dostep odpbywa sie poprzez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
+    dostep odbywa sie poprzez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]
     dostep do danych archiwalnych obiekt_strumien.get(1)[1] lub obiekt_strumien.get(1)["nazwa_pola"]
     po wykoaniu store()
     dane nie sa juz dostepne przez obiekt_strumien[1] ,lub obiekt_strumien["nazwa_pola"]

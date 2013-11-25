@@ -36,220 +36,224 @@
 //serializacje rational< T > i complex< rational < T > > 
 //Michal Widera/
 namespace boost {
-	namespace serialization {
+  namespace serialization {
 
-		template<class Archive, class T>
-		inline void serialize(
-			Archive & ar,
-			boost::rational<T> & p,
-						unsigned int /* file_version */
-			)
-		{
-			T _num( p.numerator() ) ;
-			T _den( p.denominator() );
-			ar & _num ;
-			ar & _den ;
-			p.assign( _num, _den );
-		}
+    template<class Archive, class T>
+    inline void serialize(
+        Archive & ar,
+        boost::rational<T> & p,
+        unsigned int /* file_version */
+        )
+    {
+      T _num( p.numerator() ) ;
+      T _den( p.denominator() );
+      ar & _num ;
+      ar & _den ;
+      p.assign( _num, _den );
+    }
 
-		template<class Archive, class T>
-		inline void serialize(
-			Archive & ar,
-			std::complex< rational<T> >& p,
-						unsigned int /* file_version */
-			)
-		{
-			T _numr( p.real().numerator() ) ;
-			T _denr( p.real().denominator() );
-			T _numi( p.imag().numerator() ) ;
-			T _deni( p.imag().denominator() );
-			ar & _numr;
-			ar & _denr;
-			ar & _numi;
-			ar & _deni;
-			boost::rational<T> r , i ;
-			r.assign( _numr, _denr );
-			i.assign( _numi, _deni );
-			p = std::complex< rational <T> > ( r , i ) ;
-		}
+    template<class Archive, class T>
+    inline void serialize(
+        Archive & ar,
+        std::complex< rational<T> >& p,
+        unsigned int /* file_version */
+        )
+    {
+      T _numr( p.real().numerator() ) ;
+      T _denr( p.real().denominator() );
+      T _numi( p.imag().numerator() ) ;
+      T _deni( p.imag().denominator() );
+      ar & _numr;
+      ar & _denr;
+      ar & _numi;
+      ar & _deni;
+      boost::rational<T> r , i ;
+      r.assign( _numr, _denr );
+      i.assign( _numi, _deni );
+      p = std::complex< rational <T> > ( r , i ) ;
+    }
 
-	} // namespace serialization
+  } // namespace serialization
 } // namespace boost
 
 namespace QS {
 
-	using namespace std ;
-	using namespace boost ;
+  using namespace std ;
+  using namespace boost ;
 
-	/** Funkcja ktora potrafi zrobic ze zmiennej typu rzeczywistego zmienna typu wymiernego */
-	R Rationalize ( double inValue , double DIFF=1E-6 ,  int ttl=11 ) ;
+  /** Funkcja ktora potrafi zrobic ze zmiennej typu rzeczywistego zmienna typu wymiernego */
+  R Rationalize ( double inValue , double DIFF=1E-6 ,  int ttl=11 ) ;
 
-	enum command_id 
-	{
+  enum command_id
+  {
 #define DEF_CASE( _A_ ) _A_ ,
 #include "tokendefset.h"
 #undef DEF_CASE
-	} ;
+  } ;
 
-	/** Struktura konfiguracyjna zbioru strumieni */
-	class config 
-	{
+  /** Struktura konfiguracyjna zbioru strumieni */
+  class config
+  {
 
-	private:
+  private:
 
-		friend class boost::serialization::access;
+    friend class boost::serialization::access;
 
-		template<class Archive>
-				void serialize(Archive & ar, unsigned int version)
-		{
-			ar & transactionInterval ;
-            ar & transHead ;
-		}
+    template<class Archive>
+    void serialize(Archive & ar, unsigned int version)
+    {
+      ar & transactionInterval ;
+      ar & transHead ;
+    }
 
-	public:
+  public:
 
-		config() ;        
-		R transactionInterval ;     //Default - 1 transaction per sec set by constructor
-        int transHead ;             //Default - 1 ilosc danych przetrzymywanych w oknie komunikacyjnym (wzgledem najdluzej trwajacego strumienia)
+    config() ;
+    R transactionInterval ;     //Default - 1 transaction per sec set by constructor
+    int transHead ;             //Default - 1 ilosc danych przetrzymywanych w oknie komunikacyjnym (wzgledem najdluzej trwajacego strumienia)
 
-	};
+  };
 
-	/** Podstawoa klasa przechowjaca tokeny-isntrukcje stosowane do budowy pol i strumieni */
-	class token 
-	{
+  /** Podstawoa klasa przechowjaca tokeny-isntrukcje stosowane do budowy pol i strumieni */
+  class token
+  {
 
-	private:
+  private:
 
-		friend class boost::serialization::access;
+    friend class boost::serialization::access;
 
-		template<class Archive>
-				void serialize(Archive & ar, unsigned int version)
-		{
-			ar & command ;
-			ar & crValue ;
-			ar & sValue ;
-		}
+    template<class Archive>
+    void serialize(Archive & ar, unsigned int version)
+    {
+      ar & command ;
+      ar & crValue ;
+      ar & sValue ;
+    }
 
-		command_id command ;                /**< Polecenie */
-		complex< R > crValue ;              /**< Wartosc wymierna urojona */
-		string sValue ;                     /**< Wartosc typu string */
+    command_id command ;                /**< Polecenie */
+    complex< R > crValue ;              /**< Wartosc wymierna urojona */
+    string sValue ;                     /**< Wartosc typu string */
 
-	public:
-		
-		string getValue();
-		complex< R > getCRValue() ;
+  public:
 
-		/** Construktor set */
-				token( command_id id = VOID_COMMAND , string sValue = "" ) ;
-				token( command_id id , complex< R > crValue , string sValue = "" ) ;
-		token( command_id id , double dValue );
+    string getValue();
+    complex< R > getCRValue() ;
 
-		string getStrTokenName();       /**< metoda dostepowa dekoduje w oparciu o tokendefset.h kod tokena na nazwe*/		
-		command_id getTokenCommand() ;  /**< Metoda dostepowa zwraca token id */
-	} ;
-	
-	/** Klasa przechowujaca pojedyncze pole - wraz z insturkcja jego zbudowania*/
-	class field 
-	{
+    /** Construktor set */
+    token( command_id id = VOID_COMMAND , string sValue = "" ) ;
+    token( command_id id , complex< R > crValue , string sValue = "" ) ;
+    token( command_id id , double dValue );
 
-	private:
+    string getStrTokenName();       /**< metoda dostepowa dekoduje w oparciu o tokendefset.h kod tokena na nazwe*/
+    command_id getTokenCommand() ;  /**< Metoda dostepowa zwraca token id */
+  } ;
 
-		friend class boost::serialization::access;
+  /** Klasa przechowujaca pojedyncze pole - wraz z insturkcja jego zbudowania*/
+  class field
+  {
 
-		template<class Archive>
-				void serialize(Archive & ar, unsigned int version)
-		{
-			ar & setFieldName ;
-			ar & dFieldType ;
-			ar & lProgram ;
-		}
+  private:
 
-	public:
+    friend class boost::serialization::access;
 
-        enum eType { BAD , BYTE , INTEGER , RATIONAL , CRATIONAL } ;
+    template<class Archive>
+    void serialize(Archive & ar, unsigned int version)
+    {
+      ar & setFieldName ;
+      ar & dFieldType ;
+      ar & lProgram ;
+    }
 
-		set< string > setFieldName ; /**< Zbior zawierajacy wsztkie mozliwe nazwy pola */
-		eType dFieldType ;           /**< typ pola*/
-		list < token > lProgram ;    /**< instrukcja budowy pola*/
+  public:
 
-		field () ;
-		field ( string sFieldName, list < token > & lProgram, eType fieldType ) ;
-		
-        string getFirstFieldName();  /**< Funkcja zwraca pierwsza nazwe pola */
-        string getFieldNameSet();    /**< Funkcja zwraca zagreowany w stringu zbior nazw pola (dla celow prezentacyjnych)*/
-	} ;
+    enum eType { BAD , BYTE , INTEGER , RATIONAL , CRATIONAL } ;
 
-	/** Klasa/Struktura przechowujaca zapytania - program relizacji i schemat */
-	class query 
-	{
+    set< string > setFieldName ; /**< Zbior zawierajacy wsztkie mozliwe nazwy pola */
+    eType dFieldType ;           /**< typ pola*/
+    list < token > lProgram ;    /**< instrukcja budowy pola*/
 
-	private:
+    field () ;
+    field ( string sFieldName, list < token > & lProgram, eType fieldType ) ;
 
-		friend class boost::serialization::access;
+    string getFirstFieldName();  /**< Funkcja zwraca pierwsza nazwe pola */
+    string getFieldNameSet();    /**< Funkcja zwraca zagreowany w stringu zbior nazw pola (dla celow prezentacyjnych)*/
+  } ;
 
-		template<class Archive>
-				void serialize(Archive & ar, unsigned int version)
-		{
-			ar & id ;
-            ar & filename ;
-			ar & rInterval ;
-			ar & lSchema ;
-			ar & lProgram ;
-		}
+  /** Klasa/Struktura przechowujaca zapytania - program relizacji i schemat */
+  class query
+  {
 
-    public:
+  private:
 
-        query( R rInterval , string id ) ;
-        query() ;
+    friend class boost::serialization::access;
 
-        list< string > getFieldNamesList() ;
+    template<class Archive>
+    void serialize(Archive & ar, unsigned int version)
+    {
+      ar & id ;
+      ar & filename ;
+      ar & rInterval ;
+      ar & lSchema ;
+      ar & lProgram ;
+      ar & inMulticast ;
+    }
 
-		string id ;                         /**< nazwa strumienia/zapytania */
-        string filename ;                   /**< nazwa pliku skojarzona ze strumieniem. dot. deklaracji*/
-		R rInterval ;                       /**< interwal pomiedzy krotkami strumienia */
-		list < field > lSchema ;            /**< Schemat strumienia zlozony z pol */
-		list < token > lProgram ;           /**< Program budowy strumienia */
+  public:
 
-		bool isDeclaration();               /**< Funkcja zwrcajaca informacje czy strumien jest deklaracja*/
-		bool isReductionRequired();         /**< Funkcja zwraca true jestli program budowy strumienia wymaga optymalizacji */
-        bool isGenerated();                 /**< Funkcja zwraca true jest program budowy strumienia zostal wygenerowany w trakcie kompilacji */
+    query( R rInterval , string id ) ;
+    query() ;
 
-		field & getField( string sField );
-		
-        /** Funkcja zwraca dostepna liste nazw schematow z poziomu zapytania
+    list< string > getFieldNamesList() ;
+
+    string id ;                         /**< nazwa strumienia/zapytania */
+    string filename ;                   /**< nazwa pliku skojarzona ze strumieniem. dot. deklaracji*/
+    R rInterval ;                       /**< interwal pomiedzy krotkami strumienia */
+    list < field > lSchema ;            /**< Schemat strumienia zlozony z pol */
+    list < token > lProgram ;           /**< Program budowy strumienia */
+    bool inMulticast ;                  /**< Informacja o tym czy strumien wystepuje w strumieniu transmitowanym */
+
+    bool isDeclaration();               /**< Funkcja zwrcajaca informacje czy strumien jest deklaracja*/
+    bool isReductionRequired();         /**< Funkcja zwraca true jestli program budowy strumienia wymaga optymalizacji */
+    bool isGenerated();                 /**< Funkcja zwraca true jest program budowy strumienia zostal wygenerowany w trakcie kompilacji */
+    bool isTransmitedByUDP();           /**< Funkcja informuje czy strumien jest transmitowany */
+    void setMulticastStream(bool);       /**< Przelacznik dla transmisji strumienia*/
+
+    field & getField( string sField );
+
+    /** Funkcja zwraca dostepna liste nazw schematow z poziomu zapytania
         funkcja jesli poda jej sie argument zero (domyslny)
         zwroci cala liste strumieni
         jesli jednak poda sie numer - moze zwrocic wskazany, kolejny strumien */
-        list < string > getDepStreamNameList( int reqDep = 0 ) ;
+    list < string > getDepStreamNameList( int reqDep = 0 ) ;
 
-	} ; 
+  } ;
 
-    /** potrzebne do sortowania (ustalenia relacji porzadku wzgledem interwalu czasowego) w qTree */
-    bool operator<(const query &lhs,const query &rhs) ;
+  /** potrzebne do sortowania (ustalenia relacji porzadku wzgledem interwalu czasowego) w qTree */
+  bool operator<(const query &lhs,const query &rhs) ;
 
-    query & getQuery( string query_name );              /**< Funkcja zwraca referencje do zapytania */
-    int getSeqNr( string query_name ) ;                 /**< Funkcja zwraca numer kolejny w zbiorze qTree */
+  query & getQuery( string query_name );              /**< Funkcja zwraca referencje do zapytania */
+  int getSeqNr( string query_name ) ;                 /**< Funkcja zwraca numer kolejny w zbiorze qTree */
 
-    /** Deklaracja typu qTree - uporzadkowanego wzgledem czasow wykoniania zbioru strumeni */
-	class qTree : 
-		public vector < query > 
-	{
+  /** Deklaracja typu qTree - uporzadkowanego wzgledem czasow wykoniania zbioru strumeni */
+  class qTree :
+      public vector < query >
+  {
 
-	private:
+  private:
 
-		friend class boost::serialization::access;
-		template<class Archive>
-				void serialize(Archive & ar, unsigned int version)
-		{
-			ar & boost::serialization::base_object< vector < query > >(*this);
-		}
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive & ar, unsigned int version)
+    {
+      ar & boost::serialization::base_object< vector < query > >(*this);
+    }
 
-	public:
+  public:
 
-        query & operator[] ( string query_name ) { return getQuery( query_name ) ; } ;
-        void sort() { std::sort( begin() , end() ) ; }; /**< Sortowanie wzgledem delty - patrz zdefiniowany operator */
-        void tsort() ;                                  /**< Sortowanie topologiczne */
-        R getDelta( string query_name ) ;               /**< Funkcja zwraca interwal czasu (rInterval) dla zadanego strumienia */
-   };
+    query & operator[] ( string query_name ) { return getQuery( query_name ) ; } ;
+    void sort() { std::sort( begin() , end() ) ; }; /**< Sortowanie wzgledem delty - patrz zdefiniowany operator */
+    void tsort() ;                                  /**< Sortowanie topologiczne */
+    R getDelta( string query_name ) ;               /**< Funkcja zwraca interwal czasu (rInterval) dla zadanego strumienia */
+  };
 
 }

@@ -339,9 +339,16 @@ bool operator<(const query &lhs,const query &rhs) { return lhs.rInterval < rhs.r
         list < string > schema ;
 
         BOOST_FOREACH( field  & f , lSchema )
+        {
                 schema.push_back( f.getFirstFieldName() );
+        }
 
         return schema ;
+    }
+
+    void query::setMulticastStream( bool isInMulticast )
+    {
+        inMulticast = isInMulticast ;
     }
 
     bool query::isReductionRequired()
@@ -358,14 +365,18 @@ bool operator<(const query &lhs,const query &rhs) { return lhs.rInterval < rhs.r
             if ( reqDep == 0 )
             {   //domyslne zachowanie
                 if ( t.getTokenCommand() == PUSH_STREAM )
+                  {
                     lRetVal.push_back( t.getValue() )  ;
+                  }
             }
             else
             {   //wyciaganie wskazanego argumentu
                 if ( reqDep == iDep )
                 {
                     if ( t.getTokenCommand() == PUSH_STREAM )
+                      {
                         lRetVal.push_back( t.getValue() )  ;
+                      }
                 }
                 reqDep ++ ;
             }
