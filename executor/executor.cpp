@@ -163,7 +163,7 @@ ptree commandProcessor( ptree ptInval )
     {
       string streamName = ptInval.get("db.argument" , "" ) ;
 
-      assert( streamName != "" );
+      assert( streamName != "" );   //byc moze wywolano polecenie show bez nazwy strumienia - albo cos gorszego.
 
       std::cerr << "show:" << streamName << "\n" ;
 
@@ -231,7 +231,7 @@ usleep (unsigned int usecs)
 int mainFromWin32(int argc, char* argv[])
 #endif
 {
-  cerr << "Executor - egzekutor planow zapytan tworzonych przez kompilator.\n";
+  cerr << argv[0] << " - egzekutor planow zapytan tworzonych przez kompilator.\n";
   cerr << "Tag kompilatora:" + string(COMPILER) +
         #ifdef _CONSOLE
           ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx

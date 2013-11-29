@@ -17,6 +17,7 @@
 
 #include <boost/thread/thread.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
+#include <boost/atomic.hpp>
 
 #include <iostream>
 #include <string>
@@ -62,6 +63,39 @@ cmd_e processCommand( string commandStr )
   return NoCmd ;
 }
 
+boost::lockfree::spsc_queue< pair<int,int> , boost::lockfree::capacity<1024> > spsc_queue;
+
+int producer_count = 0 ;
+
+boost::atomic<bool> done (false);
+
+void producer(void)
+{
+  for (int i = 0; i != 100 ; ++i)
+    {
+      sleep( 1 );
+      int value = ++producer_count;
+      while (!spsc_queue.push( pair<int,int>( 1 , value ) ))
+        ;
+      if ( done ) break ;
+    }
+}
+
+void consumer(void)
+{
+    pair<int,int> e_value ;
+    while (!done) {
+        while (spsc_queue.pop(e_value))
+          {
+            printw( "%d %d\n" , e_value.first , e_value.second );
+            refresh();
+          }
+    }
+
+    while (spsc_queue.pop(e_value))
+      ;
+}
+
 MxTerm::MxTerm(bool stopLoop){
 
   // ---- inicjacja tablicy polecen
@@ -85,6 +119,16 @@ MxTerm::MxTerm(bool stopLoop){
   printw("Ready.\n");
   refresh();
 
+  //
+  // funkcja w tym watku wystartuje nasluch udp ze serwera
+  //
+  boost::thread producer_thread(producer);
+
+  //
+  // funkcja w tym watku wystartuje zasilanie konsoli danymi z kolejki
+  //
+  boost::thread consumer_thread(consumer);
+
   try
   {
     do
@@ -103,6 +147,13 @@ MxTerm::MxTerm(bool stopLoop){
               {
                 printw( "%s\n" , v.second.get<std::string>("").c_str()  );
               }
+              break ;
+            }
+          case Show:
+            {
+              using boost::property_tree::ptree ;
+              ptree pt = netClient( "show" ,  what[1].str() ) ;
+              break ;
             }
           }
       }
@@ -114,6 +165,10 @@ MxTerm::MxTerm(bool stopLoop){
     endwin();
     cerr << e.what() << "\n";
   }
+
+  done = true;
+  producer_thread.join();
+  consumer_thread.join();
 
   return ;
 }

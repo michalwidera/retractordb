@@ -49,7 +49,7 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
 
-#include "continiousterminal.h"
+//#include "continiousterminal.h"
 #include "mxterm.h"
 
 using namespace std ;
@@ -157,7 +157,7 @@ ptree netClient( string netCommand , string netArgument )
 int main(int argc, char* argv[])
 {
   //Intro
-  cerr << "Console - konsola systemu.\n";
+  cerr << argv[0] << " - konsola systemu.\n";
   cerr << "Tag kompilatora:" + string(COMPILER) +
           ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
           std::endl ;
@@ -170,8 +170,6 @@ int main(int argc, char* argv[])
 
     po::options_description desc("Dozwolone opcja");
     desc.add_options()
-        ("infile,i", po::value<string>(&sInputFile) , "z poleceniami")
-        ("old,d", "old terminal stage")
         ("server,s", po::value<string>(&dbNet::sHostName)->default_value("localhost") , "nazwa serwera")
         ("help,h", "program options")
         ;
@@ -190,54 +188,11 @@ int main(int argc, char* argv[])
         return 1;
       }
 
-    // To dziala tylko z Pliku
-
-    if (vm.count("infile"))
-      {
-        return 1 ; //odcinanie funkcjonalnosci
-        cout << "Load file:" << sInputFile << endl ;
-        std::ifstream s( sInputFile.c_str() );
-        if(s)
-          {
-            boost::iostreams::stream<boost::iostreams::file_source>
-                file( sInputFile.c_str() );
-            std::string rline;
-            while (std::getline(file, rline))
-              {
-                char line[81]; //linia edytowana
-                strcpy( line , rline.c_str() );
-                cout << ":" << line ;
-                ContiniousTerminal termClassInstance ;
-                if ( termClassInstance.issueCommand(line) )
-                  {
-                    cout << ",OK" << endl ;
-                  }
-                else
-                  {
-                    cout << ",?" << endl ;
-                  }
-              }
-          }
-        else
-          {
-            cerr << "no input file." << endl ;
-            return 1 ;
-          }
-        return 0;
-      }
-
     //Tutaj jest wlasciwe wywolanie terminala w trybie tekstowym
 
-    if (vm.count("old"))
-      {
-        ContiniousTerminal instance(false);
-        return instance.postMortemRetCode ;
-      }
-    else
-      {
-        MxTerm instance(false);
-        return instance.postMortemRetCode ;
-      }
+
+    MxTerm instance(false);
+    return instance.postMortemRetCode ;
 
   }
   catch(std::exception& e)

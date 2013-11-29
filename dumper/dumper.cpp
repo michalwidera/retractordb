@@ -454,7 +454,7 @@ void dumpQHierarchy()
 int main(int argc, char* argv[])
 {
   //Intro
-  cerr << "Dumper - decoder of qry files.\n";
+  cerr << argv[0] << " - decoder plikow qry.\n";
   cerr << "Tag kompilatora:" + string(COMPILER) +
           ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
           std::endl ;

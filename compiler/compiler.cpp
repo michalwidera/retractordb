@@ -819,7 +819,7 @@ std::streambuf *oldbuf = std::clog.rdbuf(clog.rdbuf());
 int main(int argc, char* argv[])
 {
   //Intro
-  cerr << "Parser/Compiler - parser i reduktor planow zapytan.\n";
+  cerr << argv[0] << " - parser, kompilator i reduktor planow zapytan.\n";
   cerr << "Tag kompilatora:" + string(COMPILER) +
           ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
           std::endl ;
