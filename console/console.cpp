@@ -50,6 +50,7 @@
 #include <boost/range/adaptor/map.hpp>
 
 #include "continiousterminal.h"
+#include "mxterm.h"
 
 using namespace std ;
 using namespace boost ;

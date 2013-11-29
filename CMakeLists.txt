@@ -170,6 +170,8 @@ set(SOURCES_CONSOLE
   console/console.cpp
   console/continiousterminal.cpp
   console/continiousterminal.h
+  console/mxterm.cpp
+  console/mxterm.h
   share/stdafx.cpp
 )
 set(SOURCES_STAGE_1
