@@ -194,6 +194,7 @@ int main(int argc, char* argv[])
 
     if (vm.count("infile"))
       {
+        return 1 ; //odcinanie funkcjonalnosci
         cout << "Load file:" << sInputFile << endl ;
         std::ifstream s( sInputFile.c_str() );
         if(s)
