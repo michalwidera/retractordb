@@ -128,11 +128,15 @@ ptree netClient( string netCommand , string netArgument )
                                  boost::asio::transfer_at_least(1), error))
           {
             if ( error == boost::asio::error::eof )
-              break ;
+              {
+                break ;
+              }
           }
 
         if (error != boost::asio::error::eof)
-          throw boost::system::system_error(error);
+          {
+            throw boost::system::system_error(error);
+          }
 
         read_xml( response_stream , pt_response );
       }

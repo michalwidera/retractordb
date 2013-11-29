@@ -33,7 +33,9 @@ void dumpStreamData( std::ostream & xout ,
 {
   set < string > queryset ;
   BOOST_FOREACH ( query q , coreInstance )
-      queryset.insert( q.id );
+  {
+    queryset.insert( q.id );
+  }
 
   CBuffer<std::string> cbuf ;
   cbuf.Load( filename.c_str() );
