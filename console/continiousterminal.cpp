@@ -45,6 +45,10 @@ const char* welcomeString = "Ready." ;
 //deklaracja
 boost::property_tree::ptree netClient( string netCommand , string netArgument );
 
+enum { EVERYTHING_OK = 0 } ;
+
+
+
 ContiniousTerminal::ContiniousTerminal( bool stopLoop )
   : stopLoop(stopLoop),
     pos(0) ,
@@ -61,7 +65,7 @@ ContiniousTerminal::ContiniousTerminal( bool stopLoop )
   // ----
 
   if ( !stopLoop ) postMortemRetCode = terminal();
-  else postMortemRetCode = 0 ;
+  else postMortemRetCode = EVERYTHING_OK ;
 }
 
 
@@ -261,7 +265,7 @@ int ContiniousTerminal::terminal()
       processRegisteredQueries();
     }
 
-  return 0 ;
+  return EVERYTHING_OK ;
 }
 
 bool ContiniousTerminal::processRequests( cmd_e command )

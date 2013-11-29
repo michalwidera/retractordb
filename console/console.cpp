@@ -171,6 +171,7 @@ int main(int argc, char* argv[])
     po::options_description desc("Dozwolone opcja");
     desc.add_options()
         ("infile,i", po::value<string>(&sInputFile) , "z poleceniami")
+        ("matrix,x", "terminal typu matrix")
         ("server,s", po::value<string>(&dbNet::sHostName)->default_value("localhost") , "nazwa serwera")
         ("help,h", "program options")
         ;
@@ -226,8 +227,16 @@ int main(int argc, char* argv[])
 
     //Tutaj jest wlasciwe wywolanie terminala w trybie tekstowym
 
-    ContiniousTerminal instance(false);
-    return instance.postMortemRetCode ;
+    if (vm.count("matrix"))
+      {
+        MxTerm instance(false);
+        return instance.postMortemRetCode ;
+      }
+    else
+      {
+        ContiniousTerminal instance(false);
+        return instance.postMortemRetCode ;
+      }
 
   }
   catch(std::exception& e)

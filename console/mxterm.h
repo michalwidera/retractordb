@@ -16,9 +16,13 @@
 #ifndef MXTERM_H
 #define MXTERM_H
 
-class mxterm {
+class MxTerm {
+
 public:
-  mxterm() ;
+  MxTerm( bool stopLoop = true ) ;  /**< parametr - tryb pracy*/
+
+  int postMortemRetCode ;
+
 };
 
 #endif // MXTERM_H
