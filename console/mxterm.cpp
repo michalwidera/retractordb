@@ -63,6 +63,42 @@ cmd_e processCommand( string commandStr )
   return NoCmd ;
 }
 
+WINDOW *create_newwin(int height, int width, int starty, int startx)
+{	WINDOW *local_win;
+
+	local_win = newwin(height, width, starty, startx);
+	box(local_win, 0 , 0);		/* 0, 0 gives default characters
+					 * for the vertical and horizontal
+					 * lines			*/
+	wrefresh(local_win);		/* Show that box 		*/
+
+	return local_win;
+}
+
+void destroy_win(WINDOW *local_win)
+{
+	/* box(local_win, ' ', ' '); : This won't produce the desired
+	 * result of erasing the window. It will leave it's four corners
+	 * and so an ugly remnant of window.
+	 */
+	wborder(local_win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
+	/* The parameters taken are
+	 * 1. win: the window on which to operate
+	 * 2. ls: character to be used for the left side of the window
+	 * 3. rs: character to be used for the right side of the window
+	 * 4. ts: character to be used for the top side of the window
+	 * 5. bs: character to be used for the bottom side of the window
+	 * 6. tl: character to be used for the top left corner of the window
+	 * 7. tr: character to be used for the top right corner of the window
+	 * 8. bl: character to be used for the bottom left corner of the window
+	 * 9. br: character to be used for the bottom right corner of the window
+	 */
+	wrefresh(local_win);
+	delwin(local_win);
+}
+
+WINDOW *my_win;
+
 boost::lockfree::spsc_queue< pair<int,int> , boost::lockfree::capacity<1024> > spsc_queue;
 
 int producer_count = 0 ;
@@ -87,8 +123,9 @@ void consumer(void)
     while (!done) {
         while (spsc_queue.pop(e_value))
           {
-            printw( "%d %d\n" , e_value.first , e_value.second );
-            refresh();
+            wprintw(my_win, "%d %d\n" , e_value.first , e_value.second );
+            wrefresh(my_win);
+            //refresh();
           }
     }
 
@@ -118,6 +155,9 @@ MxTerm::MxTerm(bool stopLoop){
   initscr();
   printw("Ready.\n");
   refresh();
+
+  int startx = 30 , starty = 5 , width = 30 , height = 10 ;
+  my_win = create_newwin(height, width, starty, startx);
 
   //
   // funkcja w tym watku wystartuje nasluch udp ze serwera
@@ -169,6 +209,8 @@ MxTerm::MxTerm(bool stopLoop){
   done = true;
   producer_thread.join();
   consumer_thread.join();
+
+  endwin();
 
   return ;
 }
