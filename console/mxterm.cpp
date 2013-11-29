@@ -24,6 +24,8 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/regex.hpp>
 #include <boost/foreach.hpp>
+
+//sudo apt-get install libncurses5-dev libncursesw5-dev
 #include <ncurses.h>
 
 //zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
@@ -42,11 +44,6 @@ boost::property_tree::ptree netClient( string netCommand , string netArgument );
 std::map < cmd_e, boost::regex > commands ;
 
 boost::cmatch what;
-
-void gotoxy(int x,int y)
-{
-    printf("\033[%d;%df",y,x);
-}
 
 cmd_e processCommand( string commandStr )
 {
