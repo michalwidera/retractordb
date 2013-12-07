@@ -26,8 +26,10 @@
 #include <boost/regex.hpp>
 #include <boost/foreach.hpp>
 
-//sudo apt-get install libncurses5-dev libncursesw5-dev
+//sudo apt-get install libncurses5-dev libncursesw5-dev libcdk5
 #include <ncurses.h>
+#include <panel.h>
+#include <cdk/cdk.h>
 
 //zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
 #include <boost/range/algorithm.hpp>
@@ -62,42 +64,11 @@ cmd_e processCommand( string commandStr )
 
   return NoCmd ;
 }
+//http://www.tldp.org/HOWTO/NCURSES-Programming-HOWTO/windows.html#WINDOWBASICS
+//http://stackoverflow.com/questions/5749634/printing-inside-window-not-on-borders
 
-WINDOW *create_newwin(int height, int width, int starty, int startx)
-{	WINDOW *local_win;
-
-	local_win = newwin(height, width, starty, startx);
-	box(local_win, 0 , 0);		/* 0, 0 gives default characters
-					 * for the vertical and horizontal
-					 * lines			*/
-	wrefresh(local_win);		/* Show that box 		*/
-
-	return local_win;
-}
-
-void destroy_win(WINDOW *local_win)
-{
-	/* box(local_win, ' ', ' '); : This won't produce the desired
-	 * result of erasing the window. It will leave it's four corners
-	 * and so an ugly remnant of window.
-	 */
-	wborder(local_win, ' ', ' ', ' ',' ',' ',' ',' ',' ');
-	/* The parameters taken are
-	 * 1. win: the window on which to operate
-	 * 2. ls: character to be used for the left side of the window
-	 * 3. rs: character to be used for the right side of the window
-	 * 4. ts: character to be used for the top side of the window
-	 * 5. bs: character to be used for the bottom side of the window
-	 * 6. tl: character to be used for the top left corner of the window
-	 * 7. tr: character to be used for the top right corner of the window
-	 * 8. bl: character to be used for the bottom left corner of the window
-	 * 9. br: character to be used for the bottom right corner of the window
-	 */
-	wrefresh(local_win);
-	delwin(local_win);
-}
-
-WINDOW *my_win;
+WINDOW *my_win[2];
+PANEL  *my_panels[2];
 
 boost::lockfree::spsc_queue< pair<int,int> , boost::lockfree::capacity<1024> > spsc_queue;
 
@@ -123,8 +94,8 @@ void consumer(void)
     while (!done) {
         while (spsc_queue.pop(e_value))
           {
-            wprintw(my_win, "%d %d\n" , e_value.first , e_value.second );
-            wrefresh(my_win);
+            wprintw(my_win[0], "%d %d\n" , e_value.first , e_value.second );
+            wrefresh(my_win[0]);
             //refresh();
           }
     }
@@ -152,12 +123,46 @@ MxTerm::MxTerm(bool stopLoop){
 
   char str[80];
 
+  int x = 4 ,y = 2 ;
+  int lines = 10, cols = 40 ;
+
   initscr();
+  start_color();
+  scrollok( stdscr , TRUE );
+  cbreak();
+  //noecho();
+
+  // initialize color
+  init_pair( 1 , COLOR_RED , COLOR_BLACK );
+  init_pair( 2,  COLOR_GREEN, COLOR_BLACK );
+
+  my_win[0] = newwin(lines, cols, y, x);
+  my_win[1] = newwin(lines, cols, y + 1, x + 5);
+
+  scrollok( my_win[0] , TRUE );
+  scrollok( my_win[1] , TRUE );
+
+  /*
+   * Create borders around the windows so that you can see the effect
+   * of panels
+   */
+  box(my_win[0], 0, 0);
+  box(my_win[1], 0, 0);
+
+  /* Attach a panel to each window */ 	/* Order is bottom up */
+  my_panels[0] = new_panel(my_win[0]); 	/* Push 0, order: stdscr-0 */
+  my_panels[1] = new_panel(my_win[1]); 	/* Push 1, order: stdscr-0-1 */
+
+  set_panel_userptr( my_panels[0] , my_panels[1] );
+  set_panel_userptr( my_panels[1] , my_panels[0] );
+
+  update_panels();
+  doupdate();
+
+  top_panel( my_panels[0] );
+
   printw("Ready.\n");
   refresh();
-
-  int startx = 30 , starty = 5 , width = 30 , height = 10 ;
-  my_win = create_newwin(height, width, starty, startx);
 
   //
   // funkcja w tym watku wystartuje nasluch udp ze serwera
