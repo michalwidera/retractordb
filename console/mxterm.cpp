@@ -142,14 +142,12 @@ public:
           boost::asio::placeholders::error,
           boost::asio::placeholders::bytes_transferred));
 
-    timer_.expires_from_now(boost::posix_time::seconds(5));
+    timer_.expires_from_now(boost::posix_time::seconds(3)); //co trzy sekundy umiera proces zeby sie odrodzic
     timer_.async_wait(boost::bind(&receiver::close, this));
   }
 
   void close()
   {
-    printw("RcvDie.\n");
-    refresh();
     socket_.close();
     if ( !done )
       {

@@ -165,7 +165,7 @@ void tcp_server::handle_accept(session* new_session,
 //  Klasa odpowiedzialna na transmisje strumieni danych
 //
 const short multicast_port = 30001;
-const int max_message_count = 10;
+const int max_message_count = 100;
 
 udp_server::udp_server(boost::asio::io_service& io_service,
                        const boost::asio::ip::address& multicast_address)
