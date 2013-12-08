@@ -25,6 +25,8 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/asio.hpp>
 
+#include "Buffer.h"
+
 //dodatkowy naglowek trzeba wczytac jak sie kompiluje pod mingw
 //#ifndef  _CONSOLE
 //#include "windows.h"
@@ -167,10 +169,24 @@ ptree commandProcessor( ptree ptInval )
 
       std::cerr << "show:" << streamName << "\n" ;
 
-      coreInstance[streamName].setMulticastStream( true );
+      coreInstance[streamName].setMulticastStream( 1 );
     }
 
   return ptRetval ; //sub for a while
+}
+
+extern CBuffer<std::string> cbuf ;
+string prepareShipment( set < string > inSet )
+{
+  shared_array< char > pRawData ;
+  BOOST_FOREACH ( query q , coreInstance )
+  {
+      if ( inSet.find( q.id ) == inSet.end() )
+          continue ;
+
+      pRawData.reset( new char[ cbuf.GetSizeOfFrame( q.id ) ] );
+      cbuf.GetBlock( q.id , -1 , pRawData  );
+  }
 }
 
 #ifndef WIN32
@@ -402,6 +418,9 @@ int mainFromWin32(int argc, char* argv[])
           }
 
         proc.processRows( getAwaitedStreamsSet( tl , lLimitVal ) );
+
+        std::cout << prepareShipment( getAwaitedStreamsSet( tl , lLimitVal ) ) << std::endl ;
+
         //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
 
 

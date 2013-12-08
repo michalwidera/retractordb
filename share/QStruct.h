@@ -195,7 +195,7 @@ namespace QS {
       ar & rInterval ;
       ar & lSchema ;
       ar & lProgram ;
-      //ar & inMulticast ;
+      ar & inMulticast ;
     }
 
   public:
@@ -210,13 +210,13 @@ namespace QS {
     R rInterval ;                       /**< interwal pomiedzy krotkami strumienia */
     list < field > lSchema ;            /**< Schemat strumienia zlozony z pol */
     list < token > lProgram ;           /**< Program budowy strumienia */
-    bool inMulticast ;                  /**< Informacja o tym czy strumien wystepuje w strumieniu transmitowanym */
+    int inMulticast ;                   /**< Informacja o tym czy strumien wystepuje w strumieniu transmitowanym */
 
     bool isDeclaration();               /**< Funkcja zwrcajaca informacje czy strumien jest deklaracja*/
     bool isReductionRequired();         /**< Funkcja zwraca true jestli program budowy strumienia wymaga optymalizacji */
     bool isGenerated();                 /**< Funkcja zwraca true jest program budowy strumienia zostal wygenerowany w trakcie kompilacji */
     bool isTransmitedByUDP();           /**< Funkcja informuje czy strumien jest transmitowany */
-    void setMulticastStream(bool);       /**< Przelacznik dla transmisji strumienia*/
+    void setMulticastStream(int);       /**< Przelacznik dla transmisji strumienia*/
 
     field & getField( string sField );
 

@@ -346,7 +346,7 @@ bool operator<(const query &lhs,const query &rhs) { return lhs.rInterval < rhs.r
         return schema ;
     }
 
-    void query::setMulticastStream( bool isInMulticast )
+    void query::setMulticastStream( int isInMulticast )
     {
         inMulticast = isInMulticast ;
     }
