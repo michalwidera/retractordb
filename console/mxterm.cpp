@@ -34,6 +34,13 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
 
+//dla potrzeb transmisji danych
+#include <boost/asio.hpp>
+#include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+
+const short multicast_port = 30001;
+
 enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show , Add , Del ,  NoCmd }  ;
 
 enum { EVERYTHING_OK = 0 } ;
@@ -76,18 +83,9 @@ boost::atomic<bool> done (false);
 
 vector < WINDOW * > my_win ;
 
-void producer(void)
-{
-  for (int i = 0; i != 100 ; ++i)
-    {
-      sleep( 1 );
-      int value = ++producer_count;
-      while (!spsc_queue.push( pair<int,int>( 1 , value ) ))
-        ;
-      if ( done ) break ;
-    }
-}
-
+//
+// Proces konsumenta asynchronicznie pobiera dane z kolejki i umieszcza na ekranie
+//
 void consumer()
 {
     pair<int,int> e_value ;
@@ -108,6 +106,118 @@ void consumer()
     while (spsc_queue.pop(e_value))
       ;
 }
+
+
+class receiver
+{
+public:
+  receiver(boost::asio::io_service& io_service,
+      const boost::asio::ip::address& listen_address,
+      const boost::asio::ip::address& multicast_address)
+    : socket_(io_service) ,
+      timer_(io_service) ,
+      listen_address( listen_address ),
+      multicast_address( multicast_address )
+  {
+    startRcv();
+  }
+
+  void startRcv()
+  {
+    // Create the socket so that multiple may be bound to the same address.
+    boost::asio::ip::udp::endpoint listen_endpoint( listen_address, multicast_port);
+    socket_.open(listen_endpoint.protocol());
+    socket_.set_option(boost::asio::ip::udp::socket::reuse_address(true));
+    socket_.set_option(boost::asio::ip::multicast::enable_loopback(true));
+    socket_.set_option(boost::asio::ip::multicast::hops(1));
+    socket_.bind(boost::asio::ip::udp::endpoint( multicast_address, multicast_port ));
+
+    // Join the multicast group.
+    socket_.set_option(
+        boost::asio::ip::multicast::join_group(multicast_address));
+
+    socket_.async_receive_from(
+        boost::asio::buffer(data_, max_length), sender_endpoint_,
+        boost::bind(&receiver::handle_receive_from, this,
+          boost::asio::placeholders::error,
+          boost::asio::placeholders::bytes_transferred));
+
+    timer_.expires_from_now(boost::posix_time::seconds(5));
+    timer_.async_wait(boost::bind(&receiver::close, this));
+  }
+
+  void close()
+  {
+    printw("RcvDie.\n");
+    refresh();
+    socket_.close();
+    if ( !done )
+      {
+        startRcv();
+      }
+  }
+
+  void handle_receive_from(const boost::system::error_code& error, size_t bytes_recvd)
+  {
+    if ( done )
+      {
+        socket_.close();
+        return ;
+      }
+
+    if (!error)
+      {
+        /*
+            std::cout.write(data_, bytes_recvd);
+            std::cout << std::endl;
+            */
+        int value = ++producer_count;
+        while (!spsc_queue.push( pair<int,int>( 1 , value ) ))
+          ;
+
+        socket_.async_receive_from(
+              boost::asio::buffer(data_, max_length), sender_endpoint_,
+              boost::bind(&receiver::handle_receive_from, this,
+                          boost::asio::placeholders::error,
+                          boost::asio::placeholders::bytes_transferred));
+      }
+  }
+
+private:
+  boost::asio::ip::udp::socket socket_;
+  boost::asio::ip::udp::endpoint sender_endpoint_;
+  boost::asio::deadline_timer timer_;
+  enum { max_length = 1024 };
+  char data_[max_length];
+
+  boost::asio::ip::address listen_address ;
+  boost::asio::ip::address multicast_address ;
+};
+
+//
+// Proces producenta pobiera dane z sieciowego strumienia danych i umieszcza w kolejce
+//
+void producer(void)
+{
+  /*
+  for (int i = 0; i != 100 ; ++i)
+    {
+      sleep( 1 );
+      int value = ++producer_count;
+      while (!spsc_queue.push( pair<int,int>( 1 , value ) ))
+        ;
+      if ( done ) break ;
+    }
+  */
+
+  boost::asio::io_service io_service;
+  //boost::asio::deadline_timer timer_(io_service);
+  receiver r(io_service,
+             boost::asio::ip::address::from_string("0.0.0.0"),
+             boost::asio::ip::address::from_string("239.255.0.1"));
+  io_service.run();
+}
+
 
 MxTerm::MxTerm(bool stopLoop){
 
@@ -167,8 +277,6 @@ MxTerm::MxTerm(bool stopLoop){
     pos( 6,  width , height , y_offset + 1 * ( height + 1 ) , x_offset + 2 * ( width + 1 ) ) ,
   } ;
 
-  printw("Ready.\n");
-  refresh();            //taka kolejnosc - bo inaczej wyczysci sie caly ekran
 
   //
   // funkcja w tym watku wystartuje nasluch udp ze serwera
@@ -182,6 +290,9 @@ MxTerm::MxTerm(bool stopLoop){
 
   try
   {
+    printw("Ready.\n");
+    refresh();
+
     do
       {
         getstr( str );
@@ -218,7 +329,7 @@ MxTerm::MxTerm(bool stopLoop){
           case Del:
             {
               my_win.pop_back();
-              refresh();            //taka kolejnosc - bo inaczej wyczysci sie caly ekran
+              refresh();
               BOOST_FOREACH( WINDOW * w , my_win ) wrefresh( w );
             }
             break ;
@@ -230,6 +341,9 @@ MxTerm::MxTerm(bool stopLoop){
   {
     cerr << e.what() << "\n";
   }
+
+  printw("Done.\n");
+  refresh();
 
   done = true;
   producer_thread.join();
