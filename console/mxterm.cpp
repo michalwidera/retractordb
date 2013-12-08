@@ -34,7 +34,7 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
 
-enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show ,  NoCmd }  ;
+enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show , Add , Del ,  NoCmd }  ;
 
 enum { EVERYTHING_OK = 0 } ;
 
@@ -94,11 +94,14 @@ void consumer()
     while (!done) {
         while (spsc_queue.pop(e_value))
           {
-            int wnd = rand()% my_win.size() ;
-            assert( wnd < my_win.size() );
+            if ( my_win.size() > 0 )
+              {
+                int wnd = rand()% my_win.size() ;
+                assert( wnd < my_win.size() );
 
-            wprintw( my_win[wnd], "%d %d\n" , e_value.first , e_value.second );
-            wrefresh(my_win[wnd]);
+                wprintw( my_win[wnd], "%d %d\n" , e_value.first , e_value.second );
+                wrefresh(my_win[wnd]);
+              }
           }
     }
 
@@ -116,6 +119,8 @@ MxTerm::MxTerm(bool stopLoop){
   commands[ Help ] = boost::regex("help.*") ;
   commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
   commands[ Show ] = boost::regex("\\s*show\\s*(\\w*).*") ;
+  commands[ Add ] = boost::regex("\\s*add.*");
+  commands[ Del ] = boost::regex("\\s*del.*");
   // ----
 
   postMortemRetCode = EVERYTHING_OK ;
@@ -138,23 +143,32 @@ MxTerm::MxTerm(bool stopLoop){
   // initialize color
   init_pair( 1 , COLOR_BLACK, COLOR_RED  );
   init_pair( 2,  COLOR_BLACK, COLOR_GREEN );
+  init_pair( 3,  COLOR_BLACK, COLOR_YELLOW );
+
+  init_pair( 4 , COLOR_BLACK, COLOR_MAGENTA );
+  init_pair( 5,  COLOR_BLACK, COLOR_CYAN );
+  init_pair( 6,  COLOR_BLACK, COLOR_BLUE );
 
   int width = 15 ;
   int height = 10 ;
+  int x_offset = 30 ;
+  int y_offset = 2 ;
 
-  //                     lines, cols, y , x
-  my_win.push_back( newwin( height, width, 3 , 15 ) );
-  my_win.push_back( newwin( height, width, 3 , 15 + width + 1 ) );
-
-  wbkgd( my_win[0], COLOR_PAIR(1) );
-  wbkgd( my_win[1], COLOR_PAIR(2) );
-
-  BOOST_FOREACH( WINDOW *w , my_win ) scrollok( w , TRUE );
+  struct pos {
+    int c,w,h,x,y ;
+    pos(){};
+    pos( int c , int w, int h, int x, int y ) : c(c),w(w),h(h),x(x),y(y) {} ;
+  } m_pos[10] = {
+    pos( 1 , width , height , y_offset + 0 * ( height + 1 ) , x_offset + 0 * ( width + 1 ) ) ,
+    pos( 2,  width , height , y_offset + 0 * ( height + 1 ) , x_offset + 1 * ( width + 1 ) ) ,
+    pos( 3,  width , height , y_offset + 0 * ( height + 1 ) , x_offset + 2 * ( width + 1 ) ) ,
+    pos( 4,  width , height , y_offset + 1 * ( height + 1 ) , x_offset + 0 * ( width + 1 ) ) ,
+    pos( 5,  width , height , y_offset + 1 * ( height + 1 ) , x_offset + 1 * ( width + 1 ) ) ,
+    pos( 6,  width , height , y_offset + 1 * ( height + 1 ) , x_offset + 2 * ( width + 1 ) ) ,
+  } ;
 
   printw("Ready.\n");
   refresh();            //taka kolejnosc - bo inaczej wyczysci sie caly ekran
-
-  BOOST_FOREACH( WINDOW *w , my_win ) wrefresh(w);
 
   //
   // funkcja w tym watku wystartuje nasluch udp ze serwera
@@ -184,14 +198,30 @@ MxTerm::MxTerm(bool stopLoop){
               {
                 printw( "%s\n" , v.second.get<std::string>("").c_str()  );
               }
-              break ;
             }
+            break ;
           case Show:
             {
               using boost::property_tree::ptree ;
               ptree pt = netClient( "show" ,  what[1].str() ) ;
-              break ;
             }
+            break ;
+          case Add:
+            {
+              int i = my_win.size();
+              my_win.push_back( newwin( m_pos[i].h, m_pos[i].w , m_pos[i].x , m_pos[i].y ) );
+              wbkgd( my_win[i], COLOR_PAIR( m_pos[i].c ) );
+              scrollok( my_win[i] , TRUE );
+              wrefresh( my_win[i] );
+            }
+            break ;
+          case Del:
+            {
+              my_win.pop_back();
+              refresh();            //taka kolejnosc - bo inaczej wyczysci sie caly ekran
+              BOOST_FOREACH( WINDOW * w , my_win ) wrefresh( w );
+            }
+            break ;
           }
       }
     while ( cmdId != Quit );
