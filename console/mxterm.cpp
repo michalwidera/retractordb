@@ -29,7 +29,6 @@
 //sudo apt-get install libncurses5-dev libncursesw5-dev libcdk5
 #include <ncurses.h>
 #include <panel.h>
-#include <cdk/cdk.h>
 
 //zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
 #include <boost/range/algorithm.hpp>
@@ -66,15 +65,16 @@ cmd_e processCommand( string commandStr )
 }
 //http://www.tldp.org/HOWTO/NCURSES-Programming-HOWTO/windows.html#WINDOWBASICS
 //http://stackoverflow.com/questions/5749634/printing-inside-window-not-on-borders
+//http://invisible-island.net/ncurses/ncurses-intro.html
 
-WINDOW *my_win[2];
-PANEL  *my_panels[2];
 
 boost::lockfree::spsc_queue< pair<int,int> , boost::lockfree::capacity<1024> > spsc_queue;
 
 int producer_count = 0 ;
 
 boost::atomic<bool> done (false);
+
+vector < WINDOW * > my_win ;
 
 void producer(void)
 {
@@ -88,15 +88,17 @@ void producer(void)
     }
 }
 
-void consumer(void)
+void consumer()
 {
     pair<int,int> e_value ;
     while (!done) {
         while (spsc_queue.pop(e_value))
           {
-            wprintw(my_win[0], "%d %d\n" , e_value.first , e_value.second );
-            wrefresh(my_win[0]);
-            //refresh();
+            int wnd = rand()% my_win.size() ;
+            assert( wnd < my_win.size() );
+
+            wprintw( my_win[wnd], "%d %d\n" , e_value.first , e_value.second );
+            wrefresh(my_win[wnd]);
           }
     }
 
@@ -120,49 +122,39 @@ MxTerm::MxTerm(bool stopLoop){
 
   string commandTxt;
   cmd_e cmdId ;
-
   char str[80];
 
-  int x = 4 ,y = 2 ;
-  int lines = 10, cols = 40 ;
+  //WINDOW *my_win[2];
+  PANEL  *my_panel[2];
 
-  initscr();
-  start_color();
-  scrollok( stdscr , TRUE );
-  cbreak();
-  //noecho();
+                             //http://linux.die.net/man/3/cbreak
+  initscr();                 //
+  start_color();             //
+  scrollok( stdscr , TRUE ); //The scrollok controls cursor of a window is moved off the edge of the window
+  keypad(stdscr, TRUE);      //if enabled (bf is TRUE), the user can press a function key
+  cbreak();                  //The cbreak routine disables line buffering and erase/kill character-processing
+  echo();                    //characters typed by the user are echoed by getch as they are typed.
 
   // initialize color
-  init_pair( 1 , COLOR_RED , COLOR_BLACK );
-  init_pair( 2,  COLOR_GREEN, COLOR_BLACK );
+  init_pair( 1 , COLOR_BLACK, COLOR_RED  );
+  init_pair( 2,  COLOR_BLACK, COLOR_GREEN );
 
-  my_win[0] = newwin(lines, cols, y, x);
-  my_win[1] = newwin(lines, cols, y + 1, x + 5);
+  int width = 15 ;
+  int height = 10 ;
 
-  scrollok( my_win[0] , TRUE );
-  scrollok( my_win[1] , TRUE );
+  //                     lines, cols, y , x
+  my_win.push_back( newwin( height, width, 3 , 15 ) );
+  my_win.push_back( newwin( height, width, 3 , 15 + width + 1 ) );
 
-  /*
-   * Create borders around the windows so that you can see the effect
-   * of panels
-   */
-  box(my_win[0], 0, 0);
-  box(my_win[1], 0, 0);
+  wbkgd( my_win[0], COLOR_PAIR(1) );
+  wbkgd( my_win[1], COLOR_PAIR(2) );
 
-  /* Attach a panel to each window */ 	/* Order is bottom up */
-  my_panels[0] = new_panel(my_win[0]); 	/* Push 0, order: stdscr-0 */
-  my_panels[1] = new_panel(my_win[1]); 	/* Push 1, order: stdscr-0-1 */
-
-  set_panel_userptr( my_panels[0] , my_panels[1] );
-  set_panel_userptr( my_panels[1] , my_panels[0] );
-
-  update_panels();
-  doupdate();
-
-  top_panel( my_panels[0] );
+  BOOST_FOREACH( WINDOW *w , my_win ) scrollok( w , TRUE );
 
   printw("Ready.\n");
-  refresh();
+  refresh();            //taka kolejnosc - bo inaczej wyczysci sie caly ekran
+
+  BOOST_FOREACH( WINDOW *w , my_win ) wrefresh(w);
 
   //
   // funkcja w tym watku wystartuje nasluch udp ze serwera
@@ -203,11 +195,9 @@ MxTerm::MxTerm(bool stopLoop){
           }
       }
     while ( cmdId != Quit );
-    endwin();
   }
   catch(std::exception& e)
   {
-    endwin();
     cerr << e.what() << "\n";
   }
 
