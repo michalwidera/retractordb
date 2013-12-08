@@ -43,8 +43,6 @@ const short multicast_port = 30001;
 
 enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show , Add , Del ,  NoCmd }  ;
 
-enum { EVERYTHING_OK = 0 } ;
-
 using namespace std ;
 
 //deklaracja
@@ -231,15 +229,6 @@ MxTerm::MxTerm(bool stopLoop){
   commands[ Del ] = boost::regex("\\s*del.*");
   // ----
 
-  postMortemRetCode = EVERYTHING_OK ;
-
-  string commandTxt;
-  cmd_e cmdId ;
-  char str[80];
-
-  //WINDOW *my_win[2];
-  PANEL  *my_panel[2];
-
                              //http://linux.die.net/man/3/cbreak
   initscr();                 //
   start_color();             //
@@ -248,7 +237,9 @@ MxTerm::MxTerm(bool stopLoop){
   cbreak();                  //The cbreak routine disables line buffering and erase/kill character-processing
   echo();                    //characters typed by the user are echoed by getch as they are typed.
 
-  // initialize color
+  //
+  // initialize color - kolorki poszczegolnych okien
+  //
   init_pair( 1 , COLOR_BLACK, COLOR_RED  );
   init_pair( 2,  COLOR_BLACK, COLOR_GREEN );
   init_pair( 3,  COLOR_BLACK, COLOR_YELLOW );
@@ -257,11 +248,17 @@ MxTerm::MxTerm(bool stopLoop){
   init_pair( 5,  COLOR_BLACK, COLOR_CYAN );
   init_pair( 6,  COLOR_BLACK, COLOR_BLUE );
 
+  // szerokosc, wysokosc okiernka ze strumieniem
   int width = 15 ;
   int height = 10 ;
+
+  // poczatek lewego gornego, pierwszego okienka
   int x_offset = 30 ;
   int y_offset = 2 ;
 
+  //
+  // Rozklad okien ze strumieniami na ekranie
+  //
   struct pos {
     int c,w,h,x,y ;
     pos(){};
@@ -291,9 +288,15 @@ MxTerm::MxTerm(bool stopLoop){
     printw("Ready.\n");
     refresh();
 
+    // Deklaraca
+    cmd_e cmdId = Quit ;
+    const int MAX_COMMAND_STRING_SIZE = 80 ;
+
+    char str[MAX_COMMAND_STRING_SIZE];
+
     do
       {
-        getstr( str );
+        getnstr( str , MAX_COMMAND_STRING_SIZE );
         cmdId = processCommand( str );
         switch ( cmdId )
           {

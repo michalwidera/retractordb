@@ -209,6 +209,3 @@ void udp_server::handle_timeout(const boost::system::error_code& error)
                         boost::asio::placeholders::error));
     }
 }
-
-
-
