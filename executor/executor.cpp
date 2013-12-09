@@ -169,7 +169,7 @@ ptree commandProcessor( ptree ptInval )
 
       std::cerr << "show:" << streamName << "\n" ;
 
-      coreInstance[streamName].setMulticastStream( 1 );
+      coreInstance[streamName].setMulticastStream( query::send ); //tutaj docelowo - mapa bitowa - ktore pola wyjda - na razie 1 - all
     }
 
   return ptRetval ; //sub for a while
@@ -178,15 +178,39 @@ ptree commandProcessor( ptree ptInval )
 extern CBuffer<std::string> cbuf ;
 string prepareShipment( set < string > inSet )
 {
+  stringstream s ;
+
   shared_array< char > pRawData ;
   BOOST_FOREACH ( query q , coreInstance )
   {
-      if ( inSet.find( q.id ) == inSet.end() )
-          continue ;
+    if ( inSet.find( q.id ) == inSet.end() )
+      {
+        continue ;
+      }
 
-      pRawData.reset( new char[ cbuf.GetSizeOfFrame( q.id ) ] );
-      cbuf.GetBlock( q.id , -1 , pRawData  );
+    if ( q.inMulticast == query::nosend )
+      {
+        continue ;
+      }
+
+
+    //do dupy
+    pRawData.reset( new char[ cbuf.GetSizeOfFrame( q.id ) ] );
+    cbuf.GetBlock( q.id , -1 , pRawData  );
+
+    s << q.id << "," ;
+
+    for ( int i = 0 ; i < cbuf.GetSizeOfFrame( q.id ) ; i ++ )
+      {
+        s << pRawData[i] << "," ;
+      }
+
+    s << "." ;
   }
+
+  s << "." ;
+
+  return s.str();
 }
 
 #ifndef WIN32

@@ -200,6 +200,8 @@ namespace QS {
 
   public:
 
+    enum { nosend = 0 , send } ;        /**< Multicast options */
+
     query( R rInterval , string id ) ;
     query() ;
 
@@ -210,7 +212,7 @@ namespace QS {
     R rInterval ;                       /**< interwal pomiedzy krotkami strumienia */
     list < field > lSchema ;            /**< Schemat strumienia zlozony z pol */
     list < token > lProgram ;           /**< Program budowy strumienia */
-    int inMulticast ;                   /**< Informacja o tym czy strumien wystepuje w strumieniu transmitowanym */
+    int inMulticast ;                   /**< Informacja o tym czy strumien wystepuje w strumieniu transmitowanym - jak byl bool to sie sypala serializacja */
 
     bool isDeclaration();               /**< Funkcja zwrcajaca informacje czy strumien jest deklaracja*/
     bool isReductionRequired();         /**< Funkcja zwraca true jestli program budowy strumienia wymaga optymalizacji */
