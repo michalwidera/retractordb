@@ -200,12 +200,12 @@ string prepareShipment( set < string > inSet )
 
     s << q.id << "," ;
 
-    for ( int i = 0 ; i < cbuf.GetSizeOfFrame( q.id ) ; i ++ )
+    for ( int i = 0 ; i < cbuf.GetSizeOfFrame( q.id ) ; i += sizeof( complex< rational<int> > ) )
       {
-        s << pRawData[i] << "," ;
+        s << ( complex< rational<int> > ) pRawData[i] << "," ;
       }
 
-    s << "." ;
+    s << "." << endl ;
   }
 
   s << "." ;
