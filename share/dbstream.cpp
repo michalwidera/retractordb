@@ -40,7 +40,6 @@ namespace UR {
     streamName( streamName ) ,
     schema( schema ) ,
     m_offset(-1) ,
-    bWasFeedByGet( false ),
     frameSize( schema.size() * sizeof( varfield ) ),
     pRawData( new char[ frameSize ] ),
     resultValid( true )
@@ -63,20 +62,13 @@ namespace UR {
     }
 
     assert( false );                      //Pro Forma - never called
-    return mpStrVar[ * schema.begin() ] ; //Pro Forma - never called
+    return (*this)[ * schema.begin() ] ;  //Pro Forma - never called
   }
 
   //Mapping po string
   varfield& dbStream::operator[](const string& _Keyval)
   {
-    if ( bWasFeedByGet == true )
-      {
-        bWasFeedByGet = false ;
-        return mpShadow[ _Keyval ] ;
-      }
-
-    bWasFeedByGet = false ;
-    return mpStrVar[ _Keyval ] ;
+    return mpShadow[ _Keyval ] ;
   }
 
   //po wykonaniu store - dostep do danych z indeksem 0
@@ -95,7 +87,6 @@ namespace UR {
       cnt ++;
     }
 
-    mpStrVar.clear() ;                      //Po store - czytamy z shadow
     cbuf.PutBlock( streamName , pRawData ); //a tutaj jest wyslanie tej zawartosci
   }
 
@@ -106,8 +97,6 @@ namespace UR {
         resultValid = false ;
         return *this ;
       }
-
-    bWasFeedByGet = true ;
 
     if ( offset != m_offset )
       {

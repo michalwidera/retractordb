@@ -57,16 +57,11 @@ namespace UR {
     /** Schemat - inaczej - Lista nazw pol zawartych w strumieniu (kazde pole typu varfield) */
     list < string > schema ;
 
-    /** Dwie zmienne opisujace dane przechowywane w strumieniu , mpStrVal - jest zapisywany
-        metoda store, mpShadow jest tylko do odczytu (zapisac mozna ale sie straci)
-        mpStrVal - store/read, mpShadow - read */
-    record mpStrVar , mpShadow ;
+    /** zmienna opisujace dane przechowywane w strumieniu */
+    record mpShadow ;
 
     /** Ofset - przesuniecie wzgledem poczatku strumienia - jaki obsluguje w danej chiwli klasa metodami []*/
     int m_offset ;
-
-    /** Informacja dla metody [] czy odczyt idzie po .get(offset)[] */
-    bool bWasFeedByGet ;
 
   public:
 
