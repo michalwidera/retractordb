@@ -260,6 +260,7 @@ int mainFromWin32(int argc, char* argv[])
         ("dump,d", po::value<string>(&sDumpFile)->default_value("query.dmp"), "plik z zrzutem strumienia")
         ("tlimitqry,m" , po::value<int>(&iTimeLimitCnt)->default_value(0) , "limit zapytan, 0 - no limit" )
         ("waterfall,f" , "wyswietlanie danych")
+        ("waterfall2,2" , "drugi water")
         ("test,t" , "unit testy" )
         ;
 
@@ -404,19 +405,22 @@ int mainFromWin32(int argc, char* argv[])
 
         //do dupy
 
-        BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
-        {
-/*
+        if ( vm.count("waterfall2") )
+          {
+            BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
+            {
+              /*
           if ( coreInstance[ s ].inMulticast == query::nosend )
             {
               continue ;
             }
 */
-          std::cout << s << "\t" ;
-          std::cout << proc.getRowValue( s ) << std::endl ;
-        }
+              std::cout << s << "\t" ;
+              std::cout << proc.getRowValue( s ) << std::endl ;
+            }
 
-        std::cout << std::endl  ;
+            std::cout << std::endl  ;
+          }
         //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
 
 
