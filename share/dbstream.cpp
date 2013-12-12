@@ -71,8 +71,6 @@ namespace UR {
     return mpShadow[ _Keyval ] ;
   }
 
-  //po wykonaniu store - dostep do danych z indeksem 0
-  //w strumieniu tylko przez shadow
   void dbStream::store()
   {
     //tutaj musi byc przygotowanie zawartosci pRawData w oparciu o danych schemat
@@ -131,19 +129,18 @@ namespace UR {
     long ret = cbuf.GetBlock( streamName , offset , pRawData );
     char * p ( pRawData.get() );
 
-    if ( ret != 0 ) //Cos zostalo odczytane
-      {
-        BOOST_FOREACH( string & str , schema )
+    assert( ret != 0 );  //Cos zostalo odczytane
+
+    BOOST_FOREACH( string & str , schema )
+    {
+      if ( str == fieldName )
         {
-          if ( str == fieldName )
-            {
-              varfield fieldData ;
-              memcpy( & fieldData , p , sizeof( varfield ) );
-              return fieldData ;
-            }
-          p += sizeof( varfield ) ;
-        };
-      }
+          varfield fieldData ;
+          memcpy( & fieldData , p , sizeof( varfield ) );
+          return fieldData ;
+        }
+      p += sizeof( varfield ) ;
+    };
 
     assert( false );     //Pro Forma
     varfield fieldData ; //Pro Forma

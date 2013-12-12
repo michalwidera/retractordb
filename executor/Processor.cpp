@@ -127,10 +127,11 @@ namespace QS {
 
     string Processor::getRowValue( const string query_name )
     {
-        const string SEPARATOR = "\t" ;
-        const string INVALID   = "(NA)" ;
+        //const string SEPARATOR = "\t" ;
+        //const string INVALID   = "(NA)" ;
 
         stringstream retVal ;
+        /*
         BOOST_FOREACH( field  f , getQuery( query_name ).lSchema )
         {
             bool resultValidFlag ;
@@ -151,6 +152,12 @@ namespace QS {
                 retVal << INVALID ;
             retVal << SEPARATOR ;
         }
+        */
+        int i = 0 ;
+        BOOST_FOREACH( field  f , getQuery( query_name ).lSchema )
+        {
+          retVal << f.getFirstFieldName() << "=" << ( (*storage[ query_name ])[ i ++ ] ) << " " ;
+        };
         return retVal.str() ;
     }
 

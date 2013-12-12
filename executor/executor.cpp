@@ -175,44 +175,6 @@ ptree commandProcessor( ptree ptInval )
   return ptRetval ; //sub for a while
 }
 
-extern CBuffer<std::string> cbuf ;
-string prepareShipment( set < string > inSet )
-{
-  stringstream s ;
-
-  shared_array< char > pRawData ;
-  BOOST_FOREACH ( query q , coreInstance )
-  {
-    if ( inSet.find( q.id ) == inSet.end() )
-      {
-        continue ;
-      }
-
-    if ( q.inMulticast == query::nosend )
-      {
-        continue ;
-      }
-
-
-    //do dupy
-    pRawData.reset( new char[ cbuf.GetSizeOfFrame( q.id ) ] );
-    cbuf.GetBlock( q.id , -1 , pRawData  );
-
-    s << q.id << "," ;
-
-    for ( int i = 0 ; i < cbuf.GetSizeOfFrame( q.id ) ; i += sizeof( complex< rational<int> > ) )
-      {
-        s << ( complex< rational<int> > ) pRawData[i] << "," ;
-      }
-
-    s << "." << endl ;
-  }
-
-  s << "." ;
-
-  return s.str();
-}
-
 #ifndef WIN32
 //to sie kompiluje pod Linux
 
@@ -386,12 +348,9 @@ int mainFromWin32(int argc, char* argv[])
 
     TimeLine tl( getListFromCore( lLimitVal ) );
 
-
-
     //
     // Uruchomienie watku odpowiedzialnego za transmisje sieciowa
     //
-
 
     asio::io_service ios;
 
@@ -443,8 +402,21 @@ int mainFromWin32(int argc, char* argv[])
 
         proc.processRows( getAwaitedStreamsSet( tl , lLimitVal ) );
 
-        std::cout << prepareShipment( getAwaitedStreamsSet( tl , lLimitVal ) ) << std::endl ;
+        //do dupy
 
+        BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
+        {
+/*
+          if ( coreInstance[ s ].inMulticast == query::nosend )
+            {
+              continue ;
+            }
+*/
+          std::cout << s << "\t" ;
+          std::cout << proc.getRowValue( s ) << std::endl ;
+        }
+
+        std::cout << std::endl  ;
         //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
 
 
