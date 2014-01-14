@@ -26,7 +26,7 @@
 #include <boost/regex.hpp>
 #include <boost/foreach.hpp>
 
-//sudo apt-get install libncurses5-dev libncursesw5-dev libcdk5
+//sudo apt-get install libncurses5-dev libncursesw5-dev libcdk5 libcdk5-dev
 #include <ncurses.h>
 #include <panel.h>
 
