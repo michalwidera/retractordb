@@ -320,7 +320,7 @@ MxTerm::MxTerm(bool stopLoop){
             break ;
           case Help:
             {
-                printw( "DONE: add,del,show,connect\n" );
+                printw( "DONE: add,del,show,connect,help,quit\n" );
             }
             break ;
           case Add:
