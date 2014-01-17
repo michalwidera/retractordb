@@ -218,11 +218,11 @@ void producer(void)
 MxTerm::MxTerm(bool stopLoop){
 
   // ---- inicjacja tablicy polecen
-  commands[ Quit ] = boost::regex("quit.*") ;
+  commands[ Quit ] = boost::regex("\\s*quit.*") ;
   commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-  commands[ Cls ] = boost::regex("cls.*") ;
-  commands[ Connect ] = boost::regex("connect.*") ;
-  commands[ Help ] = boost::regex("help.*") ;
+  commands[ Cls ] = boost::regex("\\s*cls.*") ;
+  commands[ Connect ] = boost::regex("\\s*connect.*") ;
+  commands[ Help ] = boost::regex("\\s*help.*") ;
   commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
   commands[ Show ] = boost::regex("\\s*show\\s*(\\w*).*") ;
   commands[ Add ] = boost::regex("\\s*add.*");
@@ -316,6 +316,11 @@ MxTerm::MxTerm(bool stopLoop){
             {
               using boost::property_tree::ptree ;
               ptree pt = netClient( "show" ,  what[1].str() ) ;
+            }
+            break ;
+          case Help:
+            {
+                printw( "DONE: add,del,show,connect\n" );
             }
             break ;
           case Add:

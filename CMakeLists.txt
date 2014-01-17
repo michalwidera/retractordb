@@ -24,6 +24,9 @@
 # Continious Integration
 # http://streams-lab.com:8010/waterfall
 # http://streams-lab.com/doc/html/
+#
+# Enviroment
+# sudo route add -net 224.0.0.0/4 dev eth0
 
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR )
 
