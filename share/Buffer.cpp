@@ -653,7 +653,7 @@ template < typename BLOCK >
 void CRecord<BLOCK>::DefBlock( long blockID , long frameSize )
 {
   BLOCK a( frameSize ) ;
-  pair< typename CRecord::iterator , bool > p = insert( CRec_Pair( blockID, a ) ) ;
+  pair< typename CRecord::iterator , bool > p = this->insert( CRec_Pair( blockID, a ) ) ;
   assert( p.second );
   lastBlock = p.first ;
 }
@@ -663,7 +663,7 @@ void CRecord<BLOCK>::DelBlock( long blockID )
 {
   typename CRecord::iterator itBlock = find( blockID ) ;
   assert (itBlock != this->end() );
-  erase(itBlock);
+  this->erase(itBlock);
   lastBlock = this->end() ;
 }
 
@@ -719,7 +719,7 @@ void CRecord<BLOCK>::Load( istream &stream )
       long blockID ;
       stream.read( reinterpret_cast<char*>(&blockID), sizeof blockID );
       BLOCK a( 0 ) ;
-      pair< typename CRecord::iterator , bool > p = insert( CRec_Pair( blockID, a ) ) ;
+      pair< typename CRecord::iterator , bool > p = this->insert( CRec_Pair( blockID, a ) ) ;
       assert( p.second );
       lastBlock = p.first ;
       lastBlock->second.Load( stream );

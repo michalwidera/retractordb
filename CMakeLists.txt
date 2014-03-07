@@ -28,6 +28,16 @@
 # Enviroment
 # sudo route add -net 224.0.0.0/4 dev eth0
 
+#
+# Setup enviroment
+# sudo ./b2 install --prefix=/usr/lib
+# sudo mv boost /usr/include/boost
+# sudo apt-get install ncurses
+# sudo apt-get install ncurses-dev
+# sudo apt-get install libcdk5
+# sudo apt-get install libcdk5-dev
+#
+
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR )
 
 project( database )
