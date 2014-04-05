@@ -26,6 +26,8 @@
 #include <boost/regex.hpp>
 #include <boost/foreach.hpp>
 
+#include <boost/assign.hpp>
+
 //sudo apt-get install libncurses5-dev libncursesw5-dev libcdk5 libcdk5-dev
 #include <ncurses.h>
 #include <panel.h>
@@ -44,23 +46,34 @@ const short multicast_port = 30001;
 enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show , Add , Del ,  NoCmd }  ;
 
 using namespace std ;
+using namespace boost::assign;
 
 //deklaracja
 boost::property_tree::ptree netClient( string netCommand , string netArgument );
 
-std::map < cmd_e, boost::regex > commands ;
+std::map < cmd_e, boost::regex > commandsMap = map_list_of
+    ( Quit    , boost::regex("\\s*quit.*") )
+    ( Dir     , boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") )
+    ( Cls     , boost::regex("\\s*cls.*") )
+    ( Connect , boost::regex("\\s*connect.*") )
+    ( Help    , boost::regex("\\s*help.*") )
+    ( Detail  , boost::regex("\\s*detail\\s*(\\w*).*") )
+    ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
+    ( Add     , boost::regex("\\s*add.*") )
+    ( Del     , boost::regex("\\s*del.*") )
+    ;
 
 boost::cmatch what;
 
-cmd_e processCommand( string commandStr )
+cmd_e processCommand( string commandsMaptr )
 {
-  assert( commands.size() != 0 );
+  assert( commandsMap.size() != 0 );
 
   using namespace boost::adaptors;
 
-  BOOST_FOREACH( cmd_e i, commands | map_keys )
+  BOOST_FOREACH( cmd_e i, commandsMap | map_keys )
   {
-    if ( regex_match(commandStr.c_str(),what,commands[i] ) )
+    if ( regex_match(commandsMaptr.c_str(),what,commandsMap[i] ) )
       {
         return i ;
       }
@@ -216,18 +229,6 @@ void producer(void)
 
 
 MxTerm::MxTerm(bool stopLoop){
-
-  // ---- inicjacja tablicy polecen
-  commands[ Quit ] = boost::regex("\\s*quit.*") ;
-  commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-  commands[ Cls ] = boost::regex("\\s*cls.*") ;
-  commands[ Connect ] = boost::regex("\\s*connect.*") ;
-  commands[ Help ] = boost::regex("\\s*help.*") ;
-  commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
-  commands[ Show ] = boost::regex("\\s*show\\s*(\\w*).*") ;
-  commands[ Add ] = boost::regex("\\s*add.*");
-  commands[ Del ] = boost::regex("\\s*del.*");
-  // ----
 
                              //http://linux.die.net/man/3/cbreak
   initscr();                 //

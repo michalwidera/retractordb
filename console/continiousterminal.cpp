@@ -13,6 +13,8 @@
       (+48) 606 995 918
 */
 
+/* L E G A C Y   C O D E  - Przeanalizować i usunac zbedne rzeczy */
+
 #include "continiousterminal.h"
 
 #include "stdafx.h"
@@ -29,12 +31,15 @@
 
 #include <boost/property_tree/ptree.hpp>
 
+#include <boost/assign.hpp>
+
 //zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
 
 using namespace std ;
 using namespace boost ;
+using namespace boost::assign;
 
 //Domysla ilosc linii odpowiedzi na polecenie dir
 const int defaultLinieCount = 5 ;
@@ -47,23 +52,24 @@ boost::property_tree::ptree netClient( string netCommand , string netArgument );
 
 enum { EVERYTHING_OK = 0 } ;
 
-
+//taka konstrukcja jest mozliwa dzieki #include <boost/assign.hpp>
+//patrz: http://stackoverflow.com/questions/138600/initializing-a-static-stdmapint-int-in-c
+// ---- inicjacja tablicy polecen
+std::map < cmd_e, boost::regex > commands = map_list_of
+    ( Quit    , boost::regex("quit.*") )
+    ( Dir     , boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") )
+    ( Cls     , boost::regex("cls.*") )
+    ( Connect , boost::regex("connect.*") )
+    ( Help    , boost::regex("help.*") )
+    ( Detail  , boost::regex("\\s*detail\\s*(\\w*).*") )
+    ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
+    ;
 
 ContiniousTerminal::ContiniousTerminal( bool stopLoop )
   : stopLoop(stopLoop),
     pos(0) ,
     curline(2)
 {
-  // ---- inicjacja tablicy polecen
-  commands[ Quit ] = boost::regex("quit.*") ;
-  commands[ Dir ] = boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") ;
-  commands[ Cls ] = boost::regex("cls.*") ;
-  commands[ Connect ] = boost::regex("connect.*") ;
-  commands[ Help ] = boost::regex("help.*") ;
-  commands[ Detail ] = boost::regex("\\s*detail\\s*(\\w*).*") ;
-  commands[ Show ] = boost::regex("\\s*show\\s*(\\w*).*") ;
-  // ----
-
   if ( !stopLoop ) postMortemRetCode = terminal();
   else postMortemRetCode = EVERYTHING_OK ;
 }

@@ -38,7 +38,6 @@ class ContiniousTerminal {
 
   boost::cmatch what;
 
-  std::map < cmd_e, boost::regex > commands ;
 
   int pos ;       //<pozycja kursora 0..80
   char line[81];  //< edytowana linia
