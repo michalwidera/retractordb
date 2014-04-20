@@ -99,23 +99,24 @@ vector < WINDOW * > my_win ;
 //
 void consumer()
 {
-    pair<int,int> e_value ;
-    while (!done) {
-        while (spsc_queue.pop(e_value))
-          {
-            if ( my_win.size() > 0 )
-              {
-                int wnd = rand()% my_win.size() ;
-                assert( wnd < my_win.size() );
+  pair<int,int> e_value ;
+  while (!done)
+    {
+      while (spsc_queue.pop(e_value))
+        {
+          if ( my_win.size() > 0 )
+            {
+              int wnd = rand()% my_win.size() ;
+              assert( wnd < my_win.size() );
 
-                wprintw( my_win[wnd], "%d %d\n" , e_value.first , e_value.second );
-                wrefresh(my_win[wnd]);
-              }
-          }
+              wprintw( my_win[wnd], "%d %d\n" , e_value.first , e_value.second );
+              wrefresh(my_win[wnd]);
+            }
+        }
     }
 
-    while (spsc_queue.pop(e_value))
-      ;
+  while (spsc_queue.pop(e_value))
+    ;
 }
 
 
