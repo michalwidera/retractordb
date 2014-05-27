@@ -85,8 +85,7 @@ cmd_e processCommand( string commandsMaptr )
 //http://stackoverflow.com/questions/5749634/printing-inside-window-not-on-borders
 //http://invisible-island.net/ncurses/ncurses-intro.html
 
-
-boost::lockfree::spsc_queue< pair<int,int> , boost::lockfree::capacity<1024> > spsc_queue;
+boost::lockfree::spsc_queue< pair<int,string> , boost::lockfree::capacity< 1024 > > spsc_queue;
 
 int producer_count = 0 ;
 
@@ -99,7 +98,7 @@ vector < WINDOW * > my_win ;
 //
 void consumer()
 {
-  pair<int,int> e_value ;
+  pair<int,string> e_value ;
   while (!done)
     {
       while (spsc_queue.pop(e_value))
@@ -109,7 +108,7 @@ void consumer()
               int wnd = rand()% my_win.size() ;
               assert( wnd < my_win.size() );
 
-              wprintw( my_win[wnd], "%d %d\n" , e_value.first , e_value.second );
+              wprintw( my_win[wnd], "%d %s\n" , e_value.first , e_value.second.c_str() );
               wrefresh(my_win[wnd]);
             }
         }
@@ -181,8 +180,7 @@ public:
             std::cout.write(data_, bytes_recvd);
             std::cout << std::endl;
             */
-        int value = ++producer_count;
-        while (!spsc_queue.push( pair<int,int>( 1 , value ) ))
+        while (!spsc_queue.push( pair<int,string>( 1 , data_ ) ))
           ;
 
         socket_.async_receive_from(
