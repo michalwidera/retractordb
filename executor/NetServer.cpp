@@ -184,7 +184,7 @@ void  udp_server::handle_send_to(const boost::system::error_code& error)
 {
   if (!error && message_count_ < max_message_count)
     {
-      timer_.expires_from_now(boost::posix_time::seconds(1));
+      timer_.expires_from_now(boost::posix_time::milliseconds(500));
       timer_.async_wait(
             boost::bind(&udp_server::handle_timeout, this,
                         boost::asio::placeholders::error));
