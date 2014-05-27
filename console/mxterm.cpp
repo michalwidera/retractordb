@@ -40,6 +40,8 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 
 const short multicast_port = 30001;
 
@@ -47,6 +49,7 @@ enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show , Add , Del ,  No
 
 using namespace std ;
 using namespace boost::assign;
+using boost::property_tree::ptree;
 
 //deklaracja
 boost::property_tree::ptree netClient( string netCommand , string netArgument );
@@ -85,7 +88,7 @@ cmd_e processCommand( string commandsMaptr )
 //http://stackoverflow.com/questions/5749634/printing-inside-window-not-on-borders
 //http://invisible-island.net/ncurses/ncurses-intro.html
 
-boost::lockfree::spsc_queue< pair<int,string> , boost::lockfree::capacity< 1024 > > spsc_queue;
+boost::lockfree::spsc_queue< ptree , boost::lockfree::capacity< 1024 > > spsc_queue;
 
 int producer_count = 0 ;
 
@@ -98,18 +101,22 @@ vector < WINDOW * > my_win ;
 //
 void consumer()
 {
-  pair<int,string> e_value ;
+  ptree e_value ;
   while (!done)
     {
       while (spsc_queue.pop(e_value))
         {
           if ( my_win.size() > 0 )
             {
-              int wnd = rand()% my_win.size() ;
-              assert( wnd < my_win.size() );
+              //int wnd = rand()% my_win.size() ;
 
-              wprintw( my_win[wnd], "%d %s\n" , e_value.first , e_value.second.c_str() );
-              wrefresh(my_win[wnd]);
+              int stream = boost::lexical_cast<int>( e_value.get("stream" , "" )  ) ;
+
+              if ( stream < my_win.size() )
+              {
+                  wprintw( my_win[stream], "%d %s\n" , stream , e_value.get("field_a" , "" ).c_str() );
+                  wrefresh(my_win[stream]);
+              }
             }
         }
     }
@@ -180,7 +187,16 @@ public:
             std::cout.write(data_, bytes_recvd);
             std::cout << std::endl;
             */
-        while (!spsc_queue.push( pair<int,string>( 1 , data_ ) ))
+
+        ptree pt;
+
+        {
+            std::stringstream strstream;
+            strstream << data_ ;
+            read_xml( strstream , pt );
+        }
+
+        while (!spsc_queue.push( pt ))
           ;
 
         socket_.async_receive_from(

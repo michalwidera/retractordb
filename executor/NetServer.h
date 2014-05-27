@@ -72,6 +72,8 @@ public:
   void handle_send_to(const boost::system::error_code& error);
   void handle_timeout(const boost::system::error_code& error);
 
+  std::string handle_message();
+
 private:
   boost::asio::ip::udp::endpoint endpoint_;
   boost::asio::ip::udp::socket socket_;

@@ -174,12 +174,8 @@ udp_server::udp_server(boost::asio::io_service& io_service,
     timer_(io_service),
     message_count_(0)
 {
-  std::ostringstream os;
-  os << "Message " << message_count_++;
-  message_ = os.str();
-
   socket_.async_send_to(
-        boost::asio::buffer(message_), endpoint_,
+        boost::asio::buffer(handle_message()), endpoint_,
         boost::bind(&udp_server::handle_send_to, this,
                     boost::asio::placeholders::error));
 }
@@ -195,16 +191,27 @@ void  udp_server::handle_send_to(const boost::system::error_code& error)
     }
 }
 
+std::string udp_server::handle_message()
+{
+    using boost::property_tree::ptree;
+    ptree pt;
+
+    pt.put("stream", message_count_++ % 4 );
+    pt.put("field_a", "A" );
+    pt.put("field_b", "B" );
+
+    std::stringstream strstream;
+    write_xml( strstream , pt );
+
+    return strstream.str();
+}
+
 void udp_server::handle_timeout(const boost::system::error_code& error)
 {
   if (!error)
     {
-      std::ostringstream os;
-      os << "Message " << message_count_++;
-      message_ = os.str();
-
       socket_.async_send_to(
-            boost::asio::buffer(message_), endpoint_,
+            boost::asio::buffer(handle_message()), endpoint_,
             boost::bind(&udp_server::handle_send_to, this,
                         boost::asio::placeholders::error));
     }
