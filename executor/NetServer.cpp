@@ -176,7 +176,8 @@ udp_server::udp_server(boost::asio::io_service& io_service,
 {
   socket_.async_send_to(
         boost::asio::buffer(handle_message()), endpoint_,
-        boost::bind(&udp_server::handle_send_to, this,
+        boost::bind(&udp_server::handle_send_to,
+                    this,
                     boost::asio::placeholders::error));
 }
 
@@ -186,7 +187,8 @@ void  udp_server::handle_send_to(const boost::system::error_code& error)
     {
       timer_.expires_from_now(boost::posix_time::milliseconds(500));
       timer_.async_wait(
-            boost::bind(&udp_server::handle_timeout, this,
+            boost::bind(&udp_server::handle_timeout,
+                        this,
                         boost::asio::placeholders::error));
     }
 }
@@ -212,7 +214,8 @@ void udp_server::handle_timeout(const boost::system::error_code& error)
     {
       socket_.async_send_to(
             boost::asio::buffer(handle_message()), endpoint_,
-            boost::bind(&udp_server::handle_send_to, this,
+            boost::bind(&udp_server::handle_send_to,
+                        this,
                         boost::asio::placeholders::error));
     }
 }
