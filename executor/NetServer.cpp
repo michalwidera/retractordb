@@ -211,7 +211,7 @@ std::string udp_server::handle_message()
 void udp_server::handle_timeout(const boost::system::error_code& error)
 {
   if (!error)
-    {
+    { //  *** ASYNC_SEND_TO ***
       socket_.async_send_to(
             boost::asio::buffer(handle_message()), endpoint_,
             boost::bind(&udp_server::handle_send_to,
