@@ -25,6 +25,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/asio.hpp>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+
 #include "Buffer.h"
 
 //dodatkowy naglowek trzeba wczytac jak sie kompiluje pod mingw
@@ -216,6 +219,23 @@ int _getch()
 
 #endif
 
+int message_count_ = 0 ;
+
+std::string handle_message()
+{
+    using boost::property_tree::ptree;
+    ptree pt;
+
+    pt.put("stream", message_count_++ % 4 );
+    pt.put("field_a", "A" );
+    pt.put("field_b", "B" );
+
+    std::stringstream strstream;
+    write_xml( strstream , pt );
+
+    return strstream.str();
+}
+
 #ifdef _CONSOLE
 int main(int argc, char* argv[])
 #else
@@ -356,11 +376,29 @@ int mainFromWin32(int argc, char* argv[])
     asio::io_service ios;
 
     tcp_server server1(ios,&commandProcessor);
-    udp_server server2(ios,boost::asio::ip::address::from_string("239.255.0.1"));
+    //udp_server server2(ios,asio::ip::address::from_string("239.255.0.1"));
 
     thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 
-    std::cout << "Watek serwera sieciowego wystartowal" << std::endl ;
+    std::cout << "Watek serwera sieciowego TCP wystartowal" << std::endl ;
+
+    //UDP broadcast - przygotowanie i otwarcie socektu
+    const short multicast_port = 30001;
+    boost::asio::ip::address multicast_address = boost::asio::ip::address::from_string("239.255.0.1");
+
+    boost::system::error_code error;
+    asio::ip::udp::socket socket(ios);
+    socket.open(asio::ip::udp::v4(), error);
+    socket.set_option(asio::ip::udp::socket::reuse_address(true));
+    socket.set_option(asio::socket_base::broadcast(true));
+    socket.set_option(asio::ip::multicast::join_group(multicast_address));
+    socket.set_option(asio::ip::multicast::hops(1));
+    socket.bind(asio::ip::udp::endpoint( multicast_address, multicast_port ));
+
+    //asio::ip::udp::endpoint senderEndpoint(asio::ip::address_v4::broadcast(), multicast_port);
+    asio::ip::udp::endpoint senderEndpoint(multicast_address, multicast_port);
+
+    std::cout << "Socket UDP otwarty" << std::endl ;
 
     //
     // Glowna petla przetwarzania danych
@@ -425,6 +463,10 @@ int mainFromWin32(int argc, char* argv[])
 
 
         usleep( ms ) ;
+
+        //UDP broadcast - glowna petla
+        socket.send_to( boost::asio::buffer(handle_message()) , senderEndpoint);
+        cout << handle_message() << endl ;
       }
 
     //
@@ -432,6 +474,9 @@ int mainFromWin32(int argc, char* argv[])
     //
 
     ios.stop();
+
+    //UDP broadcast - zamkniecie socektu
+    socket.close(error);
 
     //
     // Koniec glownej petli przetwarzania

@@ -160,10 +160,13 @@ void tcp_server::handle_accept(session* new_session,
     start_accept();
 }
 
+
 //
 //  Server UDP - Czesc implementacyjna.
 //  Klasa odpowiedzialna na transmisje strumieni danych
 //
+
+/*
 const short multicast_port = 30001;
 const int max_message_count = 100;
 
@@ -174,6 +177,7 @@ udp_server::udp_server(boost::asio::io_service& io_service,
     timer_(io_service),
     message_count_(0)
 {
+//    *** ASYNC_SEND_TO ***
   socket_.async_send_to(
         boost::asio::buffer(handle_message()), endpoint_,
         boost::bind(&udp_server::handle_send_to,
@@ -219,3 +223,5 @@ void udp_server::handle_timeout(const boost::system::error_code& error)
                         boost::asio::placeholders::error));
     }
 }
+
+*/

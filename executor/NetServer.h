@@ -62,7 +62,7 @@ public:
  *  Klasa odpowiedzialna za transmisje strumienia danych
  *  Server UDP multicast
  */
-
+/*
 class udp_server
 {
 public:
@@ -81,5 +81,5 @@ private:
   int message_count_;
   std::string message_;
 };
-
+*/
 #endif // NETSERVER_H
