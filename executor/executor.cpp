@@ -226,7 +226,7 @@ std::string handle_message()
     using boost::property_tree::ptree;
     ptree pt;
 
-    pt.put("stream", message_count_++ % 4 );
+    pt.put("stream", message_count_ );
     pt.put("field_a", "A" );
     pt.put("field_b", "B" );
 
@@ -465,6 +465,8 @@ int mainFromWin32(int argc, char* argv[])
         usleep( ms ) ;
 
         //UDP broadcast - glowna petla
+        message_count_++ ;
+        message_count_ %= 4;
         socket.send_to( boost::asio::buffer(handle_message()) , senderEndpoint);
         cout << handle_message() << endl ;
       }
