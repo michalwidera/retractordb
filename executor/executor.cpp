@@ -467,8 +467,12 @@ int mainFromWin32(int argc, char* argv[])
         //UDP broadcast - glowna petla
         message_count_++ ;
         message_count_ %= 4;
-        socket.send_to( boost::asio::buffer(handle_message()) , senderEndpoint);
-        cout << handle_message() << endl ;
+
+        BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
+        {
+            socket.send_to( boost::asio::buffer( proc.getRowValue( s ) ) , senderEndpoint);
+            cout << proc.getRowValue( s ) << endl ;
+        }
       }
 
     //

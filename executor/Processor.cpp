@@ -16,6 +16,9 @@
 #include "Processor.h"
 #include "Buffer.h"
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
+
 using namespace QS ;
 
 extern "C" qTree coreInstance ;
@@ -127,8 +130,8 @@ namespace QS {
 
     string Processor::getRowValue( const string query_name )
     {
-        //const string SEPARATOR = "\t" ;
-        //const string INVALID   = "(NA)" ;
+        using boost::property_tree::ptree;
+        ptree pt;
 
         stringstream retVal ;
         /*
@@ -153,12 +156,20 @@ namespace QS {
             retVal << SEPARATOR ;
         }
         */
+
+        pt.put("stream", query_name);
+
         int i = 0 ;
         BOOST_FOREACH( field  f , getQuery( query_name ).lSchema )
         {
-          retVal << f.getFirstFieldName() << "=" << ( (*storage[ query_name ])[ i ++ ] ) << " " ;
+            pt.put( f.getFirstFieldName() , ( (*storage[ query_name ])[ i ++ ] ) );
+            //retVal << f.getFirstFieldName() << "=" << ( (*storage[ query_name ])[ i ++ ] ) << " " ;
         };
-        return retVal.str() ;
+
+        std::stringstream strstream;
+        write_xml( strstream , pt );
+
+        return strstream.str();
     }
 
 
