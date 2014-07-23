@@ -45,7 +45,7 @@
 
 const short multicast_port = 30001;
 
-enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show , Add , Del ,  NoCmd }  ;
+enum cmd_e { Quit , Cls , Connect , Help , Show , Add , Del ,  NoCmd }  ;
 
 using namespace std ;
 using namespace boost::assign;
@@ -56,14 +56,14 @@ boost::property_tree::ptree netClient( string netCommand , string netArgument );
 
 std::map < cmd_e, boost::regex > commandsMap = map_list_of
     ( Quit    , boost::regex("\\s*quit.*") )
-    ( Dir     , boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") )
+//  ( Dir     , boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") )
     ( Cls     , boost::regex("\\s*cls.*") )
     ( Connect , boost::regex("\\s*connect.*") )
     ( Help    , boost::regex("\\s*help.*") )
-    ( Detail  , boost::regex("\\s*detail\\s*(\\w*).*") )
+//  ( Detail  , boost::regex("\\s*detail\\s*(\\w*).*") )
     ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
-    ( Add     , boost::regex("\\s*add.*") )
-    ( Del     , boost::regex("\\s*del.*") )
+    ( Add     , boost::regex("\\s*add\\s*(\\w*).*") )
+    ( Del     , boost::regex("\\s*del\\s*(\\w*).*") )
     ;
 
 boost::cmatch what;
@@ -94,7 +94,7 @@ int producer_count = 0 ;
 
 boost::atomic<bool> done (false);
 
-vector < WINDOW * > my_win ;
+map < string , WINDOW * > my_win ;
 
 //
 // Proces konsumenta asynchronicznie pobiera dane z kolejki i umieszcza na ekranie
@@ -106,18 +106,17 @@ void consumer()
     {
       while (spsc_queue.pop(e_value))
         {
-          if ( my_win.size() > 0 )
-            {
-              //int wnd = rand()% my_win.size() ;
+              string stream = e_value.get("stream" , "" )  ;
 
-              int stream = boost::lexical_cast<int>( e_value.get("stream" , "" )  ) ;
-
-              if ( stream < my_win.size() )
+              if ( my_win.find( stream ) != my_win.end() )
               {
-                  wprintw( my_win[stream], "%d %s\n" , stream , e_value.get("field_a" , "" ).c_str() );
+                  //wprintw( my_win[stream], "%d %s\n" , stream , e_value.get("field_a" , "" ).c_str() );
+
+                  //Todo - po pobrac strukture strumienia i wyswietlic wartosci w okienku zamiast tego test
+
+                  wprintw( my_win[stream], "%s\n" , "test" );
                   wrefresh(my_win[stream]);
               }
-            }
         }
     }
 
@@ -193,6 +192,7 @@ public:
         {
             std::stringstream strstream;
             strstream << data_ ;
+            memset( data_ , 0 , max_length );
             read_xml( strstream , pt );
         }
 
@@ -275,6 +275,8 @@ MxTerm::MxTerm(bool stopLoop){
   //
   // Rozklad okien ze strumieniami na ekranie
   //
+  int posCnt = 0 ;
+
   struct pos {
     int c,w,h,x,y ;
     pos(){};
@@ -336,23 +338,33 @@ MxTerm::MxTerm(bool stopLoop){
             break ;
           case Help:
             {
-                printw( "DONE: add,del,show,connect,help,quit\n" );
+              printw( "DONE: add [str],del [str],show,connect,help,quit\n" );
             }
             break ;
           case Add:
             {
-              int i = my_win.size();
-              my_win.push_back( newwin( m_pos[i].h, m_pos[i].w , m_pos[i].x , m_pos[i].y ) );
-              wbkgd( my_win[i], COLOR_PAIR( m_pos[i].c ) );
-              scrollok( my_win[i] , TRUE );
-              wrefresh( my_win[i] );
+              string stream = what[1].str();
+              my_win[ stream ] = newwin( m_pos[posCnt].h, m_pos[posCnt].w , m_pos[posCnt].x , m_pos[posCnt].y );
+              wbkgd( my_win[ stream ], COLOR_PAIR( m_pos[posCnt].c ) );
+              scrollok( my_win[ stream ] , TRUE );
+              wrefresh( my_win[ stream ] );
+              posCnt ++ ;
             }
             break ;
           case Del:
             {
-              my_win.pop_back();
+              using namespace boost::adaptors;
+
+              string stream = what[1].str();
+
+              if ( my_win.find( stream ) != my_win.end() ) ;
+              {
+                my_win.erase( my_win.find( stream ) );
+              }
+
               refresh();
-              BOOST_FOREACH( WINDOW * w , my_win ) wrefresh( w );
+              BOOST_FOREACH( WINDOW * w , my_win | map_values )
+                  wrefresh( w );
             }
             break ;
           }
@@ -361,6 +373,7 @@ MxTerm::MxTerm(bool stopLoop){
   }
   catch(std::exception& e)
   {
+    cerr << "Wyjatek załapany" << "\n" ;
     cerr << e.what() << "\n";
   }
 

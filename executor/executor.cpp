@@ -222,23 +222,6 @@ int _getch()
 
 #endif
 
-int message_count_ = 0 ;
-
-std::string handle_message()
-{
-    using boost::property_tree::ptree;
-    ptree pt;
-
-    pt.put("stream", message_count_ );
-    pt.put("field_a", "A" );
-    pt.put("field_b", "B" );
-
-    std::stringstream strstream;
-    write_xml( strstream , pt );
-
-    return strstream.str();
-}
-
 #ifdef _CONSOLE
 int main(int argc, char* argv[])
 #else
@@ -468,9 +451,6 @@ int mainFromWin32(int argc, char* argv[])
         usleep( ms ) ;
 
         //UDP broadcast - glowna petla
-        message_count_++ ;
-        message_count_ %= 4;
-
         BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
         {
             socket.send_to( boost::asio::buffer( proc.getRowValue( s ) ) , senderEndpoint);
