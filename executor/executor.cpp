@@ -35,6 +35,9 @@
 //#include "windows.h"
 //#endif
 
+//to makro wyswitela line ktora sie wykonuje
+#define SHOWSTEP( _A_ ) { _A_ ; std::cout << #_A_ << std::endl ; }
+
 using namespace CRationalStreamMath ;
 using namespace QS ;
 
