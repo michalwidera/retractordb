@@ -888,8 +888,10 @@ int main(int argc, char* argv[])
         return retcode;
       }
 
+
     string sQueryFile = vm["queryfile"].as< string >() ;    //plik z zapytaniamia
     string sOutFile   = vm["outfile"].as< string >() ;      //default query.qry
+
 
     //defaults
     string sLinkFile  = "query.lkn" ;                       //ten plik sluzy do laczenia parsera z kompilatorem
@@ -906,6 +908,11 @@ int main(int argc, char* argv[])
           sSubsetFile = filenameNoExt + ".sub" ;
         }
     }
+
+    cout << "In:        \t" << sQueryFile << endl ;
+    cout << "Out:       \t" << sOutFile << endl ;
+    cout << "Link:      \t" << sLinkFile << endl ;
+    cout << "Subset:    \t" << sSubsetFile << endl ;
 
     //sprawdzenie czy query file zawiera w pierwszej linii subset[beg,end]
     //ten sub jest po to zeby dalo sie testowac rozne przypadki
@@ -942,17 +949,18 @@ int main(int argc, char* argv[])
 
     if ( vm.count("parser2") )
       {
-        cout << "Parser v2 ...\t" << parser_v2( sQueryFile , sLinkFile ) << endl ;
+        cout << "Parser v2 ...\t" << endl ;
+        cout << parser_v2( sQueryFile , sLinkFile ) << endl ;
       }
     else
       {
-        cout << "Parser v1 ...\t" << parser( sQueryFile , sLinkFile ) << endl ;
+        cout << "Parser v1 ...\t" << endl ;
+        cout << parser( sQueryFile , sLinkFile ) << endl ;
       }
 
     //
     // Main Algorithm body
     //
-
     std::ifstream ifs( sLinkFile.c_str() , std::ios::binary);
     boost::archive::text_iarchive ia(ifs);
     ia >> configInstance ;

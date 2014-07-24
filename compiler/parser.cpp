@@ -795,13 +795,16 @@ string parser( string sPlikDanych, string sPlikWynikowy )
         for ( int i = 0 ; i < 3 ; i++ )
         {
             do_reset();
-            cout << "testing:" << str[i] << endl ;
 
             if ( !parse( str[i].c_str() , g , space_p ).full )
-            {
-                cerr << "compiler:" << str[i].c_str() << endl ;
+              {
+                cerr << "error:\t" << str[i].c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
-            }
+              }
+            else
+              {
+                cout << "ok:\t" << str[i].c_str() << endl ;
+              }
         }
     }
     else
@@ -819,10 +822,14 @@ string parser( string sPlikDanych, string sPlikWynikowy )
             if ( str == "stop" ) break ;
             do_reset();
             if ( ! parse( str.c_str() , g , space_p ).full )
-            {
-                cerr << "compiler:" << str.c_str() << endl ;
+              {
+                cerr << "error:\t" << str.c_str() << endl ;
                 throw std::invalid_argument("Syntax Error.");
-            }
+              }
+            else
+              {
+                cout << "ok:\t" << str.c_str() << endl ;
+              }
         }
     }
 
