@@ -133,37 +133,58 @@ namespace QS {
         using boost::property_tree::ptree;
         ptree pt;
 
-        stringstream retVal ;
-        /*
+        pt.put("stream", query_name);
+        pt.put("count", boost::lexical_cast<std::string>( getQuery( query_name ).lSchema.size() ) );
+
+        int i = 0 ;
+
+        std::stringstream retVal ;
+
         BOOST_FOREACH( field  f , getQuery( query_name ).lSchema )
         {
+/*
             bool resultValidFlag ;
             complex< R > value( getCRValue( f , getQuery( query_name ) , resultValidFlag ) ) ;
             if ( resultValidFlag )
-            {
+              {
                 if ( value.imag() == 0 )
-                {
+                  {
                     if ( value.real().denominator() == 1 )
+                      {
                         retVal << value.real().numerator() ;
+                      }
                     else
+                      {
                         retVal << value.real() ;
-                }
+                      }
+                  }
                 else
+                  {
                     retVal << value ;
-            }
+                  }
+              }
             else
-                retVal << INVALID ;
-            retVal << SEPARATOR ;
+              {
+                retVal << "NAN" ;
+              }
+
+            retVal << " ";
+
+            pt.put( boost::lexical_cast<std::string>(i), retVal.str() );
+
+/*/
+            pt.put( boost::lexical_cast<std::string>(i) , ( (*storage[ query_name ])[i] ) );
+//*/
+            i++;
         }
-        */
 
-        pt.put("stream", query_name);
 
-        int i = 0 ;
+
         BOOST_FOREACH( field  f , getQuery( query_name ).lSchema )
         {
-            pt.put( f.getFirstFieldName() , ( (*storage[ query_name ])[ i ++ ] ) );
-            //retVal << f.getFirstFieldName() << "=" << ( (*storage[ query_name ])[ i ++ ] ) << " " ;
+            //pt.put( f.getFirstFieldName() , ( (*storage[ query_name ])[ i ++ ] ) );
+
+
         };
 
         std::stringstream strstream;

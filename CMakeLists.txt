@@ -179,12 +179,21 @@ set(SOURCES_STAGE
   stage/test_bpt.cpp
   stage/server.cpp
 )
-set(SOURCES_CONSOLE
-  console/console.cpp
-  console/mxterm.cpp
-  console/mxterm.h
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    set(SOURCES_CONSOLE
+      console/console.cpp
+      console/mxterm.cpp
+      console/mxterm.h
+      share/stdafx.cpp
+    )
+endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+set(SOURCES_TERMINAL
+  terminal/terminal.cpp
   share/stdafx.cpp
 )
+
 set(SOURCES_STAGE_1
   stage/stage_1.cpp
   share/stdafx.cpp
@@ -217,12 +226,14 @@ endif(WIN32)
 add_executable( xexecutor ${SOURCES_EXECUTOR} )
 add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
-add_executable( xconsole ${SOURCES_CONSOLE} )
 add_executable( xstage ${SOURCES_STAGE} )
 add_executable( xstage_1 ${SOURCES_STAGE_1} )
 add_executable( xstage_2 ${SOURCES_STAGE_2} )
+add_executable( xterminal ${SOURCES_TERMINAL} )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+    add_executable( xconsole ${SOURCES_CONSOLE} )
 
     IF (Boost_FOUND)
        INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
@@ -238,6 +249,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries( xstage ${Boost_LIBRARIES}   ${CMAKE_THREAD_LIBS_INIT} -lrt )
     target_link_libraries( xstage_1 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
     target_link_libraries( xstage_2 ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
+    target_link_libraries( xterminal ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
 
     add_custom_target( check ALL
         COMMAND chmod +x regtest/gocheck.sh
@@ -248,7 +260,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     )
     
     add_custom_target( gohome ALL
-        DEPENDS xexecutor xcompiler xdumper xconsole xstage xstage_1 xstage_2
+        DEPENDS xexecutor xcompiler xdumper xconsole xstage xstage_1 xstage_2 xterminal
         COMMAND mkdir -p ~/xdir
         COMMAND cp x* ~/xdir/
         COMMAND chmod +x ~/xdir/x*

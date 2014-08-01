@@ -107,14 +107,19 @@ void consumer()
       while (spsc_queue.pop(e_value))
         {
               string stream = e_value.get("stream" , "" )  ;
+              int count = boost::lexical_cast<int> ( e_value.get("count" , "" ) );
 
               if ( my_win.find( stream ) != my_win.end() )
               {
                   //wprintw( my_win[stream], "%d %s\n" , stream , e_value.get("field_a" , "" ).c_str() );
 
                   //Todo - po pobrac strukture strumienia i wyswietlic wartosci w okienku zamiast tego test
+                  for ( int i = 0 ; i < count ; i ++ )
+                    {
+                      wprintw( my_win[stream], "%s " , e_value.get( boost::lexical_cast<string>(i) , "" ).c_str() );
+                    }
 
-                  wprintw( my_win[stream], "%s\n" , "test" );
+                  wprintw( my_win[stream], "\n");
                   wrefresh(my_win[stream]);
               }
         }

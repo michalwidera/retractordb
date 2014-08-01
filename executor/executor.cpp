@@ -448,14 +448,15 @@ int mainFromWin32(int argc, char* argv[])
         //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
 
 
-        usleep( ms ) ;
-
         //UDP broadcast - glowna petla
         BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
         {
             socket.send_to( boost::asio::buffer( proc.getRowValue( s ) ) , senderEndpoint);
             cout << proc.getRowValue( s ) << endl ;
         }
+
+        // odczekanie tylu milisekund ile wynika z obliczeń
+        usleep( ms ) ;
       }
 
     //
