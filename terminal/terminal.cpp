@@ -49,6 +49,7 @@
 
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptor/map.hpp>
+#include <boost/range/algorithm/find.hpp>
 
 //dla potrzeb transmisji danych
 #include <boost/asio.hpp>
@@ -61,9 +62,15 @@
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/atomic.hpp>
 
+//zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
+#include <boost/range/algorithm.hpp>
+#include <boost/range/adaptor/map.hpp>
+
+#include <boost/assign.hpp>
+
 using namespace std ;
 using namespace boost ;
-
+using namespace boost::assign;
 
 const short multicast_port = 30001;
 
@@ -77,6 +84,7 @@ int producer_count = 0 ;
 boost::atomic<bool> done (false);
 
 std::map <string,ptree> streamTable ;
+std::list <string> streamList ;
 
 //
 // Zestawienie polaczenia
@@ -87,6 +95,39 @@ namespace dbNet {
   boost::asio::io_service io_service;
   tcp::resolver resolver(io_service);
   tcp::socket socket(io_service);
+}
+
+
+enum cmd_e { Quit , Cls , Connect , Help , Show , Add , Del ,  NoCmd }  ;
+
+std::map < cmd_e, boost::regex > commandsMap = map_list_of
+    ( Quit    , boost::regex("\\s*quit.*") )
+//  ( Dir     , boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") )
+    ( Cls     , boost::regex("\\s*cls.*") )
+    ( Connect , boost::regex("\\s*connect.*") )
+    ( Help    , boost::regex("\\s*help.*") )
+//  ( Detail  , boost::regex("\\s*detail\\s*(\\w*).*") )
+    ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
+    ( Add     , boost::regex("\\s*add\\s*(\\w*).*") )
+    ( Del     , boost::regex("\\s*del\\s*(\\w*).*") )
+    ;
+
+boost::cmatch what;
+cmd_e processCommand( string commandsMaptr )
+{
+  assert( commandsMap.size() != 0 );
+
+  using namespace boost::adaptors;
+
+  BOOST_FOREACH( cmd_e i, commandsMap | map_keys )
+  {
+    if ( regex_match(commandsMaptr.c_str(),what,commandsMap[i] ) )
+      {
+        return i ;
+      }
+  }
+
+  return NoCmd ;
 }
 
 //
@@ -100,12 +141,21 @@ void consumer()
       while (spsc_queue.pop(e_value))
         {
               string stream = e_value.get("stream" , "" )  ;
-              int count = boost::lexical_cast<int> ( e_value.get("count" , "" ) );
 
-              printf("%s\n\r",stream.c_str());
-              for ( int i = 0 ; i < count ; i ++ )
-                printf( "%s\n\r" , e_value.get( boost::lexical_cast<string>(i) , "" ).c_str() );-
-              printf("\n\r");
+              using namespace boost::adaptors;
+
+              BOOST_FOREACH( string w , streamTable | map_keys )
+                  if ( w == stream )
+              {
+                  int count = boost::lexical_cast<int> ( e_value.get("count" , "" ) );
+
+                  //printf("%s\n\r|",stream.c_str());
+                  printf("|");
+                  for ( int i = 0 ; i < count ; i ++ )
+                    printf( "%s|" , e_value.get( boost::lexical_cast<string>(i) , "" ).c_str() );
+
+                  printf("\n\r");
+              }
         }
     }
 
@@ -370,8 +420,12 @@ int main(int argc, char* argv[])
     int key;
     int i=0;
     setbuf(stdout, NULL);
-    while ( strcmp( polecenie , "quit") )
-      {
+
+    cmd_e cmdId = NoCmd ;
+
+    do
+      { 
+
         if ( kbhit() )
           {
             polecenie[ cnt ++ ] = getch();
@@ -379,15 +433,15 @@ int main(int argc, char* argv[])
 
             if ( polecenie[ cnt - 1 ] == 13 )
               {
+                cmdId = processCommand( polecenie );
                 cnt = 0 ;
                 memset( polecenie , 0 , 1024 );
               }
           }
 
-        if ( !strcmp( polecenie , "connect") )
+        if ( cmdId == Connect )
           {
-            cnt = 0 ;
-            memset( polecenie , 0 , 1024 );
+            cmdId = NoCmd ;
 
             ptree pt = netClient( "get" , "" ) ;
 
@@ -396,11 +450,20 @@ int main(int argc, char* argv[])
             {
               string stream = v.second.get<std::string>("") ;
               printf( "%s\n" , stream.c_str() );
+              streamList.push_back( stream );
               //streamTable[ stream ] = netClient( "show" , stream ) ;
             }
           }
 
-
+        if ( cmdId == Add )
+          {
+            list<string>::iterator i = boost::find(streamList, what[1].str());
+            if (i != boost::end(streamList))
+              {
+                printf(":%s:\n",(*i).c_str());
+                streamTable[ (*i) ] =  netClient( "show" , (*i) )  ;
+              }
+          }
 
         /*
         else
@@ -409,6 +472,7 @@ int main(int argc, char* argv[])
           }
           */
       }
+    while ( cmdId != Quit );
 
     done = true;
     producer_thread.join();
