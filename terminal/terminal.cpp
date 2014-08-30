@@ -102,11 +102,9 @@ enum cmd_e { Quit , Cls , Connect , Help , Show , Add , Del ,  NoCmd }  ;
 
 std::map < cmd_e, boost::regex > commandsMap = map_list_of
     ( Quit    , boost::regex("\\s*quit.*") )
-//  ( Dir     , boost::regex("\\s*dir\\s*(\\w*)\\s*(\\d*).*") )
     ( Cls     , boost::regex("\\s*cls.*") )
     ( Connect , boost::regex("\\s*connect.*") )
     ( Help    , boost::regex("\\s*help.*") )
-//  ( Detail  , boost::regex("\\s*detail\\s*(\\w*).*") )
     ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
     ( Add     , boost::regex("\\s*add\\s*(\\w*).*") )
     ( Del     , boost::regex("\\s*del\\s*(\\w*).*") )

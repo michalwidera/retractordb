@@ -44,7 +44,7 @@ project( database )
 
 SET( Boost_USE_STATIC_LIBS ON )
 
-FIND_PACKAGE( Boost 1.55.0 COMPONENTS
+FIND_PACKAGE( Boost COMPONENTS
     thread
     filesystem
     serialization
