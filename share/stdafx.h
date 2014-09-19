@@ -67,6 +67,11 @@
 //#include <boost/locale.hpp>
 //#include <boost/lexical_cast.hpp>
 
+//
+//to makro wyswitela line ktora sie wykonuje
+//
+#define SHOWSTEP( _A_ ) { _A_ ; std::cout << #_A_ << std::endl ; }
+
 typedef boost::rational<int> R ;
 
 #ifdef _MSC_VER

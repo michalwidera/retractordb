@@ -35,9 +35,6 @@
 //#include "windows.h"
 //#endif
 
-//to makro wyswitela line ktora sie wykonuje
-#define SHOWSTEP( _A_ ) { _A_ ; std::cout << #_A_ << std::endl ; }
-
 using namespace CRationalStreamMath ;
 using namespace QS ;
 
@@ -182,7 +179,10 @@ ptree commandProcessor( ptree ptInval )
 }
 
 #ifndef WIN32
+
+//
 //to sie kompiluje pod Linux
+//
 
 #include <termios.h>
 #include <unistd.h>
@@ -307,9 +307,10 @@ int mainFromWin32(int argc, char* argv[])
     ia >> coreInstance ;
 
     Processor proc;
-    //dbStreamHead head ;
 
+    //
     //opcja query powstala do testowania pojedynczych zapytan
+    //
     if (vm.count("query"))
       {
         cout << "Query :" << sQuery << "\n";
@@ -362,11 +363,11 @@ int mainFromWin32(int argc, char* argv[])
     asio::io_service ios;
 
     tcp_server server1(ios,&commandProcessor);
-    //udp_server server2(ios,asio::ip::address::from_string("239.255.0.1"));
 
     thread bt(boost::bind(&asio::io_service::run, &ios));  //puszczenie serwisu w watku
 
-    std::cout << "Watek serwera sieciowego TCP wystartowal" << std::endl ;
+    std::cout << "Watek serwera sieciowego TCP/UDP wystartowal" << std::endl ;
+
 
     //UDP broadcast - przygotowanie i otwarcie socektu
     const short multicast_port = 30001;
@@ -385,6 +386,7 @@ int mainFromWin32(int argc, char* argv[])
     asio::ip::udp::endpoint senderEndpoint(multicast_address, multicast_port);
 
     std::cout << "Socket UDP otwarty" << std::endl ;
+
 
     //
     // Glowna petla przetwarzania danych
@@ -434,11 +436,11 @@ int mainFromWin32(int argc, char* argv[])
             BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
             {
               /*
-          if ( coreInstance[ s ].inMulticast == query::nosend )
-            {
-              continue ;
-            }
-*/
+              if ( coreInstance[ s ].inMulticast == query::nosend )
+                {
+                  continue ;
+                }
+              */
               std::cout << s << "\t" ;
               std::cout << proc.getRowValue( s ) << std::endl ;
             }
@@ -447,8 +449,9 @@ int mainFromWin32(int argc, char* argv[])
           }
         //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
 
-
+        //
         //UDP broadcast - glowna petla
+        //
         BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
         {
             socket.send_to( boost::asio::buffer( proc.getRowValue( s ) ) , senderEndpoint);
@@ -488,6 +491,5 @@ int mainFromWin32(int argc, char* argv[])
     return 1;
   }
 
-  //end
   return 0;
 }
