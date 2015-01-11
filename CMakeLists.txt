@@ -55,6 +55,13 @@ FIND_PACKAGE( Boost COMPONENTS
     system
     REQUIRED )
 
+find_package(GTest)
+if (GTEST_FOUND)
+    enable_testing()
+    add_custom_target(test ${CMAKE_CTEST_COMMAND} -V)
+#    add_subdirectory(test)
+endif()
+
 #SET( Boost_INCLUDE_DIRS D:\\boost\\include\\boost-1_50 )
 
 MESSAGE(STATUS "Boost information:")
