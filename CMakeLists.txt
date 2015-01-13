@@ -21,6 +21,11 @@
 # BOOST_ROOT to enviroment 
 #
 
+#
+# Google testing
+# http://www.thebigblob.com/getting-started-with-google-test-on-ubuntu/
+#
+
 # Continious Integration
 # http://streams-lab.com:8010/waterfall
 # http://streams-lab.com/doc/html/
@@ -37,6 +42,11 @@
 # sudo apt-get install libcdk5
 # sudo apt-get install libcdk5-dev
 #
+# sudo apt-get install libgtest-dev
+# cd /usr/src/gtest
+# sudo cmake CMakeLists.txt
+# sudo make
+# sudo cp *.a /usr/lib
 
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR )
 
@@ -55,12 +65,10 @@ FIND_PACKAGE( Boost COMPONENTS
     system
     REQUIRED )
 
-find_package(GTest)
-if (GTEST_FOUND)
+find_package(GTest REQUIRED)
     enable_testing()
     add_custom_target(test ${CMAKE_CTEST_COMMAND} -V)
 #    add_subdirectory(test)
-endif()
 
 #SET( Boost_INCLUDE_DIRS D:\\boost\\include\\boost-1_50 )
 
