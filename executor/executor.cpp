@@ -397,10 +397,11 @@ int mainFromWin32(int argc, char* argv[])
     //
     // jesli ta wartosc jest 0 - to znaczy ze czekamy na klawisz, inaczej watchdog
     //
-    std::cout << ( iTimeLimitCnt == 0 ) ?
+    std::cout <<
+                 ( ( iTimeLimitCnt == 0 ) ?
                    "Nacisnij dowolny klawisz aby przerwac."  :
-                   "Po wyczerpaniu limitu zapytan (-m) oczekiwany jest koniec petli." ;
-    std::cout << std::endl ;
+                   "Po wyczerpaniu limitu zapytan (-m) oczekiwany jest koniec petli." )
+              << std::endl ;
 
     //head.prepareSharedArea();
     R prev_interval(0);
