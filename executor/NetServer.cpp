@@ -76,6 +76,7 @@ void session::handle_read(const boost::system::error_code& error,
 
         {
             std::stringstream strstream;
+            data_[ bytes_transferred ] = 0 ;
             strstream << data_ ;
             read_xml( strstream , pt );
         }
