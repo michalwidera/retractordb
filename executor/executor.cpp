@@ -254,7 +254,7 @@ int mainFromWin32(int argc, char* argv[])
     string sLimit ;
     string sQuery ;
     string sDumpFile ;
-    int iTimeLimitCnt ;
+    int iTimeLimitCnt ; //zmienna związana z parametrem tlimitqry (-m) jak się go poda wątek wyjdzie po zadanym czasie (do testowania)
 
     po::options_description desc("Obslugiwane opcje programu");
     desc.add_options()
@@ -316,7 +316,9 @@ int mainFromWin32(int argc, char* argv[])
         cout << "Query :" << sQuery << "\n";
 
         if ( iTimeLimitCnt == 0 )
-          std::cout << "Nacisnij dowolny klawisz aby przerwac." << std::endl ;
+          {
+            std::cout << "Nacisnij dowolny klawisz aby przerwac." << std::endl ;
+          }
 
         R prev_interval(0);
         R timeSlot( coreInstance.getDelta( sQuery ) );
@@ -395,10 +397,10 @@ int mainFromWin32(int argc, char* argv[])
     //
     // jesli ta wartosc jest 0 - to znaczy ze czekamy na klawisz, inaczej watchdog
     //
-    if ( iTimeLimitCnt == 0 )
-      std::cout << "Nacisnij dowolny klawisz aby przerwac." << std::endl ;
-    else
-      std::cout << "Po wyczerpaniu limitu zapytan (-m) oczekiwany jest koniec petli." << std::endl ;
+    std::cout << ( iTimeLimitCnt == 0 ) ?
+                   "Nacisnij dowolny klawisz aby przerwac."  :
+                   "Po wyczerpaniu limitu zapytan (-m) oczekiwany jest koniec petli." ;
+    std::cout << std::endl ;
 
     //head.prepareSharedArea();
     R prev_interval(0);
@@ -407,16 +409,25 @@ int mainFromWin32(int argc, char* argv[])
         if ( iTimeLimitCnt != 0 )
           {
             if ( iTimeLimitCnt != 1 )
-              iTimeLimitCnt -- ;
+              {
+                iTimeLimitCnt -- ;
+              }
             else
-              break ;
-          }
+              {
+                break ;
+              }
+        }
 
         R nextTimeSlot( tl.getNextTimeSlot() );
         R interval( nextTimeSlot * 1000 );
         int ms ( rational_cast<int> ( interval - prev_interval ) ) ; // miliseconds
         prev_interval = interval ;
 
+        //
+        //Jeśli się poda dodatkowy parametr -w pojawią się numery zapytań na ekranie
+        //jesli dodatkowo -w -s str2 (gdzie -s oznacza display) pojawi się jedno konkretne zapytanie
+        //znaczy informacja że czeka w kolejce
+        //
         if ( vm.count("waterfall") )
           {
             std::cout << ms << "\t" ;
@@ -429,61 +440,58 @@ int mainFromWin32(int argc, char* argv[])
 
         proc.processRows( getAwaitedStreamsSet( tl , lLimitVal ) );
 
-        //do dupy
-
-        if ( vm.count("waterfall2") )
-          {
-            BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
-            {
-              /*
-              if ( coreInstance[ s ].inMulticast == query::nosend )
-                {
-                  continue ;
-                }
-              */
-              std::cout << s << "\t" ;
-              std::cout << proc.getRowValue( s ) << std::endl ;
-            }
-
-            std::cout << std::endl  ;
-          }
-        //head.storeInCommonArea( getAwaitedStreamsSet( tl , lLimitVal ) );
-
         //
         //UDP broadcast - glowna petla
         //
         BOOST_FOREACH( string s , getAwaitedStreamsSet( tl , lLimitVal ) )
         {
-            socket.send_to( boost::asio::buffer( proc.getRowValue( s ) ) , senderEndpoint);
-            cout << proc.getRowValue( s ) << endl ;
+          socket.send_to( boost::asio::buffer( proc.getRowValue( s ) ) , senderEndpoint);
+          //
+          // Jeśli się poda dodatkowy parametr -2 pojawią się zapytania na ekranie
+          //
+          if ( vm.count("waterfall2") )
+            {
+              std::cout << s << "\t" ;
+              std::cout << proc.getRowValue( s ) ;
+              std::cout << endl ;
+            }
         }
 
+        //
         // odczekanie tylu milisekund ile wynika z obliczeń
+        //
         usleep( ms ) ;
+
+      //
+      //Koniec pętli while( ! _kbhit() )
+      //
       }
 
     //
     // Zatrzymanie watku przesylania danych
     //
-
     ios.stop();
 
+    //
     //UDP broadcast - zamkniecie socektu
+    //
     socket.close(error);
 
     //
     // Koniec glownej petli przetwarzania
     //
-
     if ( iTimeLimitCnt != 1 )
-      _getch(); //no wait ... feed key from kbhit
+      {
+        _getch(); //no wait ... feed key from kbhit
+      }
     else
-      cout << "Wyczerpany limit zapytan (-m) oczekiwanie zakonczyl martwa petle." << endl ;
+      {
+        cout << "Wyczerpany limit zapytan (-m) oczekiwanie zakonczyl martwa petle." << endl ;
+      }
 
     proc.saveStreamsToFile( sDumpFile );
     cout << "Dump  :" << sDumpFile << endl ;
     UR::Dump( std::cout );
-
   }
   catch(std::exception& e)
   {
