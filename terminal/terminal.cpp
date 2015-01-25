@@ -98,16 +98,12 @@ namespace dbNet {
 }
 
 
-enum cmd_e { Quit , Cls , Connect , Help , Show , Add , Del ,  NoCmd }  ;
+enum cmd_e { Quit , Connect , Add ,  NoCmd }  ;
 
 std::map < cmd_e, boost::regex > commandsMap = map_list_of
     ( Quit    , boost::regex("\\s*quit.*") )
-    ( Cls     , boost::regex("\\s*cls.*") )
     ( Connect , boost::regex("\\s*connect.*") )
-    ( Help    , boost::regex("\\s*help.*") )
-    ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
     ( Add     , boost::regex("\\s*add\\s*(\\w*).*") )
-    ( Del     , boost::regex("\\s*del\\s*(\\w*).*") )
     ;
 
 boost::cmatch what;
@@ -228,6 +224,7 @@ public:
 
         {
             std::stringstream strstream;
+            data_[bytes_recvd] = 0 ;
             strstream << data_ ;
             memset( data_ , 0 , max_length );
             read_xml( strstream , pt );
@@ -303,7 +300,9 @@ ptree netClient( string netCommand , string netArgument )
     pt_request.put("db.message", netCommand );
 
     if ( netArgument != "" )
-      pt_request.put("db.argument", netArgument );
+      {
+        pt_request.put("db.argument", netArgument );
+      }
 
     //
     //request part
@@ -357,12 +356,15 @@ ptree netClient( string netCommand , string netArgument )
         pt_response.put("error.response" , "invalid" );
       }
   }
+  catch (boost::system::system_error& e)
+  {
+    std::cerr << e.what() << std::endl ;
+  }
   catch (std::exception& e)
   {
-    std::cerr << "exception catch:" << e.what() << std::endl ;
+    std::cerr << e.what() << std::endl ;
     pt_response.put("error.response" , e.what() );
   }
-
   return pt_response ;
 }
 
