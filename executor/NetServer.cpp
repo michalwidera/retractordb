@@ -80,8 +80,11 @@ void session::handle_read(const boost::system::error_code& error,
             read_xml( strstream , pt );
         }
 
-        if ( !onCommandProcess )  //safe
-            throw std::out_of_range("cos nie tak - wolanie pustego wskaznika");
+        //
+        //onCommandProcess musi zawierac wskaznik do funkcji
+        //tworzone jest to na konstruktrze
+        //
+        assert ( onCommandProcess != NULL );
 
         pt = onCommandProcess( pt );
 
@@ -90,6 +93,8 @@ void session::handle_read(const boost::system::error_code& error,
 
         std::stringstream strstream;
         write_xml( strstream , pt );
+
+        assert( strstream.str().size() > 0 );
 
         //
         // tutaj jest wysylana odpowiedz po interpretacji protokolu

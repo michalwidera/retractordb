@@ -166,11 +166,13 @@ ptree commandProcessor( ptree ptInval )
   //
   if ( command == "show" )
     {
+      std::cerr << "got show" << std::endl ;
+
       string streamName = ptInval.get("db.argument" , "" ) ;
 
       assert( streamName != "" );   //byc moze wywolano polecenie show bez nazwy strumienia - albo cos gorszego.
 
-      std::cerr << "show:" << streamName << "\n" ;
+      std::cerr << "show:" << streamName << std::endl ;
 
       coreInstance[streamName].setMulticastStream( query::send ); //tutaj docelowo - mapa bitowa - ktore pola wyjda - na razie 1 - all
     }

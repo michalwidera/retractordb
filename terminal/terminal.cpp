@@ -455,11 +455,17 @@ int main(int argc, char* argv[])
 
         if ( cmdId == Add )
           {
+            cmdId = NoCmd ;
+
             list<string>::iterator i = boost::find(streamList, what[1].str());
             if (i != boost::end(streamList))
               {
-                printf(":%s:\n",(*i).c_str());
+                printf("found: %s\n",(*i).c_str());
                 streamTable[ (*i) ] =  netClient( "show" , (*i) )  ;
+              }
+            else
+              {
+                printf( "not found: %s\n" , what[1].str().c_str() );
               }
           }
 
