@@ -62,30 +62,6 @@ FIND_PACKAGE( Boost COMPONENTS
     system
     REQUIRED )
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    find_package(GTest REQUIRED)
-    #enable_testing()
-    #add_custom_target(test ${CMAKE_CTEST_COMMAND} -V)
-
-    ################################
-    # GTest
-    ################################
-    #ADD_SUBDIRECTORY (gtest-1.6.0)
-    enable_testing()
-    include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
-
-    ################################
-    # Unit Tests
-    ################################
-    # Add test cpp file
-    add_executable( runUnitTests testgtest.cpp  )
-    # Link test executable against gtest & gtest_main
-    target_link_libraries(runUnitTests gtest gtest_main ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt )
-    add_test( runUnitTests runUnitTests )
-
-endif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-
-
 #SET( Boost_INCLUDE_DIRS D:\\boost\\include\\boost-1_50 )
 
 MESSAGE(STATUS "Boost information:")
