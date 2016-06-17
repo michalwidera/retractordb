@@ -37,12 +37,13 @@
 # Setup enviroment
 # sudo ./b2 install --prefix=/usr/lib
 # sudo mv boost /usr/include/boost
-# sudo apt-get install ncurses
-# sudo apt-get install ncurses-dev
-# sudo apt-get install libcdk5
+#
+# sudo apt-get install libncurses-dev
 # sudo apt-get install libcdk5-dev
 #
-# sudo apt-get install libgtest-dev
+# sudo apt-get install libgtest-dev (?)
+#
+# sudo apt-get install libboost-all-dev
 #
 
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR )
