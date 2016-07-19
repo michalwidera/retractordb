@@ -109,7 +109,7 @@ std::map < cmd_e, boost::regex > commandsMap = map_list_of
 boost::cmatch what;
 cmd_e processCommand( string commandsMaptr )
 {
-  assert( commandsMap.size() != 0 );
+  assert( commandsMap.size() );
 
   using namespace boost::adaptors;
 
@@ -230,7 +230,7 @@ public:
             read_xml( strstream , pt );
         }
 
-        string stream = pt.get("stream" , "" )  ;
+        pt.get("stream" , "" )  ;
 
         while (!spsc_queue.push( pt ))
           ;
@@ -281,7 +281,7 @@ void producer(void)
 
 ptree netClient( string netCommand , string netArgument )
 {
-  const int max_length = 1024;
+  //const int max_length = 1024;
 
   ptree pt_response ; //Zwracana wartosc/odpowiedz przez funkcje
   ptree pt_request;   //Tutaj konstruowane jest pytanie
@@ -380,7 +380,7 @@ int main(int argc, char* argv[])
   try {
     namespace po = boost::program_options;
 
-    string sInputFile ;
+    //string sInputFile ;
 
     po::options_description desc("Dozwolone opcja");
     desc.add_options()
@@ -416,9 +416,9 @@ int main(int argc, char* argv[])
     char polecenie[1024];
     memset( polecenie , 0 ,  1024 );
     int cnt = 0;
-    char kreska[] = "-/|\\";
-    int key;
-    int i=0;
+    //char kreska[] = "-/|\\";
+    //int key;
+    //int i=0;
     setbuf(stdout, NULL);
 
     cmd_e cmdId = NoCmd ;
