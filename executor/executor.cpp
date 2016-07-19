@@ -140,6 +140,8 @@ ptree commandProcessor( ptree ptInval )
   //
   if ( command == "get" )
     {
+      std::cerr << "get cmd rcv" << std::endl ;    
+
       BOOST_FOREACH( const query & it , coreInstance )
       {
         ptRetval.put( string("db.stream.")+it.id , it.id );
@@ -154,6 +156,8 @@ ptree commandProcessor( ptree ptInval )
       string streamName = ptInval.get("db.argument" , "" ) ;
 
       assert( streamName != "" );
+
+      std::cerr << "detail cmd rcv:" << streamName << std::endl ;      
 
       BOOST_FOREACH( string s , coreInstance[streamName].getFieldNamesList() )
       {

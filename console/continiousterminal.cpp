@@ -13,7 +13,24 @@
       (+48) 606 995 918
 */
 
-/* L E G A C Y   C O D E  - Przeanalizować i usunac zbedne rzeczy */
+/*
+
+
+
+                TO SIE NIE WYKONUJE !
+
+              funkcjonalność jest w mxterm.cpp !
+
+ L E G A C Y   C O D E  - Przeanalizować i usunac zbedne rzeczy 
+
+
+
+
+
+
+
+*/
+
 
 #include "continiousterminal.h"
 
@@ -65,6 +82,8 @@ std::map < cmd_e, boost::regex > commands = map_list_of
     ( Show    , boost::regex("\\s*show\\s*(\\w*).*") )
     ;
 
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
+
 ContiniousTerminal::ContiniousTerminal( bool stopLoop )
   : stopLoop(stopLoop),
     pos(0) ,
@@ -74,7 +93,7 @@ ContiniousTerminal::ContiniousTerminal( bool stopLoop )
   else postMortemRetCode = EVERYTHING_OK ;
 }
 
-
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 cmd_e ContiniousTerminal::processCommand( char * commandStr )
 {
@@ -92,6 +111,8 @@ cmd_e ContiniousTerminal::processCommand( char * commandStr )
 
   return NoCmd ;
 }
+
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 void ContiniousTerminal::printLine( int curline , int pos , char * line )
 {
@@ -115,6 +136,7 @@ void ContiniousTerminal::printLine( int curline , int pos , char * line )
       }
   }
 }
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 void ContiniousTerminal::registerDirCmd( int &curline , int pos , char * line , string tableName , int l )
 {
@@ -130,6 +152,8 @@ void ContiniousTerminal::registerDirCmd( int &curline , int pos , char * line , 
 
   REP(i,80) line[i] = ' ' ;        //Przywrocenie wartosci domyslnych
 }
+
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 void ContiniousTerminal::clearRegisteredQueries()
 {
@@ -153,6 +177,8 @@ void ContiniousTerminal::processRegisteredQueries()
     }
   }
 }
+
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 //
 // Glowna procedura terminala z petla zdarzen
@@ -273,6 +299,8 @@ int ContiniousTerminal::terminal()
 
   return EVERYTHING_OK ;
 }
+
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 bool ContiniousTerminal::processRequests( cmd_e command )
 {

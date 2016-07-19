@@ -197,6 +197,7 @@ int main(int argc, char* argv[])
   }
   catch(std::exception& e)
   {
+    cerr << "general loop exception catch" << "\n" ;
     cerr << e.what() << "\n";
     return 1;
   }

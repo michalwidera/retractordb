@@ -30,6 +30,7 @@ class session
 public:
 
     session(boost::asio::io_service& io_service) ;
+    ~session();
     boost::asio::ip::tcp::socket& socket();
     void start();
 };

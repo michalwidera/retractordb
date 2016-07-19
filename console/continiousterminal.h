@@ -12,6 +12,8 @@
       Poland, Zabrze, 41-800
       (+48) 606 995 918
 */
+      
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 #ifndef CONTINIOUSTERMINAL_H
 #define CONTINIOUSTERMINAL_H
@@ -22,6 +24,8 @@
 #include <string>
 
 enum cmd_e { Quit , Dir , Cls , Connect , Help , Detail , Show ,  NoCmd }  ;
+
+/* ten kod się nie wykonuje - funkcjonalność jest w mxterm.cpp */
 
 class ContiniousTerminal {
 

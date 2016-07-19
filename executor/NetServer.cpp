@@ -46,6 +46,10 @@ session::session(boost::asio::io_service& io_service)
 {
 }
 
+session::~session()
+{
+}
+
 tcp::socket& session::socket()
 {
     return socket_;
@@ -155,7 +159,7 @@ void tcp_server::handle_accept(session* new_session,
                                const boost::system::error_code& error)
 {
     if (!error)
-    {
+    {        
         new_session->start();
     }
     else

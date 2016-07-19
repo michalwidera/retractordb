@@ -98,12 +98,12 @@ namespace dbNet {
 }
 
 
-enum cmd_e { Quit , Connect , Add ,  NoCmd }  ;
+enum cmd_e { Quit , Connect , Select ,  NoCmd }  ;
 
 std::map < cmd_e, boost::regex > commandsMap = map_list_of
     ( Quit    , boost::regex("\\s*quit.*") )
     ( Connect , boost::regex("\\s*connect.*") )
-    ( Add     , boost::regex("\\s*add\\s*(\\w*).*") )
+    ( Select  , boost::regex("\\s*select\\s*(\\w*).*") )
     ;
 
 boost::cmatch what;
@@ -148,7 +148,7 @@ void consumer()
                   for ( int i = 0 ; i < count ; i ++ )
                     printf( "%s|" , e_value.get( boost::lexical_cast<string>(i) , "" ).c_str() );
 
-                  printf("\n\r");
+                  printf("\r\n");
               }
         }
     }
@@ -428,6 +428,8 @@ int main(int argc, char* argv[])
 
         if ( kbhit() )
           {
+            streamTable.clear(); //to powoduje wyczyszcznie wszystkich strumieni odpytywanych
+
             polecenie[ cnt ++ ] = getch();
             printf( "%c" , polecenie[ cnt - 1 ] );
 
@@ -455,7 +457,7 @@ int main(int argc, char* argv[])
             }
           }
 
-        if ( cmdId == Add )
+        if ( cmdId == Select )
           {
             cmdId = NoCmd ;
 

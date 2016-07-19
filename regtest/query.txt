@@ -5,13 +5,13 @@ transaction 0.5,1
 declare a INTEGER,b INTEGER stream core0, 3 FILE datafile2.dat
 declare e INTEGER,f INTEGER stream core2, 1
 declare c INTEGER,d INTEGER stream core1, 3
+declare g INTEGER,h INTEGER stream core3, 60 FILE datafile3.dat
 
 
 #deklaracja zlaczen strumieni
 select core0[1,1],a+{1,1},core1.c stream str1 from core0#(core1+1)
 select (e+1)*2+1,1  stream str2 from core2
 select core1[0,1] stream str3 from core1+core2
-
 
 #staging
 select 1 stream str4 from core0+1
