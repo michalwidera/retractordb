@@ -376,6 +376,7 @@ int main(int argc, char* argv[])
           ", CTS:" << string( __TIMESTAMP__) <<	//http://msdn2.microsoft.com/en-us/library/b0084kay(VS.80).aspx
           std::endl ;
   cerr << "Boost wersja:" << BOOST_LIB_VERSION << std::endl ;
+  cerr << "Commands: Connect, Select stream, Quit" << std::endl ;
 
   try {
     namespace po = boost::program_options;
@@ -427,7 +428,7 @@ int main(int argc, char* argv[])
       { 
 
         if ( kbhit() )
-          {
+          {            
             streamTable.clear(); //to powoduje wyczyszcznie wszystkich strumieni odpytywanych
 
             polecenie[ cnt ++ ] = getch();
