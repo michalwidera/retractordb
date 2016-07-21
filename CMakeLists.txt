@@ -121,7 +121,7 @@ set(SOURCES_EXECUTOR
   share/RandomFile.cpp
   share/stdafx.cpp
   share/inputFileInstance.cpp
-  share/IPhHead.cpp
+#  share/IPhHead.cpp
 )
 if(WIN32)
   set(SOURCES_EXECUTOR ${SOURCES_EXECUTOR}
@@ -129,7 +129,7 @@ if(WIN32)
 #        executor/IPhStrMgr.h
         executor/NetServer.h
         share/dbstream.h
-        share/IPhHead.h
+#        share/IPhHead.h
 	share/QStruct.h 
 	share/stdafx.h 
 	share/RandomFile.h 

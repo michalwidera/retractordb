@@ -18,7 +18,7 @@
 #include "CRSMath.h"
 #include "dbstream.h"
 #include "Processor.h"
-#include "IPhHead.h"
+// #include "IPhHead.h"
 #include "NetServer.h"
 
 #include <boost/thread.hpp>
@@ -38,8 +38,8 @@
 using namespace CRationalStreamMath ;
 using namespace QS ;
 
-extern "C" qTree coreInstance ;
-extern "C" config configInstance ;
+qTree coreInstance ;
+config configInstance ;
 
 enum limits {
   limitToDeclarations,
