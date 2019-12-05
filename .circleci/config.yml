@@ -1,0 +1,108 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~
+    docker:
+      - image: micwide/boostedgcc:latest
+    steps:
+      - checkout
+      - run:
+          name: CMake & make
+          command: 'cmake CMakeLists.txt ; make'
+  
+  build-on-updated:
+    working_directory: ~
+    docker:
+      - image: micwide/boostedgcc:latest
+    steps:
+      - checkout
+      - run:
+          name: Update and Upgrade distro
+          command: 'apt-get -y update && apt-get -y upgrade'
+      - run:
+          name: CMake & make
+          command: 'cmake CMakeLists.txt ; make'
+  
+  build-on-clean:
+    working_directory: ~
+    docker:
+      - image: circleci/buildpack-deps:latest
+    steps:
+      - checkout
+      - run:
+          name: Show what I really am
+          command: 'uname -a ; cat /proc/version; cat /etc/issue'
+      - run:
+          name: Install required libs
+          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential cppcheck openssl'
+      - run:
+          name: CMake & make
+          command: 'cmake CMakeLists.txt ; make'
+  
+  test:
+    working_directory: ~
+    docker:
+      - image: micwide/boostedgcc:latest
+    steps:
+      - checkout
+      - run:
+          name: CMake & make
+          command: 'cmake CMakeLists.txt ; make'
+      - run:
+          name: Test
+          command: 'make test'
+  
+  test-on-clean:
+    working_directory: ~
+    docker:
+      - image: circleci/buildpack-deps:latest
+    steps:
+      - checkout
+      - run:
+          name: Show what I really am
+          command: 'uname -a ; cat /proc/version; cat /etc/issue'
+      - run:
+          name: Install required libs
+          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential cppcheck openssl'
+      - run:
+          name: CMake & make
+          command: 'cmake CMakeLists.txt ; make'
+      - run:
+          name: Test
+          command: 'make test'
+
+workflows:
+  version: 2
+  commit:
+    jobs:
+      - build-on-clean:
+          filters:
+            branches:
+              only: master
+      - test-on-clean:
+          requires:
+            - build-on-clean
+          filters:
+            branches:
+              only: master
+  nightly:
+    triggers:
+      - schedule:
+          # https://crontab.guru/#0_1_*_*_3
+          cron: "0 1 * * 3"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - build
+      - test:
+          requires:
+            - build
+      - build-on-updated:
+          requires:
+            - build
+      - build-on-clean
+      - test-on-clean:
+          requires:
+            - build-on-clean

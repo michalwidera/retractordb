@@ -1,0 +1,15 @@
+CMakeCache.txt
+CMakeFiles/*
+CMakeLists.txt.user
+Makefile
+cmake_install.cmake
+database.cbp
+out.*
+query.dmp
+query.lkn
+query.qry*
+testfile
+CTestTestfile.cmake
+Testing/
+query.dot
+query.jpg

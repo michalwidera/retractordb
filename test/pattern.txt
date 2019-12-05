@@ -1,0 +1,35 @@
+str1(1/3)
+	:- PUSH_STREAM(core0)
+	:- PUSH_STREAM(core1)
+	:- STREAM_HASH(0)
+	Field_0:
+		PUSH_ID(core0[0/1])
+	Field_1:
+		PUSH_ID(core0[1/1])
+core1(1/2)	test/datafile3.dat
+	c:
+	d:
+str2(1/2)
+	:- PUSH_STREAM(core1)
+	:- STREAM_SUBSTRACT(1_2)
+	Field_2:
+		PUSH_ID(core1[0/1])
+		PUSH_VAL(1)
+		ADD(0)
+		PUSH_VAL(2)
+		MULTIPLY(0)
+		PUSH_VAL(1)
+		ADD(0)
+	Field_3:
+		PUSH_VAL(1)
+str3(1/2)
+	:- PUSH_STREAM(core1)
+	:- PUSH_STREAM(core0)
+	:- STREAM_ADD(0)
+	Field_4:
+		PUSH_ID(core0[0/1])
+	Field_5:
+		PUSH_ID(core0[1/1])
+core0(1/1)	test/datafile2.dat
+	a:
+	b:
