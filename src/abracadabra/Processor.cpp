@@ -312,11 +312,8 @@ void Processor::updateContext( set < string > inSet ) {
                     assert (gContextValMap[ argument2.getValue()].size() == getQuery( argument2.getValue() ).lSchema.size()) ;
 
                     for ( auto f : q.lSchema ) {
-                        int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue() ) ;
-                        string schema = f.getFirstFieldToken().getValue() ;
-
-                        number ret = getValue(schema, 0, pos ) ;
-                        rowValues.push_back( ret );
+                        boost::rational<int> value(computeValue(f, q)) ;
+                        rowValues.push_back(value);
                     }
 
                     break;
@@ -725,14 +722,14 @@ boost::rational<int> Processor::computeValue(
 
                     int offsetInSchema ( rational_cast<int>(tk.getCRValue()));
                     string argument( tk.getValue() );
-                    string schema( q.id );
+                    string outSchema( q.id );
 
                     // If opration ADD exist - then position schema will be moved
                     // first argument
-                    int offsetFromArg = getArgumentOffset( schema, argument );
+                    int offsetFromArg = getArgumentOffset( outSchema, argument );
 
-                    number a = getValue( schema, 0, offsetInSchema + offsetFromArg ) ;
-                    rStack.push( boost::get< boost::rational<int> >(a)  );
+                    number a = getValue(argument, 0, offsetInSchema + offsetFromArg);
+                    rStack.push( boost::get< boost::rational<int> >(a) );
                 }
 
                 break ;
