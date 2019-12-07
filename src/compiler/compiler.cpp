@@ -540,7 +540,7 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
             } else if ( cmd == STREAM_AGSE ) {
                 s << sName1 ;
             } else {
-                s << generateStreamName( sName2, sName1, cmd ) ;
+                s << sName1 ; //generateStreamName( sName2, sName1, cmd ) ;
             }
             s << "[" ;
             s << offset ++ ;
