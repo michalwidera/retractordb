@@ -728,7 +728,7 @@ boost::rational<int> Processor::computeValue(
                     // first argument
                     int offsetFromArg = getArgumentOffset( outSchema, argument );
 
-                    number a = getValue(argument, 0, offsetInSchema + offsetFromArg);
+                    number a = getValue(outSchema, 0, offsetInSchema + offsetFromArg);
                     rStack.push( boost::get< boost::rational<int> >(a) );
                 }
 
