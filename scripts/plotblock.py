@@ -11,6 +11,7 @@ parser.add_argument("x", default=10, help="x dimension in points",type=int)
 parser.add_argument("y", default=256, help="y dimension in points",type=int)
 parser.add_argument("--term", default="qt", help="termianl plot type i.e. x11,wxt,qt")
 parser.add_argument("--sleep", default=0 , help="put sleep in pipe transfer to plot", type=float)
+parser.add_argument("--feedinit", default=0, help="feeds gnuplot with initial zeros",type=int)
 parser.add_argument("desc", help="data descriptor")
 args = parser.parse_args()
 
@@ -28,7 +29,8 @@ print "set ticslevel 0"
 print "set hidden3d"
 
 try:
-    for line in sys.stdin:
+    #for line in sys.stdin:
+    for line in iter(sys.stdin.readline, ''):
 
         print "plot",
         for i in prdata:
