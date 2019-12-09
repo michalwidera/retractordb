@@ -154,6 +154,7 @@ bool operator<(const query &lhs,const query &rhs) ;
 query & getQuery( string query_name ) ;
 int getSeqNr( string query_name ) ;
 bool isDeclared( string query_name ) ;
+bool isExist(string query_name);
 
 class qTree :
     public vector < query > {

@@ -312,8 +312,16 @@ void Processor::updateContext( set < string > inSet ) {
                     assert (gContextValMap[ argument2.getValue()].size() == getQuery( argument2.getValue() ).lSchema.size()) ;
 
                     for ( auto f : q.lSchema ) {
-                        boost::rational<int> value(computeValue(f, q)) ;
-                        rowValues.push_back(value);
+
+                        string schema = f.getFirstFieldToken().getValue() ;
+                        if ( isExist(schema) ) {
+
+                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
+                            rowValues.push_back(getValue(schema, 0, pos));
+                        } else {
+
+                            rowValues.push_back(computeValue(f, q));
+                        }
                     }
 
                     break;

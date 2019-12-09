@@ -214,6 +214,15 @@ bool isDeclared( string query_name ) {
     return false ;
 }
 
+bool isExist( string query_name ) {
+    for ( auto & q : coreInstance ) {
+        if ( query_name == q.id ) {
+            return true ;
+        }
+    }
+    return false ;
+}
+
 boost::rational<int> token::getCRValue() {
     return crValue ;
 }
