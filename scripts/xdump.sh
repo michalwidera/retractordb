@@ -31,7 +31,7 @@ echo 'FILE:' $FILE
 echo 'PHASE:' $PHASE
 echo 'DUMP:' 'query.'$PHASE
 
-if ! ./build/xcompiler -q $FILE ; then exit 1 ; fi 
+if ! xcompiler -q $FILE ; then exit 1 ; fi 
 
 echo "Show fields? [Y/n]"
 read answer
@@ -57,7 +57,7 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then
 vTYPES=-w
 fi
 
-if ! ./build/xdumper -i 'query.'$PHASE -d $vFIELDS $vSTRPROGS $vTAGS $vTYPES > ${FILE%%.*}'.dot' ; then exit 1 ; fi 
+if ! xdumper -i 'query.'$PHASE -d $vFIELDS $vSTRPROGS $vTAGS $vTYPES > ${FILE%%.*}'.dot' ; then exit 1 ; fi 
 
 dot -T$PICTYPE ${FILE%%.*}'.dot' -o ${FILE%%.*}'.'$PICTYPE
 

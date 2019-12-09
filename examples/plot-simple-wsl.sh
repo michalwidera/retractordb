@@ -4,7 +4,7 @@ trap control_c SIGINT
 
 control_c()
 {
-    ../build/xqry -k
+    xqry -k
     pkill plotblock
     stty sane
 }
@@ -47,13 +47,13 @@ echo 'STREAM:' $STREAM
 echo 'XDIM:' $XDIM
 echo 'YDIM:' $YDIM
 
-if ! ../build/xcompiler -q $FILE ; then exit 1 ; fi 
+if ! xcompiler -q $FILE ; then exit 1 ; fi 
 
-nohup ../build/xabracadabra &
+nohup xabracadabra &
 
 sleep 2
 
 echo "Type ctrl+c to stop."
 
 export DISPLAY=:0
-../build/xqry -s $STREAM | ../scripts/plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.02 --term wxt| gnuplot 2>/dev/null
+xqry -s $STREAM | plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.02 --term wxt| gnuplot 2>/dev/null

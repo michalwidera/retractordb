@@ -1,5 +1,4 @@
 #!/bin/bash
-export PATH=../build:../scripts:$PATH
 
 trap control_c SIGINT
 

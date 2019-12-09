@@ -34,7 +34,7 @@ jobs:
           command: 'uname -a ; cat /proc/version; cat /etc/issue'
       - run:
           name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential cppcheck openssl'
+          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential'
       - run:
           name: CMake & make
           command: 'cmake CMakeLists.txt ; make'
@@ -50,7 +50,7 @@ jobs:
           command: 'cmake CMakeLists.txt ; make'
       - run:
           name: Test
-          command: 'make test'
+          command: 'make install; make test'
   
   test-on-clean:
     working_directory: ~
@@ -63,13 +63,13 @@ jobs:
           command: 'uname -a ; cat /proc/version; cat /etc/issue'
       - run:
           name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential cppcheck openssl'
+          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential'
       - run:
           name: CMake & make
           command: 'cmake CMakeLists.txt ; make'
       - run:
           name: Test
-          command: 'make test'
+          command: 'make install; make test'
 
 workflows:
   version: 2
@@ -78,13 +78,17 @@ workflows:
       - build-on-clean:
           filters:
             branches:
-              only: master
+              only: 
+                - master
+                - /issue_.*/
       - test-on-clean:
           requires:
             - build-on-clean
           filters:
             branches:
-              only: master
+              only: 
+                 - master
+                 - /issue_.*/
   nightly:
     triggers:
       - schedule:

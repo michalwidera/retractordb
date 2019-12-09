@@ -7,23 +7,23 @@
 
 #jeśli pokazujemy -t tagi to muszą być pola
 
-if ! ./build/xcompiler -q ./test/query-thesis.txt ; then exit 1 ; fi 
+if ! xcompiler -q ./test/query-thesis.txt ; then exit 1 ; fi 
 
-if ! ./build/xdumper -d  -i query.qry.lg1       > out1_1.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d  -i query.qry.lg2       > out1_2.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d                         > out1_3.dot   ; then exit 1 ; fi 
+if ! xdumper -d  -i query.qry.lg1       > out1_1.dot ; then exit 1 ; fi 
+if ! xdumper -d  -i query.qry.lg2       > out1_2.dot ; then exit 1 ; fi 
+if ! xdumper -d                         > out1_3.dot   ; then exit 1 ; fi 
 
-if ! ./build/xdumper -d -s -f -i query.qry.lg1 > out2_1.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d -s -f -i query.qry.lg2 > out2_2.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d -s -f -i query.qry     > out2_3.dot ; then exit 1 ; fi 
+if ! xdumper -d -s -f -i query.qry.lg1 > out2_1.dot ; then exit 1 ; fi 
+if ! xdumper -d -s -f -i query.qry.lg2 > out2_2.dot ; then exit 1 ; fi 
+if ! xdumper -d -s -f -i query.qry     > out2_3.dot ; then exit 1 ; fi 
 
-if ! ./build/xdumper -d -f -t -i query.qry.lg1 > out3_1.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d -f -t -i query.qry.lg2 > out3_2.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d -f -t -i query.qry     > out3_3.dot ; then exit 1 ; fi 
+if ! xdumper -d -f -t -i query.qry.lg1 > out3_1.dot ; then exit 1 ; fi 
+if ! xdumper -d -f -t -i query.qry.lg2 > out3_2.dot ; then exit 1 ; fi 
+if ! xdumper -d -f -t -i query.qry     > out3_3.dot ; then exit 1 ; fi 
 
-if ! ./build/xdumper -d -s -f -t -i query.qry.lg1 > out4_1.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d -s -f -t -i query.qry.lg2 > out4_2.dot ; then exit 1 ; fi 
-if ! ./build/xdumper -d -s -f -t -i query.qry     > out4_3.dot ; then exit 1 ; fi 
+if ! xdumper -d -s -f -t -i query.qry.lg1 > out4_1.dot ; then exit 1 ; fi 
+if ! xdumper -d -s -f -t -i query.qry.lg2 > out4_2.dot ; then exit 1 ; fi 
+if ! xdumper -d -s -f -t -i query.qry     > out4_3.dot ; then exit 1 ; fi 
 
 echo "1"; dot -Teps out1_1.dot -o eoutput1_1.eps
 echo "1"; dot -Teps out1_2.dot -o eoutput1_2.eps
