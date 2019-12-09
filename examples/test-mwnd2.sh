@@ -4,7 +4,7 @@ export PATH=../build:../scripts:$PATH
 if [ "$1" != "" ]; then
 FILE=$1
 else
-FILE=query-mwnd.txt  
+FILE=query-mwnd2.txt  
 fi
 
 if ! xcompiler -q $FILE ; then exit 1 ; fi 
@@ -32,7 +32,7 @@ then
     tmux resize-pane -t dev:0.5 -x 15       
 
     tmux send-keys -t dev:0.0 'xabracadabra -v' C-m
-    sleep 2
+    sleep 4
     tmux send-keys -t dev:0.1 'clear; xqry -s core0' C-m
     tmux send-keys -t dev:0.2 'clear; xqry -s str1' C-m
     tmux send-keys -t dev:0.3 'clear; xqry -s str2' C-m

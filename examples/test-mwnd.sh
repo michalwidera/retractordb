@@ -37,6 +37,6 @@ then
     tmux send-keys -t dev:0.2 'clear; xqry -s agregacja' C-m
     tmux send-keys -t dev:0.3 'clear; xqry -s agregacjaSerializacja' C-m
     tmux send-keys -t dev:0.4 'clear; xqry -s agregacjaLustrzana' C-m
-    tmux send-keys -t dev:0.5 'clear; /xqry -s agregacjaSelektywna' C-m
+    tmux send-keys -t dev:0.5 'clear; xqry -s agregacjaSelektywna' C-m
 fi
 tmux attach -t dev
