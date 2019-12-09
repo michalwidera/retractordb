@@ -49,6 +49,9 @@ jobs:
           name: CMake & make
           command: 'cmake CMakeLists.txt ; make'
       - run:
+          name: Install 
+          command: 'sudo make install'
+      - run:
           name: Test
           command: 'make install; make test'
   
@@ -68,8 +71,11 @@ jobs:
           name: CMake & make
           command: 'cmake CMakeLists.txt ; make'
       - run:
+          name: Install 
+          command: 'sudo make install'
+      - run:
           name: Test
-          command: 'make install; make test'
+          command: 'make test'
 
 workflows:
   version: 2
