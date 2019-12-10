@@ -425,10 +425,6 @@ int main(int argc, char* argv[]) {
 
         if (vm.count("verbose") || vm.count("help")) {
             cerr << argv[0] << " - qry file decoder.\n";
-            cerr <<
-                ", CTS:" << string( __TIMESTAMP__) <<
-                std::endl ;
-            cerr << "Boost version:" << BOOST_LIB_VERSION << std::endl ;
         }
 
         if (vm.count("help")) {

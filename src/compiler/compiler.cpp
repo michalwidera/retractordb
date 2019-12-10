@@ -975,9 +975,9 @@ int main(int argc, char* argv[]) {
 
         po::options_description desc("Avaiable options");
         desc.add_options()
-        ("help,h", "Program options")
-        ("queryfile,q", po::value<string>(&sInputFile)->default_value("query.txt"), "plik z zapytaniem")
-        ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "plik wynikowy")
+        ("help,h", "Show program options")
+        ("queryfile,q", po::value<string>(&sInputFile)->default_value("query.txt"), "query set file")
+        ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "output file")
         ("regtest,t","Regression Test")
         ("log,g","Translation raport - debuglog")
         ("verbose,v", "Diangostic info")
@@ -994,10 +994,6 @@ int main(int argc, char* argv[]) {
         //Intro
         if (vm.count("verbose")) {
             cerr << argv[0] << " - parser, compiler and qery plans reductor.\n";
-            cerr <<
-                "CTS:" << string( __TIMESTAMP__) <<
-                std::endl ;
-            cerr << "Boost version:" << BOOST_LIB_VERSION << std::endl ;
         }
 
         if (vm.count("help")) {

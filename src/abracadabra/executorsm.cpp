@@ -400,8 +400,6 @@ int main(int argc, char* argv[]) {
 
         if (vm.count("verbose")) {
             cerr << argv[0] << " - query plan executor." << std::endl;
-            cerr << "CTS:" << string( __TIMESTAMP__) << std::endl;
-            cerr << "Boost version:" << BOOST_LIB_VERSION << std::endl;
         }
 
         if (vm.count("help")) {

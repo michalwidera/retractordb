@@ -424,8 +424,6 @@ int main(int argc, char* argv[]) {
 
         if (vm.count("help")) {
             cerr << argv[0] << " - xabracadabra communication tool." << std::endl;
-            cerr << "CTS:" << string( __TIMESTAMP__) << std::endl ;
-            cerr << "Boost versions:" << BOOST_LIB_VERSION << std::endl ;
             cerr << desc << endl ;
             return 1;
         } else if (vm.count("hello") ) {
