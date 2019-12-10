@@ -446,8 +446,8 @@ int main(int argc, char* argv[]) {
         // Check if we put depended parameters
         //
         if ( vm.count("tags") != 0 &&  vm.count("fields") == 0 ) {
-            cerr << "Parametry bez sensu!" << endl ;
-            cerr << "tagi odwoluja sie do pol - jak ustawiasz tagi, postaw pola w dot" << endl ;
+            cerr << "Conflicting parameters" << endl ;
+            cerr << "Tags are referencing fields - when you set tags, leve field in dots" << endl ;
             return 1 ;
         }
         if ( vm.count("view") ) {

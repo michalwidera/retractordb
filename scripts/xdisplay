@@ -1,0 +1,67 @@
+#!/bin/bash
+
+me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+
+if [ $# -eq 0 ] ; then
+    echo "Usage: $me queryFileName.Ext [phaseLnkExt][PicType]"
+    echo "Example: $me query.txt"
+    exit
+fi
+
+FILE=$1
+
+if [ "$2" != "" ] ; then
+PHASE="qry."$2
+else
+PHASE=qry
+fi
+
+if [ "$3" != "" ] ; then
+PICTYPE=$3
+else
+PICTYPE=png
+fi
+
+echo "Calling compiler for" $FILE
+
+if ! xcompiler -q $FILE ; then exit 1 ; fi 
+
+echo 'Phase view: query.'$PHASE
+
+arg=""
+
+echo "Show fields? [Y/n]"
+read answer
+if [ "$answer" == "${answer#[Nn]}" ] ;then
+arg=$arg" -f"
+fi
+
+echo "Show stream progs ? [Y/n]"
+read answer
+if [ "$answer" == "${answer#[Nn]}" ] ;then
+arg=$arg" -s"
+fi
+
+echo "Show tags ? [Y/n]"
+read answer
+if [ "$answer" == "${answer#[Nn]}" ] ;then
+arg=$arg" -t"
+fi
+
+echo "Show types ? [Y/n]"
+read answer
+if [ "$answer" == "${answer#[Nn]}" ] ;then
+arg=$arg" -w"
+fi
+
+echo 'Calling xdumper for query.'$PHASE
+
+if ! xdumper -i 'query.'$PHASE -d $arg > ${FILE%%.*}'.dot' ; then exit 1 ; fi 
+
+dot -T$PICTYPE ${FILE%%.*}'.dot' -o ${FILE%%.*}'.'$PICTYPE
+
+rm ${FILE%%.*}'.dot'
+
+#sudo apt install feh
+feh ${FILE%%.*}'.'$PICTYPE
+

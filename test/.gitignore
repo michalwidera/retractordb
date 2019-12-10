@@ -15,3 +15,6 @@ Testing/
 query.dot
 query.jpg
 doxygen.config
+*.dot
+*.jpg
+*.png
