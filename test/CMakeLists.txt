@@ -6,12 +6,12 @@ enable_testing()
 
 add_test( NAME compier-selftest
           WORKING_DIRECTORY .
-          COMMAND build/xcompiler -t
+          COMMAND xcompiler -t
          )
 
 add_test( NAME compier-test-on-query
           WORKING_DIRECTORY .
-          COMMAND build/xcompiler -q test/query-lnx.txt 
+          COMMAND xcompiler -q test/query-lnx.txt 
          )
 
 add_test( NAME compier-test-on-dumper 
@@ -32,7 +32,7 @@ add_test( NAME dumper-test
 
 add_test( NAME executor-waterfall
           WORKING_DIRECTORY .
-          COMMAND build/xabracadabra -m 20 --waterfall 
+          COMMAND xabracadabra -m 20 --waterfall 
          )
 
 add_test( NAME workflow-test

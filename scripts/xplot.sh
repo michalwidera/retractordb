@@ -5,7 +5,7 @@ trap control_c SIGINT
 control_c()
 {
     stty sane
-    ./build/xqry -k
+    xqry -k
 }
 
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
@@ -46,14 +46,14 @@ echo 'STREAM:' $STREAM
 echo 'XDIM:' $XDIM
 echo 'YDIM:' $YDIM
 
-if ! ./build/xcompiler -q $FILE ; then exit 1 ; fi 
+if ! xcompiler -q $FILE ; then exit 1 ; fi 
 
-nohup ./build/xabracadabra &
+nohup xabracadabra &
 
 sleep 2
 
 echo "Type ctrl+c to stop."
 
-./build/xqry -s $STREAM |\
-./plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.01 |\
+xqry -s $STREAM |\
+plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.01 |\
 gnuplot 2>/dev/null

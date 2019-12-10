@@ -129,3 +129,5 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
     COMMENT "Running include-what-you-use tool"
     VERBATIM
   )
+
+install(TARGETS xabracadabra xcompiler xdumper xqry DESTINATION /usr/local/bin) 
