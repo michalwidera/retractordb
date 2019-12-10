@@ -1,29 +1,42 @@
 version: 2
 jobs:
-  build:
+ 
+  build-boostedgcc:
     working_directory: ~
     docker:
       - image: micwide/boostedgcc:latest
     steps:
       - checkout
       - run:
-          name: CMake & make
+          name: Build from source
           command: 'cmake CMakeLists.txt ; make'
-  
-  build-on-updated:
+      - run:
+          name: Install product
+          command: 'sudo make install'
+      - run:
+          name: Test
+          command: 'make test'
+
+  build-boostedgcc-update:
     working_directory: ~
     docker:
       - image: micwide/boostedgcc:latest
     steps:
       - checkout
       - run:
-          name: Update and Upgrade distro
+          name: Update docker libs
           command: 'apt-get -y update && apt-get -y upgrade'
       - run:
           name: CMake & make
           command: 'cmake CMakeLists.txt ; make'
-  
-  build-on-clean:
+      - run:
+          name: Install product
+          command: 'sudo make install'
+      - run:
+          name: Check if there is any regression
+          command: 'make test'
+
+  build-buildpack:
     working_directory: ~
     docker:
       - image: circleci/buildpack-deps:latest
@@ -36,60 +49,20 @@ jobs:
           name: Install required libs
           command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential'
       - run:
-          name: CMake & make
-          command: 'cmake CMakeLists.txt ; make'
-  
-  test:
-    working_directory: ~
-    docker:
-      - image: micwide/boostedgcc:latest
-    steps:
-      - checkout
-      - run:
-          name: CMake & make
+          name: Build from source
           command: 'cmake CMakeLists.txt ; make'
       - run:
-          name: Install 
+          name: Install product 
           command: 'sudo make install'
       - run:
-          name: Test
-          command: 'make install; make test'
-  
-  test-on-clean:
-    working_directory: ~
-    docker:
-      - image: circleci/buildpack-deps:latest
-    steps:
-      - checkout
-      - run:
-          name: Show what I really am
-          command: 'uname -a ; cat /proc/version; cat /etc/issue'
-      - run:
-          name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential'
-      - run:
-          name: CMake & make
-          command: 'cmake CMakeLists.txt ; make'
-      - run:
-          name: Install 
-          command: 'sudo make install'
-      - run:
-          name: Test
+          name: Check if there is any regression
           command: 'make test'
 
 workflows:
   version: 2
   commit:
     jobs:
-      - build-on-clean:
-          filters:
-            branches:
-              only: 
-                - master
-                - /issue_.*/
-      - test-on-clean:
-          requires:
-            - build-on-clean
+      - build-buildpack:
           filters:
             branches:
               only: 
@@ -105,14 +78,6 @@ workflows:
               only:
                 - master
     jobs:
-      - build
-      - test:
-          requires:
-            - build
-      - build-on-updated:
-          requires:
-            - build
-      - build-on-clean
-      - test-on-clean:
-          requires:
-            - build-on-clean
+      - build-boostedgcc
+      - build-boostedgcc-update
+      - build-buildpack
