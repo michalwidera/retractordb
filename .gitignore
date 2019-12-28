@@ -1,9 +1,10 @@
 CMakeCache.txt
 CMakeFiles/*
+.idea/*
 CMakeLists.txt.user
 Makefile
 cmake_install.cmake
-database.cbp
+*.cbp
 out.*
 query.dmp
 query.lkn
