@@ -371,6 +371,20 @@ ptree netClient( string netCommand, string netArgument ) {
 }
 
 int main(int argc, char* argv[]) {
+
+    // Clarification: When gcc has been upgraded to 9.x version some tests fails.
+    // Bug appear when data are passing to program via script .sh
+    // additional 13 (\r) character was append - this code normalize argv list.
+    // C99: The parameters argc and argv and the strings pointed to by the argv array
+    // shall be modifiable by the program, and retain their last-stored values
+    // between program startup and program termination.
+    for ( int i = 0 ; i < argc ;  i ++ )
+    {
+        auto len = strlen( argv[i] ) ;
+        if ( len > 0 )
+            if ( argv[i][len-1] == 13 ) argv[i][len-1] = 0 ;
+    }
+
     try {
         namespace po = boost::program_options;
 
@@ -392,8 +406,8 @@ int main(int argc, char* argv[]) {
         ("needctrlc,c", "force ctl+c for stop this tool")
         ;
 
-        po::positional_options_description p;       //Assume that infile is the first option
-        p.add("infile", -1);
+        po::positional_options_description p;       //Assume that select is the first option
+        p.add("select", -1);
 
         po::variables_map vm;
         po::store(po::command_line_parser(argc, argv).

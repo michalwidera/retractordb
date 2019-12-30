@@ -965,6 +965,19 @@ std::streambuf *oldbuf = std::clog.rdbuf(clog.rdbuf());
 
 int main(int argc, char* argv[]) {
 
+    // Clarification: When gcc has been upgraded to 9.x version some tests fails.
+    // Bug appear when data are passing to program via script .sh
+    // additional 13 (\r) character was append - this code normalize argv list.
+    // C99: The parameters argc and argv and the strings pointed to by the argv array
+    // shall be modifiable by the program, and retain their last-stored values
+    // between program startup and program termination.
+    for ( int i = 0 ; i < argc ;  i ++ )
+    {
+        auto len = strlen( argv[i] ) ;
+        if ( len > 0 )
+            if ( argv[i][len-1] == 13 ) argv[i][len-1] = 0 ;
+    }
+
     try {
         scoped_ptr<ostream> p_ofs;
 
@@ -984,7 +997,7 @@ int main(int argc, char* argv[]) {
         ;
 
         po::positional_options_description p;       //Assume that infile is the first option
-        p.add("infile", -1);
+        p.add("queryfile", -1);
 
         po::variables_map vm;
         po::store(po::command_line_parser(argc, argv).
@@ -1053,34 +1066,35 @@ int main(int argc, char* argv[]) {
         //and file query.txt can be always in repo
         {
             string str;
-            ifstream input( sQueryFile.c_str() );
-            getline( input, str ) ;
+            ifstream input(sQueryFile.c_str());
+            getline(input, str);
 
             boost::cmatch what;
 
             boost::regex mulitestRe("set\\[(\\d*)\\,(\\d*)\\]");  //multiset[2-7]
-            if ( regex_match(str.c_str(),what,mulitestRe) ) {
-                sQueryFile = sSubsetFile ;
-                ofstream querySubset( sQueryFile.c_str() );
+            if (regex_match(str.c_str(), what, mulitestRe)) {
+                sQueryFile = sSubsetFile;
+                ofstream querySubset(sQueryFile.c_str());
 
-                const int dGivenSetBeg( atoi( string( what[1] ).c_str() ) ) ;
-                const int dGivenSetEnd( atoi( string( what[2] ).c_str() ) ) ;
+                const int dGivenSetBeg(atoi( string( what[1]).c_str()));
+                const int dGivenSetEnd(atoi( string( what[2]).c_str()));
 
-                input.seekg( 0, ios_base::beg );
+                input.seekg(0, ios_base::beg);
 
                 int lineNr(0);
-                list < string > querySet ;
-                while( getline( input, str ) ) {
-                    if ( lineNr >= dGivenSetBeg && lineNr <= dGivenSetEnd ) {
-                        querySubset << str << "\n" ;
+                list <string> querySet;
+                while (getline(input, str)) {
+                    if (lineNr >= dGivenSetBeg && lineNr <= dGivenSetEnd) {
+                        querySubset << str << "\n";
                     }
-                    lineNr ++ ;
+                    lineNr++;
                 }
-                cout << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl ;
+                cout << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl;
             }
         }
 
-        cout << "Compiler " << parser( sQueryFile, sLinkFile, vm.count("verbose")) << endl ;
+        cout << "Input file:" << sQueryFile << endl ;
+        cout << "Compile result:" << parser( sQueryFile, sLinkFile, vm.count("verbose")) << endl ;
 
         //
         // Main Algorithm body

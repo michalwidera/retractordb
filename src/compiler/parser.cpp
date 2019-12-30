@@ -619,7 +619,7 @@ struct ql_parser : public grammar<ql_parser> {
     };
 };
 
-string parser( string sPlikDanych, string sPlikWynikowy, bool verbose = true) {
+string parser( string sInputFile, string sOutputFile, bool verbose = true) {
     //
     // Main parser body
     //
@@ -627,7 +627,7 @@ string parser( string sPlikDanych, string sPlikWynikowy, bool verbose = true) {
     ql_parser g;
     stk.push( boost::shared_ptr<query>( new query() ) );
 
-    if ( sPlikDanych == "regtest" ) {
+    if ( sInputFile == "regtest" ) {
         string str[] = { "declare a INTEGER stream core0, 1",
                 "select core0[1],core0 stream str1 from core0"
             } ;
@@ -645,10 +645,10 @@ string parser( string sPlikDanych, string sPlikWynikowy, bool verbose = true) {
             }
         }
     } else {
-        ifstream input( sPlikDanych.c_str() );
+        ifstream input( sInputFile.c_str(), ifstream::in );
 
         if ( ! input.is_open() ) {
-            throw std::out_of_range("No file to process");
+            throw std::out_of_range("File not found.");
         }
 
         string str;
@@ -676,10 +676,10 @@ string parser( string sPlikDanych, string sPlikWynikowy, bool verbose = true) {
     {
         const qTree coreInstance2( coreInstance_parser ) ;
 
-        std::ofstream ofs( sPlikWynikowy.c_str() );
+        std::ofstream ofs( sOutputFile.c_str() );
 
         if ( ! ofs.good() ) {
-            cerr << "No serialization file:" << sPlikWynikowy << endl ;
+            cerr << "No serialization file:" << sOutputFile << endl ;
             throw std::invalid_argument("Runtime Error");
         }
 

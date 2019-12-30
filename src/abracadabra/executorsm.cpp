@@ -361,6 +361,19 @@ int _getch() {
 }
 
 int main(int argc, char* argv[]) {
+    // Clarification: When gcc has been upgraded to 9.x version some tests fails.
+    // Bug appear when data are passing to program via script .sh
+    // additional 13 (\r) character was append - this code normalize argv list.
+    // C99: The parameters argc and argv and the strings pointed to by the argv array
+    // shall be modifiable by the program, and retain their last-stored values
+    // between program startup and program termination.
+    for ( int i = 0 ; i < argc ;  i ++ )
+    {
+        auto len = strlen( argv[i] ) ;
+        if ( len > 0 )
+            if ( argv[i][len-1] == 13 ) argv[i][len-1] = 0 ;
+    }
+
     thread bt(commmandProcessorLoop);  //Sending service in thread
 
     // This line - delay is ugly fix for slow machine on CI !
@@ -377,7 +390,7 @@ int main(int argc, char* argv[]) {
         desc.add_options()
         ("help,h", "show help")
         ("infile,i", po::value<string>(&sInputFile)->default_value("query.qry"), "input query plan")
-        ("query,q", po::value<string>(&sQuery), "query fie" )
+        ("query,q", po::value<string>(&sQuery), "query file" )
         ("display,s", po::value<string>(&sQuery), "process single query" )
         ("dump,d", po::value<string>(&sDumpFile)->default_value("query.dmp"), "dump file name")
         ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0), "query limit, 0 - no limit" )
