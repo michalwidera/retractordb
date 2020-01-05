@@ -623,24 +623,70 @@ void Processor::updateContext( set < string > inSet ) {
     }
 }
 
-int getSizeOfRollup( query &q ) {
+number Processor::getValueOfRollup( const query &q , int offset ) {
 
-    token arg1,arg2,arg3;
-
+    token arg[3];
+    const int progSize =  q.lProgram.size() ;
     int ret = 0 ;
 
-    for( auto tk : q.lProgram ) {
-        if ( q.lProgram.size() == 1 ) {
-            return getQuery( tk.getValue() ).lSchema.size();
-        }
-        if ( q.lProgram.size() == 2 ) {
-            return getQuery( tk.getValue() ).lSchema.size();
-        }
-        if ( q.lProgram.size() == 3 ) {
-            
+    int i = 0;
+    for( auto tk : q.lProgram ) arg[i++] = tk ;
+
+    token cmd = arg[progSize-1];
+
+    string v = arg[0].getValue() ;
+    if ( cmd.getTokenCommand() == PUSH_STREAM )
+        //getValue(outSchema, 0, offsetInSchema + offsetFromArg);
+        return getValue( v , 0, offset );
+
+    assert(false); //TODO PART
+
+    /** We need to create support for all operators - not only PUSH_STREAM scenario */
+
+    return number(0) ; /* pro forma */
+}
+
+/** This function will give info how long is stream argument if argument will be * instead of argument list */
+int getSizeOfRollup( const query &q ) {
+
+    token arg[3];
+    const int progSize =  q.lProgram.size() ;
+    int ret = 0 ;
+
+    int i = 0;
+    for( auto tk : q.lProgram ) arg[i++] = tk ;
+
+    token cmd = arg[progSize-1];
+
+    if ( progSize == 1 )
+        return getQuery( arg[0].getValue() ).lSchema.size() ;
+
+    if ( progSize == 2 )
+        return getQuery( arg[0].getValue() ).lSchema.size() ;
+
+    if ( progSize == 3 ) {
+        switch( cmd.getTokenCommand() ) {
+            case STREAM_HASH:
+            case STREAM_DEHASH_MOD:
+            case STREAM_DEHASH_DIV:
+            case STREAM_SUBSTRACT:
+            case STREAM_TIMEMOVE:
+                return getQuery( arg[0].getValue() ).lSchema.size() ;
+            case STREAM_AGSE:
+                return abs(rational_cast<int>(cmd.getCRValue()));
+            case STREAM_ADD:
+                return getQuery( arg[0].getValue() ).lSchema.size() +
+                       getQuery( arg[1].getValue() ).lSchema.size() ;
+            case STREAM_AVG:
+            case STREAM_MIN:
+            case STREAM_MAX:
+            case STREAM_SUM:
+                return 1 ;
+
         }
     }
-    return 0;
+    assert(false);
+    return 0; //pro forma
 }
 
 boost::rational<int> Processor::computeValue(
@@ -727,7 +773,7 @@ boost::rational<int> Processor::computeValue(
                         b = rStack.top() ;
                         rStack.pop() ;
 
-                        if ( a < b ) {
+                        if ( a > b ) {
                             boost::rational <int> temp = b ;
                             b = a ;
                             a = temp ;
@@ -736,14 +782,14 @@ boost::rational<int> Processor::computeValue(
                         int pos = 0 ;
 
                         boost::rational <int> ret = 0 ; /* limits.h */
-                        for ( auto f : getQuery(q.id).lSchema ) {
 
-                            boost::rational <int> val =
-                                    boost::get< boost::rational<int> >( getValue(q.id, 0, pos ++ ) );
-                            cerr << q.id << val << "." ;
-                            if ( val >= a )
-                                if ( val <= b )
-                                    ret ++ ;
+                        for ( int i = 0 ; i < getSizeOfRollup(q) ; i ++ ) {
+
+                            boost::rational <int> val = boost::get< boost::rational<int> >( getValueOfRollup( q , i ) );
+
+                            if ( val >= a && val <= b ) {
+                                ret++;
+                            }
                         }
 
                         rStack.push( ret );
@@ -754,10 +800,9 @@ boost::rational<int> Processor::computeValue(
 
                         int pos = 0 ;
 
-                        for ( auto f : getQuery(q.id).lSchema ) {
+                        for ( int i = 0 ; i < getSizeOfRollup(q) ; i ++ ) {
 
-                            boost::rational <int> val =
-                                    boost::get< boost::rational<int> >( getValue(q.id, 0, pos ++ ) );
+                            boost::rational <int> val = boost::get< boost::rational<int> > ( getValueOfRollup( q , i ) );
 
                             if ( a == val ) ret ++ ;
                         }

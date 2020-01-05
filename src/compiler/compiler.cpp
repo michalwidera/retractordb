@@ -617,7 +617,6 @@ string prepareFields() {
                         list < token >::iterator eIt = q.lProgram.begin();
 
                         string sName1  = ( * eIt ++ ).getValue() ;
-                        string sVar1   = ( * eIt ).getValue() ;
                         token cmd = ( * eIt ++ ) ;
 
                         q.lSchema = combine( sName1, "", cmd ) ;
