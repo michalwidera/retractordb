@@ -627,21 +627,61 @@ number Processor::getValueOfRollup( const query &q , int offset ) {
 
     token arg[3];
     const int progSize =  q.lProgram.size() ;
+    assert(progSize < 4);
     int ret = 0 ;
 
     int i = 0;
     for( auto tk : q.lProgram ) arg[i++] = tk ;
 
-    token cmd = arg[progSize-1];
+    const command_id cmd = arg[progSize-1].getTokenCommand();
 
-    string v = arg[0].getValue() ;
-    if ( cmd.getTokenCommand() == PUSH_STREAM )
-        //getValue(outSchema, 0, offsetInSchema + offsetFromArg);
-        return getValue( v , 0, offset );
+    int TimeOffset(-1) ;                   // This -1 is intentionally wrong - Hash return value
 
-    assert(false); //TODO PART
+    switch ( cmd ){
+        case PUSH_STREAM:
+            return getValue( arg[0].getValue() , 0, offset );
+        case STREAM_TIMEMOVE:
+            /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
+            return getValue( arg[0].getValue() , rational_cast<int> ( arg[1].getCRValue() ), offset );
+        case STREAM_DEHASH_MOD:
+        case STREAM_DEHASH_DIV:
+            /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2), PUSH_DEHASH_DIV(0) */
+            assert(false); //TODO
+        case STREAM_SUBSTRACT:
+            //TODO: Check
+            return getValue( arg[0].getValue() , 0, offset );
+        case STREAM_AVG:
+        case STREAM_MIN:
+        case STREAM_MAX:
+        case STREAM_SUM:
+            assert(offset == 1);
+            return getValue( arg[0].getValue() , 0, offset );
+        case STREAM_ADD:
+            /* signalRow+source : PUSH_STREAM(signalRow), PUSH_STREAM(source), STREAM_ADD(0) */
+            {
+            const auto sizeOfFirstSchema = getQuery(arg[0].getValue()).lSchema.size();
+            if (offset < sizeOfFirstSchema)
+                return getValue(arg[0].getValue(), 0, offset);
+            else
+                return getValue(arg[1].getValue(), 0, offset - sizeOfFirstSchema);
+            }
+        case STREAM_AGSE:
+            assert(false); //TODO
+            return number(0) ; /* pro forma */
+        case STREAM_HASH:
+            // TODO: Check if right hash part is returned here
+            if ( Hash(
+                    getQuery( arg[0].getValue() ).rInterval,
+                    getQuery( arg[1].getValue() ).rInterval,
+                    gContextLenMap[q.id],
+                    TimeOffset ) ) {
+                return getValue( arg[1].getValue()  , 0, offset );
+            } else {
+                return getValue( arg[0].getValue()  , 0, offset );
+            }
+    }
 
-    /** We need to create support for all operators - not only PUSH_STREAM scenario */
+    assert(false); // Unknown operator catched here
 
     return number(0) ; /* pro forma */
 }
@@ -651,12 +691,12 @@ int getSizeOfRollup( const query &q ) {
 
     token arg[3];
     const int progSize =  q.lProgram.size() ;
+    assert(progSize < 4);
     int ret = 0 ;
 
     int i = 0;
     for( auto tk : q.lProgram ) arg[i++] = tk ;
 
-    token cmd = arg[progSize-1];
 
     if ( progSize == 1 )
         return getQuery( arg[0].getValue() ).lSchema.size() ;
@@ -664,8 +704,9 @@ int getSizeOfRollup( const query &q ) {
     if ( progSize == 2 )
         return getQuery( arg[0].getValue() ).lSchema.size() ;
 
+    const command_id cmd = arg[progSize-1].getTokenCommand();
     if ( progSize == 3 ) {
-        switch( cmd.getTokenCommand() ) {
+        switch( cmd ) {
             case STREAM_HASH:
             case STREAM_DEHASH_MOD:
             case STREAM_DEHASH_DIV:
@@ -673,7 +714,7 @@ int getSizeOfRollup( const query &q ) {
             case STREAM_TIMEMOVE:
                 return getQuery( arg[0].getValue() ).lSchema.size() ;
             case STREAM_AGSE:
-                return abs(rational_cast<int>(cmd.getCRValue()));
+                return abs(rational_cast<int>(arg[2].getCRValue()));
             case STREAM_ADD:
                 return getQuery( arg[0].getValue() ).lSchema.size() +
                        getQuery( arg[1].getValue() ).lSchema.size() ;
