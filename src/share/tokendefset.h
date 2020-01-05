@@ -39,6 +39,8 @@ DEF_CASE( STREAM_ADD        )
 DEF_CASE( STREAM_SUBSTRACT  )
 DEF_CASE( STREAM_TIMEMOVE   )
 DEF_CASE( STREAM_AGSE       )
+DEF_CASE( COUNT             )
+DEF_CASE( COUNT_RANGE       )
 #else
 #error Please define operation in tokendefset.h - DEF_CASE
 #endif

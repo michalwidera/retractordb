@@ -163,7 +163,7 @@ int Processor::getArgumentOffset( const string & streamName, const string & stre
                 cerr << "1st: " << A.getValue() << endl ;
                 cerr << "2nd: " << B.getValue() << endl ;
 
-                throw  std::out_of_range("Odwolanie do schematu ktorego nie ma zbiorze argumetow");
+                throw  std::out_of_range("Call to schema that not exist");
             }
 
         }
@@ -482,19 +482,11 @@ void Processor::updateContext( set < string > inSet ) {
 
                         if ( operation.getTokenCommand() == STREAM_DEHASH_DIV ) {
 
-                            // deltaA = deltadivMod( rationalArgument , q.rInterval ) ?
-                            // deltaB = rationalArgument
-                            // deltaC = q.rInterval
-                            // i = gStreamSize[q.id] -> gContextLenMap[ q.id ]
                             TimeOffset = Div( rationalArgument, q.rInterval, position );
                         }
 
                         if ( operation.getTokenCommand() == STREAM_DEHASH_MOD ) {
 
-                            // deltaA = rationalArgument
-                            // deltaB = deltadivMod( rationalArgument , q.rInterval ) ?
-                            // deltaC = q.rInterval
-                            // i = gStreamSize[q.id] -> gContextLenMap[ q.id ]
                             TimeOffset = Mod( rationalArgument, q.rInterval, position );
                         }
 
@@ -631,6 +623,26 @@ void Processor::updateContext( set < string > inSet ) {
     }
 }
 
+int getSizeOfRollup( query &q ) {
+
+    token arg1,arg2,arg3;
+
+    int ret = 0 ;
+
+    for( auto tk : q.lProgram ) {
+        if ( q.lProgram.size() == 1 ) {
+            return getQuery( tk.getValue() ).lSchema.size();
+        }
+        if ( q.lProgram.size() == 2 ) {
+            return getQuery( tk.getValue() ).lSchema.size();
+        }
+        if ( q.lProgram.size() == 3 ) {
+            
+        }
+    }
+    return 0;
+}
+
 boost::rational<int> Processor::computeValue(
     field & f,
     query & q
@@ -709,9 +721,51 @@ boost::rational<int> Processor::computeValue(
                     } else if ( tk.getValue() == "getRowValueceil" ) {
                         rStack.push ( boost::rational<int>(Rationalize(ceil(real))));
                     } else if ( tk.getValue() == "sqrt" ) {
-                        rStack.push (boost::rational<int>(Rationalize(sqrt(real))));;
+                        rStack.push (boost::rational<int>(Rationalize(sqrt(real))));
+                    } else if ( tk.getValue() == "count_range" ) {
+
+                        b = rStack.top() ;
+                        rStack.pop() ;
+
+                        if ( a < b ) {
+                            boost::rational <int> temp = b ;
+                            b = a ;
+                            a = temp ;
+                        }
+
+                        int pos = 0 ;
+
+                        boost::rational <int> ret = 0 ; /* limits.h */
+                        for ( auto f : getQuery(q.id).lSchema ) {
+
+                            boost::rational <int> val =
+                                    boost::get< boost::rational<int> >( getValue(q.id, 0, pos ++ ) );
+                            cerr << q.id << val << "." ;
+                            if ( val >= a )
+                                if ( val <= b )
+                                    ret ++ ;
+                        }
+
+                        rStack.push( ret );
+
+                    } else if ( tk.getValue() == "count" ) {
+
+                        boost::rational <int> ret = 0 ; /* limits.h */
+
+                        int pos = 0 ;
+
+                        for ( auto f : getQuery(q.id).lSchema ) {
+
+                            boost::rational <int> val =
+                                    boost::get< boost::rational<int> >( getValue(q.id, 0, pos ++ ) );
+
+                            if ( a == val ) ret ++ ;
+                        }
+
+                        rStack.push( ret );
+
                     } else {
-                        throw std::out_of_range("No support for this math function - write is SVP");
+                        throw std::out_of_range("No support for this math function - write it SVP");
                     }
                 }
                 break;
@@ -732,7 +786,7 @@ boost::rational<int> Processor::computeValue(
                     string argument( tk.getValue() );
                     string outSchema( q.id );
 
-                    // If opration ADD exist - then position schema will be moved
+                    // If operation ADD exist - then position schema will be moved
                     // first argument
                     int offsetFromArg = getArgumentOffset( outSchema, argument );
 

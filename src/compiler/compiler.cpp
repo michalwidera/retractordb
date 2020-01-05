@@ -523,7 +523,6 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
         throw std::invalid_argument("Command stack hits undefinied opeation");
     }
 
-
     //Here are added to fields execution methods 
     //by reference to schema position 
 
@@ -588,20 +587,12 @@ string prepareFields() {
 
                         clog << "prepareFields() size()==1" << endl ;
 
-                        //we assure that on and only token is puhs_stream
+                        //we assure that on and only token is push_stream
                         assert( ( * q.lProgram.begin() ).getTokenCommand() == PUSH_STREAM ) ;
 
                         //copy list of fields from one to another
                         q.lSchema = getQuery( t.getValue() ).lSchema ;
 
-                        for ( auto & fld : q.lSchema ) {
-                            clog << "prepareFields(): fields in source:" << fld.getFirstFieldName() << endl ;
-                            for ( auto & tk2 : fld.lProgram ) {
-
-                                string target = tk2.getValue() ;
-                                clog << "prepareFields(): " << tk2.getStrTokenName() << " " << target << endl;
-                            }
-                        }
                         break ;
                     }
 
