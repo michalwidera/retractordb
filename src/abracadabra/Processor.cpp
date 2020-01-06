@@ -1,6 +1,7 @@
 #include "Processor.h"
 #include "Buffer.h"
 #include "SOperations.h"
+#include "../share/QStruct.h"
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
@@ -623,7 +624,7 @@ void Processor::updateContext( set < string > inSet ) {
     }
 }
 
-number Processor::getValueOfRollup( const query &q , int offset ) {
+number Processor::getValueOfRollup( const query &q , int offset , int timeOffset ) {
 
     token arg[3];
     const int progSize =  q.lProgram.size() ;
@@ -639,46 +640,50 @@ number Processor::getValueOfRollup( const query &q , int offset ) {
 
     switch ( cmd ){
         case PUSH_STREAM:
-            return getValue( arg[0].getValue() , 0, offset );
+            return getValue( arg[0].getValue() , timeOffset, offset );
         case STREAM_TIMEMOVE:
             /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-            return getValue( arg[0].getValue() , rational_cast<int> ( arg[1].getCRValue() ), offset );
+            return getValue( arg[0].getValue() , timeOffset + rational_cast<int> ( arg[1].getCRValue() ), offset );
         case STREAM_DEHASH_MOD:
         case STREAM_DEHASH_DIV:
             /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2), PUSH_DEHASH_DIV(0) */
             assert(false); //TODO
         case STREAM_SUBSTRACT:
             //TODO: Check
-            return getValue( arg[0].getValue() , 0, offset );
+            return getValue( arg[0].getValue() , timeOffset, offset );
         case STREAM_AVG:
         case STREAM_MIN:
         case STREAM_MAX:
         case STREAM_SUM:
             assert(offset == 1);
-            return getValue( arg[0].getValue() , 0, offset );
+            return getValue( arg[0].getValue() , timeOffset, offset );
         case STREAM_ADD:
             /* signalRow+source : PUSH_STREAM(signalRow), PUSH_STREAM(source), STREAM_ADD(0) */
             {
             const auto sizeOfFirstSchema = getQuery(arg[0].getValue()).lSchema.size();
             if (offset < sizeOfFirstSchema)
-                return getValue(arg[0].getValue(), 0, offset);
+                return getValue(arg[0].getValue(), timeOffset, offset);
             else
-                return getValue(arg[1].getValue(), 0, offset - sizeOfFirstSchema);
+                return getValue(arg[1].getValue(), timeOffset, offset - sizeOfFirstSchema);
             }
         case STREAM_AGSE:
             assert(false); //TODO
             return number(0) ; /* pro forma */
         case STREAM_HASH:
             // TODO: Check if right hash part is returned here
-            if ( Hash(
-                    getQuery( arg[0].getValue() ).rInterval,
-                    getQuery( arg[1].getValue() ).rInterval,
-                    gContextLenMap[q.id],
-                    TimeOffset ) ) {
-                return getValue( arg[1].getValue()  , 0, offset );
+        {
+            const auto timeSeqence = ( gContextLenMap[q.id] - timeOffset ) > 1 ? gContextLenMap[q.id] - timeOffset : 1 ;
+            if (Hash(
+                    getQuery(arg[0].getValue()).rInterval,
+                    getQuery(arg[1].getValue()).rInterval,
+                    timeSeqence,
+                    TimeOffset)) {
+                return getValue(arg[1].getValue(), TimeOffset, offset);
             } else {
-                return getValue( arg[0].getValue()  , 0, offset );
+                return getValue(arg[0].getValue(), TimeOffset, offset);
             }
+        }
+            assert(false); //TODO
     }
 
     assert(false); // Unknown operator catched here
@@ -737,7 +742,7 @@ boost::rational<int> Processor::computeValue(
     bool resultValid = true ;
 
     stack < boost::rational<int> > rStack ;
-    boost::rational<int> a, b ;
+    boost::rational<int> a,b ;
 
     for( auto tk : f.lProgram ) {
         if ( ! resultValid ) { //Is somewe by walk we hit NULL - getoutofhere! - and be back in a while.
@@ -798,55 +803,70 @@ boost::rational<int> Processor::computeValue(
             case CALL:
 
                 {
-                    a = rStack.top() ;
-                    rStack.pop() ;
-
                     double real = (double) a.numerator() / (double) a.denominator() ;
 
                     if ( tk.getValue() == "floor" ) {
+                        a = rStack.top() ;
+                        rStack.pop() ;
                         rStack.push ( boost::rational<int>(Rationalize(floor(real))));
                     } else if ( tk.getValue() == "getRowValueceil" ) {
+                        a = rStack.top() ;
+                        rStack.pop() ;
                         rStack.push ( boost::rational<int>(Rationalize(ceil(real))));
                     } else if ( tk.getValue() == "sqrt" ) {
-                        rStack.push (boost::rational<int>(Rationalize(sqrt(real))));
-                    } else if ( tk.getValue() == "count_range" ) {
-
-                        b = rStack.top() ;
+                        a = rStack.top() ;
                         rStack.pop() ;
-
-                        if ( a > b ) {
-                            boost::rational <int> temp = b ;
-                            b = a ;
-                            a = temp ;
-                        }
-
-                        int pos = 0 ;
-
-                        boost::rational <int> ret = 0 ; /* limits.h */
-
-                        for ( int i = 0 ; i < getSizeOfRollup(q) ; i ++ ) {
-
-                            boost::rational <int> val = boost::get< boost::rational<int> >( getValueOfRollup( q , i ) );
-
-                            if ( val >= a && val <= b ) {
-                                ret++;
-                            }
-                        }
-
-                        rStack.push( ret );
-
+                        rStack.push (boost::rational<int>(Rationalize(sqrt(real))));
                     } else if ( tk.getValue() == "count" ) {
 
+                        assert( rStack.size() < 4 );
+                        assert( rStack.size() > 0 );
+                        /**
+                         * Overhere you should see 1,2 or 3 arguments
+                         * (x) means count X in schema
+                         * (x,y) means count from X to Y in schema
+                         * (x,y,t) meanse count X to Y in schemat and t probes back
+                         */
+
+                        vector<int> args ;
+
+                        while( !rStack.empty() ) {
+                            args.push_back(rational_cast<int>(rStack.top()));
+                            rStack.pop();
+                        }
+
+                        int from,to,len = 1 ;
+
+                        if ( args.size() == 1 ) {
+                            from = to = args[0];
+                        }
+                        if ( args.size() == 2 ) {
+                            from = args[1];
+                            to = args[0];
+                        }
+                        if ( args.size() == 3 ) {
+                            from = args[2];
+                            to = args[1];
+                            len = args[0];
+                        }
+
+                        if ( to < from ) {
+                            int tempval = from ;
+                            to = from ;
+                            from = tempval ;
+                        }
+
                         boost::rational <int> ret = 0 ; /* limits.h */
 
-                        int pos = 0 ;
+                        for ( int j = 0 ; j < len ; j ++ )
+                            for ( int i = 0 ; i < getSizeOfRollup(q) ; i ++ ) {
 
-                        for ( int i = 0 ; i < getSizeOfRollup(q) ; i ++ ) {
+                                boost::rational <int> val = boost::get< boost::rational<int> >( getValueOfRollup( q, i, j ) );
 
-                            boost::rational <int> val = boost::get< boost::rational<int> > ( getValueOfRollup( q , i ) );
-
-                            if ( a == val ) ret ++ ;
-                        }
+                                if ( val >= from && val <= to ) {
+                                    ret++;
+                                }
+                            }
 
                         rStack.push( ret );
 

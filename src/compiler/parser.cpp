@@ -319,7 +319,6 @@ struct ql_parser : public grammar<ql_parser> {
             Token_t MIN = as_lower_d["min"] ;
             Token_t SUM = as_lower_d["sum"] ;
             Token_t COUNT = as_lower_d["count"] ;
-            Token_t COUNT_RANGE = as_lower_d["count_range"] ;
             Token_t AGSE = as_lower_d["agse"] ;
             Token_t SELECT = as_lower_d["select"] ;
             Token_t DECLARE = as_lower_d["declare"] ;
@@ -562,9 +561,6 @@ struct ql_parser : public grammar<ql_parser> {
 
             funct
                 =
-                    ( COUNT_RANGE >> ch_p('(') >> expression >> ch_p(',') >> expression >> ch_p(')') )
-                    [&do_fcall]
-                    |
                     (
                         ( SQRT
                             | CEIL
@@ -579,7 +575,7 @@ struct ql_parser : public grammar<ql_parser> {
                             | INT
                             | COUNT
                         )
-                        >> ch_p('(') >> expression >> ch_p(')')
+                        >> ch_p('(') >> expression % ch_p(',') >> ch_p(')')
                     )
                     [&do_fcall]
                     ;
