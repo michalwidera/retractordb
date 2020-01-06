@@ -2,4 +2,4 @@ declare a BYTE stream source, 1 file /dev/urandom
 
 select * stream signalRow from source@(1,25)
 
-select count_range(0,50), count_range(50,100) stream count5 from signalRow+source
+select count_range(0,50), count_range(50,100) stream countHistorgram from signalRow
