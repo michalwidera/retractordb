@@ -320,6 +320,12 @@ list< string > query::getFieldNamesList() {
     return schema ;
 }
 
+/*
+ * list < string > query::getArgumentList() {
+
+}
+ */
+
 int query::getFieldIndex( field f_arg ) {
     int idx(0);
     for ( auto f : lSchema ) {

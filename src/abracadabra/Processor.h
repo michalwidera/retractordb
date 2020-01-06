@@ -62,4 +62,7 @@ class Processor : private boost::noncopyable {
     /** This function return lenght of data stream */
     int getStreamCount( const string query_name );
 
+    /** */
+    number getValueOfRollup( const query &q , int offset );
+
 };
