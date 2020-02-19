@@ -1,8 +1,8 @@
-Abracadabra DB
+RetractorDB
 -----------------------------------------------------------------------
-![CircleCI](https://circleci.com/gh/michalwidera/abracadabradb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
+![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
 
-Sources of AbracadabraDB Time Series Database System prototype.
+Sources of RetractorDB Time Series Database System prototype.
 
 Contents
 -----------------------------------------------------------------------
@@ -22,8 +22,8 @@ Installation procedure
 
 ```
 sudo apt-get -y install gcc cmake libboost-all-dev make build-essential
-git clone https://github.com/michalwidera/abracadabradb.git
-cd abracadabradb
+git clone https://github.com/michalwidera/retractordb.git
+cd retractordb
 cmake CMakeLists.txt; make
 sudo make install
 ```
