@@ -76,10 +76,10 @@ add_definitions(
   -D_DEBUG
 )
 
-set(SOURCES_ABRACADABRA
-  abracadabra/Processor.cpp
-  abracadabra/executorsm.cpp
-  abracadabra/CRSMath.cpp
+set(SOURCES_RETRACTOR
+        retractor/Processor.cpp
+        retractor/executorsm.cpp
+        retractor/CRSMath.cpp
   share/Buffer.cpp
   share/dbstream.cpp
   share/QStruct.cpp
@@ -107,7 +107,7 @@ set(SOURCES_QRY
   qry/qry.cpp
 )
 
-add_executable( xabracadabra ${SOURCES_ABRACADABRA} )
+add_executable( xretractor ${SOURCES_RETRACTOR} )
 add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
@@ -117,7 +117,7 @@ ADD_DEFINITIONS( "-DHAS_BOOST" )
 
 find_package( Threads )
 
-target_link_libraries( xabracadabra ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )    
+target_link_libraries( xretractor ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
 target_link_libraries( xcompiler ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
 target_link_libraries( xdumper ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
 target_link_libraries( xqry ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
@@ -130,4 +130,4 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
     VERBATIM
   )
 
-install(TARGETS xabracadabra xcompiler xdumper xqry DESTINATION /usr/local/bin) 
+install(TARGETS xretractor xcompiler xdumper xqry DESTINATION /usr/local/bin)

@@ -46,7 +46,7 @@ typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
 using namespace CRationalStreamMath ;
 
 // Segment and allocator for string exchange
-// IPC::managed_shared_memory strSegment(IPC::open_or_create, "AbracadabraShmemStr", 65536);
+// IPC::managed_shared_memory strSegment(IPC::open_or_create, "RetractorShmemStr", 65536);
 // const StringAllocator allocatorShmemStrInstance (strSegment.get_segment_manager());
 
 // Maps stores realtions processId -> sended stream
@@ -254,17 +254,17 @@ ptree commandProcessor( ptree ptInval ) {
 void commmandProcessorLoop() {
 
     try {
-        IPC::message_queue::remove("AbracadabraQueryQueue");
-        IPC::shared_memory_object::remove("AbracadabraShmemMap");
+        IPC::message_queue::remove("RetractorQueryQueue");
+        IPC::shared_memory_object::remove("RetractorShmemMap");
 
         // Segment and allogator for map purposes
-        IPC::managed_shared_memory mapSegment(IPC::open_or_create, "AbracadabraShmemMap", 65536);
+        IPC::managed_shared_memory mapSegment(IPC::open_or_create, "RetractorShmemMap", 65536);
         const ShmemAllocator allocatorShmemMapInstance (mapSegment.get_segment_manager());
 
         //Create a message_queue.
         IPC::message_queue mq
         (IPC::open_or_create           //open or crate
-            ,"AbracadabraQueryQueue"   //name
+            ,"RetractorQueryQueue"   //name
             ,1000                      //max message number
             ,1000                      //max message size
         );
@@ -622,8 +622,8 @@ int main(int argc, char* argv[]) {
     bt.interrupt();
     bt.join();
 
-    IPC::shared_memory_object::remove("AbracadabraShmemMap");
-    IPC::message_queue::remove("AbracadabraQueryQueue");
+    IPC::shared_memory_object::remove("RetractorShmemMap");
+    IPC::message_queue::remove("RetractorQueryQueue");
 
     for ( const auto & element : id2StreamName_Relation ) {
         std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first) ;

@@ -3,17 +3,17 @@
 echo "-----------------------------------------------------------------"
 if  ! xcompiler -t ; then exit 1 ; fi
 echo "-----------------------------------------------------------------"
-if  ! xexecutor -t ; then exit 1 ; fi
+if  ! xretractor -t ; then exit 1 ; fi
 echo "-----------------------------------------------------------------"
-if ! xcompiler -q test/query-lnx.txt ; then exit 1 ; fi 
+if ! xcompiler -q test/query-lnx.txt ; then exit 1 ; fi
 echo "-----------------------------------------------------------------"
 echo "\n SUKCES 1 z 3\n"
 echo "-----------------------------------------------------------------"
-if ! xdumper -d ; then exit 1 ; fi 
+if ! xdumper -d ; then exit 1 ; fi
 echo "-----------------------------------------------------------------"
 echo "\n SUKCES 2 z 3\n"
 echo "-----------------------------------------------------------------"
-if ! xexecutor -m 20 --waterfall ; then exit 1 ; fi
+if ! xretractor -m 20 --waterfall ; then exit 1 ; fi
 echo "-----------------------------------------------------------------"
 echo "\n SUKCES 3 z 3\n"
 echo "-----------------------------------------------------------------"

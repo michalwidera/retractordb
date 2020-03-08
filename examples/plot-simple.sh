@@ -49,7 +49,7 @@ echo 'YDIM:' $YDIM
 
 if ! xcompiler -q $FILE ; then exit 1 ; fi 
 
-nohup xabracadabra &
+nohup xretractor &
 
 sleep 2
 

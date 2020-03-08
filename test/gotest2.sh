@@ -4,7 +4,7 @@ echo "-----------------------------------------------------------------"
 if ! xcompiler -q regtest/query.txt ; then exit ; fi
 sleep 1
 echo "-----------------------------------------------------------------"
-nohup xexecutor &
+nohup xretractor &
 read -p "any key to kill"
 echo "-----------------------------------------------------------------"
 xqdb -k 

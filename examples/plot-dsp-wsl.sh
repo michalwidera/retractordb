@@ -13,7 +13,7 @@ echo "Type ctrl+c to stop."
 
 if ! xcompiler -q query-dsp.txt ; then exit 1 ; fi 
 
-nohup xabracadabra &
+nohup xretractor &
 
 sleep 4
 export DISPLAY=:0

@@ -13,7 +13,7 @@ xdumper: query plan dumper
 
 xcompiler: query compiler
 
-xabracadabra: database main process
+xretractor: database main process
 
 xdisplay: query plan presentation script
 
@@ -27,12 +27,12 @@ cd retractordb
 cmake CMakeLists.txt; make
 sudo make install
 ```
-After installation xabracadabra, xqry ... etc will be installed in /usr/local/bin on path.
+After installation xretractor, xqry ... etc will be installed in /usr/local/bin on path.
 Please check proper installation by typing in command prompt - for instance: xqry -h
 
 You should see:
 ```
-xqry - xabracadabra communication tool.
+xqry - xretractor communication tool.
 Allowed options:
   -s [ --select ] arg         show this stream
   -t [ --detail ] arg         show details of this stream
