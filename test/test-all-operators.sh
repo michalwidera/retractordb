@@ -1,6 +1,6 @@
 #!/bin/sh
 xcompiler -q test/query-all.txt
-nohup xabracadabra -m 8000 &
+nohup xretractor -m 8000 &
 sleep 5
 xqry -d
 xqry -s str3 -m 5 

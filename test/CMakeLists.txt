@@ -30,9 +30,9 @@ add_test( NAME dumper-test
           COMMAND build/xdumper -d
          )
 
-add_test( NAME executor-waterfall
+add_test( NAME retractor-waterfall
           WORKING_DIRECTORY .
-          COMMAND xabracadabra -m 20 --waterfall 
+          COMMAND xretractor -m 20 --waterfall
          )
 
 add_test( NAME workflow-test
