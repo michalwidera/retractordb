@@ -30,7 +30,7 @@ then
     tmux resize-pane -t dev:0.4 -x 15       
     tmux resize-pane -t dev:0.5 -x 15       
 
-    tmux send-keys -t dev:0.0 'xabracadabra -v' C-m
+    tmux send-keys -t dev:0.0 'xretractor -v' C-m
     sleep 2
     tmux send-keys -t dev:0.1 'clear; xqry -s core' C-m
     tmux send-keys -t dev:0.2 'clear; xqry -s agregacja' C-m

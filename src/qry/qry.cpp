@@ -274,7 +274,7 @@ ptree netClient( string netCommand, string netArgument ) {
 
     try {
 
-        IPC::managed_shared_memory mapSegment(IPC::open_only, "AbracadabraShmemMap");
+        IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
         const ShmemAllocator allocatorShmemMapInstance (mapSegment.get_segment_manager());
 
         pt_request.put("db.message", netCommand );
@@ -290,7 +290,7 @@ ptree netClient( string netCommand, string netArgument ) {
 
         IPC::message_queue mq
         (IPC::open_only
-            ,"AbracadabraQueryQueue"
+            ,"RetractorQueryQueue"
         );
 
         std::stringstream request_stream ;
@@ -397,7 +397,7 @@ int main(int argc, char* argv[]) {
         ("json,j", "json communication protocol")
         ("xml,x", "xml communication protocol")
         ("info,o", "info communication protocol (default)")
-        ("kill,k", "kill xabracadabra server" )
+        ("kill,k", "kill xretractor server" )
         ("dir,d", "list of queries" )
         ("graphite,g", "graphite output mode")
         ("influxdb,f", "influxDB output mode")
@@ -437,7 +437,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (vm.count("help")) {
-            cerr << argv[0] << " - xabracadabra communication tool." << std::endl;
+            cerr << argv[0] << " - xretractor communication tool." << std::endl;
             cerr << desc << endl ;
             return 1;
         } else if (vm.count("hello") ) {
