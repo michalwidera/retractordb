@@ -439,7 +439,7 @@ int main(int argc, char* argv[]) {
         if (vm.count("help")) {
             cerr << argv[0] << " - xretractor communication tool." << std::endl;
             cerr << desc << endl ;
-            return 1;
+            return 0;
         } else if (vm.count("hello") ) {
             ptree pt = netClient( "hello", "" ) ;
             printf ("snd: hello\n");
