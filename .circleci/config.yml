@@ -14,11 +14,8 @@ jobs:
           name: Install product
           command: 'sudo make install'
       - run:
-          name: Test
-          command: 'make test'
-      - run:
-          name: Show Test results
-          command: 'cat Testing/Temporary/*'
+          name: Check if there is any regression
+          command: 'ctest --output-on-failure'
 
   build-boostedgcc-update:
     working_directory: ~
@@ -37,10 +34,7 @@ jobs:
           command: 'sudo make install'
       - run:
           name: Check if there is any regression
-          command: 'make test'
-      - run:
-          name: Show Test results
-          command: 'cat Testing/Temporary/*'
+          command: 'ctest --output-on-failure'
 
   build-buildpack:
     working_directory: ~
@@ -62,10 +56,7 @@ jobs:
           command: 'sudo make install'
       - run:
           name: Check if there is any regression
-          command: 'make test'
-      - run:
-          name: Show Test results
-          command: 'cat Testing/Temporary/*'
+          command: 'ctest --output-on-failure'
 
 workflows:
   version: 2
