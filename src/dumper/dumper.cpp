@@ -7,6 +7,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
 #include <boost/program_options.hpp>
+#include <boost/system/error_code.hpp>
 
 #include "Buffer.h"
 
@@ -429,7 +430,7 @@ int main(int argc, char* argv[]) {
 
         if (vm.count("help")) {
             cerr << desc << endl ;
-            return 1;
+            return system::errc::success;
         }
 
         string sPlikDanych = vm["infile"].as< string >() ;
@@ -446,11 +447,14 @@ int main(int argc, char* argv[]) {
         // Check if we put depended parameters
         //
         if ( vm.count("tags") != 0 &&  vm.count("fields") == 0 ) {
+
             cerr << "Conflicting parameters" << endl ;
             cerr << "Tags are referencing fields - when you set tags, leve field in dots" << endl ;
-            return 1 ;
+            return system::errc::invalid_argument;
         }
+
         if ( vm.count("view") ) {
+
             const std::string sTempDotFile( "temp_$$$.dot" );
             const std::string sTempPngFile( "temp_$$$.png" );
             {
@@ -462,12 +466,17 @@ int main(int argc, char* argv[]) {
                     vm.count("showtypes") != 0
                 );
             }
+
             std::system( std::string( "dot -Tpng " + sTempDotFile + " -o " + sTempPngFile ).c_str() );
+
             if ( ! vm.count("leavedot") ) {
+
                 std::remove( sTempDotFile.c_str() );
             }
             cerr << "type: start " << sTempPngFile << endl ;
+
         } else if (vm.count("dot")) {
+
             dumpGraphiz( cout,
                 vm.count("fields") != 0,
                 vm.count("streamprogs") != 0,
@@ -475,19 +484,22 @@ int main(int argc, char* argv[]) {
                 vm.count("showtypes") != 0
             );
         } else if (vm.count("csv")) {
+
             cerr << "Core count:" << (int)coreInstance.size() << endl ;
             dumpQSet() ;
             dumpQPrograms() ;
             dumpQFields() ;
             dumpQFieldsProgram() ;
         } else {
+
             // Default
             dumpQHierarchy() ;
         }
     } catch(std::exception& e) {
-        cerr << e.what() << "\n";
-        return 1;
+
+        cerr << e.what() << endl;
+        return system::errc::interrupted;
     }
 
-    return 0;
+    return system::errc::success;
 }

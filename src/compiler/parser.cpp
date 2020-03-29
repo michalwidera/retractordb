@@ -620,44 +620,25 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
     ql_parser g;
     stk.push( boost::shared_ptr<query>( new query() ) );
 
-    if ( sInputFile == "regtest" ) {
-        string str[] = { "declare a INTEGER stream core0, 1",
-                "select core0[1],core0 stream str1 from core0"
-            } ;
+    ifstream input( sInputFile.c_str(), ifstream::in );
 
-        for ( int i = 0 ; i < 2 ; i++ ) {
-            do_reset();
-            stripUnicode( str[i] );
-            if ( !parse( str[i].c_str(), g, space_p ).full ) {
-                cerr << "Error:\t" << str[i].c_str() << endl ;
-                throw std::invalid_argument("Syntax Error");
-            } else {
-                if ( verbose ) {
-                    cout << "OK:\t" << str[i].c_str() << endl ;
-                }
-            }
+    if ( ! input.is_open() ) {
+        throw std::out_of_range("File not found.");
+    }
+
+    string str;
+    while ( getline( input, str ) ) {
+        if ( str == "stop" ) {
+            break ;
         }
-    } else {
-        ifstream input( sInputFile.c_str(), ifstream::in );
-
-        if ( ! input.is_open() ) {
-            throw std::out_of_range("File not found.");
-        }
-
-        string str;
-        while ( getline( input, str ) ) {
-            if ( str == "stop" ) {
-                break ;
-            }
-            do_reset();
-            stripUnicode( str );
-            if ( ! parse( str.c_str(), g, space_p ).full ) {
-                cerr << "error:\t" << str.c_str() << endl ;
-                throw std::invalid_argument("Syntax Error");
-            } else {
-                if ( verbose ) {
-                    cout << "OK:\t" << str.c_str() << endl ;
-                }
+        do_reset();
+        stripUnicode( str );
+        if ( ! parse( str.c_str(), g, space_p ).full ) {
+            cerr << "error:\t" << str.c_str() << endl ;
+            throw std::invalid_argument("Syntax Error");
+        } else {
+            if ( verbose ) {
+                cout << "OK:\t" << str.c_str() << endl ;
             }
         }
     }

@@ -26,6 +26,8 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptors.hpp>
 
+#include <boost/system/error_code.hpp>
+
 #include "Buffer.h"
 
 namespace IPC = boost::interprocess ;
@@ -361,12 +363,16 @@ int _getch() {
 }
 
 int main(int argc, char* argv[]) {
+
     // Clarification: When gcc has been upgraded to 9.x version some tests fails.
     // Bug appear when data are passing to program via script .sh
     // additional 13 (\r) character was append - this code normalize argv list.
     // C99: The parameters argc and argv and the strings pointed to by the argv array
     // shall be modifiable by the program, and retain their last-stored values
     // between program startup and program termination.
+
+    auto retVal = system::errc::success;
+
     for ( int i = 0 ; i < argc ;  i ++ )
     {
         auto len = strlen( argv[i] ) ;
@@ -417,7 +423,7 @@ int main(int argc, char* argv[]) {
 
         if (vm.count("help")) {
             cout << desc << "\n";
-            return 0;
+            return system::errc::success;
         }
 
         if ( vm.count("json") ) {
@@ -436,7 +442,7 @@ int main(int argc, char* argv[]) {
 
         if ( ! ifs ) {
             cerr << sInputFile << " - no input file" << endl;
-            return 1;
+            return system::errc::invalid_argument;
         }
 
         boost::archive::text_iarchive ia(ifs);
@@ -479,7 +485,7 @@ int main(int argc, char* argv[]) {
 
             _getch(); //no wait ... feed key from kbhit
 
-            return 0;
+            return system::errc::success;
         }
 
         if (vm.count("verbose")) {
@@ -630,5 +636,5 @@ int main(int argc, char* argv[]) {
         IPC::message_queue::remove(queueName.c_str());
     }
 
-    return 0;
+    return retVal;
 }

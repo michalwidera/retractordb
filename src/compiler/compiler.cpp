@@ -5,6 +5,7 @@
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
+#include <boost/system/error_code.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -981,7 +982,6 @@ int main(int argc, char* argv[]) {
         ("help,h", "Show program options")
         ("queryfile,q", po::value<string>(&sInputFile)->default_value("query.txt"), "query set file")
         ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "output file")
-        ("regtest,t","Regression Test")
         ("log,g","Translation raport - debuglog")
         ("verbose,v", "Diangostic info")
         ;
@@ -1001,7 +1001,7 @@ int main(int argc, char* argv[]) {
 
         if (vm.count("help")) {
             cout << desc << "\n";
-            return 1;
+            return system::errc::success;
         }
 
         if (vm.count("log")) {
@@ -1014,16 +1014,6 @@ int main(int argc, char* argv[]) {
             clog << "Start\n";
         } else {
             clog.rdbuf(NULL);
-        }
-
-        if (vm.count("regtest")) {
-            int retcode = 0 ;
-            cout << "Regression test start" << endl ;
-            retcode = parser( "regtest", "testfile", vm.count("verbose")) != "OK" ;
-            SOperations_regtest();
-            cout << "Regression test end" << endl ;
-            clog.rdbuf(oldbuf);
-            return retcode;
         }
 
         string sQueryFile = vm["queryfile"].as< string >() ;
@@ -1045,6 +1035,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (vm.count("verbose")) {
+
             cout << "In:        \t" << sQueryFile << endl ;
             cout << "Out:       \t" << sOutFile << endl ;
             cout << "Link:      \t" << sLinkFile << endl ;
@@ -1079,6 +1070,7 @@ int main(int argc, char* argv[]) {
                     }
                     lineNr++;
                 }
+
                 cout << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl;
             }
         }
@@ -1095,6 +1087,7 @@ int main(int argc, char* argv[]) {
         ia >> coreInstance ;
 
         if ( coreInstance.size() == 0 ) {
+
             throw std::out_of_range("No queries to process found");
         }
 
@@ -1130,12 +1123,14 @@ int main(int argc, char* argv[]) {
         string sSize( "" ) ;
 
         if ( dSize > 0 ) {
+
             stringstream s ;
             s << dSize ;
             sSize = string( " + " ) + string( s.str() ) ;
         }
 
         if (vm.count("verbose")) {
+
             cout << "Raport:"
                 << sQueryFile
                 << " => "
@@ -1148,10 +1143,11 @@ int main(int argc, char* argv[]) {
         clog.rdbuf(oldbuf);
 
     } catch(std::exception& e) {
+
         clog.rdbuf(oldbuf);
         cerr << e.what() << "\n";
-        return 1;
+        return system::errc::interrupted;
     }
 
-    return 0;
+    return system::errc::success;
 }

@@ -148,6 +148,7 @@ int _getch() {
 // Consumer process asynchronusly fetch data from quere and puts on screen/output
 //
 void consumer() {
+
     ptree e_value ;
     while (!done) {
         while (spsc_queue.pop(e_value)) {
@@ -215,6 +216,7 @@ void consumer() {
 
 
 void producer() {
+
     try {
 
         string queueName = "brcdbr" + boost::lexical_cast<string>(boost::this_process::get_id()) ;
@@ -260,6 +262,7 @@ void producer() {
 
         }
     } catch(IPC::interprocess_exception &ex) {
+
         cerr << ex.what() << endl << "catch on producer queue" << endl;
         cerr << "queue:" << "brcdbr" + boost::lexical_cast<string>(boost::this_process::get_id()) << endl ;
         done = true ;
@@ -357,12 +360,15 @@ ptree netClient( string netCommand, string netArgument ) {
         }
 
     } catch(IPC::interprocess_exception &ex) {
+
         cerr << ex.what() << endl << "catch IPC server" << endl;
         done = true ;
     } catch (boost::system::system_error& e) {
+
         cerr << e.what() << endl << "boost system_error" << endl ;
         done = true ;
     } catch (std::exception& e) {
+
         cerr << e.what() << endl ;
         pt_response.put("error.response", e.what() );
         done = true ;
@@ -437,10 +443,13 @@ int main(int argc, char* argv[]) {
         }
 
         if (vm.count("help")) {
+
             cerr << argv[0] << " - xretractor communication tool." << std::endl;
             cerr << desc << endl ;
-            return 0;
+            return system::errc::success;
+
         } else if (vm.count("hello") ) {
+
             ptree pt = netClient( "hello", "" ) ;
             printf ("snd: hello\n");
 
@@ -453,8 +462,9 @@ int main(int argc, char* argv[]) {
             }
 
             if ( rcv != "world" ) {
+
                 printf( "%s\n", rcv.c_str() );
-                return 1 ;
+                return system::errc::protocol_error;
             }
 
             // Fail in this part of code could means that server in in json mode
@@ -513,8 +523,9 @@ int main(int argc, char* argv[]) {
                     printf( "%s.%s\n", sInputStream.c_str(), v.second.get<std::string>("").c_str() );
                 }
             } else {
-                printf( "not found\n" );
-                return 1 ;
+
+                cerr << "not found" << endl ;
+                return system::errc::no_such_file_or_directory ;
             }
 
         } else if (vm.count("select") && sInputStream != "none" ) {
@@ -524,16 +535,19 @@ int main(int argc, char* argv[]) {
             ptree pt = netClient( "get", "" ) ;
 
             for ( const auto & v : pt.get_child("db.stream") ) {
+
                 if ( sInputStream == v.second.get<std::string>("") ) {
+
                     streamTable[ sInputStream ] = netClient( "show", sInputStream )  ;
                     found = true ;
                     break ;
                 }
             }
 
-            printf( found ? "" : "not found\n" );
             if ( !found ) {
-                return 1 ;
+
+                cerr << "not found" << endl ;
+                return system::errc::no_such_file_or_directory;
             }
 
             schema = netClient( "detail", sInputStream ) ;
@@ -574,19 +588,26 @@ int main(int argc, char* argv[]) {
             done = true;
             producer_thread.join();
             consumer_thread.join();
+
         } else {
+
             cerr << "use -h" << endl ;
-            return 1;
+            return system::errc::invalid_argument ;
         }
+
     } catch(IPC::interprocess_exception &ex) {
+
         cerr << ex.what() << endl << "catch client" << endl;
-        return 1;
+        return system::errc::no_child_process;
+
     } catch(std::exception& e) {
-        cerr << e.what() << "\n";
-        return 1;
+
+        cerr << e.what() << endl;
+        return system::errc::interrupted;
+
     }
 
     cout << "ok." << endl ;
 
-    return 0;
+    return system::errc::success;
 }
