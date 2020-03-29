@@ -1,6 +1,6 @@
 # declaration of input time series
-declare a INTEGER,b INTEGER stream core0, 1 file test/datafile2.dat
-declare c INTEGER,d INTEGER stream core1, 0.5 file test/datafile3.dat
+declare a INTEGER,b INTEGER stream core0, 1 file datafile2.dat
+declare c INTEGER,d INTEGER stream core1, 0.5 file datafile3.dat
 
 # time series junction
 select core0[0],core0[1] stream str1 from core0#core1

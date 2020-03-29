@@ -371,8 +371,6 @@ int main(int argc, char* argv[]) {
     // shall be modifiable by the program, and retain their last-stored values
     // between program startup and program termination.
 
-    auto retVal = system::errc::success;
-
     for ( int i = 0 ; i < argc ;  i ++ )
     {
         auto len = strlen( argv[i] ) ;
@@ -636,5 +634,5 @@ int main(int argc, char* argv[]) {
         IPC::message_queue::remove(queueName.c_str());
     }
 
-    return retVal;
+    return system::errc::success;
 }
