@@ -980,7 +980,7 @@ int main(int argc, char* argv[]) {
         po::options_description desc("Avaiable options");
         desc.add_options()
         ("help,h", "Show program options")
-        ("queryfile,q", po::value<string>(&sInputFile)->default_value("query.txt"), "query set file")
+        ("queryfile,q", po::value<string>(&sInputFile) , "query set file")
         ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "output file")
         ("log,g","Translation raport - debuglog")
         ("verbose,v", "Diangostic info")
@@ -994,9 +994,11 @@ int main(int argc, char* argv[]) {
             options(desc).positional(p).run(), vm);
         po::notify(vm);
 
-        //Intro
-        if (vm.count("verbose")) {
-            cerr << argv[0] << " - parser, compiler and qery plans reductor.\n";
+        if ( vm.count("queryfile") == 0 ) {
+
+            cout << argv[0] << ": fatal error: no input file" << endl ;
+            cout << "compilation terminated." << endl ;
+            return EPERM ; //ERROR defined in errno-base.h
         }
 
         if (vm.count("help")) {

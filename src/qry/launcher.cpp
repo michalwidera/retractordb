@@ -157,12 +157,17 @@ int main(int argc, char* argv[]) {
 
         } else if (vm.count("select") && sInputStream != "none" ) {
             
-            select( vm.count("needctrlc") );
+            if ( select( vm.count("needctrlc") == false  )) {
+
+                return system::errc::no_such_file_or_directory;
+            }
 
         } else {
 
-            cerr << "use -h" << endl ;
-            return system::errc::invalid_argument ;
+
+            cout << argv[0] << ": fatal error: no argument" << endl ;
+            cout << "query receiver terminated." << endl ;
+            return EPERM ; //ERROR defined in errno-base.h
         }
 
     } catch(IPC::interprocess_exception &ex) {

@@ -28,6 +28,8 @@
 
 #include <boost/system/error_code.hpp>
 
+#include <boost/filesystem.hpp>
+
 #include "Buffer.h"
 
 namespace IPC = boost::interprocess ;
@@ -424,6 +426,14 @@ int main(int argc, char* argv[]) {
         if (vm.count("help")) {
             cout << desc << "\n";
             return system::errc::success;
+        }
+
+        if ( !boost::filesystem::exists( sInputFile ) )
+        {
+
+            cout << argv[0] << ": fatal error: no input file" << endl ;
+            cout << "query processing terminated." << endl ;
+            return EPERM ; //ERROR defined in errno-base.h
         }
 
         if ( vm.count("json") ) {

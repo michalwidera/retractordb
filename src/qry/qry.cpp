@@ -385,7 +385,7 @@ ptree netClient( string netCommand, string netArgument ) {
     return pt_response ;
 }
 
-void select( bool needctrlc ) {
+bool select( bool needctrlc ) {
 
     bool found ( false );
 
@@ -404,7 +404,7 @@ void select( bool needctrlc ) {
     if ( !found ) {
 
         cerr << "not found" << endl ;
-        return; // system::errc::no_such_file_or_directory;
+        return found;
     }
 
     schema = netClient( "detail", sInputStream ) ;
@@ -439,12 +439,17 @@ void select( bool needctrlc ) {
     } while(true);
 
     if ( iTimeLimitCnt != 1 && !done ) {
+
         _getch(); //no wait ... feed key from kbhit
     }
 
     done = true;
     producer_thread.join();
     consumer_thread.join();
+
+    assert(found == true);
+
+    return found;
 }
 
 int hello() {
