@@ -1,11 +1,10 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR )
 
-project( database-test )
+project( regression-test )
 
 enable_testing()
 
-set( CMAKE_CURRENT_BINARY_DIR test/Scripts)
-set( CMAKE_CURRENT_DATA_DIR test/DataSet)
+set(CMAKE_CURRENT_DATA_DIR test/Regression/Data)
 
 add_test( 
   NAME compiler-test-on-query
@@ -16,7 +15,7 @@ add_test(
 add_test( 
   NAME compiler-test-on-dumper 
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
-  COMMAND sh -c "xdumper > out.txt"
+  COMMAND sh -c "xcompiler -q query-lnx.txt; xdumper > out.txt"
 )
 
 add_test(
@@ -28,13 +27,13 @@ add_test(
 add_test(
   NAME dumper-test
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
-  COMMAND xdumper -d
+  COMMAND sh -c "xcompiler -q query-lnx.txt; xdumper -d"
 )
 
 add_test( 
   NAME retractor-waterfall
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
-  COMMAND xretractor -m 20 --waterfall
+  COMMAND sh -c "xcompiler -q query-lnx.txt; xretractor -m 20 --waterfall"
 )
 
 add_test( 
