@@ -16,6 +16,9 @@ jobs:
       - run:
           name: Test
           command: 'make test'
+      - run:
+          name: Show Test results
+          command: 'cat Testing/Temporary/*'
 
   build-boostedgcc-update:
     working_directory: ~
@@ -35,6 +38,9 @@ jobs:
       - run:
           name: Check if there is any regression
           command: 'make test'
+      - run:
+          name: Show Test results
+          command: 'cat Testing/Temporary/*'
 
   build-buildpack:
     working_directory: ~
@@ -57,6 +63,9 @@ jobs:
       - run:
           name: Check if there is any regression
           command: 'make test'
+      - run:
+          name: Show Test results
+          command: 'cat Testing/Temporary/*'
 
 workflows:
   version: 2
