@@ -371,6 +371,8 @@ int main(int argc, char* argv[]) {
     // shall be modifiable by the program, and retain their last-stored values
     // between program startup and program termination.
 
+    auto retVal = system::errc::success;
+
     for ( int i = 0 ; i < argc ;  i ++ )
     {
         auto len = strlen( argv[i] ) ;
@@ -559,7 +561,9 @@ int main(int argc, char* argv[]) {
                     std::list<int> eraseList ;
 
                     for ( const auto & element : id2StreamName_Relation ) {
+
                         if ( element.second == queryName ) {
+
                             using namespace boost::interprocess;
 
                             //
@@ -582,9 +586,11 @@ int main(int argc, char* argv[]) {
                     // cleaning form clients map that are not receiving data from queue
                     //
                     for ( const auto & element : eraseList ) {
+
                         id2StreamName_Relation.erase( element ) ;
                         if (vm.count("verbose")) {
-                            std::cerr << "queue erased on timeout, procId=" << element << std::endl;
+
+                            cout << "queue erased on timeout, procId=" << element << std::endl;
                         }
                     }
                 }
@@ -604,23 +610,30 @@ int main(int argc, char* argv[]) {
         // End of main processing loop
         //
         if ( iTimeLimitCnt != 1 ) {
+
             _getch(); //no wait ... feed key from kbhit
         } else {
             if (vm.count("verbose")) {
+
                 cout << "Query limit (-m) waiting for fullfil" << endl ;
             }
         }
 
         saveStreamsToFile( sDumpFile );
         if (vm.count("verbose")) {
+    
             cout << "Dump  :" << sDumpFile << endl ;
             Dump( std::cout );
         }
 
     } catch(IPC::interprocess_exception &ex) {
+
         std::cout << ex.what() << std::endl << "interprocess exception" << std::endl;
+        retVal = system::errc::no_child_process;
     } catch(std::exception& e) {
+
         cerr << e.what() << endl ;
+        retVal = system::errc::interrupted;
     }
 
     bt.interrupt();
@@ -634,5 +647,5 @@ int main(int argc, char* argv[]) {
         IPC::message_queue::remove(queueName.c_str());
     }
 
-    return system::errc::success;
+    return retVal;
 }
