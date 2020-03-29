@@ -77,9 +77,9 @@ add_definitions(
 )
 
 set(SOURCES_RETRACTOR
-        retractor/Processor.cpp
-        retractor/executorsm.cpp
-        retractor/CRSMath.cpp
+  retractor/Processor.cpp
+  retractor/executorsm.cpp
+  retractor/CRSMath.cpp
   share/Buffer.cpp
   share/dbstream.cpp
   share/QStruct.cpp
@@ -105,6 +105,7 @@ set(SOURCES_DUMPER
 
 set(SOURCES_QRY
   qry/qry.cpp
+  qry/launcher.cpp
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )
@@ -124,10 +125,10 @@ target_link_libraries( xqry ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-  add_custom_target(iwyu
-    COMMAND iwyu_tool -p "${CMAKE_BINARY_DIR}"
-    COMMENT "Running include-what-you-use tool"
-    VERBATIM
-  )
+add_custom_target(iwyu
+  COMMAND iwyu_tool -p "${CMAKE_BINARY_DIR}"
+  COMMENT "Running include-what-you-use tool"
+  VERBATIM
+)
 
 install(TARGETS xretractor xcompiler xdumper xqry DESTINATION /usr/local/bin)

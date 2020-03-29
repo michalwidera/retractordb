@@ -9,5 +9,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 
 add_subdirectory(src)
 add_subdirectory(test/Regression)
+add_subdirectory(test/UnitTest)
 add_subdirectory(scripts)
 

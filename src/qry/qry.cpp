@@ -60,8 +60,6 @@ How xqry terminal works
 // boost::this_process::get_id()
 #include <boost/process/environment.hpp>
 
-#include <boost/program_options.hpp>
-
 #include <time.h>
 
 using namespace std ;
@@ -114,6 +112,17 @@ enum outputFormatMode {
 //Graphite nbeed scheamt in format "path.to.data value timestamp"
 ptree schema ;
 string sInputStream ;
+
+
+void setmode( std::string mode ) {
+    if (mode == "XML") outMode = XML ;
+    else if (mode == "JSON") outMode = JSON ;
+    else if (mode == "INFO") outMode = INFO ;
+    else if (mode == "RAW") outputFormatMode = RAW ;
+    else if (mode == "GRAPHITE") outputFormatMode = GRAPHITE;
+    else if (mode == "INFLUXDB") outputFormatMode = INFLUXDB;
+    else assert(false);
+}
 
 int _kbhit(void) {
     struct termios oldt, newt;
@@ -376,238 +385,89 @@ ptree netClient( string netCommand, string netArgument ) {
     return pt_response ;
 }
 
-int main(int argc, char* argv[]) {
+void select( bool needctrlc ) {
 
-    // Clarification: When gcc has been upgraded to 9.x version some tests fails.
-    // Bug appear when data are passing to program via script .sh
-    // additional 13 (\r) character was append - this code normalize argv list.
-    // C99: The parameters argc and argv and the strings pointed to by the argv array
-    // shall be modifiable by the program, and retain their last-stored values
-    // between program startup and program termination.
-    for ( int i = 0 ; i < argc ;  i ++ )
-    {
-        auto len = strlen( argv[i] ) ;
-        if ( len > 0 )
-            if ( argv[i][len-1] == 13 ) argv[i][len-1] = 0 ;
+    bool found ( false );
+
+    ptree pt = netClient( "get", "" ) ;
+
+    for ( const auto & v : pt.get_child("db.stream") ) {
+
+        if ( sInputStream == v.second.get<std::string>("") ) {
+
+            streamTable[ sInputStream ] = netClient( "show", sInputStream )  ;
+            found = true ;
+            break ;
+        }
     }
 
-    try {
-        namespace po = boost::program_options;
+    if ( !found ) {
 
-        po::options_description desc("Allowed options");
-        desc.add_options()
-        ("select,s", po::value<string>(&sInputStream), "show this stream")
-        ("detail,t", po::value<string>(&sInputStream), "show details of this stream")
-        ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0), "limit of elements, 0 - no limit" )
-        ("hello,l", "diagnostic - hello db world")
-        ("json,j", "json communication protocol")
-        ("xml,x", "xml communication protocol")
-        ("info,o", "info communication protocol (default)")
-        ("kill,k", "kill xretractor server" )
-        ("dir,d", "list of queries" )
-        ("graphite,g", "graphite output mode")
-        ("influxdb,f", "influxDB output mode")
-        ("raw,r", "raw mode (default)")
-        ("help,h", "show options")
-        ("needctrlc,c", "force ctl+c for stop this tool")
-        ;
+        cerr << "not found" << endl ;
+        return; // system::errc::no_such_file_or_directory;
+    }
 
-        po::positional_options_description p;       //Assume that select is the first option
-        p.add("select", -1);
+    schema = netClient( "detail", sInputStream ) ;
 
-        po::variables_map vm;
-        po::store(po::command_line_parser(argc, argv).
-            options(desc).positional(p).run(), vm);
-        po::notify(vm);
+    //
+    // Function in this thread will start listner on udp
+    //
+    boost::thread producer_thread(producer);
 
-        setbuf(stdout, NULL);
+    //
+    // Function in this thrade will start fetching data from queue
+    //
+    boost::thread consumer_thread(consumer);
 
-        if ( vm.count("json") ) {
-            outMode = JSON ;
-        }
-        if ( vm.count("xml" ) ) {
-            outMode = XML ;
-        }
-        if ( vm.count("info") ) {
-            outMode = INFO ;
-        }
-
-        if ( vm.count("graphite") ) {
-            outputFormatMode = GRAPHITE ;
-        }
-        if ( vm.count("raw") ) {
-            outputFormatMode = RAW ;
-        }
-        if ( vm.count("influxdb") ) {
-            outputFormatMode = INFLUXDB ;
-        }
-
-        if (vm.count("help")) {
-
-            cerr << argv[0] << " - xretractor communication tool." << std::endl;
-            cerr << desc << endl ;
-            return system::errc::success;
-
-        } else if (vm.count("hello") ) {
-
-            ptree pt = netClient( "hello", "" ) ;
-            printf ("snd: hello\n");
-
-            string rcv("fail.") ;
-
-            BOOST_FOREACH(ptree::value_type &v,
-                pt) {
-                rcv = v.second.get<std::string>("") ;
-                printf( "rcv: %s %s\n", v.first.c_str(), rcv.c_str() );
-            }
-
-            if ( rcv != "world" ) {
-
-                printf( "%s\n", rcv.c_str() );
-                return system::errc::protocol_error;
-            }
-
-            // Fail in this part of code could means that server in in json mode
-            // and query is going xml. (or otherwise)
-            // catched in regressions
-
-        } else if (vm.count("kill") ) {
-
-            ptree pt = netClient( "kill", "" ) ;
-            printf ("kill sent.\n");
-
-        } else if (vm.count("dir") ) {
-
-            ptree pt = netClient( "get", "" ) ;
-
-            std::vector<string> vcols = {"", "duration", "size", "count" };
-            stringstream ss ;
-            for ( auto nName : vcols ) {
-                int maxSize = 0 ;
-                for ( const auto & v : pt.get_child("db.stream") ) {
-                    if ( v.second.get<std::string>(nName).length() > maxSize ) {
-                        maxSize = v.second.get<std::string>( nName ).length();
-                    }
-                }
-                ss << "|%" ;
-                ss << maxSize ;
-                ss << "s";
-            };
-            ss << "|\n" ;
-
-            for ( const auto & v : pt.get_child("db.stream") ) {
-                printf( ss.str().c_str()
-                    , v.second.get<std::string>("").c_str()
-                    , v.second.get<std::string>("duration").c_str()
-                    , v.second.get<std::string>("size").c_str()
-                    , v.second.get<std::string>("count").c_str() );
-            }
-
-        } else if (vm.count("detail") ) {
-
-            bool found(false);
-            ptree pt = netClient( "get", "" ) ;
-
-            cerr << "got answer" << endl ;
-
-            for ( const auto & v : pt.get_child("db.stream") ) {
-                if ( sInputStream == v.second.get<std::string>("") ) {
-                    found = true ;
-                }
-            }
-
-            if ( found ) {
-                ptree pt = netClient( "detail", sInputStream ) ;
-
-                for ( const auto & v : pt.get_child("db.field") ) {
-                    printf( "%s.%s\n", sInputStream.c_str(), v.second.get<std::string>("").c_str() );
-                }
-            } else {
-
-                cerr << "not found" << endl ;
-                return system::errc::no_such_file_or_directory ;
-            }
-
-        } else if (vm.count("select") && sInputStream != "none" ) {
-
-            bool found ( false );
-
-            ptree pt = netClient( "get", "" ) ;
-
-            for ( const auto & v : pt.get_child("db.stream") ) {
-
-                if ( sInputStream == v.second.get<std::string>("") ) {
-
-                    streamTable[ sInputStream ] = netClient( "show", sInputStream )  ;
-                    found = true ;
-                    break ;
-                }
-            }
-
-            if ( !found ) {
-
-                cerr << "not found" << endl ;
-                return system::errc::no_such_file_or_directory;
-            }
-
-            schema = netClient( "detail", sInputStream ) ;
-
-            //
-            // Function in this thread will start listner on udp
-            //
-            boost::thread producer_thread(producer);
-
-            //
-            // Function in this thrade will start fetching data from queue
-            //
-            boost::thread consumer_thread(consumer);
-
-            do {
-                if ( vm.count("needctrlc") ) {
-                    // If this option appear - any key will not stop process
-                } else {
-                    if ( _kbhit() ) {
-                        break ;
-                    }
-                }
-                if ( done ) {
-                    break ;
-                }
-                if ( iTimeLimitCnt == 1 ) {
-                    break ;
-                }
-
-                boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
-
-            } while(true);
-
-            if ( iTimeLimitCnt != 1 && !done ) {
-                _getch(); //no wait ... feed key from kbhit
-            }
-
-            done = true;
-            producer_thread.join();
-            consumer_thread.join();
-
+    do {
+        if ( needctrlc ) {
+            // If this option appear - any key will not stop process
         } else {
-
-            cerr << "use -h" << endl ;
-            return system::errc::invalid_argument ;
+            if ( _kbhit() ) {
+                break ;
+            }
+        }
+        if ( done ) {
+            break ;
+        }
+        if ( iTimeLimitCnt == 1 ) {
+            break ;
         }
 
-    } catch(IPC::interprocess_exception &ex) {
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
 
-        cerr << ex.what() << endl << "catch client" << endl;
-        return system::errc::no_child_process;
+    } while(true);
 
-    } catch(std::exception& e) {
-
-        cerr << e.what() << endl;
-        return system::errc::interrupted;
-
+    if ( iTimeLimitCnt != 1 && !done ) {
+        _getch(); //no wait ... feed key from kbhit
     }
 
-    cout << "ok." << endl ;
+    done = true;
+    producer_thread.join();
+    consumer_thread.join();
+}
+
+int hello() {
+    ptree pt = netClient( "hello", "" ) ;
+    printf ("snd: hello\n");
+
+    string rcv("fail.") ;
+
+    BOOST_FOREACH(ptree::value_type &v,
+        pt) {
+        rcv = v.second.get<std::string>("") ;
+        printf( "rcv: %s %s\n", v.first.c_str(), rcv.c_str() );
+    }
+
+    if ( rcv != "world" ) {
+
+        printf( "%s\n", rcv.c_str() );
+        return system::errc::protocol_error;
+    }
 
     return system::errc::success;
+
+    // Fail in this part of code could means that server in in json mode
+    // and query is going xml. (or otherwise)
+    // catched in regressions
 }
