@@ -377,7 +377,7 @@ ptree netClient( string netCommand, string netArgument ) {
     return pt_response ;
 }
 
-bool select( bool needctrlc ) {
+bool select( bool noneedctrlc ) {
     bool found ( false );
     ptree pt = netClient( "get", "" ) ;
 
@@ -405,7 +405,7 @@ bool select( bool needctrlc ) {
     boost::thread consumer_thread(consumer);
 
     do {
-        if ( needctrlc ) {
+        if ( noneedctrlc ) {
             // If this option appear - any key will not stop process
         } else {
             if ( _kbhit() ) {

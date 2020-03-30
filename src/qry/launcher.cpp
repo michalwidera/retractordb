@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
                 return system::errc::no_such_file_or_directory ;
             }
         } else if (vm.count("select") && sInputStream != "none" ) {
-            if ( select(vm.count("needctrlc")) == false ) {
+            if ( select(vm.count("needctrlc" )) == false) {
                 return system::errc::no_such_file_or_directory;
             }
         } else {

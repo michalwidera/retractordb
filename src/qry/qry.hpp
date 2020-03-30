@@ -4,7 +4,7 @@
 int _getch();
 void consumer();
 void producer();
-bool select( bool needctrlc );
+bool select( bool noneedctrlc );
 void dir();
 int hello();
 void setmode( std::string mode );
