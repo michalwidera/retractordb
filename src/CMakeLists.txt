@@ -94,4 +94,8 @@ add_custom_target(iwyu
   VERBATIM
 )
 
+add_custom_target(astyle
+  COMMAND astyle share/* qry/* dumper/* compiler/* retractor/*
+)
+
 install(TARGETS xretractor xcompiler xdumper xqry DESTINATION /usr/local/bin)
