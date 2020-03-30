@@ -35,7 +35,7 @@ class inputDF :
     inputDF();
     inputDF( std::string inputFileName, std::list < field > &lSchema ) ;
 
-    /** The purpose of this function is to retrieve a row 
+    /** The purpose of this function is to retrieve a row
      * from the file is created based on the schema saved in the query.
      */
     void processRow() ;

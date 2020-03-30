@@ -27,21 +27,24 @@ CRandomFile::CRandomFile( string murExt, const bool destroyOnDestructor ) :
 
     assert( TMP_PATH != "" );
     assert( murExt != "" );
-
 #ifdef WIN32
     char randomFilename [MAX_PATH];
+
     if ( ! GetTempFileNameA( TMP_PATH.c_str(), murExt.c_str(), 0, randomFilename ) ) {
         throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/WINAPI32 GetTempFileNameA");
     }
+
 #else
     char randomFilename [MAX_PATH] = "/tmp/stream.XXXXXXXX";
+
     if ( mkstemp(randomFilename) == -1 ) {
         throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/mkstemp(template)");
     }
-#endif
 
+#endif
     filename = randomFilename ;
     open( filename.c_str(), ios::in | ios::out | ios::binary ) ;
+
     if ( !good() ) {
         throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/Randomfile does not created file");
     }
@@ -59,7 +62,7 @@ CRandomFile::~CRandomFile() {
     }
 }
 
-const CRandomFile &CRandomFile::operator << ( string & text ) {
+const CRandomFile &CRandomFile::operator << ( string &text ) {
     write( text.c_str(), static_cast<long>( text.length() ) );
     flush();
     return *this ;
@@ -70,17 +73,14 @@ const CRandomFile &CRandomFile::operator << ( string & text ) {
 int main(int argc, char* argv[]) {
     try {
         std::cerr << "start regression\n";
-
-        CRandomFile *test = new CRandomFile();
+        CRandomFile* test = new CRandomFile();
         *test << "test";
         delete test;
-
         std::cerr << "stop regression\n";
         return 1;
-    } catch(std::exception& e) {
+    } catch(std::exception &e) {
         std::cerr << e.what() << "\n";
         return 1;
     }
-
 }
 #endif

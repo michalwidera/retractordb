@@ -9,7 +9,7 @@ using namespace boost ;
 #include <boost/scoped_ptr.hpp>
 #include <boost/crc.hpp>
 
-const int max_packet_size=1024 ;
+const int max_packet_size = 1024 ;
 
 /** Mutex declartion */
 recursive_mutex lock_ ;
@@ -20,7 +20,7 @@ using boost::shared_array ;
 
 /** Interface contract for Block class type */
 class IBlock {
-    void operator= (const IBlock&);   //prevent from copying this way
+    void operator= (const IBlock &);  //prevent from copying this way
 
   public:
 
@@ -33,24 +33,24 @@ class IBlock {
     IBlock ( long frameSize = 0 )
         : frameSize(frameSize), frameCount(0), firstFrame(0)
     {}
-    IBlock (const IBlock&);           //allow copying
+    IBlock (const IBlock &);          //allow copying
     virtual ~IBlock() {}  ;
 
     void PutBlock( arrayPointer_t pBlockBuffer, long count ) ;
     long GetBlock( long position, arrayPointer_t pBlockBuffer ) ;
     long GetByteSize() ;
-    void Save( std::ostream& strout ) ;
-    void Load( std::istream& strin ) ;
+    void Save( std::ostream &strout ) ;
+    void Load( std::istream &strin ) ;
     void Trunc() ;
     long SyncToDisk() ;
 } ;
 
 /**
-	 * Template class - atribute is data stream
-	 * STREAM - can take CBlock<CRandomFile>,CBlock<strstream>
-	 * Look at cyclic block
-	 * @see CCycBlock
-	 */
+     * Template class - atribute is data stream
+     * STREAM - can take CBlock<CRandomFile>,CBlock<strstream>
+     * Look at cyclic block
+     * @see CCycBlock
+     */
 template <class STREAM>
 class CBlock : public IBlock {
     boost::scoped_ptr< STREAM > pImpl ;   /**< Pointer for standard stream ie. (cin,cout,iostream)*/
@@ -64,8 +64,8 @@ class CBlock : public IBlock {
     void PutBlock( arrayPointer_t pBlockBuffer, long count ) ;  /**< Put frame in block */
     long GetBlock( long position, arrayPointer_t pBlockBuffer ) ;  /**< Get Frame from block  */
     long GetByteSize() ;                /**< Count of bytes in block */
-    void Save( std::ostream& strout ) ; /**< Save block to stream */
-    void Load( std::istream& strin ) ;  /**< Load block from stream */
+    void Save( std::ostream &strout ) ; /**< Save block to stream */
+    void Load( std::istream &strin ) ;  /**< Load block from stream */
     void Trunc() ;                      /**< Truncate block */
     long SyncToDisk() ;                 /**< Drop block to disk */
 };
@@ -81,31 +81,31 @@ class CRecord : public std::map< long, BLOCK > {
     void DefBlock( long blockID, long frameSize ) ;
     void DelBlock( long blockID ) ;
     void PutBlock( long blockID, arrayPointer_t pBlockBuffer, long count ) ;
-    long GetBlock( long blockID, long position, arrayPointer_t pBlockBuffer  )	;
-    BLOCK & RefBlock( long blockID )	;
+    long GetBlock( long blockID, long position, arrayPointer_t pBlockBuffer  )  ;
+    BLOCK &RefBlock( long blockID )    ;
     typename CRecord::iterator find( long blockID ) ;
-    void Save( std::ostream& stream ) ;
+    void Save( std::ostream &stream ) ;
     void Load( std::istream &stream ) ;
 };
 
 /**
-	*	Template class - atribute stream
-	*	STREAM - can be CCycBlock<CRandomFile>,CCycBlock<strstream>
-	*/
+    *   Template class - atribute stream
+    *   STREAM - can be CCycBlock<CRandomFile>,CCycBlock<strstream>
+    */
 template <class STREAM>
 class CCycBlock : public IBlock {
-    long lastblockCnt ;			    /**< JIT Support */
+    long lastblockCnt ;             /**< JIT Support */
 
-    typedef std::pair < long,CBlock<STREAM> > blockMapPair ;
-    typedef std::map<long,CBlock<STREAM> > blockMapT ;
+    typedef std::pair < long, CBlock<STREAM>> blockMapPair ;
+    typedef std::map<long, CBlock<STREAM>> blockMapT ;
     blockMapT blockMap ;
     typename blockMapT::iterator itLastBlock ;
 
   public:
-    /**	Intended no copy consrutor here ! => JIT/Shallow Copy required !*/
+    /** Intended no copy consrutor here ! => JIT/Shallow Copy required !*/
 
-    unsigned long slices ;	        /**< Slice count for cyclical block  */
-    long framesInSlice ;	        /**< Count of frames in each subblock */
+    unsigned long slices ;          /**< Slice count for cyclical block  */
+    long framesInSlice ;            /**< Count of frames in each subblock */
 
     /** Konstruktor bloku cyklicznego */
     CCycBlock( long frameSize = 0 );
@@ -115,8 +115,8 @@ class CCycBlock : public IBlock {
     virtual ~CCycBlock() ;
     void PutBlock( arrayPointer_t pBlockBuffer, long count ) ;
     long GetBlock( long position, arrayPointer_t pBlockBuffer ) ;
-    void Save( std::ostream& strout ) ;
-    void Load( std::istream& strin ) ;
+    void Save( std::ostream &strout ) ;
+    void Load( std::istream &strin ) ;
     long SyncToDisk() ;
 };
 
@@ -124,35 +124,35 @@ template <class IDTYPE>
 class CBufferImpl {
     typedef std::map < long, BlockType > BMap ;
 
-    boost::shared_ptr< CRecord<CBlock<CRandomFile> > > recordInFile ;
-    boost::shared_ptr< CRecord<CBlock<std::stringstream> > > recordInMemory;
-    boost::shared_ptr< CRecord<CCycBlock<CRandomFile> > > recordInCycleFile ;
-    boost::shared_ptr< CRecord<CCycBlock<std::stringstream> > > recordInCycleMemory ;
+    boost::shared_ptr< CRecord<CBlock<CRandomFile>>> recordInFile ;
+    boost::shared_ptr< CRecord<CBlock<std::stringstream>>> recordInMemory;
+    boost::shared_ptr< CRecord<CCycBlock<CRandomFile>>> recordInCycleFile ;
+    boost::shared_ptr< CRecord<CCycBlock<std::stringstream>>> recordInCycleMemory ;
     /** Intended map encapsulation */
     BMap blok  ;
 
     long eval( long BlockID ) ;     /** Eval functions are type deduction supportes during compilation */
     long eval( const std::string &BlockName ) ;
-    
+
   public:
 
     CBufferImpl();
 
     virtual ~CBufferImpl() ;
-    void Load( const char * filename ) ;
-    void Save( const char * filename ) ;
+    void Load( const char* filename ) ;
+    void Save( const char* filename ) ;
     void PutBlock( IDTYPE blockID, arrayPointer_t pBlockBuffer, long count = 1 ) ;
-    long GetBlock( IDTYPE blockID, long position, arrayPointer_t pBlockBuffer ) ; 
+    long GetBlock( IDTYPE blockID, long position, arrayPointer_t pBlockBuffer ) ;
     void DefBlock( IDTYPE blockID, long frameSize, BlockType btType = BF, long aux1 = 0, long aux2 = 0) ;
     void DelBlock( IDTYPE blockID ) ;
     long GetLen( IDTYPE blockID ) ;
-    long GetSizeOfFrame( IDTYPE blockID ) ; 
-    long GetSizeOfBlock( IDTYPE blockID, long firstFrm=0, long lastFrm=-1 ) ;
+    long GetSizeOfFrame( IDTYPE blockID ) ;
+    long GetSizeOfBlock( IDTYPE blockID, long firstFrm = 0, long lastFrm = -1 ) ;
     void Clear() ;
     void DecycleBlockType( IDTYPE blockID, arrayPointer_t pBlockBuffer ) ;
     void MemorizeBlockType( IDTYPE blockID, arrayPointer_t pBlockBuffer ) ;
     long syncToDisk(IDTYPE blockID ) ;
-    void Dump( std::ostream &os, std::set < string > * pQset ) ;
+    void Dump( std::ostream &os, std::set < string >* pQset ) ;
 };
 
 template class CBlock<CRandomFile> ;
@@ -164,11 +164,11 @@ template class CCycBlock<stringstream> ;
 template class CBufferImpl<std::string> ;
 template class CBufferImpl<long> ;
 
-template class CRecord<CBlock<CRandomFile> > ;
-template class CRecord<CBlock<stringstream> >;
+template class CRecord<CBlock<CRandomFile>> ;
+template class CRecord<CBlock<stringstream>>;
 
-template class CRecord<CCycBlock<CRandomFile> > ;
-template class CRecord<CCycBlock<stringstream> >;
+template class CRecord<CCycBlock<CRandomFile>> ;
+template class CRecord<CCycBlock<stringstream>>;
 
 template <class IDTYPE>
 long CBufferImpl<IDTYPE>::eval( long BlockID ) {
@@ -178,19 +178,20 @@ long CBufferImpl<IDTYPE>::eval( long BlockID ) {
 template <class IDTYPE>
 long CBufferImpl<IDTYPE>::eval( const string &BlockName ) {
     long hashKey(0) ;
+
     for ( long i = 0 ; i < static_cast<long>( BlockName.length() ) ; i ++ ) {
         hashKey += ( static_cast<char>( BlockName[i] ) - 48 ) * ( i * 80 + 1 );
     }
+
     return hashKey ;
 }
 
 template <class IDTYPE>
 CBufferImpl<IDTYPE>::CBufferImpl() {
-    recordInFile.reset( new CRecord< CBlock<CRandomFile> >() );
-    recordInMemory.reset( new CRecord< CBlock<stringstream> >() );
-
-    recordInCycleFile.reset( new CRecord< CCycBlock<CRandomFile> >());
-    recordInCycleMemory.reset( new CRecord< CCycBlock<stringstream> >() );
+    recordInFile.reset( new CRecord< CBlock<CRandomFile>>() );
+    recordInMemory.reset( new CRecord< CBlock<stringstream>>() );
+    recordInCycleFile.reset( new CRecord< CCycBlock<CRandomFile>>());
+    recordInCycleMemory.reset( new CRecord< CCycBlock<stringstream>>() );
 }
 
 template <class IDTYPE>
@@ -199,11 +200,11 @@ CBufferImpl<IDTYPE>::~CBufferImpl() {
 
 #define MAP_SWICH( __FUNCT__ , __PREFUNCT__ ) \
   switch ( blok[eval(blockID)] ) { \
-  case BF: 	 __PREFUNCT__ (*recordInFile). __FUNCT__  ;  break ; \
-  case BM:	 __PREFUNCT__ (*recordInMemory). __FUNCT__  ;  break ; \
+  case BF:   __PREFUNCT__ (*recordInFile). __FUNCT__  ;  break ; \
+  case BM:   __PREFUNCT__ (*recordInMemory). __FUNCT__  ;  break ; \
   default: assert( false ); \
-  case BCF:	 __PREFUNCT__ (*recordInCycleFile). __FUNCT__  ;  break ; \
-  case BCM:	 __PREFUNCT__ (*recordInCycleMemory). __FUNCT__  ;  break ;  };
+  case BCF:  __PREFUNCT__ (*recordInCycleFile). __FUNCT__  ;  break ; \
+  case BCM:  __PREFUNCT__ (*recordInCycleMemory). __FUNCT__  ;  break ;  };
 
 #define MAP_EACH( __FUNCT__ ) \
   (*recordInFile). __FUNCT__  ; \
@@ -213,15 +214,17 @@ CBufferImpl<IDTYPE>::~CBufferImpl() {
 
 
 template <class IDTYPE>
-void CBufferImpl<IDTYPE>::Load( const char * filename ) {
-    std::ifstream file(filename, ios::in|ios::binary);
+void CBufferImpl<IDTYPE>::Load( const char* filename ) {
+    std::ifstream file(filename, ios::in | ios::binary);
+
     if ( ! file ) {
         throw std::out_of_range("Thrown/Buffer.h/Load()/Read failed");
     }
-    //http://www.cplusplus.com/doc/tutorial/tut5-3.html - exception handling
 
+    //http://www.cplusplus.com/doc/tutorial/tut5-3.html - exception handling
     long sizeOfmap ;
     file.read(  reinterpret_cast<char*>(&sizeOfmap), sizeof sizeOfmap ) ;
+
     for ( long i = 0 ; i < sizeOfmap ; i ++ ) {
         long blockID  ;
         BlockType type  ;
@@ -229,18 +232,21 @@ void CBufferImpl<IDTYPE>::Load( const char * filename ) {
         file.read( reinterpret_cast<char*>(&type), sizeof type ) ;
         blok[eval(blockID)] = type ;
     }
+
     MAP_EACH ( Load(file) ) ;
 }
 
 template <class IDTYPE>
-void CBufferImpl<IDTYPE>::Save( const char * filename ) {
-    fstream file(filename, ios::out|ios::binary|ios::trunc);
+void CBufferImpl<IDTYPE>::Save( const char* filename ) {
+    fstream file(filename, ios::out | ios::binary | ios::trunc);
+
     if ( ! file ) {
         throw std::out_of_range("Thrown/Buffer.h/Save()/Write failed");
     }
 
     size_t sizeOfmap = blok.size() ;
     file.write(  reinterpret_cast<char*>(&sizeOfmap), sizeof sizeOfmap ) ;
+
     for ( BMap::iterator it = blok.begin() ; it != blok.end() ; it ++ ) {
         long blockID = (*it).first ;
         BlockType type = (*it).second ;
@@ -279,10 +285,12 @@ void CBufferImpl<IDTYPE>::DefBlock(
         (*recordInCycleFile).RefBlock( eval(blockID) ).slices = aux1 ;
         (*recordInCycleFile).RefBlock( eval(blockID) ).framesInSlice = aux2 ;
     }
+
     if ( btType == BCM ) {
         (*recordInCycleMemory).RefBlock( eval(blockID) ).slices = aux1 ;
         (*recordInCycleMemory).RefBlock( eval(blockID) ).framesInSlice = aux2 ;
     }
+
     if ( btType == BF || btType == BM ) {
         assert ( aux1 == 0 && aux2 == 0 );
     }
@@ -313,8 +321,8 @@ long CBufferImpl<IDTYPE>::GetSizeOfBlock( IDTYPE blockID, long firstFrm, long la
 
 template <class IDTYPE>
 void CBufferImpl< IDTYPE>::Clear() {
-    recordInFile.reset( new CRecord< CBlock<CRandomFile> >() );
-    recordInMemory.reset( new CRecord< CBlock<stringstream> >() );
+    recordInFile.reset( new CRecord< CBlock<CRandomFile>>() );
+    recordInMemory.reset( new CRecord< CBlock<stringstream>>() );
     blok.clear();
 }
 
@@ -336,9 +344,11 @@ void CBufferImpl<IDTYPE>::DecycleBlockType( IDTYPE blockID, arrayPointer_t pBloc
     if ( blok[eval(blockID)] == BF ) {
         return ;
     }
+
     if ( blok[eval(blockID)] == BM ) {
         return ;
     }
+
     META_PROG( BCF, BF, (*recordInCycleFile), (*recordInFile) );
     META_PROG( BCM, BM, (*recordInCycleMemory), (*recordInMemory) );
 }
@@ -348,9 +358,11 @@ void CBufferImpl<IDTYPE>::MemorizeBlockType( IDTYPE blockID, arrayPointer_t pBlo
     if ( blok[eval(blockID)] == BCM ) {
         return ;
     }
+
     if ( blok[eval(blockID)] == BM ) {
         return ;
     }
+
     META_PROG( BCF, BCM, (*recordInCycleFile), (*recordInCycleMemory) );
     META_PROG( BF, BM, (*recordInFile), (*recordInMemory) );
 }
@@ -364,8 +376,9 @@ long CBufferImpl<IDTYPE>::syncToDisk(IDTYPE blockID ) {
 }
 
 template <class IDTYPE>
-void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string > * pQset ) {
+void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string >* pQset ) {
     os << "Count\tFSize\tLoc\tBlockID" << std::endl ;
+
     for ( BMap::iterator it = blok.begin() ; it != blok.end() ; it ++ ) {
         switch ( (*it).second ) {
             case BF:
@@ -375,6 +388,7 @@ void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string > * pQset ) {
                 os << "\t" ;
                 os <<  "File" ;
                 break ;
+
             case BM:
                 os << (*recordInMemory).RefBlock( (*it).first ).frameCount ;
                 os << "\t" ;
@@ -382,6 +396,7 @@ void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string > * pQset ) {
                 os << "\t" ;
                 os << "Memory" ;
                 break ;
+
             case BCF:
                 os << (*recordInCycleFile).RefBlock( (*it).first ).frameCount ;
                 os << "\t" ;
@@ -389,6 +404,7 @@ void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string > * pQset ) {
                 os << "\t" ;
                 os << "Cycle File" ;
                 break ;
+
             case BCM:
                 os << (*recordInCycleMemory).RefBlock( (*it).first ).frameCount ;
                 os << "\t" ;
@@ -396,11 +412,13 @@ void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string > * pQset ) {
                 os << "\t" ;
                 os << "Cycle Memory" ;
                 break ;
+
             default:
                 assert( false );
         }
 
         os << "\t" ;
+
         if ( pQset == NULL ) {
             os << (*it).first ;
         } else
@@ -419,18 +437,15 @@ void CBufferImpl<IDTYPE>::Dump( ostream &os,  set < string > * pQset ) {
 
 template <class STREAM>
 CBlock<STREAM>::CBlock( const CBlock<STREAM> &x ) {
-    //	LOCKBYMUTEX ;
-
+    //  LOCKBYMUTEX ;
     pImpl.reset( new STREAM );
     frameSize = x.frameSize ;
     frameCount = x.frameCount ;
     firstFrame = x.firstFrame ;
-
     assert( frameCount == 0 ) ;
-
     //Stream has always only one owner - copying only <=
     //WARNINNG - THERE IS HAPPEN SOMETHING NASTY
-    CBlock<STREAM> * y = const_cast<CBlock<STREAM> * >(&x) ;
+    CBlock<STREAM>* y = const_cast<CBlock<STREAM> * >(&x) ;
     y->pImpl.reset() ;
 }
 
@@ -444,7 +459,7 @@ CBlock<STREAM>::CBlock( long frameSize ) :
 
 template <class STREAM>
 CBlock<STREAM>::~CBlock() {
-    //	LOCKBYMUTEX ;
+    //  LOCKBYMUTEX ;
     frameCount = 0 ;
     firstFrame = 0 ;
 }
@@ -452,22 +467,18 @@ CBlock<STREAM>::~CBlock() {
 template <class STREAM>
 void CBlock<STREAM>::PutBlock( arrayPointer_t pBlockBuffer, long count ) {
     assert( pBlockBuffer.get() != NULL ) ;
-
     LOCKBYMUTEX ;
-
-    pImpl->seekp(0,STREAM::end);
+    pImpl->seekp(0, STREAM::end);
     pImpl->write( pBlockBuffer.get(), frameSize * count );
-
     frameCount ++ ;
 }
 
 template <class STREAM>
 long CBlock<STREAM>::GetBlock( long position, arrayPointer_t pBlockBuffer ) {
     assert( pBlockBuffer.get() != NULL ) ;
-
     LOCKBYMUTEX ;
-
     pImpl->sync();
+
     if ( position >= 0 ) {
         pImpl->seekg( position * frameSize ) ;
     } else {
@@ -475,28 +486,25 @@ long CBlock<STREAM>::GetBlock( long position, arrayPointer_t pBlockBuffer ) {
     }
 
     pImpl->read( pBlockBuffer.get(), frameSize ) ;
-    return ( static_cast<long>(pImpl->gcount())/frameSize );
+    return ( static_cast<long>(pImpl->gcount()) / frameSize );
 }
 
 template <class STREAM>
 long CBlock<STREAM>::GetByteSize() {
-    return frameSize*frameCount ;
+    return frameSize * frameCount ;
 }
 
 template <class STREAM>
-void CBlock<STREAM>::Save( ostream& strout ) {
+void CBlock<STREAM>::Save( ostream &strout ) {
     LOCKBYMUTEX ;
-
     pImpl->sync();
     pImpl->seekg( 0 );
-
     strout.write( reinterpret_cast<char*>(&frameCount), sizeof(long) );
     strout.write( reinterpret_cast<char*>(&frameSize), sizeof(long) );
-
     result.reset();
     char blok1024[max_packet_size] ;
-
     long LeftSizeOfFrames = frameSize * frameCount ;
+
     while( LeftSizeOfFrames > 0 ) {
         long nBlokDysk = ( LeftSizeOfFrames >= max_packet_size ) ? max_packet_size : LeftSizeOfFrames ;
         pImpl->read( reinterpret_cast<char*>(&blok1024), nBlokDysk );
@@ -506,23 +514,17 @@ void CBlock<STREAM>::Save( ostream& strout ) {
     }
 
     boost::crc_32_type::value_type crc = result.checksum() ;
-
     strout.write( reinterpret_cast<char*>(&crc), sizeof crc );
-
     pImpl->sync();
-
 }
 
 template <class STREAM>
-void CBlock<STREAM>::Load( istream& strin ) {
+void CBlock<STREAM>::Load( istream &strin ) {
     LOCKBYMUTEX ;
-
     strin.read( reinterpret_cast<char*>(&frameCount), sizeof(long) );
     strin.read( reinterpret_cast<char*>(&frameSize), sizeof(long) );
-
     result.reset();
     char blok1024[max_packet_size] ;
-
     long LeftSizeOfFrames = frameCount * frameSize ;
 
     while( LeftSizeOfFrames > 0 ) {
@@ -535,7 +537,6 @@ void CBlock<STREAM>::Load( istream& strin ) {
 
     boost::crc_32_type::value_type crc ;
     strin.read( reinterpret_cast<char*>(&crc), sizeof crc );
-
     pImpl->sync();
 
     if ( crc != result.checksum() ) {
@@ -546,7 +547,6 @@ void CBlock<STREAM>::Load( istream& strin ) {
 template <class STREAM>
 void CBlock<STREAM>::Trunc() {
     LOCKBYMUTEX ;
-
     frameCount = 0 ;
     pImpl.reset( new STREAM );
 }
@@ -554,7 +554,6 @@ void CBlock<STREAM>::Trunc() {
 template <class STREAM>
 long CBlock<STREAM>::SyncToDisk() {
     LOCKBYMUTEX ;
-
     pImpl->sync();
     return frameCount ;
 }
@@ -596,7 +595,7 @@ long CRecord<BLOCK>::GetBlock( long blockID, long position, arrayPointer_t pBloc
 }
 
 template < typename BLOCK >
-BLOCK & CRecord<BLOCK>::RefBlock( long blockID ) {
+BLOCK &CRecord<BLOCK>::RefBlock( long blockID ) {
     return find( blockID )->second ;
 }
 
@@ -606,16 +605,16 @@ typename CRecord<BLOCK>::iterator CRecord<BLOCK>::find( long blockID ) {
         if ( lastBlock->first == blockID ) {
             return lastBlock ;
         }
+
     return lastBlock = map< long, BLOCK >::find( blockID );
 }
 template < typename BLOCK >
-void CRecord<BLOCK>::Save( ostream& stream ) {
+void CRecord<BLOCK>::Save( ostream &stream ) {
     size_t blockCount = this->size() ;
     stream.write(  reinterpret_cast <char*>(&blockCount), sizeof blockCount ) ;
 
     for ( typename CRecord::iterator itBlock = this->begin() ; itBlock != this->end() ; itBlock ++ ) {
         long blockID = itBlock->first ;
- 
         stream.write(  reinterpret_cast<char*>(&blockID), sizeof blockID ) ;
         itBlock->second.Save( stream );
     }
@@ -626,6 +625,7 @@ void CRecord<BLOCK>::Load( istream &stream ) {
     this->clear();
     long blockCount ;
     stream.read( reinterpret_cast<char*>(&blockCount), sizeof blockCount );
+
     for ( int i = 0 ; i < blockCount ; i ++ ) {
         long blockID ;
         stream.read( reinterpret_cast<char*>(&blockID), sizeof blockID );
@@ -654,10 +654,8 @@ CCycBlock <STREAM>::CCycBlock( const CCycBlock<STREAM> &x ) {
 template < typename STREAM >
 long CCycBlock <STREAM>::GetByteSize() {
     int loc_frameCount( 0 ) ;
-
     BOOST_FOREACH( const blockMapPair & i, blockMap )
     loc_frameCount += ( i.second.frameCount * i.second.frameSize ) ;
-
     return loc_frameCount ;
 }
 
@@ -669,7 +667,6 @@ CCycBlock <STREAM>::~CCycBlock() {
 template < typename STREAM >
 void CCycBlock <STREAM>::PutBlock( arrayPointer_t pBlockBuffer, long count ) {
     assert ( count == 1 );
-
     LOCKBYMUTEX ;
 
     if ( lastblockCnt == 0 ) {
@@ -684,11 +681,13 @@ void CCycBlock <STREAM>::PutBlock( arrayPointer_t pBlockBuffer, long count ) {
         std::pair< typename blockMapT::iterator, bool > p = blockMap.insert( blockMapPair( lastblockCnt ++, a ) ) ;
         assert( p.second );
         itLastBlock = p.first ;
+
         if ( blockMap.size() >= slices + 1 ) {
             blockMap.erase( blockMap.begin() ) ;
             firstFrame =  firstFrame + framesInSlice ;
-         }
+        }
     }
+
     IBlock::frameCount ++ ;
     itLastBlock->second.PutBlock( pBlockBuffer, count );
 };
@@ -696,7 +695,6 @@ void CCycBlock <STREAM>::PutBlock( arrayPointer_t pBlockBuffer, long count ) {
 template < typename STREAM >
 long CCycBlock <STREAM>::GetBlock( long position, arrayPointer_t pBlockBuffer ) {
     LOCKBYMUTEX ;
-
     long offsetInSubblock = position % framesInSlice ;
     long offsetInBlockSet = position / framesInSlice ;
 
@@ -708,21 +706,17 @@ long CCycBlock <STREAM>::GetBlock( long position, arrayPointer_t pBlockBuffer ) 
 };
 
 template < typename STREAM >
-void CCycBlock <STREAM>::Save( std::ostream& strout ) {
+void CCycBlock <STREAM>::Save( std::ostream &strout ) {
     LOCKBYMUTEX ;
-
     size_t lsize = blockMap.size() ;
-
     unsigned long frameSize = IBlock::frameSize ;
     unsigned long frameCount = IBlock::frameCount ;
-
     strout.write( reinterpret_cast<char*>(&lsize), sizeof(long) );
     strout.write( reinterpret_cast<char*>(&slices), sizeof(long) );
     strout.write( reinterpret_cast<char*>(&frameSize), sizeof(long) );
     strout.write( reinterpret_cast<char*>(&framesInSlice), sizeof(long) );
     strout.write( reinterpret_cast<char*>(&frameCount), sizeof(long) );
     strout.write( reinterpret_cast<char*>(&firstFrame), sizeof(long) );
-
     BOOST_FOREACH( blockMapPair i, blockMap ) {
         long blockCntID = i.first ;
         strout.write( reinterpret_cast<char*>( &blockCntID ), sizeof blockCntID );
@@ -731,50 +725,41 @@ void CCycBlock <STREAM>::Save( std::ostream& strout ) {
 };
 
 template < typename STREAM >
-void CCycBlock <STREAM>::Load( std::istream& strin ) {
+void CCycBlock <STREAM>::Load( std::istream &strin ) {
     LOCKBYMUTEX ;
-
     long lsize ;
-
     unsigned long frameSize(0) ;
     unsigned long frameCount(0) ;
-
     strin.read( reinterpret_cast<char*>(&lsize), sizeof(long) );
     strin.read( reinterpret_cast<char*>(&slices), sizeof(long) );
     strin.read( reinterpret_cast<char*>(&frameSize), sizeof(long) );
     strin.read( reinterpret_cast<char*>(&framesInSlice), sizeof(long) );
     strin.read( reinterpret_cast<char*>(&frameCount), sizeof(long) );
     strin.read( reinterpret_cast<char*>(&firstFrame), sizeof(long) );
-
     IBlock::frameSize = frameSize ;
     IBlock::frameCount = frameCount  ;
-
     blockMap.clear();
 
     for ( long i = 0 ; i < lsize; i ++ ) {
         strin.read( reinterpret_cast<char*>(&lastblockCnt), sizeof lastblockCnt ) ;
-
         CBlock<STREAM> a( IBlock::frameSize ) ;
         pair< typename blockMapT::iterator, bool > p = blockMap.insert( blockMapPair( lastblockCnt ++, a ) ) ;
         assert( p.second );
         itLastBlock = p.first ;
-
         itLastBlock->second.Load( strin );
     };
+
     assert ( static_cast<long>(blockMap.size()) == lsize );
 };
 
 template < typename STREAM >
 long CCycBlock <STREAM>:: SyncToDisk() {
     LOCKBYMUTEX ;
-
     long loc_frameCount( 0 );
-
     BOOST_FOREACH( blockMapPair  i, blockMap ) {
         i.second.SyncToDisk();
         loc_frameCount += i.second.frameCount ;
     }
-
     return loc_frameCount ;
 }
 
@@ -788,12 +773,12 @@ CBuffer<IDTYPE>::CBuffer() :
 }
 
 template <class IDTYPE>
-void CBuffer<IDTYPE>::Load( const char * filename ) {
+void CBuffer<IDTYPE>::Load( const char* filename ) {
     pImpl->Load( filename );
 }
 
 template <class IDTYPE>
-void CBuffer<IDTYPE>::Save( const char * filename ) {
+void CBuffer<IDTYPE>::Save( const char* filename ) {
     pImpl->Save( filename );
 }
 
@@ -877,7 +862,7 @@ long CBuffer<IDTYPE>::syncToDisk(IDTYPE blockID ) {
 template <class IDTYPE>
 void CBuffer<IDTYPE>::Dump(
     std::ostream &os,
-    std::set < string > * pQset ) {
+    std::set < string >* pQset ) {
     pImpl->Dump( os, pQset );
 }
 

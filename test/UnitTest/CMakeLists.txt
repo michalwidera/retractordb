@@ -20,7 +20,7 @@ MESSAGE(STATUS "Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
 MESSAGE(STATUS "Boost_LIBRARY_DIRS: ${Boost_LIBRARY_DIRS}")
 MESSAGE(STATUS "Boost_LIBRARIES: ${Boost_LIBRARIES}")
 
-include_directories( ${Boost_INCLUDE_DIR} "../../share" )
+include_directories( ${Boost_INCLUDE_DIR} "../../share" "../../src" )
 
 link_libraries(
     ${Boost_LIBRARIES}

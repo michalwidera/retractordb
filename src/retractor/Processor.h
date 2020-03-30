@@ -7,7 +7,7 @@
 /** Query processor */
 class Processor : private boost::noncopyable {
     /** Archive of data streams - initStorage */
-    std::map< std::string, boost::shared_ptr< dbStream > > storage ;
+    std::map< std::string, boost::shared_ptr< dbStream >> storage ;
 
     /** This function assue data access
      *  Due each field is computed in form schema/query
@@ -16,8 +16,8 @@ class Processor : private boost::noncopyable {
      *  main solution (we need it make it better)
     */
     boost::rational<int> computeValue(
-        field & f,
-        query & q
+        field &f,
+        query &q
     );
 
     /** Variable that contains sources of data */
@@ -27,7 +27,7 @@ class Processor : private boost::noncopyable {
     map< string, int > gStreamSize ;
 
     /** Context variables */
-    map< string, vector< number > > gContextValMap ;  // schema name/record values
+    map< string, vector< number >> gContextValMap ;  // schema name/record values
 
     /** Context variables */
     map< string, int > gContextLenMap ;
@@ -41,7 +41,7 @@ class Processor : private boost::noncopyable {
     /** Function will return offsets according to stack operations
      *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
      */
-    int getArgumentOffset( const string & streamName, const string & streamArgument ) ;
+    int getArgumentOffset( const string &streamName, const string &streamArgument ) ;
 
   public:
 
@@ -64,6 +64,6 @@ class Processor : private boost::noncopyable {
 
     /** This function try to roll up argument and reads data from schema
      * This is not finished - need to be fixed */
-    number getValueOfRollup( const query &q , int offset , int timeOffset );
+    number getValueOfRollup( const query &q, int offset, int timeOffset );
 
 };

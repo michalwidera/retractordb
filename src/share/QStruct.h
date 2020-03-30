@@ -22,14 +22,14 @@ namespace boost {
 
         template<class Archive, class T>
         inline void serialize(
-            Archive & ar,
-            boost::rational<T> & p,
+            Archive &ar,
+            boost::rational<T> &p,
             unsigned int /* file_version */
         ) {
             T _num( p.numerator() ) ;
             T _den( p.denominator() );
-            ar & _num ;
-            ar & _den ;
+            ar &_num ;
+            ar &_den ;
             p.assign( _num, _den );
         }
     } // namespace serialization
@@ -40,7 +40,7 @@ namespace boost {
 using namespace std ;
 using namespace boost ;
 
-boost::rational<int> Rationalize ( double inValue, double DIFF=1E-6,  int ttl=11 ) ;
+boost::rational<int> Rationalize ( double inValue, double DIFF = 1E-6,  int ttl = 11 ) ;
 
 enum command_id {
 #define DEF_CASE( _A_ ) _A_ ,
@@ -53,11 +53,11 @@ class token {
     friend class boost::serialization::access;
 
     template<class Archive>
-    void serialize(Archive & ar, unsigned int version) {
-        ar & command ;
-        ar & crValue ;
-        ar & rcValue ;
-        ar & sValue_ ;
+    void serialize(Archive &ar, unsigned int version) {
+        ar &command ;
+        ar &crValue ;
+        ar &rcValue ;
+        ar &sValue_ ;
     }
 
     command_id command ;
@@ -84,11 +84,11 @@ class field {
     friend class boost::serialization::access;
 
     template<class Archive>
-    void serialize(Archive & ar, unsigned int version) {
-        ar & setFieldName ;
-        ar & dFieldType ;
-        ar & lProgram ;
-        ar & sFieldText ;
+    void serialize(Archive &ar, unsigned int version) {
+        ar &setFieldName ;
+        ar &dFieldType ;
+        ar &lProgram ;
+        ar &sFieldText ;
     }
 
     string sFieldText ;
@@ -102,7 +102,7 @@ class field {
     list < token > lProgram ;
 
     field () ;
-    field ( string sFieldName, list < token > & lProgram, eType fieldType, string sFieldText ) ;
+    field ( string sFieldName, list < token > &lProgram, eType fieldType, string sFieldText ) ;
 
     string getFirstFieldName() ;
     string getFieldNameSet() ;
@@ -117,12 +117,12 @@ class query {
     friend class boost::serialization::access ;
 
     template<class Archive>
-    void serialize(Archive & ar, unsigned int version) {
-        ar & id ;
-        ar & filename ;
-        ar & rInterval ;
-        ar & lSchema ;
-        ar & lProgram ;
+    void serialize(Archive &ar, unsigned int version) {
+        ar &id ;
+        ar &filename ;
+        ar &rInterval ;
+        ar &lSchema ;
+        ar &lProgram ;
     }
 
   public:
@@ -142,7 +142,7 @@ class query {
     bool isReductionRequired();
     bool isGenerated();
 
-    field & getField( string sField );
+    field &getField( string sField );
 
     list < string > getDepStreamNameList( int reqDep = 0 ) ;
 
@@ -151,9 +151,9 @@ class query {
     int getFieldIndex( field f );
 } ;
 
-bool operator<(const query &lhs,const query &rhs) ;
+bool operator<(const query &lhs, const query &rhs) ;
 
-query & getQuery( string query_name ) ;
+query &getQuery( string query_name ) ;
 int getSeqNr( string query_name ) ;
 bool isDeclared( string query_name ) ;
 bool isExist(string query_name);
@@ -165,13 +165,13 @@ class qTree :
 
     friend class boost::serialization::access;
     template<class Archive>
-    void serialize(Archive & ar, unsigned int version) {
-        ar & boost::serialization::base_object< vector < query > >(*this) ;
+    void serialize(Archive &ar, unsigned int version) {
+        ar &boost::serialization::base_object< vector < query >>(*this) ;
     }
 
   public:
 
-    query & operator[] ( string query_name ) {
+    query &operator[] ( string query_name ) {
         return getQuery( query_name ) ;
     } ;
 

@@ -26,7 +26,7 @@ using namespace boost::lambda;
 
 qTree coreInstance_parser ;
 
-stack < boost::shared_ptr<query> > stk ;
+stack < boost::shared_ptr<query>> stk ;
 
 // ---------- SET OF TEMP VARIABLES
 
@@ -37,13 +37,11 @@ field::eType fieldType = field::BAD ;
 int fieldCount(0);
 int flen = 1 ;
 
-bool invalidChar (char c)
-{
-    return !(c>=32 && c<128);
+bool invalidChar (char c) {
+    return !(c >= 32 && c < 128);
 }
 
-void stripUnicode(std::string & str)
-{
+void stripUnicode(std::string &str) {
     str.erase(remove_if(str.begin(), str.end(), invalidChar), str.end());
 }
 
@@ -80,7 +78,7 @@ namespace {
     }
 
     void do_alias(char const* str, char const* end) {
-        sFieldName = string( str,end ) ;
+        sFieldName = string( str, end ) ;
         flen = 1 ;
     }
 
@@ -94,15 +92,16 @@ namespace {
 
     void do_ftype(char const* str, char const* end) {
         fieldType = field::BAD ;
-
         string vStr( string( str, end ) );
 
         if ( vStr == "BYTE" || vStr == "BTE" ) {
             fieldType = field::BYTE ;
         }
+
         if ( vStr == "INTEGER" || vStr == "INT" ) {
             fieldType = field::INTEGER ;
         }
+
         if ( vStr == "RATIONAL" || vStr == "RAT" ) {
             fieldType = field::RATIONAL ;
         }
@@ -110,13 +109,13 @@ namespace {
 
 
     void do_stream_assign_id(char const* str, char const* end) {
-        stk.top()->id = string( str,end );
+        stk.top()->id = string( str, end );
         stk.top()->filename = "";
     }
 
 
     void do_stream_assign_file(char const* str, char const* end) {
-        std::string filename = string( str,end );
+        std::string filename = string( str, end );
         ltrim(filename);
         rtrim(filename);
         stk.top()->filename = filename;
@@ -139,7 +138,7 @@ namespace {
     void do_band(char const*, char const*)           RECPTOKEN( AND )
     void do_bor(char const*, char const*)            RECPTOKEN( OR )
     void do_bneg(char const*, char const*)           RECPTOKEN( NOT )
-    void do_shash(char const*a, char const*b)        RECPTOKEN( STREAM_HASH )
+    void do_shash(char const* a, char const* b)        RECPTOKEN( STREAM_HASH )
     void do_sdein(char const*, char const*)          RECPTOKEN( STREAM_DEHASH_DIV )
     void do_sdmin(char const*, char const*)          RECPTOKEN( STREAM_DEHASH_MOD )
     void do_sadd(char const*, char const*)           RECPTOKEN( STREAM_ADD )
@@ -199,22 +198,25 @@ namespace {
         lSchema.clear() ;
     }
 
-    void do_from_section(char const*str, char const*end) {
+    void do_from_section(char const* str, char const* end) {
         stk.top()->lProgram = lProgram ;
         lProgram.clear() ;
     }
 
-    void do_arg_separator(char const*str, char const*end) {
+    void do_arg_separator(char const* str, char const* end) {
         for ( int i = 0 ; i < flen ; i ++ ) {
             string s(str, end);
+
             if ( flen == 1 ) {
-                lSchema.push_back( field( sFieldName, lProgram, fieldType,s  ) );
+                lSchema.push_back( field( sFieldName, lProgram, fieldType, s  ) );
             } else {
                 string name = sFieldName + "_" + boost::lexical_cast<std::string>( i ) ;
                 lSchema.push_back( field( name, lProgram, fieldType, s ) );
             }
+
             lProgram.clear() ;
         }
+
         sFieldName = "" ;
         fieldType = field::BAD ;
         flen = 1 ;
@@ -230,7 +232,7 @@ namespace {
         lProgram.push_back( token ( PUSH_STREAM, streamNameLoc ) );
     };
 
-    void do_print(char const*str, char const*end) {
+    void do_print(char const* str, char const* end) {
         string s(str, end);
         clog << "compiler:" << "[[" << s << "]]" << endl ;
     }
@@ -244,11 +246,12 @@ namespace {
     }
 
     void do_insert_into_schema  (char const* str, char const* end ) {
-        for ( auto  & q : coreInstance_parser ) {
+        for ( auto   &q : coreInstance_parser ) {
             if ( q.id == ( stk.top() )->id ) {
                 throw std::invalid_argument(string( "Duplicate stream name:" ) + q.id );
             }
         }
+
         if ( ! stk.top()->id.empty() ) {
             coreInstance_parser.push_back( * ( stk.top() ) );
         }
@@ -261,7 +264,6 @@ namespace {
         string s(str, end);
         stripUnicode( s );
         parse(s.c_str(),
-
             // Begin grammar
             (
                 (
@@ -288,7 +290,7 @@ namespace {
 struct ql_parser : public grammar<ql_parser> {
     template <typename ScannerT>
     struct definition {
-        definition(ql_parser const& ) {
+        definition(ql_parser const & ) {
             keywords =  "avg",
             "min",
             "max",
@@ -298,9 +300,7 @@ struct ql_parser : public grammar<ql_parser> {
             "stream",
             "as"
             ;
-
-            typedef inhibit_case<strlit<> > Token_t;
-
+            typedef inhibit_case<strlit<>> Token_t;
             //Operators
             chlit<>     EQUAL('=');
             strlit<>    NOT_EQUAL("<>");
@@ -308,10 +308,8 @@ struct ql_parser : public grammar<ql_parser> {
             strlit<>    LE("<=");
             strlit<>    GE(">=");
             chlit<>     GT('>');
-
             Token_t     IN_BEGIN = as_lower_d["{"];
             Token_t     IN_END = as_lower_d["}"];
-
             Token_t NUMBER = as_lower_d["number"] ;
             Token_t CHAR = as_lower_d["char"] ;
             Token_t AVG = as_lower_d["avg"] ;
@@ -341,7 +339,6 @@ struct ql_parser : public grammar<ql_parser> {
             Token_t TO_TIMESTAMP = as_lower_d["to_timestamp"] ;
             Token_t FLOAT = as_lower_d["float"] ;
             Token_t INT = as_lower_d["int"] ;
-
             command
                 =
                     remarque_command
@@ -349,14 +346,12 @@ struct ql_parser : public grammar<ql_parser> {
                     | declare_command
                     | empty_line
                     ;
-
             empty_line
                 =
                     (
                         * ( ch_p(' ') | ch_p('\t') )
                     )
                     ;
-
             remarque_command
                 =
                     (
@@ -364,7 +359,6 @@ struct ql_parser : public grammar<ql_parser> {
                         >> * anychar_p
                     )
                     ;
-
             declare_command
                 =
                     (
@@ -398,7 +392,6 @@ struct ql_parser : public grammar<ql_parser> {
                     )
                     [&do_insert_into_schema]
                     ;
-
             select_command
                 =
                     (
@@ -407,7 +400,7 @@ struct ql_parser : public grammar<ql_parser> {
                         (
                             (
                                 table_scan                     [&do_alias_f]
-                                |( expression                  [&do_alias_f]
+                                | ( expression                  [&do_alias_f]
                                     >> ! ( AS >> id[&do_alias] )
                                 )
                             )                                  [&do_arg_separator]
@@ -418,19 +411,16 @@ struct ql_parser : public grammar<ql_parser> {
                     )
                     [&do_insert_into_schema]
                     ;
-
             rational
                 =
                     ( uint_p [&rational_nominator] >> ch_p('/') >> uint_p[&rational_denominator] )
                     | ch_p('(') >> rational >> ch_p(')')
                     | real_p[&rational_irrational]
                     ;
-
             table_scan
                 =
                     ( ! ( stream_id >> ch_p('.') ) >> ch_p('*') )       [&do_TScan]
                     ;
-
             condition
                 =
                     ! ( NOT [ &do_bneg] )
@@ -438,12 +428,10 @@ struct ql_parser : public grammar<ql_parser> {
                     >> * ( ( OR >> logical_term )                       [ &do_bor ]
                     )
                     ;
-
             logical_term
                 =
                     logical_factor >>  *( ( AND >> logical_factor )     [ &do_band ] )
                     ;
-
             logical_factor
                 =
                     ( ch_p('(') >> condition >> ch_p(')') )
@@ -457,24 +445,21 @@ struct ql_parser : public grammar<ql_parser> {
                         | ( LE >> expression )          [&do_CMP_le]
                     )
                     ;
-
             stream_id
                 =
                     id
                     ;
-
             field_id
                 =
                     (
-                        ( id>>ch_p('.')>>id )                                   [&do_ID1]   //a stream.field
-                        |( id>>ch_p('[')>>uint_p>>ch_p(']')>>ch_p('[')>>uint_p>>ch_p(']')) [&do_ID5]   //b stream[idx][timemove]
-                        |( id>>ch_p('[')>>uint_p>>ch_p(',')>>uint_p>>ch_p(']')) [&do_ID4]   //b stream[idx,timemove]
-                        |( id>>ch_p('[')>>uint_p>>ch_p(']') )                   [&do_ID2]   //b stream[idx]
-                        |( id>>ch_p('[')>>ch_p('_')>>ch_p(']') )                [&do_IDX]
-                        |id                                                     [&do_ID3]   //a field
+                        ( id >> ch_p('.') >> id )                                   [&do_ID1] //a stream.field
+                        | ( id >> ch_p('[') >> uint_p >> ch_p(']') >> ch_p('[') >> uint_p >> ch_p(']')) [&do_ID5] //b stream[idx][timemove]
+                        | ( id >> ch_p('[') >> uint_p >> ch_p(',') >> uint_p >> ch_p(']')) [&do_ID4] //b stream[idx,timemove]
+                        | ( id >> ch_p('[') >> uint_p >> ch_p(']') )                   [&do_ID2] //b stream[idx]
+                        | ( id >> ch_p('[') >> ch_p('_') >> ch_p(']') )                [&do_IDX]
+                        | id                                                     [&do_ID3]  //a field
                     )
                     ;
-
             id
                 =
                     as_lower_d
@@ -486,7 +471,6 @@ struct ql_parser : public grammar<ql_parser> {
                         ]
                     ]
                     ;
-
             stream_expression
                 =
                     stream_term >>
@@ -496,7 +480,6 @@ struct ql_parser : public grammar<ql_parser> {
                         | ( ch_p('-') >> rational )             [&do_streamsubstract]
                     )
                     ;
-
             stream_term
                 =
                     stream_factor >>
@@ -520,7 +503,6 @@ struct ql_parser : public grammar<ql_parser> {
                         | SUM       [&do_sum]
                     )
                     ;
-
             stream_factor
                 =
                     stream_id                                   [&do_Stream]
@@ -531,7 +513,6 @@ struct ql_parser : public grammar<ql_parser> {
                         >> IN_END
                     )                                       [&do_Inner_Stream_End]
                     ;
-
             expression
                 =
                     term
@@ -540,7 +521,6 @@ struct ql_parser : public grammar<ql_parser> {
                         |   ('-' >> term)               [&do_subt]
                     )
                     ;
-
             term
                 =   factor
                     >> *(
@@ -548,7 +528,6 @@ struct ql_parser : public grammar<ql_parser> {
                         |   ('/' >> factor)             [&do_div]
                     )
                     ;
-
             factor
                 =   real_p                      [&pushVal]
                     |   ('-' >> factor)             [&do_neg]
@@ -558,7 +537,6 @@ struct ql_parser : public grammar<ql_parser> {
                     |   agregator                   [&do_aggregate]
                     |   '(' >> expression >> ')'
                     ;
-
             funct
                 =
                     (
@@ -579,7 +557,6 @@ struct ql_parser : public grammar<ql_parser> {
                     )
                     [&do_fcall]
                     ;
-
             schema
                 =
                     ch_p('(')
@@ -595,9 +572,9 @@ struct ql_parser : public grammar<ql_parser> {
                     declare_command,
                     remarque_command,
                     empty_line,
-                    id,stream_id,field_id,
-                    stream_expression, stream_term,stream_factor,inner_stream,
-                    natural,schema,type_id,
+                    id, stream_id, field_id,
+                    stream_expression, stream_term, stream_factor, inner_stream,
+                    natural, schema, type_id,
                     funct,
                     rational,
                     condition, logical_term, logical_factor,
@@ -605,7 +582,7 @@ struct ql_parser : public grammar<ql_parser> {
                     command
                     ;
 
-        rule<ScannerT> const&
+        rule<ScannerT> const &
         start() const {
             return command;
         }
@@ -616,10 +593,8 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
     //
     // Main parser body
     //
-
     ql_parser g;
     stk.push( boost::shared_ptr<query>( new query() ) );
-
     ifstream input( sInputFile.c_str(), ifstream::in );
 
     if ( ! input.is_open() ) {
@@ -627,12 +602,15 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
     }
 
     string str;
+
     while ( getline( input, str ) ) {
         if ( str == "stop" ) {
             break ;
         }
+
         do_reset();
         stripUnicode( str );
+
         if ( ! parse( str.c_str(), g, space_p ).full ) {
             cerr << "error:\t" << str.c_str() << endl ;
             throw std::invalid_argument("Syntax Error");
@@ -645,11 +623,9 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
 
     assert( ! stk.empty() );
     stk.pop();
-
     // Store of compiled queries on disk
     {
         const qTree coreInstance2( coreInstance_parser ) ;
-
         std::ofstream ofs( sOutputFile.c_str() );
 
         if ( ! ofs.good() ) {
@@ -666,6 +642,5 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
 
         oa << coreInstance2 ;
     }
-
     return string("OK");
 }
