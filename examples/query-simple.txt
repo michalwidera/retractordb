@@ -1,5 +1,3 @@
-#plik dla testu pod linuxem
-
 declare a INTEGER stream core0, 0.1 file datafile2.dat
 declare b INTEGER stream core1, 0.2 file datafile3.dat
 

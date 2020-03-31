@@ -5,11 +5,6 @@
 #include <boost/system/error_code.hpp>
 #include "qry/qry.hpp"
 
-int dodaj( int i, int j )
-{
-    return i + j;
-}
-
 bool check_hello_function() {
     return ( hello() == boost::system::errc::protocol_error );
 }
