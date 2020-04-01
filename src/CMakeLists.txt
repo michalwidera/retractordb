@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR )
+cmake_minimum_required(VERSION 3.3 FATAL_ERROR )
 
 project( database-src )
 
@@ -15,6 +15,11 @@ FIND_PACKAGE( Boost COMPONENTS
     date_time
     system
     REQUIRED )
+
+find_program(iwyu_path NAMES include-what-you-use iwyu)
+if(NOT iwyu_path)
+  message(FATAL_ERROR "Could not find the program include-what-you-use")
+endif()
 
 MESSAGE(STATUS "Boost information:")
 MESSAGE(STATUS "Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
@@ -77,6 +82,11 @@ add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
 
+set_property(TARGET xretractor PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+set_property(TARGET xdumper PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 ADD_DEFINITIONS( "-DHAS_BOOST" )
 
@@ -88,12 +98,6 @@ target_link_libraries( xdumper ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lr
 target_link_libraries( xqry ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-add_custom_target(iwyu
-  COMMAND iwyu_tool -p "${CMAKE_BINARY_DIR}"
-  COMMENT "Running include-what-you-use tool"
-  VERBATIM
-)
 
 add_custom_target(astyle
   COMMAND astyle share/* qry/* dumper/* compiler/* retractor/*
