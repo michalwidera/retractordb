@@ -1,5 +1,14 @@
 #include "Buffer.h"
-#include "RandomFile.h"
+#include <assert.h>                                  // for assert
+#include <stddef.h>                                  // for size_t, NULL
+#include <boost/crc.hpp>                             // for crc_32_type, crc...
+#include <boost/foreach.hpp>                         // for auto_any_base
+#include <boost/smart_ptr/scoped_ptr.hpp>            // for scoped_ptr
+#include <boost/thread/pthread/recursive_mutex.hpp>  // for recursive_mutex
+#include <map>                                       // for map, map<>::iter...
+#include <stdexcept>                                 // for out_of_range
+#include <utility>                                   // for pair
+#include "RandomFile.h"                              // for CRandomFile, string
 
 #include <boost/thread/recursive_mutex.hpp>
 using namespace boost ;

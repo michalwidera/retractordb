@@ -4,11 +4,7 @@
 #include <boost/system/error_code.hpp>
 #include <boost/property_tree/ptree.hpp>
 
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/containers/map.hpp>
 
 #include "qry.hpp"
 

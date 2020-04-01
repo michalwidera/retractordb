@@ -1,6 +1,9 @@
 #include <SOperations.h>
-#include <algorithm>    // std::min
-#include <iostream>
+#include <assert.h>                  // for assert
+#include <algorithm>                 // for min
+#include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
+#include <stdexcept>                 // for out_of_range
+
 using namespace boost ;
 
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <iostream>
-#include <string>
-#include <set>
+#include <iostream>                                  // for ostream
+#include <set>                                       // for set
+#include <string>                                    // for string
 
 #include <boost/shared_ptr.hpp>
 #include <boost/shared_array.hpp>

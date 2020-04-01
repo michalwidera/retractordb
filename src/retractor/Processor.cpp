@@ -1,7 +1,9 @@
 #include "Processor.h"
 #include "Buffer.h"
 #include "SOperations.h"
-#include "../share/QStruct.h"
+#include "QStruct.h"
+
+#include <boost/variant.hpp>
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>

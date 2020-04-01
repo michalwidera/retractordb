@@ -1,5 +1,9 @@
 #include "dbstream.h"
-#include "Buffer.h"
+#include <assert.h>            // for assert
+#include <ext/alloc_traits.h>  // for __alloc_traits<>::value_type
+#include <string.h>            // for memcpy, NULL
+#include <iostream>            // for basic_ostream::operator<<, operator<<
+#include "Buffer.h"            // for CBuffer, BF
 
 // stacktrace -> -ldl in CMakeList.txt
 //#include <boost/stacktrace.hpp>

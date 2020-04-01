@@ -1,13 +1,13 @@
 #pragma once
 
-#include <list>
-#include <map>
-#include <vector>
-#include <string>
-#include <boost/shared_array.hpp>
-#include <boost/variant.hpp>
-#include <boost/rational.hpp>
-#include <boost/core/noncopyable.hpp>
+#include <boost/core/noncopyable.hpp>        // for noncopyable
+#include <boost/rational.hpp>                // for rational
+#include <boost/smart_ptr/shared_array.hpp>  // for shared_array
+#include <boost/variant/variant.hpp>         // for variant
+#include <iosfwd>                            // for ostream
+#include <list>                              // for list
+#include <string>                            // for string
+#include <vector>                            // for vector
 
 /** Data of this type are stored in streams */
 typedef boost::variant< boost::rational<int>, int, double > number ;

@@ -1,7 +1,14 @@
 #include <inputFileInstance.h>
-#include <boost/rational.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
+#include <assert.h>                                // for assert
+#include <ctype.h>                                 // for tolower
+#include <algorithm>                               // for transform
+#include <boost/algorithm/string/trim.hpp>         // for trim_right
+#include <boost/filesystem/convenience.hpp>        // for extension
+#include <boost/rational.hpp>                      // for rational, operator>>
+#include <boost/type_index.hpp>                    // for type_info
+#include <boost/type_index/type_index_facade.hpp>  // for operator==
+#include <stdexcept>                               // for out_of_range
+#include "QStruct.h"                               // for field, field::BAD
 
 using namespace std ;
 using namespace boost ;

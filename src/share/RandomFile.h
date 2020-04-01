@@ -1,8 +1,7 @@
 #pragma once
 
-#include <fstream>
-#include <string>
-#include <iostream>
+#include <fstream>  // for fstream, ios
+#include <string>   // for string
 
 using std::fstream ;
 using std::string ;

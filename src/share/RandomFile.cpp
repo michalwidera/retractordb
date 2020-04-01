@@ -1,5 +1,8 @@
 #include "RandomFile.h"
-#include <cassert>
+#include <stdio.h>    // for remove
+#include <stdlib.h>   // for getenv, NULL, mkstemp
+#include <cassert>    // for assert
+#include <stdexcept>  // for out_of_range
 
 //risk: Storing the pointer to the string returned by getenv() can result in overwritten environmental data.
 //https://www.securecoding.cert.org/confluence/display/cplusplus/ENV00-CPP.+Do+not+store+the+pointer+to+the+string+returned+by+getenv()
