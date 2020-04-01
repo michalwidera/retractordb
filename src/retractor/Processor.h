@@ -3,11 +3,12 @@
 #include "QStruct.h"
 #include "dbstream.h"
 #include "inputFileInstance.h"
+#include <memory>
 
 /** Query processor */
 class Processor : private boost::noncopyable {
     /** Archive of data streams - initStorage */
-    std::map< std::string, boost::shared_ptr< dbStream >> storage ;
+    std::map< std::string, std::shared_ptr< dbStream >> storage ;
 
     /** This function assue data access
      *  Due each field is computed in form schema/query

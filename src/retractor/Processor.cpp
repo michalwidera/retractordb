@@ -29,7 +29,7 @@ Processor::Processor() {
     for ( auto q : coreInstance ) {
         if ( storage.find(q.id) == storage.end() )
             storage[ q.id ] =
-                boost::shared_ptr< dbStream >( new dbStream( q.id, q.getFieldNamesList() ) ) ;
+                std::shared_ptr< dbStream >( new dbStream( q.id, q.getFieldNamesList() ) ) ;
         else
             ; //Stream with this name already exist in stystem
 

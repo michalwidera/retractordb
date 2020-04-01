@@ -4,7 +4,7 @@
 #include <set>                                       // for set
 #include <string>                                    // for string
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <boost/shared_array.hpp>
 
 typedef boost::shared_array<char> arrayPointer_t ;
@@ -21,7 +21,7 @@ class CBufferImpl ;
 
 template <class IDTYPE>
 class CBuffer {
-    boost::shared_ptr< CBufferImpl< IDTYPE >> pImpl ;
+    std::shared_ptr< CBufferImpl< IDTYPE >> pImpl ;
 
   public:
 
