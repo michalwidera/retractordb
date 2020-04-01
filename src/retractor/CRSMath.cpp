@@ -1,4 +1,5 @@
 #include "CRSMath.h"
+#include <assert.h>  // for assert
 
 using namespace CRationalStreamMath ;
 

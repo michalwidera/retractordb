@@ -10,13 +10,8 @@
 #include <utility>                                   // for pair
 #include "RandomFile.h"                              // for CRandomFile, string
 
-#include <boost/thread/recursive_mutex.hpp>
 using namespace boost ;
 #define LOCKBYMUTEX recursive_mutex::scoped_lock scoped_lock_instance(lock_)
-
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/crc.hpp>
 
 const int max_packet_size = 1024 ;
 
@@ -133,10 +128,10 @@ template <class IDTYPE>
 class CBufferImpl {
     typedef std::map < long, BlockType > BMap ;
 
-    boost::shared_ptr< CRecord<CBlock<CRandomFile>>> recordInFile ;
-    boost::shared_ptr< CRecord<CBlock<std::stringstream>>> recordInMemory;
-    boost::shared_ptr< CRecord<CCycBlock<CRandomFile>>> recordInCycleFile ;
-    boost::shared_ptr< CRecord<CCycBlock<std::stringstream>>> recordInCycleMemory ;
+    std::shared_ptr< CRecord<CBlock<CRandomFile>>> recordInFile ;
+    std::shared_ptr< CRecord<CBlock<std::stringstream>>> recordInMemory;
+    std::shared_ptr< CRecord<CCycBlock<CRandomFile>>> recordInCycleFile ;
+    std::shared_ptr< CRecord<CCycBlock<std::stringstream>>> recordInCycleMemory ;
     /** Intended map encapsulation */
     BMap blok  ;
 

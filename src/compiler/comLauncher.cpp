@@ -3,7 +3,6 @@
 #include <sstream>
 #include <boost/system/error_code.hpp>
 #include <boost/regex.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
@@ -13,6 +12,8 @@
 
 #include <fstream>
 #include <iostream>
+
+#include <memory>
 
 #include "../share/QStruct.h"
 
@@ -46,7 +47,7 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        scoped_ptr<ostream> p_ofs;
+        std::unique_ptr<ostream> p_ofs;
         namespace po = boost::program_options;
         string sOutputFile ;
         string sInputFile ;

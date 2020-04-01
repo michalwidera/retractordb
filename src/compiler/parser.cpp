@@ -5,7 +5,6 @@
 #include <boost/spirit/include/classic_core.hpp>
 #include <boost/spirit/include/classic_symbols.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/bind.hpp>
@@ -16,6 +15,7 @@
 #include <fstream>
 #include <cctype>
 #include <locale>
+#include <memory>
 
 //bjam "-sTOOLS=vc-8_0"
 
@@ -26,7 +26,7 @@ using namespace boost::lambda;
 
 qTree coreInstance_parser ;
 
-stack < boost::shared_ptr<query>> stk ;
+stack < std::shared_ptr<query>> stk ;
 
 // ---------- SET OF TEMP VARIABLES
 
@@ -223,7 +223,7 @@ namespace {
     }
 
     void do_Inner_Stream_Begin  (char const*, char const*) {
-        stk.push( boost::shared_ptr<query>( new query() ) );
+        stk.push( std::shared_ptr<query>( new query() ) );
     }
 
     void do_Inner_Stream_End    (char const*, char const*) {
@@ -594,7 +594,7 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
     // Main parser body
     //
     ql_parser g;
-    stk.push( boost::shared_ptr<query>( new query() ) );
+    stk.push( std::shared_ptr<query>( new query() ) );
     ifstream input( sInputFile.c_str(), ifstream::in );
 
     if ( ! input.is_open() ) {
