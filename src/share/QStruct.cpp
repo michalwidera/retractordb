@@ -1,10 +1,16 @@
 #include "QStruct.h"
 
+#include <assert.h>                  // for assert
+#include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
+#include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
+#include <iostream>                  // for cerr
+#include <sstream>                   // for operator<<, basic_ostream, endl
+#include <stack>                     // for stack
+#include <stdexcept>                 // for logic_error
+
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/function.hpp>
-
-#include <iostream>
 
 using namespace boost;
 using namespace boost::lambda;

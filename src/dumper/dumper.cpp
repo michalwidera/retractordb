@@ -1,10 +1,9 @@
-#include "QStruct.h"
-#include "dbstream.h"
+#include "QStruct.h"                                        // for query, token
 
-#include <iostream>
+#include <iostream>                                         // for operator<<
 #include <fstream>
 
-#include <boost/lexical_cast.hpp>
+#include <boost/lexical_cast.hpp>                           // for lexical_cast
 #include <boost/regex.hpp>
 #include <boost/program_options.hpp>
 #include <boost/system/error_code.hpp>

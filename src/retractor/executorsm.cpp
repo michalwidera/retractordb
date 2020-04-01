@@ -22,7 +22,7 @@
 // boost::this_process::get_id()
 #include <boost/process/environment.hpp>
 
-//zeby sie dalo: BOOST_FOREACH( cmd_e i, commands | map_keys )
+// for BOOST_FOREACH( cmd_e i, commands | map_keys )
 #include <boost/range/algorithm.hpp>
 #include <boost/range/adaptors.hpp>
 
