@@ -52,6 +52,7 @@ set(SOURCES_RETRACTOR
 )
 
 set(SOURCES_COMPILER
+  compiler/comLauncher.cpp
   compiler/compiler.cpp
   compiler/parser.cpp
   share/QStruct.cpp
@@ -67,8 +68,8 @@ set(SOURCES_DUMPER
 )
 
 set(SOURCES_QRY
+  qry/qryLauncher.cpp
   qry/qry.cpp
-  qry/launcher.cpp
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )
