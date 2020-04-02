@@ -4,8 +4,8 @@
 #include <fstream>
 
 #include <boost/lexical_cast.hpp>                           // for lexical_cast
-#include <boost/regex.hpp>
-#include <boost/program_options.hpp>
+#include <boost/regex.hpp>                                  // IWYU pragma: keep
+#include <boost/program_options.hpp>                        // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
 
 extern "C" {
