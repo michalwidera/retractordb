@@ -8,9 +8,9 @@
 #include <stack>                     // for stack
 #include <stdexcept>                 // for logic_error
 
-#include <boost/lambda/lambda.hpp>
-#include <boost/lambda/bind.hpp>
-#include <boost/function.hpp>
+#include <boost/lambda/lambda.hpp>   // IWYU pragma: keep
+#include <boost/lambda/bind.hpp>     // IWYU pragma: keep
+#include <boost/function.hpp>        // IWYU pragma: keep
 
 using namespace boost;
 using namespace boost::lambda;

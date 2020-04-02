@@ -5,7 +5,7 @@
 #include <string>                                    // for string
 
 #include <memory>
-#include <boost/shared_array.hpp>
+#include <boost/shared_array.hpp>                    // IWYU pragma: keep
 
 typedef boost::shared_array<char> arrayPointer_t ;
 
