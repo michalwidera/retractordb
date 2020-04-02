@@ -17,7 +17,6 @@ How xqry terminal works
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <boost/asio.hpp>
 #include <boost/config.hpp>
 #include <boost/thread.hpp>
 
@@ -41,7 +40,6 @@ How xqry terminal works
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <boost/thread/thread.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/atomic.hpp>
 

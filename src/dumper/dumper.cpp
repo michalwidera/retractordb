@@ -8,8 +8,6 @@
 #include <boost/program_options.hpp>
 #include <boost/system/error_code.hpp>
 
-#include "Buffer.h"
-
 extern "C" {
     qTree coreInstance ;
 }
