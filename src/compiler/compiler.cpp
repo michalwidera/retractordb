@@ -19,9 +19,7 @@ extern "C" {
 }
 
 std::vector<std::string> load_file( std::string sInputFile ) {
-
-    vector<string> retVal; 
-
+    vector<string> retVal;
     std::ifstream input( sInputFile.c_str(), ifstream::in );
 
     if ( ! input.is_open() ) {

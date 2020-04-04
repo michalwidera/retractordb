@@ -606,7 +606,6 @@ string storeParseResult(string sOutputFile) {
     }
 
     oa << coreInstance2 ;
-
     return string("OK");
 }
 
@@ -616,12 +615,12 @@ string parser(vector<string> vsInputFile) {
     //
     ql_parser g;
     stk.push( std::shared_ptr<query>( new query() ) );
-
     string str;
 
     for( string line : vsInputFile ) {
         do_reset();
         stripUnicode(line);
+
         if ( ! parse( line.c_str(), g, space_p ).full ) {
             cerr << "error:\t" << line << endl ;
             throw std::invalid_argument("Syntax Error");
@@ -630,6 +629,5 @@ string parser(vector<string> vsInputFile) {
 
     assert( ! stk.empty() );
     stk.pop();
-
     return string("OK");
 }
