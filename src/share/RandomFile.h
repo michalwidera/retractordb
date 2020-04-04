@@ -1,8 +1,7 @@
 #pragma once
 
-#include <fstream>
-#include <string>
-#include <iostream>
+#include <fstream>  // for fstream, ios
+#include <string>   // for string
 
 using std::fstream ;
 using std::string ;
@@ -18,5 +17,5 @@ class CRandomFile : public fstream {
 
     CRandomFile( string murExt = "mur", const bool destroyOnDestructor = true );
     virtual ~CRandomFile();
-    const CRandomFile &operator << ( string& text );
+    const CRandomFile &operator << ( string &text );
 };

@@ -1,13 +1,13 @@
 #pragma once
 
-#include <string>
-#include <fstream>
-#include <list>
-#include <vector>
-#include <QStruct.h>
-
-#include <boost/any.hpp>
-#include <memory>
+#include <QStruct.h>           // for field
+#include <boost/any.hpp>       // for any
+#include <boost/rational.hpp>  // for rational
+#include <fstream>             // for ifstream
+#include <list>                // for list
+#include <memory>              // for shared_ptr
+#include <string>              // for string
+#include <vector>              // for vector
 
 class inputFileInstance {
 
@@ -35,7 +35,7 @@ class inputDF :
     inputDF();
     inputDF( std::string inputFileName, std::list < field > &lSchema ) ;
 
-    /** The purpose of this function is to retrieve a row 
+    /** The purpose of this function is to retrieve a row
      * from the file is created based on the schema saved in the query.
      */
     void processRow() ;

@@ -1,7 +1,14 @@
 #include <inputFileInstance.h>
-#include <boost/rational.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
+#include <assert.h>                                // for assert
+#include <ctype.h>                                 // for tolower
+#include <algorithm>                               // for transform
+#include <boost/algorithm/string/trim.hpp>         // for trim_right
+#include <boost/filesystem/convenience.hpp>        // for extension
+#include <boost/rational.hpp>                      // for rational, operator>>
+#include <boost/type_index.hpp>                    // for type_info
+#include <boost/type_index/type_index_facade.hpp>  // for operator==
+#include <stdexcept>                               // for out_of_range
+#include "QStruct.h"                               // for field, field::BAD
 
 using namespace std ;
 using namespace boost ;
@@ -11,36 +18,31 @@ void inputFileInstance::goBegin() {
         psFile->clear();
         psFile->seekg (0, ios::beg);
     }
+
     curPos = 0 ;
 }
 
 inputFileInstance::inputFileInstance( std::string inputFileName )
     : len(0), curPos(0) {
-
     extension = boost::filesystem::extension(inputFileName);
     std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-
     // Parser feeds space at the end of string
     boost::trim_right(inputFileName);
-
-    ifstream *pstream = new ifstream(
+    ifstream* pstream = new ifstream(
         inputFileName,
         ( extension == ".txt" ) ? ios::in : ios::in | ios::binary
     );
-
     psFile.reset( pstream );
-
     assert( psFile );
 
     if ( ! psFile.get() ) {
-
         len = -1 ;
-
     } else {
         if ( extension == ".dat" ) {
             psFile->seekg (0, ios::end);
             len = psFile->tellg();
         }
+
         goBegin();
     }
 
@@ -55,22 +57,17 @@ T inputFileInstance::get() {
     T retVal ;
 
     if ( len == -1 ) {
-
         throw std::out_of_range("no file connected to object");
     }
 
     if ( extension == ".txt" ) {
-
         *psFile >> retVal ;
 
         if ( psFile->eof() ) {
-
             goBegin();
             *psFile >> retVal ;
         }
-
     } else {
-
         if ( curPos > ( len - sizeof ( T ) ) ) {
             goBegin();
         }
@@ -78,6 +75,7 @@ T inputFileInstance::get() {
         psFile->read( reinterpret_cast<char*>(&retVal), sizeof retVal );
         curPos += sizeof ( T ) ;
     }
+
     return retVal ;
 }
 
@@ -105,12 +103,15 @@ void inputDF::processRow() {
             case field::BYTE:
                 lResult.push_back( get<char>() );
                 break ;
+
             case field::INTEGER:
                 lResult.push_back( get<int>() ) ;
                 break ;
+
             case field::RATIONAL:
                 lResult.push_back( get<boost::rational<int>>() );
                 break ;
+
             case field::BAD:
             default:
                 throw std::out_of_range( "processRow/undefined type" );
@@ -121,13 +122,13 @@ void inputDF::processRow() {
 
 boost::rational<int> inputDF::getCR( field f ) {
     boost::rational<int> retValue(0) ;
-
     int cnt(0);
 
-    for( auto & v : lSchema ) {
+    for( auto &v : lSchema ) {
         if (  v.getFirstFieldName() == f.getFirstFieldName() ) {
             break ;
         }
+
         cnt++ ;
     }
 
@@ -146,5 +147,6 @@ boost::rational<int> inputDF::getCR( field f ) {
     } else {
         throw std::out_of_range( "getCR/undefined type" );
     }
+
     return retValue ;
 }

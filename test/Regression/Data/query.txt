@@ -1,0 +1,19 @@
+# declaration of input time series
+declare a INTEGER,b INTEGER stream core0, 3 FILE datafile1.dat
+declare c INTEGER,d INTEGER stream core1, 1
+declare e INTEGER,f INTEGER stream core2, 3
+
+# time series junction queries
+select core0[1,1],a+1,core1.c stream str1 from core0#(core1>1)
+select (e+1)*2+1,1  stream str2 from core2
+select core1[0,1] stream str3 from core1+core2
+
+# staging
+select 1 stream str4 from core0>1
+select floor(core1[0]) stream str5 from core1@(2,2)#(core1>1)
+
+# Stop here
+stop
+
+# This is testing area here and below
+#

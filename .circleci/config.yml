@@ -1,41 +1,6 @@
 version: 2
 jobs:
  
-  build-boostedgcc:
-    working_directory: ~
-    docker:
-      - image: micwide/boostedgcc:latest
-    steps:
-      - checkout
-      - run:
-          name: Build from source
-          command: 'cmake CMakeLists.txt ; make'
-      - run:
-          name: Install product
-          command: 'sudo make install'
-      - run:
-          name: Test
-          command: 'make test'
-
-  build-boostedgcc-update:
-    working_directory: ~
-    docker:
-      - image: micwide/boostedgcc:latest
-    steps:
-      - checkout
-      - run:
-          name: Update docker libs
-          command: 'apt-get -y update && apt-get -y upgrade'
-      - run:
-          name: CMake & make
-          command: 'cmake CMakeLists.txt ; make'
-      - run:
-          name: Install product
-          command: 'sudo make install'
-      - run:
-          name: Check if there is any regression
-          command: 'make test'
-
   build-buildpack:
     working_directory: ~
     docker:
@@ -47,7 +12,7 @@ jobs:
           command: 'uname -a ; cat /proc/version; cat /etc/issue'
       - run:
           name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential'
+          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential iwyu'
       - run:
           name: Build from source
           command: 'cmake CMakeLists.txt ; make'
@@ -56,7 +21,7 @@ jobs:
           command: 'sudo make install'
       - run:
           name: Check if there is any regression
-          command: 'make test'
+          command: 'ctest --output-on-failure'
 
 workflows:
   version: 2

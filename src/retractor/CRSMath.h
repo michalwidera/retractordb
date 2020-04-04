@@ -19,7 +19,7 @@ namespace CRationalStreamMath {
     class TimeLine :  private boost::noncopyable {
 
         /** Set of _SORTED_ deltas */
-        set< rational<int> > sr;
+        set< rational<int>> sr;
 
         /** Here is multiplier for time values */
         map < rational<int>, long > counter ;
@@ -36,19 +36,19 @@ namespace CRationalStreamMath {
           * Times that are multiplicity of other values are removed
           * Prepared list is then taken as argument by getNextTimeSlot function
           */
-        TimeLine( const set< rational<int> > inSet ) ;
+        TimeLine( const set< rational<int>> inSet ) ;
 
         /** Function return true if given delta is in current time slot
           * Note: This is not trivial
           */
-        bool isThisDeltaAwaitCurrentTimeSlot( rational<int> & inDelta ) ;
+        bool isThisDeltaAwaitCurrentTimeSlot( rational<int> &inDelta ) ;
 
         /** This function computes next ctSlot value.
           * This value describe what is next time interval
           * that depends of series of deltas of time series data
           * Note: This is HARD
           */
-        rational<int> & getNextTimeSlot() ;
+        rational<int> &getNextTimeSlot() ;
     };
 
 } // namespace

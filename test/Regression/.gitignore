@@ -9,7 +9,12 @@ query.dmp
 query.lkn
 query.qry*
 testfile
+x*
 CTestTestfile.cmake
 Testing/
 query.dot
 query.jpg
+doxygen.config
+*.dot
+*.jpg
+*.png
