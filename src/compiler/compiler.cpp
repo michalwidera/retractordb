@@ -18,6 +18,29 @@ extern "C" {
     qTree coreInstance ;
 }
 
+std::vector<std::string> load_file( std::string sInputFile ) {
+
+    vector<string> retVal; 
+
+    std::ifstream input( sInputFile.c_str(), ifstream::in );
+
+    if ( ! input.is_open() ) {
+        throw std::out_of_range("File not found.");
+    }
+
+    string str;
+
+    while ( getline( input, str ) ) {
+        if ( str == "stop" ) {
+            break ;
+        }
+
+        retVal.push_back( str );
+    }
+
+    return retVal ;
+}
+
 /** This procedure computes time delays (delata) for generated streams */
 string intervalCounter() {
     while ( true ) {

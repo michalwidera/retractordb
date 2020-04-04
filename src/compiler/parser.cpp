@@ -588,54 +588,48 @@ struct ql_parser : public grammar<ql_parser> {
     };
 };
 
-string parser( string sInputFile, string sOutputFile) {
+string storeParseResult(string sOutputFile) {
+    // Store of compiled queries on disk
+    const qTree coreInstance2( coreInstance_parser ) ;
+    std::ofstream ofs( sOutputFile.c_str() );
+
+    if ( ! ofs.good() ) {
+        cerr << "No serialization file:" << sOutputFile << endl ;
+        throw std::invalid_argument("Runtime Error");
+    }
+
+    boost::archive::text_oarchive oa(ofs);
+
+    if ( ! ofs.good() ) {
+        cerr << "File chain serialization fail" << endl ;
+        throw std::invalid_argument("Runtime Error");
+    }
+
+    oa << coreInstance2 ;
+
+    return string("OK");
+}
+
+string parser(vector<string> vsInputFile) {
     //
     // Main parser body
     //
     ql_parser g;
     stk.push( std::shared_ptr<query>( new query() ) );
-    ifstream input( sInputFile.c_str(), ifstream::in );
-
-    if ( ! input.is_open() ) {
-        throw std::out_of_range("File not found.");
-    }
 
     string str;
 
-    while ( getline( input, str ) ) {
-        if ( str == "stop" ) {
-            break ;
-        }
-
+    for( string line : vsInputFile ) {
         do_reset();
-        stripUnicode( str );
-
-        if ( ! parse( str.c_str(), g, space_p ).full ) {
-            cerr << "error:\t" << str.c_str() << endl ;
+        stripUnicode(line);
+        if ( ! parse( line.c_str(), g, space_p ).full ) {
+            cerr << "error:\t" << line << endl ;
             throw std::invalid_argument("Syntax Error");
         }
     }
 
     assert( ! stk.empty() );
     stk.pop();
-    // Store of compiled queries on disk
-    {
-        const qTree coreInstance2( coreInstance_parser ) ;
-        std::ofstream ofs( sOutputFile.c_str() );
 
-        if ( ! ofs.good() ) {
-            cerr << "No serialization file:" << sOutputFile << endl ;
-            throw std::invalid_argument("Runtime Error");
-        }
-
-        boost::archive::text_oarchive oa(ofs);
-
-        if ( ! ofs.good() ) {
-            cerr << "File chain serialization fail" << endl ;
-            throw std::invalid_argument("Runtime Error");
-        }
-
-        oa << coreInstance2 ;
-    }
     return string("OK");
 }

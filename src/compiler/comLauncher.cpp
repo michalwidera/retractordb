@@ -24,7 +24,8 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern string parser( string sInputFile, string sOutputFile);
+extern string parser(vector<string> vsInputFile);
+extern string storeParseResult(string sOutputFile);
 
 extern qTree coreInstance ;
 
@@ -62,20 +63,19 @@ int main(int argc, char* argv[]) {
             options(desc).positional(p).run(), vm);
         po::notify(vm);
 
+        if (vm.count("help")) {
+            cout << desc ;
+            return system::errc::success;
+        }
+
         if ( vm.count("queryfile") == 0 ) {
             cout << argv[0] << ": fatal error: no input file" << endl ;
             cout << "compilation terminated." << endl ;
             return EPERM ; //ERROR defined in errno-base.h
         }
 
-        if (vm.count("help")) {
-            cout << desc << "\n";
-            return system::errc::success;
-        }
-
         string sQueryFile = vm["queryfile"].as< string >() ;
         string sOutFile   = vm["outfile"].as< string >() ;
-        //defaults
         string sLinkFile  = "query.lkn" ;
         string sSubsetFile = "query.sub" ;
         //override defaults if filename is matching regexp
@@ -89,38 +89,9 @@ int main(int argc, char* argv[]) {
                 sSubsetFile = filenameNoExt + ".sub" ;
             }
         }
-        //check in query file contains first line subset[beg,end]
-        //this sub is to check if we can test different examples
-        //and file query.txt can be always in repo
-        {
-            string str;
-            ifstream input(sQueryFile.c_str());
-            getline(input, str);
-            boost::cmatch what;
-            boost::regex mulitestRe("set\\[(\\d*)\\,(\\d*)\\]");  //multiset[2-7]
-
-            if (regex_match(str.c_str(), what, mulitestRe)) {
-                sQueryFile = sSubsetFile;
-                ofstream querySubset(sQueryFile.c_str());
-                const int dGivenSetBeg(atoi( string( what[1]).c_str()));
-                const int dGivenSetEnd(atoi( string( what[2]).c_str()));
-                input.seekg(0, ios_base::beg);
-                int lineNr(0);
-                list <string> querySet;
-
-                while (getline(input, str)) {
-                    if (lineNr >= dGivenSetBeg && lineNr <= dGivenSetEnd) {
-                        querySubset << str << "\n";
-                    }
-
-                    lineNr++;
-                }
-
-                cout << "Subset ...\t" << dGivenSetBeg << "-" << dGivenSetEnd << endl;
-            }
-        }
         cout << "Input file:" << sQueryFile << endl ;
-        cout << "Compile result:" << parser( sQueryFile, sLinkFile) << endl ;
+        cout << "Compile result:" << parser(load_file(sQueryFile)) << endl ;
+        cout << "Store result:" << storeParseResult(sLinkFile) << endl ;
         //
         // Main Algorithm body
         //
