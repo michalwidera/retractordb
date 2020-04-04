@@ -36,9 +36,17 @@ set(SOURCES_QRY_TEST
   test_qry.cpp
 )
 
+set(SOURCES_COMPILER_TEST
+  ../../src/compiler/compiler.cpp
+  ../../src/compiler/parser.cpp
+  test_compiler.cpp
+)
+
 add_executable( test_xqry ${SOURCES_QRY_TEST} )
+add_executable( test_xcompiler ${SOURCES_QRY_TEST} )
 
 target_link_libraries( test_xqry ${Boost_LIBRARIES}  -lrt -ldl -lboost_unit_test_framework )
+target_link_libraries( test_xcompiler ${Boost_LIBRARIES}  -lrt -ldl -lboost_unit_test_framework )
 
 add_test( 
   NAME unittest-test-xqry
@@ -46,3 +54,8 @@ add_test(
   COMMAND test_xqry
 )
 
+add_test( 
+  NAME unittest-test-xcompiler
+  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
+  COMMAND test_xcompiler
+)
