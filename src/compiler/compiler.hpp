@@ -2,7 +2,7 @@
 #include <string>
 
 std::string intervalCounter();
-void dumpInstance( std::string sOutFile, bool verbose = true );
+void dumpInstance( std::string sOutFile);
 std::string simplifyLProgram();
 std::string prepareFields();
 std::string replicateIDX();

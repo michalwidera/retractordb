@@ -20,8 +20,6 @@ extern "C" {
 
 /** This procedure computes time delays (delata) for generated streams */
 string intervalCounter() {
-    clog << "intervalCounter()" << endl ;
-
     while ( true ) {
         bool bOnceAgain( false );
         coreInstance.sort();
@@ -170,8 +168,6 @@ string intervalCounter() {
                         } else {
                             delta = ( deltaSrc / schemaSizeSrc ) * step ;
                         }
-
-                        clog << "Computed delta from agse:" << delta << endl ;
                     }
                     break ;
 
@@ -218,7 +214,6 @@ string generateStreamName( string sName1, string sName2, command_id cmd ) {
 TODO: Stream_MAX,MIN,AVG...
 */
 string simplifyLProgram() {
-    clog << "simplifyLProgram() - start" << endl ;
     coreInstance.sort();
 
     for (
@@ -254,8 +249,6 @@ string simplifyLProgram() {
 
         //Otimization phase 2
         if ( (*it).isReductionRequired() ) {
-            clog << "simplifyLProgram(): reduction hit" << endl ;
-
             for (
                 list < token >::iterator it2 = (*it).lProgram.begin() ;
                 it2 != (*it).lProgram.end() ;
@@ -273,11 +266,6 @@ string simplifyLProgram() {
                         token newVal( *it2 );
                         newQuery.lProgram.push_front( newVal );
                         cmd = ( *it2 ).getTokenCommand() ;
-                        clog << "simplifyLProgram(): mv cmd "
-                            << ( *it2 ).getStrTokenName()
-                            << " "
-                            << ( *it2 ).getValue()
-                            << endl ;
                         it2 = (*it).lProgram.erase( it2 );
                         it2 -- ;
                     }
@@ -287,11 +275,6 @@ string simplifyLProgram() {
                         stringstream s ;
                         s << ( *it2 ).getValue() ;
                         arg1 =  string(s.str()) ;
-                        clog << "simplifyLProgram(): mv arg "
-                            << ( *it2 ).getStrTokenName()
-                            << " "
-                            << ( *it2 ).getValue()
-                            << endl ;
                         affectedField = ( *it2 ).getValue() ;
                         it2 = (*it).lProgram.erase( it2 );
                         it2 -- ;
@@ -301,7 +284,6 @@ string simplifyLProgram() {
                     lSchema.push_back( token( PUSH_TSCAN )  );
                     newQuery.lSchema.push_back( field( "*", lSchema, field::BAD, "*" ) ) ;
                     newQuery.id = generateStreamName( arg1, "", cmd );
-                    clog << "simplifyLProgram(): generation of " << newQuery.id << endl ;
                     (*it).lProgram.insert( it2, token( PUSH_STREAM, newQuery.id ) );
                     coreInstance.push_back( newQuery ); //After this instruction it loses context
                     it = coreInstance.begin() ;
@@ -354,13 +336,11 @@ string simplifyLProgram() {
         }  //Endif
     }  //Endfor
 
-    clog << "simplifyLProgram() - stop" << endl ;
     return string("OK") ;
 }
 
 //Goal of this procedure is to unroll schema bsased of given command
 list < field > combine( string sName1, string sName2, token cmd_token ) {
-    clog << "combine() - (" << sName1 << "),(" << sName2 << ")" << endl ;
     list < field > lRetVal ;
     command_id cmd = cmd_token.getTokenCommand() ;
 
@@ -498,7 +478,6 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
 //and some * can be process which have arguments appear as two asterixe
 //In such case unrool does not appear and algorithm gets shitin-shitout
 string prepareFields() {
-    clog << "prepareFields() - start" << endl ;
     coreInstance.tsort();
 
     for ( auto &q : coreInstance ) {
@@ -508,14 +487,9 @@ string prepareFields() {
             //after otimization alerady
 
             for ( auto &f : q.lSchema ) {
-                clog << "prepareFields() getFirstFieldName=" << f.getFirstFieldName() << endl ;
-
                 if ( f.getFirstFieldToken().getTokenCommand() ==  PUSH_TSCAN ) {
-                    clog << "prepareFields() found (*)" << endl ;
-
                     //found! - and now unroll
                     if ( q.lProgram.size() == 1 ) {
-                        clog << "prepareFields() size()==1" << endl ;
                         //we assure that on and only token is push_stream
                         assert( ( * q.lProgram.begin() ).getTokenCommand() == PUSH_STREAM ) ;
                         //copy list of fields from one to another
@@ -524,7 +498,6 @@ string prepareFields() {
                     }
 
                     if ( q.lProgram.size() == 3 ) {
-                        clog << "prepareFields() size()==3" << endl ;
                         list < token >::iterator eIt = q.lProgram.begin();
                         string sName1  = ( * eIt ++ ).getValue() ;
                         string sName2  = ( * eIt ++ ).getValue() ;
@@ -534,7 +507,6 @@ string prepareFields() {
                     }
 
                     if ( q.lProgram.size() == 2 ) {
-                        clog << "prepareFields() size()==2" << endl ;
                         list < token >::iterator eIt = q.lProgram.begin();
                         string sName1  = ( * eIt ++ ).getValue() ;
                         token cmd = ( * eIt ++ ) ;
@@ -547,7 +519,6 @@ string prepareFields() {
     }
 
     coreInstance.sort();
-    clog << "prepareFields() - stop" << endl ;
     return string("OK") ;
 }
 
@@ -627,7 +598,6 @@ note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction
 */
 string convertReferences() {
-    clog << "convertReferences() enter" << endl ;
     boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  //something[1][1]
     boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");  //something[1,1]
     boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");         //something[1]
@@ -643,13 +613,9 @@ string convertReferences() {
                 const command_id cmd( t.getTokenCommand() );
                 const string text( t.getValue() );
                 boost::cmatch what;
-                clog << "convertReferences() token:" << t.getStrTokenName() << "," ;
-                clog << "convertReferences() text :" << text << endl ;
 
                 switch ( cmd ) {
                     case PUSH_ID1:
-                        clog << "convertReferences() PUSH_ID1 match - something.in_schema" << endl ;
-
                         if ( regex_search(text.c_str(), what, xprFieldId1) ) {
                             assert( what.size() == 3 );
                             const string schema( what[1] );
@@ -662,8 +628,6 @@ string convertReferences() {
                                     int offset1( 0 );
 
                                     for ( auto &f1 : q1.lSchema ) {
-                                        clog << "convertReferences() a.field:" << *f1.setFieldName.begin() << endl ;
-
                                         if ( f1.setFieldName.find( field ) != f1.setFieldName.end() ) {
                                             t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema ) ;
                                             break ;
@@ -686,8 +650,6 @@ string convertReferences() {
                         break ;
 
                     case PUSH_IDX:
-                        clog << "convertReferences() PUSH_IDX match - something[_]" << endl ;
-
                         if ( regex_search(text.c_str(), what, xprFieldIdX) ) {
                             assert( what.size() == 2 );
                             const string schema( what[1] );
@@ -699,8 +661,6 @@ string convertReferences() {
                         break ;
 
                     case PUSH_ID2:
-                        clog << "convertReferences() PUSH_ID2 match - something[1]" << endl ;
-
                         if ( regex_search(text.c_str(), what, xprFieldId2) ) {
                             assert( what.size() == 3 );
                             const string schema( what[1] );
@@ -716,8 +676,6 @@ string convertReferences() {
                         break ;
 
                     case PUSH_ID3:
-                        clog << "convertReferences() PUSH_ID3 match - type field_of_corn" << endl ;
-
                         if ( regex_search(text.c_str(), what, xprFieldId3) ) {
                             assert( what.size() == 2 );
                             const string field( what[1] );
@@ -727,7 +685,6 @@ string convertReferences() {
                             query* pQ1 ( NULL ), *pQ2 ( NULL );
 
                             if ( q.lProgram.size() == 1 ) {
-                                clog << "convertReferences() size=1" << endl ;
                                 schema1  = ( * eIt ).getValue() ;       //push stream - stream
                                 cmd = ( * eIt ).getTokenCommand() ;
                                 assert( cmd == PUSH_STREAM ) ;
@@ -735,14 +692,12 @@ string convertReferences() {
                             }
 
                             if ( q.lProgram.size() == 2 ) {
-                                clog << "convertReferences() size=2" << endl ;
                                 schema1  = ( * eIt ++ ).getValue() ;    //push stream - stream
                                 cmd = ( * eIt ).getTokenCommand() ;     //comand
                                 pQ1 = & getQuery( schema1 ) ;
                             }
 
                             if ( q.lProgram.size() == 3 ) {
-                                clog << "convertReferences() size=3" << endl ;
                                 schema1  = ( * eIt ++ ).getValue() ;    //push stream - stream
                                 schema2  = ( * eIt ++ ).getValue() ;    //push stream - stream
                                 cmd = ( * eIt ).getTokenCommand() ;     //comand
@@ -757,8 +712,6 @@ string convertReferences() {
                                 offset1 = 0;
 
                                 for( auto &f1 : (*pQ1).lSchema ) {
-                                    clog << "convertReferences() b.field:" << *f1.setFieldName.begin() << endl ;
-
                                     if ( f1.setFieldName.find( field ) != f1.setFieldName.end() ) {
                                         t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema1 ) ;
                                         bFieldFound = true ;
@@ -772,8 +725,6 @@ string convertReferences() {
                                 offset1 = 0 ;
 
                                 for( auto &f2 : (*pQ2).lSchema ) {
-                                    clog << "convertReferences() c.field:" << *f2.setFieldName.begin() << endl ;
-
                                     if ( f2.setFieldName.find( field ) != f2.setFieldName.end() ) {
                                         t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema2 ) ;
                                         bFieldFound = true ;
@@ -794,8 +745,6 @@ string convertReferences() {
 
                     case PUSH_ID4:
                     case PUSH_ID5:
-                        clog << "convertReferences() PUSH_ID4/5 match - type something[1,1] || [1][1]" << endl ;
-
                         if ( regex_search(text.c_str(), what, xprFieldId4) ||
                             regex_search(text.c_str(), what, xprFieldId5)
                         ) {
@@ -815,7 +764,6 @@ string convertReferences() {
                             }
 
                             if ( !foundSchema ) {
-                                clog << "convertReferences() - Field calls nonexist schema - " << text.c_str() << endl ;
                                 throw std::logic_error("Field calls nonexist schema - config.log (-g)");
                             }
 
@@ -830,18 +778,13 @@ string convertReferences() {
         }
     }
 
-    clog << "convertReferences() leave" << endl ;
     return string("OK");
 }
 
-void dumpInstance( std::string sOutFile, bool verbose ) {
+void dumpInstance( std::string sOutFile) {
     //These object must be const
     const qTree coreInstance2( coreInstance ) ;
     std::ofstream ofs( sOutFile.c_str() );
     boost::archive::text_oarchive oa(ofs);
     oa << coreInstance2 ;
-
-    if ( verbose ) {
-        cout << "Dump:      \t" << sOutFile << endl ;
-    }
 }

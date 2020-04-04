@@ -24,9 +24,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern string parser( string sInputFile, string sOutputFile, bool verbose = true);
-
-std::streambuf* oldbuf = std::clog.rdbuf(clog.rdbuf());
+extern string parser( string sInputFile, string sOutputFile);
 
 extern qTree coreInstance ;
 
@@ -56,8 +54,6 @@ int main(int argc, char* argv[]) {
         ("help,h", "Show program options")
         ("queryfile,q", po::value<string>(&sInputFile), "query set file")
         ("outfile,o", po::value<string>(&sOutputFile)->default_value("query.qry"), "output file")
-        ("log,g", "Translation raport - debuglog")
-        ("verbose,v", "Diangostic info")
         ;
         po::positional_options_description p;       //Assume that infile is the first option
         p.add("queryfile", -1);
@@ -77,20 +73,6 @@ int main(int argc, char* argv[]) {
             return system::errc::success;
         }
 
-        if (vm.count("log")) {
-            p_ofs.reset( new ofstream("compiler.log") ) ;
-
-            if ( ! p_ofs ) {
-                throw std::out_of_range("No report (debuglog)");
-            }
-
-            clog.rdbuf( p_ofs->rdbuf());
-            cout << "Debuglog active\n";
-            clog << "Start\n";
-        } else {
-            clog.rdbuf(NULL);
-        }
-
         string sQueryFile = vm["queryfile"].as< string >() ;
         string sOutFile   = vm["outfile"].as< string >() ;
         //defaults
@@ -107,14 +89,6 @@ int main(int argc, char* argv[]) {
                 sSubsetFile = filenameNoExt + ".sub" ;
             }
         }
-
-        if (vm.count("verbose")) {
-            cout << "In:        \t" << sQueryFile << endl ;
-            cout << "Out:       \t" << sOutFile << endl ;
-            cout << "Link:      \t" << sLinkFile << endl ;
-            cout << "Subset:    \t" << sSubsetFile << endl ;
-        }
-
         //check in query file contains first line subset[beg,end]
         //this sub is to check if we can test different examples
         //and file query.txt can be always in repo
@@ -146,7 +120,7 @@ int main(int argc, char* argv[]) {
             }
         }
         cout << "Input file:" << sQueryFile << endl ;
-        cout << "Compile result:" << parser( sQueryFile, sLinkFile, vm.count("verbose")) << endl ;
+        cout << "Compile result:" << parser( sQueryFile, sLinkFile) << endl ;
         //
         // Main Algorithm body
         //
@@ -159,20 +133,20 @@ int main(int argc, char* argv[]) {
         }
 
         string sOutFileLog1   = vm["outfile"].as< string >() + ".lg1" ;
-        dumpInstance( sOutFileLog1, vm.count("verbose") );
+        dumpInstance(sOutFileLog1);
         int dAfterParserSize((int)coreInstance.size());
         string response ;
         response = simplifyLProgram() ;
         string sOutFileLog2   = vm["outfile"].as< string >() + ".lg2" ;
-        dumpInstance( sOutFileLog2, vm.count("verbose"));
+        dumpInstance(sOutFileLog2);
         response = prepareFields();
         string sOutFileLog3   = vm["outfile"].as< string >() + ".lg3" ;
-        dumpInstance( sOutFileLog3, vm.count("verbose"));
+        dumpInstance( sOutFileLog3);
         response = intervalCounter() ;
         response = convertReferences();
         response = replicateIDX();
         int dAfterCompilingSize((int)coreInstance.size());
-        dumpInstance( sOutFile, vm.count("verbose"));
+        dumpInstance( sOutFile);
         int dSize ( dAfterCompilingSize - dAfterParserSize ) ;
         string sSize( "" ) ;
 
@@ -181,20 +155,7 @@ int main(int argc, char* argv[]) {
             s << dSize ;
             sSize = string( " + " ) + string( s.str() ) ;
         }
-
-        if (vm.count("verbose")) {
-            cout << "Raport:"
-                << sQueryFile
-                << " => "
-                << sOutFile
-                << sSize
-                << endl ;
-            cout << "Stop\n" ;
-        }
-
-        clog.rdbuf(oldbuf);
     } catch(std::exception &e) {
-        clog.rdbuf(oldbuf);
         cerr << e.what() << "\n";
         return system::errc::interrupted;
     }

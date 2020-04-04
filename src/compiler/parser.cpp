@@ -234,7 +234,6 @@ namespace {
 
     void do_print(char const* str, char const* end) {
         string s(str, end);
-        clog << "compiler:" << "[[" << s << "]]" << endl ;
     }
 
 
@@ -589,7 +588,7 @@ struct ql_parser : public grammar<ql_parser> {
     };
 };
 
-string parser( string sInputFile, string sOutputFile, bool verbose = true) {
+string parser( string sInputFile, string sOutputFile) {
     //
     // Main parser body
     //
@@ -614,10 +613,6 @@ string parser( string sInputFile, string sOutputFile, bool verbose = true) {
         if ( ! parse( str.c_str(), g, space_p ).full ) {
             cerr << "error:\t" << str.c_str() << endl ;
             throw std::invalid_argument("Syntax Error");
-        } else {
-            if ( verbose ) {
-                cout << "OK:\t" << str.c_str() << endl ;
-            }
         }
     }
 
