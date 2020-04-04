@@ -93,8 +93,8 @@ ADD_DEFINITIONS( "-DHAS_BOOST" )
 find_package( Threads )
 
 target_link_libraries( xretractor ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
-target_link_libraries( xcompiler ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
-target_link_libraries( xdumper ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
+target_link_libraries( xcompiler ${Boost_LIBRARIES} -lrt -ldl )
+target_link_libraries( xdumper ${Boost_LIBRARIES} -lrt -ldl )
 target_link_libraries( xqry ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
