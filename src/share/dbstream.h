@@ -36,11 +36,11 @@ class dbStream : private boost::noncopyable {
     number &operator[](const int &_Keyval);
     number readCache(const int &_Keyval);
     void store();
-    bool get( int offset = 0 );
+    bool get(int offset = 0);
 };
 
-void saveStreamsToFile( std::string filename );
+void saveStreamsToFile(std::string filename);
 
-long streamStoredSize( std::string filename );
+long streamStoredSize(std::string filename);
 
-void Dump( std::ostream &os );
+void Dump(std::ostream &os);

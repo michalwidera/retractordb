@@ -14,26 +14,26 @@ CBuffer<std::string> cbuf ;
 using namespace std ;
 using namespace boost ;
 
-void saveStreamsToFile( string filename ) {
-    cbuf.Save( filename.c_str() );
+void saveStreamsToFile(string filename) {
+    cbuf.Save(filename.c_str());
 }
-long streamStoredSize( string filename ) {
-    return cbuf.GetLen( filename ) ;
+long streamStoredSize(string filename) {
+    return cbuf.GetLen(filename) ;
 }
-void Dump( std::ostream &os ) {
-    cbuf.Dump( os, NULL );
+void Dump(std::ostream &os) {
+    cbuf.Dump(os, NULL);
 }
 
-number fake = boost::rational<int>(99, 1);
+number fake = boost::rational<int> (99, 1);
 
-dbStream::dbStream( std::string streamName, list < std::string > schema ) :
-    streamName( streamName ),
-    schema( schema ),
+dbStream::dbStream(std::string streamName, list < std::string > schema) :
+    streamName(streamName),
+    schema(schema),
     mpReadNr(-1),
     mpLenNr(-1),
-    frameSize( schema.size() * sizeof( number ) ),
-    pRawData( new char[ frameSize ] ) {
-    cbuf.DefBlock( streamName, frameSize, BF );
+    frameSize(schema.size() * sizeof(number)),
+    pRawData(new char[ frameSize ]) {
+    cbuf.DefBlock(streamName, frameSize, BF);
     mpShadow.resize(schema.size());
     mpRead.resize(schema.size());
 }
@@ -43,69 +43,69 @@ number  &dbStream::operator[](const int &_Keyval) {
 }
 
 void dbStream::store() {
-    char* p ( pRawData.get() );
+    char* p(pRawData.get());
     int cnt(0);
 
-    for( auto &str : schema ) {
-        number fieldData ( mpShadow[ cnt ] ) ;
-        memcpy( p, & fieldData, sizeof( number ) );
-        p += sizeof( number ) ;
+    for (auto &str : schema) {
+        number fieldData(mpShadow[ cnt ]) ;
+        memcpy(p, & fieldData, sizeof(number));
+        p += sizeof(number) ;
         cnt ++;
     }
 
-    cbuf.PutBlock( streamName, pRawData );
+    cbuf.PutBlock(streamName, pRawData);
     mpLenNr = -1 ;
     mpReadNr = -1 ;
 }
 
-number dbStream::readCache( const int &_Keyval ) {
-    if ( mpReadNr == -1 ) {
+number dbStream::readCache(const int &_Keyval) {
+    if (mpReadNr == -1) {
         get(0);
     }
 
     return mpRead[ _Keyval ] ;
 }
 
-bool dbStream::get( int offset ) {
-    if ( offset < 0 ) {
+bool dbStream::get(int offset) {
+    if (offset < 0) {
         //std::cerr << boost::stacktrace::stacktrace() ;
         assert(false);
     }
 
-    assert ( offset >= 0 ) ;
-    int len = cbuf.GetLen( streamName ) ;
+    assert(offset >= 0) ;
+    int len = cbuf.GetLen(streamName) ;
 
-    if ( mpReadNr == offset && mpLenNr == len ) {
+    if (mpReadNr == offset && mpLenNr == len) {
         return true ;
     }
 
-    if ( offset >= len || len == 0 ) {
-        for( int i = 0 ; i < schema.size() ; i++ ) {
+    if (offset >= len || len == 0) {
+        for (int i = 0 ; i < schema.size() ; i++) {
             mpRead[ i ] = fake ;
         }
 
         return false ;
     }
 
-    assert ( cbuf.GetLen( streamName ) != 0 );
-    long ret = cbuf.GetBlock( streamName, len - offset - 1, pRawData );
+    assert(cbuf.GetLen(streamName) != 0);
+    long ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData);
 
-    if ( ret == 0 ) {
+    if (ret == 0) {
         cerr << len << "," << offset << endl ;
     }
 
-    assert( ret != 0 );
+    assert(ret != 0);
     mpRead.clear();
-    char* p ( pRawData.get() );
+    char* p(pRawData.get());
 
-    for( int i = 0 ; i < schema.size() ; i++ ) {
+    for (int i = 0 ; i < schema.size() ; i++) {
         number fieldData ;
-        memcpy( & fieldData, p, sizeof( number ) );
+        memcpy(& fieldData, p, sizeof(number));
         mpRead[ i ] = fieldData ;
-        p += sizeof( number ) ;
+        p += sizeof(number) ;
     }
 
-    assert( mpShadow.size() != 0 );
+    assert(mpShadow.size() != 0);
     mpReadNr = offset ; /* position */
     mpLenNr  = len ;
     return true ;

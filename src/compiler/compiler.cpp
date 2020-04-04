@@ -18,22 +18,22 @@ extern "C" {
     qTree coreInstance ;
 }
 
-std::vector<std::string> load_file( std::string sInputFile ) {
+std::vector<std::string> load_file(std::string sInputFile) {
     vector<string> retVal;
-    std::ifstream input( sInputFile.c_str(), ifstream::in );
+    std::ifstream input(sInputFile.c_str(), ifstream::in);
 
-    if ( ! input.is_open() ) {
+    if (! input.is_open()) {
         throw std::out_of_range("File not found.");
     }
 
     string str;
 
-    while ( getline( input, str ) ) {
-        if ( str == "stop" ) {
+    while (getline(input, str)) {
+        if (str == "stop") {
             break ;
         }
 
-        retVal.push_back( str );
+        retVal.push_back(str);
     }
 
     return retVal ;
@@ -41,31 +41,31 @@ std::vector<std::string> load_file( std::string sInputFile ) {
 
 /** This procedure computes time delays (delata) for generated streams */
 string intervalCounter() {
-    while ( true ) {
-        bool bOnceAgain( false );
+    while (true) {
+        bool bOnceAgain(false);
         coreInstance.sort();
 
-        for ( auto &q : coreInstance ) {
-            if ( q.lProgram.size() == 0 ) {
+        for (auto &q : coreInstance) {
+            if (q.lProgram.size() == 0) {
                 continue ;    /* Declaration */
             }
 
-            if ( q.lProgram.size() == 1  ) {
-                if ( q.rInterval == 0 ) {
-                    token tInstance( * ( q.lProgram.begin() ) );
-                    q.rInterval = coreInstance.getDelta( tInstance.getValue() ) ;
+            if (q.lProgram.size() == 1) {
+                if (q.rInterval == 0) {
+                    token tInstance(* (q.lProgram.begin()));
+                    q.rInterval = coreInstance.getDelta(tInstance.getValue()) ;
                 }
 
                 continue ;  // Just one stream
             }
 
-            assert( q.lProgram.size() == 3 || q.lProgram.size() == 2 ) ;
+            assert(q.lProgram.size() == 3 || q.lProgram.size() == 2) ;
             // This is shit coded (these size2 i size3) and fast fixed
-            bool size3 = ( q.lProgram.size() == 3 );
+            bool size3 = (q.lProgram.size() == 3);
             list < token > loc = q.lProgram ;
             token t1(*loc.begin()) ;
 
-            if ( size3 ) {
+            if (size3) {
                 loc.pop_front();
             }
 
@@ -75,77 +75,77 @@ string intervalCounter() {
             loc.pop_front();
             boost::rational<int> delta(-1) ;
 
-            switch ( op.getTokenCommand() ) {
+            switch (op.getTokenCommand()) {
                 case STREAM_HASH: {
-                        boost::rational<int> delta1 = coreInstance.getDelta( t1.getValue() ) ;
-                        boost::rational<int> delta2 = coreInstance.getDelta( t2.getValue() ) ;
+                        boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue()) ;
+                        boost::rational<int> delta2 = coreInstance.getDelta(t2.getValue()) ;
 
-                        if ( delta1 == 0 || delta2 == 0 ) {
+                        if (delta1 == 0 || delta2 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
-                            delta = deltaHash ( delta1, delta2 ) ;
+                            delta = deltaHash(delta1, delta2) ;
                         }
                     }
                     break ;
 
                 case STREAM_DEHASH_DIV: {
-                        boost::rational<int> delta1 = coreInstance.getDelta( t1.getValue() ) ;
+                        boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue()) ;
                         boost::rational<int> delta2 = t2.getCRValue() ; //Tutaj nie ma drugiego strumienia tylko od razu argument
-                        assert( delta2 != 0 );
+                        assert(delta2 != 0);
 
-                        if ( delta1 == 0 ) {
+                        if (delta1 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
-                            delta = deltaDivMod ( delta1, delta2 ) ;
+                            delta = deltaDivMod(delta1, delta2) ;
                         }
 
-                        if ( delta1 > delta ) {
+                        if (delta1 > delta) {
                             throw std::out_of_range("Nie mozna zrobić szybszego div z wolniejszego zrodla");
                         }
                     }
                     break ;
 
                 case STREAM_DEHASH_MOD: {
-                        boost::rational<int> delta1 = coreInstance.getDelta( t1.getValue() ) ;
+                        boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue()) ;
                         boost::rational<int> delta2 = t2.getCRValue() ;
-                        assert( delta2 != 0 );
+                        assert(delta2 != 0);
 
-                        if ( delta1 == 0 ) {
+                        if (delta1 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
-                            delta = deltaDivMod ( delta1, delta2 ) ;
+                            delta = deltaDivMod(delta1, delta2) ;
                         }
 
-                        if ( delta1 > delta ) {
+                        if (delta1 > delta) {
                             throw std::out_of_range("Nie mozna zrobić szybszego mod z wolniejszego zrodla");
                         }
                     }
                     break ;
 
                 case STREAM_SUBSTRACT: {
-                        boost::rational<int> delta1 = coreInstance.getDelta( t1.getValue() ) ;
+                        boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue()) ;
 
-                        if ( delta1 == 0 ) {
+                        if (delta1 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
-                            delta = deltaSubstract ( delta1 ) ;
+                            delta = deltaSubstract(delta1) ;
                         }
                     }
                     break ;
 
                 case STREAM_ADD: {
-                        boost::rational<int>delta1 = coreInstance.getDelta( t1.getValue() ) ;
-                        boost::rational<int>delta2 = coreInstance.getDelta( t2.getValue() ) ;
+                        boost::rational<int>delta1 = coreInstance.getDelta(t1.getValue()) ;
+                        boost::rational<int>delta2 = coreInstance.getDelta(t2.getValue()) ;
 
-                        if ( delta1 == 0 || delta2 == 0 ) {
+                        if (delta1 == 0 || delta2 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
-                            delta = deltaAdd ( delta1, delta2 ) ;
+                            delta = deltaAdd(delta1, delta2) ;
                         }
                     }
                     break ;
@@ -157,14 +157,14 @@ string intervalCounter() {
 
                 // Delta UNCHANGED ! (like time move)
                 case STREAM_TIMEMOVE: {
-                        boost::rational<int>delta1 = coreInstance.getDelta( t1.getValue() ) ;
+                        boost::rational<int>delta1 = coreInstance.getDelta(t1.getValue()) ;
 
-                        if ( delta1 == 0 ) {
+                        if (delta1 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         }
 
-                        delta = deltaTimemove ( delta1, 0 ) ;
+                        delta = deltaTimemove(delta1, 0) ;
                     }
                     break ;
 
@@ -174,20 +174,20 @@ string intervalCounter() {
                         // push_stream core0 -> deltaSrc
                         // push_val 5 -> size_of_window
                         // stream agse 3 -> step_of_window
-                        boost::rational<int> deltaSrc = coreInstance.getDelta( t1.getValue() ) ;
-                        boost::rational<int> schemaSizeSrc = getQuery( t1.getValue() ).getFieldNamesList().size() ;
-                        boost::rational<int> step = abs( t2.getCRValue() );
-                        boost::rational<int> windowSize  = abs( op.getCRValue() ) ;
-                        assert( windowSize > 0 );
-                        assert( step > 0 );
+                        boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getValue()) ;
+                        boost::rational<int> schemaSizeSrc = getQuery(t1.getValue()).getFieldNamesList().size() ;
+                        boost::rational<int> step = abs(t2.getCRValue());
+                        boost::rational<int> windowSize  = abs(op.getCRValue()) ;
+                        assert(windowSize > 0);
+                        assert(step > 0);
 
-                        if ( t2.getCRValue() < 0 ) { // windowSize < 0
+                        if (t2.getCRValue() < 0) {   // windowSize < 0
                             delta = deltaSrc ;
                             delta /= schemaSizeSrc ;
                             delta *= windowSize ;
                             delta /= step ;
                         } else {
-                            delta = ( deltaSrc / schemaSizeSrc ) * step ;
+                            delta = (deltaSrc / schemaSizeSrc) * step ;
                         }
                     }
                     break ;
@@ -200,11 +200,11 @@ string intervalCounter() {
                     throw std::out_of_range("Undefined token/command on list");
             } //switch ( op.getTokenCommand() )
 
-            assert( delta != -1 );
+            assert(delta != -1);
             q.rInterval = delta;  //Tutaj jest ustalana wartosc delta - wartosc zwrotna
         }  //BOOST_FOREACH ( query & q , coreInstance )
 
-        if ( ! bOnceAgain ) {
+        if (! bOnceAgain) {
             break ;
         } else {
             coreInstance.sort();
@@ -215,19 +215,19 @@ string intervalCounter() {
     return string("OK") ;
 }
 
-string generateStreamName( string sName1, string sName2, command_id cmd ) {
-    string sOperation( "undefinied" );
+string generateStreamName(string sName1, string sName2, command_id cmd) {
+    string sOperation("undefinied");
 
-    switch ( cmd ) {
+    switch (cmd) {
 #define DEF_CASE( _A_ ) case _A_ : sOperation = #_A_ ; break ;
 #include "tokendefset.h"
 #undef DEF_CASE
     }
 
-    if ( sName2 == "" ) {
-        return sOperation + string ( "_" ) + sName1 ;
+    if (sName2 == "") {
+        return sOperation + string("_") + sName1 ;
     } else {
-        return sOperation + string ( "_" ) + sName2 + string ( "_" ) + sName1 ;
+        return sOperation + string("_") + sName2 + string("_") + sName1 ;
     }
 }
 
@@ -254,22 +254,22 @@ string simplifyLProgram() {
             t1 = t2 ;
             t2 = (*it2);
 
-            if ( t2.getStrTokenName() == "STREAM_AGSE" &&
+            if (t2.getStrTokenName() == "STREAM_AGSE" &&
                 t1.getStrTokenName() == "PUSH_VAL" &&
                 t0.getStrTokenName() == "PUSH_VAL"
             ) {
-                token newVal( t2.getTokenCommand(), t1.getCRValue(), t1.getValue() );
-                it2 = (*it).lProgram.erase( it2 );
+                token newVal(t2.getTokenCommand(), t1.getCRValue(), t1.getValue());
+                it2 = (*it).lProgram.erase(it2);
                 it2 -- ;
-                it2 = (*it).lProgram.erase( it2 );
-                (*it).lProgram.insert( it2, newVal );
+                it2 = (*it).lProgram.erase(it2);
+                (*it).lProgram.insert(it2, newVal);
                 it2 = (*it).lProgram.begin() ;
                 break;
             }
         }
 
         //Otimization phase 2
-        if ( (*it).isReductionRequired() ) {
+        if ((*it).isReductionRequired()) {
             for (
                 list < token >::iterator it2 = (*it).lProgram.begin() ;
                 it2 != (*it).lProgram.end() ;
@@ -284,29 +284,29 @@ string simplifyLProgram() {
                     command_id cmd ;
                     string affectedField ;
                     {
-                        token newVal( *it2 );
-                        newQuery.lProgram.push_front( newVal );
-                        cmd = ( *it2 ).getTokenCommand() ;
-                        it2 = (*it).lProgram.erase( it2 );
+                        token newVal(*it2);
+                        newQuery.lProgram.push_front(newVal);
+                        cmd = (*it2).getTokenCommand() ;
+                        it2 = (*it).lProgram.erase(it2);
                         it2 -- ;
                     }
                     {
-                        token newVal( *it2 );
-                        newQuery.lProgram.push_front( newVal );
+                        token newVal(*it2);
+                        newQuery.lProgram.push_front(newVal);
                         stringstream s ;
-                        s << ( *it2 ).getValue() ;
+                        s << (*it2).getValue() ;
                         arg1 =  string(s.str()) ;
-                        affectedField = ( *it2 ).getValue() ;
-                        it2 = (*it).lProgram.erase( it2 );
+                        affectedField = (*it2).getValue() ;
+                        it2 = (*it).lProgram.erase(it2);
                         it2 -- ;
                     }
                     it2 ++ ;
                     list < token > lSchema;
-                    lSchema.push_back( token( PUSH_TSCAN )  );
-                    newQuery.lSchema.push_back( field( "*", lSchema, field::BAD, "*" ) ) ;
-                    newQuery.id = generateStreamName( arg1, "", cmd );
-                    (*it).lProgram.insert( it2, token( PUSH_STREAM, newQuery.id ) );
-                    coreInstance.push_back( newQuery ); //After this instruction it loses context
+                    lSchema.push_back(token(PUSH_TSCAN));
+                    newQuery.lSchema.push_back(field("*", lSchema, field::BAD, "*")) ;
+                    newQuery.id = generateStreamName(arg1, "", cmd);
+                    (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
+                    coreInstance.push_back(newQuery);    //After this instruction it loses context
                     it = coreInstance.begin() ;
                     break ;
                 } else if (
@@ -319,37 +319,37 @@ string simplifyLProgram() {
                     arg2 ;  //< Name of second opeartion arguemnt
                     command_id cmd ;
                     {
-                        token newVal( *it2 );
-                        newQuery.lProgram.push_front( newVal );
-                        cmd = ( *it2 ).getTokenCommand() ;
-                        it2 = (*it).lProgram.erase( it2 );
+                        token newVal(*it2);
+                        newQuery.lProgram.push_front(newVal);
+                        cmd = (*it2).getTokenCommand() ;
+                        it2 = (*it).lProgram.erase(it2);
                         it2 -- ;
                     }
                     {
-                        token newVal( *it2 );
-                        newQuery.lProgram.push_front( newVal );
+                        token newVal(*it2);
+                        newQuery.lProgram.push_front(newVal);
                         stringstream s ;
-                        s << ( *it2 ).getValue() ;
+                        s << (*it2).getValue() ;
                         arg1 =  string(s.str()) ;
-                        it2 = (*it).lProgram.erase( it2 );
+                        it2 = (*it).lProgram.erase(it2);
                         it2 -- ;
                     }
                     {
-                        token newVal( *it2 );
-                        newQuery.lProgram.push_front( newVal );
+                        token newVal(*it2);
+                        newQuery.lProgram.push_front(newVal);
                         stringstream s ;
-                        s << ( *it2 ).getValue() ;
+                        s << (*it2).getValue() ;
                         arg2 =  string(s.str()) ;
-                        it2 = (*it).lProgram.erase( it2 );
+                        it2 = (*it).lProgram.erase(it2);
                         it2 -- ;
                     }
                     it2 ++ ;
                     list < token > lSchema;
-                    lSchema.push_back( token( PUSH_TSCAN )  );
-                    newQuery.lSchema.push_back( field( "*", lSchema, field::BAD, "*" ) ) ;
-                    newQuery.id = generateStreamName( arg1, arg2, cmd );
-                    (*it).lProgram.insert( it2, token( PUSH_STREAM, newQuery.id ) );
-                    coreInstance.push_back( newQuery );
+                    lSchema.push_back(token(PUSH_TSCAN));
+                    newQuery.lSchema.push_back(field("*", lSchema, field::BAD, "*")) ;
+                    newQuery.id = generateStreamName(arg1, arg2, cmd);
+                    (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
+                    coreInstance.push_back(newQuery);
                     it = coreInstance.begin() ;
                     break ;
                 }   //Endif
@@ -361,20 +361,20 @@ string simplifyLProgram() {
 }
 
 //Goal of this procedure is to unroll schema bsased of given command
-list < field > combine( string sName1, string sName2, token cmd_token ) {
+list < field > combine(string sName1, string sName2, token cmd_token) {
     list < field > lRetVal ;
     command_id cmd = cmd_token.getTokenCommand() ;
 
     //Merge of schemas for junction of hash type
-    if ( cmd == STREAM_HASH ) {
+    if (cmd == STREAM_HASH) {
         if (
-            getQuery( sName1 ).lSchema.size() !=
-            getQuery( sName2 ).lSchema.size()
+            getQuery(sName1).lSchema.size() !=
+            getQuery(sName2).lSchema.size()
         ) {
             throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
         }
 
-        lRetVal = getQuery( sName1 ).lSchema ;
+        lRetVal = getQuery(sName1).lSchema ;
         //check this!!!
         //        list < field >::iterator it = lRetVal.begin() ;
         //        BOOST_FOREACH ( field f1 , getQuery( sName1 ).lSchema )
@@ -383,69 +383,69 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
         //                    (*it).setFieldName.insert( s ) ;
         //            it ++ ;
         //        }
-    } else if ( cmd == STREAM_DEHASH_DIV ) {
-        lRetVal = getQuery( sName1 ).lSchema ;
-    } else if ( cmd == STREAM_DEHASH_MOD ) {
-        lRetVal = getQuery( sName1 ).lSchema ;
-    } else if ( cmd == STREAM_ADD ) {
-        for ( auto f : getQuery( sName1 ).lSchema ) {
-            lRetVal.push_back( f );
+    } else if (cmd == STREAM_DEHASH_DIV) {
+        lRetVal = getQuery(sName1).lSchema ;
+    } else if (cmd == STREAM_DEHASH_MOD) {
+        lRetVal = getQuery(sName1).lSchema ;
+    } else if (cmd == STREAM_ADD) {
+        for (auto f : getQuery(sName1).lSchema) {
+            lRetVal.push_back(f);
         }
 
-        for ( auto f : getQuery( sName2 ).lSchema ) {
-            lRetVal.push_back( f );
+        for (auto f : getQuery(sName2).lSchema) {
+            lRetVal.push_back(f);
         }
-    } else if ( cmd == STREAM_SUBSTRACT ) {
-        lRetVal = getQuery( sName1 ).lSchema ;
-    } else if ( cmd == STREAM_TIMEMOVE ) {
-        lRetVal = getQuery( sName1 ).lSchema ;
-    } else if ( cmd == STREAM_AVG ) {
+    } else if (cmd == STREAM_SUBSTRACT) {
+        lRetVal = getQuery(sName1).lSchema ;
+    } else if (cmd == STREAM_TIMEMOVE) {
+        lRetVal = getQuery(sName1).lSchema ;
+    } else if (cmd == STREAM_AVG) {
         field intf ;
-        intf.setFieldName.insert( "avg" );
+        intf.setFieldName.insert("avg");
         intf.dFieldType = field::RATIONAL ;
-        intf.lProgram.push_front( token( PUSH_ID, sName1 ) );
-        lRetVal.push_back( intf );
+        intf.lProgram.push_front(token(PUSH_ID, sName1));
+        lRetVal.push_back(intf);
         return lRetVal ;
-    } else if ( cmd == STREAM_MIN ) {
+    } else if (cmd == STREAM_MIN) {
         field intf ;
-        intf.setFieldName.insert( "min" );
+        intf.setFieldName.insert("min");
         intf.dFieldType = field::RATIONAL ;
-        intf.lProgram.push_front( token( PUSH_ID, sName1 ) );
-        lRetVal.push_back( intf );
+        intf.lProgram.push_front(token(PUSH_ID, sName1));
+        lRetVal.push_back(intf);
         return lRetVal ;
-    } else if ( cmd == STREAM_MAX ) {
+    } else if (cmd == STREAM_MAX) {
         field intf ;
-        intf.setFieldName.insert( "max" );
+        intf.setFieldName.insert("max");
         intf.dFieldType = field::RATIONAL ;
-        intf.lProgram.push_front( token( PUSH_ID, sName1 ) );
-        lRetVal.push_back( intf );
+        intf.lProgram.push_front(token(PUSH_ID, sName1));
+        lRetVal.push_back(intf);
         return lRetVal ;
-    } else if ( cmd == STREAM_SUM ) {
+    } else if (cmd == STREAM_SUM) {
         field intf ;
-        intf.setFieldName.insert( "sum" );
+        intf.setFieldName.insert("sum");
         intf.dFieldType = field::RATIONAL ;
-        intf.lProgram.push_front( token( PUSH_ID, sName1 ) );
-        lRetVal.push_back( intf );
+        intf.lProgram.push_front(token(PUSH_ID, sName1));
+        lRetVal.push_back(intf);
         return lRetVal ;
-    } else if ( cmd == STREAM_AGSE ) {
+    } else if (cmd == STREAM_AGSE) {
         //Unrolling schema for agse - discussion needed if we need do that this way
         list < field > schema ;
-        int windowSize = abs ( rational_cast<int>(cmd_token.getCRValue()) ) ;
+        int windowSize = abs(rational_cast<int> (cmd_token.getCRValue())) ;
 
         //If winows is negative - reverted schema
-        if ( rational_cast<int>(cmd_token.getCRValue()) > 0 ) {
-            for ( int i = 0 ; i < windowSize ; i++ ) {
+        if (rational_cast<int> (cmd_token.getCRValue()) > 0) {
+            for (int i = 0 ; i < windowSize ; i++) {
                 field intf ;
-                intf.setFieldName.insert( sName1 + "_" + lexical_cast<string>(i) );
+                intf.setFieldName.insert(sName1 + "_" + lexical_cast<string> (i));
                 intf.dFieldType = field::BAD ;
-                schema.push_back( intf );
+                schema.push_back(intf);
             }
         } else {
-            for ( int i = windowSize - 1 ; i >= 0  ; i-- ) {
+            for (int i = windowSize - 1 ; i >= 0  ; i--) {
                 field intf ;
-                intf.setFieldName.insert( sName1 + "_" + lexical_cast<string>(i) );
+                intf.setFieldName.insert(sName1 + "_" + lexical_cast<string> (i));
                 intf.dFieldType = field::BAD ;
-                schema.push_back( intf );
+                schema.push_back(intf);
             }
         }
 
@@ -457,17 +457,17 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
     //Here are added to fields execution methods
     //by reference to schema position
 
-    if ( cmd != STREAM_ADD ) {
-        int offset( 0 ) ;
+    if (cmd != STREAM_ADD) {
+        int offset(0) ;
 
-        for ( auto &f : lRetVal ) {
+        for (auto &f : lRetVal) {
             stringstream s ;
 
-            if ( cmd == STREAM_HASH ) {
+            if (cmd == STREAM_HASH) {
                 s << sName1 ;
-            } else if ( cmd == STREAM_TIMEMOVE ) {
+            } else if (cmd == STREAM_TIMEMOVE) {
                 s << sName1 ;
-            } else if ( cmd == STREAM_AGSE ) {
+            } else if (cmd == STREAM_AGSE) {
                 s << sName1 ;
             } else {
                 s << sName1 ; //generateStreamName( sName2, sName1, cmd ) ;
@@ -477,17 +477,17 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
             s << offset ++ ;
             s << "]" ;
 
-            if ( f.lProgram.size() > 0 ) {
+            if (f.lProgram.size() > 0) {
                 f.lProgram.pop_front();
             }
 
-            f.lProgram.push_front( token( PUSH_ID2, s.str() ) );
+            f.lProgram.push_front(token(PUSH_ID2, s.str()));
         }
     } else {
-        for ( auto &f : lRetVal ) {
+        for (auto &f : lRetVal) {
             stringstream s ;
             s << f.getFirstFieldName() ;
-            f.lProgram.push_front( token( PUSH_ID3, s.str() ) );
+            f.lProgram.push_front(token(PUSH_ID3, s.str()));
         }
     }
 
@@ -501,37 +501,37 @@ list < field > combine( string sName1, string sName2, token cmd_token ) {
 string prepareFields() {
     coreInstance.tsort();
 
-    for ( auto &q : coreInstance ) {
-        for ( auto &t : q.lProgram ) {
-            assert( q.lProgram.size() < 4 ) ;
+    for (auto &q : coreInstance) {
+        for (auto &t : q.lProgram) {
+            assert(q.lProgram.size() < 4) ;
             //fail of this asseration means that all streams are
             //after otimization alerady
 
-            for ( auto &f : q.lSchema ) {
-                if ( f.getFirstFieldToken().getTokenCommand() ==  PUSH_TSCAN ) {
+            for (auto &f : q.lSchema) {
+                if (f.getFirstFieldToken().getTokenCommand() ==  PUSH_TSCAN) {
                     //found! - and now unroll
-                    if ( q.lProgram.size() == 1 ) {
+                    if (q.lProgram.size() == 1) {
                         //we assure that on and only token is push_stream
-                        assert( ( * q.lProgram.begin() ).getTokenCommand() == PUSH_STREAM ) ;
+                        assert((* q.lProgram.begin()).getTokenCommand() == PUSH_STREAM) ;
                         //copy list of fields from one to another
-                        q.lSchema = getQuery( t.getValue() ).lSchema ;
+                        q.lSchema = getQuery(t.getValue()).lSchema ;
                         break ;
                     }
 
-                    if ( q.lProgram.size() == 3 ) {
+                    if (q.lProgram.size() == 3) {
                         list < token >::iterator eIt = q.lProgram.begin();
-                        string sName1  = ( * eIt ++ ).getValue() ;
-                        string sName2  = ( * eIt ++ ).getValue() ;
-                        token cmd = ( * eIt ++ ) ;
-                        q.lSchema = combine( sName1, sName2, cmd ) ;
+                        string sName1  = (* eIt ++).getValue() ;
+                        string sName2  = (* eIt ++).getValue() ;
+                        token cmd = (* eIt ++) ;
+                        q.lSchema = combine(sName1, sName2, cmd) ;
                         break ;
                     }
 
-                    if ( q.lProgram.size() == 2 ) {
+                    if (q.lProgram.size() == 2) {
                         list < token >::iterator eIt = q.lProgram.begin();
-                        string sName1  = ( * eIt ++ ).getValue() ;
-                        token cmd = ( * eIt ++ ) ;
-                        q.lSchema = combine( sName1, "", cmd ) ;
+                        string sName1  = (* eIt ++).getValue() ;
+                        token cmd = (* eIt ++) ;
+                        q.lSchema = combine(sName1, "", cmd) ;
                         break ;
                     }
                 }
@@ -544,13 +544,13 @@ string prepareFields() {
 }
 
 void replaceAll(std::string &str, const std::string &from, const std::string &to) {
-    if(from.empty()) {
+    if (from.empty()) {
         return;
     }
 
     size_t start_pos = 0;
 
-    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
         str.replace(start_pos, from.length(), to);
         start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
     }
@@ -558,15 +558,15 @@ void replaceAll(std::string &str, const std::string &from, const std::string &to
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
 string replicateIDX() {
-    for ( auto &q : coreInstance ) {  // for each query
-        for ( auto &f : q.lSchema ) {  // for each field in query
+    for (auto &q : coreInstance) {    // for each query
+        for (auto &f : q.lSchema) {    // for each field in query
             string schemaName = "" ;
-            bool found ( false );
+            bool found(false);
 
-            for ( auto &t : f.lProgram ) {  // for each token in query field
-                if ( t.getTokenCommand() == PUSH_IDX ) {
-                    if ( found ) {
-                        if ( q.lSchema.size() != 1 ) {
+            for (auto &t : f.lProgram) {    // for each token in query field
+                if (t.getTokenCommand() == PUSH_IDX) {
+                    if (found) {
+                        if (q.lSchema.size() != 1) {
                             // if _ exist then only one filed can be in query
                             throw std::out_of_range("Only one _ attribute can be in query");
                         }
@@ -577,32 +577,32 @@ string replicateIDX() {
                 }
             }
 
-            if ( found ) {
-                const int fieldSize =  getQuery( schemaName ).lSchema.size() ;
-                assert( fieldSize > 0 );
+            if (found) {
+                const int fieldSize =  getQuery(schemaName).lSchema.size() ;
+                assert(fieldSize > 0);
                 list < field > oldFieldSet = q.lSchema ;
-                assert ( oldFieldSet.size() == 1);
+                assert(oldFieldSet.size() == 1);
                 field oldField = * q.lSchema.begin() ;
                 q.lSchema.clear();
 
-                for ( int i = 0 ; i < fieldSize ; i ++ ) {
+                for (int i = 0 ; i < fieldSize ; i ++) {
                     list < token > newLProgram ;
 
-                    for ( auto &t : oldField.lProgram ) {
-                        if ( t.getTokenCommand() == PUSH_IDX ) {
-                            newLProgram.push_back ( token( PUSH_ID, boost::rational<int> ( i ), t.getValue() ) );
+                    for (auto &t : oldField.lProgram) {
+                        if (t.getTokenCommand() == PUSH_IDX) {
+                            newLProgram.push_back(token(PUSH_ID, boost::rational<int> (i), t.getValue()));
                         } else {
-                            newLProgram.push_back ( token( t.getTokenCommand(), t.getCRValue(), t.getValue() ) );
+                            newLProgram.push_back(token(t.getTokenCommand(), t.getCRValue(), t.getValue()));
                         }
                     }
 
                     string toRepalce = oldField.getFieldText() ;
-                    replaceAll( toRepalce, "_", lexical_cast<string>(i) ) ;
-                    field newField ( schemaName + "_" + lexical_cast<string>(i), newLProgram, oldField.dFieldType, toRepalce );
-                    q.lSchema.push_back( newField );
+                    replaceAll(toRepalce, "_", lexical_cast<string> (i)) ;
+                    field newField(schemaName + "_" + lexical_cast<string> (i), newLProgram, oldField.dFieldType, toRepalce);
+                    q.lSchema.push_back(newField);
                 }
 
-                assert ( q.lSchema.size() == getQuery( schemaName ).lSchema.size() );
+                assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());
                 break ;
             }
         }
@@ -619,45 +619,45 @@ note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction
 */
 string convertReferences() {
-    boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  //something[1][1]
-    boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");  //something[1,1]
+    boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");    //something[1][1]
+    boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");    //something[1,1]
     boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");         //something[1]
     boost::regex xprFieldIdX("(\\w*)\\[_]");                //something[_]
     boost::regex xprFieldId1("(\\w*).(\\w*)");              //something.in_schema
     boost::regex xprFieldId3("(\\w*)");                     //field_fo_corn
 
-    for ( auto &q : coreInstance ) {  // for each query
-        assert( ! q.isReductionRequired() );
+    for (auto &q : coreInstance) {    // for each query
+        assert(! q.isReductionRequired());
 
-        for ( auto &f : q.lSchema ) {     // for each field in query
-            for ( auto &t : f.lProgram ) {  // for each token in query field
-                const command_id cmd( t.getTokenCommand() );
-                const string text( t.getValue() );
+        for (auto &f : q.lSchema) {       // for each field in query
+            for (auto &t : f.lProgram) {    // for each token in query field
+                const command_id cmd(t.getTokenCommand());
+                const string text(t.getValue());
                 boost::cmatch what;
 
-                switch ( cmd ) {
+                switch (cmd) {
                     case PUSH_ID1:
-                        if ( regex_search(text.c_str(), what, xprFieldId1) ) {
-                            assert( what.size() == 3 );
-                            const string schema( what[1] );
-                            const string field( what[2] );
+                        if (regex_search(text.c_str(), what, xprFieldId1)) {
+                            assert(what.size() == 3);
+                            const string schema(what[1]);
+                            const string field(what[2]);
 
                             //aim of this procedure is found scheamt, next field in schema
                             //and then insert
-                            for ( auto &q1 : coreInstance ) {
-                                if ( q1.id == schema ) {
-                                    int offset1( 0 );
+                            for (auto &q1 : coreInstance) {
+                                if (q1.id == schema) {
+                                    int offset1(0);
 
-                                    for ( auto &f1 : q1.lSchema ) {
-                                        if ( f1.setFieldName.find( field ) != f1.setFieldName.end() ) {
-                                            t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema ) ;
+                                    for (auto &f1 : q1.lSchema) {
+                                        if (f1.setFieldName.find(field) != f1.setFieldName.end()) {
+                                            t = token(PUSH_ID, boost::rational<int> (offset1), schema) ;
                                             break ;
                                         } else {
                                             offset1 ++ ;
                                         }
                                     }
 
-                                    if ( offset1 == q1.lSchema.size() ) {
+                                    if (offset1 == q1.lSchema.size()) {
                                         throw std::out_of_range("Failure during refernece converstion - schema exist, no fields");
                                     }
 
@@ -671,10 +671,10 @@ string convertReferences() {
                         break ;
 
                     case PUSH_IDX:
-                        if ( regex_search(text.c_str(), what, xprFieldIdX) ) {
-                            assert( what.size() == 2 );
-                            const string schema( what[1] );
-                            t = token( PUSH_IDX, boost::rational<int> ( 0 ), schema ) ;
+                        if (regex_search(text.c_str(), what, xprFieldIdX)) {
+                            assert(what.size() == 2);
+                            const string schema(what[1]);
+                            t = token(PUSH_IDX, boost::rational<int> (0), schema) ;
                         } else {
                             throw std::out_of_range("No mach on type conversion IDX");
                         }
@@ -682,12 +682,12 @@ string convertReferences() {
                         break ;
 
                     case PUSH_ID2:
-                        if ( regex_search(text.c_str(), what, xprFieldId2) ) {
-                            assert( what.size() == 3 );
-                            const string schema( what[1] );
-                            const string sOffset1( what[2] );
-                            const int offset1( atoi( sOffset1.c_str() ) ) ;
-                            t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema ) ;
+                        if (regex_search(text.c_str(), what, xprFieldId2)) {
+                            assert(what.size() == 3);
+                            const string schema(what[1]);
+                            const string sOffset1(what[2]);
+                            const int offset1(atoi(sOffset1.c_str())) ;
+                            t = token(PUSH_ID, boost::rational<int> (offset1), schema) ;
                         } else {
                             cerr << xprFieldId2 << endl ;
                             cerr << text.c_str() << endl ;
@@ -697,44 +697,44 @@ string convertReferences() {
                         break ;
 
                     case PUSH_ID3:
-                        if ( regex_search(text.c_str(), what, xprFieldId3) ) {
-                            assert( what.size() == 2 );
-                            const string field( what[1] );
+                        if (regex_search(text.c_str(), what, xprFieldId3)) {
+                            assert(what.size() == 2);
+                            const string field(what[1]);
                             list < token >::iterator eIt = q.lProgram.begin();
                             string schema1, schema2 ;
                             command_id cmd ;
-                            query* pQ1 ( NULL ), *pQ2 ( NULL );
+                            query* pQ1(NULL), *pQ2(NULL);
 
-                            if ( q.lProgram.size() == 1 ) {
-                                schema1  = ( * eIt ).getValue() ;       //push stream - stream
-                                cmd = ( * eIt ).getTokenCommand() ;
-                                assert( cmd == PUSH_STREAM ) ;
-                                pQ1 = & getQuery( schema1 ) ;
+                            if (q.lProgram.size() == 1) {
+                                schema1  = (* eIt).getValue() ;         //push stream - stream
+                                cmd = (* eIt).getTokenCommand() ;
+                                assert(cmd == PUSH_STREAM) ;
+                                pQ1 = & getQuery(schema1) ;
                             }
 
-                            if ( q.lProgram.size() == 2 ) {
-                                schema1  = ( * eIt ++ ).getValue() ;    //push stream - stream
-                                cmd = ( * eIt ).getTokenCommand() ;     //comand
-                                pQ1 = & getQuery( schema1 ) ;
+                            if (q.lProgram.size() == 2) {
+                                schema1  = (* eIt ++).getValue() ;      //push stream - stream
+                                cmd = (* eIt).getTokenCommand() ;       //comand
+                                pQ1 = & getQuery(schema1) ;
                             }
 
-                            if ( q.lProgram.size() == 3 ) {
-                                schema1  = ( * eIt ++ ).getValue() ;    //push stream - stream
-                                schema2  = ( * eIt ++ ).getValue() ;    //push stream - stream
-                                cmd = ( * eIt ).getTokenCommand() ;     //comand
-                                pQ1 = & getQuery( schema1 ) ;
-                                pQ2 = & getQuery( schema2 ) ;
+                            if (q.lProgram.size() == 3) {
+                                schema1  = (* eIt ++).getValue() ;      //push stream - stream
+                                schema2  = (* eIt ++).getValue() ;      //push stream - stream
+                                cmd = (* eIt).getTokenCommand() ;       //comand
+                                pQ1 = & getQuery(schema1) ;
+                                pQ2 = & getQuery(schema2) ;
                             }
 
-                            bool bFieldFound( false );
-                            int offset1( 0 );
+                            bool bFieldFound(false);
+                            int offset1(0);
 
-                            if ( pQ1 != NULL ) {
+                            if (pQ1 != NULL) {
                                 offset1 = 0;
 
-                                for( auto &f1 : (*pQ1).lSchema ) {
-                                    if ( f1.setFieldName.find( field ) != f1.setFieldName.end() ) {
-                                        t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema1 ) ;
+                                for (auto &f1 : (*pQ1).lSchema) {
+                                    if (f1.setFieldName.find(field) != f1.setFieldName.end()) {
+                                        t = token(PUSH_ID, boost::rational<int> (offset1), schema1) ;
                                         bFieldFound = true ;
                                     }
 
@@ -742,12 +742,12 @@ string convertReferences() {
                                 }
                             }
 
-                            if ( pQ2 != NULL && bFieldFound == false ) {
+                            if (pQ2 != NULL && bFieldFound == false) {
                                 offset1 = 0 ;
 
-                                for( auto &f2 : (*pQ2).lSchema ) {
-                                    if ( f2.setFieldName.find( field ) != f2.setFieldName.end() ) {
-                                        t = token( PUSH_ID, boost::rational<int> ( offset1 ), schema2 ) ;
+                                for (auto &f2 : (*pQ2).lSchema) {
+                                    if (f2.setFieldName.find(field) != f2.setFieldName.end()) {
+                                        t = token(PUSH_ID, boost::rational<int> (offset1), schema2) ;
                                         bFieldFound = true ;
                                     }
 
@@ -755,7 +755,7 @@ string convertReferences() {
                                 }
                             }
 
-                            if ( bFieldFound == false ) {
+                            if (bFieldFound == false) {
                                 throw std::logic_error("No field of given name in stream schema");
                             }
                         } else {
@@ -766,29 +766,29 @@ string convertReferences() {
 
                     case PUSH_ID4:
                     case PUSH_ID5:
-                        if ( regex_search(text.c_str(), what, xprFieldId4) ||
+                        if (regex_search(text.c_str(), what, xprFieldId4) ||
                             regex_search(text.c_str(), what, xprFieldId5)
                         ) {
-                            assert( what.size() == 4 );
-                            const string schema( what[1] );
-                            const string sOffset1( what[2] );
-                            const string sOffset2( what[3] );
-                            const int offset1( atoi( sOffset1.c_str() ) ) ;
-                            const int offset2( atoi( sOffset2.c_str() ) ) ;
-                            bool foundSchema( false );
+                            assert(what.size() == 4);
+                            const string schema(what[1]);
+                            const string sOffset1(what[2]);
+                            const string sOffset2(what[3]);
+                            const int offset1(atoi(sOffset1.c_str())) ;
+                            const int offset2(atoi(sOffset2.c_str())) ;
+                            bool foundSchema(false);
 
-                            for ( auto &q : coreInstance ) {
-                                if ( q.id  == schema ) {
+                            for (auto &q : coreInstance) {
+                                if (q.id  == schema) {
                                     foundSchema = true ;
                                     break ;
                                 }
                             }
 
-                            if ( !foundSchema ) {
+                            if (!foundSchema) {
                                 throw std::logic_error("Field calls nonexist schema - config.log (-g)");
                             }
 
-                            t = token( PUSH_ID, boost::rational<int> ( offset1 + offset2 * q.lSchema.size() ), schema ) ;
+                            t = token(PUSH_ID, boost::rational<int> (offset1 + offset2 * q.lSchema.size()), schema) ;
                         } else {
                             throw std::out_of_range("No mach on type conversion ID4");
                         }
@@ -802,10 +802,10 @@ string convertReferences() {
     return string("OK");
 }
 
-void dumpInstance( std::string sOutFile) {
+void dumpInstance(std::string sOutFile) {
     //These object must be const
-    const qTree coreInstance2( coreInstance ) ;
-    std::ofstream ofs( sOutFile.c_str() );
+    const qTree coreInstance2(coreInstance) ;
+    std::ofstream ofs(sOutFile.c_str());
     boost::archive::text_oarchive oa(ofs);
     oa << coreInstance2 ;
 }

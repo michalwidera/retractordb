@@ -23,7 +23,7 @@ using namespace boost::lambda;
 //        ) ;
 //}
 
-bool operator<(const query &lhs, const query &rhs) {
+bool operator< (const query &lhs, const query &rhs) {
     return lhs.rInterval < rhs.rInterval;
 }
 
@@ -62,7 +62,7 @@ command_id token::getTokenCommand() {
 }
 
 string token::getStrTokenName() {
-    switch ( getTokenCommand() ) {
+    switch (getTokenCommand()) {
 #define DEF_CASE( _A_ ) case _A_ : return #_A_ ;
 #include "tokendefset.h"
 #undef DEF_CASE
@@ -71,41 +71,41 @@ string token::getStrTokenName() {
     return UNDEFINIED_TOKEN ;
 }
 
-boost::rational<int> Rationalize ( double inValue, double DIFF/*=1E-6*/,  int ttl/*=11*/ ) {
+boost::rational<int> Rationalize(double inValue, double DIFF/*=1E-6*/,  int ttl/*=11*/) {
     stack<int> st ;
-    double startx( inValue ), diff, err1, err2;
+    double startx(inValue), diff, err1, err2;
     unsigned int val ;
 
-    for( ;; ) {
-        val = static_cast<unsigned int>( startx ) ;
-        st.push ( static_cast<int>( val ) ) ;
+    for (;;) {
+        val = static_cast<unsigned int>(startx) ;
+        st.push(static_cast<int>(val)) ;
 
-        if ( ( ttl -- ) == 0 ) {
+        if ((ttl --) == 0) {
             break ;
         }
 
         diff = startx - val  ;
 
-        if ( diff < DIFF ) {
+        if (diff < DIFF) {
             break ;
         } else {
             startx = 1 / diff ;
         }
 
-        if ( startx > ( 1 / DIFF ) ) {
+        if (startx > (1 / DIFF)) {
             break ;
         }
     }
 
-    if ( st.empty() ) {
-        return boost::rational<int>(0, 1) ;
+    if (st.empty()) {
+        return boost::rational<int> (0, 1) ;
     }
 
     boost::rational<int> result1(0, 1), result2(0, 1);
 
-    while ( ! st.empty() ) {
-        if ( result1.numerator() != 0 ) {
-            result2 = st.top() + ( 1 / result1 ) ;
+    while (! st.empty()) {
+        if (result1.numerator() != 0) {
+            result2 = st.top() + (1 / result1) ;
         } else {
             result2 = st.top() ;
         }
@@ -114,14 +114,14 @@ boost::rational<int> Rationalize ( double inValue, double DIFF/*=1E-6*/,  int tt
         result1 = result2 ;
     }
 
-    err1 = abs( rational_cast<double>(result1) - inValue );
-    err2 = abs( rational_cast<double>(result2) - inValue );
+    err1 = abs(rational_cast<double> (result1) - inValue);
+    err2 = abs(rational_cast<double> (result2) - inValue);
     return err1 > err2 ? result2 : result1 ;
 }
 
-field &query::getField( string sField ) {
-    for( auto &f : lSchema ) {
-        if ( f.setFieldName.find( sField ) != f.setFieldName.end() ) {
+field &query::getField(string sField) {
+    for (auto &f : lSchema) {
+        if (f.setFieldName.find(sField) != f.setFieldName.end()) {
             return f ;
         }
     }
@@ -132,9 +132,9 @@ field &query::getField( string sField ) {
 
 extern "C" qTree coreInstance ;
 
-bool isThere( vector < query > v, string query_name ) {
-    for( auto &q : v ) {
-        if ( q.id == query_name ) {
+bool isThere(vector < query > v, string query_name) {
+    for (auto &q : v) {
+        if (q.id == query_name) {
             return true ;
         }
     }
@@ -148,46 +148,46 @@ void qTree::tsort() {
     vector < query > v = *this ;
     vector < query > des ;
 
-    while ( ! v.empty() )
-        for ( vector < query >::iterator it = v.begin() ;
+    while (! v.empty())
+        for (vector < query >::iterator it = v.begin() ;
             it != v.end() ;
-            it ++ ) {
-            if ( v.empty() ) {
+            it ++) {
+            if (v.empty()) {
                 break ;
             }
 
             list < string > ls = (*it).getDepStreamNameList() ;
             bool fullDependent(true);
 
-            for( auto s : ls ) {
-                if ( ! isThere( des, s ) ) {
+            for (auto s : ls) {
+                if (! isThere(des, s)) {
                     fullDependent = false ;
                 }
             }
 
-            if ( fullDependent ) {
-                des.push_back( *it );
-                v.erase( it );
+            if (fullDependent) {
+                des.push_back(*it);
+                v.erase(it);
                 it = v.begin();
             }
         }
 
-    erase( begin(), end() );
+    erase(begin(), end());
 
-    for( auto &q : des ) {
-        push_back( q );
+    for (auto &q : des) {
+        push_back(q);
     }
 }
 
-boost::rational<int> qTree::getDelta( string query_name ) {
-    return getQuery( query_name ).rInterval ;
+boost::rational<int> qTree::getDelta(string query_name) {
+    return getQuery(query_name).rInterval ;
 }
 
-query &getQuery( string query_name ) {
-    assert ( query_name != "" );
+query &getQuery(string query_name) {
+    assert(query_name != "");
 
-    for ( auto &q : coreInstance ) {
-        if ( q.id == query_name ) {
+    for (auto &q : coreInstance) {
+        if (q.id == query_name) {
             return q ;
         }
     }
@@ -196,20 +196,20 @@ query &getQuery( string query_name ) {
     cerr << " " << query_name << endl ;
     cerr << "Avaiable:" << endl ;
 
-    for ( auto &q : coreInstance ) {
+    for (auto &q : coreInstance) {
         cerr << " " << q.id << endl ;
     }
 
     throw std::logic_error("No such stream in set - getQuery");
     static query void_query ;
-    return ( void_query ) ; //proforma
+    return (void_query) ;   //proforma
 }
 
-int getSeqNr( string query_name ) {
+int getSeqNr(string query_name) {
     int cnt(0);
 
-    for ( auto &q : coreInstance ) {
-        if ( query_name == q.id ) {
+    for (auto &q : coreInstance) {
+        if (query_name == q.id) {
             return cnt ;
         } else {
             cnt ++ ;
@@ -220,9 +220,9 @@ int getSeqNr( string query_name ) {
     return -1 ; //INVALID QUERY_NR
 }
 
-bool isDeclared( string query_name ) {
-    for ( auto &q : coreInstance ) {
-        if ( query_name == q.id ) {
+bool isDeclared(string query_name) {
+    for (auto &q : coreInstance) {
+        if (query_name == q.id) {
             return q.isDeclaration() ;
         }
     }
@@ -230,9 +230,9 @@ bool isDeclared( string query_name ) {
     return false ;
 }
 
-bool isExist( string query_name ) {
-    for ( auto &q : coreInstance ) {
-        if ( query_name == q.id ) {
+bool isExist(string query_name) {
+    for (auto &q : coreInstance) {
+        if (query_name == q.id) {
             return true ;
         }
     }
@@ -245,16 +245,16 @@ boost::rational<int> token::getCRValue() {
 }
 
 string token::getValue() {
-    if ( sValue_.empty() ) {
+    if (sValue_.empty()) {
         stringstream ss ;
         ss << crValue.numerator() ;
 
-        if ( crValue.denominator() != 1 ) {
+        if (crValue.denominator() != 1) {
             ss << "_" ;
             ss << crValue.denominator() ;
         }
 
-        return string( ss.str() ) ;
+        return string(ss.str()) ;
     } else {
         return sValue_ ;
     }
@@ -265,23 +265,23 @@ bool query::isDeclaration() {
 }
 
 bool query::isGenerated() {
-    return ! id.compare( 0, 7, "STREAM_");
+    return ! id.compare(0, 7, "STREAM_");
 }
 
 /** Construktor set */
 
-field::field ()
+field::field()
 {}
 
-field::field (
+field::field(
     string sFieldName,
     list < token > &lProgram,
     eType dFieldType,
-    string sFieldText ) :
-    lProgram ( lProgram ),
-    dFieldType( dFieldType ),
-    sFieldText( sFieldText ) {
-    setFieldName.insert( sFieldName ) ;
+    string sFieldText) :
+    lProgram(lProgram),
+    dFieldType(dFieldType),
+    sFieldText(sFieldText) {
+    setFieldName.insert(sFieldName) ;
 }
 string field::getFieldText() {
     return sFieldText ;
@@ -292,14 +292,14 @@ string field::getFirstFieldName() {
 }
 
 token field::getFirstFieldToken() {
-    assert (lProgram.size() > 0 );  //If this fails that means in field no program (decl!)
+    assert(lProgram.size() > 0);    //If this fails that means in field no program (decl!)
     return * lProgram.begin() ;
 }
 
 string field::getFieldNameSet() {
     stringstream retVal;
 
-    for ( const auto &s : setFieldName ) {
+    for (const auto &s : setFieldName) {
         retVal << s << " " ;
     }
 
@@ -308,23 +308,23 @@ string field::getFieldNameSet() {
 
 /** Construktor set */
 
-token::token( command_id id, string sValue ) :
-    command( id ), crValue(0), sValue_( sValue )
+token::token(command_id id, string sValue) :
+    command(id), crValue(0), sValue_(sValue)
 {}
 
-token::token( command_id id, boost::rational<int> crValue, string sValue ) :
-    command( id ), crValue( crValue ), sValue_( sValue )
+token::token(command_id id, boost::rational<int> crValue, string sValue) :
+    command(id), crValue(crValue), sValue_(sValue)
 {}
 
-token::token( command_id id, double dValue ):
-    command( id ), crValue( Rationalize( dValue ) ), sValue_( "" )
+token::token(command_id id, double dValue) :
+    command(id), crValue(Rationalize(dValue)), sValue_("")
 {}
 
 /** Construktor set */
 
 
-query::query( boost::rational<int> rInterval, string id ) :
-    rInterval( rInterval ),  id( id )
+query::query(boost::rational<int> rInterval, string id) :
+    rInterval(rInterval),  id(id)
 {}
 
 query::query()
@@ -333,8 +333,8 @@ query::query()
 list< string > query::getFieldNamesList() {
     list < string > schema ;
 
-    for ( auto &f : lSchema ) {
-        schema.push_back( f.getFirstFieldName() );
+    for (auto &f : lSchema) {
+        schema.push_back(f.getFirstFieldName());
     }
 
     return schema ;
@@ -346,11 +346,11 @@ list< string > query::getFieldNamesList() {
 }
  */
 
-int query::getFieldIndex( field f_arg ) {
+int query::getFieldIndex(field f_arg) {
     int idx(0);
 
-    for ( auto f : lSchema ) {
-        if ( f.getFirstFieldName() == f_arg.getFirstFieldName() ) { //Todo
+    for (auto f : lSchema) {
+        if (f.getFirstFieldName() == f_arg.getFirstFieldName()) {   //Todo
             return idx ;
         }
 
@@ -363,32 +363,32 @@ int query::getFieldIndex( field f_arg ) {
 bool query::isReductionRequired() {
     int streamOperatorCount(0) ;
 
-    for ( auto &t : lProgram ) {
-        if ( t.getTokenCommand() == STREAM_HASH ) {
+    for (auto &t : lProgram) {
+        if (t.getTokenCommand() == STREAM_HASH) {
             streamOperatorCount ++ ;
         }
 
-        if ( t.getTokenCommand() == STREAM_DEHASH_DIV ) {
+        if (t.getTokenCommand() == STREAM_DEHASH_DIV) {
             streamOperatorCount ++ ;
         }
 
-        if ( t.getTokenCommand() == STREAM_DEHASH_MOD ) {
+        if (t.getTokenCommand() == STREAM_DEHASH_MOD) {
             streamOperatorCount ++ ;
         }
 
-        if ( t.getTokenCommand() == STREAM_ADD ) {
+        if (t.getTokenCommand() == STREAM_ADD) {
             streamOperatorCount ++ ;
         }
 
-        if ( t.getTokenCommand() == STREAM_SUBSTRACT ) {
+        if (t.getTokenCommand() == STREAM_SUBSTRACT) {
             streamOperatorCount ++ ;
         }
 
-        if ( t.getTokenCommand() == STREAM_TIMEMOVE ) {
+        if (t.getTokenCommand() == STREAM_TIMEMOVE) {
             streamOperatorCount ++ ;
         }
 
-        if ( t.getTokenCommand() == STREAM_AGSE ) {
+        if (t.getTokenCommand() == STREAM_AGSE) {
             streamOperatorCount ++ ;
         }
     }
@@ -396,20 +396,20 @@ bool query::isReductionRequired() {
     return streamOperatorCount > 1 ;
 }
 
-list < string > query::getDepStreamNameList( int reqDep ) {
+list < string > query::getDepStreamNameList(int reqDep) {
     int iDep(0);
     list < string > lRetVal ;
 
-    for ( auto &t : lProgram ) {
-        if ( reqDep == 0 ) {
+    for (auto &t : lProgram) {
+        if (reqDep == 0) {
             //defult behaviour
-            if ( t.getTokenCommand() == PUSH_STREAM ) {
-                lRetVal.push_back( t.getValue() )  ;
+            if (t.getTokenCommand() == PUSH_STREAM) {
+                lRetVal.push_back(t.getValue())  ;
             }
         } else {
-            if ( reqDep == iDep ) {
-                if ( t.getTokenCommand() == PUSH_STREAM ) {
-                    lRetVal.push_back( t.getValue() )  ;
+            if (reqDep == iDep) {
+                if (t.getTokenCommand() == PUSH_STREAM) {
+                    lRetVal.push_back(t.getValue())  ;
                 }
             }
 

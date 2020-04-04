@@ -14,15 +14,15 @@ using namespace std ;
 using namespace boost ;
 
 void inputFileInstance::goBegin() {
-    if ( extension == ".dat" ) {
+    if (extension == ".dat") {
         psFile->clear();
-        psFile->seekg (0, ios::beg);
+        psFile->seekg(0, ios::beg);
     }
 
     curPos = 0 ;
 }
 
-inputFileInstance::inputFileInstance( std::string inputFileName )
+inputFileInstance::inputFileInstance(std::string inputFileName)
     : len(0), curPos(0) {
     extension = boost::filesystem::extension(inputFileName);
     std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
@@ -30,16 +30,16 @@ inputFileInstance::inputFileInstance( std::string inputFileName )
     boost::trim_right(inputFileName);
     ifstream* pstream = new ifstream(
         inputFileName,
-        ( extension == ".txt" ) ? ios::in : ios::in | ios::binary
+        (extension == ".txt") ? ios::in : ios::in | ios::binary
     );
-    psFile.reset( pstream );
-    assert( psFile );
+    psFile.reset(pstream);
+    assert(psFile);
 
-    if ( ! psFile.get() ) {
+    if (! psFile.get()) {
         len = -1 ;
     } else {
-        if ( extension == ".dat" ) {
-            psFile->seekg (0, ios::end);
+        if (extension == ".dat") {
+            psFile->seekg(0, ios::end);
             len = psFile->tellg();
         }
 
@@ -56,24 +56,24 @@ template < typename T >
 T inputFileInstance::get() {
     T retVal ;
 
-    if ( len == -1 ) {
+    if (len == -1) {
         throw std::out_of_range("no file connected to object");
     }
 
-    if ( extension == ".txt" ) {
+    if (extension == ".txt") {
         *psFile >> retVal ;
 
-        if ( psFile->eof() ) {
+        if (psFile->eof()) {
             goBegin();
             *psFile >> retVal ;
         }
     } else {
-        if ( curPos > ( len - sizeof ( T ) ) ) {
+        if (curPos > (len - sizeof(T))) {
             goBegin();
         }
 
-        psFile->read( reinterpret_cast<char*>(&retVal), sizeof retVal );
-        curPos += sizeof ( T ) ;
+        psFile->read(reinterpret_cast<char*>(&retVal), sizeof retVal);
+        curPos += sizeof(T) ;
     }
 
     return retVal ;
@@ -87,65 +87,65 @@ template boost::rational<int> inputFileInstance::get<boost::rational<int>>() ;
 //input DISK FILE - part
 //-------------------------------------------------------------
 
-inputDF::inputDF(): inputFileInstance() {
+inputDF::inputDF() : inputFileInstance() {
 }
 
-inputDF::inputDF( std::string inputFileName, std::list < field > &lSchema ):
-    inputFileInstance( inputFileName ),
-    lSchema( lSchema ) {
+inputDF::inputDF(std::string inputFileName, std::list < field > &lSchema) :
+    inputFileInstance(inputFileName),
+    lSchema(lSchema) {
 }
 
 void inputDF::processRow() {
     lResult.clear();
 
-    for( auto &f : lSchema ) {
-        switch( f.dFieldType ) {
+    for (auto &f : lSchema) {
+        switch (f.dFieldType) {
             case field::BYTE:
-                lResult.push_back( get<char>() );
+                lResult.push_back(get<char>());
                 break ;
 
             case field::INTEGER:
-                lResult.push_back( get<int>() ) ;
+                lResult.push_back(get<int>()) ;
                 break ;
 
             case field::RATIONAL:
-                lResult.push_back( get<boost::rational<int>>() );
+                lResult.push_back(get<boost::rational<int>>());
                 break ;
 
             case field::BAD:
             default:
-                throw std::out_of_range( "processRow/undefined type" );
+                throw std::out_of_range("processRow/undefined type");
                 break ; //proforma
         }
     }
 }
 
-boost::rational<int> inputDF::getCR( field f ) {
+boost::rational<int> inputDF::getCR(field f) {
     boost::rational<int> retValue(0) ;
     int cnt(0);
 
-    for( auto &v : lSchema ) {
-        if (  v.getFirstFieldName() == f.getFirstFieldName() ) {
+    for (auto &v : lSchema) {
+        if (v.getFirstFieldName() == f.getFirstFieldName()) {
             break ;
         }
 
         cnt++ ;
     }
 
-    if ( lResult.size() == 0 ) {
+    if (lResult.size() == 0) {
         processRow();
     }
 
-    assert( lResult.size() != 0 );
+    assert(lResult.size() != 0);
 
-    if ( lResult[ cnt ].type() == typeid(char) ) {
-        retValue  = any_cast<char>( lResult[ cnt ] );
-    } else if ( lResult[ cnt ].type() == typeid(int)  ) {
-        retValue = any_cast<int>(  lResult[ cnt ] );
-    } else if ( lResult[ cnt ].type() == typeid(boost::rational<int>)  ) {
-        retValue = any_cast<boost::rational<int>>( lResult[ cnt ] );
+    if (lResult[ cnt ].type() == typeid(char)) {
+        retValue  = any_cast<char> (lResult[ cnt ]);
+    } else if (lResult[ cnt ].type() == typeid(int)) {
+        retValue = any_cast<int> (lResult[ cnt ]);
+    } else if (lResult[ cnt ].type() == typeid(boost::rational<int>)) {
+        retValue = any_cast<boost::rational<int>> (lResult[ cnt ]);
     } else {
-        throw std::out_of_range( "getCR/undefined type" );
+        throw std::out_of_range("getCR/undefined type");
     }
 
     return retValue ;

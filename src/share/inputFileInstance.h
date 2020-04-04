@@ -19,7 +19,7 @@ class inputFileInstance {
 
   public:
 
-    inputFileInstance( std::string inputFileName ) ;
+    inputFileInstance(std::string inputFileName) ;
     inputFileInstance() ;
 
     template < typename T > T get();
@@ -33,7 +33,7 @@ class inputDF :
   public:
 
     inputDF();
-    inputDF( std::string inputFileName, std::list < field > &lSchema ) ;
+    inputDF(std::string inputFileName, std::list < field > &lSchema) ;
 
     /** The purpose of this function is to retrieve a row
      * from the file is created based on the schema saved in the query.
@@ -47,5 +47,5 @@ class inputDF :
      *  reference because there is a mess with const
      *  Here, the conversion to CR type also takes place
      */
-    boost::rational<int> getCR( field f );
+    boost::rational<int> getCR(field f);
 };

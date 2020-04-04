@@ -8,8 +8,8 @@
 --pad-oper
 --pad-header
 --pad-comma
+--unpad-paren
 
---pad-paren-in
 --delete-empty-lines
 --align-pointer=type
 --align-reference=name

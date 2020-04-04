@@ -15,7 +15,7 @@ class CRandomFile : public fstream {
 
     string filename;
 
-    CRandomFile( string murExt = "mur", const bool destroyOnDestructor = true );
+    CRandomFile(string murExt = "mur", const bool destroyOnDestructor = true);
     virtual ~CRandomFile();
-    const CRandomFile &operator << ( string &text );
+    const CRandomFile &operator << (string &text);
 };

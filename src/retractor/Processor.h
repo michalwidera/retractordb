@@ -34,15 +34,15 @@ class Processor : private boost::noncopyable {
     map< string, int > gContextLenMap ;
 
     /** Context functions */
-    number getValue( string streamName, int timeOffset, int schemaOffset ) ;
+    number getValue(string streamName, int timeOffset, int schemaOffset) ;
 
     /** Context functions */
-    vector<number> getRow( string streamName, int timeOffset ) ;
+    vector<number> getRow(string streamName, int timeOffset) ;
 
     /** Function will return offsets according to stack operations
      *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
      */
-    int getArgumentOffset( const string &streamName, const string &streamArgument ) ;
+    int getArgumentOffset(const string &streamName, const string &streamArgument) ;
 
   public:
 
@@ -50,21 +50,21 @@ class Processor : private boost::noncopyable {
     Processor();
 
     /** String representation of stream */
-    string printRowValue( const string query_name );
+    string printRowValue(const string query_name);
 
     /** This function take in proper moment data to process */
-    void processRows( set < string > inSet );
+    void processRows(set < string > inSet);
 
     /** Main purpose of this function is fullfill all stream fields values
      *  on given moment by  realization all 1v2v3 elements stream programs
      */
-    void updateContext( set < string > inSet ) ;
+    void updateContext(set < string > inSet) ;
 
     /** This function return lenght of data stream */
-    int getStreamCount( const string query_name );
+    int getStreamCount(const string query_name);
 
     /** This function try to roll up argument and reads data from schema
      * This is not finished - need to be fixed */
-    number getValueOfRollup( const query &q, int offset, int timeOffset );
+    number getValueOfRollup(const query &q, int offset, int timeOffset);
 
 };

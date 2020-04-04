@@ -26,11 +26,11 @@ namespace boost {
             boost::rational<T> &p,
             unsigned int /* file_version */
         ) {
-            T _num( p.numerator() ) ;
-            T _den( p.denominator() );
+            T _num(p.numerator()) ;
+            T _den(p.denominator());
             ar &_num ;
             ar &_den ;
-            p.assign( _num, _den );
+            p.assign(_num, _den);
         }
     } // namespace serialization
 } // namespace boost
@@ -40,7 +40,7 @@ namespace boost {
 using namespace std ;
 using namespace boost ;
 
-boost::rational<int> Rationalize ( double inValue, double DIFF = 1E-6,  int ttl = 11 ) ;
+boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,  int ttl = 11) ;
 
 enum command_id {
 #define DEF_CASE( _A_ ) _A_ ,
@@ -69,9 +69,9 @@ class token {
     string getValue();
     boost::rational<int> getCRValue() ;
 
-    token( command_id id = VOID_COMMAND, string sValue = "" ) ;
-    token( command_id id, boost::rational<int> crValue, string sValue = "" ) ;
-    token( command_id id, double dValue );
+    token(command_id id = VOID_COMMAND, string sValue = "") ;
+    token(command_id id, boost::rational<int> crValue, string sValue = "") ;
+    token(command_id id, double dValue);
 
     string getStrTokenName() ;
     command_id getTokenCommand();
@@ -101,8 +101,8 @@ class field {
     eType dFieldType ;
     list < token > lProgram ;
 
-    field () ;
-    field ( string sFieldName, list < token > &lProgram, eType fieldType, string sFieldText ) ;
+    field() ;
+    field(string sFieldName, list < token > &lProgram, eType fieldType, string sFieldText) ;
 
     string getFirstFieldName() ;
     string getFieldNameSet() ;
@@ -127,7 +127,7 @@ class query {
 
   public:
 
-    query( boost::rational<int> rInterval, string id ) ;
+    query(boost::rational<int> rInterval, string id) ;
     query() ;
 
     list< string > getFieldNamesList() ;
@@ -142,20 +142,20 @@ class query {
     bool isReductionRequired();
     bool isGenerated();
 
-    field &getField( string sField );
+    field &getField(string sField);
 
-    list < string > getDepStreamNameList( int reqDep = 0 ) ;
+    list < string > getDepStreamNameList(int reqDep = 0) ;
 
     //list < string > getArgumentList();
 
-    int getFieldIndex( field f );
+    int getFieldIndex(field f);
 } ;
 
-bool operator<(const query &lhs, const query &rhs) ;
+bool operator< (const query &lhs, const query &rhs) ;
 
-query &getQuery( string query_name ) ;
-int getSeqNr( string query_name ) ;
-bool isDeclared( string query_name ) ;
+query &getQuery(string query_name) ;
+int getSeqNr(string query_name) ;
+bool isDeclared(string query_name) ;
 bool isExist(string query_name);
 
 class qTree :
@@ -166,21 +166,21 @@ class qTree :
     friend class boost::serialization::access;
     template<class Archive>
     void serialize(Archive &ar, unsigned int version) {
-        ar &boost::serialization::base_object< vector < query >>(*this) ;
+        ar &boost::serialization::base_object< vector < query >> (*this) ;
     }
 
   public:
 
-    query &operator[] ( string query_name ) {
-        return getQuery( query_name ) ;
+    query &operator[](string query_name) {
+        return getQuery(query_name) ;
     } ;
 
     void sort() {
-        std::sort( begin(), end() ) ;
+        std::sort(begin(), end()) ;
     };
 
     /** Topological sort*/
     void tsort() ;
 
-    boost::rational<int> getDelta( string query_name ) ;
+    boost::rational<int> getDelta(string query_name) ;
 };
