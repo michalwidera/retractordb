@@ -40,11 +40,14 @@ void dumpGraphiz(std::ostream &xout,
 
         if (q.isDeclaration()) {
             xout << "style=filled,fillcolor=Skyblue,color=Black," ;
-        };
-
-        if (q.isGenerated()) {
+        }
+        else if (q.isGenerated()) {
             xout << "style=filled,fillcolor=Sienna,color=Black," ;
-        };
+        } 
+        else 
+        {
+           xout << "style=\"filled\",fillcolor=Gray,color=Black," ;
+        }
 
         xout << "label=\"" ;
 
@@ -138,6 +141,8 @@ void dumpGraphiz(std::ostream &xout,
                     xout << "fillcolor=Yellow,color=Black," ;
                     xout << "label=\"";
                 } else {
+                    //These are stream programs
+                    xout << "fillcolor=Orange,color=Black," ;
                     xout << "label=\"";
                 }
 
