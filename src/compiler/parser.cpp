@@ -94,11 +94,11 @@ namespace {
         fieldType = field::BAD ;
         string vStr(string(str, end));
 
-        if (vStr == "u8" || vStr == "BYTE" || vStr == "char" ) {
+        if (vStr == "i8" || vStr == "BYTE" || vStr == "char") {
             fieldType = field::BYTE ;
         }
 
-        if (vStr == "u16" || vStr == "INTEGER" || vStr == "int" ) {
+        if (vStr == "i16" || vStr == "INTEGER" || vStr == "int") {
             fieldType = field::INTEGER ;
         }
 

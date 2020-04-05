@@ -1,6 +1,6 @@
 # declaration of input time series
-declare a u16 ,b u16 stream core0, 3 FILE datafile1.dat
-declare c INT ,d INT stream core1, 1 file /dev/urandom
+declare a i16 ,b i16 stream core0, 3 FILE datafile1.dat
+declare c i8 ,d i8 stream core1, 1 file /dev/urandom
 declare e INTEGER,f INTEGER stream core2, 3 file /dev/urandom
 
 # time series junction queries

@@ -15,7 +15,7 @@ bool check_compile_function() {
     
     vector<string> cs;
 
-    cs.push_back("declare a u16 ,b int stream core0, 1 file /dev/urandom");
+    cs.push_back("declare a i16 ,b i8 stream core0, 1 file /dev/urandom");
     cs.push_back("declare c integer,d stream core1, 1 file /dev/urandom");
     cs.push_back("select core0[0],core0[1] as test stream str1 from core0#core1");
 

@@ -102,7 +102,21 @@ string Processor::printRowValue(const string query_name) {
 
     for (auto n : getRow(query_name, 0)) {
         stringstream retVal ;
-        retVal << boost::rational_cast<double> (boost::get< boost::rational<int>> (n)) ;
+
+        if (n.type() == typeid(int)) {
+            retVal << boost::rational_cast<int> (boost::get< boost::rational<int>> (n)) ;
+        } else if (n.type() == typeid(double)) {
+            retVal << boost::rational_cast<double> (boost::get< boost::rational<int>> (n)) ;
+        } else if (n.type() == typeid(boost::rational<int>)) {
+            if ((boost::get< boost::rational<int>> (n)).denominator() == 1) {
+                retVal << boost::rational_cast<int> (boost::get< boost::rational<int>> (n)) ;
+            } else {
+                retVal << boost::rational_cast<double> (boost::get< boost::rational<int>> (n)) ;
+            }
+        } else {
+            retVal << boost::rational_cast<int> (boost::get< boost::rational<int>> (n)) << "?" ;
+        }
+
         pt.put(boost::lexical_cast<std::string> (i++), retVal.str());
     }
 
