@@ -1,0 +1,6 @@
+# declaration of input time series
+declare a i8 stream core0, 1 file /dev/urandom 
+declare c char stream core1, 0.5 file /dev/urandom
+
+select core0[0] stream str1 from core0#core1
+select core1[0]/2+1,a,a+1 stream str2 from core1+core0
