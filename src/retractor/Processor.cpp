@@ -278,6 +278,10 @@ void Processor::updateContext(set < string > inSet) {
 
                     TimeOffset = TimeOffset - gStreamSize[ streamNameArg ];
                     assert(TimeOffset >= 0);
+                    //
+                    // If this assert fails - you are probably trying to hash a#b when a and b has different schema sizes.
+                    // This should be identified on compilation phase in future.
+                    //
                     assert(gContextValMap[streamNameArg].size() == getQuery(argument1.getValue()).lSchema.size()) ;
                     assert(gContextValMap[streamNameArg].size() == getQuery(argument2.getValue()).lSchema.size()) ;
                     rowValues = getRow(streamNameArg, TimeOffset) ;

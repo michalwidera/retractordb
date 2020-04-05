@@ -221,7 +221,7 @@ ptree commandProcessor(ptree ptInval) {
         if (command == "hello") {
             cerr << "got hello." << endl ;
             ptRetval.put(string("db"), string("world"));
-            cerr << "will reply:" << endl;
+            cerr << "reply:" ;
             using boost::property_tree::ptree;
             std::stringstream strstream;
 
@@ -233,7 +233,7 @@ ptree commandProcessor(ptree ptInval) {
                 write_info(strstream, ptRetval);
             }
 
-            cerr << strstream.str() << endl; ;
+            cerr << strstream.str();
         }
     } catch (const boost::property_tree::ptree_error &e) {
         cerr << "ptree fail:" << e.what() << endl;
