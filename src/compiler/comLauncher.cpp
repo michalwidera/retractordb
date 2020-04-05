@@ -78,7 +78,6 @@ int main(int argc, char* argv[]) {
 
         string sQueryFile = vm["queryfile"].as< string >() ;
         string sOutFile   = vm["outfile"].as< string >() ;
-        string sLinkFile  = "query.lkn" ;
         string sSubsetFile = "query.sub" ;
         //override defaults if filename is matching regexp
         {
@@ -87,7 +86,6 @@ int main(int argc, char* argv[]) {
 
             if (regex_match(sQueryFile.c_str(), what, filenameRe)) {
                 string filenameNoExt = string(what[1]) ;
-                sLinkFile = filenameNoExt + ".lkn" ;
                 sSubsetFile = filenameNoExt + ".sub" ;
             }
         }

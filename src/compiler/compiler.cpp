@@ -29,7 +29,9 @@ std::vector<std::string> load_file(std::string sInputFile) {
     string str;
 
     while (getline(input, str)) {
-        if (str == "stop") {
+        boost::algorithm::trim(str);    //trailing and leading spaces need to be cut off
+
+        if (str == "stop") {            //stop command is not covered by grammar
             break ;
         }
 

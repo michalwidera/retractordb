@@ -22,6 +22,7 @@ bool check_compile_function() {
     return ( parser( cs ) == "OK" );
 }
 
+
 BOOST_AUTO_TEST_CASE( check_compile )
 {
     BOOST_CHECK( check_compile_function() == true );

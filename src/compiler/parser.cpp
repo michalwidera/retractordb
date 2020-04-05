@@ -630,7 +630,7 @@ string parser(vector<string> vsInputFile) {
         stripUnicode(line);
 
         if (! parse(line.c_str(), g, space_p).full) {
-            cerr << "error:\t" << line << endl ;
+            cerr << "error in:[" << line << "]" << endl ;
             throw std::invalid_argument("Syntax Error");
         }
     }
