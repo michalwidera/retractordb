@@ -10,6 +10,8 @@
 #include <stdexcept>                               // for out_of_range
 #include "QStruct.h"                               // for field, field::BAD
 
+#include <iostream>
+
 using namespace std ;
 using namespace boost ;
 
@@ -114,6 +116,7 @@ void inputDF::processRow() {
 
             case field::BAD:
             default:
+                std::cerr << "field:" << f.getFirstFieldName() << std::endl ;
                 throw std::out_of_range("processRow/undefined type");
                 break ; //proforma
         }

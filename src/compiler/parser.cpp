@@ -96,14 +96,12 @@ namespace {
 
         if (vStr == "i8" || vStr == "BYTE" || vStr == "char") {
             fieldType = field::BYTE ;
-        }
-
-        if (vStr == "i16" || vStr == "INTEGER" || vStr == "int") {
+        } else if (vStr == "i16" || vStr == "INTEGER" || vStr == "int") {
             fieldType = field::INTEGER ;
-        }
-
-        if (vStr == "RATIONAL" || vStr == "RAT") {
+        } else if (vStr == "RATIONAL" || vStr == "RAT") {
             fieldType = field::RATIONAL ;
+        } else {
+            throw std::invalid_argument(string("Undefined type ") + vStr);
         }
     }
 

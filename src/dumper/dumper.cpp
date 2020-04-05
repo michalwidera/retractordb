@@ -40,19 +40,14 @@ void dumpGraphiz(std::ostream &xout,
 
         if (q.isDeclaration()) {
             xout << "style=filled,fillcolor=Skyblue,color=Black," ;
-        }
-        else if (q.isGenerated()) {
+        } else if (q.isGenerated()) {
             xout << "style=filled,fillcolor=Sienna,color=Black," ;
-        } 
-        else 
-        {
-           xout << "style=\"filled\",fillcolor=Gray,color=Black," ;
+        } else {
+            xout << "style=\"filled\",fillcolor=Gray,color=Black," ;
         }
 
         xout << "label=\"" ;
-
         xout << q.id ;
-
         xout << "\\ninterval=" << q.rInterval ;
 
         if (q.isDeclaration()) {
