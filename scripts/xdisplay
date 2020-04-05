@@ -5,6 +5,7 @@ me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 if [ $# -eq 0 ] ; then
     echo "Usage: $me queryFileName.Ext [phaseLnkExt][PicType]"
     echo "Example: $me query.txt"
+    echo "         $me query.qry"
     exit
 fi
 
@@ -22,33 +23,34 @@ else
 PICTYPE=png
 fi
 
+if [[ $FILE == *.txt ]] ; then
 echo "Calling compiler for" $FILE
-
 if ! xcompiler -q $FILE ; then exit 1 ; fi 
+fi
 
 echo 'Phase view: query.'$PHASE
 
 arg=""
 
-echo -e "Show fields? [Y/n]\c"
+echo -e "Show fields?        [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -f"
 fi
 
-echo -e "Show stream progs ? [Y/n]\c"
+echo -e "Show stream progs?  [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -s"
 fi
 
-echo -e "Show tags ? [Y/n]\c"
+echo -e "Show tags?          [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -t"
 fi
 
-echo -e "Show types ? [Y/n]\c"
+echo -e "Show types?         [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -w"
