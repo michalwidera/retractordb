@@ -26,6 +26,7 @@ using boost::lexical_cast;
 
 extern string parser(vector<string> vsInputFile);
 extern string storeParseResult(string sOutputFile);
+extern string getParseResult();
 
 extern qTree coreInstance ;
 
@@ -92,12 +93,11 @@ int main(int argc, char* argv[]) {
         }
         cout << "Input file:" << sQueryFile << endl ;
         cout << "Compile result:" << parser(load_file(sQueryFile)) << endl ;
-        cout << "Store result:" << storeParseResult(sLinkFile) << endl ;
         //
         // Main Algorithm body
         //
-        std::ifstream ifs(sLinkFile.c_str(), std::ios::binary);
-        boost::archive::text_iarchive ia(ifs);
+        std::istringstream iss(getParseResult(), std::ios::binary);
+        boost::archive::text_iarchive ia(iss);
         ia >> coreInstance ;
 
         if (coreInstance.size() == 0) {

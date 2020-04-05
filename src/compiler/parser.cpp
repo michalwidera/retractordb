@@ -588,6 +588,14 @@ struct ql_parser : public grammar<ql_parser> {
     };
 };
 
+string getParseResult() {
+    const qTree coreInstance2(coreInstance_parser) ;
+    std::stringstream retval;
+    boost::archive::text_oarchive oa(retval);
+    oa << coreInstance2 ;
+    return retval.str();
+}
+
 string storeParseResult(string sOutputFile) {
     // Store of compiled queries on disk
     const qTree coreInstance2(coreInstance_parser) ;
