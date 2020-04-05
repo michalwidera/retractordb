@@ -94,11 +94,11 @@ namespace {
         fieldType = field::BAD ;
         string vStr(string(str, end));
 
-        if (vStr == "BYTE" || vStr == "BTE") {
+        if (vStr == "u8" || vStr == "BYTE" || vStr == "char" ) {
             fieldType = field::BYTE ;
         }
 
-        if (vStr == "INTEGER" || vStr == "INT") {
+        if (vStr == "u16" || vStr == "INTEGER" || vStr == "int" ) {
             fieldType = field::INTEGER ;
         }
 
@@ -379,14 +379,13 @@ struct ql_parser : public grammar<ql_parser> {
                         (
                             STREAM
                             >> id                               [&do_stream_assign_id]
-                            >> ch_p(',') >> (rational          [&do_static_delta]
+                            >> ch_p(',') >> (rational           [&do_static_delta]
                             )
                         )
                         >>
-                        !(
+                        (
                             FILE
-                            >>
-                            (* anychar_p) [&do_stream_assign_file]
+                            >> (* anychar_p)                    [&do_stream_assign_file]
                         )
                     )
                     [&do_insert_into_schema]

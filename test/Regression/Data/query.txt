@@ -1,7 +1,7 @@
 # declaration of input time series
-declare a INTEGER,b INTEGER stream core0, 3 FILE datafile1.dat
-declare c INTEGER,d INTEGER stream core1, 1
-declare e INTEGER,f INTEGER stream core2, 3
+declare a u16 ,b u16 stream core0, 3 FILE datafile1.dat
+declare c INT ,d INT stream core1, 1 file /dev/urandom
+declare e INTEGER,f INTEGER stream core2, 3 file /dev/urandom
 
 # time series junction queries
 select core0[1,1],a+1,core1.c stream str1 from core0#(core1>1)
