@@ -4,6 +4,7 @@
 #include <boost/any.hpp>
 #include <boost/spirit/include/classic_core.hpp>
 #include <boost/spirit/include/classic_symbols.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/bind.hpp>
@@ -93,12 +94,13 @@ namespace {
     void do_ftype(char const* str, char const* end) {
         fieldType = field::BAD ;
         string vStr(string(str, end));
+        boost::algorithm::to_lower(vStr);
 
-        if (vStr == "i8" || vStr == "BYTE" || vStr == "char") {
+        if ((vStr == "i8") || (vStr == "byte") || (vStr == "char")) {
             fieldType = field::BYTE ;
-        } else if (vStr == "i16" || vStr == "INTEGER" || vStr == "int") {
+        } else if ((vStr == "i16") || (vStr == "integer") || (vStr == "int")) {
             fieldType = field::INTEGER ;
-        } else if (vStr == "RATIONAL" || vStr == "RAT") {
+        } else if ((vStr == "rational") || (vStr == "rat")) {
             fieldType = field::RATIONAL ;
         } else {
             throw std::invalid_argument(string("Undefined type ") + vStr);
