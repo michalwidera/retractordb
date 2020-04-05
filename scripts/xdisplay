@@ -30,25 +30,25 @@ echo 'Phase view: query.'$PHASE
 
 arg=""
 
-echo "Show fields? [Y/n]"
+echo -e "Show fields? [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -f"
 fi
 
-echo "Show stream progs ? [Y/n]"
+echo -e "Show stream progs ? [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -s"
 fi
 
-echo "Show tags ? [Y/n]"
+echo -e "Show tags ? [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -t"
 fi
 
-echo "Show types ? [Y/n]"
+echo -e "Show types ? [Y/n]\c"
 read answer
 if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -w"
