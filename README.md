@@ -21,7 +21,7 @@ Installation procedure
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake libboost-all-dev make build-essential
+sudo apt-get -y install gcc cmake libboost-all-dev make build-essential iwyu
 git clone https://github.com/michalwidera/retractordb.git
 cd retractordb
 cmake CMakeLists.txt; make
