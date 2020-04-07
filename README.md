@@ -42,7 +42,7 @@ Allowed options:
 
 To get full functionality additional packages may be required like:
 ```
-sudo apt install graphviz, feh, tmux, gnuplot
+sudo apt install graphviz feh tmux gnuplot
 ```
 
 Author
