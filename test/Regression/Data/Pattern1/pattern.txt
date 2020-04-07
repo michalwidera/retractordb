@@ -1,3 +1,5 @@
+Input file:query.txt
+Compile result:OK
 str1(1/3)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)

@@ -1,3 +1,5 @@
+Input file:query.txt
+Compile result:OK
 core1(1/2)	/dev/urandom
 	c:
 str1(1/2)
@@ -18,7 +20,7 @@ str2(1/2)
 		ADD(0)
 	Field_3:
 		PUSH_ID(core0[0/1])
-str0(1/2)
+str0(1/1)
 	:- PUSH_STREAM(core0)
 	Field_0:
 		PUSH_ID(core0[0/1])

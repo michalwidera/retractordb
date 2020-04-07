@@ -15,7 +15,7 @@ add_test(
 add_test( 
   NAME compile_pattern_source-1
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}/Pattern1
-  COMMAND sh -c "xcompiler -q query.txt; xdumper > out.txt"
+  COMMAND sh -c "xcompiler -q query.txt > out.txt ; xdumper >> out.txt"
 )
 
 add_test(
@@ -29,7 +29,7 @@ set_tests_properties(compare_output_with_pattern-1 PROPERTIES DEPENDS compile_pa
 add_test( 
   NAME compile_pattern_source-2
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}/Pattern2
-  COMMAND sh -c "xcompiler -q query.txt; xdumper > out.txt"
+  COMMAND sh -c "xcompiler -q query.txt > out.txt ; xdumper >> out.txt"
 )
 
 add_test(
