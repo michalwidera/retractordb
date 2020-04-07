@@ -55,7 +55,6 @@ string intervalCounter() {
             if (q.lProgram.size() == 1) {
                 token tInstance(* (q.lProgram.begin()));
                 q.rInterval = coreInstance.getDelta(tInstance.getValue()) ;
-                cerr << "size == 1, delta " << q.rInterval << endl ;
                 continue ;  // Just one stream
             }
 
