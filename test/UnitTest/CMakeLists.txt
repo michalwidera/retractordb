@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR )
 
 project( regression-test )
 
+set(Boost_USE_STATIC_LIBS ON )
+set(Boost_USE_MULTITHREADED ON)
+
 enable_testing()
 
 FIND_PACKAGE( Boost COMPONENTS
@@ -45,8 +48,8 @@ set(SOURCES_COMPILER_TEST
 add_executable( test_xqry ${SOURCES_QRY_TEST} )
 add_executable( test_xcompiler ${SOURCES_COMPILER_TEST} )
 
-target_link_libraries( test_xqry ${Boost_LIBRARIES}  -lrt -ldl -lboost_unit_test_framework )
-target_link_libraries( test_xcompiler ${Boost_LIBRARIES}  -lrt -ldl -lboost_unit_test_framework )
+target_link_libraries( test_xqry ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl -lboost_unit_test_framework )
+target_link_libraries( test_xcompiler ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl -lboost_unit_test_framework )
 
 add_test( 
   NAME unittest-test-xqry

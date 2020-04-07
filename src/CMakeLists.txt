@@ -16,11 +16,6 @@ FIND_PACKAGE( Boost COMPONENTS
     system
     REQUIRED )
 
-find_program(iwyu_path NAMES include-what-you-use iwyu)
-if(NOT iwyu_path)
-  message(FATAL_ERROR "Could not find the program include-what-you-use")
-endif()
-
 MESSAGE(STATUS "Boost information:")
 MESSAGE(STATUS "Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
 MESSAGE(STATUS "Boost_LIBRARY_DIRS: ${Boost_LIBRARY_DIRS}")
@@ -82,10 +77,13 @@ add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
 
-set_property(TARGET xretractor PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-set_property(TARGET xdumper PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+find_program(iwyu_path NAMES include-what-you-use iwyu)
+if(iwyu_path)
+  set_property(TARGET xretractor PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+  set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+  set_property(TARGET xdumper PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+  set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
+endif()
 
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
 ADD_DEFINITIONS( "-DHAS_BOOST" )

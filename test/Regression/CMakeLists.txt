@@ -7,6 +7,12 @@ enable_testing()
 set(CMAKE_CURRENT_DATA_DIR test/Regression/Data)
 
 add_test( 
+  NAME check_if_installed
+  WORKING_DIRECTORY /usr/local/bin
+  COMMAND test -f /usr/local/bin/xcompiler
+)
+
+add_test( 
   NAME compiler-test-on-query
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
   COMMAND xcompiler -q query-lnx.txt 
