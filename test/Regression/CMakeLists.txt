@@ -13,22 +13,40 @@ add_test(
 )
 
 add_test( 
-  NAME compiler-test-on-dumper 
-  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
-  COMMAND sh -c "xcompiler -q query-lnx.txt; xdumper > out.txt"
+  NAME compile_pattern_source-1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}/Pattern1
+  COMMAND sh -c "xcompiler -q query.txt; xdumper > out.txt"
 )
 
 add_test(
-  NAME compare_outputs 
-  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
+  NAME compare_output_with_pattern-1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}/Pattern1
   COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
 )
+
+set_tests_properties(compare_output_with_pattern-1 PROPERTIES DEPENDS compile_pattern_source-1)
+
+add_test( 
+  NAME compile_pattern_source-2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}/Pattern2
+  COMMAND sh -c "xcompiler -q query.txt; xdumper > out.txt"
+)
+
+add_test(
+  NAME compare_output_with_pattern-2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}/Pattern2
+  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
+)
+
+set_tests_properties(compare_output_with_pattern-2 PROPERTIES DEPENDS compile_pattern_source-2)
 
 add_test(
   NAME dumper-test
   WORKING_DIRECTORY ${CMAKE_CURRENT_DATA_DIR}
   COMMAND sh -c "xcompiler -q query-lnx.txt; xdumper -d"
 )
+
+set_tests_properties(dumper-test PROPERTIES DEPENDS compiler-test-on-query)
 
 add_test( 
   NAME retractor-waterfall
