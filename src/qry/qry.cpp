@@ -183,7 +183,7 @@ void consumer() {
                     int i = 0 ;
 
                     for (const auto &v : schema.get_child("db.field")) {
-                        printf("%s.%s %s %llu ",
+                        printf("%s.%s %s %llu\n",
                             sInputStream.c_str(),
                             v.second.get<std::string> ("").c_str(),
                             e_value.get(boost::lexical_cast<string> (i++), "").c_str(),
