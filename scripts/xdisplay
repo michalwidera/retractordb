@@ -4,7 +4,7 @@ me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 if [ $# -eq 0 ] ; then
     echo "Usage: $me queryFileName.Ext [phaseLnkExt][PicType]"
-    echo "Example: $me query.txt"
+    echo "Example: $me query.rql"
     echo "         $me query.qry"
     exit
 fi
@@ -23,7 +23,7 @@ else
 PICTYPE=png
 fi
 
-if [[ $FILE == *.txt ]] ; then
+if [[ $FILE == *.qry ]] ; then
 echo "Calling compiler for" $FILE
 if ! xcompiler -q $FILE ; then exit 1 ; fi 
 fi

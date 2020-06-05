@@ -1,4 +1,4 @@
-Input file:query.txt
+Input file:query.rql
 Compile result:OK
 core1(1/2)	/dev/urandom
 	c:

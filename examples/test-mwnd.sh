@@ -3,7 +3,7 @@
 if [ "$1" != "" ]; then
 FILE=$1
 else
-FILE=query-mwnd.txt  
+FILE=query-mwnd.rql
 fi
 
 if ! xcompiler -q $FILE ; then exit 1 ; fi 

@@ -12,5 +12,5 @@ xqry -l
 xqry -k
 
 else
-    echo "missing source file. Try query-lnx.txt"
+    echo "missing source file. Try query-lnx.rql"
 fi

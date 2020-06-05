@@ -7,15 +7,11 @@ Sources of RetractorDB Time Series Database System prototype.
 Contents
 -----------------------------------------------------------------------
 
-xqry: database client
-
-xdumper: query plan dumper
-
-xcompiler: query compiler
-
-xretractor: database main process
-
-xdisplay: query plan presentation script
+* _xqry_: database client
+* _xdumper_: query plan dumper
+* _xcompiler_: query compiler
+* _xretractor_: database main process
+* _xdisplay_: query plan presentation script
 
 Installation procedure
 -----------------------------------------------------------------------
@@ -27,8 +23,8 @@ cd retractordb
 cmake CMakeLists.txt; make
 sudo make install
 ```
-After installation xretractor, xqry ... etc will be installed in /usr/local/bin on path.
-Please check proper installation by typing in command prompt - for instance: xqry -h
+After installation _xretractor_, _xqry_ ... etc will be installed in /usr/local/bin on path.
+Please check proper installation by typing in command prompt - for instance: _xqry -h_
 
 You should see:
 ```
@@ -43,6 +39,27 @@ Allowed options:
 To get full functionality additional packages may be required like:
 ```
 sudo apt install graphviz feh tmux gnuplot
+```
+
+Query Language
+-----------------------------------------------------------------------
+Example queries are located in examples directory as *.rql files.
+There are two types supported.
+First starts from _declare_ keyword and declares time series. 
+This could be a data file, binary file or even device file from _/dev_ directory.
+Second starts from _select_ keyword and have following formal form:
+
+```
+select column_names
+stream output_stream
+from junction_of_input_streams
+``` 
+
+Example:
+```
+select core1[0]/2+1,a 
+stream str2
+from core1+core0
 ```
 
 Author

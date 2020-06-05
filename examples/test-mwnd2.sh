@@ -4,7 +4,7 @@ export PATH=../build:../scripts:$PATH
 if [ "$1" != "" ]; then
 FILE=$1
 else
-FILE=query-mwnd2.txt  
+FILE=query-mwnd2.rql
 fi
 
 if ! xcompiler -q $FILE ; then exit 1 ; fi 

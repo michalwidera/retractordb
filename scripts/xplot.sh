@@ -11,8 +11,8 @@ control_c()
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 if [ "$1" == "-h" ] ; then
-    echo "Usage: $me query-file.txt streamName x-dimension y-dimension"
-    echo "Example: $me query.txt str1 100 256"
+    echo "Usage: $me query-file.rql streamName x-dimension y-dimension"
+    echo "Example: $me query.rql str1 100 256"
     echo "When no parameters given - defaults are used."
     exit
 fi
@@ -20,7 +20,7 @@ fi
 if [ "$1" != "" ] ; then
 FILE=$1
 else
-FILE=query.txt
+FILE=query.rql
 fi
 
 if [ "$2" != "" ] ; then

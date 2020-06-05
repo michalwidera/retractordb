@@ -14,5 +14,5 @@ xqry -l
 xqry -k
 
 else
-    echo "missing source file. Try query-all.txt"
+    echo "missing source file. Try query-all.rql"
 fi

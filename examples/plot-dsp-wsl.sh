@@ -11,7 +11,7 @@ control_c()
 
 echo "Type ctrl+c to stop."
 
-if ! xcompiler -q query-dsp.txt ; then exit 1 ; fi 
+if ! xcompiler -q query-dsp.rql ; then exit 1 ; fi
 
 nohup xretractor &
 
