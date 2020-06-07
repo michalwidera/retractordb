@@ -3,5 +3,6 @@
 *.sh		text eol=lf
 *.jpg	        binary
 *.png           binary
-*.py        text eol=lf
-xdisplay    test eol=fl
+*.py            text eol=lf
+*.vim           text eol=lf
+xdisplay        test eol=lf
