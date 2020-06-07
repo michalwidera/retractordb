@@ -9,37 +9,46 @@ control_c()
     stty sane
 }
 
+if [[ $linuxver == *"Microsoft"* ]] ; then
+    TTYPE="--term wxt"
+else
+    TTYPE=""
+fi
+
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+
+linuxver=$(uname -r)
 
 if [ "$1" == "-h" ] ; then
     echo "Usage: $me query-file.rql streamName x-dimension y-dimension"
     echo "Example: $me query.rql str1 100 256"
     echo "When no parameters given - defaults are used."
+    echo $linuxver
     exit
 fi
 
 if [ "$1" != "" ] ; then
-FILE=$1
+    FILE=$1
 else
-FILE=query-simple.rql
+    FILE=query-simple.rql
 fi
 
 if [ "$2" != "" ] ; then
-STREAM=$2
+    STREAM=$2
 else
-STREAM=str1
+    STREAM=str1
 fi
 
 if [ "$3" != "" ] ; then
-XDIM=$3
+    XDIM=$3
 else
-XDIM=50
+    XDIM=50
 fi
 
 if [ "$4" != "" ] ; then
-YDIM=$4
+    YDIM=$4
 else
-YDIM=256
+    YDIM=256
 fi
 
 echo 'FILE:' $FILE
@@ -56,4 +65,4 @@ sleep 2
 echo "Type ctrl+c to stop."
 
 export DISPLAY=:0
-xqry -s $STREAM | plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.02 | gnuplot 2>/dev/null
+xqry -s $STREAM | plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.02 $TTYPE| gnuplot 2>/dev/null

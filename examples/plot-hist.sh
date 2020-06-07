@@ -9,6 +9,12 @@ control_c()
     stty sane
 }
 
+if [[ $linuxver == *"Microsoft"* ]] ; then
+    TTYPE="--term wxt"
+else
+    TTYPE=""
+fi
+
 echo "Type ctrl+c to stop."
 
 if ! xcompiler -q query-histogram.rql ; then exit 1 ; fi
@@ -17,4 +23,4 @@ nohup xretractor &
 
 sleep 4
 export DISPLAY=:0
-xqry -s countHistorgram | plothistgram.py 0 25 "first-argument:red;second-argument:blue" --sleep 0.5 --term wxt | gnuplot 2>/dev/null
+xqry -s countHistorgram | plothistgram.py 0 25 "first-argument:red;second-argument:blue" --sleep 0.5 $TTYPE | gnuplot 2>/dev/null
