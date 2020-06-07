@@ -9,6 +9,7 @@ control_c()
     stty sane
 }
 
+linuxver=$(uname -r)
 if [[ $linuxver == *"Microsoft"* ]] ; then
     TTYPE="--term wxt"
 else

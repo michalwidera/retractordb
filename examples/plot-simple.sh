@@ -9,6 +9,7 @@ control_c()
     stty sane
 }
 
+linuxver=$(uname -r)
 if [[ $linuxver == *"Microsoft"* ]] ; then
     TTYPE="--term wxt"
 else
@@ -17,13 +18,12 @@ fi
 
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
-linuxver=$(uname -r)
+
 
 if [ "$1" == "-h" ] ; then
     echo "Usage: $me query-file.rql streamName x-dimension y-dimension"
     echo "Example: $me query.rql str1 100 256"
     echo "When no parameters given - defaults are used."
-    echo $linuxver
     exit
 fi
 
