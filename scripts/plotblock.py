@@ -6,6 +6,9 @@ import collections
 
 from time import sleep
 
+#from signal import signal, SIGPIPE, SIG_DFL
+#signal(SIGPIPE, SIG_DFL)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("x", default=10, help="x dimension in points",type=int)
 parser.add_argument("y", default=256, help="y dimension in points",type=int)
@@ -56,7 +59,6 @@ try:
 
             print 'e'
             sys.stdout.flush()
-
 
 #ctrl+c to gracefull exit loop
 except KeyboardInterrupt:
