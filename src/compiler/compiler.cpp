@@ -14,6 +14,8 @@
 
 using boost::lexical_cast;
 
+extern int fieldCount;
+
 extern "C" {
     qTree coreInstance ;
 }
@@ -506,14 +508,33 @@ string prepareFields() {
             //fail of this asseration means that all streams are
             //after otimization alerady
 
+            vector<list<field>::iterator> eraseList;
+
+            list<field>::iterator it = q.lSchema.begin();
+
             for (auto &f : q.lSchema) {
-                if (f.getFirstFieldToken().getTokenCommand() ==  PUSH_TSCAN) {
+                if (f.getFirstFieldToken().getTokenCommand() == PUSH_TSCAN) {
                     //found! - and now unroll
                     if (q.lProgram.size() == 1) {
                         //we assure that on and only token is push_stream
-                        assert((* q.lProgram.begin()).getTokenCommand() == PUSH_STREAM) ;
+                        assert((* q.lProgram.begin()).getTokenCommand() == PUSH_STREAM);
+
+                        auto nameOfscanningTable = (* q.lProgram.begin()).getValue();
+
+                        //Remove of TSCAN
+                        eraseList.push_back(it);
+
+                        //q.lSchema =  getQuery(t.getValue()).lSchema;
                         //copy list of fields from one to another
-                        q.lSchema = getQuery(t.getValue()).lSchema ;
+                        int filedPosition = 0;
+                        for ( auto s : getQuery(t.getValue()).lSchema ) {
+
+                            list < token > newLProgram ;
+                            newLProgram.push_back(token(PUSH_ID, boost::rational<int> (filedPosition++), nameOfscanningTable ));
+
+                            string name = "Field_" + boost::lexical_cast<std::string> (fieldCount++) ;
+                            q.lSchema.push_back(field(name, newLProgram, field::INTEGER, ""));
+                        }
                         break ;
                     }
 
@@ -534,7 +555,10 @@ string prepareFields() {
                         break ;
                     }
                 }
+                it ++;
             }
+            for ( auto eraseIt : eraseList )
+                q.lSchema.erase(eraseIt);
         }
     }
 
@@ -623,7 +647,7 @@ string convertReferences() {
     boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");         //something[1]
     boost::regex xprFieldIdX("(\\w*)\\[_]");                //something[_]
     boost::regex xprFieldId1("(\\w*).(\\w*)");              //something.in_schema
-    boost::regex xprFieldId3("(\\w*)");                     //field_fo_corn
+    boost::regex xprFieldId3("(\\w*)");                     //field_of_corn
 
     for (auto &q : coreInstance) {    // for each query
         assert(! q.isReductionRequired());

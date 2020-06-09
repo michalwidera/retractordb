@@ -1,0 +1,6 @@
+# this test will check if crc function is compiled correctly
+
+declare a INTEGER, b INTEGER stream datasrc,0.5 file datafile2.dat
+
+select a,b,crc(16,1234) stream out1 from datasrc
+select a,b,crc(8,12) stream out2 from datasrc

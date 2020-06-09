@@ -1,0 +1,6 @@
+# this test will check if * operator is unfloded
+
+declare a INTEGER, b INTEGER stream datasrc,0.5 file datafile2.dat
+
+select 1,* stream out1 from datasrc
+select 1,a,b stream out2 from datasrc

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "QStruct.h"
 #include "dbstream.h"
 #include "inputFileInstance.h"
 #include <memory>

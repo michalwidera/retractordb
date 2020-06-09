@@ -24,7 +24,7 @@ void Dump(std::ostream &os) {
     cbuf.Dump(os, NULL);
 }
 
-number fake = boost::rational<int> (99, 1);
+number fake = boost::rational<int> (99,1);
 
 dbStream::dbStream(std::string streamName, list < std::string > schema) :
     streamName(streamName),

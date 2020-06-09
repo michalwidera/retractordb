@@ -1,17 +1,20 @@
 #include "Processor.h"
-#include "Buffer.h"
 #include "SOperations.h"
 #include "QStruct.h"
 
-#include <boost/variant.hpp>
-
+#include <boost/variant.hpp> // IWYU pragma: keep
+// IWYU pragma: begin_exports
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/crc.hpp>
+// IWYU pragma: end_exports
+#include <iostream>
+#include <cstdint>
 
-//#include <boost/stacktrace.hpp>
+#include <boost/stacktrace.hpp>
 
 extern "C" qTree coreInstance ;
 
@@ -44,7 +47,7 @@ Processor::Processor() {
         vector< number > rowValues ;
 
         for (auto f : q.lSchema) {
-            rowValues.push_back(boost::rational<int> (0)) ;
+            rowValues.push_back(0) ;
         }
 
         gContextValMap[ q.id ] = rowValues ;
@@ -440,7 +443,7 @@ void Processor::updateContext(set < string > inSet) {
                         }
 
                         if (TimeOffset < 0) {
-                            //cerr << "@:" << boost::stacktrace::stacktrace() << endl ;
+                            cerr << "@:" << boost::stacktrace::stacktrace() << endl ;
                             //req. higher boost version
                             assert(false);
                         }
@@ -741,9 +744,79 @@ boost::rational<int> Processor::computeValue(
                         rStack.pop() ;
                         rStack.push(boost::rational<int> (Rationalize(ceil(real))));
                     } else if (tk.getValue() == "sqrt") {
-                        a = rStack.top() ;
-                        rStack.pop() ;
-                        rStack.push(boost::rational<int> (Rationalize(sqrt(real))));
+                        a = rStack.top();
+                        rStack.pop();
+                        rStack.push(boost::rational<int>(Rationalize(sqrt(real))));
+                    } else if (tk.getValue() == "crc") {
+
+                        union Converter
+                        {
+                                int32_t  i32;
+                                int      int_type;
+                                int16_t  i16[2];
+                                int8_t   i8[4];
+                                uint32_t u32;
+                                uint16_t u16[2];
+                                unsigned short us16[2];
+                                uint8_t  u8[4];
+                        } byteConverter;
+
+                        b = rStack.top();
+                        rStack.pop();
+                        a = rStack.top();
+                        rStack.pop();
+
+                        if ( a == 8 ) {
+
+                            boost::crc_basic<8> crcfn(rational_cast<unsigned char>(b), 0x0, 0x0, false, false);
+
+                            vector<unsigned char> data_v;
+                            for (int i = 0; i < getSizeOfRollup(q); i++) {
+                                boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
+                                byteConverter.int_type = rational_cast<int>(val) ;
+                                data_v.push_back( byteConverter.u8[0] );
+                            }
+
+                            crcfn.process_bytes(data_v.data(), data_v.size());
+                            boost::rational<int> val(crcfn.checksum());
+                            rStack.push(val);
+
+                        } else if ( a == 16 ) {
+
+                            boost::crc_basic<16> crcfn(rational_cast<unsigned short>(b), 0x0, 0x0, false, false);
+
+                            vector<unsigned short> data_v;
+                            for (int i = 0; i < getSizeOfRollup(q); i++) {
+                                boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
+                                byteConverter.int_type = rational_cast<int>(val) ;
+                                data_v.push_back( byteConverter.u16[0] );
+                            }
+
+                            crcfn.process_bytes(data_v.data(), 2 * data_v.size());
+                            boost::rational<int> val(crcfn.checksum());
+                            rStack.push(val);
+
+                        } else if ( a == 32 ) {
+
+                            boost::crc_basic<32> crcfn(rational_cast<unsigned long>(b), 0x0, 0x0, false, false);
+
+                            vector<unsigned long> data_v;
+                            for (int i = 0; i < getSizeOfRollup(q); i++) {
+                                boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
+                                byteConverter.int_type = rational_cast<int>(val) ;
+                                data_v.push_back( byteConverter.u32 );
+                            }
+
+                            crcfn.process_bytes(data_v.data(), 4 * data_v.size());
+                            boost::rational<int> val(crcfn.checksum());
+                            rStack.push(val);
+
+                        } else {
+
+                            throw std::out_of_range("No support for this CRC size");
+
+                        }
+
                     } else if (tk.getValue() == "count") {
                         assert(rStack.size() < 4);
                         assert(rStack.size() > 0);
@@ -751,7 +824,7 @@ boost::rational<int> Processor::computeValue(
                          * Overhere you should see 1,2 or 3 arguments
                          * (x) means count X in schema
                          * (x,y) means count from X to Y in schema
-                         * (x,y,t) meanse count X to Y in schemat and t probes back
+                         * (x,y,t) means count X to Y in schemat and t probes back
                          */
                         vector<int> args ;
 
@@ -824,6 +897,62 @@ boost::rational<int> Processor::computeValue(
 
             default:
                 throw std::out_of_range("Thrown/Processor.cpp/getCRValue Unknown token");
+            case VOID_COMMAND:
+                break;
+            case VOID_VALUE:
+                break;
+            case PUSH_TSCAN:
+                break;
+            case TYPE:
+                break;
+            case AND:
+                break;
+            case OR:
+                break;
+            case NOT:
+                break;
+            case CMP_EQUAL:
+                break;
+            case CMP_LT:
+                break;
+            case CMP_GT:
+                break;
+            case CMP_LE:
+                break;
+            case CMP_GE:
+                break;
+            case CMP_NOT_EQUAL:
+                break;
+            case STREAM_AVG:
+                break;
+            case STREAM_MIN:
+                break;
+            case STREAM_MAX:
+                break;
+            case STREAM_SUM:
+                break;
+            case AGSE:
+                break;
+            case PUSH_STREAM:
+                break;
+            case STREAM_HASH:
+                break;
+            case STREAM_DEHASH_DIV:
+                break;
+            case STREAM_DEHASH_MOD:
+                break;
+            case STREAM_ADD:
+                break;
+            case STREAM_SUBSTRACT:
+                break;
+            case STREAM_TIMEMOVE:
+                break;
+            case STREAM_AGSE:
+                break;
+            case COUNT:
+                break;
+            case COUNT_RANGE:
+                break;
         }
     }
 

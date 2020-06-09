@@ -316,6 +316,7 @@ struct ql_parser : public grammar<ql_parser> {
             Token_t MIN = as_lower_d["min"] ;
             Token_t SUM = as_lower_d["sum"] ;
             Token_t COUNT = as_lower_d["count"] ;
+            Token_t CRC = as_lower_d["crc"] ;
             Token_t AGSE = as_lower_d["agse"] ;
             Token_t SELECT = as_lower_d["select"] ;
             Token_t DECLARE = as_lower_d["declare"] ;
@@ -550,6 +551,7 @@ struct ql_parser : public grammar<ql_parser> {
                             | FLOAT
                             | INT
                             | COUNT
+                            | CRC
                         )
                         >> ch_p('(') >> expression % ch_p(',') >> ch_p(')')
                     )
