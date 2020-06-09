@@ -79,11 +79,9 @@ int main(int argc, char* argv[]) {
 			remote.push_back(val);
 		}
 		remotefile.close();
+
+		assert( remote.size() >= packCount * packSize);
 	}
-
-	cerr << endl ;
-
-	assert( remote.size() >= packCount * packSize);
 
 	int cnt=0;
 	for(auto j = 0; j < packCount; j++) {
@@ -115,8 +113,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	myfile.write((char*)data.data() , data.size()*sizeof(unsigned int));
-
-
 	myfile.close();
 
     cout << "done." << endl ;
