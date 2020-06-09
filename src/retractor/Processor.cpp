@@ -47,7 +47,7 @@ Processor::Processor() {
         vector< number > rowValues ;
 
         for (auto f : q.lSchema) {
-            rowValues.push_back(0) ;
+            rowValues.push_back(boost::rational<int> (0)) ;
         }
 
         gContextValMap[ q.id ] = rowValues ;
@@ -772,6 +772,7 @@ boost::rational<int> Processor::computeValue(
 
                             vector<unsigned char> data_v;
                             for (int i = 0; i < getSizeOfRollup(q); i++) {
+
                                 boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
                                 byteConverter.int_type = rational_cast<int>(val) ;
                                 data_v.push_back( byteConverter.u8[0] );
@@ -787,6 +788,7 @@ boost::rational<int> Processor::computeValue(
 
                             vector<unsigned short> data_v;
                             for (int i = 0; i < getSizeOfRollup(q); i++) {
+
                                 boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
                                 byteConverter.int_type = rational_cast<int>(val) ;
                                 data_v.push_back( byteConverter.u16[0] );

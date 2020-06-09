@@ -83,7 +83,8 @@ int main(int argc, char* argv[]) {
 		assert( remote.size() >= packCount * packSize);
 	}
 
-	int cnt=0;
+	int crcqCnt=0; //Count of crc that landend in output file
+	int cnt=0; //Count of data read from remote file
 	for(auto j = 0; j < packCount; j++) {
 
 		vector<unsigned int> crcq;
@@ -107,14 +108,20 @@ int main(int argc, char* argv[]) {
 
 			boost::crc_basic<16> crcfn(crcPoly, 0x0, 0x0, false, false);
 			crcfn.process_bytes(crcq.data(), sizeof(unsigned int) * crcq.size());
-			if (vm.count("print")) { cout << crcfn.checksum() << endl ;	}
+			if (vm.count("print")) { cout << crcfn.checksum() << endl ; }
 			data.push_back(crcfn.checksum());
+			crcqCnt++;
 		}
 	}
 
-	myfile.write((char*)data.data() , data.size()*sizeof(unsigned int));
+	if (vm.count("print")) { cout << endl ;	}
+
+	myfile.write((char*)data.data(), data.size()*sizeof(unsigned int));
 	myfile.close();
 
-    cout << "done." << endl ;
+	cout << "count:"<< packCount * packSize << endl;
+	if (vm.count("addcrc")) { cout << "crc's:"<< crcqCnt << endl; }
+	cout << "output:" << sOutputFile << endl;
+    cout << "done." << endl;
     return system::errc::success;
 }
