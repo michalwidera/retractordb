@@ -92,13 +92,18 @@ string intervalCounter() {
 
                 case STREAM_DEHASH_DIV: {
                         boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue()) ;
-                        boost::rational<int> delta2 = t2.getCRValue() ; //Tutaj nie ma drugiego strumienia tylko od razu argument
+                        boost::rational<int> delta2 = t2.getCRValue() ; //There is no second stream - just fraction argument
                         assert(delta2 != 0);
 
                         if (delta1 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
+
+                            //           D_c * D_b
+                            //   D_a = --------------
+                            //         abs(D_c - D_b)
+
                             delta = deltaDivMod(delta1, delta2) ;
                         }
 
@@ -117,6 +122,11 @@ string intervalCounter() {
                             bOnceAgain = true ;
                             continue ;
                         } else {
+
+                            //           D_c * D_a
+                            //   D_b = --------------
+                            //         abs(D_c - D_a)
+
                             delta = deltaDivMod(delta1, delta2) ;
                         }
 
@@ -202,7 +212,7 @@ string intervalCounter() {
             } //switch ( op.getTokenCommand() )
 
             assert(delta != -1);
-            q.rInterval = delta;  //Tutaj jest ustalana wartosc delta - wartosc zwrotna
+            q.rInterval = delta;  //There is estabilished delta value - return value
         }  //BOOST_FOREACH ( query & q , coreInstance )
 
         if (! bOnceAgain) {
@@ -499,6 +509,7 @@ list < field > combine(string sName1, string sName2, token cmd_token) {
 //unfortunatlle algorithm if broken - because does not search backward but next by next
 //and some * can be process which have arguments appear as two asterixe
 //In such case unrool does not appear and algorithm gets shitin-shitout
+
 string prepareFields() {
     coreInstance.tsort();
 
