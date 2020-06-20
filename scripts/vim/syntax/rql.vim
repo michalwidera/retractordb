@@ -9,7 +9,7 @@ endif
 syn case ignore
 
 " basic
-syn keyword rqlKey	declare file select stream from
+syn keyword rqlKey declare file select stream from
 
 " comment
 syn match  rqlComment       "^#.*$"
@@ -37,4 +37,3 @@ hi def link rqlComment      Comment
 hi def link rqlType         Type
 
 let b:current_syntax = "rql"
-

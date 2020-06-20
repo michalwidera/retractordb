@@ -11,7 +11,7 @@
 #include "RandomFile.h"                              // for CRandomFile, string
 
 using namespace boost ;
-#define LOCKBYMUTEX recursive_mutex::scoped_lock scoped_lock_instance(lock_)
+#define LOCKBYMUTEX boost::recursive_mutex::scoped_lock scoped_lock_instance(lock_)
 
 const int max_packet_size = 1024 ;
 

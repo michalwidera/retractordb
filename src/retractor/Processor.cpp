@@ -153,7 +153,7 @@ vector<number> Processor::getRow(string streamName, int timeOffset) {
     int column = 0 ;
 
     for (auto f : getQuery(streamName).lSchema) {
-        retVal.push_back(getValue(streamName, timeOffset, column++));
+        retVal.push_back(getValueProc(streamName, timeOffset, column++));
     }
 
     return retVal ;
@@ -187,7 +187,7 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
     return retVal ;
 }
 
-number Processor::getValue(string streamName, int timeOffset, int schemaOffset) {
+number Processor::getValueProc(string streamName, int timeOffset, int schemaOffset) {
     number retval ;
     query &q(getQuery(streamName)) ;
     assert(timeOffset >= 0);
@@ -307,7 +307,7 @@ void Processor::updateContext(set < string > inSet) {
 
                         if (isExist(schema)) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                            rowValues.push_back(getValue(schema, 0, pos));
+                            rowValues.push_back(getValueProc(schema, 0, pos));
                         } else {
                             rowValues.push_back(computeValue(f, q));
                         }
@@ -326,7 +326,7 @@ void Processor::updateContext(set < string > inSet) {
                         for (auto f : getQuery(streamNameArg).lSchema) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
                             string schema = f.getFirstFieldToken().getValue() ;
-                            ret = ret + boost::get< boost::rational<int>> (getValue(schema, 0, pos));
+                            ret = ret + boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                         }
 
                         ret = ret / static_cast<int>(q.lSchema.size())  ;
@@ -346,7 +346,7 @@ void Processor::updateContext(set < string > inSet) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
                             string schema = f.getFirstFieldToken().getValue() ;
                             boost::rational <int> val =
-                                boost::get< boost::rational<int>> (getValue(schema, 0, pos));
+                                boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
 
                             if (val > ret) {
                                 ret = val ;
@@ -369,7 +369,7 @@ void Processor::updateContext(set < string > inSet) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
                             string schema = f.getFirstFieldToken().getValue() ;
                             boost::rational <int> val =
-                                boost::get< boost::rational<int>> (getValue(schema, 0, pos));
+                                boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
 
                             if (val < ret) {
                                 ret = val ;
@@ -392,7 +392,7 @@ void Processor::updateContext(set < string > inSet) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
                             string schema = f.getFirstFieldToken().getValue() ;
                             boost::rational <int> val =
-                                boost::get< boost::rational<int>> (getValue(schema, 0, pos));
+                                boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                             ret += val ;
                         }
 
@@ -435,20 +435,22 @@ void Processor::updateContext(set < string > inSet) {
                         // gStreamSize[q.id] == -1 for zero elements (therefore + 1)
 
                         if (operation.getTokenCommand() == STREAM_DEHASH_DIV) {
+
                             TimeOffset = Div(rationalArgument, q.rInterval, position);
                         }
 
                         if (operation.getTokenCommand() == STREAM_DEHASH_MOD) {
+
                             TimeOffset = Mod(rationalArgument, q.rInterval, position);
                         }
 
                         if (TimeOffset < 0) {
+
                             cerr << "@:" << boost::stacktrace::stacktrace() << endl ;
-                            //req. higher boost version
+                            // NOTE: req. higher boost version
                             assert(false);
                         }
 
-                        assert(TimeOffset >= 0);
                         rowValues = getRow(streamNameArg, TimeOffset);
                     }
                     break ;
@@ -493,7 +495,7 @@ void Processor::updateContext(set < string > inSet) {
 
                         if (mirror) {
                             for (int i = windowSize - 1 ; i >= 0  ; i --) {
-                                number ret = getValue(nameSrc, 0, i) ;
+                                number ret = getValueProc(nameSrc, 0, i) ;
                                 rowValues.push_back(ret);
                             }
                         } else {
@@ -504,7 +506,7 @@ void Processor::updateContext(set < string > inSet) {
                                 ) ;
 
                             for (int i = 0 ; i < windowSize ; i ++) {
-                                number ret = getValue(nameSrc, 0, i + d) ;
+                                number ret = getValueProc(nameSrc, 0, i + d) ;
                                 rowValues.push_back(ret);
                             }
                         }
@@ -563,11 +565,11 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 
     switch (cmd) {
         case PUSH_STREAM:
-            return getValue(arg[0].getValue(), timeOffset, offset);
+            return getValueProc(arg[0].getValue(), timeOffset, offset);
 
         case STREAM_TIMEMOVE:
             /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-            return getValue(arg[0].getValue(), timeOffset + rational_cast<int> (arg[1].getCRValue()), offset);
+            return getValueProc(arg[0].getValue(), timeOffset + rational_cast<int> (arg[1].getCRValue()), offset);
 
         case STREAM_DEHASH_MOD:
         case STREAM_DEHASH_DIV:
@@ -576,14 +578,14 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 
         case STREAM_SUBSTRACT:
             //TODO: Check
-            return getValue(arg[0].getValue(), timeOffset, offset);
+            return getValueProc(arg[0].getValue(), timeOffset, offset);
 
         case STREAM_AVG:
         case STREAM_MIN:
         case STREAM_MAX:
         case STREAM_SUM:
             assert(offset == 1);
-            return getValue(arg[0].getValue(), timeOffset, offset);
+            return getValueProc(arg[0].getValue(), timeOffset, offset);
 
         case STREAM_ADD:
             /* signalRow+source : PUSH_STREAM(signalRow), PUSH_STREAM(source), STREAM_ADD(0) */
@@ -591,9 +593,9 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
                 const auto sizeOfFirstSchema = getQuery(arg[0].getValue()).lSchema.size();
 
                 if (offset < sizeOfFirstSchema) {
-                    return getValue(arg[0].getValue(), timeOffset, offset);
+                    return getValueProc(arg[0].getValue(), timeOffset, offset);
                 } else {
-                    return getValue(arg[1].getValue(), timeOffset, offset - sizeOfFirstSchema);
+                    return getValueProc(arg[1].getValue(), timeOffset, offset - sizeOfFirstSchema);
                 }
             }
 
@@ -611,9 +613,9 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
                         getQuery(arg[1].getValue()).rInterval,
                         timeSeqence,
                         TimeOffset)) {
-                    return getValue(arg[1].getValue(), TimeOffset, offset);
+                    return getValueProc(arg[1].getValue(), TimeOffset, offset);
                 } else {
-                    return getValue(arg[0].getValue(), TimeOffset, offset);
+                    return getValueProc(arg[0].getValue(), TimeOffset, offset);
                 }
             }
 
@@ -892,69 +894,13 @@ boost::rational<int> Processor::computeValue(
                     // If operation ADD exist - then position schema will be moved
                     // first argument
                     int offsetFromArg = getArgumentOffset(outSchema, argument);
-                    number a = getValue(outSchema, 0, offsetInSchema + offsetFromArg);
+                    number a = getValueProc(outSchema, 0, offsetInSchema + offsetFromArg);
                     rStack.push(boost::get< boost::rational<int>> (a));
                 }
                 break ;
 
             default:
                 throw std::out_of_range("Thrown/Processor.cpp/getCRValue Unknown token");
-            case VOID_COMMAND:
-                break;
-            case VOID_VALUE:
-                break;
-            case PUSH_TSCAN:
-                break;
-            case TYPE:
-                break;
-            case AND:
-                break;
-            case OR:
-                break;
-            case NOT:
-                break;
-            case CMP_EQUAL:
-                break;
-            case CMP_LT:
-                break;
-            case CMP_GT:
-                break;
-            case CMP_LE:
-                break;
-            case CMP_GE:
-                break;
-            case CMP_NOT_EQUAL:
-                break;
-            case STREAM_AVG:
-                break;
-            case STREAM_MIN:
-                break;
-            case STREAM_MAX:
-                break;
-            case STREAM_SUM:
-                break;
-            case AGSE:
-                break;
-            case PUSH_STREAM:
-                break;
-            case STREAM_HASH:
-                break;
-            case STREAM_DEHASH_DIV:
-                break;
-            case STREAM_DEHASH_MOD:
-                break;
-            case STREAM_ADD:
-                break;
-            case STREAM_SUBSTRACT:
-                break;
-            case STREAM_TIMEMOVE:
-                break;
-            case STREAM_AGSE:
-                break;
-            case COUNT:
-                break;
-            case COUNT_RANGE:
-                break;
         }
     }
 

@@ -3,6 +3,7 @@
 #include "dbstream.h"
 #include "inputFileInstance.h"
 #include <memory>
+#include <map>
 
 /** Query processor */
 class Processor : private boost::noncopyable {
@@ -33,7 +34,7 @@ class Processor : private boost::noncopyable {
     map< string, int > gContextLenMap ;
 
     /** Context functions */
-    number getValue(string streamName, int timeOffset, int schemaOffset) ;
+    number getValueProc(string streamName, int timeOffset, int schemaOffset) ;
 
     /** Context functions */
     vector<number> getRow(string streamName, int timeOffset) ;
