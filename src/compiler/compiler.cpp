@@ -103,7 +103,7 @@ string intervalCounter() {
                         }
 
                         if (delta1 > delta) {
-                            throw std::out_of_range("Nie mozna zrobić szybszego div z wolniejszego zrodla");
+                            throw std::out_of_range("You cannot make faster div from slower source");
                         }
                     }
                     break ;
@@ -121,7 +121,7 @@ string intervalCounter() {
                         }
 
                         if (delta1 > delta) {
-                            throw std::out_of_range("Nie mozna zrobić szybszego mod z wolniejszego zrodla");
+                            throw std::out_of_range("You cannot make faster mod from slower source");
                         }
                     }
                     break ;
