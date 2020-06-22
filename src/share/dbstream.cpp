@@ -7,7 +7,7 @@
 #include "Buffer.h"            // for CBuffer, BF
 
 // stacktrace -> -ldl in CMakeList.txt
-//#include <boost/stacktrace.hpp>
+#include <boost/stacktrace.hpp>
 
 CBuffer<std::string> cbuf ;
 
@@ -66,29 +66,34 @@ number dbStream::readCache(const int &_Keyval) {
     return mpRead[ _Keyval ] ;
 }
 
-bool dbStream::get(int offset) {
+void dbStream::get(int offset) {
     if (offset < 0) {
-        //std::cerr << boost::stacktrace::stacktrace() ;
+        std::cerr << boost::stacktrace::stacktrace();
         assert(false);
+        return;
     }
 
     assert(offset >= 0) ;
     int len = cbuf.GetLen(streamName) ;
 
     if (mpReadNr == offset && mpLenNr == len) {
-        return true ;
+        return;
     }
 
     if (offset >= len || len == 0) {
         for (int i = 0 ; i < schema.size() ; i++) {
             mpRead[ i ] = fake ;
         }
-
-        return false ;
+        cerr << "offset:" << offset << endl ;
+        cerr << "len:" << len << endl ;
+        cerr << "streamName:" << streamName << endl;
+        cerr << boost::stacktrace::stacktrace() ;
+        assert(false);
+        return;
     }
 
     assert(cbuf.GetLen(streamName) != 0);
-    long ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData);
+    long ret = cbuf.GetBlock(streamName, offset , pRawData);
 
     if (ret == 0) {
         cerr << len << "," << offset << endl ;
@@ -108,5 +113,5 @@ bool dbStream::get(int offset) {
     assert(mpShadow.size() != 0);
     mpReadNr = offset ; /* position */
     mpLenNr  = len ;
-    return true ;
+    return;
 }

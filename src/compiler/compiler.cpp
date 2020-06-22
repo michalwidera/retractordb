@@ -127,7 +127,7 @@ string intervalCounter() {
                             //   D_b = --------------
                             //         abs(D_c - D_a)
 
-                            delta = deltaDivMod(delta1, delta2) ;
+                            delta = deltaDivMod(delta2, delta1) ;
                         }
 
                         if (delta1 > delta) {
