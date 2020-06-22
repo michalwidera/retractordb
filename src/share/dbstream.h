@@ -36,7 +36,7 @@ class dbStream : private boost::noncopyable {
     number &operator[](const int &_Keyval);
     number readCache(const int &_Keyval);
     void store();
-    void get(int offset = 0); /**< Get data from archive */
+    void get(int offset = 0, bool reverse = false); /**< Get data from archive */
 };
 
 void saveStreamsToFile(std::string filename);
