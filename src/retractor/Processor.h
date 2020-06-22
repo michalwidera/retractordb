@@ -34,10 +34,10 @@ class Processor : private boost::noncopyable {
     map< string, int > gContextLenMap ;
 
     /** Context functions */
-    number getValueProc(string streamName, int timeOffset, int schemaOffset) ;
+    number getValueProc(string streamName, int timeOffset, int schemaOffset, bool reverse=false) ;
 
     /** Context functions */
-    vector<number> getRow(string streamName, int timeOffset) ;
+    vector<number> getRow(string streamName, int timeOffset, bool reverse=false) ;
 
     /** Function will return offsets according to stack operations
      *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)

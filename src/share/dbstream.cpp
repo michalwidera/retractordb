@@ -66,7 +66,7 @@ number dbStream::readCache(const int &_Keyval) {
     return mpRead[ _Keyval ] ;
 }
 
-void dbStream::get(int offset) {
+void dbStream::get(int offset, bool reverse) {
     if (offset < 0) {
         std::cerr << boost::stacktrace::stacktrace();
         assert(false);
@@ -92,7 +92,13 @@ void dbStream::get(int offset) {
     }
 
     assert(cbuf.GetLen(streamName) != 0);
-    long ret = cbuf.GetBlock(streamName, offset , pRawData);
+    long ret;
+    if ( reverse ) {
+        ret = cbuf.GetBlock(streamName, offset, pRawData);
+    } else {
+        ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData);
+    }
+
 
     if (ret == 0) {
         cerr << len << "," << offset << endl ;

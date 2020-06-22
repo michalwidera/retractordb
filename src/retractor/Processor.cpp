@@ -136,7 +136,7 @@ string Processor::printRowValue(const string query_name) {
     return strstream.str();
 }
 
-vector<number> Processor::getRow(string streamName, int timeOffset) {
+vector<number> Processor::getRow(string streamName, int timeOffset, bool reverse) {
     vector<number> retVal ;
     /*
         if ( timeOffset == 0  && gContextLenMap[streamName] != gStreamSize[streamName]) {
@@ -153,7 +153,7 @@ vector<number> Processor::getRow(string streamName, int timeOffset) {
     int column = 0 ;
 
     for (auto f : getQuery(streamName).lSchema) {
-        retVal.push_back(getValueProc(streamName, timeOffset, column++));
+        retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
     }
 
     return retVal ;
@@ -187,7 +187,7 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
     return retVal ;
 }
 
-number Processor::getValueProc(string streamName, int timeOffset, int schemaOffset) {
+number Processor::getValueProc(string streamName, int timeOffset, int schemaOffset, bool reverse) {
     number retval ;
     query &q(getQuery(streamName)) ;
     assert(timeOffset >= 0);
@@ -201,7 +201,7 @@ number Processor::getValueProc(string streamName, int timeOffset, int schemaOffs
         retval = gContextValMap[streamName][schemaOffset] ;
     } else {
         dbStream &archive = * (storage[ streamName ]) ;
-        archive.get(timeOffset - 1);
+        archive.get(timeOffset - 1, reverse);
         retval = archive.readCache(schemaOffset) ;
     }
 
@@ -451,7 +451,7 @@ void Processor::updateContext(set < string > inSet) {
                             assert(false);
                         }
 
-                        rowValues = getRow(streamNameArg, TimeOffset);
+                        rowValues = getRow(streamNameArg, TimeOffset, true);
                     }
                     break ;
 
