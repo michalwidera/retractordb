@@ -436,7 +436,7 @@ void Processor::updateContext(set < string > inSet) {
 
                         if (operation.getTokenCommand() == STREAM_DEHASH_DIV) {
 
-                            TimeOffset = Div(rationalArgument, q.rInterval, position);
+                            TimeOffset = Div(q.rInterval, rationalArgument, position);
                         }
 
                         if (operation.getTokenCommand() == STREAM_DEHASH_MOD) {

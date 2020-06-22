@@ -1,0 +1,9 @@
+# Deklaracja strumienia danych wejsciowych
+declare a INTEGER stream danewejsciowe,1/4 file dane2.dat
+
+# Zapytania przetwarzajace dane
+select * stream samepomiary from danewejsciowe&1
+select * stream samecrc from danewejsciowe%1/3
+
+select * stream danedocrc from samepomiary@(3,-3)
+select crc(16,33796) stream danecrc from danedocrc
