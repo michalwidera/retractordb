@@ -9,4 +9,4 @@ select * stream samecrc from danewejsciowe%1/3
 select * stream danedocrc from samepomiary@(3,3)
 select crc(16,33796) stream danecrc from danedocrc
 select * stream d0 from danecrc+samecrc
-#select * stream d1 from danewejsciowe+danewe
+

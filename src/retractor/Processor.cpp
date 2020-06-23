@@ -305,7 +305,7 @@ void Processor::updateContext(set < string > inSet) {
 
                         if (isExist(schema)) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                            rowValues.push_back(getValueProc(schema, 0, pos));
+                            rowValues.push_back(getValueProc(schema, 1, pos));
                         } else {
                             rowValues.push_back(computeValue(f, q));
                         }
