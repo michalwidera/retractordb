@@ -15,6 +15,8 @@
 
 #include <memory>
 
+#include <boost/stacktrace.hpp>
+
 #include "../share/QStruct.h"
 
 #include "compiler.hpp"
@@ -138,6 +140,7 @@ int main(int argc, char* argv[]) {
         }
     } catch (std::exception &e) {
         cerr << e.what() << "\n";
+        //cerr << boost::stacktrace::stacktrace() << endl ;
         return system::errc::interrupted;
     }
 

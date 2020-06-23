@@ -84,7 +84,7 @@ void dbStream::get(int offset, bool reverse) {
         for (int i = 0 ; i < schema.size() ; i++) {
             mpRead[ i ] = fake ;
         }
-        cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
+//        cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
 //        TODO: There is problem. Need to investigate.
 //        cerr << boost::stacktrace::stacktrace() ;
 //        assert(false);

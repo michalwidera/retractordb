@@ -179,6 +179,7 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
                 cerr << "argument:" << streamArgument << endl ;
                 cerr << "1st: " << A.getValue() << endl ;
                 cerr << "2nd: " << B.getValue() << endl ;
+                cerr << "@:" << boost::stacktrace::stacktrace() << endl ;
                 throw  std::out_of_range("Call to schema that not exist");
             }
         }
@@ -298,9 +299,6 @@ void Processor::updateContext(set < string > inSet) {
                     argument1 = * (it++);
                     argument2 = * (it++);
                     assert(streamNameArg == "");
-                    // Checking if ontex have same schema
-                    assert(gContextValMap[ argument1.getValue()].size() == getQuery(argument1.getValue()).lSchema.size()) ;
-                    assert(gContextValMap[ argument2.getValue()].size() == getQuery(argument2.getValue()).lSchema.size()) ;
 
                     for (auto f : q.lSchema) {
                         string schema = f.getFirstFieldToken().getValue() ;

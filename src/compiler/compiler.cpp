@@ -399,13 +399,27 @@ list < field > combine(string sName1, string sName2, token cmd_token) {
     } else if (cmd == STREAM_DEHASH_MOD) {
         lRetVal = getQuery(sName1).lSchema ;
     } else if (cmd == STREAM_ADD) {
+
+        int i = 0;
+
         for (auto f : getQuery(sName1).lSchema) {
-            lRetVal.push_back(f);
+            field intf;
+            intf.setFieldName.insert("Field_" + boost::lexical_cast<std::string> (fieldCount++));
+            intf.lProgram.push_front(token(PUSH_ID, boost::rational<int> (i++), sName1));
+            lRetVal.push_back(intf);
         }
 
+        i = 0;
+
         for (auto f : getQuery(sName2).lSchema) {
-            lRetVal.push_back(f);
+            field intf ;
+            intf.setFieldName.insert("Field_" + boost::lexical_cast<std::string> (fieldCount++));
+            intf.lProgram.push_front(token(PUSH_ID, boost::rational<int> (i++), sName2));
+            lRetVal.push_back(intf);
         }
+
+        return lRetVal ;
+
     } else if (cmd == STREAM_SUBSTRACT) {
         lRetVal = getQuery(sName1).lSchema ;
     } else if (cmd == STREAM_TIMEMOVE) {
@@ -468,38 +482,30 @@ list < field > combine(string sName1, string sName2, token cmd_token) {
     //Here are added to fields execution methods
     //by reference to schema position
 
-    if (cmd != STREAM_ADD) {
-        int offset(0) ;
+    int offset(0) ;
 
-        for (auto &f : lRetVal) {
-            stringstream s ;
+    for (auto &f : lRetVal) {
+        stringstream s ;
 
-            if (cmd == STREAM_HASH) {
-                s << sName1 ;
-            } else if (cmd == STREAM_TIMEMOVE) {
-                s << sName1 ;
-            } else if (cmd == STREAM_AGSE) {
-                s << sName1 ;
-            } else {
-                s << sName1 ; //generateStreamName( sName2, sName1, cmd ) ;
-            }
-
-            s << "[" ;
-            s << offset ++ ;
-            s << "]" ;
-
-            if (f.lProgram.size() > 0) {
-                f.lProgram.pop_front();
-            }
-
-            f.lProgram.push_front(token(PUSH_ID2, s.str()));
+        if (cmd == STREAM_HASH) {
+            s << sName1 ;
+        } else if (cmd == STREAM_TIMEMOVE) {
+            s << sName1 ;
+        } else if (cmd == STREAM_AGSE) {
+            s << sName1 ;
+        } else {
+            s << sName1 ; //generateStreamName( sName2, sName1, cmd ) ;
         }
-    } else {
-        for (auto &f : lRetVal) {
-            stringstream s ;
-            s << f.getFirstFieldName() ;
-            f.lProgram.push_front(token(PUSH_ID3, s.str()));
+
+        s << "[" ;
+        s << offset ++ ;
+        s << "]" ;
+
+        if (f.lProgram.size() > 0) {
+            f.lProgram.pop_front();
         }
+
+        f.lProgram.push_front(token(PUSH_ID2, s.str()));
     }
 
     return lRetVal ;
@@ -790,7 +796,7 @@ string convertReferences() {
                             }
 
                             if (bFieldFound == false) {
-                                throw std::logic_error("No field of given name in stream schema");
+                                throw std::logic_error("No field of given name in stream schema ID3");
                             }
                         } else {
                             throw std::out_of_range("No mach on type conversion ID3");
