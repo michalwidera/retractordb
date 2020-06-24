@@ -35,6 +35,7 @@ int main(int argc, char* argv[]) {
     desc.add_options()
 	("help,h", "show options")
 	("addcrc,c", po::value<unsigned int> (&packSize), "count crc after this")
+	("addsum,u", po::value<unsigned int> (&packSize), "count simple sum after this")
 	("datacount,d" , po::value<unsigned int> (&packCount), "count of genrated packs")
 	("outfile,f", po::value<string> (&sOutputFile), "outputfilename, default:file.binary")
 	("inputfile,k", po::value<string> (&sInpuFile), "get data from inputfile instead of algo" )
@@ -84,10 +85,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	int crcqCnt=0; //Count of crc that landend in output file
+	int sumqCnt=0; //Count of crc that landend in output file
 	int cnt=0; //Count of data read from remote file
 	for(auto j = 0; j < packCount; j++) {
 
 		vector<unsigned int> crcq;
+		unsigned int sumq = 0;
 
 		for(auto i = 0; i < packSize; ++i) {
 
@@ -102,6 +105,8 @@ int main(int argc, char* argv[]) {
 			data.push_back(val);
 			if (vm.count("addcrc")) { crcq.push_back(val); }
 			if (vm.count("print")) { cout << val << " "; }
+
+			if (vm.count("addsum")) { sumq+=val; }
 		}
 		
 		if (vm.count("addcrc")) {
@@ -111,6 +116,11 @@ int main(int argc, char* argv[]) {
 			if (vm.count("print")) { cout << crcfn.checksum() << endl ; }
 			data.push_back(crcfn.checksum());
 			crcqCnt++;
+		}
+
+		if (vm.count("addsum")) {
+			if (vm.count("print")) { cout << sumq << endl ; }
+			data.push_back(sumq);
 		}
 	}
 

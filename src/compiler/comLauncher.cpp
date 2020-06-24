@@ -119,6 +119,7 @@ int main(int argc, char* argv[]) {
         }
 
         response = prepareFields();
+        assert( response == "OK");
 
         if (vm.count("dumpcross")) {
             string sOutFileLog3   = vm["outfile"].as< string >() + ".lg3" ;
@@ -126,8 +127,11 @@ int main(int argc, char* argv[]) {
         }
 
         response = intervalCounter() ;
+        assert( response == "OK");
         response = convertReferences();
+        assert( response == "OK");
         response = replicateIDX();
+        assert( response == "OK");
         int dAfterCompilingSize((int) coreInstance.size());
         dumpInstance(sOutFile);
         int dSize(dAfterCompilingSize - dAfterParserSize) ;

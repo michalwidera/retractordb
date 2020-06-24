@@ -144,6 +144,11 @@ bool isThere(vector < query > v, string query_name) {
 
 
 //https://en.wikipedia.org/wiki/Topological_sorting
+//
+//NOTE: Technical debt!! - if in compiled query set
+//there is missing declaration of one stream this tsort
+//function will go into infinite loop
+//This is bug that need to be resolved
 void qTree::tsort() {
     vector < query > v = *this ;
     vector < query > des ;

@@ -747,6 +747,18 @@ boost::rational<int> Processor::computeValue(
                         a = rStack.top();
                         rStack.pop();
                         rStack.push(boost::rational<int>(Rationalize(sqrt(real))));
+                    } else if (tk.getValue() == "sum") {
+
+                        int data_sum;
+                        for (int i = 0; i < getSizeOfRollup(q); i++) {
+
+                            boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
+                            data_sum += rational_cast<int>(val);
+                        }
+
+                        boost::rational<int> val(data_sum);
+                        rStack.push(val);
+
                     } else if (tk.getValue() == "crc") {
 
                         union Converter
