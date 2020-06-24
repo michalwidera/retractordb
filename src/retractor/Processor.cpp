@@ -749,7 +749,7 @@ boost::rational<int> Processor::computeValue(
                         rStack.push(boost::rational<int>(Rationalize(sqrt(real))));
                     } else if (tk.getValue() == "sum") {
 
-                        int data_sum;
+                        int data_sum(0);
                         for (int i = 0; i < getSizeOfRollup(q); i++) {
 
                             boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
