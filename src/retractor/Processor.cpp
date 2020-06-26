@@ -70,14 +70,8 @@ void Processor::processRows(set < string > inSet) {
 
         if (q.isDeclaration()) {
 
-            if (q.filename.empty()) {
-
-                assert(false);
-                continue ;    //There are going randoms and no need to acces file
-            } else {
-
-                gFileMap[ q.id ].processRow() ;    // Fetch next row form file that have schema
-            }
+            assert(!q.filename.empty());
+            gFileMap[ q.id ].processRow() ;    // Fetch next row form file that have schema
         }
 
         // here should be computer values of stream tuples
@@ -87,15 +81,14 @@ void Processor::processRows(set < string > inSet) {
 
         for (auto &f : q.lSchema) {
 
-            boost::rational<int> value(computeValue(f, q)) ;
-            (*storage[q.id])[cnt++] = value ;
+            boost::rational<int> value(computeValue(f, q));
+            (*storage[q.id])[cnt++] = value;
             rowValue.push_back(value);
-
         }
 
         gContextValMap[q.id] = rowValue;
         // Store computed values to cbuffer - on disk
-        storage[ q.id ]->store() ;
+        storage[ q.id ]->store();
     }
 }
 
@@ -132,9 +125,9 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
         if (t.getTokenCommand() == STREAM_ADD) {
 
             auto it = q.lProgram.begin() ;
-            token A = * it ;
+            token A = * it;
             it ++ ;
-            token B = * it ;
+            token B = * it;
 
             if (A.getValue() == streamArgument) {
 
@@ -196,7 +189,7 @@ void Processor::updateContext(set < string > inSet) {
         // If given stream is aledy synchronized with context
         // there is no sens to make computed twice
         if (gContextLenMap[ q.id ] == gStreamSize[ q.id ])
-            continue ;
+            continue;
 
         vector<number> rowValues;
 
@@ -204,17 +197,12 @@ void Processor::updateContext(set < string > inSet) {
 
             // If argument is declared -
             // we read source and store in context
-            if (q.filename != "") {
 
-                for (auto f : q.lSchema)
-                    rowValues.push_back(gFileMap[ q.id ].getCR(f));
+            assert( q.filename != "");
 
-            } else {
+            for (auto f : q.lSchema)
+                rowValues.push_back(gFileMap[ q.id ].getCR(f));
 
-                for (auto f : q.lSchema)
-                    rowValues.push_back(boost::rational<int> (rand() % 10, 1 + rand() % 9)) ;
-
-            }
         } else {
 
             // execution of stream program and store data
@@ -234,10 +222,13 @@ void Processor::updateContext(set < string > inSet) {
 
                     // PUSH_STREAM core0
                     // push stream operation does not have additonal stack arguments
+
                     streamNameArg = operation.getValue();
+
                     // check if context have same lengt like field
+
                     assert(gContextValMap[streamNameArg].size() == getQuery(streamNameArg).lSchema.size());
-                    rowValues = gContextValMap[streamNameArg] ;
+                    rowValues = gContextValMap[streamNameArg];
                     break;
 
                 case STREAM_HASH :
@@ -245,9 +236,12 @@ void Processor::updateContext(set < string > inSet) {
                     // PUSH_STREAM core0
                     // PUSH_STREAM core1
                     // STREAM_HASH
+
                     assert(q.lProgram.size() == 3) ;
+
                     // hash operations have two additional arguments of stack
                     // these argument are stream names to HASH operation
+
                     argument1 = * (it++);
                     argument2 = * (it++);
 
@@ -263,12 +257,12 @@ void Processor::updateContext(set < string > inSet) {
                         streamNameArg = argument1.getValue();
                     }
 
-                    TimeOffset = TimeOffset - gStreamSize[ streamNameArg ];
+                    TimeOffset = TimeOffset - gStreamSize[streamNameArg];
                     assert(TimeOffset >= 0);
-                    //
+
                     // If this assert fails - you are probably trying to hash a#b when a and b has different schema sizes.
                     // This should be identified on compilation phase in future.
-                    //
+
                     assert(gContextValMap[streamNameArg].size() == getQuery(argument1.getValue()).lSchema.size()) ;
                     assert(gContextValMap[streamNameArg].size() == getQuery(argument2.getValue()).lSchema.size()) ;
                     rowValues = getRow(streamNameArg, TimeOffset) ;
@@ -279,6 +273,7 @@ void Processor::updateContext(set < string > inSet) {
                     // PUSH_STREAM core0
                     // PUSH_STREAM core1
                     // STREAM_ADD
+
                     assert(q.lProgram.size() == 3) ;
                     argument1 = * (it++);
                     argument2 = * (it++);
@@ -309,12 +304,12 @@ void Processor::updateContext(set < string > inSet) {
                         boost::rational <int> ret = 0 ;
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
-                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
-                            string schema = f.getFirstFieldToken().getValue() ;
+                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
+                            string schema = f.getFirstFieldToken().getValue();
                             ret = ret + boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                         }
 
-                        ret = ret / static_cast<int>(q.lSchema.size())  ;
+                        ret = ret / static_cast<int>(q.lSchema.size());
                         rowValues.push_back(ret);
                     }
                     break ;
@@ -329,8 +324,8 @@ void Processor::updateContext(set < string > inSet) {
                         boost::rational <int> ret = INT_MIN ; /* limits.h */
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
-                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
-                            string schema = f.getFirstFieldToken().getValue() ;
+                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
+                            string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
                                 boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
 
@@ -354,13 +349,13 @@ void Processor::updateContext(set < string > inSet) {
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
     
-                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
-                            string schema = f.getFirstFieldToken().getValue() ;
+                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
+                            string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
                                 boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
 
                             if (val < ret)
-                                ret = val ;
+                                ret = val;
 
                         }
 
@@ -379,11 +374,11 @@ void Processor::updateContext(set < string > inSet) {
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
 
-                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue()) ;
-                            string schema = f.getFirstFieldToken().getValue() ;
+                            int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
+                            string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
                                 boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
-                            ret += val ;
+                            ret += val;
                         }
 
                         rowValues.push_back(ret);
@@ -394,14 +389,15 @@ void Processor::updateContext(set < string > inSet) {
 
                     // PUSH_STREAM core1
                     // STREAM_TIMEMOVE 10
-                    assert(q.lProgram.size() == 2) ;
+
+                    assert(q.lProgram.size() == 2);
                     argument1 = * (it++);
                     streamNameArg = argument1.getValue();
                     assert(streamNameArg != "");
                     TimeOffset = rational_cast<int> (operation.getCRValue());
                     assert(TimeOffset >= 0);
                     rowValues = getRow(streamNameArg, TimeOffset);
-                    break ;
+                    break;
 
                 case STREAM_DEHASH_DIV :
                 case STREAM_DEHASH_MOD:
@@ -409,6 +405,7 @@ void Processor::updateContext(set < string > inSet) {
                     // PUSH_STREAM core0
                     // PUSH_STREAM 2/3
                     // STREAM_DEHASH_DIV
+
                     {
                         assert(q.lProgram.size() == 3) ;
                         boost::rational<int> rationalArgument;
@@ -416,13 +413,13 @@ void Processor::updateContext(set < string > inSet) {
                         argument2 = * (it++);
                         streamNameArg = argument1.getValue();
                         assert(streamNameArg != "");
-                        rationalArgument = argument2.getCRValue() ;
+                        rationalArgument = argument2.getCRValue();
                         assert(rationalArgument > 0);
                         // q.id - name of output stream
                         // gStreamSize[q.id] - count of record in output stream
                         // q.rInterval - delta of output stream (rational) - contains deltaDivMod( core0.delta , rationalArgument )
                         // rationalArgument - (2/3) argument of operation (rational)
-                        int position = gStreamSize[q.id] + 1 ;
+                        int position = gStreamSize[q.id] + 1;
 
                         // gStreamSize[q.id] == -1 for zero elements (therefore + 1)
 
@@ -444,6 +441,7 @@ void Processor::updateContext(set < string > inSet) {
                     // PUSH_STREAM core -> delta_source (argument1)
                     // PUSH_VAL 2 -> window_length (argument2)
                     // STREAM_AGSE 3 -> window_step (operation)
+
                     {
                         argument1 = * (it++);
                         argument2 = * (it++);
@@ -457,11 +455,11 @@ void Processor::updateContext(set < string > inSet) {
                         assert(step >= 0);
                         int windowSize = abs(rational_cast<int> (operation.getCRValue()));
                         assert(windowSize > 0);
-                        boost::rational<int> factor = windowSize / step  ;
-                        boost::rational<int> deltaSrc = getQuery(nameSrc).rInterval ;
-                        boost::rational<int> deltaOut = getQuery(nameOut).rInterval ;
-                        int schemaSizeSrc =  getQuery(nameSrc).lSchema.size() ;
-                        int schemaSizeOut =  getQuery(nameOut).lSchema.size() ;
+                        boost::rational<int> factor = windowSize / step;
+                        boost::rational<int> deltaSrc = getQuery(nameSrc).rInterval;
+                        boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
+                        int schemaSizeSrc =  getQuery(nameSrc).lSchema.size();
+                        int schemaSizeOut =  getQuery(nameOut).lSchema.size();
                         int streamSizeSrc = gContextLenMap[ nameSrc ];
                         int streamSizeOut = gContextLenMap[ nameOut ];
                         int streamSizeSrc_ = gStreamSize[ nameSrc ];
@@ -479,7 +477,7 @@ void Processor::updateContext(set < string > inSet) {
                         if (mirror) {
 
                             for (int i = windowSize - 1 ; i >= 0  ; i --) {
-                                number ret = getValueProc(nameSrc, 0, i) ;
+                                number ret = getValueProc(nameSrc, 0, i);
                                 rowValues.push_back(ret);
                             }
                         } else {
@@ -492,7 +490,7 @@ void Processor::updateContext(set < string > inSet) {
 
                             for (int i = 0 ; i < windowSize ; i ++) {
 
-                                number ret = getValueProc(nameSrc, 0, i + d) ;
+                                number ret = getValueProc(nameSrc, 0, i + d);
                                 rowValues.push_back(ret);
                             }
                         }
@@ -507,7 +505,8 @@ void Processor::updateContext(set < string > inSet) {
                     // PUSH_STREAM core
                     // STREAM_SUBSTRACT 3_2
                     // This need to be checked - I was tired when I wrote this
-                    assert(q.lProgram.size() == 2) ;
+
+                    assert(q.lProgram.size() == 2);
                     argument1 = * (it++);
                     streamNameArg = argument1.getValue();
                     assert(streamNameArg != "");
@@ -516,11 +515,11 @@ void Processor::updateContext(set < string > inSet) {
 
                         // Check if parameters are in oposite order
                         TimeOffset = Substract(q.rInterval, operation.getCRValue(), gStreamSize[q.id]);
-                        TimeOffset = gContextLenMap[ q.id ] - TimeOffset  ;
+                        TimeOffset = gContextLenMap[ q.id ] - TimeOffset;
                         rowValues = getRow(streamNameArg, TimeOffset);
                     } else {
 
-                        rowValues = gContextValMap[ streamNameArg ] ;
+                        rowValues = gContextValMap[streamNameArg];
                     }
 
                     break ;
@@ -533,26 +532,24 @@ void Processor::updateContext(set < string > inSet) {
 
         // Store to conext computed values
         assert(!rowValues.empty());
-        gContextValMap[ q.id ] = rowValues ;
-        gContextLenMap[ q.id ]++ ;
+        gContextValMap[ q.id ] = rowValues;
+        gContextLenMap[ q.id ]++;
     }
 }
 
 number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 
     token arg[3];
-    const int progSize =  q.lProgram.size() ;
+    const int progSize =  q.lProgram.size();
     assert(progSize < 4);
-    int ret = 0 ;
+    int ret = 0;
     int i = 0;
 
-    for (auto tk : q.lProgram) {
-
-        arg[i++] = tk ;
-    }
+    for (auto tk : q.lProgram) 
+        arg[i++] = tk;
 
     const command_id cmd = arg[progSize - 1].getTokenCommand();
-    int TimeOffset(-1) ;                   // This -1 is intentionally wrong - Hash return value
+    int TimeOffset(-1);                   // This -1 is intentionally wrong - Hash return value
 
     switch (cmd) {
 
@@ -607,7 +604,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         case STREAM_HASH:
             // TODO: Check if right hash part is returned here
             {
-                const auto timeSeqence = (gContextLenMap[q.id] - timeOffset) > 1 ? gContextLenMap[q.id] - timeOffset : 1 ;
+                const auto timeSeqence = (gContextLenMap[q.id] - timeOffset) > 1 ? gContextLenMap[q.id] - timeOffset : 1;
 
                 if (Hash(
                         getQuery(arg[0].getValue()).rInterval,
@@ -631,11 +628,14 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 
 /** This function will give info how long is stream argument if argument will be * instead of argument list */
 int getSizeOfRollup(const query &q) {
+
     token arg[3];
     const int progSize =  q.lProgram.size() ;
     assert(progSize < 4);
     int ret = 0 ;
     int i = 0;
+
+    assert( q.lProgram.size() < 3);
 
     for (auto tk : q.lProgram)
         arg[i++] = tk;
@@ -721,7 +721,6 @@ boost::rational<int> Processor::computeValue(
             case ADD:
 
                 rStack.push(b + a);
-
                 if ( q.id == "out") cerr << b + a << ";" ;
                 break;
 
