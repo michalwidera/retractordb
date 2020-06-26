@@ -26,12 +26,13 @@ extern enum mode {
 } outMode ;
 
 Processor::Processor() {
+
     //This function initialize map creating archive streams in cbuff
     for (auto q : coreInstance) {
 
         if (storage.find(q.id) == storage.end())
             storage[ q.id ] =
-                std::shared_ptr< dbStream > (new dbStream(q.id, q.getFieldNamesList())) ;
+                std::shared_ptr<dbStream>(new dbStream(q.id, q.getFieldNamesList())) ;
         else
             ; //Stream with this name already exist in stystem
 
@@ -56,7 +57,7 @@ Processor::Processor() {
     pProc = this ;
 }
 
-void Processor::processRows(set < string > inSet) {
+void Processor::processRows(set<string> inSet) {
 
     for (auto q : coreInstance) {
 
@@ -76,8 +77,8 @@ void Processor::processRows(set < string > inSet) {
 
         // here should be computer values of stream tuples
         // computed value shoud be stored in file
-        vector <number> rowValue ;
-        int cnt(0) ;
+        vector <number> rowValue;
+        int cnt(0);
 
         for (auto &f : q.lSchema) {
 
@@ -95,18 +96,6 @@ void Processor::processRows(set < string > inSet) {
 vector<number> Processor::getRow(string streamName, int timeOffset, bool reverse) {
 
     vector<number> retVal ;
-    /*
-        if ( timeOffset == 0  && gContextLenMap[streamName] != gStreamSize[streamName]) {
-            retVal = gContextValMap[ streamName ] ;
-        } else {
-            int column = 0;
-            dbStream & archive = * ( storage[ streamName ] ) ;
-            archive.get( timeOffset );
-            for ( auto f : getQuery( streamName ).lSchema ) {
-                retVal.push_back( archive.readCache(column++) ) ;
-            }
-        }
-    */
     int column = 0 ;
 
     for (auto f : getQuery(streamName).lSchema)
