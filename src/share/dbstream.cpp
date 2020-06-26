@@ -24,7 +24,7 @@ void Dump(std::ostream &os) {
     cbuf.Dump(os, NULL);
 }
 
-number fake = boost::rational<int> (99,1);
+number fake = boost::rational<int> (999,1);
 
 dbStream::dbStream(std::string streamName, list < std::string > schema) :
     streamName(streamName),
@@ -84,7 +84,7 @@ void dbStream::get(int offset, bool reverse) {
         for (int i = 0 ; i < schema.size() ; i++) {
             mpRead[ i ] = fake ;
         }
-//        cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
+//      cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
 //        TODO: There is problem. Need to investigate.
 //        cerr << boost::stacktrace::stacktrace() ;
 //        assert(false);
