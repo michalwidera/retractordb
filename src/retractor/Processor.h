@@ -22,16 +22,20 @@ class Processor : private boost::noncopyable {
     );
 
     /** Variable that contains sources of data */
-    map<string, inputDF> gFileMap ;
+    map<string, inputDF> gFileMap;
 
     /** Length of data streams processed by processor */
-    map<string, int> gStreamSize ;
+    map<string, int> gStreamSize;
 
     /** Context variables */
-    map<string, vector<number>> gContextValMap ;  // schema name/record values
+    map<string, vector<number>> gContextValMap;  // schema name/record values
 
-    /** Context variables */
-    map< string, int> gContextLenMap ;
+    /** Context variables
+     *  NOTE: There shoulnd not appear two different stream lengths
+     *  Existence of this should be revisited. Probably need to remove.
+     */
+    map<string, int> gContextLenMap;
+
 
     /** Context functions */
     number getValueProc(string streamName, 

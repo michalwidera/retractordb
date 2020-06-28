@@ -115,7 +115,7 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
 
             auto it = q.lProgram.begin() ;
             token A = * it;
-            it ++ ;
+            it ++;
             token B = * it;
 
             if (A.getValue() == streamArgument) {
@@ -187,7 +187,7 @@ void Processor::updateContext(set < string > inSet) {
             // If argument is declared -
             // we read source and store in context
 
-            assert( q.filename != "");
+            assert(q.filename != "");
 
             for (auto f : q.lSchema)
                 rowValues.push_back(gFileMap[ q.id ].getCR(f));
@@ -197,11 +197,11 @@ void Processor::updateContext(set < string > inSet) {
             // execution of stream program and store data
             assert(q.lProgram.size() < 4);      //we assume that all stream programs are optimized and 1v2v3 size
             assert(q.lProgram.size() > 0);      //we assume that optimized streams are ready and filled
-            list<token>::iterator it = q.lProgram.begin() ;
+            list<token>::iterator it = q.lProgram.begin();
             token operation = q.lProgram.back() ;  // Operation is always last element on stack
             token argument1, argument2;            // This arugments are optionally fullfiled
-            string streamNameArg ;                 // Same as argument
-            int TimeOffset(-1) ;                   // This -1 is intentionally wrong to catch errors
+            string streamNameArg;                 // Same as argument
+            int TimeOffset(-1);                   // This -1 is intentionally wrong to catch errors
             assert(rowValues.empty());
 
             //all stream operations cover
@@ -239,6 +239,7 @@ void Processor::updateContext(set < string > inSet) {
                             getQuery(argument2.getValue()).rInterval,
                             gContextLenMap[q.id],
                             TimeOffset)) {
+
                         streamNameArg = argument2.getValue();
 
                     } else {
@@ -293,6 +294,7 @@ void Processor::updateContext(set < string > inSet) {
                         boost::rational <int> ret = 0 ;
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
+
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
                             string schema = f.getFirstFieldToken().getValue();
                             ret = ret + boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
@@ -313,6 +315,7 @@ void Processor::updateContext(set < string > inSet) {
                         boost::rational <int> ret = INT_MIN ; /* limits.h */
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
+
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
                             string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
@@ -619,12 +622,12 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 int getSizeOfRollup(const query &q) {
 
     token arg[3];
-    const int progSize =  q.lProgram.size() ;
+    const int progSize = q.lProgram.size() ;
     assert(progSize < 4);
     int ret = 0 ;
     int i = 0;
 
-    assert( q.lProgram.size() < 3);
+    assert(q.lProgram.size() < 3);
 
     for (auto tk : q.lProgram)
         arg[i++] = tk;
@@ -656,7 +659,7 @@ int getSizeOfRollup(const query &q) {
             case STREAM_ADD:
 
                 return getQuery(arg[0].getValue()).lSchema.size() +
-                    getQuery(arg[1].getValue()).lSchema.size() ;
+                    getQuery(arg[1].getValue()).lSchema.size();
 
             case STREAM_AVG:
             case STREAM_MIN:
@@ -671,10 +674,8 @@ int getSizeOfRollup(const query &q) {
     return 0; //pro forma
 }
 
-boost::rational<int> Processor::computeValue(
-    field &f,
-    query &q
-) {
+boost::rational<int> Processor::computeValue(field &f, query &q) {
+
     bool resultValid = true ;
     stack < boost::rational<int>> rStack ;
     boost::rational<int> a, b ;
@@ -929,10 +930,14 @@ boost::rational<int> Processor::computeValue(
                     // If operation ADD exist - then position schema will be moved
                     // first argument
 
+                    //int offsetFromArg = getArgumentOffset(q.id, argument);
+
                     int offsetFromArg = getArgumentOffset(q.id, argument);
                     number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
+
+                    //number a = gContextValMap[q.id][offsetInSchema];
+
                     rStack.push(boost::get<boost::rational<int>>(a));
-                    if ( q.id == "out") cerr << a << ";";
                 }
                 break ;
 
@@ -950,7 +955,6 @@ boost::rational<int> Processor::computeValue(
 
     } else if (rStack.size() == 1) {
 
-        if ( q.id == "out") cerr << "=>" << rStack.top() << endl;
         return rStack.top();
 
     } else {
@@ -958,10 +962,10 @@ boost::rational<int> Processor::computeValue(
         throw std::out_of_range("Thrown/Processor.cpp/getCRValue too much token left on stack");
     }
 
-    return boost::rational<int>(0) ;   /* pro forma */
+    return boost::rational<int>(0);   /* pro forma */
 }
 
 int Processor::getStreamCount(const string query_name) {
 
-    return gStreamSize[ query_name ];
+    return gStreamSize[query_name];
 }
