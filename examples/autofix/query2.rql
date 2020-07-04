@@ -1,0 +1,17 @@
+# 1,2,3,4,
+declare a INTEGER stream adata,1/3 file sequence.dat
+# 0,100,200,300
+declare b INTEGER stream bdata,1 file flat.dat
+
+# d0_Delata = 1/4
+# 200,3,4,5,300,6,7,0,400,...
+select * stream d0 from bdata#adata
+
+# d1_Delta = 1/3
+# (4,100)(5,100),(6,100),(7,200),(0,200)...
+select * stream d1 from adata+bdata 
+
+# d3_Delta = 1/3
+# eq. adata 
+select * stream d3 from d0&1
+

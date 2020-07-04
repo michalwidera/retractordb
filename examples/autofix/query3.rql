@@ -1,0 +1,15 @@
+# Deklaracja strumienia danych wejsciowych
+declare b INTEGER stream dane,1/4 file danesum.dat
+
+select * stream dag from dane@(4,-4)
+#select dag[3],dag[2],dag[1],dag[0],dag[0]+dag[1]+dag[2] stream out from dag
+select out1[3],123,out1[0]+out1[1]+out1[2],out1[2] stream out1 from dag
+select dag[3],123,dag[0]+dag[1]+dag[2] stream out2 from dag
+
+# Zapytania przetwarzajace dane
+#select * stream samepomiary from danewe&1
+#select * stream samesumy from danewe%1/3
+
+#select sum() stream wyliczonesumy from danedosum
+#select * stream both from wyliczonesumy+samesumy
+
