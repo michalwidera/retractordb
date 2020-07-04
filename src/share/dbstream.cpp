@@ -24,8 +24,6 @@ void Dump(std::ostream &os) {
     cbuf.Dump(os, NULL);
 }
 
-number fake = boost::rational<int> (999,1);
-
 dbStream::dbStream(std::string streamName, list < std::string > schema) :
     streamName(streamName),
     schema(schema),
@@ -80,9 +78,10 @@ void dbStream::get(int offset, bool reverse) {
         return;
     }
 
-    if (offset >= len || len == 0) {
-        for (int i = 0 ; i < schema.size() ; i++) {
-            mpRead[ i ] = fake ;
+    if (offset > len || len == 0) {
+        const number fake = boost::rational<int> (999,1);
+        for (auto i = 0 ; i < schema.size() ; i++) {
+            mpRead[i] = fake ;
         }
 //      cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
 //        TODO: There is problem. Need to investigate.
@@ -91,17 +90,12 @@ void dbStream::get(int offset, bool reverse) {
         return;
     }
 
-    assert(cbuf.GetLen(streamName) != 0);
+    assert(len != 0);
     long ret;
     if ( reverse ) {
         ret = cbuf.GetBlock(streamName, offset, pRawData);
     } else {
         ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData);
-    }
-
-
-    if (ret == 0) {
-        cerr << len << "," << offset << endl ;
     }
 
     assert(ret != 0);

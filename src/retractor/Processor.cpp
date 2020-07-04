@@ -57,6 +57,70 @@ Processor::Processor() {
     pProc = this ;
 }
 
+/** This function will give info how long is stream argument if argument will be * instead of argument list */
+int getSizeOfRollup(const query &q) {
+
+    token arg[3];
+
+    auto progSize = q.lProgram.size() ;
+
+    assert(progSize < 4);
+
+    auto i = 0;
+    for (auto tk : q.lProgram)
+        arg[i++] = tk;
+
+    if (progSize == 0) {
+
+        return q.lSchema.size();
+    }
+
+    if (progSize == 1)
+        return getQuery(arg[0].getValue()).lSchema.size();
+
+    if (progSize == 2)
+        return getQuery(arg[0].getValue()).lSchema.size();
+
+    const command_id cmd = arg[progSize - 1].getTokenCommand();
+
+    if (progSize == 3) {
+
+        switch (cmd) {
+
+            case STREAM_HASH:
+            case STREAM_DEHASH_MOD:
+            case STREAM_DEHASH_DIV:
+            case STREAM_SUBSTRACT:
+            case STREAM_TIMEMOVE:
+
+                return getQuery(arg[0].getValue()).lSchema.size() ;
+
+            case STREAM_AGSE:
+
+                return abs(rational_cast<int> (arg[2].getCRValue()));
+
+            case STREAM_ADD:
+
+                return getQuery(arg[0].getValue()).lSchema.size() +
+                    getQuery(arg[1].getValue()).lSchema.size();
+
+            case STREAM_AVG:
+            case STREAM_MIN:
+            case STREAM_MAX:
+            case STREAM_SUM:
+
+                return 1 ;
+
+            default:
+
+                assert(false);
+        }
+    }
+
+    assert(false);
+    return 0; //pro forma
+}
+
 void Processor::processRows(set<string> inSet) {
 
     for (auto q : coreInstance) {
@@ -67,7 +131,7 @@ void Processor::processRows(set<string> inSet) {
 
         gStreamSize[ q.id ] ++ ;
 
-        //Declareations need to be supported otherwise
+        //Declarations need to be supported otherwise
 
         if (q.isDeclaration()) {
 
@@ -143,17 +207,17 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
 
 number Processor::getValueProc(string streamName, int timeOffset, int schemaOffset, bool reverse) {
 
-    number retval ;
-    query &q(getQuery(streamName)) ;
+    number retval;
+    query &q(getQuery(streamName));
     assert(timeOffset >= 0);
 
     if (schemaOffset >= q.lSchema.size()) {
 
-        timeOffset += schemaOffset / q.lSchema.size();
+        timeOffset += schemaOffset / getSizeOfRollup(q);
         schemaOffset %= q.lSchema.size();
     }
 
-    if ((timeOffset == 0) && (gContextLenMap[streamName] != gStreamSize[streamName])) {
+    if ((timeOffset == 0) && (gContextLenMap[streamName] > gStreamSize[streamName])) {
 
         retval = gContextValMap[streamName][schemaOffset];
 
@@ -534,9 +598,8 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
     token arg[3];
     const int progSize =  q.lProgram.size();
     assert(progSize < 4);
-    int ret = 0;
-    int i = 0;
 
+    int i = 0;
     for (auto tk : q.lProgram) 
         arg[i++] = tk;
 
@@ -618,62 +681,6 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
     return number(0) ;    /* pro forma */
 }
 
-/** This function will give info how long is stream argument if argument will be * instead of argument list */
-int getSizeOfRollup(const query &q) {
-
-    token arg[3];
-    const int progSize = q.lProgram.size() ;
-    assert(progSize < 4);
-    int ret = 0 ;
-    int i = 0;
-
-    assert(q.lProgram.size() < 3);
-
-    for (auto tk : q.lProgram)
-        arg[i++] = tk;
-
-    if (progSize == 1)
-        return getQuery(arg[0].getValue()).lSchema.size();
-
-    if (progSize == 2)
-        return getQuery(arg[0].getValue()).lSchema.size();
-
-    const command_id cmd = arg[progSize - 1].getTokenCommand();
-
-    if (progSize == 3) {
-
-        switch (cmd) {
-
-            case STREAM_HASH:
-            case STREAM_DEHASH_MOD:
-            case STREAM_DEHASH_DIV:
-            case STREAM_SUBSTRACT:
-            case STREAM_TIMEMOVE:
-
-                return getQuery(arg[0].getValue()).lSchema.size() ;
-
-            case STREAM_AGSE:
-
-                return abs(rational_cast<int> (arg[2].getCRValue()));
-
-            case STREAM_ADD:
-
-                return getQuery(arg[0].getValue()).lSchema.size() +
-                    getQuery(arg[1].getValue()).lSchema.size();
-
-            case STREAM_AVG:
-            case STREAM_MIN:
-            case STREAM_MAX:
-            case STREAM_SUM:
-
-                return 1 ;
-        }
-    }
-
-    assert(false);
-    return 0; //pro forma
-}
-
 boost::rational<int> Processor::computeValue(field &f, query &q) {
 
     bool resultValid = true ;
@@ -711,7 +718,6 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
             case ADD:
 
                 rStack.push(b + a);
-                if ( q.id == "out") cerr << b + a << ";" ;
                 break;
 
             case SUBTRACT:
