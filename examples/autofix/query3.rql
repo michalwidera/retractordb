@@ -2,8 +2,9 @@
 declare b INTEGER stream dane,1/4 file danesum.dat
 
 select * stream dag from dane@(4,-4)
-select dag[3],dag[2],dag[1],dag[0],dag[0]+dag[1]+dag[2] stream out from dag
-select dag[3],dag[0]+dag[1]+dag[2] stream out1 from dag
+#select dag[3],dag[2],dag[1],dag[0],dag[0]+dag[1]+dag[2] stream out from dag
+select out[3],out[0]+out[1]+out[2] stream out1 from dag
+select out[0],out[1],out[2],out[3],out[0]+out[1]+out[2]-out[3] stream out2 from dag
 
 # Zapytania przetwarzajace dane
 #select * stream samepomiary from danewe&1

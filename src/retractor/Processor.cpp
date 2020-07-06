@@ -936,12 +936,10 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
                     // If operation ADD exist - then position schema will be moved
                     // first argument
 
-                    //int offsetFromArg = getArgumentOffset(q.id, argument);
-
                     int offsetFromArg = getArgumentOffset(q.id, argument);
                     number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
 
-                    //number a = gContextValMap[q.id][offsetInSchema];
+                    //cerr << "q.id:" << q.id << "[" << offsetInSchema + offsetFromArg << "]" << "=>" << a << endl ;
 
                     rStack.push(boost::get<boost::rational<int>>(a));
                 }
@@ -954,6 +952,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
 
     if (rStack.size() == 0) {
 
+        assert(q.isDeclaration());
         int fieldPosition =  q.getFieldIndex(f) ;
         assert(fieldPosition != -1);
         number retVal = gContextValMap[ q.id ][ fieldPosition ];
