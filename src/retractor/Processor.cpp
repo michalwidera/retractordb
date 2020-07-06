@@ -211,11 +211,13 @@ number Processor::getValueProc(string streamName, int timeOffset, int schemaOffs
     query &q(getQuery(streamName));
     assert(timeOffset >= 0);
 
-    if (schemaOffset >= q.lSchema.size()) {
+    if (schemaOffset >= getSizeOfRollup(q)) { //q.lSchema.size()) {
 
         timeOffset += schemaOffset / getSizeOfRollup(q);
         schemaOffset %= q.lSchema.size();
     }
+
+
 
     if ((timeOffset == 0) && (gContextLenMap[streamName] > gStreamSize[streamName])) {
 
@@ -683,17 +685,10 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 
 boost::rational<int> Processor::computeValue(field &f, query &q) {
 
-    bool resultValid = true ;
     stack < boost::rational<int>> rStack ;
     boost::rational<int> a, b ;
 
     for (auto tk : f.lProgram) {
-
-        if (! resultValid) {   //Is somewe by walk we hit NULL - getoutofhere! - and be back in a while.
-
-            cerr << "result fail" << endl ;
-            break ;    //Check it - TODO!
-        }
 
         switch (tk.getTokenCommand()) {
 
@@ -736,7 +731,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
                     rStack.push(b / a);
                 } else {
                     rStack.push(0);
-                    resultValid = false;
+                    assert(false);
                 }
 
                 break;
@@ -938,8 +933,6 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
 
                     int offsetFromArg = getArgumentOffset(q.id, argument);
                     number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
-
-                    //cerr << "q.id:" << q.id << "[" << offsetInSchema + offsetFromArg << "]" << "=>" << a << endl ;
 
                     rStack.push(boost::get<boost::rational<int>>(a));
                 }
