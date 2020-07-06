@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
 				val = remote[cnt++];
 			} else {
 				if (rndSize>0) { rndVector = rand()%rndSize; }
-				val = ((rndVector + (j*packSize + i)) * mulSize)%sawSize ; 
+				val = ((rndVector + (j*packSize + i)) * mulSize)%sawSize ;
 			}
 			data.push_back(val);
 			if (vm.count("addcrc")) { crcq.push_back(val); }
@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
 
 			if (vm.count("addsum")) { sumq+=val; }
 		}
-		
+
 		if (vm.count("addcrc")) {
 
 			boost::crc_basic<16> crcfn(crcPoly, 0x0, 0x0, false, false);

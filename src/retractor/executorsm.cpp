@@ -137,7 +137,7 @@ void dumpCore(std::ostream &xout) {
     }
 }
 
-set < string > 
+set < string >
 getAwaitedStreamsSet(TimeLine &tl) {
 
     set < string > retVal ;
@@ -149,7 +149,7 @@ getAwaitedStreamsSet(TimeLine &tl) {
     for (const auto &it : coreInstance) {
         boost::rational<int> slot = it.rInterval ;
 
-        if (! tl.isThisDeltaAwaitCurrentTimeSlot(slot)) 
+        if (! tl.isThisDeltaAwaitCurrentTimeSlot(slot))
             continue ;
 
         retVal.insert(it.id);
@@ -172,10 +172,10 @@ string Processor::printRowValue(const string query_name) {
 
         if (n.type() == typeid(int))
             retVal << boost::rational_cast<int> (boost::get< boost::rational<int>>(n));
-        
+
         if (n.type() == typeid(double))
             retVal << boost::rational_cast<double> (boost::get< boost::rational<int>>(n));
-        
+
         if (n.type() == typeid(boost::rational<int>)) {
 
             if ((boost::get< boost::rational<int>> (n)).denominator() == 1) {

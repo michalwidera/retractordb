@@ -38,7 +38,7 @@ class Processor : private boost::noncopyable {
 
 
     /** Context functions */
-    number getValueProc(string streamName, 
+    number getValueProc(string streamName,
                         int timeOffset,
                         int schemaOffset,
                         bool reverse=false) ;
@@ -75,7 +75,7 @@ class Processor : private boost::noncopyable {
 
     /** This function try to roll up argument and reads data from schema
      * This is not finished - need to be fixed */
-    number getValueOfRollup(const query &q, 
+    number getValueOfRollup(const query &q,
                             int offset,
                             int timeOffset);
 

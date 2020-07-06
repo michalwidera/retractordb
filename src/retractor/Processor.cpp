@@ -25,37 +25,6 @@ extern enum mode {
     INFO
 } outMode ;
 
-Processor::Processor() {
-
-    //This function initialize map creating archive streams in cbuff
-    for (auto q : coreInstance) {
-
-        if (storage.find(q.id) == storage.end())
-            storage[ q.id ] =
-                std::shared_ptr<dbStream>(new dbStream(q.id, q.getFieldNamesList())) ;
-        else
-            ; //Stream with this name already exist in stystem
-
-        //Container initialization for file type data sources
-        if (! q.filename.empty())
-            gFileMap[ q.id ] = inputDF(q.filename.c_str(), q.lSchema);
-    }
-
-    // Initializing fill of context and lenght of data stream
-    for (auto q : coreInstance) {   // For all queries in systes
-
-        vector< number > rowValues ;
-
-        for (auto f : q.lSchema) 
-            rowValues.push_back(boost::rational<int> (0));
-
-        gContextValMap[ q.id ] = rowValues;
-        gContextLenMap[ q.id ] = 0;
-        gStreamSize[q.id] = -1;
-    }
-
-    pProc = this ;
-}
 
 /** This function will give info how long is stream argument if argument will be * instead of argument list */
 int getSizeOfRollup(const query &q) {
@@ -121,6 +90,209 @@ int getSizeOfRollup(const query &q) {
     return 0; //pro forma
 }
 
+
+number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
+
+    token arg[3];
+    const int progSize =  q.lProgram.size();
+    assert(progSize < 4);
+
+    int i = 0;
+    for (auto tk : q.lProgram)
+        arg[i++] = tk;
+
+    const command_id cmd = arg[progSize - 1].getTokenCommand();
+    int TimeOffset(-1);                   // This -1 is intentionally wrong - Hash return value
+
+    switch (cmd) {
+
+        case PUSH_STREAM:
+
+            return getValueProc(arg[0].getValue(), timeOffset, offset);
+
+        case STREAM_TIMEMOVE:
+
+            /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
+            return getValueProc(arg[0].getValue(), timeOffset + rational_cast<int> (arg[1].getCRValue()), offset);
+
+        case STREAM_DEHASH_MOD:
+        case STREAM_DEHASH_DIV:
+
+            /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2), PUSH_DEHASH_DIV(0) */
+
+            //TODO: This is copy&paste&fix - need to refactor
+
+            {
+                assert(q.lProgram.size() == 3) ;
+                auto streamNameArg = arg[0].getValue();
+                assert(streamNameArg != "");
+                auto rationalArgument = arg[1].getCRValue();
+                assert(rationalArgument > 0);
+                // q.id - name of output stream
+                // gStreamSize[q.id] - count of record in output stream
+                // q.rInterval - delta of output stream (rational) - contains deltaDivMod( core0.delta , rationalArgument )
+                // rationalArgument - (2/3) argument of operation (rational)
+
+                int newTimeOffset = -1 ;
+
+                if (cmd == STREAM_DEHASH_DIV)
+                    newTimeOffset = Div(q.rInterval, rationalArgument, timeOffset);
+
+                if (cmd == STREAM_DEHASH_MOD)
+                    newTimeOffset = Mod(rationalArgument, q.rInterval, timeOffset);
+
+                if (newTimeOffset < 0)
+                    assert(false);
+
+                return getValueProc(streamNameArg, newTimeOffset, offset);
+            }
+
+        case STREAM_SUBSTRACT:
+
+            //TODO: Check
+            return getValueProc(arg[0].getValue(), timeOffset, offset);
+
+        case STREAM_AVG:
+        case STREAM_MIN:
+        case STREAM_MAX:
+        case STREAM_SUM:
+
+            assert(offset == 1);
+            return getValueProc(arg[0].getValue(), timeOffset, offset);
+
+        case STREAM_ADD:
+
+            /* signalRow+source : PUSH_STREAM(signalRow), PUSH_STREAM(source), STREAM_ADD(0) */
+            {
+                const auto sizeOfFirstSchema = getQuery(arg[0].getValue()).lSchema.size();
+
+                if (offset < sizeOfFirstSchema) {
+
+                    return getValueProc(arg[0].getValue(), timeOffset, offset);
+                } else {
+
+                    return getValueProc(arg[1].getValue(), timeOffset, offset - sizeOfFirstSchema);
+                }
+            }
+
+        case STREAM_AGSE:
+
+            // PUSH_STREAM core -> delta_source (argument1) arg[0]
+            // PUSH_VAL 2 -> window_length (argument2) arg[1]
+            // STREAM_AGSE 3 -> window_step (operation) arg[2]
+
+            // TODO: This is copy&paste&fix - need to refactor
+
+            // This code I've wrote when when was late - 1.00 AM
+            // need to put more effort to analysis expecially for
+            // if (mirror) - two conditions
+
+            {
+                assert(q.lProgram.size() == 3) ;
+
+                string nameSrc = arg[0].getValue();
+                string nameOut = q.id ;
+                bool mirror = arg[2].getCRValue() < 0 ;
+                // step - means step of how long moving window will over data stream
+                // step is counted in tuples/atribute
+                // windowsSize - is length of moving data window
+                int step  = rational_cast<int> (arg[1].getCRValue());
+                assert(step >= 0);
+                int windowSize = abs(rational_cast<int> (arg[2].getCRValue()));
+                assert(windowSize > 0);
+                boost::rational<int> deltaSrc = getQuery(nameSrc).rInterval;
+                boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
+                int schemaSizeSrc =  getQuery(nameSrc).lSchema.size();
+                int schemaSizeOut =  getQuery(nameOut).lSchema.size();
+                int streamSizeSrc = gContextLenMap[ nameSrc ];
+                int streamSizeOut = gContextLenMap[ nameOut ];
+                int streamSizeSrc_ = gStreamSize[ nameSrc ];
+                int streamSizeOut_ = gStreamSize[ nameOut ];
+
+                if (streamSizeOut_ < 0)
+                    streamSizeOut_ = 0;
+
+                if (streamSizeSrc_ < 0)
+                    streamSizeSrc_ = 0;
+
+                assert(nameSrc != "");
+                assert(windowSize == schemaSizeOut);
+
+                if (mirror) {
+
+                    return getValueProc(nameSrc, timeOffset, windowSize - 1 + offset );
+
+                } else {
+
+                    int d =
+                        abs(
+                            (streamSizeOut) -
+                            agse(streamSizeSrc * schemaSizeSrc, step)
+                        ) ;
+
+                    return getValueProc(nameSrc, timeOffset, windowSize - offset + d );
+                }
+            }
+
+        case STREAM_HASH:
+            // TODO: Check if right hash part is returned here
+            {
+                const auto timeSeqence = (gContextLenMap[q.id] - timeOffset) > 1 ? gContextLenMap[q.id] - timeOffset : 1;
+
+                if (Hash(
+                        getQuery(arg[0].getValue()).rInterval,
+                        getQuery(arg[1].getValue()).rInterval,
+                        timeSeqence,
+                        TimeOffset)) {
+
+                    return getValueProc(arg[1].getValue(), TimeOffset, offset);
+                } else {
+
+                    return getValueProc(arg[0].getValue(), TimeOffset, offset);
+                }
+            }
+
+            assert(false);    //TODO
+    }
+
+    cerr << "cmd=" << cmd << endl ;
+    cerr << "progsize=" << progSize << endl ;
+    assert(false);    // Unknown operator catched here
+    return number(0) ;    /* pro forma */
+}
+
+Processor::Processor() {
+
+    //This function initialize map creating archive streams in cbuff
+    for (auto q : coreInstance) {
+
+        if (storage.find(q.id) == storage.end())
+            storage[ q.id ] =
+                std::shared_ptr<dbStream>(new dbStream(q.id, q.getFieldNamesList())) ;
+        else
+            ; //Stream with this name already exist in stystem
+
+        //Container initialization for file type data sources
+        if (! q.filename.empty())
+            gFileMap[ q.id ] = inputDF(q.filename.c_str(), q.lSchema);
+    }
+
+    // Initializing fill of context and lenght of data stream
+    for (auto q : coreInstance) {   // For all queries in systes
+
+        vector< number > rowValues ;
+
+        for (auto i = 0; i < getSizeOfRollup(q); i ++)
+            rowValues.push_back(boost::rational<int> (0));
+
+        gContextValMap[ q.id ] = rowValues;
+        gContextLenMap[ q.id ] = 0;
+        gStreamSize[q.id] = -1;
+    }
+
+    pProc = this ;
+}
+
 void Processor::processRows(set<string> inSet) {
 
     for (auto q : coreInstance) {
@@ -139,19 +311,36 @@ void Processor::processRows(set<string> inSet) {
             gFileMap[ q.id ].processRow() ;    // Fetch next row form file that have schema
         }
 
+        vector <number> ctxRowValue;
+
+        if ( q.isDeclaration() )
+        {
+            for (auto f : q.lSchema)
+                ctxRowValue.push_back(gFileMap[ q.id ].getCR(f));
+        }
+        else
+        {
+            for (auto i = 0; i < getSizeOfRollup(q); i ++)
+            {
+                ctxRowValue.push_back(getValueOfRollup(q,i,0));
+            }
+        }
+
+        gContextValMap[q.id] = ctxRowValue;
+
         // here should be computer values of stream tuples
         // computed value shoud be stored in file
         vector <number> rowValue;
+
         int cnt(0);
 
-        for (auto &f : q.lSchema) {
+        for (auto &f : q.lSchema)
+        {
 
             boost::rational<int> value(computeValue(f, q));
             (*storage[q.id])[cnt++] = value;
-            rowValue.push_back(value);
         }
 
-        gContextValMap[q.id] = rowValue;
         // Store computed values to cbuffer - on disk
         storage[ q.id ]->store();
     }
@@ -216,8 +405,6 @@ number Processor::getValueProc(string streamName, int timeOffset, int schemaOffs
         timeOffset += schemaOffset / getSizeOfRollup(q);
         schemaOffset %= q.lSchema.size();
     }
-
-
 
     if ((timeOffset == 0) && (gContextLenMap[streamName] > gStreamSize[streamName])) {
 
@@ -406,7 +593,7 @@ void Processor::updateContext(set < string > inSet) {
                         boost::rational <int> ret = INT_MAX ; /* limits.h */
 
                         for (auto f : getQuery(streamNameArg).lSchema) {
-    
+
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
                             string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
@@ -513,7 +700,6 @@ void Processor::updateContext(set < string > inSet) {
                         assert(step >= 0);
                         int windowSize = abs(rational_cast<int> (operation.getCRValue()));
                         assert(windowSize > 0);
-                        boost::rational<int> factor = windowSize / step;
                         boost::rational<int> deltaSrc = getQuery(nameSrc).rInterval;
                         boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
                         int schemaSizeSrc =  getQuery(nameSrc).lSchema.size();
@@ -593,94 +779,6 @@ void Processor::updateContext(set < string > inSet) {
         gContextValMap[ q.id ] = rowValues;
         gContextLenMap[ q.id ]++;
     }
-}
-
-number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
-
-    token arg[3];
-    const int progSize =  q.lProgram.size();
-    assert(progSize < 4);
-
-    int i = 0;
-    for (auto tk : q.lProgram) 
-        arg[i++] = tk;
-
-    const command_id cmd = arg[progSize - 1].getTokenCommand();
-    int TimeOffset(-1);                   // This -1 is intentionally wrong - Hash return value
-
-    switch (cmd) {
-
-        case PUSH_STREAM:
-
-            return getValueProc(arg[0].getValue(), timeOffset, offset);
-
-        case STREAM_TIMEMOVE:
-
-            /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-            return getValueProc(arg[0].getValue(), timeOffset + rational_cast<int> (arg[1].getCRValue()), offset);
-
-        case STREAM_DEHASH_MOD:
-        case STREAM_DEHASH_DIV:
-
-            /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2), PUSH_DEHASH_DIV(0) */
-            assert(false);    //TODO
-
-        case STREAM_SUBSTRACT:
-
-            //TODO: Check
-            return getValueProc(arg[0].getValue(), timeOffset, offset);
-
-        case STREAM_AVG:
-        case STREAM_MIN:
-        case STREAM_MAX:
-        case STREAM_SUM:
-
-            assert(offset == 1);
-            return getValueProc(arg[0].getValue(), timeOffset, offset);
-
-        case STREAM_ADD:
-
-            /* signalRow+source : PUSH_STREAM(signalRow), PUSH_STREAM(source), STREAM_ADD(0) */
-            {
-                const auto sizeOfFirstSchema = getQuery(arg[0].getValue()).lSchema.size();
-
-                if (offset < sizeOfFirstSchema) {
-
-                    return getValueProc(arg[0].getValue(), timeOffset, offset);
-                } else {
-
-                    return getValueProc(arg[1].getValue(), timeOffset, offset - sizeOfFirstSchema);
-                }
-            }
-
-        case STREAM_AGSE:
-
-            assert(false);    //TODO
-            return number(0) ;    /* pro forma */
-
-        case STREAM_HASH:
-            // TODO: Check if right hash part is returned here
-            {
-                const auto timeSeqence = (gContextLenMap[q.id] - timeOffset) > 1 ? gContextLenMap[q.id] - timeOffset : 1;
-
-                if (Hash(
-                        getQuery(arg[0].getValue()).rInterval,
-                        getQuery(arg[1].getValue()).rInterval,
-                        timeSeqence,
-                        TimeOffset)) {
-
-                    return getValueProc(arg[1].getValue(), TimeOffset, offset);
-                } else {
-
-                    return getValueProc(arg[0].getValue(), TimeOffset, offset);
-                }
-            }
-
-            assert(false);    //TODO
-    }
-
-    assert(false);    // Unknown operator catched here
-    return number(0) ;    /* pro forma */
 }
 
 boost::rational<int> Processor::computeValue(field &f, query &q) {

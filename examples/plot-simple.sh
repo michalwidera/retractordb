@@ -48,7 +48,7 @@ fi
 if [ "$4" != "" ] ; then
     YDIM=$4
 else
-    YDIM=256
+    YDIM=20
 fi
 
 echo 'FILE:' $FILE
