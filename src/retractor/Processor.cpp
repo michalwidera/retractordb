@@ -155,10 +155,28 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         case STREAM_AVG:
         case STREAM_MIN:
         case STREAM_MAX:
-        case STREAM_SUM:
 
             assert(offset == 1);
             return getValueProc(arg[0].getValue(), timeOffset, offset);
+
+        case STREAM_SUM:
+
+            assert(arg[0].getValue() != "");
+            {
+                assert(q.lProgram.size() == 2) ;
+                boost::rational <int> ret = 0 ; /* limits.h */
+
+                for (auto f : getQuery(arg[0].getValue()).lSchema) {
+
+                    int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
+                    string schema = f.getFirstFieldToken().getValue();
+                    boost::rational <int> val =
+                        boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
+                    ret += val;
+                }
+
+                return ret;
+            }
 
         case STREAM_ADD:
 
@@ -338,7 +356,9 @@ void Processor::processRows(set<string> inSet) {
         {
 
             boost::rational<int> value(computeValue(f, q));
-            (*storage[q.id])[cnt++] = value;
+            (*storage[q.id])[cnt] = value;
+            gContextValMap[q.id][cnt] = value;
+            cnt ++;
         }
 
         // Store computed values to cbuffer - on disk

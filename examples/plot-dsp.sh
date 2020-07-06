@@ -24,4 +24,4 @@ nohup xretractor &
 
 sleep 4
 export DISPLAY=:0
-xqry -s outputAll | plotblock.py 100 256 "output:red;source:blue" --sleep 0.05 $TTYPE | gnuplot 2>/dev/null
+xqry -s outputAll | plotblock.py 50 256 "output:red;source:blue" --sleep 0.05 $TTYPE | gnuplot 2>/dev/null
