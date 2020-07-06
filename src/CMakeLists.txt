@@ -98,7 +98,7 @@ target_link_libraries( xqry ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_custom_target(astyle
-  COMMAND astyle --project=src/.astylerc share/* qry/* dumper/* compiler/* retractor/*
+  COMMAND astyle share/* qry/* dumper/* compiler/* retractor/*
 )
 
 install(TARGETS xretractor xcompiler xdumper xqry DESTINATION /usr/local/bin)

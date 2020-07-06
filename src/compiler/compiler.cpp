@@ -92,18 +92,23 @@ string intervalCounter() {
 
                 case STREAM_DEHASH_DIV: {
                         boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue()) ;
-                        boost::rational<int> delta2 = t2.getCRValue() ; //Tutaj nie ma drugiego strumienia tylko od razu argument
+                        boost::rational<int> delta2 = t2.getCRValue() ; //There is no second stream - just fraction argument
                         assert(delta2 != 0);
 
                         if (delta1 == 0) {
                             bOnceAgain = true ;
                             continue ;
                         } else {
+
+                            //           D_c * D_b
+                            //   D_a = --------------
+                            //         abs(D_c - D_b)
+
                             delta = deltaDivMod(delta1, delta2) ;
                         }
 
                         if (delta1 > delta) {
-                            throw std::out_of_range("Nie mozna zrobić szybszego div z wolniejszego zrodla");
+                            throw std::out_of_range("You cannot make faster div from slower source");
                         }
                     }
                     break ;
@@ -126,7 +131,7 @@ string intervalCounter() {
                         }
 
                         if (delta1 > delta) {
-                            throw std::out_of_range("Nie mozna zrobić szybszego mod z wolniejszego zrodla");
+                            throw std::out_of_range("You cannot make faster mod from slower source");
                         }
                     }
                     break ;
@@ -207,7 +212,7 @@ string intervalCounter() {
             } //switch ( op.getTokenCommand() )
 
             assert(delta != -1);
-            q.rInterval = delta;  //Tutaj jest ustalana wartosc delta - wartosc zwrotna
+            q.rInterval = delta;  //There is estabilished delta value - return value
         }  //BOOST_FOREACH ( query & q , coreInstance )
 
         if (! bOnceAgain) {
@@ -394,13 +399,27 @@ list < field > combine(string sName1, string sName2, token cmd_token) {
     } else if (cmd == STREAM_DEHASH_MOD) {
         lRetVal = getQuery(sName1).lSchema ;
     } else if (cmd == STREAM_ADD) {
+
+        int i = 0;
+
         for (auto f : getQuery(sName1).lSchema) {
-            lRetVal.push_back(f);
+            field intf;
+            intf.setFieldName.insert("Field_" + boost::lexical_cast<std::string> (fieldCount++));
+            intf.lProgram.push_front(token(PUSH_ID, boost::rational<int> (i++), sName1));
+            lRetVal.push_back(intf);
         }
 
+        i = 0;
+
         for (auto f : getQuery(sName2).lSchema) {
-            lRetVal.push_back(f);
+            field intf ;
+            intf.setFieldName.insert("Field_" + boost::lexical_cast<std::string> (fieldCount++));
+            intf.lProgram.push_front(token(PUSH_ID, boost::rational<int> (i++), sName2));
+            lRetVal.push_back(intf);
         }
+
+        return lRetVal ;
+
     } else if (cmd == STREAM_SUBSTRACT) {
         lRetVal = getQuery(sName1).lSchema ;
     } else if (cmd == STREAM_TIMEMOVE) {
@@ -463,38 +482,30 @@ list < field > combine(string sName1, string sName2, token cmd_token) {
     //Here are added to fields execution methods
     //by reference to schema position
 
-    if (cmd != STREAM_ADD) {
-        int offset(0) ;
+    int offset(0) ;
 
-        for (auto &f : lRetVal) {
-            stringstream s ;
+    for (auto &f : lRetVal) {
+        stringstream s ;
 
-            if (cmd == STREAM_HASH) {
-                s << sName1 ;
-            } else if (cmd == STREAM_TIMEMOVE) {
-                s << sName1 ;
-            } else if (cmd == STREAM_AGSE) {
-                s << sName1 ;
-            } else {
-                s << sName1 ; //generateStreamName( sName2, sName1, cmd ) ;
-            }
-
-            s << "[" ;
-            s << offset ++ ;
-            s << "]" ;
-
-            if (f.lProgram.size() > 0) {
-                f.lProgram.pop_front();
-            }
-
-            f.lProgram.push_front(token(PUSH_ID2, s.str()));
+        if (cmd == STREAM_HASH) {
+            s << sName1 ;
+        } else if (cmd == STREAM_TIMEMOVE) {
+            s << sName1 ;
+        } else if (cmd == STREAM_AGSE) {
+            s << sName1 ;
+        } else {
+            s << sName1 ; //generateStreamName( sName2, sName1, cmd ) ;
         }
-    } else {
-        for (auto &f : lRetVal) {
-            stringstream s ;
-            s << f.getFirstFieldName() ;
-            f.lProgram.push_front(token(PUSH_ID3, s.str()));
+
+        s << "[" ;
+        s << offset ++ ;
+        s << "]" ;
+
+        if (f.lProgram.size() > 0) {
+            f.lProgram.pop_front();
         }
+
+        f.lProgram.push_front(token(PUSH_ID2, s.str()));
     }
 
     return lRetVal ;
@@ -504,6 +515,7 @@ list < field > combine(string sName1, string sName2, token cmd_token) {
 //unfortunatlle algorithm if broken - because does not search backward but next by next
 //and some * can be process which have arguments appear as two asterixe
 //In such case unrool does not appear and algorithm gets shitin-shitout
+
 string prepareFields() {
     coreInstance.tsort();
 
@@ -784,7 +796,7 @@ string convertReferences() {
                             }
 
                             if (bFieldFound == false) {
-                                throw std::logic_error("No field of given name in stream schema");
+                                throw std::logic_error("No field of given name in stream schema ID3");
                             }
                         } else {
                             throw std::out_of_range("No mach on type conversion ID3");

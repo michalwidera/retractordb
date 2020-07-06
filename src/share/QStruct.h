@@ -146,8 +146,6 @@ class query {
 
     list < string > getDepStreamNameList(int reqDep = 0) ;
 
-    //list < string > getArgumentList();
-
     int getFieldIndex(field f);
 } ;
 

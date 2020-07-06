@@ -153,7 +153,7 @@ namespace {
     void do_avg(char const*, char const*)            RECPTOKEN(STREAM_AVG)
     void do_min(char const*, char const*)            RECPTOKEN(STREAM_MIN)
     void do_max(char const*, char const*)            RECPTOKEN(STREAM_MAX)
-    void do_sum(char const*, char const*)            RECPTOKEN(STREAM_SUM)
+    void do_sumc(char const*, char const*)           RECPTOKEN(STREAM_SUM)
 
     boost::rational<int> r_val ;
 
@@ -269,7 +269,7 @@ namespace {
                     as_lower_d["min"][&do_min]
                     | as_lower_d["max"][&do_max]
                     | as_lower_d["avg"][&do_avg]
-                    | as_lower_d["sum"][&do_sum]
+                    | as_lower_d["sum"][&do_sumc]
                 )
                 >> ch_p('(')
                 >> alnum_p
@@ -317,6 +317,7 @@ struct ql_parser : public grammar<ql_parser> {
             Token_t SUM = as_lower_d["sum"] ;
             Token_t COUNT = as_lower_d["count"] ;
             Token_t CRC = as_lower_d["crc"] ;
+            Token_t SUMC = as_lower_d["sum"] ;
             Token_t AGSE = as_lower_d["agse"] ;
             Token_t SELECT = as_lower_d["select"] ;
             Token_t DECLARE = as_lower_d["declare"] ;
@@ -499,7 +500,7 @@ struct ql_parser : public grammar<ql_parser> {
                 = (MIN           [&do_min]
                         | MAX       [&do_max]
                         | AVG       [&do_avg]
-                        | SUM       [&do_sum]
+                        | SUMC      [&do_sumc]
                     )
                     ;
             stream_factor
@@ -552,8 +553,9 @@ struct ql_parser : public grammar<ql_parser> {
                             | INT
                             | COUNT
                             | CRC
+                            | SUM
                         )
-                        >> ch_p('(') >> expression % ch_p(',') >> ch_p(')')
+                        >> ch_p('(') >> * ( expression % ch_p(',') ) >> ch_p(')')
                     )
                     [&do_fcall]
                     ;

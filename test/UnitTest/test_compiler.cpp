@@ -12,7 +12,7 @@ using namespace std;
 extern string parser(vector<string> vsInputFile);
 
 bool check_compile_function() {
-    
+
     vector<string> cs;
 
     cs.push_back("declare a i16, b i8 stream core0, 1 file /dev/urandom");

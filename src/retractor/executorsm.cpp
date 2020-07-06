@@ -18,6 +18,9 @@
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/containers/map.hpp>
 
+#include <boost/lexical_cast.hpp>
+#include <boost/variant.hpp>
+
 // boost::this_process::get_id()
 #include <boost/process/environment.hpp>
 
@@ -31,6 +34,10 @@
 #include <memory>
 
 #include "Buffer.h"
+
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 namespace IPC = boost::interprocess ;
 
@@ -79,12 +86,41 @@ extern int iTest();
 
 std::map <string, ptree> streamTable ;
 
-set< boost::rational<int>> getListFromCore() {
+int _kbhit(void) {
+
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+    if (ch != EOF) {
+        ungetc(ch, stdin);
+        return 1;
+    }
+
+    return 0;
+}
+
+int _getch() {
+
+    return getchar();
+}
+
+set< boost::rational<int>>
+getListFromCore() {
+
     set< boost::rational<int>> lstTimeIntervals ;
 
-    for (const auto &it : coreInstance) {
+    for (const auto &it : coreInstance)
         lstTimeIntervals.insert(it.rInterval);
-    }
 
     return lstTimeIntervals ;
 }
@@ -101,7 +137,9 @@ void dumpCore(std::ostream &xout) {
     }
 }
 
-set < string > getAwaitedStreamsSet(TimeLine &tl) {
+set < string >
+getAwaitedStreamsSet(TimeLine &tl) {
+
     set < string > retVal ;
 
     while (pProc == NULL) {
@@ -111,9 +149,8 @@ set < string > getAwaitedStreamsSet(TimeLine &tl) {
     for (const auto &it : coreInstance) {
         boost::rational<int> slot = it.rInterval ;
 
-        if (! tl.isThisDeltaAwaitCurrentTimeSlot(slot)) {
+        if (! tl.isThisDeltaAwaitCurrentTimeSlot(slot))
             continue ;
-        }
 
         retVal.insert(it.id);
     }
@@ -121,16 +158,57 @@ set < string > getAwaitedStreamsSet(TimeLine &tl) {
     return retVal ;
 }
 
-void showAwaitedStreams(TimeLine &tl,
-    string streamName = "") {
+
+string Processor::printRowValue(const string query_name) {
+
+    using boost::property_tree::ptree;
+    ptree pt;
+    pt.put("stream", query_name);
+    pt.put("count", boost::lexical_cast<std::string> (getQuery(query_name).lSchema.size()));
+    int i = 0 ;
+
+    for (auto n : getRow(query_name, 0)) {
+        stringstream retVal ;
+
+        if (n.type() == typeid(int))
+            retVal << boost::rational_cast<int> (boost::get< boost::rational<int>>(n));
+
+        if (n.type() == typeid(double))
+            retVal << boost::rational_cast<double> (boost::get< boost::rational<int>>(n));
+
+        if (n.type() == typeid(boost::rational<int>)) {
+
+            if ((boost::get< boost::rational<int>> (n)).denominator() == 1) {
+
+                retVal << boost::rational_cast<int> (boost::get< boost::rational<int>>(n));
+            } else {
+
+                retVal << boost::rational_cast<double> (boost::get< boost::rational<int>>(n));
+            }
+        }
+
+        if (retVal.str().empty())
+            retVal << boost::rational_cast<int> (boost::get< boost::rational<int>> (n)) << "?" ;
+
+        pt.put(boost::lexical_cast<std::string> (i++), retVal.str());
+    }
+
+    stringstream strstream;
+
+    if (outMode == JSON) write_json(strstream, pt);
+    if (outMode == XML) write_xml(strstream, pt);
+    if (outMode == INFO) write_info(strstream, pt);
+
+    return strstream.str();
+}
+
+void showAwaitedStreams(TimeLine &tl, string streamName = "") {
+
     set< string > strSet = getAwaitedStreamsSet(tl);
 
     for (const auto &str : strSet) {
-        if (streamName == "") {
+
             cout << "-" << getSeqNr(str) << "-" ;
-        } else if (streamName == str) {
-            cout << "-" << getSeqNr(str) << "-" ;
-        }
     }
 }
 
@@ -143,9 +221,11 @@ ptree commandProcessor(ptree ptInval) {
         // This command return stream idenifiers
         //
         if (command == "get" && pProc != NULL) {
+
             std::cerr << "get cmd rcv." << std::endl ;
 
             for (auto &q : coreInstance) {
+
                 ptRetval.put(string("db.stream.") + q.id, q.id);
                 ptRetval.put(string("db.stream.") + q.id + string(".duration"), boost::lexical_cast<std::string> (q.rInterval));
                 long recordsCount = 0 ;
@@ -166,12 +246,14 @@ ptree commandProcessor(ptree ptInval) {
         // This command return what stream contains of
         //
         if (command == "detail" && pProc != NULL) {
+
             string streamName = ptInval.get("db.argument", "") ;
             assert(streamName != "");
             std::cerr << "got detail " << streamName << " rcv." << std::endl ;
 
             for (const auto &s : coreInstance[streamName].getFieldNamesList()) {
-                ptRetval.put(string("db.field.") + s, s);
+
+                ptRetval.put(string("db.field.")+s, s);
             }
         }
 
@@ -181,6 +263,7 @@ ptree commandProcessor(ptree ptInval) {
         // and map indentifier with this stream
         //
         if (command == "show"  && pProc != NULL) {
+
             string streamName = ptInval.get("db.argument", "") ;
             // Probably someone call show w/o stream name
             assert(streamName != "");
@@ -211,6 +294,7 @@ ptree commandProcessor(ptree ptInval) {
         // This command stop (kills) server process
         //
         if (command == "kill") {
+
             std::cerr << "got kill rcv." << std::endl ;
             iTimeLimitCnt = 1 ;
         }
@@ -219,25 +303,24 @@ ptree commandProcessor(ptree ptInval) {
         // Diagnostic method
         //
         if (command == "hello") {
+
             cerr << "got hello." << endl ;
             ptRetval.put(string("db"), string("world"));
             cerr << "reply:" ;
             using boost::property_tree::ptree;
             std::stringstream strstream;
 
-            if (outMode == JSON) {
-                write_json(strstream, ptRetval) ;
-            } else if (outMode == XML) {
-                write_xml(strstream, ptRetval);
-            } else if (outMode == INFO) {
-                write_info(strstream, ptRetval);
-            }
+            if (outMode == JSON) write_json(strstream, ptRetval) ;
+            if (outMode == XML) write_xml(strstream, ptRetval);
+            if (outMode == INFO) write_info(strstream, ptRetval);
 
             cerr << strstream.str();
         }
     } catch (const boost::property_tree::ptree_error &e) {
+
         cerr << "ptree fail:" << e.what() << endl;
     } catch (std::exception &e) {
+
         cerr << e.what() << endl ;
     }
 
@@ -246,7 +329,9 @@ ptree commandProcessor(ptree ptInval) {
 
 // Thread procedure
 void commmandProcessorLoop() {
+
     try {
+
         IPC::message_queue::remove("RetractorQueryQueue");
         IPC::shared_memory_object::remove("RetractorShmemMap");
         // Segment and allogator for map purposes
@@ -269,37 +354,27 @@ void commmandProcessorLoop() {
         IPC::message_queue::size_type recvd_size;
 
         while (true) {
+
             while (mq.try_receive(message, 1000, recvd_size, priority)) {
+
                 message[recvd_size] = 0 ;
                 std::stringstream strstream;
                 strstream << message ;
                 memset(message, 0, 1000);
                 ptree pt ;
 
-                if (outMode == JSON) {
-                    read_json(strstream, pt) ;
-                }
-
-                if (outMode == XML) {
-                    read_xml(strstream, pt);
-                }
-
-                if (outMode == INFO) {
-                    read_info(strstream, pt);
-                }
+                if (outMode == JSON) read_json(strstream, pt) ;
+                if (outMode == XML) read_xml(strstream, pt);
+                if (outMode == INFO) read_info(strstream, pt);
 
                 ptree pt_retval = commandProcessor(pt);
                 int clientProcessId = boost::lexical_cast<int> (pt.get("db.id", "")) ;
                 // Sending answer
                 std::stringstream response_stream ;
 
-                if (outMode == JSON) {
-                    write_json(response_stream, pt_retval) ;
-                } else if (outMode == XML) {
-                    write_xml(response_stream, pt_retval);
-                } else if (outMode == INFO) {
-                    write_info(response_stream, pt_retval);
-                }
+                if (outMode == JSON) write_json(response_stream, pt_retval) ;
+                if (outMode == XML) write_xml(response_stream, pt_retval);
+                if (outMode == INFO) write_info(response_stream, pt_retval);
 
                 IPCString response(allocatorShmemMapInstance);
                 response = response_stream.str().c_str();
@@ -313,36 +388,6 @@ void commmandProcessorLoop() {
     }
 }
 
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-int _kbhit(void) {
-    struct termios oldt, newt;
-    int ch;
-    int oldf;
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-    ch = getchar();
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    fcntl(STDIN_FILENO, F_SETFL, oldf);
-
-    if (ch != EOF) {
-        ungetc(ch, stdin);
-        return 1;
-    }
-
-    return 0;
-}
-
-int _getch() {
-    return getchar();
-}
-
 int main(int argc, char* argv[]) {
     // Clarification: When gcc has been upgraded to 9.x version some tests fails.
     // Bug appear when data are passing to program via script .sh
@@ -353,11 +398,11 @@ int main(int argc, char* argv[]) {
     auto retVal = system::errc::success;
 
     for (int i = 0 ; i < argc ;  i ++) {
-        auto len = strlen(argv[i]) ;
+        auto len = strlen(argv[i]);
 
         if (len > 0)
             if (argv[i][len - 1] == 13) {
-                argv[i][len - 1] = 0 ;
+                argv[i][len - 1] = 0;
             }
     }
 
@@ -403,18 +448,15 @@ int main(int argc, char* argv[]) {
         }
 
         if (!boost::filesystem::exists(sInputFile)) {
+
             cout << argv[0] << ": fatal error: no input file" << endl ;
             cout << "query processing terminated." << endl ;
             return EPERM ; //ERROR defined in errno-base.h
         }
 
-        if (vm.count("json")) {
-            outMode = JSON ;
-        } else if (vm.count("xml")) {
-            outMode = XML ;
-        } else if (vm.count("info")) {
-            outMode = INFO ;
-        }
+        if (vm.count("json")) outMode = JSON;
+        if (vm.count("xml")) outMode = XML;
+        if (vm.count("info")) outMode = INFO;
 
         if (vm.count("verbose")) {
             cerr << "Input :" << sInputFile << endl ;
@@ -436,6 +478,7 @@ int main(int argc, char* argv[]) {
         //
 
         if (vm.count("query")) {
+
             if (vm.count("verbose")) {
                 cerr << "Query :" << sQuery << flush;
             }
@@ -467,6 +510,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (vm.count("verbose")) {
+
             cerr << "Objects:" ;
             dumpCore(cerr);
         }
@@ -481,6 +525,7 @@ int main(int argc, char* argv[]) {
         // When this value is 0 - means we are waiting for key - other way watchdog
         //
         if (vm.count("verbose")) {
+
             std::cout <<
                 ((iTimeLimitCnt == 0) ?
                     "Press any key to stop."  :
@@ -493,7 +538,7 @@ int main(int argc, char* argv[]) {
         while (! _kbhit() && iTimeLimitCnt != 1) {
             if (iTimeLimitCnt != 0) {
                 if (iTimeLimitCnt != 1) {
-                    iTimeLimitCnt -- ;
+                    iTimeLimitCnt --;
                 } else {
                     break ;
                 }
@@ -513,13 +558,13 @@ int main(int argc, char* argv[]) {
             // if additional -w -s str2 (when -s means display) only given one query will appear
             //
             if (vm.count("waterfall")) {
+
                 std::cout << period << "\t" ;
-                showAwaitedStreams(tl,
-                    vm.count("display") ? sQuery : "");
+                showAwaitedStreams(tl, vm.count("display") ? sQuery : "");
                 std::cout << std::endl ;
             }
 
-            set < string > inSet = getAwaitedStreamsSet(tl) ;
+            set < string > inSet = getAwaitedStreamsSet(tl);
             proc.updateContext(inSet);
             proc.processRows(inSet);
 
@@ -528,19 +573,25 @@ int main(int argc, char* argv[]) {
             //
 
             for (auto queryName : getAwaitedStreamsSet(tl)) {
+
                 if (vm.count("onscreen")) {
-                    std::cout << proc.printRowValue(queryName) << endl ;
+
+                    std::cout << proc.printRowValue(queryName) << endl;
+
                 } else {
-                    std::string row = proc.printRowValue(queryName) ;
-                    std::list<int> eraseList ;
+
+                    std::string row = proc.printRowValue(queryName);
+                    std::list<int> eraseList;
 
                     for (const auto &element : id2StreamName_Relation) {
+
                         if (element.second == queryName) {
+
                             using namespace boost::interprocess;
                             //
                             // Query discovery. queues are created by show command
                             //
-                            std::string queueName = "brcdbr" + boost::lexical_cast<std::string> (element.first) ;
+                            std::string queueName = "brcdbr" + boost::lexical_cast<std::string> (element.first);
                             IPC::message_queue mq(IPC::open_only, queueName.c_str());
 
                             //
@@ -557,11 +608,11 @@ int main(int argc, char* argv[]) {
                     // cleaning form clients map that are not receiving data from queue
                     //
                     for (const auto &element : eraseList) {
+
                         id2StreamName_Relation.erase(element) ;
 
-                        if (vm.count("verbose")) {
+                        if (vm.count("verbose"))
                             cout << "queue erased on timeout, procId=" << element << std::endl;
-                        }
                     }
                 }
             }
@@ -579,8 +630,10 @@ int main(int argc, char* argv[]) {
         // End of main processing loop
         //
         if (iTimeLimitCnt != 1) {
+
             _getch(); //no wait ... feed key from kbhit
         } else {
+
             if (vm.count("verbose")) {
                 cout << "Query limit (-m) waiting for fullfil" << endl ;
             }
@@ -589,14 +642,18 @@ int main(int argc, char* argv[]) {
         saveStreamsToFile(sDumpFile);
 
         if (vm.count("verbose")) {
-            cout << "Dump  :" << sDumpFile << endl ;
+
+            cout << "Dump  :" << sDumpFile << endl;
             Dump(std::cout);
         }
+
     } catch (IPC::interprocess_exception &ex) {
+
         std::cout << ex.what() << std::endl << "interprocess exception" << std::endl;
         retVal = system::errc::no_child_process;
     } catch (std::exception &e) {
-        cerr << e.what() << endl ;
+
+        cerr << e.what() << endl;
         retVal = system::errc::interrupted;
     }
 
@@ -606,7 +663,8 @@ int main(int argc, char* argv[]) {
     IPC::message_queue::remove("RetractorQueryQueue");
 
     for (const auto &element : id2StreamName_Relation) {
-        std::string queueName = "brcdbr" + boost::lexical_cast<std::string> (element.first) ;
+
+        std::string queueName = "brcdbr" + boost::lexical_cast<std::string> (element.first);
         IPC::message_queue::remove(queueName.c_str());
     }
 

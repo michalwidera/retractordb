@@ -1,0 +1,6 @@
+declare b INTEGER stream dane,1/4 file danesum.dat
+
+select * stream dag from dane@(4,-4)
+
+select out1[0]+out1[1]+out1[2],out1[3] stream out1 from dag
+select out2[0],out2[1],out2[2],out2[3],out2[0]+out2[1]+out2[2]-out2[3] stream out2 from dag
