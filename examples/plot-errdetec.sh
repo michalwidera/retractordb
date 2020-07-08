@@ -30,13 +30,13 @@ fi
 if [ "$1" != "" ] ; then
     FILE=$1
 else
-    FILE=query-crc.rql
+    FILE=query-errdetect.rql
 fi
 
 if [ "$2" != "" ] ; then
     STREAM=$2
 else
-    STREAM=data1
+    STREAM=graph
 fi
 
 if [ "$3" != "" ] ; then
@@ -48,7 +48,7 @@ fi
 if [ "$4" != "" ] ; then
     YDIM=$4
 else
-    YDIM=256
+    YDIM=20
 fi
 
 echo 'FILE:' $FILE
@@ -56,7 +56,7 @@ echo 'STREAM:' $STREAM
 echo 'XDIM:' $XDIM
 echo 'YDIM:' $YDIM
 
-if ! xcompiler -q $FILE ; then exit 1 ; fi
+if ! xcompiler -q $FILE ; then exit 1 ; fi 
 
 nohup xretractor &
 

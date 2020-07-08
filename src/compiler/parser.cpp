@@ -317,6 +317,8 @@ struct ql_parser : public grammar<ql_parser> {
             Token_t SUM = as_lower_d["sum"] ;
             Token_t COUNT = as_lower_d["count"] ;
             Token_t CRC = as_lower_d["crc"] ;
+            Token_t ISZERO = as_lower_d["iszero"] ;
+            Token_t ISNONZERO = as_lower_d["isnonzero"] ;
             Token_t SUMC = as_lower_d["sum"] ;
             Token_t AGSE = as_lower_d["agse"] ;
             Token_t SELECT = as_lower_d["select"] ;
@@ -554,6 +556,8 @@ struct ql_parser : public grammar<ql_parser> {
                             | COUNT
                             | CRC
                             | SUM
+                            | ISZERO
+                            | ISNONZERO
                         )
                         >> ch_p('(') >> * ( expression % ch_p(',') ) >> ch_p(')')
                     )
