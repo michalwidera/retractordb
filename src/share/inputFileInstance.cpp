@@ -81,7 +81,7 @@ T inputFileInstance::get() {
     return retVal ;
 }
 
-template char inputFileInstance::get<char>() ;
+template unsigned char inputFileInstance::get<unsigned char>() ;
 template int inputFileInstance::get<int>() ;
 template boost::rational<int> inputFileInstance::get<boost::rational<int>>() ;
 
@@ -103,7 +103,7 @@ void inputDF::processRow() {
     for (auto &f : lSchema) {
         switch (f.dFieldType) {
             case field::BYTE:
-                lResult.push_back(get<char>());
+                lResult.push_back(get<unsigned char>());
                 break ;
 
             case field::INTEGER:
@@ -141,8 +141,8 @@ boost::rational<int> inputDF::getCR(field f) {
 
     assert(lResult.size() != 0);
 
-    if (lResult[ cnt ].type() == typeid(char)) {
-        retValue  = any_cast<char> (lResult[ cnt ]);
+    if (lResult[ cnt ].type() == typeid(unsigned char)) {
+        retValue  = any_cast<unsigned char> (lResult[ cnt ]);
     } else if (lResult[ cnt ].type() == typeid(int)) {
         retValue = any_cast<int> (lResult[ cnt ]);
     } else if (lResult[ cnt ].type() == typeid(boost::rational<int>)) {

@@ -109,8 +109,9 @@ void dumpGraphiz(std::ostream &xout,
                             break ;
 
                         default:
-                            cerr << "?? " << f.dFieldType << endl ;
-                            throw std::invalid_argument("niezdefiniowany typ w polu");
+                            xout << "(Integer)";
+                            //cerr << "?? " << f.dFieldType << endl ;
+                            //throw std::invalid_argument("niezdefiniowany typ w polu");
                     }
             }
 
