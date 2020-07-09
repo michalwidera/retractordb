@@ -6,5 +6,5 @@ declare data BYTE stream source, 0.02 file /dev/urandom
 select * stream signalRow from source@(1,25)
 select signalRow[_] * filter[_] stream accRow from signalRow+filter
 select accRow[0] stream output from accRow.sum
-select output[0]/26,source[0] stream outputAll from output+source
+select output[0]/25,source[0] stream outputAll from output+source
 
