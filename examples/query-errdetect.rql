@@ -7,5 +7,5 @@ declare a INTEGER stream inputdata,1/4 file datasum.dat
 select * stream do from (inputdata>1)@(4,4)
 select wy[0]+wy[1]+wy[2]-wy[3] stream wy from do
 select iszero(err[0])*10 stream err from wy
-select * stream graph_all from ((err>1) + inputdata) 
+select * stream graph_all from ((err>1) + inputdata)
 select * stream graph from graph_all & 1

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import sys
 import argparse
@@ -15,39 +15,39 @@ parser.add_argument("desc", help="data descriptor")
 args = parser.parse_args()
 prdata = args.desc.split(';')
 
-print "set term " + args.term + " noraise"
-print "set yrange [" + str(args.ymin) + ":" + str(args.ymax) + "]"
-print "set style fill solid"
-print "set ticslevel 0"
-print "set hidden3d"
+if (args.term) : print ("set term {} noraise".format(args.term))
+print ("set yrange [0:{}]".format(str(args.y)))
+print ("set style fill solid")
+print ("set ticslevel 0")
+print ("set hidden3d")
 
-print 'color(name) = (name eq "gray") ? 0xdddddd \
+print ('color(name) = (name eq "gray") ? 0xdddddd \
 : (name eq "white") ? 0xffffff \
 : (name eq "black") ? 0x000000 \
 : (name eq "red")  ?  0xff0000 \
 : (name eq "blue") ?  0x0000ff \
 : (name eq "green") ? 0x00ff00 \
 : (name eq "yellow") ? 0xffff00 \
-: int(rand(0)*0xffffff)'
+: int(rand(0)*0xffffff)')
 
-print "boxwidth = 0.5"
+print("boxwidth = 0.5")
 
 try:
     for line in iter(sys.stdin.readline, ''):
 
-        print "plot '-' using 1:3:(boxwidth):(color(strcol(4))):xtic(2) with boxes fillcolor rgb variable notitle"
+        print("plot '-' using 1:3:(boxwidth):(color(strcol(4))):xtic(2) with boxes fillcolor rgb variable notitle")
 
         record = line.split()
 
         lineCount = 0
         for i in record:
-            print lineCount + 1, prdata[lineCount].split(':')[0] , record[lineCount] , prdata[lineCount].split(':')[1]
+            print("{} {} {} {}".format(lineCount + 1, prdata[lineCount].split(':')[0] , record[lineCount] , prdata[lineCount].split(':')[1])
             lineCount +=1
 
         #gnuplot sometimes get too much data and raises memory exception
-        if ( args.sleep <> 0 ) : sleep( args.sleep )
+        if ( args.sleep != 0 ) : sleep( args.sleep )
 
-        print 'e'
+        print("e")
         sys.stdout.flush()
 
 
