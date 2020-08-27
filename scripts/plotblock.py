@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 import sys
 import argparse
@@ -24,23 +24,23 @@ collectionList = []
 for i in prdata:
     collectionList.append( collections.deque(maxlen=args.x) )
 
-print "set term " + args.term + " noraise"
-print "set style fill transparent solid 0.5"
-print "set xrange [0:" + str(args.x) + "]"
-print "set yrange [0:" + str(args.y) + "]"
-print "set ticslevel 0"
-print "set hidden3d"
+if (args.term) : print ("set term {} noraise".format(args.term))
+print ("set style fill transparent solid 0.5")
+print ("set xrange [0:{}]".format(str(args.x)))
+print ("set yrange [0:{}]".format(str(args.y)))
+print ("set ticslevel 0")
+print ("set hidden3d")
 
 try:
     #for line in sys.stdin:
     for line in iter(sys.stdin.readline, ''):
 
-        print "plot",
+        print("plot",end = '')
         for i in prdata:
             desc = i.split(':')
-            print " '-' u 1:2 t '" + desc[0] + "' w lines lc rgb '" + desc[1] + "'",
-            if ( i <> prdata[-1] ) : print ",",
-        print
+            print (" '-' u 1:2 t '{}' w lines lc rgb '{}'".format(desc[0],desc[1]), end = '')
+            if ( i != prdata[-1] ) : print (",", end = '')
+        print()
 
         for i in range(len(prdata)):
             record = line.split()
@@ -50,16 +50,17 @@ try:
 
                 lineCount = 0
                 for i in collectionList[i]:
-                    print lineCount , i
+                    print("{} {}".format(lineCount , i))
                     lineCount +=1
 
 
                 #gnuplot sometimes get too much data and raises memory exception
-                if ( args.sleep <> 0 ) : sleep( args.sleep )
+                if ( args.sleep != 0 ) : sleep( args.sleep )
 
-            print 'e'
+            print('e')
             sys.stdout.flush()
 
 #ctrl+c to gracefull exit loop
 except KeyboardInterrupt:
     pass
+

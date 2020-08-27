@@ -23,5 +23,8 @@ if ! xcompiler -q query-histogram.rql ; then exit 1 ; fi
 nohup xretractor &
 
 sleep 4
+if [ -z "$DISPLAY" ]
+then
 export DISPLAY=:0
+fi
 xqry -s countHistorgram | plothistgram.py 0 25 "first-argument:red;second-argument:blue" --sleep 0.5 $TTYPE | gnuplot 2>/dev/null

@@ -64,5 +64,8 @@ sleep 2
 
 echo "Type ctrl+c to stop."
 
+if [ -z "$DISPLAY" ]
+then
 export DISPLAY=:0
+fi
 xqry -s $STREAM | plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.02 $TTYPE| gnuplot 2>/dev/null
