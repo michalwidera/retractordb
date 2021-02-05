@@ -1,6 +1,6 @@
 version: 2
 jobs:
- 
+
   build-buildpack:
     working_directory: ~
     docker:
@@ -17,7 +17,7 @@ jobs:
           name: Build from source
           command: 'cmake CMakeLists.txt ; make'
       - run:
-          name: Install product 
+          name: Install product
           command: 'sudo make install'
       - run:
           name: Check if there is any regression
@@ -30,7 +30,7 @@ workflows:
       - build-buildpack:
           filters:
             branches:
-              only: 
+              only:
                  - master
                  - /issue_.*/
   nightly:

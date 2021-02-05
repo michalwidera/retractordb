@@ -1,7 +1,8 @@
---style=A1
+--style=bsd
 --suffix=none
 --indent=spaces
 --indent-switches
+--indent-cases
 
 # Paddings around operators, parentheses, and a header
 # (header means `if`, `while`, etc. Example: `if (true)`, instead of `if(true)`)

@@ -7,11 +7,12 @@ using std::fstream ;
 using std::string ;
 using std::ios ;
 
-class CRandomFile : public fstream {
+class CRandomFile : public fstream
+{
 
     bool destroyOnDestructor ;
 
-  public:
+public:
 
     string filename;
 

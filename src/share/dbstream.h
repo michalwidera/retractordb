@@ -19,7 +19,8 @@ typedef boost::variant< boost::rational<int>, int, double > number ;
  * after store() opeartion data are no longer avaiable by
  * stream[1] or stream["field_name"] but new place is ready for tuple
  */
-class dbStream : private boost::noncopyable {
+class dbStream : private boost::noncopyable
+{
 
     int frameSize ; /**< Size of frame in bytes */
     boost::shared_array< char >  pRawData ; /**< Pointer for binary data */
@@ -29,7 +30,7 @@ class dbStream : private boost::noncopyable {
     std::vector < number >  mpRead ;
     int mpReadNr, mpLenNr ;
 
-  public:
+public:
 
     dbStream(std::string streamName, std::list < std::string > schema);
 

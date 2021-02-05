@@ -6,7 +6,8 @@
 #include <map>
 
 /** Query processor */
-class Processor : private boost::noncopyable {
+class Processor : private boost::noncopyable
+{
     /** Archive of data streams - initStorage */
     std::map<std::string, std::shared_ptr<dbStream>> storage ;
 
@@ -39,22 +40,22 @@ class Processor : private boost::noncopyable {
 
     /** Context functions */
     number getValueProc(string streamName,
-                        int timeOffset,
-                        int schemaOffset,
-                        bool reverse=false) ;
+        int timeOffset,
+        int schemaOffset,
+        bool reverse = false) ;
 
     /** Context functions */
     vector<number> getRow(string streamName,
-                          int timeOffset,
-                          bool reverse=false) ;
+        int timeOffset,
+        bool reverse = false) ;
 
     /** Function will return offsets according to stack operations
      *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
      */
     int getArgumentOffset(const string &streamName,
-                          const string &streamArgument) ;
+        const string &streamArgument) ;
 
-  public:
+public:
 
     /** Query processor works on core varialbe */
     Processor();
@@ -76,7 +77,7 @@ class Processor : private boost::noncopyable {
     /** This function try to roll up argument and reads data from schema
      * This is not finished - need to be fixed */
     number getValueOfRollup(const query &q,
-                            int offset,
-                            int timeOffset);
+        int offset,
+        int timeOffset);
 
 };
