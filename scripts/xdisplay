@@ -24,7 +24,7 @@ fi
 
 if [[ $FILE == *.qry ]] ; then
 echo "Calling compiler for" $FILE
-if ! xcompiler -q $FILE ; then exit 1 ; fi 
+if ! xcompiler -q $FILE ; then exit 1 ; fi
 fi
 
 echo 'Phase view: query.'$PHASE
@@ -57,7 +57,7 @@ fi
 
 echo 'Calling xdumper for query.'$PHASE
 
-if ! xdumper -i 'query.'$PHASE -d $arg > ${FILE%%.*}'.dot' ; then exit 1 ; fi 
+if ! xdumper -i 'query.'$PHASE -d $arg > ${FILE%%.*}'.dot' ; then exit 1 ; fi
 
 dot -T$PICTYPE ${FILE%%.*}'.dot' -o ${FILE%%.*}'.'$PICTYPE
 

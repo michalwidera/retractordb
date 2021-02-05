@@ -17,15 +17,18 @@
 
 #include <boost/rational.hpp>
 
-namespace boost {
-    namespace serialization {
+namespace boost
+{
+    namespace serialization
+    {
 
         template<class Archive, class T>
         inline void serialize(
             Archive &ar,
             boost::rational<T> &p,
             unsigned int /* file_version */
-        ) {
+        )
+        {
             T _num(p.numerator()) ;
             T _den(p.denominator());
             ar &_num ;
@@ -42,18 +45,21 @@ using namespace boost ;
 
 boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,  int ttl = 11) ;
 
-enum command_id {
+enum command_id
+{
 #define DEF_CASE( _A_ ) _A_ ,
 #include "tokendefset.h"
 #undef DEF_CASE
 } ;
 
-class token {
+class token
+{
 
     friend class boost::serialization::access;
 
     template<class Archive>
-    void serialize(Archive &ar, unsigned int version) {
+    void serialize(Archive &ar, unsigned int version)
+    {
         ar &command ;
         ar &crValue ;
         ar &rcValue ;
@@ -65,7 +71,7 @@ class token {
     boost::rational<int> rcValue ;
     string sValue_ ;
 
-  public:
+public:
     string getValue();
     boost::rational<int> getCRValue() ;
 
@@ -77,14 +83,16 @@ class token {
     command_id getTokenCommand();
 } ;
 
-class field {
+class field
+{
 
-  private:
+private:
 
     friend class boost::serialization::access;
 
     template<class Archive>
-    void serialize(Archive &ar, unsigned int version) {
+    void serialize(Archive &ar, unsigned int version)
+    {
         ar &setFieldName ;
         ar &dFieldType ;
         ar &lProgram ;
@@ -93,7 +101,7 @@ class field {
 
     string sFieldText ;
 
-  public:
+public:
 
     enum eType { BAD, BYTE, INTEGER, RATIONAL } ;
 
@@ -110,14 +118,16 @@ class field {
     token  getFirstFieldToken() ;
 } ;
 
-class query {
+class query
+{
 
-  private:
+private:
 
     friend class boost::serialization::access ;
 
     template<class Archive>
-    void serialize(Archive &ar, unsigned int version) {
+    void serialize(Archive &ar, unsigned int version)
+    {
         ar &id ;
         ar &filename ;
         ar &rInterval ;
@@ -125,7 +135,7 @@ class query {
         ar &lProgram ;
     }
 
-  public:
+public:
 
     query(boost::rational<int> rInterval, string id) ;
     query() ;
@@ -157,23 +167,27 @@ bool isDeclared(string query_name) ;
 bool isExist(string query_name);
 
 class qTree :
-    public vector < query > {
+    public vector < query >
+{
 
-  private:
+private:
 
     friend class boost::serialization::access;
     template<class Archive>
-    void serialize(Archive &ar, unsigned int version) {
+    void serialize(Archive &ar, unsigned int version)
+    {
         ar &boost::serialization::base_object< vector < query >> (*this) ;
     }
 
-  public:
+public:
 
-    query &operator[](string query_name) {
+    query &operator[](string query_name)
+    {
         return getQuery(query_name) ;
     } ;
 
-    void sort() {
+    void sort()
+    {
         std::sort(begin(), end()) ;
     };
 

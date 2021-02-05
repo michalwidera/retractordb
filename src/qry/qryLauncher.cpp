@@ -14,23 +14,27 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess ;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
     // Clarification: When gcc has been upgraded to 9.x version some tests fails.
     // Bug appear when data are passing to program via script .sh
     // additional 13 (\r) character was append - this code normalize argv list.
     // C99: The parameters argc and argv and the strings pointed to by the argv array
     // shall be modifiable by the program, and retain their last-stored values
     // between program startup and program termination.
-    for (int i = 0 ; i < argc ;  i ++) {
+    for (int i = 0 ; i < argc ;  i ++)
+    {
         auto len = strlen(argv[i]) ;
 
         if (len > 0)
-            if (argv[i][len - 1] == 13) {
+            if (argv[i][len - 1] == 13)
+            {
                 argv[i][len - 1] = 0 ;
             }
     }
 
-    try {
+    try
+    {
         namespace po = boost::program_options;
         po::options_description desc("Allowed options");
         desc.add_options()
@@ -57,58 +61,83 @@ int main(int argc, char* argv[]) {
         po::notify(vm);
         setbuf(stdout, NULL);
 
-        if (vm.count("json")) {
+        if (vm.count("json"))
+        {
             setmode("JSON") ;
         }
 
-        if (vm.count("xml")) {
+        if (vm.count("xml"))
+        {
             setmode("XML");
         }
 
-        if (vm.count("info")) {
+        if (vm.count("info"))
+        {
             setmode("INFO");
         }
 
-        if (vm.count("graphite")) {
+        if (vm.count("graphite"))
+        {
             setmode("GRAPHITE") ;
         }
 
-        if (vm.count("raw")) {
+        if (vm.count("raw"))
+        {
             setmode("RAW");
         }
 
-        if (vm.count("influxdb")) {
+        if (vm.count("influxdb"))
+        {
             setmode("INFLUXDB") ;
         }
 
-        if (vm.count("help")) {
+        if (vm.count("help"))
+        {
             cerr << argv[0] << " - xretractor communication tool." << std::endl;
             cerr << desc << endl ;
             return system::errc::success;
-        } else if (vm.count("hello")) {
+        }
+        else if (vm.count("hello"))
+        {
             return hello();
-        } else if (vm.count("kill")) {
+        }
+        else if (vm.count("kill"))
+        {
             ptree pt = netClient("kill", "") ;
             printf("kill sent.\n");
-        } else if (vm.count("dir")) {
+        }
+        else if (vm.count("dir"))
+        {
             dir();
-        } else if (vm.count("detail")) {
-            if (detailShow() == false) {
+        }
+        else if (vm.count("detail"))
+        {
+            if (detailShow() == false)
+            {
                 return system::errc::no_such_file_or_directory ;
             }
-        } else if (vm.count("select") && sInputStream != "none") {
-            if (select(vm.count("needctrlc")) == false) {
+        }
+        else if (vm.count("select") && sInputStream != "none")
+        {
+            if (select(vm.count("needctrlc")) == false)
+            {
                 return system::errc::no_such_file_or_directory;
             }
-        } else {
+        }
+        else
+        {
             cout << argv[0] << ": fatal error: no argument" << endl ;
             cout << "query receiver terminated." << endl ;
             return EPERM ; //ERROR defined in errno-base.h
         }
-    } catch (IPC::interprocess_exception &ex) {
+    }
+    catch (IPC::interprocess_exception &ex)
+    {
         cerr << ex.what() << endl << "catch client" << endl;
         return system::errc::no_child_process;
-    } catch (std::exception &e) {
+    }
+    catch (std::exception &e)
+    {
         cerr << e.what() << endl;
         return system::errc::interrupted;
     }

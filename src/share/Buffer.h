@@ -9,7 +9,8 @@
 
 typedef boost::shared_array<char> arrayPointer_t ;
 
-enum BlockType {
+enum BlockType
+{
     BF,     /** Block in File */
     BM,     /** Block in Memory */
     BCF,    /** Block in Cyclic File */
@@ -20,10 +21,11 @@ template <class IDTYPE>
 class CBufferImpl ;
 
 template <class IDTYPE>
-class CBuffer {
+class CBuffer
+{
     std::shared_ptr< CBufferImpl< IDTYPE >> pImpl ;
 
-  public:
+public:
 
     CBuffer() ;
 

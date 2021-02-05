@@ -9,7 +9,8 @@
 #include <string>              // for string
 #include <vector>              // for vector
 
-class inputFileInstance {
+class inputFileInstance
+{
 
     std::shared_ptr< std::ifstream > psFile ;
     int len ; /**< Length of file in bytes */
@@ -17,7 +18,7 @@ class inputFileInstance {
     void goBegin();
     string extension;
 
-  public:
+public:
 
     inputFileInstance(std::string inputFileName) ;
     inputFileInstance() ;
@@ -26,11 +27,12 @@ class inputFileInstance {
 };
 
 class inputDF :
-    public inputFileInstance {
+    public inputFileInstance
+{
     std::vector < boost::any > lResult ;
     std::list < field > lSchema ;
 
-  public:
+public:
 
     inputDF();
     inputDF(std::string inputFileName, std::list < field > &lSchema) ;

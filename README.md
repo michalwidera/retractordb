@@ -5,7 +5,7 @@ RetractorDB
 
 Sources of RetractorDB Time Series Database System prototype.
 
-Contents
+Commands
 -----------------------------------------------------------------------
 
 * _xqry_: database client
@@ -14,7 +14,7 @@ Contents
 * _xretractor_: database main process
 * _xdisplay_: query plan presentation script
 
-Installation procedure
+How to install
 -----------------------------------------------------------------------
 
 ```
@@ -35,7 +35,7 @@ Allowed options:
   -t [ --detail ] arg         show details of this stream
   ...
 ```
-  
+
 
 To get full functionality additional packages may be required like:
 ```
@@ -45,8 +45,8 @@ sudo apt install graphviz feh tmux gnuplot
 Query Language
 -----------------------------------------------------------------------
 Example queries are located in examples directory as *.rql files.
-There are two types supported.
-First starts from _declare_ keyword and declares time series. 
+Two types of queries are supported.
+First starts from _declare_ keyword that declares time series.
 This could be a data file, binary file or even device file from _/dev_ directory.
 Second starts from _select_ keyword and have following formal form:
 
@@ -54,11 +54,11 @@ Second starts from _select_ keyword and have following formal form:
 select column_names
 stream output_stream
 from junction_of_input_streams
-``` 
+```
 
 Example:
 ```
-select core1[0]/2+1,a 
+select core1[0]/2+1,a
 stream str2
 from core1+core0
 ```
@@ -66,7 +66,7 @@ from core1+core0
 Author
 -----------------------------------------------------------------------
 
-Project created in 2003-2020 by Michal Widera
+Project created in 2003-2021 by Michal Widera
 (michal@widera.com.pl)
 
 ## Project Web Page
