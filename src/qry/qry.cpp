@@ -13,6 +13,11 @@ How xqry terminal works
 #include <cstdio>
 #include <chrono>
 
+// This define is required to remove deprecation of boost/bind.hpp
+// some boost libraries still didn't remove dependency to boost bin
+// remove this is boost will clean up on own side.
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
 #include <boost/regex.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
@@ -36,7 +41,7 @@ How xqry terminal works
 
 //For data transmision purposes
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -63,6 +68,7 @@ How xqry terminal works
 using namespace std ;
 using namespace boost ;
 using namespace boost::assign;
+using namespace boost::placeholders;
 
 using boost::property_tree::ptree;
 

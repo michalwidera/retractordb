@@ -2,6 +2,11 @@
 #include "CRSMath.h"
 #include "Processor.h"
 
+// This define is required to remove deprecation of boost/bind.hpp
+// some boost libraries still didn't remove dependency to boost bin
+// remove this is boost will clean up on own side.
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
