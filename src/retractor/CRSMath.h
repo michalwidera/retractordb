@@ -5,7 +5,8 @@
 #include <boost/rational.hpp>
 #include <boost/core/noncopyable.hpp>
 
-namespace CRationalStreamMath {
+namespace CRationalStreamMath
+{
 
     using namespace boost ;
 
@@ -16,7 +17,8 @@ namespace CRationalStreamMath {
      * This class is designed to time management and sheduling task
      * Note: This is complicated
      */
-    class TimeLine :  private boost::noncopyable {
+    class TimeLine :  private boost::noncopyable
+    {
 
         /** Set of _SORTED_ deltas */
         set< rational<int>> sr;
@@ -29,7 +31,7 @@ namespace CRationalStreamMath {
          */
         rational<int> ctSlot ;
 
-      public:
+    public:
 
         /** This constructor fills inherited set of values filtered
           * During call of constructor list with minimal times is created

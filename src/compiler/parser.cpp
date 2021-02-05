@@ -44,11 +44,13 @@ field::eType fieldType = field::BAD ;
 int fieldCount(0);
 int flen = 1 ;
 
-bool invalidChar(char c) {
+bool invalidChar(char c)
+{
     return !(c >= 32 && c < 128);
 }
 
-void stripUnicode(std::string &str) {
+void stripUnicode(std::string &str)
+{
     str.erase(remove_if(str.begin(), str.end(), invalidChar), str.end());
 }
 
@@ -57,14 +59,18 @@ void stripUnicode(std::string &str) {
 // https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
 //
 
-static inline void ltrim(std::string &s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
+static inline void ltrim(std::string &s)
+{
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch)
+    {
         return !std::isspace(ch);
     }));
 }
 
-static inline void rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) {
+static inline void rtrim(std::string &s)
+{
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch)
+    {
         return !std::isspace(ch);
     }).base(), s.end());
 }
@@ -73,54 +79,69 @@ static inline void rtrim(std::string &s) {
 //  Semantic actions
 //
 
-namespace {
+namespace
+{
 
 #define RECPTOKEN(x)  { lProgram.push_back( token( x ) ) ; }
 #define RECPSTRTK(x)  { lProgram.push_back( token( x , string( str,end ) ) ) ; }
 
-    void do_fcall(char const* str, char const* end) {
+    void do_fcall(char const* str, char const* end)
+    {
         string s(str, end);
         s.erase(s.find('('));
         lProgram.push_back(token(CALL, s)) ;
     }
 
-    void do_alias(char const* str, char const* end) {
+    void do_alias(char const* str, char const* end)
+    {
         sFieldName = string(str, end) ;
         flen = 1 ;
     }
 
-    void do_alias_f(char const* str, char const* end) {
+    void do_alias_f(char const* str, char const* end)
+    {
         sFieldName = "Field_" + boost::lexical_cast<std::string> (fieldCount ++);
     }
 
-    void do_flen(int val) {
+    void do_flen(int val)
+    {
         flen = val ;
     }
 
-    void do_ftype(char const* str, char const* end) {
+    void do_ftype(char const* str, char const* end)
+    {
         fieldType = field::BAD ;
         string vStr(string(str, end));
         boost::algorithm::to_lower(vStr);
 
-        if ((vStr == "i8") || (vStr == "byte") || (vStr == "char")) {
+        if ((vStr == "i8") || (vStr == "byte") || (vStr == "char"))
+        {
             fieldType = field::BYTE ;
-        } else if ((vStr == "i16") || (vStr == "integer") || (vStr == "int")) {
+        }
+        else if ((vStr == "i16") || (vStr == "integer") || (vStr == "int"))
+        {
             fieldType = field::INTEGER ;
-        } else if ((vStr == "rational") || (vStr == "rat")) {
+        }
+        else if ((vStr == "rational") || (vStr == "rat"))
+        {
             fieldType = field::RATIONAL ;
-        } else {
+        }
+        else
+        {
             throw std::invalid_argument(string("Undefined type ") + vStr);
         }
     }
 
 
-    void do_stream_assign_id(char const* str, char const* end) {
+    void do_stream_assign_id(char const* str, char const* end)
+    {
         stk.top()->id = string(str, end);
         stk.top()->filename = "";
     }
 
 
-    void do_stream_assign_file(char const* str, char const* end) {
+    void do_stream_assign_file(char const* str, char const* end)
+    {
         std::string filename = string(str, end);
         ltrim(filename);
         rtrim(filename);
@@ -163,59 +184,75 @@ namespace {
 
     boost::rational<int> r_val ;
 
-    void pushVal(double val) {
+    void pushVal(double val)
+    {
         lProgram.push_back(token(PUSH_VAL, val)) ;
     }
 
-    void pushValI(int val) {
+    void pushValI(int val)
+    {
         lProgram.push_back(token(PUSH_VAL, val)) ;
     }
 
-    void pushValR(char const* str, char const* end) {
+    void pushValR(char const* str, char const* end)
+    {
         lProgram.push_back(token(PUSH_VAL, r_val)) ;
     }
 
-    void do_static_delta(char const*, char const*) {
+    void do_static_delta(char const*, char const*)
+    {
         stk.top()->rInterval = r_val ;
     }
 
-    void rational_nominator(int rat_nom_param) {
+    void rational_nominator(int rat_nom_param)
+    {
         r_val = rat_nom_param ;
     }
 
-    void rational_denominator(int rat_denom_param) {
+    void rational_denominator(int rat_denom_param)
+    {
         r_val = r_val / rat_denom_param ;
     }
 
-    void rational_irrational(double rat_irrational_param) {
+    void rational_irrational(double rat_irrational_param)
+    {
         r_val = Rationalize(rat_irrational_param);
     }
 
-    void do_streamsubstract(char const* str, char const* end) {
+    void do_streamsubstract(char const* str, char const* end)
+    {
         lProgram.push_back(token(STREAM_SUBSTRACT, r_val)) ;
     }
 
-    void do_timemove(int const val) {
+    void do_timemove(int const val)
+    {
         lProgram.push_back(token(STREAM_TIMEMOVE, val)) ;
     }
 
-    void do_select_section(char const*, char const*) {
+    void do_select_section(char const*, char const*)
+    {
         stk.top()->lSchema = lSchema ;
         lSchema.clear() ;
     }
 
-    void do_from_section(char const* str, char const* end) {
+    void do_from_section(char const* str, char const* end)
+    {
         stk.top()->lProgram = lProgram ;
         lProgram.clear() ;
     }
 
-    void do_arg_separator(char const* str, char const* end) {
-        for (int i = 0 ; i < flen ; i ++) {
+    void do_arg_separator(char const* str, char const* end)
+    {
+        for (int i = 0 ; i < flen ; i ++)
+        {
             string s(str, end);
 
-            if (flen == 1) {
+            if (flen == 1)
+            {
                 lSchema.push_back(field(sFieldName, lProgram, fieldType, s));
-            } else {
+            }
+            else
+            {
                 string name = sFieldName + "_" + boost::lexical_cast<std::string> (i) ;
                 lSchema.push_back(field(name, lProgram, fieldType, s));
             }
@@ -228,36 +265,44 @@ namespace {
         flen = 1 ;
     }
 
-    void do_Inner_Stream_Begin(char const*, char const*) {
+    void do_Inner_Stream_Begin(char const*, char const*)
+    {
         stk.push(std::shared_ptr<query> (new query()));
     }
 
-    void do_Inner_Stream_End(char const*, char const*) {
+    void do_Inner_Stream_End(char const*, char const*)
+    {
         string streamNameLoc(stk.top()->id);
         stk.pop();
         lProgram.push_back(token(PUSH_STREAM, streamNameLoc));
     };
 
-    void do_print(char const* str, char const* end) {
+    void do_print(char const* str, char const* end)
+    {
         string s(str, end);
     }
 
 
-    void do_reset() {
+    void do_reset()
+    {
         lProgram.clear();
         lSchema.clear();
         sFieldName = "" ;
         fieldType = field::BAD ;
     }
 
-    void do_insert_into_schema(char const* str, char const* end) {
-        for (auto   &q : coreInstance_parser) {
-            if (q.id == (stk.top())->id) {
+    void do_insert_into_schema(char const* str, char const* end)
+    {
+        for (auto   &q : coreInstance_parser)
+        {
+            if (q.id == (stk.top())->id)
+            {
                 throw std::invalid_argument(string("Duplicate stream name:") + q.id);
             }
         }
 
-        if (! stk.top()->id.empty()) {
+        if (! stk.top()->id.empty())
+        {
             coreInstance_parser.push_back(* (stk.top()));
         }
 
@@ -265,7 +310,8 @@ namespace {
     }
 
 
-    void do_aggregate(char const* str, char const* end) {
+    void do_aggregate(char const* str, char const* end)
+    {
         string s(str, end);
         stripUnicode(s);
         parse(s.c_str(),
@@ -292,10 +338,13 @@ namespace {
 //  Our ql_parser grammar
 //
 ////////////////////////////////////////////////////////////////////////////
-struct ql_parser : public grammar<ql_parser> {
+struct ql_parser : public grammar<ql_parser>
+{
     template <typename ScannerT>
-    struct definition {
-        definition(ql_parser const &) {
+    struct definition
+    {
+        definition(ql_parser const &)
+        {
             keywords =  "avg",
             "min",
             "max",
@@ -565,7 +614,7 @@ struct ql_parser : public grammar<ql_parser> {
                             | ISZERO
                             | ISNONZERO
                         )
-                        >> ch_p('(') >> * ( expression % ch_p(',') ) >> ch_p(')')
+                        >> ch_p('(') >> * (expression % ch_p(',')) >> ch_p(')')
                     )
                     [&do_fcall]
                     ;
@@ -595,13 +644,15 @@ struct ql_parser : public grammar<ql_parser> {
                     ;
 
         rule<ScannerT> const &
-        start() const {
+        start() const
+        {
             return command;
         }
     };
 };
 
-string getParseResult() {
+string getParseResult()
+{
     const qTree coreInstance2(coreInstance_parser) ;
     std::stringstream retval;
     boost::archive::text_oarchive oa(retval);
@@ -609,19 +660,22 @@ string getParseResult() {
     return retval.str();
 }
 
-string storeParseResult(string sOutputFile) {
+string storeParseResult(string sOutputFile)
+{
     // Store of compiled queries on disk
     const qTree coreInstance2(coreInstance_parser) ;
     std::ofstream ofs(sOutputFile.c_str());
 
-    if (! ofs.good()) {
+    if (! ofs.good())
+    {
         cerr << "No serialization file:" << sOutputFile << endl ;
         throw std::invalid_argument("Runtime Error");
     }
 
     boost::archive::text_oarchive oa(ofs);
 
-    if (! ofs.good()) {
+    if (! ofs.good())
+    {
         cerr << "File chain serialization fail" << endl ;
         throw std::invalid_argument("Runtime Error");
     }
@@ -630,7 +684,8 @@ string storeParseResult(string sOutputFile) {
     return string("OK");
 }
 
-string parser(vector<string> vsInputFile) {
+string parser(vector<string> vsInputFile)
+{
     //
     // Main parser body
     //
@@ -638,11 +693,13 @@ string parser(vector<string> vsInputFile) {
     stk.push(std::shared_ptr<query> (new query()));
     string str;
 
-    for (string line : vsInputFile) {
+    for (string line : vsInputFile)
+    {
         do_reset();
         stripUnicode(line);
 
-        if (! parse(line.c_str(), g, space_p).full) {
+        if (! parse(line.c_str(), g, space_p).full)
+        {
             cerr << "error in:[" << line << "]" << endl ;
             throw std::invalid_argument("Syntax Error");
         }

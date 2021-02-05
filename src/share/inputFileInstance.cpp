@@ -15,8 +15,10 @@
 using namespace std ;
 using namespace boost ;
 
-void inputFileInstance::goBegin() {
-    if (extension == ".dat") {
+void inputFileInstance::goBegin()
+{
+    if (extension == ".dat")
+    {
         psFile->clear();
         psFile->seekg(0, ios::beg);
     }
@@ -25,7 +27,8 @@ void inputFileInstance::goBegin() {
 }
 
 inputFileInstance::inputFileInstance(std::string inputFileName)
-    : len(0), curPos(0) {
+    : len(0), curPos(0)
+{
     extension = boost::filesystem::extension(inputFileName);
     std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     // Parser feeds space at the end of string
@@ -37,10 +40,14 @@ inputFileInstance::inputFileInstance(std::string inputFileName)
     psFile.reset(pstream);
     assert(psFile);
 
-    if (! psFile.get()) {
+    if (! psFile.get())
+    {
         len = -1 ;
-    } else {
-        if (extension == ".dat") {
+    }
+    else
+    {
+        if (extension == ".dat")
+        {
             psFile->seekg(0, ios::end);
             len = psFile->tellg();
         }
@@ -51,26 +58,34 @@ inputFileInstance::inputFileInstance(std::string inputFileName)
     //Don't throw exception from constructor - Rule!
 }
 
-inputFileInstance::inputFileInstance() : len(0), curPos(0) {
+inputFileInstance::inputFileInstance() : len(0), curPos(0)
+{
 }
 
 template < typename T >
-T inputFileInstance::get() {
+T inputFileInstance::get()
+{
     T retVal ;
 
-    if (len == -1) {
+    if (len == -1)
+    {
         throw std::out_of_range("no file connected to object");
     }
 
-    if (extension == ".txt") {
+    if (extension == ".txt")
+    {
         *psFile >> retVal ;
 
-        if (psFile->eof()) {
+        if (psFile->eof())
+        {
             goBegin();
             *psFile >> retVal ;
         }
-    } else {
-        if (curPos > (len - sizeof(T))) {
+    }
+    else
+    {
+        if (curPos > (len - sizeof(T)))
+        {
             goBegin();
         }
 
@@ -89,19 +104,24 @@ template boost::rational<int> inputFileInstance::get<boost::rational<int>>() ;
 //input DISK FILE - part
 //-------------------------------------------------------------
 
-inputDF::inputDF() : inputFileInstance() {
+inputDF::inputDF() : inputFileInstance()
+{
 }
 
 inputDF::inputDF(std::string inputFileName, std::list < field > &lSchema) :
     inputFileInstance(inputFileName),
-    lSchema(lSchema) {
+    lSchema(lSchema)
+{
 }
 
-void inputDF::processRow() {
+void inputDF::processRow()
+{
     lResult.clear();
 
-    for (auto &f : lSchema) {
-        switch (f.dFieldType) {
+    for (auto &f : lSchema)
+    {
+        switch (f.dFieldType)
+        {
             case field::BYTE:
                 lResult.push_back(get<unsigned char>());
                 break ;
@@ -123,31 +143,42 @@ void inputDF::processRow() {
     }
 }
 
-boost::rational<int> inputDF::getCR(field f) {
+boost::rational<int> inputDF::getCR(field f)
+{
     boost::rational<int> retValue(0) ;
     int cnt(0);
 
-    for (auto &v : lSchema) {
-        if (v.getFirstFieldName() == f.getFirstFieldName()) {
+    for (auto &v : lSchema)
+    {
+        if (v.getFirstFieldName() == f.getFirstFieldName())
+        {
             break ;
         }
 
         cnt++ ;
     }
 
-    if (lResult.size() == 0) {
+    if (lResult.size() == 0)
+    {
         processRow();
     }
 
     assert(lResult.size() != 0);
 
-    if (lResult[ cnt ].type() == typeid(unsigned char)) {
+    if (lResult[ cnt ].type() == typeid(unsigned char))
+    {
         retValue  = any_cast<unsigned char> (lResult[ cnt ]);
-    } else if (lResult[ cnt ].type() == typeid(int)) {
+    }
+    else if (lResult[ cnt ].type() == typeid(int))
+    {
         retValue = any_cast<int> (lResult[ cnt ]);
-    } else if (lResult[ cnt ].type() == typeid(boost::rational<int>)) {
+    }
+    else if (lResult[ cnt ].type() == typeid(boost::rational<int>))
+    {
         retValue = any_cast<boost::rational<int>> (lResult[ cnt ]);
-    } else {
+    }
+    else
+    {
         throw std::out_of_range("getCR/undefined type");
     }
 

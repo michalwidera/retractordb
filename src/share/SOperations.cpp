@@ -8,13 +8,16 @@ using namespace boost ;
 
 
 //https://stackoverflow.com/questions/35971827/c-boost-rational-class-floor-function
-namespace boost {
+namespace boost
+{
     template <typename IntType>
-    constexpr IntType floor(rational<IntType> const &num) {
+    constexpr IntType floor(rational<IntType> const &num)
+    {
         return static_cast<IntType>(num.numerator() / num.denominator());
     }
     template <typename IntType>
-    constexpr IntType ceil(rational<IntType> const &num) {
+    constexpr IntType ceil(rational<IntType> const &num)
+    {
         auto inum = static_cast<IntType>(num.numerator() / num.denominator());
         return (num == inum) ? inum : ((num.numerator() > 0) ? ++ inum : --inum) ;
     }
@@ -30,20 +33,25 @@ for i in range(0,10):
 deltaC = (deltaA*deltaB)/(deltaA+deltaB)
 */
 
-rational<int> deltaHash(const rational<int> &arg1, const rational<int> &arg2) {
+rational<int> deltaHash(const rational<int> &arg1, const rational<int> &arg2)
+{
     assert(arg1 + arg2 != 0);
     return (arg1 * arg2) / (arg1 + arg2);
 }
 
-bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {
+bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos)
+{
     assert(deltaA > 0);
     assert(deltaB > 0);
     const rational<int> delta = deltaB / (deltaA + deltaB) ;
     bool ret = floor(delta * i) == floor(delta * (i + 1));
 
-    if (ret) {
+    if (ret)
+    {
         retPos = i - (floor((i + 1) * delta));        //B
-    } else {
+    }
+    else
+    {
         retPos = floor(i * delta);    //A
     }
 
@@ -74,7 +82,8 @@ for i in range(0,5) :
 #div- end
 */
 
-int Div(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
+int Div(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i)
+{
     return i + ceil((i + 1) * deltaA / deltaB);
 }
 
@@ -103,16 +112,19 @@ for i in range(0,10) :
 */
 
 
-int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
+int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i)
+{
     return i + floor(i * deltaB / deltaA);
 }
 
 /* Ta funkcja jest taka sama dla obu operacji */
 
-rational<int> deltaDivMod(const rational<int> &arg1, const rational<int> &arg2) {
+rational<int> deltaDivMod(const rational<int> &arg1, const rational<int> &arg2)
+{
     assert(arg1 != arg2);
 
-    if (arg1 == arg2) {
+    if (arg1 == arg2)
+    {
         throw std::out_of_range("Delta are equal in DehashDiv - undefinied.");
     }
 
@@ -128,15 +140,18 @@ for i in range(0,10):
         print C[i][0],
 */
 
-rational<int> deltaSubstract(const rational<int> &arg1) {
+rational<int> deltaSubstract(const rational<int> &arg1)
+{
     return arg1 ;
 }
 //todo
-int Substract(const rational<int> &deltaA, const rational<int> &deltaB, const int i) {
+int Substract(const rational<int> &deltaA, const rational<int> &deltaB, const int i)
+{
     return ceil(i * deltaA / deltaB);
 }
 
-rational<int> deltaAdd(const rational<int> &arg1, const rational<int> &arg2) {
+rational<int> deltaAdd(const rational<int> &arg1, const rational<int> &arg2)
+{
     return std::min(arg1, arg2) ;
 }
 
@@ -150,15 +165,18 @@ for i in range(0,10):
 */
 
 
-rational<int> deltaTimemove(const rational<int> &arg1, const rational<int> &arg2) {
+rational<int> deltaTimemove(const rational<int> &arg1, const rational<int> &arg2)
+{
     return arg1 ;
 }
 
-int agse(int offset, int step) {
+int agse(int offset, int step)
+{
     return floor(boost::rational<int> (offset) / boost::rational<int> (step));
 }
 
-void SOperations_regtest() {
+void SOperations_regtest()
+{
     boost::rational<int> a(1, 2) ;
     boost::rational<int> b(1, 3) ;
     boost::rational<int> c(2, 3) ;
