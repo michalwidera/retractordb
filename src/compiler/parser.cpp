@@ -1,5 +1,10 @@
 #include "QStruct.h"
 
+// This define is required to remove deprecation of boost/bind.hpp
+// some boost libraries still didn't remove dependency to boost bin
+// remove this is boost will clean up on own side.
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
 //Boost libraries
 #include <boost/any.hpp>
 #include <boost/spirit/include/classic_core.hpp>
@@ -8,7 +13,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/bind.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/regex.hpp>
 
 #include <algorithm>
@@ -24,6 +29,7 @@ using namespace std ;
 using namespace boost ;
 using namespace boost::spirit::classic;
 using namespace boost::lambda;
+using namespace boost::placeholders;
 
 qTree coreInstance_parser ;
 

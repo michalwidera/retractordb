@@ -2,6 +2,11 @@
 #include "SOperations.h"
 #include "QStruct.h"
 
+// This define is required to remove deprecation of boost/bind.hpp
+// some boost libraries still didn't remove dependency to boost bin
+// remove this is boost will clean up on own side.
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
 #include <boost/variant.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
