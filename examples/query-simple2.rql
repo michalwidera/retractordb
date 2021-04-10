@@ -6,4 +6,3 @@ select * stream str2 from core0#core1
 select * stream str3 from str1-1/2
 select * stream str4 from core0%2
 select * stream str5 from (core0+core1)>10
-

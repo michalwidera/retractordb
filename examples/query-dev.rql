@@ -1,5 +1,6 @@
+# This example show stream sum on data file and device
+
 declare a INTEGER stream core0, 0.5 file datafile2.dat
 declare c BYTE stream core1, 1 file /dev/urandom
 
 select core0[0],core1[0],core0[0]+core0[1] stream str1 from core0+core1
-

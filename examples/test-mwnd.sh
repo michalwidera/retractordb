@@ -6,7 +6,7 @@ else
 FILE=query-mwnd.rql
 fi
 
-if ! xcompiler -q $FILE ; then exit 1 ; fi 
+if ! xcompiler -q $FILE ; then exit 1 ; fi
 
 if [ "$2" == "x" ]; then exit 1 ; fi
 
@@ -32,13 +32,24 @@ then
     tmux resize-pane -t dev:0.5 -x 12
     tmux resize-pane -t dev:0.6 -x 12
 
-    tmux send-keys -t dev:0.0 'xretractor -v' C-m
-    sleep 2
-    tmux send-keys -t dev:0.1 'clear; xqry -s core' C-m
-    tmux send-keys -t dev:0.2 'clear; xqry -s agregation' C-m
-    tmux send-keys -t dev:0.3 'clear; xqry -s agregationSerialization' C-m
-    tmux send-keys -t dev:0.4 'clear; xqry -s agregationMirror' C-m
-    tmux send-keys -t dev:0.5 'clear; xqry -s agregationSelective' C-m
-    tmux send-keys -t dev:0.6 'clear; xqry -s serialization' C-m
+    # https://github.com/tmux/tmux/issues/1778
+    # "Probably the enter is being sent before the shell
+    # has started and it is eating it."
+    # Therefore sleep 5 here.
+    sleep 5
+
+    tmux send-keys -t dev:0.0 'xretractor -v' Enter
+    sleep 1
+    tmux send-keys -t dev:0.1 'clear; xqry -s core' Enter
+    sleep 1
+    tmux send-keys -t dev:0.2 'clear; xqry -s agregation' Enter
+    sleep 1
+    tmux send-keys -t dev:0.3 'clear; xqry -s agregationSerialization' Enter
+    sleep 1
+    tmux send-keys -t dev:0.4 'clear; xqry -s agregationMirror' Enter
+    sleep 1
+    tmux send-keys -t dev:0.5 'clear; xqry -s agregationSelective' Enter
+    sleep 1
+    tmux send-keys -t dev:0.6 'clear; xqry -s serialization' Enter
 fi
 tmux attach -t dev

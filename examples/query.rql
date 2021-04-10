@@ -4,9 +4,8 @@ declare e INTEGER stream core2, 1 file datafile1.txt
 
 #select core0[0],core0[1] as test stream str1 from core0#core1
 select * stream str1 from core1@(1,-2)
-#select * stream str2 from core1@(3,2)
+select * stream str2 from core1@(3,2)
 select * stream str3 from str1@(3,2)
 select * stream str4 from core1@(1,1)
 
-select * stream str2 from core2
-
+#select * stream str2 from core2
