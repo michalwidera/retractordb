@@ -31,14 +31,15 @@ then
     tmux resize-pane -t 5 -x 15
 
     # https://github.com/tmux/tmux/issues/1778
-    # "Probably the enter is being sent before the shell 
+    # "Probably the enter is being sent before the shell
     # has started and it is eating it."
-    # Therefore sleep 5 here. 
+    # Therefore sleep 5 here.
     sleep 5
 
-    tmux send-keys -t 0 "xretractor -v" Enter 
-    tmux send-keys -t 1 "sleep 2; clear; xqry -s core0" Enter 
-    tmux send-keys -t 2 "sleep 2; clear; xqry -s str1" Enter 
+    tmux send-keys -t 0 "xretractor -v" Enter
+    sleep 1
+    tmux send-keys -t 1 "sleep 2; clear; xqry -s core0" Enter
+    tmux send-keys -t 2 "sleep 2; clear; xqry -s str1" Enter
     tmux send-keys -t 3 "sleep 2; clear; xqry -s str2" Enter
     tmux send-keys -t 4 "sleep 2; clear; xqry -s str3" Enter
     tmux send-keys -t 5 "sleep 2; clear; xqry -s str4" Enter

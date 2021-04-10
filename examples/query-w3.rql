@@ -4,4 +4,3 @@ select * stream agregacja from core@(2,2)
 select * stream agregacjaSerializacja from core@(1,2)
 
 select * stream agregacjaLustrzana from core@(2,-2)
-

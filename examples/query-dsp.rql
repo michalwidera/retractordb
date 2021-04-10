@@ -7,4 +7,3 @@ select * stream signalRow from source@(1,25)
 select signalRow[_] * filter[_] stream accRow from signalRow+filter
 select accRow[0] stream output from accRow.sum
 select output[0]/25,source[0] stream outputAll from output+source
-
