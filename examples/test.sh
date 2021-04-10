@@ -31,12 +31,22 @@ then
     tmux resize-pane -t dev:0.4 -x 15
     tmux resize-pane -t dev:0.5 -x 15
 
+    # https://github.com/tmux/tmux/issues/1778
+    # "Probably the enter is being sent before the shell
+    # has started and it is eating it."
+    # Therefore sleep 5 here.
+    sleep 5
+
     tmux send-keys -t dev:0.0 'xretractor -v' C-m
-    sleep 2
-    tmux send-keys -t dev:0.1 'clear; xqry -s str1' C-m
-    tmux send-keys -t dev:0.2 'clear; xqry -s str2' C-m
-    tmux send-keys -t dev:0.3 'clear; xqry -s str3' C-m
-    tmux send-keys -t dev:0.4 'clear; xqry -s str4' C-m
-    tmux send-keys -t dev:0.5 'clear; xqry -s core1' C-m
+    sleep 1
+    tmux send-keys -t dev:0.1 'clear; xqry -s str1' Enter
+    sleep 1
+    tmux send-keys -t dev:0.2 'clear; xqry -s str2' Enter
+    sleep 1
+    tmux send-keys -t dev:0.3 'clear; xqry -s str3' Enter
+    sleep 1
+    tmux send-keys -t dev:0.4 'clear; xqry -s str4' Enter
+    sleep 1
+    tmux send-keys -t dev:0.5 'clear; xqry -s core1' Enter
 fi
 tmux attach -t dev

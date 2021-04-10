@@ -7,4 +7,3 @@ select * stream agregationMirror from core@(2,-2)
 select * stream agregationSelective from core@(3,-2)
 
 select * stream serialization from agregationMirror@(1,1)
-

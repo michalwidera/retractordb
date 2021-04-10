@@ -8,4 +8,3 @@ select core0[0],core1[0] as test stream hash4 from (core0-1.5)#(core1>10)
 
 select core0[0,1],core1[0][1] as test stream hash5 from (core0&(1/5))#(core1%10)
 select core0[0],core1[0] as test stream hash6 from (core0-1.5)#(core1&10)
-
