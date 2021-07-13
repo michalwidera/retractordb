@@ -1,16 +1,16 @@
 #pragma once
 
-#include <boost/core/noncopyable.hpp>        // for noncopyable
-#include <boost/rational.hpp>                // for rational
-#include <boost/smart_ptr/shared_array.hpp>  // for shared_array
-#include <boost/variant/variant.hpp>         // for variant
-#include <iosfwd>                            // for ostream
-#include <list>                              // for list
-#include <string>                            // for string
-#include <vector>                            // for vector
+#include <boost/core/noncopyable.hpp>       // for noncopyable
+#include <boost/rational.hpp>               // for rational
+#include <boost/smart_ptr/shared_array.hpp> // for shared_array
+#include <boost/variant/variant.hpp>        // for variant
+#include <iosfwd>                           // for ostream
+#include <list>                             // for list
+#include <string>                           // for string
+#include <vector>                           // for vector
 
 /** Data of this type are stored in streams */
-typedef boost::variant< boost::rational<int>, int, double > number ;
+typedef boost::variant<boost::rational<int>, int, double> number;
 
 /**
  * Class covers CBuffer with own abstraction
@@ -22,17 +22,16 @@ typedef boost::variant< boost::rational<int>, int, double > number ;
 class dbStream : private boost::noncopyable
 {
 
-    int frameSize ; /**< Size of frame in bytes */
-    boost::shared_array< char >  pRawData ; /**< Pointer for binary data */
-    std::string streamName ; /**< Stream name */
-    std::list < std::string > schema ; /**< Schema - otherwize, list of field in stream */
-    std::vector < number >  mpShadow ;
-    std::vector < number >  mpRead ;
-    int mpReadNr, mpLenNr ;
+    int frameSize;                      /**< Size of frame in bytes */
+    boost::shared_array<char> pRawData; /**< Pointer for binary data */
+    std::string streamName;             /**< Stream name */
+    std::list<std::string> schema;      /**< Schema - otherwize, list of field in stream */
+    std::vector<number> mpShadow;
+    std::vector<number> mpRead;
+    int mpReadNr, mpLenNr;
 
 public:
-
-    dbStream(std::string streamName, std::list < std::string > schema);
+    dbStream(std::string streamName, std::list<std::string> schema);
 
     number &operator[](const int &_Keyval);
     number readCache(const int &_Keyval);

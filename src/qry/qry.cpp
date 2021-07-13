@@ -65,14 +65,14 @@ How xqry terminal works
 
 #include <time.h>
 
-using namespace std ;
-using namespace boost ;
+using namespace std;
+using namespace boost;
 using namespace boost::assign;
 using namespace boost::placeholders;
 
 using boost::property_tree::ptree;
 
-namespace IPC = boost::interprocess ;
+namespace IPC = boost::interprocess;
 
 //definitions for IPC - maps i strings (most important IPCString i IPCMap)
 typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
@@ -88,17 +88,17 @@ typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
 typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
 
 //When server works under valgrid - must be 10 probes x 10ms
-constexpr int maxAcceptableFails = 10 ;
+constexpr int maxAcceptableFails = 10;
 
-boost::lockfree::spsc_queue< ptree, boost::lockfree::capacity< 1024 >> spsc_queue;
+boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
-int producer_count = 0 ;
+int producer_count = 0;
 
 boost::atomic<bool> done(false);
 
-std::map <string, ptree> streamTable ;
+std::map<string, ptree> streamTable;
 
-int iTimeLimitCnt ; // testing purposes - time limit query (-m)
+int iTimeLimitCnt; // testing purposes - time limit query (-m)
 
 //Default comunication mode INFO
 enum mode
@@ -106,37 +106,36 @@ enum mode
     XML,
     JSON,
     INFO
-} outMode(INFO) ;
+} outMode(INFO);
 
 enum outputFormatMode
 {
     RAW,
     GRAPHITE,
     INFLUXDB
-} outputFormatMode(RAW) ;
+} outputFormatMode(RAW);
 
 //Graphite nbeed scheamt in format "path.to.data value timestamp"
-ptree schema ;
-string sInputStream ;
-
+ptree schema;
+string sInputStream;
 
 void setmode(std::string mode)
 {
     if (mode == "XML")
     {
-        outMode = XML ;
+        outMode = XML;
     }
     else if (mode == "JSON")
     {
-        outMode = JSON ;
+        outMode = JSON;
     }
     else if (mode == "INFO")
     {
-        outMode = INFO ;
+        outMode = INFO;
     }
     else if (mode == "RAW")
     {
-        outputFormatMode = RAW ;
+        outputFormatMode = RAW;
     }
     else if (mode == "GRAPHITE")
     {
@@ -186,79 +185,77 @@ int _getch()
 //
 void consumer()
 {
-    ptree e_value ;
+    ptree e_value;
 
     while (!done)
     {
         while (spsc_queue.pop(e_value))
         {
-            string stream = e_value.get("stream", "")  ;
+            string stream = e_value.get("stream", "");
             using namespace boost::adaptors;
-            BOOST_FOREACH(string w, streamTable | map_keys)
+            BOOST_FOREACH (string w, streamTable | map_keys)
 
-            if (w == stream)
-            {
-                int count = boost::lexical_cast<int> (e_value.get("count", ""));
-
-                if (outputFormatMode == RAW)
+                if (w == stream)
                 {
-                    for (int i = 0 ; i < count ; i ++)
+                    int count = boost::lexical_cast<int>(e_value.get("count", ""));
+
+                    if (outputFormatMode == RAW)
                     {
-                        printf("%s ", e_value.get(boost::lexical_cast<string> (i), "").c_str());
-                    }
-
-                    printf("\r\n");
-                }
-
-                if (outputFormatMode == GRAPHITE)
-                {
-                    int i = 0 ;
-
-                    for (const auto &v : schema.get_child("db.field"))
-                    {
-                        printf("%s.%s %s %llu\n",
-                            sInputStream.c_str(),
-                            v.second.get<std::string> ("").c_str(),
-                            e_value.get(boost::lexical_cast<string> (i++), "").c_str(),
-                            (long long) time(NULL)
-                        );
-                    }
-                }
-
-                //https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
-                if (outputFormatMode == INFLUXDB)
-                {
-                    using namespace std::chrono;
-                    int i = 0 ;
-                    printf("%s ", sInputStream.c_str());
-                    bool firstValNoComma(true);
-
-                    for (const auto &v : schema.get_child("db.field"))
-                    {
-                        if (firstValNoComma)
+                        for (int i = 0; i < count; i++)
                         {
-                            firstValNoComma = false ;
-                        }
-                        else
-                        {
-                            printf(",");
+                            printf("%s ", e_value.get(boost::lexical_cast<string>(i), "").c_str());
                         }
 
-                        printf("%s=%s",
-                            v.second.get<std::string> ("").c_str(),
-                            e_value.get(boost::lexical_cast<string> (i++), "").c_str()
-                        );
+                        printf("\r\n");
                     }
 
-                    printf(" %ld\n", duration_cast<nanoseconds> (system_clock::now().time_since_epoch()).count());
-                }
+                    if (outputFormatMode == GRAPHITE)
+                    {
+                        int i = 0;
 
-                //This part is time limited (-m) resposbile
-                if (iTimeLimitCnt > 1)
-                {
-                    iTimeLimitCnt -- ;
+                        for (const auto &v : schema.get_child("db.field"))
+                        {
+                            printf("%s.%s %s %llu\n",
+                                   sInputStream.c_str(),
+                                   v.second.get<std::string>("").c_str(),
+                                   e_value.get(boost::lexical_cast<string>(i++), "").c_str(),
+                                   (long long)time(NULL));
+                        }
+                    }
+
+                    //https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
+                    if (outputFormatMode == INFLUXDB)
+                    {
+                        using namespace std::chrono;
+                        int i = 0;
+                        printf("%s ", sInputStream.c_str());
+                        bool firstValNoComma(true);
+
+                        for (const auto &v : schema.get_child("db.field"))
+                        {
+                            if (firstValNoComma)
+                            {
+                                firstValNoComma = false;
+                            }
+                            else
+                            {
+                                printf(",");
+                            }
+
+                            printf("%s=%s",
+                                   v.second.get<std::string>("").c_str(),
+                                   e_value.get(boost::lexical_cast<string>(i++), "").c_str());
+                        }
+
+                        printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
+                    }
+
+                    //This part is time limited (-m) resposbile
+                    if (iTimeLimitCnt > 1)
+                    {
+                        iTimeLimitCnt--;
+                    }
                 }
-            }
         }
 
         boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
@@ -270,12 +267,11 @@ void consumer()
     }
 }
 
-
 void producer()
 {
     try
     {
-        string queueName = "brcdbr" + boost::lexical_cast<string> (boost::this_process::get_id()) ;
+        string queueName = "brcdbr" + boost::lexical_cast<string>(boost::this_process::get_id());
         IPC::message_queue mq(IPC::open_only, queueName.c_str());
         char message[1024];
         unsigned int priority;
@@ -283,9 +279,9 @@ void producer()
 
         while (!done)
         {
-            bool messageReceived = false ;
+            bool messageReceived = false;
 
-            while (! messageReceived && !done)
+            while (!messageReceived && !done)
             {
                 messageReceived = mq.try_receive(message, 1024, recvd_size, priority);
                 boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
@@ -293,18 +289,18 @@ void producer()
 
             if (done)
             {
-                continue ;
+                continue;
             }
 
-            message[recvd_size] = 0 ;
+            message[recvd_size] = 0;
             std::stringstream strstream;
-            strstream << message ;
+            strstream << message;
             memset(message, 0, 1000);
-            ptree pt ;
+            ptree pt;
 
             if (outMode == JSON)
             {
-                read_json(strstream, pt) ;
+                read_json(strstream, pt);
             }
 
             if (outMode == XML)
@@ -325,17 +321,19 @@ void producer()
     }
     catch (IPC::interprocess_exception &ex)
     {
-        cerr << ex.what() << endl << "catch on producer queue" << endl;
-        cerr << "queue:" << "brcdbr" + boost::lexical_cast<string> (boost::this_process::get_id()) << endl ;
-        done = true ;
-        return ;
+        cerr << ex.what() << endl
+             << "catch on producer queue" << endl;
+        cerr << "queue:"
+             << "brcdbr" + boost::lexical_cast<string>(boost::this_process::get_id()) << endl;
+        done = true;
+        return;
     }
 }
 
 ptree netClient(string netCommand, string netArgument)
 {
-    ptree pt_response ;
-    ptree pt_request ;
+    ptree pt_response;
+    ptree pt_request;
 
     try
     {
@@ -352,15 +350,12 @@ ptree netClient(string netCommand, string netArgument)
         //
         //request part
         //
-        IPC::message_queue mq
-        (IPC::open_only
-            , "RetractorQueryQueue"
-        );
-        std::stringstream request_stream ;
+        IPC::message_queue mq(IPC::open_only, "RetractorQueryQueue");
+        std::stringstream request_stream;
 
         if (outMode == JSON)
         {
-            write_json(request_stream, pt_request) ;
+            write_json(request_stream, pt_request);
         }
 
         if (outMode == XML)
@@ -382,26 +377,26 @@ ptree netClient(string netCommand, string netArgument)
         // grow to accommodate the entire line. The growth may be limited by passing
         // a maximum size to the streambuf constructor.
         // Check that response is OK.
-        std::pair<IPCMap*, std::size_t> ret = mapSegment.find<IPCMap> ("MyMap");
-        IPCMap* mymap = ret.first ;
+        std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
+        IPCMap *mymap = ret.first;
         assert(mymap);
-        int processId = boost::this_process::get_id() ;
-        IPCMap::iterator it = mymap->find(processId) ;
+        int processId = boost::this_process::get_id();
+        IPCMap::iterator it = mymap->find(processId);
         int cntr(maxAcceptableFails);
 
         while (it == mymap->end() && cntr)
         {
             boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-            it = mymap->find(processId) ;
-            --cntr ;
+            it = mymap->find(processId);
+            --cntr;
         }
 
         if (it == mymap->end())
         {
             printf("server not found\n");
-            done = true ;
+            done = true;
             pt_response.put("error.response", "server not found");
-            return pt_response ;
+            return pt_response;
         }
 
         std::stringstream strstream;
@@ -410,7 +405,7 @@ ptree netClient(string netCommand, string netArgument)
 
         if (outMode == JSON)
         {
-            read_json(strstream, pt_response) ;
+            read_json(strstream, pt_response);
         }
 
         if (outMode == XML)
@@ -425,46 +420,48 @@ ptree netClient(string netCommand, string netArgument)
     }
     catch (IPC::interprocess_exception &ex)
     {
-        cerr << ex.what() << endl << "catch IPC server" << endl;
-        done = true ;
+        cerr << ex.what() << endl
+             << "catch IPC server" << endl;
+        done = true;
     }
     catch (boost::system::system_error &e)
     {
-        cerr << e.what() << endl << "boost system_error" << endl ;
-        done = true ;
+        cerr << e.what() << endl
+             << "boost system_error" << endl;
+        done = true;
     }
     catch (std::exception &e)
     {
-        cerr << e.what() << endl ;
+        cerr << e.what() << endl;
         pt_response.put("error.response", e.what());
-        done = true ;
+        done = true;
     }
 
-    return pt_response ;
+    return pt_response;
 }
 
 bool select(bool noneedctrlc)
 {
     bool found(false);
-    ptree pt = netClient("get", "") ;
+    ptree pt = netClient("get", "");
 
     for (const auto &v : pt.get_child("db.stream"))
     {
-        if (sInputStream == v.second.get<std::string> (""))
+        if (sInputStream == v.second.get<std::string>(""))
         {
-            streamTable[ sInputStream ] = netClient("show", sInputStream)  ;
-            found = true ;
-            break ;
+            streamTable[sInputStream] = netClient("show", sInputStream);
+            found = true;
+            break;
         }
     }
 
     if (!found)
     {
-        cerr << "not found" << endl ;
+        cerr << "not found" << endl;
         return found;
     }
 
-    schema = netClient("detail", sInputStream) ;
+    schema = netClient("detail", sInputStream);
     //
     // Function in this thread will start listner on udp
     //
@@ -484,23 +481,22 @@ bool select(bool noneedctrlc)
         {
             if (_kbhit())
             {
-                break ;
+                break;
             }
         }
 
         if (done)
         {
-            break ;
+            break;
         }
 
         if (iTimeLimitCnt == 1)
         {
-            break ;
+            break;
         }
 
         boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
-    }
-    while (true);
+    } while (true);
 
     if (iTimeLimitCnt != 1 && !done)
     {
@@ -516,13 +512,13 @@ bool select(bool noneedctrlc)
 
 int hello()
 {
-    ptree pt = netClient("hello", "") ;
+    ptree pt = netClient("hello", "");
     printf("snd: hello\n");
-    string rcv("fail.") ;
-    BOOST_FOREACH(ptree::value_type & v,
-        pt)
+    string rcv("fail.");
+    BOOST_FOREACH (ptree::value_type &v,
+                   pt)
     {
-        rcv = v.second.get<std::string> ("") ;
+        rcv = v.second.get<std::string>("");
         printf("rcv: %s %s\n", v.first.c_str(), rcv.c_str());
     }
 
@@ -540,66 +536,62 @@ int hello()
 
 void dir()
 {
-    ptree pt = netClient("get", "") ;
-    std::vector<string> vcols = {"", "duration", "size", "count" };
-    stringstream ss ;
+    ptree pt = netClient("get", "");
+    std::vector<string> vcols = {"", "duration", "size", "count"};
+    stringstream ss;
 
     for (auto nName : vcols)
     {
-        int maxSize = 0 ;
+        int maxSize = 0;
 
         for (const auto &v : pt.get_child("db.stream"))
         {
-            if (v.second.get<std::string> (nName).length() > maxSize)
+            if (v.second.get<std::string>(nName).length() > maxSize)
             {
-                maxSize = v.second.get<std::string> (nName).length();
+                maxSize = v.second.get<std::string>(nName).length();
             }
         }
 
-        ss << "|%" ;
-        ss << maxSize ;
+        ss << "|%";
+        ss << maxSize;
         ss << "s";
     };
 
-    ss << "|\n" ;
+    ss << "|\n";
 
     for (const auto &v : pt.get_child("db.stream"))
     {
-        printf(ss.str().c_str()
-            , v.second.get<std::string> ("").c_str()
-            , v.second.get<std::string> ("duration").c_str()
-            , v.second.get<std::string> ("size").c_str()
-            , v.second.get<std::string> ("count").c_str());
+        printf(ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(), v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str());
     }
 }
 
 bool detailShow()
 {
     bool found(false);
-    ptree pt = netClient("get", "") ;
-    cerr << "got answer" << endl ;
+    ptree pt = netClient("get", "");
+    cerr << "got answer" << endl;
 
     for (const auto &v : pt.get_child("db.stream"))
     {
-        if (sInputStream == v.second.get<std::string> (""))
+        if (sInputStream == v.second.get<std::string>(""))
         {
-            found = true ;
+            found = true;
         }
     }
 
     if (found)
     {
-        ptree pt = netClient("detail", sInputStream) ;
+        ptree pt = netClient("detail", sInputStream);
 
         for (const auto &v : pt.get_child("db.field"))
         {
-            printf("%s.%s\n", sInputStream.c_str(), v.second.get<std::string> ("").c_str());
+            printf("%s.%s\n", sInputStream.c_str(), v.second.get<std::string>("").c_str());
         }
     }
     else
     {
-        cerr << "not found" << endl ;
+        cerr << "not found" << endl;
     }
 
-    return found ;
+    return found;
 }

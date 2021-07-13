@@ -1,11 +1,10 @@
 #include <SOperations.h>
-#include <assert.h>                  // for assert
-#include <algorithm>                 // for min
-#include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
-#include <stdexcept>                 // for out_of_range
+#include <assert.h>                 // for assert
+#include <algorithm>                // for min
+#include <boost/core/enable_if.hpp> // for enable_if_c<>::type
+#include <stdexcept>                // for out_of_range
 
-using namespace boost ;
-
+using namespace boost;
 
 //https://stackoverflow.com/questions/35971827/c-boost-rational-class-floor-function
 namespace boost
@@ -19,7 +18,7 @@ namespace boost
     constexpr IntType ceil(rational<IntType> const &num)
     {
         auto inum = static_cast<IntType>(num.numerator() / num.denominator());
-        return (num == inum) ? inum : ((num.numerator() > 0) ? ++ inum : --inum) ;
+        return (num == inum) ? inum : ((num.numerator() > 0) ? ++inum : --inum);
     }
 }
 
@@ -43,19 +42,19 @@ bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i,
 {
     assert(deltaA > 0);
     assert(deltaB > 0);
-    const rational<int> delta = deltaB / (deltaA + deltaB) ;
+    const rational<int> delta = deltaB / (deltaA + deltaB);
     bool ret = floor(delta * i) == floor(delta * (i + 1));
 
     if (ret)
     {
-        retPos = i - (floor((i + 1) * delta));        //B
+        retPos = i - (floor((i + 1) * delta)); //B
     }
     else
     {
-        retPos = floor(i * delta);    //A
+        retPos = floor(i * delta); //A
     }
 
-    return ret ;
+    return ret;
 }
 
 /*
@@ -111,7 +110,6 @@ for i in range(0,10) :
 #mod - end
 */
 
-
 int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i)
 {
     return i + floor(i * deltaB / deltaA);
@@ -142,7 +140,7 @@ for i in range(0,10):
 
 rational<int> deltaSubstract(const rational<int> &arg1)
 {
-    return arg1 ;
+    return arg1;
 }
 //todo
 int Substract(const rational<int> &deltaA, const rational<int> &deltaB, const int i)
@@ -152,7 +150,7 @@ int Substract(const rational<int> &deltaA, const rational<int> &deltaB, const in
 
 rational<int> deltaAdd(const rational<int> &arg1, const rational<int> &arg2)
 {
-    return std::min(arg1, arg2) ;
+    return std::min(arg1, arg2);
 }
 
 /*
@@ -164,25 +162,24 @@ for i in range(0,10):
          print str(A[int(i*deltaB/deltaA)])+B[i],
 */
 
-
 rational<int> deltaTimemove(const rational<int> &arg1, const rational<int> &arg2)
 {
-    return arg1 ;
+    return arg1;
 }
 
 int agse(int offset, int step)
 {
-    return floor(boost::rational<int> (offset) / boost::rational<int> (step));
+    return floor(boost::rational<int>(offset) / boost::rational<int>(step));
 }
 
 void SOperations_regtest()
 {
-    boost::rational<int> a(1, 2) ;
-    boost::rational<int> b(1, 3) ;
-    boost::rational<int> c(2, 3) ;
-    boost::rational<int> d(5, 4) ;
-    boost::rational<int> e(1) ;
-    boost::rational<int> f(0) ;
+    boost::rational<int> a(1, 2);
+    boost::rational<int> b(1, 3);
+    boost::rational<int> c(2, 3);
+    boost::rational<int> d(5, 4);
+    boost::rational<int> e(1);
+    boost::rational<int> f(0);
     boost::rational<int> g(-2, 3);
     boost::rational<int> h(-1);
     boost::rational<int> j(-5, 4);

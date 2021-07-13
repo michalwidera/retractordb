@@ -1,8 +1,8 @@
 #include "RandomFile.h"
-#include <stdio.h>    // for remove
-#include <stdlib.h>   // for getenv, NULL, mkstemp
-#include <cassert>    // for assert
-#include <stdexcept>  // for out_of_range
+#include <stdio.h>   // for remove
+#include <stdlib.h>  // for getenv, NULL, mkstemp
+#include <cassert>   // for assert
+#include <stdexcept> // for out_of_range
 
 //risk: Storing the pointer to the string returned by getenv() can result in overwritten environmental data.
 //https://www.securecoding.cert.org/confluence/display/cplusplus/ENV00-CPP.+Do+not+store+the+pointer+to+the+string+returned+by+getenv()
@@ -14,22 +14,21 @@
 #define MAX_PATH 512
 #endif
 
-CRandomFile::CRandomFile(string murExt, const bool destroyOnDestructor) :
-    destroyOnDestructor(destroyOnDestructor)
+CRandomFile::CRandomFile(string murExt, const bool destroyOnDestructor) : destroyOnDestructor(destroyOnDestructor)
 {
     std::string TMP_PATH;
 
     if (getenv("TMP") != NULL)
     {
-        TMP_PATH = getenv("TMP") ;
+        TMP_PATH = getenv("TMP");
     }
     else if (getenv("TEMP") != NULL)
     {
-        TMP_PATH = getenv("TEMP") ;
+        TMP_PATH = getenv("TEMP");
     }
     else if (getenv("HOME") != NULL)
     {
-        TMP_PATH = getenv("HOME") ;
+        TMP_PATH = getenv("HOME");
     }
     else
     {
@@ -39,15 +38,15 @@ CRandomFile::CRandomFile(string murExt, const bool destroyOnDestructor) :
     assert(TMP_PATH != "");
     assert(murExt != "");
 #ifdef WIN32
-    char randomFilename [MAX_PATH];
+    char randomFilename[MAX_PATH];
 
-    if (! GetTempFileNameA(TMP_PATH.c_str(), murExt.c_str(), 0, randomFilename))
+    if (!GetTempFileNameA(TMP_PATH.c_str(), murExt.c_str(), 0, randomFilename))
     {
         throw std::out_of_range("Thrown/RandomFile.cpp/CRandomFile/WINAPI32 GetTempFileNameA");
     }
 
 #else
-    char randomFilename [MAX_PATH] = "/tmp/stream.XXXXXXXX";
+    char randomFilename[MAX_PATH] = "/tmp/stream.XXXXXXXX";
 
     if (mkstemp(randomFilename) == -1)
     {
@@ -55,8 +54,8 @@ CRandomFile::CRandomFile(string murExt, const bool destroyOnDestructor) :
     }
 
 #endif
-    filename = randomFilename ;
-    open(filename.c_str(), ios::in | ios::out | ios::binary) ;
+    filename = randomFilename;
+    open(filename.c_str(), ios::in | ios::out | ios::binary);
 
     if (!good())
     {
@@ -80,21 +79,21 @@ CRandomFile::~CRandomFile()
     }
 }
 
-const CRandomFile &CRandomFile::operator << (string &text)
+const CRandomFile &CRandomFile::operator<<(string &text)
 {
     write(text.c_str(), static_cast<long>(text.length()));
     flush();
-    return *this ;
+    return *this;
 }
 
 #ifdef __REGTEST
 //g++ RandomFile.cpp -D__REGTEST
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     try
     {
         std::cerr << "start regression\n";
-        CRandomFile* test = new CRandomFile();
+        CRandomFile *test = new CRandomFile();
         *test << "test";
         delete test;
         std::cerr << "stop regression\n";

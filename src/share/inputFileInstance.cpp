@@ -1,19 +1,19 @@
 #include <inputFileInstance.h>
-#include <assert.h>                                // for assert
-#include <ctype.h>                                 // for tolower
-#include <algorithm>                               // for transform
-#include <boost/algorithm/string/trim.hpp>         // for trim_right
-#include <boost/filesystem/convenience.hpp>        // for extension
-#include <boost/rational.hpp>                      // for rational, operator>>
-#include <boost/type_index.hpp>                    // for type_info
-#include <boost/type_index/type_index_facade.hpp>  // for operator==
-#include <stdexcept>                               // for out_of_range
-#include "QStruct.h"                               // for field, field::BAD
+#include <assert.h>                               // for assert
+#include <ctype.h>                                // for tolower
+#include <algorithm>                              // for transform
+#include <boost/algorithm/string/trim.hpp>        // for trim_right
+#include <boost/filesystem/convenience.hpp>       // for extension
+#include <boost/rational.hpp>                     // for rational, operator>>
+#include <boost/type_index.hpp>                   // for type_info
+#include <boost/type_index/type_index_facade.hpp> // for operator==
+#include <stdexcept>                              // for out_of_range
+#include "QStruct.h"                              // for field, field::BAD
 
 #include <iostream>
 
-using namespace std ;
-using namespace boost ;
+using namespace std;
+using namespace boost;
 
 void inputFileInstance::goBegin()
 {
@@ -23,7 +23,7 @@ void inputFileInstance::goBegin()
         psFile->seekg(0, ios::beg);
     }
 
-    curPos = 0 ;
+    curPos = 0;
 }
 
 inputFileInstance::inputFileInstance(std::string inputFileName)
@@ -33,16 +33,15 @@ inputFileInstance::inputFileInstance(std::string inputFileName)
     std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     // Parser feeds space at the end of string
     boost::trim_right(inputFileName);
-    ifstream* pstream = new ifstream(
+    ifstream *pstream = new ifstream(
         inputFileName,
-        (extension == ".txt") ? ios::in : ios::in | ios::binary
-    );
+        (extension == ".txt") ? ios::in : ios::in | ios::binary);
     psFile.reset(pstream);
     assert(psFile);
 
-    if (! psFile.get())
+    if (!psFile.get())
     {
-        len = -1 ;
+        len = -1;
     }
     else
     {
@@ -62,10 +61,10 @@ inputFileInstance::inputFileInstance() : len(0), curPos(0)
 {
 }
 
-template < typename T >
+template <typename T>
 T inputFileInstance::get()
 {
-    T retVal ;
+    T retVal;
 
     if (len == -1)
     {
@@ -74,12 +73,12 @@ T inputFileInstance::get()
 
     if (extension == ".txt")
     {
-        *psFile >> retVal ;
+        *psFile >> retVal;
 
         if (psFile->eof())
         {
             goBegin();
-            *psFile >> retVal ;
+            *psFile >> retVal;
         }
     }
     else
@@ -89,16 +88,16 @@ T inputFileInstance::get()
             goBegin();
         }
 
-        psFile->read(reinterpret_cast<char*>(&retVal), sizeof retVal);
-        curPos += sizeof(T) ;
+        psFile->read(reinterpret_cast<char *>(&retVal), sizeof retVal);
+        curPos += sizeof(T);
     }
 
-    return retVal ;
+    return retVal;
 }
 
-template unsigned char inputFileInstance::get<unsigned char>() ;
-template int inputFileInstance::get<int>() ;
-template boost::rational<int> inputFileInstance::get<boost::rational<int>>() ;
+template unsigned char inputFileInstance::get<unsigned char>();
+template int inputFileInstance::get<int>();
+template boost::rational<int> inputFileInstance::get<boost::rational<int>>();
 
 //-------------------------------------------------------------
 //input DISK FILE - part
@@ -108,9 +107,8 @@ inputDF::inputDF() : inputFileInstance()
 {
 }
 
-inputDF::inputDF(std::string inputFileName, std::list < field > &lSchema) :
-    inputFileInstance(inputFileName),
-    lSchema(lSchema)
+inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema) : inputFileInstance(inputFileName),
+                                                                         lSchema(lSchema)
 {
 }
 
@@ -122,40 +120,40 @@ void inputDF::processRow()
     {
         switch (f.dFieldType)
         {
-            case field::BYTE:
-                lResult.push_back(get<unsigned char>());
-                break ;
+        case field::BYTE:
+            lResult.push_back(get<unsigned char>());
+            break;
 
-            case field::INTEGER:
-                lResult.push_back(get<int>()) ;
-                break ;
+        case field::INTEGER:
+            lResult.push_back(get<int>());
+            break;
 
-            case field::RATIONAL:
-                lResult.push_back(get<boost::rational<int>>());
-                break ;
+        case field::RATIONAL:
+            lResult.push_back(get<boost::rational<int>>());
+            break;
 
-            case field::BAD:
-            default:
-                std::cerr << "field:" << f.getFirstFieldName() << std::endl ;
-                throw std::out_of_range("processRow/undefined type");
-                break ; //proforma
+        case field::BAD:
+        default:
+            std::cerr << "field:" << f.getFirstFieldName() << std::endl;
+            throw std::out_of_range("processRow/undefined type");
+            break; //proforma
         }
     }
 }
 
 boost::rational<int> inputDF::getCR(field f)
 {
-    boost::rational<int> retValue(0) ;
+    boost::rational<int> retValue(0);
     int cnt(0);
 
     for (auto &v : lSchema)
     {
         if (v.getFirstFieldName() == f.getFirstFieldName())
         {
-            break ;
+            break;
         }
 
-        cnt++ ;
+        cnt++;
     }
 
     if (lResult.size() == 0)
@@ -165,22 +163,22 @@ boost::rational<int> inputDF::getCR(field f)
 
     assert(lResult.size() != 0);
 
-    if (lResult[ cnt ].type() == typeid(unsigned char))
+    if (lResult[cnt].type() == typeid(unsigned char))
     {
-        retValue  = any_cast<unsigned char> (lResult[ cnt ]);
+        retValue = any_cast<unsigned char>(lResult[cnt]);
     }
-    else if (lResult[ cnt ].type() == typeid(int))
+    else if (lResult[cnt].type() == typeid(int))
     {
-        retValue = any_cast<int> (lResult[ cnt ]);
+        retValue = any_cast<int>(lResult[cnt]);
     }
-    else if (lResult[ cnt ].type() == typeid(boost::rational<int>))
+    else if (lResult[cnt].type() == typeid(boost::rational<int>))
     {
-        retValue = any_cast<boost::rational<int>> (lResult[ cnt ]);
+        retValue = any_cast<boost::rational<int>>(lResult[cnt]);
     }
     else
     {
         throw std::out_of_range("getCR/undefined type");
     }
 
-    return retValue ;
+    return retValue;
 }

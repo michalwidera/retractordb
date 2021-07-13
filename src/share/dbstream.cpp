@@ -1,18 +1,18 @@
 #include "dbstream.h"
-#include <assert.h>            // for assert
-#include <ext/alloc_traits.h>  // for __alloc_traits<>::value_type
-#include <string.h>            // for memcpy, NULL
-#include <algorithm>           // for max
-#include <iostream>            // for basic_ostream::operator<<, operator<<
-#include "Buffer.h"            // for CBuffer, BF
+#include <assert.h>           // for assert
+#include <ext/alloc_traits.h> // for __alloc_traits<>::value_type
+#include <string.h>           // for memcpy, NULL
+#include <algorithm>          // for max
+#include <iostream>           // for basic_ostream::operator<<, operator<<
+#include "Buffer.h"           // for CBuffer, BF
 
 // stacktrace -> -ldl in CMakeList.txt
 #include <boost/stacktrace.hpp>
 
-CBuffer<std::string> cbuf ;
+CBuffer<std::string> cbuf;
 
-using namespace std ;
-using namespace boost ;
+using namespace std;
+using namespace boost;
 
 void saveStreamsToFile(string filename)
 {
@@ -20,47 +20,46 @@ void saveStreamsToFile(string filename)
 }
 long streamStoredSize(string filename)
 {
-    return cbuf.GetLen(filename) ;
+    return cbuf.GetLen(filename);
 }
 void Dump(std::ostream &os)
 {
     cbuf.Dump(os, NULL);
 }
 
-dbStream::dbStream(std::string streamName, list < std::string > schema) :
-    streamName(streamName),
-    schema(schema),
-    mpReadNr(-1),
-    mpLenNr(-1),
-    frameSize(schema.size() * sizeof(number)),
-    pRawData(new char[ frameSize ])
+dbStream::dbStream(std::string streamName, list<std::string> schema) : streamName(streamName),
+                                                                       schema(schema),
+                                                                       mpReadNr(-1),
+                                                                       mpLenNr(-1),
+                                                                       frameSize(schema.size() * sizeof(number)),
+                                                                       pRawData(new char[frameSize])
 {
     cbuf.DefBlock(streamName, frameSize, BF);
     mpShadow.resize(schema.size());
     mpRead.resize(schema.size());
 }
 
-number  &dbStream::operator[](const int &_Keyval)
+number &dbStream::operator[](const int &_Keyval)
 {
-    return mpShadow[ _Keyval ] ;
+    return mpShadow[_Keyval];
 }
 
 void dbStream::store()
 {
-    char* p(pRawData.get());
+    char *p(pRawData.get());
     int cnt(0);
 
     for (auto &str : schema)
     {
-        number fieldData(mpShadow[ cnt ]) ;
-        memcpy(p, & fieldData, sizeof(number));
-        p += sizeof(number) ;
-        cnt ++;
+        number fieldData(mpShadow[cnt]);
+        memcpy(p, &fieldData, sizeof(number));
+        p += sizeof(number);
+        cnt++;
     }
 
     cbuf.PutBlock(streamName, pRawData);
-    mpLenNr = -1 ;
-    mpReadNr = -1 ;
+    mpLenNr = -1;
+    mpReadNr = -1;
 }
 
 number dbStream::readCache(const int &_Keyval)
@@ -70,7 +69,7 @@ number dbStream::readCache(const int &_Keyval)
         get(0);
     }
 
-    return mpRead[ _Keyval ] ;
+    return mpRead[_Keyval];
 }
 
 void dbStream::get(int offset, bool reverse)
@@ -82,8 +81,8 @@ void dbStream::get(int offset, bool reverse)
         return;
     }
 
-    assert(offset >= 0) ;
-    int len = cbuf.GetLen(streamName) ;
+    assert(offset >= 0);
+    int len = cbuf.GetLen(streamName);
 
     if (mpReadNr == offset && mpLenNr == len)
     {
@@ -92,17 +91,17 @@ void dbStream::get(int offset, bool reverse)
 
     if (offset > len || len == 0)
     {
-        const number fake = boost::rational<int> (999, 1);
+        const number fake = boost::rational<int>(999, 1);
 
-        for (auto i = 0 ; i < schema.size() ; i++)
+        for (auto i = 0; i < schema.size(); i++)
         {
-            mpRead[i] = fake ;
+            mpRead[i] = fake;
         }
 
-//      cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
-//        TODO: There is problem. Need to investigate.
-//        cerr << boost::stacktrace::stacktrace() ;
-//        assert(false);
+        //      cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
+        //        TODO: There is problem. Need to investigate.
+        //        cerr << boost::stacktrace::stacktrace() ;
+        //        assert(false);
         return;
     }
 
@@ -120,18 +119,18 @@ void dbStream::get(int offset, bool reverse)
 
     assert(ret != 0);
     mpRead.clear();
-    char* p(pRawData.get());
+    char *p(pRawData.get());
 
-    for (int i = 0 ; i < schema.size() ; i++)
+    for (int i = 0; i < schema.size(); i++)
     {
-        number fieldData ;
-        memcpy(& fieldData, p, sizeof(number));
-        mpRead[ i ] = fieldData ;
-        p += sizeof(number) ;
+        number fieldData;
+        memcpy(&fieldData, p, sizeof(number));
+        mpRead[i] = fieldData;
+        p += sizeof(number);
     }
 
     assert(mpShadow.size() != 0);
-    mpReadNr = offset ; /* position */
-    mpLenNr  = len ;
+    mpReadNr = offset; /* position */
+    mpLenNr = len;
     return;
 }

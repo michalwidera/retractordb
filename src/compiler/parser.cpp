@@ -257,12 +257,12 @@ namespace
                 lSchema.push_back(field(name, lProgram, fieldType, s));
             }
 
-            lProgram.clear() ;
+            lProgram.clear();
         }
 
-        sFieldName = "" ;
-        fieldType = field::BAD ;
-        flen = 1 ;
+        sFieldName = "";
+        fieldType = field::BAD;
+        flen = 1;
     }
 
     void do_Inner_Stream_Begin(char const*, char const*)
@@ -690,7 +690,7 @@ string parser(vector<string> vsInputFile)
     // Main parser body
     //
     ql_parser g;
-    stk.push(std::shared_ptr<query> (new query()));
+    stk.push(std::shared_ptr<query>(new query()));
     string str;
 
     for (string line : vsInputFile)
@@ -698,14 +698,14 @@ string parser(vector<string> vsInputFile)
         do_reset();
         stripUnicode(line);
 
-        if (! parse(line.c_str(), g, space_p).full)
+        if (!parse(line.c_str(), g, space_p).full)
         {
-            cerr << "error in:[" << line << "]" << endl ;
+            cerr << "error in:[" << line << "]" << endl;
             throw std::invalid_argument("Syntax Error");
         }
     }
 
-    assert(! stk.empty());
+    assert(!stk.empty());
     stk.pop();
     return string("OK");
 }
