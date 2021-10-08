@@ -17,20 +17,17 @@ jobs:
           name: Install conan build system
           command: 'pip install conan'
       - run:
-          name: Change to build folder
-          command: 'cd build'
-      - run:
           name: Source project
-          command: 'conan source ..'
+          command: 'cd build && conan source ..'
       - run:
           name: Build from source
-          command: 'conan install ..'
+          command: 'cd build && conan install ..'
       - run:
           name: Install product
-          command: 'conan build ..'
+          command: 'cd build && conan build ..'
       - run:
           name: Test product
-          command: 'make test'
+          command: 'cd build && make test'
 
 workflows:
   version: 2
