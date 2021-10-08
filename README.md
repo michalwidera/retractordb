@@ -20,6 +20,7 @@ How to install
 ```
 sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
 pip install conan
+conan profile update settings.compiler.libcxx=libstdc++11 default
 git clone https://github.com/michalwidera/retractordb.git
 cd build
 conan source ..
