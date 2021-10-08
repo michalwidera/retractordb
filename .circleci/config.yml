@@ -17,6 +17,9 @@ jobs:
           name: Install conan build system
           command: 'pip install conan'
       - run:
+          name: Set C++11
+          command: 'conan profile update settings.compiler.libcxx=libstdc++11 default'
+      - run:
           name: Source project
           command: 'cd build && conan source ..'
       - run:
