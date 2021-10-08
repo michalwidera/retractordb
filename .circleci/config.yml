@@ -12,7 +12,10 @@ jobs:
           command: 'uname -a ; cat /proc/version; cat /etc/issue'
       - run:
           name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential iwyu'
+          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential iwyu python3 pip'
+      - run:
+          name: Insall conan build system
+          command: 'pip install conan'
       - run:
           name: Build from source
           command: 'cmake CMakeLists.txt ; make'
