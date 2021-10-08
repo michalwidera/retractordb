@@ -8,23 +8,26 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Show what I really am
-          command: 'uname -a ; cat /proc/version; cat /etc/issue'
+          name: Present build platform info
+          command: 'uname -a && cat /proc/version && cat /etc/issue'
       - run:
           name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake libboost-all-dev make build-essential iwyu python3 pip'
+          command: 'sudo apt-get -y install gcc cmake make build-essential python3 python3-pip'
       - run:
-          name: Insall conan build system
+          name: Install conan build system
           command: 'pip install conan'
       - run:
+          name: Source project
+          command: 'cd build && conan source ..'
+      - run:
           name: Build from source
-          command: 'cmake CMakeLists.txt ; make'
+          command: 'cd build && conan install ..'
       - run:
           name: Install product
-          command: 'sudo make install'
+          command: 'cd build && conan build ..'
       - run:
-          name: Check if there is any regression
-          command: 'ctest --output-on-failure'
+          name: Test product
+          command: 'cd build && make test'
 
 workflows:
   version: 2
