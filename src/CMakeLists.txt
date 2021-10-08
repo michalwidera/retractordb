@@ -1,43 +1,8 @@
-cmake_minimum_required(VERSION 3.3 FATAL_ERROR )
+#cmake_minimum_required(VERSION 3.3 FATAL_ERROR )
 
 project( retractordb-src )
 
-set(Boost_USE_STATIC_LIBS ON )
-set(Boost_USE_MULTITHREADED ON)
-
-FIND_PACKAGE( Boost COMPONENTS
-    thread
-    filesystem
-    serialization
-    regex
-    program_options
-    chrono
-    date_time
-    system
-    REQUIRED )
-
-MESSAGE(STATUS "Boost information:")
-MESSAGE(STATUS "Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
-MESSAGE(STATUS "Boost_LIBRARY_DIRS: ${Boost_LIBRARY_DIRS}")
-MESSAGE(STATUS "Boost_LIBRARIES: ${Boost_LIBRARIES}")
-
 include_directories( ${Boost_INCLUDE_DIR} "share" )
-
-link_libraries(
-    ${Boost_LIBRARIES}
-)
-
-# Release version without Debug option !!!
-#
-
-add_definitions(-DCMAKE_BUILD_TYPE=Debug )
-
-set(CMAKE_BUILD_TYPE Debug)
-
-add_definitions(
-  -D_CONSOLE
-  -D_DEBUG
-)
 
 set(SOURCES_RETRACTOR
   retractor/Processor.cpp
@@ -77,28 +42,9 @@ add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
 
-#find_program(iwyu_path NAMES include-what-you-use iwyu)
-#if(iwyu_path)
-#  set_property(TARGET xretractor PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-#  set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-#  set_property(TARGET xdumper PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-#  set_property(TARGET xqry PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path})
-#endif()
+target_link_libraries( xretractor ${CONAN_LIBS} )
+target_link_libraries( xcompiler ${CONAN_LIBS} )
+target_link_libraries( xdumper ${CONAN_LIBS} )
+target_link_libraries( xqry ${CONAN_LIBS} )
 
-INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
-ADD_DEFINITIONS( "-DHAS_BOOST" )
-
-find_package( Threads )
-
-target_link_libraries( xretractor ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
-target_link_libraries( xcompiler ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
-target_link_libraries( xdumper ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
-target_link_libraries( xqry ${Boost_LIBRARIES}  ${CMAKE_THREAD_LIBS_INIT} -lrt -ldl )
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-add_custom_target(astyle
-  COMMAND astyle --options=astyle.options share/* qry/* dumper/* compiler/* retractor/*
-)
-
-install(TARGETS xretractor xcompiler xdumper xqry DESTINATION /usr/local/bin)
+install(TARGETS xretractor xcompiler xdumper xqry DESTINATION ~/.local/bin)

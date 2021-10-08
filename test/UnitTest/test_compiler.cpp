@@ -1,6 +1,4 @@
-#define BOOST_TEST_DYN_LINK
-#define BOOST_TEST_MODULE Hello
-#include <boost/test/unit_test.hpp>
+#include <gtest/gtest.h>
 
 #include <boost/system/error_code.hpp>
 #include "compiler/compiler.hpp"
@@ -23,7 +21,7 @@ bool check_compile_function() {
 }
 
 
-BOOST_AUTO_TEST_CASE( check_compile )
+TEST( xcompiler, check_compile )
 {
-    BOOST_CHECK( check_compile_function() == true );
+    ASSERT_TRUE( check_compile_function() );
 }

@@ -18,13 +18,16 @@ How to install
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake libboost-all-dev make build-essential iwyu
+sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+pip install conan
 git clone https://github.com/michalwidera/retractordb.git
-cd retractordb
-cmake CMakeLists.txt; make
-sudo make install
+cd build
+conan source ..
+conan install ..
+conan build ..
+make test
 ```
-After installation _xretractor_, _xqry_ ... etc will be installed in /usr/local/bin on path.
+After installation _xretractor_, _xqry_ ... etc will be installed in ~/.local/bin on path.
 Please check proper installation by typing in command prompt - for instance: _xqry -h_
 
 You should see:
