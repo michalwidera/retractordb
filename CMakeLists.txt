@@ -4,9 +4,9 @@ project (retractordb)
 
 enable_testing()
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup()
 
 add_subdirectory(src)
 add_subdirectory(scripts)
 add_subdirectory(test)
-
