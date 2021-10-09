@@ -84,6 +84,6 @@ workflows:
                 - master
     jobs:
       - build-buildpack
-      - build-edge
+      - build-edge:
           requires:
             - build-buildpack
