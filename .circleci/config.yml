@@ -73,6 +73,9 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-edge:
+          requires:
+            - build-buildpack
   nightly:
     triggers:
       - schedule:
