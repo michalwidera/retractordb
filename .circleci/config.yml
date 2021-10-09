@@ -17,7 +17,7 @@ jobs:
           name: Install conan build system
           command: 'pip install conan'
       - run:
-          name: Set C++11
+          name: Set libstdc++11 (new ABI)
           command: 'conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default'
       - run:
           name: Source project
