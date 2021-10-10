@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <tuple>
 
 //https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 //https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -15,13 +16,30 @@ using namespace std;
 
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 
-typedef uint ProtocolTypeSize;
 
-class FileAggregator {
+enum typeInfo {
+    String,
+    Uint,
+    Byte,
+    Int
+} ;
+
+typedef int recordLen;
+typedef string recordName;
+typedef tuple <recordName, recordLen, typeInfo> record ;
+
+struct binaryProtocol {
     string fileLocation;
-    vector < uint > recordStruct;
-};
+    vector <record> recordStruct;
 
+    // This enables binaryProtocol << record << record chaining
+
+    template< typename T>
+    binaryProtocol &operator<<(const T& b) {
+        recordStruct.push_back(b);
+        return *this;
+    }
+};
 
 /*
 
@@ -32,7 +50,7 @@ message Person {
     int cost;
 }
 
-binaryprotocol data = String("name",10) | Uint("len") | Byte("status") | Int("cost");
+binaryprotocol data(String("name",10).Uint("len").Byte("status").Int("cost"));
 */
 
 void write( char * ptrSrc , uint size )
@@ -76,5 +94,17 @@ int main(int argc, char* argv[])
     read(x2,AREA_SIZE);
     std::cout << x2 << std::endl;
 
+    // test
+
+    binaryProtocol data1;
+
+    data1.recordStruct.push_back(record( "Name" , 10 , String ));
+    data1.recordStruct.push_back(record( "Len" , sizeof(uint) , Uint ));
+
+    data1 << record( "Name2" , 10 , String ) << record( "Len2" , sizeof(uint) , Uint ) ;
+
+    for(auto const& value: data1.recordStruct) {
+        cout << get<0>(value) << "\t" << get<1>(value) << "\t" << get<2>(value) << endl;
+    }
     return 0;
 }
