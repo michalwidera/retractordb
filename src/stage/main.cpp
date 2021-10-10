@@ -35,10 +35,6 @@ message Person {
 binaryprotocol data = String("name",10) | Uint("len") | Byte("status") | Int("cost");
 */
 
-class String {
-
-}
-
 void write( char * ptrSrc , uint size )
 {
     std::fstream myFile;
