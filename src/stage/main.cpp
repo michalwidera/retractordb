@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <tuple>
+#include <boost/type_index.hpp>
 
 //https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 //https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -16,42 +17,61 @@ using namespace std;
 
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 
-
-enum typeInfo {
+enum fieldType {
     String,
     Uint,
     Byte,
     Int
-} ;
+};
 
-typedef int recordLen;
-typedef string recordName;
-typedef tuple <recordName, recordLen, typeInfo> record ;
+typedef int fieldLen;
+typedef string fieldName;
+typedef tuple <fieldName, fieldLen, fieldType> field ;
 
-struct binaryProtocol {
-    string fileLocation;
-    vector <record> recordStruct;
+enum fieldColumn {
+    name = 0,
+    len = 1,
+    type = 2
+};
 
-    // This enables binaryProtocol << record << record chaining
+struct messageDescriptor : vector <field> {
 
-    template< typename T>
-    binaryProtocol &operator<<(const T& b) {
-        recordStruct.push_back(b);
+    auto &operator|(const field &b) {
+        push_back(b);
         return *this;
+    }
+
+    messageDescriptor(const field& b) {
+        *this | b;
     }
 };
 
-/*
-
-message Person {
-    string name[10];
-    uint len;
-    byte status;
-    int cost;
+string getLenIfString(fieldType e, fieldLen l) {
+    if(e==String) return "[" + to_string(l) + "]";
+    else return "";
 }
 
-binaryprotocol data(String("name",10).Uint("len").Byte("status").Int("cost"));
-*/
+string getFieldType(fieldType e) {
+    switch (e) 
+    {
+        case String : return "String";
+        case Uint : return "Uint";
+        case Byte : return "Byte";
+        case Int : return "Int";
+    }
+    assert(false);
+    return "";
+}
+
+void printmessageDescriptor(const messageDescriptor &msg) {
+    cout << "{" << endl ;
+    for(auto const& r: msg) 
+        cout << "\t" << getFieldType(get<type>(r))
+             << " " << get<name>(r) 
+             << getLenIfString(get<type>(r),get<len>(r))
+             << endl;
+    cout << "}" << endl;
+}
 
 void write( char * ptrSrc , uint size )
 {
@@ -82,8 +102,6 @@ void read(char * ptrOut, uint size )
 
 int main(int argc, char* argv[])
 {
-    std::cout << "File stage" << std::endl;
-
     const uint AREA_SIZE = 10 ;
 
     char x1[AREA_SIZE] = "test data";
@@ -94,17 +112,16 @@ int main(int argc, char* argv[])
     read(x2,AREA_SIZE);
     std::cout << x2 << std::endl;
 
-    // test
+    messageDescriptor data1(field( "Init" , 15 , String ));
 
-    binaryProtocol data1;
+    data1.push_back(field( "Name" , 10 , String ));
+    data1.push_back(field( "Len" , sizeof(uint) , Uint ));
 
-    data1.recordStruct.push_back(record( "Name" , 10 , String ));
-    data1.recordStruct.push_back(record( "Len" , sizeof(uint) , Uint ));
+    data1 | field( "Name2" , 10 , String ) 
+          | field( "Control" , sizeof(Byte) , Byte )
+          | field( "Len3" , sizeof(uint) , Uint );
 
-    data1 << record( "Name2" , 10 , String ) << record( "Len2" , sizeof(uint) , Uint ) ;
+    printmessageDescriptor(data1);
 
-    for(auto const& value: data1.recordStruct) {
-        cout << get<0>(value) << "\t" << get<1>(value) << "\t" << get<2>(value) << endl;
-    }
     return 0;
 }
