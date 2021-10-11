@@ -46,6 +46,13 @@ struct messageDescriptor : vector <field> {
     }
 };
 
+uint getMessageSize(const messageDescriptor &msg) {
+    uint size=0;
+    for(auto const& r: msg) 
+        size+=get<len>(r);
+    return size;
+}
+
 string getLenIfString(fieldType e, fieldLen l) {
     if(e==String) return "[" + to_string(l) + "]";
     else return "";
@@ -122,6 +129,8 @@ int main(int argc, char* argv[])
           | field( "Len3" , sizeof(uint) , Uint );
 
     printmessageDescriptor(data1);
+
+    cout << "Message size:" << getMessageSize(data1) << " Bytes" << endl;
 
     return 0;
 }
