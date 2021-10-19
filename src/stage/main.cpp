@@ -27,26 +27,38 @@ enum fieldType {
 typedef int fieldLen;
 typedef string fieldName;
 typedef tuple <fieldName, fieldLen, fieldType> field ;
-
 enum fieldColumn {
     name = 0,
     len = 1,
     type = 2
 };
 
-struct messageDescriptor : vector <field> {
+struct descriptor : vector <field> {
 
-    auto &operator|(const field &b) {
-        push_back(b);
+    auto &operator|(const descriptor &a) {
+        insert(end(), a.begin(), a.end());
         return *this;
     }
 
-    messageDescriptor(const field& b) {
+    auto &operator=(const descriptor &a) {
+        clear();
+        insert(end(), a.begin(), a.end());
+        return *this;
+    }
+
+    descriptor(const descriptor& b) {
         *this | b;
+    }
+
+    descriptor(fieldName n, fieldLen l, fieldType t) {
+        push_back(field(n,l,t));
+    }
+
+    descriptor() {
     }
 };
 
-uint getMessageSize(const messageDescriptor &msg) {
+uint getMessageSize(const descriptor &msg) {
     uint size=0;
     for(auto const& r: msg) 
         size+=get<len>(r);
@@ -70,14 +82,14 @@ string getFieldType(fieldType e) {
     return "";
 }
 
-void printmessageDescriptor(const messageDescriptor &msg) {
+void printDescriptor(const descriptor &msg) {
     cout << "{" << endl ;
     for(auto const& r: msg) 
         cout << "\t" << getFieldType(get<type>(r))
              << " " << get<name>(r) 
              << getLenIfString(get<type>(r),get<len>(r))
              << endl;
-    cout << "}" << endl;
+    cout << "}[" << getMessageSize(msg) << "]" << endl;
 }
 
 void write( char * ptrSrc , uint size )
@@ -119,18 +131,26 @@ int main(int argc, char* argv[])
     read(x2,AREA_SIZE);
     std::cout << x2 << std::endl;
 
-    messageDescriptor data1(field( "Init" , 15 , String ));
+    descriptor data1;
 
     data1.push_back(field( "Name" , 10 , String ));
     data1.push_back(field( "Len" , sizeof(uint) , Uint ));
 
-    data1 | field( "Name2" , 10 , String ) 
-          | field( "Control" , sizeof(Byte) , Byte )
-          | field( "Len3" , sizeof(uint) , Uint );
+    data1 | descriptor( "Name2" , 10 , String ) 
+          | descriptor( "Control" , sizeof(Byte) , Byte )
+          | descriptor( "Len3" , sizeof(uint) , Uint );
 
-    printmessageDescriptor(data1);
+    printDescriptor(data1);
 
-    cout << "Message size:" << getMessageSize(data1) << " Bytes" << endl;
+    data1 | data1 ;
+
+    printDescriptor(data1);
+
+    descriptor data2 = descriptor( "Name" , 10 , String ) 
+                     | descriptor( "Control" , sizeof(Byte) , Byte )
+                     | descriptor( "Len3" , sizeof(uint) , Uint );
+
+    printDescriptor(data2);
 
     return 0;
 }
