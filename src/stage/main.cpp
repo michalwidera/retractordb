@@ -153,6 +153,19 @@ struct descriptor : vector<field>
         return get<len>((*this)[pos]);
     }
 
+    int getRecordOffset(string name) {
+        auto offset = 0;
+        for (auto const i : *this) 
+        {
+            if (name == get<fieldName>(i))
+                return offset;
+            offset += get<len>(i);
+        }
+        const bool record_not_found_with_that_name = false ;
+        assert(record_not_found_with_that_name);
+        return -1;
+    }
+
     string getRecordType(string name) {
         auto pos = getRecordPosition(name);
         return getFieldType(get<type>((*this)[pos]));
@@ -227,10 +240,6 @@ int main(int argc, char *argv[])
 
     std::cout << data1 << std::endl;;
 
-    //data1 | data1 ;
-
-    //std::cout << data1 << std::endl;
-
     descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1 , Byte) ;
 
     std::cout << data2 << std::endl;
@@ -238,9 +247,7 @@ int main(int argc, char *argv[])
     std::cout << "Record Control is at " << data2.getRecordPosition("Control") << std::endl ;
     std::cout << "Record Control len is " << data2.getRecordLen("Control") << std::endl ;
     std::cout << "Record Control type is " << data2.getRecordType("Control") << std::endl ;
-
-    //data2 | descriptor("Name", 10, String);
-    //std::cout << data2 << std::endl;
+    std::cout << "Record Control offset is " << data2.getRecordOffset("Control") << std::endl ;
 
     return 0;
 }
