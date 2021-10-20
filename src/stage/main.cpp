@@ -35,56 +35,6 @@ enum fieldColumn
     type = 2
 };
 
-struct descriptor : vector<field>
-{
-
-    auto &operator|(const descriptor &a)
-    {
-        if (this != &a)
-        {
-            insert(end(), a.begin(), a.end());
-        }
-        else
-        {
-            assert(false); // it is not allowed to use it following way: data|data
-        }
-        return *this;
-    }
-
-    auto &operator=(const descriptor &a)
-    {
-        clear();
-        insert(end(), a.begin(), a.end());
-        return *this;
-    }
-
-    descriptor(const descriptor &b)
-    {
-        *this | b;
-    }
-
-    descriptor(fieldName n, fieldLen l, fieldType t)
-    {
-        push_back(field(n, l, t));
-    }
-
-    descriptor()
-    {
-    }
-
-    uint getSize() const
-    {
-        uint size = 0;
-        for (auto const i : *this)
-        {
-            size += get<len>(i);
-        }
-        return size;
-    }
-
-    friend ostream &operator<<(ostream &os, const descriptor &desc);
-};
-
 string getLenIfString(fieldType e, fieldLen l)
 {
     if (e == String)
@@ -110,6 +60,109 @@ string getFieldType(fieldType e)
     return "";
 }
 
+struct descriptor : vector<field>
+{
+
+    map<string,int> fieldNames;
+
+    auto &operator|(const descriptor &a)
+    {
+        if (this != &a)
+        {
+            insert(end(), a.begin(), a.end());
+        }
+        else
+        {
+            //descriptor b(*this);
+            //insert(end(), b.begin(), b.end());
+            const bool can_not_merge_same_to_same = false ;
+            assert(can_not_merge_same_to_same);
+            // can't do safe: data | data
+            // due one name policy
+        }
+        updateNames();
+        return *this;
+    }
+
+    auto &operator=(const descriptor &a)
+    {
+        clear();
+        insert(end(), a.begin(), a.end());
+        updateNames();
+        return *this;
+    }
+
+    descriptor(const descriptor &b)
+    {
+        *this | b;
+        updateNames();
+    }
+
+    descriptor(fieldName n, fieldLen l, fieldType t)
+    {
+        push_back(field(n, l, t));
+        updateNames();
+    }
+
+    descriptor()
+    {
+    }
+
+    uint getSize() const
+    {
+        uint size = 0;
+        for (auto const i : *this)
+        {
+            size += get<len>(i);
+        }
+        return size;
+    }
+
+    bool updateNames()
+    {
+        uint position = 0;
+        fieldNames.clear();
+        for (auto const i : *this)
+        {
+            if ( fieldNames.find(get<fieldName>(i)) == fieldNames.end() )
+            { 
+                fieldNames[get<fieldName>(i)] = position;
+            }
+            else
+            {
+                fieldNames.clear();
+                const bool that_name_aleardy_exist_so_it_will_make_dirty = false ;
+                assert(that_name_aleardy_exist_so_it_will_make_dirty);
+                return false;
+            }
+            position ++;
+        }
+        return true;
+    }
+
+    int getRecordPosition(string name){
+        if ( fieldNames.find(name) != fieldNames.end() ) 
+            return fieldNames[name];
+        const bool did_not_find_that_record_id_descriptor = false ;
+        assert(did_not_find_that_record_id_descriptor);
+        return -1;
+    }
+
+    int getRecordLen(string name) {
+        auto pos = getRecordPosition(name);
+        return get<len>((*this)[pos]);
+    }
+
+    string getRecordType(string name) {
+        auto pos = getRecordPosition(name);
+        return getFieldType(get<type>((*this)[pos]));
+    }
+
+    friend ostream &operator<<(ostream &os, const descriptor &desc);
+};
+
+
+
 ostream &operator<<(ostream &os, const descriptor &desc)
 {
     os << "{" ;
@@ -119,6 +172,9 @@ ostream &operator<<(ostream &os, const descriptor &desc)
            << getLenIfString(get<type>(r), get<len>(r))
            << endl;
     os << "}[" << desc.getSize() << "]";
+
+    if (desc.fieldNames.size() == 0)
+        os << "[dirty]";
 
     return os;
 }
@@ -167,17 +223,24 @@ int main(int argc, char *argv[])
     data1.push_back(field("Name", 10, String));
     data1.push_back(field("Len", sizeof(uint), Uint));
 
-    data1 | descriptor("Name2", 10, String) | descriptor("Control", sizeof(Byte), Byte) | descriptor("Len3", sizeof(uint), Uint);
+    data1 | descriptor("Name2", 10, String) | descriptor("Control", 1, Byte) | descriptor("Len3", sizeof(uint), Uint);
 
     std::cout << data1 << std::endl;;
 
     //data1 | data1 ;
 
-    std::cout << data1 << std::endl;
+    //std::cout << data1 << std::endl;
 
-    descriptor data2 = descriptor("Name", 10, String) | descriptor("Control", sizeof(Byte), Byte) | descriptor("Len3", sizeof(uint), Uint);
+    descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1 , Byte) ;
 
     std::cout << data2 << std::endl;
+
+    std::cout << "Record Control is at " << data2.getRecordPosition("Control") << std::endl ;
+    std::cout << "Record Control len is " << data2.getRecordLen("Control") << std::endl ;
+    std::cout << "Record Control type is " << data2.getRecordType("Control") << std::endl ;
+
+    //data2 | descriptor("Name", 10, String);
+    //std::cout << data2 << std::endl;
 
     return 0;
 }
