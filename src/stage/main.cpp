@@ -244,10 +244,10 @@ int main(int argc, char *argv[])
 
     std::cout << data2 << std::endl;
 
-    std::cout << "Record Control is at " << data2.getRecordPosition("Control") << std::endl ;
-    std::cout << "Record Control len is " << data2.getRecordLen("Control") << std::endl ;
-    std::cout << "Record Control type is " << data2.getRecordType("Control") << std::endl ;
-    std::cout << "Record Control offset is " << data2.getRecordOffset("Control") << std::endl ;
+    std::cout << "Field Control is at " << data2.getRecordPosition("Control") << std::endl ;
+    std::cout << "Field Control len is " << data2.getRecordLen("Control") << std::endl ;
+    std::cout << "Field Control type is " << data2.getRecordType("Control") << std::endl ;
+    std::cout << "Field Control offset is " << data2.getRecordOffset("Control") << std::endl ;
 
     return 0;
 }
