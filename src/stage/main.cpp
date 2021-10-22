@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 #include <tuple>
+#include <initializer_list>
+
 #include <boost/type_index.hpp>
 
 //https://courses.cs.vt.edu/~cs2604/fall02/binio.html
@@ -63,7 +65,26 @@ string getFieldType(fieldType e)
 struct descriptor : vector<field>
 {
 
-    map<string,int> fieldNames;
+    map<string, int> fieldNames;
+
+    descriptor(initializer_list<field> l) : vector(l)
+    {
+    }
+
+    descriptor(fieldName n, fieldLen l, fieldType t)
+    {
+        push_back(field(n, l, t));
+        updateNames();
+    }
+
+    descriptor()
+    {
+    }
+
+    void append(std::initializer_list<field> l)
+    {
+        insert(end(), l.begin(), l.end());
+    }
 
     auto &operator|(const descriptor &a)
     {
@@ -75,7 +96,7 @@ struct descriptor : vector<field>
         {
             //descriptor b(*this);
             //insert(end(), b.begin(), b.end());
-            const bool can_not_merge_same_to_same = false ;
+            const bool can_not_merge_same_to_same = false;
             assert(can_not_merge_same_to_same);
             // can't do safe: data | data
             // due one name policy
@@ -98,16 +119,6 @@ struct descriptor : vector<field>
         updateNames();
     }
 
-    descriptor(fieldName n, fieldLen l, fieldType t)
-    {
-        push_back(field(n, l, t));
-        updateNames();
-    }
-
-    descriptor()
-    {
-    }
-
     uint getSize() const
     {
         uint size = 0;
@@ -124,49 +135,53 @@ struct descriptor : vector<field>
         fieldNames.clear();
         for (auto const i : *this)
         {
-            if ( fieldNames.find(get<fieldName>(i)) == fieldNames.end() )
-            { 
+            if (fieldNames.find(get<fieldName>(i)) == fieldNames.end())
+            {
                 fieldNames[get<fieldName>(i)] = position;
             }
             else
             {
                 fieldNames.clear();
-                const bool that_name_aleardy_exist_so_it_will_make_dirty = false ;
+                const bool that_name_aleardy_exist_so_it_will_make_dirty = false;
                 assert(that_name_aleardy_exist_so_it_will_make_dirty);
                 return false;
             }
-            position ++;
+            position++;
         }
         return true;
     }
 
-    int getRecordPosition(string name){
-        if ( fieldNames.find(name) != fieldNames.end() ) 
+    int getRecordPosition(string name)
+    {
+        if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
-        const bool did_not_find_that_record_id_descriptor = false ;
+        const bool did_not_find_that_record_id_descriptor = false;
         assert(did_not_find_that_record_id_descriptor);
         return -1;
     }
 
-    int getRecordLen(string name) {
+    int getRecordLen(string name)
+    {
         auto pos = getRecordPosition(name);
         return get<len>((*this)[pos]);
     }
 
-    int getRecordOffset(string name) {
+    int getRecordOffset(string name)
+    {
         auto offset = 0;
-        for (auto const i : *this) 
+        for (auto const i : *this)
         {
             if (name == get<fieldName>(i))
                 return offset;
             offset += get<len>(i);
         }
-        const bool record_not_found_with_that_name = false ;
+        const bool record_not_found_with_that_name = false;
         assert(record_not_found_with_that_name);
         return -1;
     }
 
-    string getRecordType(string name) {
+    string getRecordType(string name)
+    {
         auto pos = getRecordPosition(name);
         return getFieldType(get<type>((*this)[pos]));
     }
@@ -174,11 +189,9 @@ struct descriptor : vector<field>
     friend ostream &operator<<(ostream &os, const descriptor &desc);
 };
 
-
-
 ostream &operator<<(ostream &os, const descriptor &desc)
 {
-    os << "{" ;
+    os << "{";
     for (auto const &r : desc)
         os << "\t" << getFieldType(get<type>(r))
            << " " << get<name>(r)
@@ -231,23 +244,26 @@ int main(int argc, char *argv[])
     read(x2, AREA_SIZE);
     std::cout << x2 << std::endl;
 
-    descriptor data1;
+    descriptor data1{field("Name3", 10, String), field("Name4", 10, String)};
+
+    data1.append({field("Name5z", 10, String)});
 
     data1.push_back(field("Name", 10, String));
     data1.push_back(field("Len", sizeof(uint), Uint));
 
     data1 | descriptor("Name2", 10, String) | descriptor("Control", 1, Byte) | descriptor("Len3", sizeof(uint), Uint);
 
-    std::cout << data1 << std::endl;;
+    std::cout << data1 << std::endl;
+    ;
 
-    descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1 , Byte) ;
+    descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1, Byte);
 
     std::cout << data2 << std::endl;
 
-    std::cout << "Field Control is at " << data2.getRecordPosition("Control") << std::endl ;
-    std::cout << "Field Control len is " << data2.getRecordLen("Control") << std::endl ;
-    std::cout << "Field Control type is " << data2.getRecordType("Control") << std::endl ;
-    std::cout << "Field Control offset is " << data2.getRecordOffset("Control") << std::endl ;
+    std::cout << "Field Control is at " << data2.getRecordPosition("Control") << std::endl;
+    std::cout << "Field Control len is " << data2.getRecordLen("Control") << std::endl;
+    std::cout << "Field Control type is " << data2.getRecordType("Control") << std::endl;
+    std::cout << "Field Control offset is " << data2.getRecordOffset("Control") << std::endl;
 
     return 0;
 }
