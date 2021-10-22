@@ -248,13 +248,16 @@ int main(int argc, char *argv[])
 
     data1.append({field("Name5z", 10, String)});
 
+    auto testf = field("Name6z", 10, String);
+
+    data1.append({testf});
+
     data1.push_back(field("Name", 10, String));
     data1.push_back(field("Len", sizeof(uint), Uint));
 
     data1 | descriptor("Name2", 10, String) | descriptor("Control", 1, Byte) | descriptor("Len3", sizeof(uint), Uint);
 
     std::cout << data1 << std::endl;
-    ;
 
     descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1, Byte);
 
