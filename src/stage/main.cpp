@@ -6,6 +6,7 @@
 #include <string>
 #include <tuple>
 #include <initializer_list>
+#include <locale>
 
 #include <boost/type_index.hpp>
 
@@ -37,6 +38,22 @@ enum fieldColumn
     type = 2
 };
 
+struct synsugar_is_space : std::ctype<char>
+{
+    synsugar_is_space() : std::ctype<char>(get_table()) {}
+    static mask const *get_table()
+    {
+        static mask rc[table_size];
+        rc['['] = std::ctype_base::space;
+        rc[']'] = std::ctype_base::space;
+        rc['{'] = std::ctype_base::space;
+        rc['}'] = std::ctype_base::space;
+        rc[' '] = std::ctype_base::space;
+        rc['\n'] = std::ctype_base::space;
+        return &rc[0];
+    }
+};
+
 string getLenIfString(fieldType e, fieldLen l)
 {
     if (e == String)
@@ -58,8 +75,23 @@ string getFieldType(fieldType e)
     case Int:
         return "Int";
     }
-    assert(false && "Didn't find such filed type name");
+    assert(false && "Didn't find such filed type name as fieldType");
     return "";
+}
+
+fieldType getFieldType(string e)
+{
+    if (e.compare("String") == 0)
+        return String;
+    if (e.compare("Uint") == 0)
+        return Uint;
+    if (e.compare("Byte") == 0)
+        return Byte;
+    if (e.compare("Int") == 0)
+        return Int;
+
+    assert(false && "Didn't find such filed type name as string");
+    return Byte;
 }
 
 struct descriptor : vector<field>
@@ -183,6 +215,7 @@ struct descriptor : vector<field>
     }
 
     friend ostream &operator<<(ostream &os, const descriptor &desc);
+    friend istream &operator>>(istream &is, descriptor &desc);
 };
 
 ostream &operator<<(ostream &os, const descriptor &desc)
@@ -193,13 +226,61 @@ ostream &operator<<(ostream &os, const descriptor &desc)
            << " " << get<name>(r)
            << getLenIfString(get<type>(r), get<len>(r))
            << endl;
-    os << "}[" << desc.getSize() << "]";
+    os << "}";
 
     if (desc.fieldNames.size() == 0)
         os << "[dirty]";
 
     return os;
 }
+
+istream &operator>>(istream &is, descriptor &desc)
+{
+    do
+    {
+        string type;
+        string name;
+        int len = 0;
+        is >> type;
+        if (is.eof()){
+            break;
+        }
+        is >> name;
+        if (is.eof()){
+            break;
+        }
+
+        fieldType ft = getFieldType(type);
+
+        if (ft == String)
+        {
+            is >> len;
+        }
+        else if (ft == Uint)
+        {
+            len = sizeof(uint);
+        }
+        else if (ft == Int)
+        {
+            len = sizeof(int);
+        }
+        else if (ft == Byte)
+        {
+            len = 1;
+        }
+        else
+        {
+            assert(len != 0 && "Undefined type");
+        }
+
+        desc | descriptor(name, len, ft);
+    } while (!is.eof());
+    return is;
+}
+
+struct binaryStream
+{
+};
 
 void write(char *ptrSrc, uint size)
 {
@@ -263,6 +344,12 @@ int main(int argc, char *argv[])
     std::cout << "Field Control len is " << data2.getRecordLen("Control") << std::endl;
     std::cout << "Field Control type is " << data2.getRecordType("Control") << std::endl;
     std::cout << "Field Control offset is " << data2.getRecordOffset("Control") << std::endl;
+
+    cin.imbue(locale(cin.getloc(), new synsugar_is_space));
+
+    descriptor data3;
+    std::cin >> data3;
+    std::cout << data3 << std::endl;
 
     return 0;
 }
