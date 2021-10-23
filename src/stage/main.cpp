@@ -58,7 +58,7 @@ string getFieldType(fieldType e)
     case Int:
         return "Int";
     }
-    assert(false);
+    assert(false && "Didn't find such filed type name");
     return "";
 }
 
@@ -96,8 +96,7 @@ struct descriptor : vector<field>
         {
             //descriptor b(*this);
             //insert(end(), b.begin(), b.end());
-            const bool can_not_merge_same_to_same = false;
-            assert(can_not_merge_same_to_same);
+            assert(false && "can not merge same to same");
             // can't do safe: data | data
             // due one name policy
         }
@@ -142,8 +141,7 @@ struct descriptor : vector<field>
             else
             {
                 fieldNames.clear();
-                const bool that_name_aleardy_exist_so_it_will_make_dirty = false;
-                assert(that_name_aleardy_exist_so_it_will_make_dirty);
+                assert(false && "that name aleardy exist so it will make dirty");
                 return false;
             }
             position++;
@@ -155,8 +153,7 @@ struct descriptor : vector<field>
     {
         if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
-        const bool did_not_find_that_record_id_descriptor = false;
-        assert(did_not_find_that_record_id_descriptor);
+        assert(false && "did not find that record id descriptor");
         return -1;
     }
 
@@ -175,8 +172,7 @@ struct descriptor : vector<field>
                 return offset;
             offset += get<len>(i);
         }
-        const bool record_not_found_with_that_name = false;
-        assert(record_not_found_with_that_name);
+        assert(false && "record not found with that name");
         return -1;
     }
 
