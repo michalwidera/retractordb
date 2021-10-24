@@ -503,9 +503,10 @@ int main(int argc, char *argv[])
     create("datafile-11", dataDescriptor);
 
     append("datafile-11", payload.dataArea);
-    update("datafile-11", payload2.dataArea, 0);
     append("datafile-11", payload.dataArea);
     append("datafile-11", payload.dataArea);
+
+    update("datafile-11", payload2.dataArea, 1);
 
     // use '$xxd datafile-11' to check
 
