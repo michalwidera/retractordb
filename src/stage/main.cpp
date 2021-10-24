@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <locale>
 #include <memory>
+#include <sstream>
 
 #include <boost/type_index.hpp>
 
@@ -412,11 +413,23 @@ int main(int argc, char *argv[])
     cout << "Field Control type is " << data2.getRecordType("Control") << endl;
     cout << "Field Control offset is " << data2.getRecordOffset("Control") << endl;
 
-    cin.imbue(locale(cin.getloc(), unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
+    //start cin test
+    //https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
+    streambuf* orig = cin.rdbuf();
+    //Note: This mess is intended here in test
+    istringstream input("{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }");
+    cin.rdbuf(input.rdbuf());
+    // Test goes here
 
+    cin.imbue(locale(cin.getloc(), unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
     descriptor data3;
     cin >> data3;
     cout << data3 << endl;
 
+    // Revert to orginal cin
+    std::cin.rdbuf(orig);
+    // end cin test
+
     return 0;
 }
+
