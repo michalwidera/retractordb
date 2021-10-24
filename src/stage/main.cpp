@@ -42,6 +42,7 @@ enum fieldColumn
 // Look here to explain: https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
 struct synsugar_is_space : ctype<char>
 {
+
     synsugar_is_space() : ctype<char>(get_table()) {}
     static mask const *get_table()
     {
@@ -272,10 +273,6 @@ istream &operator>>(istream &is, descriptor &desc)
     return is;
 }
 
-struct binaryStream
-{
-};
-
 void write(char *ptrSrc, uint size)
 {
     fstream myFile;
@@ -301,6 +298,18 @@ void read(char *ptrOut, uint size)
     myFile.read(ptrOut, size);
     assert((myFile.rdstate() & ifstream::failbit) == 0);
     myFile.close();
+}
+
+// ------------------------------------------------------------------------
+// Interface
+
+void update( string file, char *outBuffer , uint poistion ) {
+}
+
+void read( string file, char *inBuffer , uint position ) {
+}
+
+void append( string file, char *outBuffer ) {
 }
 
 int main(int argc, char *argv[])
