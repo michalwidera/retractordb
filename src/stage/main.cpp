@@ -273,20 +273,24 @@ istream &operator>>(istream &is, descriptor &desc)
     return is;
 }
 
-void write(char *ptrSrc, uint size)
+//https://en.cppreference.com/w/cpp/io/ios_base/openmode
+//https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
+
+void append(char *ptrData, uint size)
 {
     fstream myFile;
 
     myFile.rdbuf()->pubsetbuf(0, 0);
 
-    myFile.open("data.bin", ios::out | ios::binary | ios::app);
-    assert((myFile.rdstate() & ifstream::failbit) == 0);
-    myFile.write(ptrSrc, size);
-    assert((myFile.rdstate() & ifstream::failbit) == 0);
+    myFile.open("data.bin", ios::out | ios::binary | ios::app | ios::ate);
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
+    //myFile.seekp(0,ios::end); <- not needed due ios::ate
+    myFile.write(ptrData, size);
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
     myFile.close();
 }
 
-void read(char *ptrOut, uint size)
+void read(char *ptrData, uint size, uint position)
 {
     fstream myFile;
 
@@ -294,35 +298,95 @@ void read(char *ptrOut, uint size)
 
     myFile.open("data.bin", ios::in | ios::binary);
     assert((myFile.rdstate() & ifstream::failbit) == 0);
-    myFile.seekg(0);
-    myFile.read(ptrOut, size);
+    myFile.seekg(position);
     assert((myFile.rdstate() & ifstream::failbit) == 0);
+    myFile.read(ptrData, size);
+    assert((myFile.rdstate() & ifstream::failbit) == 0);
+    myFile.close();
+}
+
+void update(char *ptrData, uint size, uint position)
+{
+    fstream myFile;
+
+    myFile.rdbuf()->pubsetbuf(0, 0);
+
+    myFile.open("data.bin",  ios::in | ios::out | ios::binary | ios::ate );
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
+    myFile.seekp(position);
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
+    myFile.write(ptrData, size);
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
     myFile.close();
 }
 
 // ------------------------------------------------------------------------
 // Interface
 
-void update( string file, char *outBuffer , uint poistion ) {
+void update(string file, char *outBuffer, uint offsetFromHead)
+{
 }
 
-void read( string file, char *inBuffer , uint position ) {
+void read(string file, char *inBuffer, uint offsetFromHead)
+{
 }
 
-void append( string file, char *outBuffer ) {
+void append(string file, char *outBuffer)
+{
 }
 
 int main(int argc, char *argv[])
 {
     const uint AREA_SIZE = 10;
 
-    char x1[AREA_SIZE] = "test data";
+    auto status = remove("data.bin");    
 
-    write(x1, AREA_SIZE);
+    {
+        char xData[AREA_SIZE] = "test data";
+        //                       0123456789
 
-    char x2[10];
-    read(x2, AREA_SIZE);
-    cout << x2 << endl;
+        append(xData, AREA_SIZE);
+        append(xData, AREA_SIZE); // Add one extra record
+
+        assert(strcmp(xData, "test data") == 0);
+
+        char yData[AREA_SIZE];
+        read(yData, AREA_SIZE, 0);
+        cout << yData << endl;
+        assert(strcmp(yData, "test data") == 0);
+    }
+
+    {
+        char xData[AREA_SIZE] = "test updt";
+        //                       0123456789
+
+        update(xData, AREA_SIZE, 0);
+
+        char yData[AREA_SIZE];
+
+        read(yData, AREA_SIZE, 0);
+        cout << yData << endl;
+        assert(strcmp(yData, "test updt") == 0);
+
+        read(yData, AREA_SIZE, AREA_SIZE);
+        cout << yData << endl;
+        assert(strcmp(yData, "test data") == 0);
+    }
+
+    // Revert data to default.
+    {
+        char xData[AREA_SIZE] = "test data";
+        //                       0123456789
+
+        update(xData, AREA_SIZE, 0);
+
+        // update -> data in file
+
+        char yData[AREA_SIZE];
+        read(yData, AREA_SIZE, 0);
+        cout << yData << endl;
+        assert(strcmp(yData, "test data") == 0);
+    }
 
     descriptor data1{field("Name3", 10, String), field("Name4", 10, String)};
 
