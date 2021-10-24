@@ -7,6 +7,7 @@
 #include <tuple>
 #include <initializer_list>
 #include <locale>
+#include <memory>
 
 #include <boost/type_index.hpp>
 
@@ -38,18 +39,14 @@ enum fieldColumn
     type = 2
 };
 
-struct synsugar_is_space : std::ctype<char>
+// Look here to explain: https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
+struct synsugar_is_space : ctype<char>
 {
-    synsugar_is_space() : std::ctype<char>(get_table()) {}
+    synsugar_is_space() : ctype<char>(get_table()) {}
     static mask const *get_table()
     {
         static mask rc[table_size];
-        rc['['] = std::ctype_base::space;
-        rc[']'] = std::ctype_base::space;
-        rc['{'] = std::ctype_base::space;
-        rc['}'] = std::ctype_base::space;
-        rc[' '] = std::ctype_base::space;
-        rc['\n'] = std::ctype_base::space;
+        rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = ctype_base::space;
         return &rc[0];
     }
 };
@@ -113,7 +110,7 @@ struct descriptor : vector<field>
     {
     }
 
-    void append(std::initializer_list<field> l)
+    void append(initializer_list<field> l)
     {
         insert(end(), l.begin(), l.end());
     }
@@ -242,39 +239,36 @@ istream &operator>>(istream &is, descriptor &desc)
         string name;
         int len = 0;
         is >> type;
-        if (is.eof()){
+        if (is.eof())
+        {
             break;
         }
         is >> name;
-        if (is.eof()){
-            break;
-        }
 
         fieldType ft = getFieldType(type);
 
-        if (ft == String)
+        switch (ft)
         {
+        case String:
             is >> len;
-        }
-        else if (ft == Uint)
-        {
+            break;
+        case Uint:
             len = sizeof(uint);
-        }
-        else if (ft == Int)
-        {
+            break;
+        case Int:
             len = sizeof(int);
-        }
-        else if (ft == Byte)
-        {
+            break;
+        case Byte:
             len = 1;
-        }
-        else
-        {
+            break;
+        default:
             assert(len != 0 && "Undefined type");
         }
 
         desc | descriptor(name, len, ft);
+
     } while (!is.eof());
+
     return is;
 }
 
@@ -284,28 +278,28 @@ struct binaryStream
 
 void write(char *ptrSrc, uint size)
 {
-    std::fstream myFile;
+    fstream myFile;
 
     myFile.rdbuf()->pubsetbuf(0, 0);
 
     myFile.open("data.bin", ios::out | ios::binary | ios::app);
-    assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+    assert((myFile.rdstate() & ifstream::failbit) == 0);
     myFile.write(ptrSrc, size);
-    assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+    assert((myFile.rdstate() & ifstream::failbit) == 0);
     myFile.close();
 }
 
 void read(char *ptrOut, uint size)
 {
-    std::fstream myFile;
+    fstream myFile;
 
     myFile.rdbuf()->pubsetbuf(0, 0);
 
     myFile.open("data.bin", ios::in | ios::binary);
-    assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+    assert((myFile.rdstate() & ifstream::failbit) == 0);
     myFile.seekg(0);
     myFile.read(ptrOut, size);
-    assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+    assert((myFile.rdstate() & ifstream::failbit) == 0);
     myFile.close();
 }
 
@@ -319,7 +313,7 @@ int main(int argc, char *argv[])
 
     char x2[10];
     read(x2, AREA_SIZE);
-    std::cout << x2 << std::endl;
+    cout << x2 << endl;
 
     descriptor data1{field("Name3", 10, String), field("Name4", 10, String)};
 
@@ -334,22 +328,22 @@ int main(int argc, char *argv[])
 
     data1 | descriptor("Name2", 10, String) | descriptor("Control", 1, Byte) | descriptor("Len3", sizeof(uint), Uint);
 
-    std::cout << data1 << std::endl;
+    cout << data1 << endl;
 
     descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1, Byte);
 
-    std::cout << data2 << std::endl;
+    cout << data2 << endl;
 
-    std::cout << "Field Control is at " << data2.getRecordPosition("Control") << std::endl;
-    std::cout << "Field Control len is " << data2.getRecordLen("Control") << std::endl;
-    std::cout << "Field Control type is " << data2.getRecordType("Control") << std::endl;
-    std::cout << "Field Control offset is " << data2.getRecordOffset("Control") << std::endl;
+    cout << "Field Control is at " << data2.getRecordPosition("Control") << endl;
+    cout << "Field Control len is " << data2.getRecordLen("Control") << endl;
+    cout << "Field Control type is " << data2.getRecordType("Control") << endl;
+    cout << "Field Control offset is " << data2.getRecordOffset("Control") << endl;
 
-    cin.imbue(locale(cin.getloc(), new synsugar_is_space));
+    cin.imbue(locale(cin.getloc(), unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
 
     descriptor data3;
-    std::cin >> data3;
-    std::cout << data3 << std::endl;
+    cin >> data3;
+    cout << data3 << endl;
 
     return 0;
 }
