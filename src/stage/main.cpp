@@ -93,6 +93,25 @@ fieldType getFieldType(string e)
     return Byte;
 }
 
+int getFieldLenFromType(fieldType ft)
+{
+    switch (ft)
+    {
+    case Uint:
+        return sizeof(uint);
+    case Int:
+        return sizeof(int);
+    case Byte:
+        return 1;
+    case String:
+        assert(len != 0 && "String has other method of len-type id");
+        break;
+    default:
+        assert(len != 0 && "Undefined type");
+    }
+    return 0;
+}
+
 struct descriptor : vector<field>
 {
 
@@ -105,6 +124,13 @@ struct descriptor : vector<field>
     descriptor(fieldName n, fieldLen l, fieldType t)
     {
         push_back(field(n, l, t));
+        updateNames();
+    }
+
+    descriptor(fieldName n, fieldType t)
+    {
+        assert(t != String && "This method does not work for Stings");
+        push_back(field(n, getFieldLenFromType(t), t));
         updateNames();
     }
 
@@ -249,22 +275,13 @@ istream &operator>>(istream &is, descriptor &desc)
 
         fieldType ft = getFieldType(type);
 
-        switch (ft)
+        if ( ft == String )
         {
-        case String:
             is >> len;
-            break;
-        case Uint:
-            len = sizeof(uint);
-            break;
-        case Int:
-            len = sizeof(int);
-            break;
-        case Byte:
-            len = 1;
-            break;
-        default:
-            assert(len != 0 && "Undefined type");
+        }
+        else
+        {
+            len = getFieldLenFromType(ft);
         }
 
         desc | descriptor(name, len, ft);
@@ -277,13 +294,13 @@ istream &operator>>(istream &is, descriptor &desc)
 //https://en.cppreference.com/w/cpp/io/ios_base/openmode
 //https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-void append(char *ptrData, uint size)
+void append(string fileName, char *ptrData, uint size)
 {
     fstream myFile;
 
     myFile.rdbuf()->pubsetbuf(0, 0);
 
-    myFile.open("data.bin", ios::out | ios::binary | ios::app | ios::ate);
+    myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
     assert((myFile.rdstate() & ofstream::failbit) == 0);
     //myFile.seekp(0,ios::end); <- not needed due ios::ate
     myFile.write(ptrData, size);
@@ -291,13 +308,13 @@ void append(char *ptrData, uint size)
     myFile.close();
 }
 
-void read(char *ptrData, uint size, uint position)
+void read(string fileName, char *ptrData, uint size, uint position)
 {
     fstream myFile;
 
     myFile.rdbuf()->pubsetbuf(0, 0);
 
-    myFile.open("data.bin", ios::in | ios::binary);
+    myFile.open(fileName, ios::in | ios::binary);
     assert((myFile.rdstate() & ifstream::failbit) == 0);
     myFile.seekg(position);
     assert((myFile.rdstate() & ifstream::failbit) == 0);
@@ -306,13 +323,13 @@ void read(char *ptrData, uint size, uint position)
     myFile.close();
 }
 
-void update(char *ptrData, uint size, uint position)
+void update(string fileName, char *ptrData, uint size, uint position)
 {
     fstream myFile;
 
     myFile.rdbuf()->pubsetbuf(0, 0);
 
-    myFile.open("data.bin",  ios::in | ios::out | ios::binary | ios::ate );
+    myFile.open(fileName, ios::in | ios::out | ios::binary | ios::ate);
     assert((myFile.rdstate() & ofstream::failbit) == 0);
     myFile.seekp(position);
     assert((myFile.rdstate() & ofstream::failbit) == 0);
@@ -324,35 +341,63 @@ void update(char *ptrData, uint size, uint position)
 // ------------------------------------------------------------------------
 // Interface
 
+map<string, descriptor> schema;
+
+// There should be offsetFromHead - 
+// Implementation now works as offsetFrom Begin
+// Neet to fix this.
+
 void update(string file, char *outBuffer, uint offsetFromHead)
 {
+    auto size = schema[file].getSize();
+    update(file,outBuffer,size,offsetFromHead*size);
 }
 
 void read(string file, char *inBuffer, uint offsetFromHead)
 {
+    auto size = schema[file].getSize();
+    read(file,inBuffer,size,offsetFromHead*size);
 }
 
 void append(string file, char *outBuffer)
 {
+    auto size = schema[file].getSize();
+    append(file,outBuffer,size);
+}
+
+void create(string file, descriptor desc)
+{
+    schema[file] = desc;
+    fstream myFile;
+
+    myFile.rdbuf()->pubsetbuf(0, 0);
+
+    string fileDesc(file.append(".desc"));
+
+    myFile.open(fileDesc, ios::out);
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
+    myFile << desc;
+    assert((myFile.rdstate() & ofstream::failbit) == 0);
+    myFile.close();
 }
 
 int main(int argc, char *argv[])
 {
     const uint AREA_SIZE = 10;
 
-    auto status = remove("data.bin");    
+    auto status = remove("data.bin");
 
     {
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        append(xData, AREA_SIZE);
-        append(xData, AREA_SIZE); // Add one extra record
+        append("testfile.bin",xData, AREA_SIZE);
+        append("testfile.bin",xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(xData, "test data") == 0);
 
         char yData[AREA_SIZE];
-        read(yData, AREA_SIZE, 0);
+        read("testfile.bin",yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -361,15 +406,15 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test updt";
         //                       0123456789
 
-        update(xData, AREA_SIZE, 0);
+        update("testfile.bin",xData, AREA_SIZE, 0);
 
         char yData[AREA_SIZE];
 
-        read(yData, AREA_SIZE, 0);
+        read("testfile.bin",yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test updt") == 0);
 
-        read(yData, AREA_SIZE, AREA_SIZE);
+        read("testfile.bin",yData, AREA_SIZE, AREA_SIZE);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -379,12 +424,12 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        update(xData, AREA_SIZE, 0);
+        update("testfile.bin",xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         char yData[AREA_SIZE];
-        read(yData, AREA_SIZE, 0);
+        read("testfile.bin",yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -400,11 +445,11 @@ int main(int argc, char *argv[])
     data1.push_back(field("Name", 10, String));
     data1.push_back(field("Len", sizeof(uint), Uint));
 
-    data1 | descriptor("Name2", 10, String) | descriptor("Control", 1, Byte) | descriptor("Len3", sizeof(uint), Uint);
+    data1 | descriptor("Name2", 10, String) | descriptor("Control", Byte) | descriptor("Len3", Uint);
 
     cout << data1 << endl;
 
-    descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", sizeof(uint), Uint) | descriptor("Control", 1, Byte);
+    descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", Uint) | descriptor("Control", Byte);
 
     cout << data2 << endl;
 
@@ -415,7 +460,7 @@ int main(int argc, char *argv[])
 
     //start cin test
     //https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
-    streambuf* orig = cin.rdbuf();
+    streambuf *orig = cin.rdbuf();
     //Note: This mess is intended here in test
     istringstream input("{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }");
     cin.rdbuf(input.rdbuf());
@@ -430,6 +475,39 @@ int main(int argc, char *argv[])
     std::cin.rdbuf(orig);
     // end cin test
 
+    auto dataDescriptor{descriptor("Name", 10, String) | descriptor("Len", Uint) | descriptor("Control", Byte) | descriptor("Waste", Byte)};
+    assert( dataDescriptor.getSize() == 16);
+
+    union dataPayload {
+        char dataArea[16];
+        struct alignas(8) {
+            char Name[10];
+            uint Len;
+            char Control;
+            char Waste;
+        };
+    };
+
+    dataPayload payload ;
+    strcpy(payload.Name, "test data");
+    payload.Len = 2 ;
+    payload.Control = 0;
+
+    dataPayload payload2 ;
+    strcpy(payload2.Name, "xxxx xxxx");
+    payload2.Len = 10 ;
+    payload2.Control = 0;
+
+    auto statusRemove = remove("datafile-11");
+
+    create("datafile-11", dataDescriptor);
+
+    append("datafile-11", payload.dataArea);
+    update("datafile-11", payload2.dataArea, 0);
+    append("datafile-11", payload.dataArea);
+    append("datafile-11", payload.dataArea);
+
+    // use '$xxd datafile-11' to check
+
     return 0;
 }
-
