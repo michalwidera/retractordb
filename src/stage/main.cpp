@@ -384,7 +384,7 @@ void create(string file, descriptor desc)
 int main(int argc, char *argv[])
 {
     const uint AREA_SIZE = 10;
-
+    
     auto status = remove("data.bin");
 
     {
@@ -508,7 +508,27 @@ int main(int argc, char *argv[])
 
     update("datafile-11", payload2.dataArea, 1);
 
-    // use '$xxd datafile-11' to check
+    cout << "use '$xxd datafile-11' to check" << endl;
+
+    // Diagnostic code
+
+    #ifdef NDEBUG
+        cerr << endl;
+        cerr << "\x1B[31m";
+        cerr << "Warning! This code should run in Debug mode." << endl;
+        cerr << "         This is Staging/Testing code." << endl;
+        cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
+        cerr << "         Rebuild code asap with follwoing command:" << endl;
+        cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
+        cerr << "         make install && xstage || echo Fail" << endl;
+        cerr << "\033[0m";
+        assert(false); // Note this assert will have no effect!
+    #else
+        // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
+        struct check_assert{bool ok(){cout << "\x1B[32mOk.\033[0m";return true;}} check;
+        assert(check.ok());  // This assert show that assert is compiled and works.
+        // Program will show green "Ok." at the end of work if assert is compiled and executed.
+    #endif
 
     return 0;
 }
