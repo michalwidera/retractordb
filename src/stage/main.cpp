@@ -206,21 +206,22 @@ struct descriptor : vector<field>
         return true;
     }
 
-    int getRecordPosition(string name)
+    int Position(string name)
     {
         if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
-        assert(false && "did not find that record id descriptor");
+        cerr << "[" << name << "]" << endl ;
+        assert(false && "did not find that record id descriptor:{}" );
         return -1;
     }
 
-    int getRecordLen(string name)
+    int Len(string name)
     {
-        auto pos = getRecordPosition(name);
+        auto pos = Position(name);
         return get<len>((*this)[pos]);
     }
 
-    int getRecordOffset(string name)
+    int Offset(string name)
     {
         auto offset = 0;
         for (auto const i : *this)
@@ -233,9 +234,9 @@ struct descriptor : vector<field>
         return -1;
     }
 
-    string getRecordType(string name)
+    string Type(string name)
     {
-        auto pos = getRecordPosition(name);
+        auto pos = Position(name);
         return getFieldType(get<type>((*this)[pos]));
     }
 
@@ -381,6 +382,44 @@ void create(string file, descriptor desc)
     myFile.close();
 }
 
+struct getFromBinary {
+
+    descriptor *pDesc;
+    getFromBinary( descriptor &desc):
+        pDesc(&desc) {
+    }
+
+    string String(char *ptr, string fieldName) {
+        auto position = pDesc->Offset(fieldName);
+        auto len = pDesc->Len(fieldName);
+        string ret(len,1);
+        memcpy(&ret[0],ptr+position,len);
+        return ret;
+    };
+    int Int(char *ptr, string fieldName) {
+        auto position = pDesc->Offset(fieldName);
+        //cerr << "p:" << position << " " << fieldName << endl ;
+        int ret = *(reinterpret_cast<int*>(ptr+position));
+        //int ret;
+        //memcpy(&ret,ptr+position,sizeof(int));
+        return ret;
+    };
+    uint Uint(char *ptr, string fieldName) {
+        auto position = pDesc->Offset(fieldName);
+        //cerr << "p:" << position << " " << fieldName << endl ;
+        uint ret = *(reinterpret_cast<uint*>(ptr+position));
+        //uint ret;
+        //memcpy(&ret,ptr+position,sizeof(uint));
+        return ret;
+    };
+    char Byte(char *ptr, string fieldName) {
+        auto position = pDesc->Offset(fieldName);
+        char ret;
+        memcpy(&ret,ptr+position,len);
+        return ret;
+    };
+};
+
 int main(int argc, char *argv[])
 {
     const uint AREA_SIZE = 10;
@@ -443,7 +482,7 @@ int main(int argc, char *argv[])
     data1.append({testf});
 
     data1.push_back(field("Name", 10, String));
-    data1.push_back(field("Len", sizeof(uint), Uint));
+    data1.push_back(field("TLen", sizeof(uint), Uint));
 
     data1 | descriptor("Name2", 10, String) | descriptor("Control", Byte) | descriptor("Len3", Uint);
 
@@ -453,10 +492,10 @@ int main(int argc, char *argv[])
 
     cout << data2 << endl;
 
-    cout << "Field Control is at " << data2.getRecordPosition("Control") << endl;
-    cout << "Field Control len is " << data2.getRecordLen("Control") << endl;
-    cout << "Field Control type is " << data2.getRecordType("Control") << endl;
-    cout << "Field Control offset is " << data2.getRecordOffset("Control") << endl;
+    cout << "Field Control is at " << data2.Position("Control") << endl;
+    cout << "Field Control len is " << data2.Len("Control") << endl;
+    cout << "Field Control type is " << data2.Type("Control") << endl;
+    cout << "Field Control offset is " << data2.Offset("Control") << endl;
 
     //start cin test
     //https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
@@ -475,40 +514,68 @@ int main(int argc, char *argv[])
     std::cin.rdbuf(orig);
     // end cin test
 
-    auto dataDescriptor{descriptor("Name", 10, String) | descriptor("Len", Uint) | descriptor("Control", Byte) | descriptor("Waste", Byte)};
+
+    // ----------------------------------------------------------------------------
+
+    auto dataDescriptor{descriptor("Name", 10, String) | descriptor("TLen", Int) | descriptor("Control", Byte) | descriptor("Waste", Byte)};
     assert( dataDescriptor.getSize() == 16);
 
     union dataPayload {
-        char dataArea[16];
-        struct alignas(8) {
+        char ptr[16];
+        struct {
             char Name[10];
-            uint Len;
+            int  TLen;
             char Control;
             char Waste;
-        };
+        };  
     };
+    
+
+    auto statusRemove = remove("datafile-11");
+    create("datafile-11", dataDescriptor);
+    getFromBinary data(schema["datafile-11"]);
 
     dataPayload payload ;
+
     strcpy(payload.Name, "test data");
-    payload.Len = 2 ;
-    payload.Control = 0;
+    payload.TLen = 0x66 ;
+    payload.Control = 0x69;
+
+    cout << "Check:" << payload.TLen << endl;
+    cout << "   Re:" << (int) data.Int(payload.ptr,"TLen") << endl;
+
+    append("datafile-11", payload.ptr);
+    append("datafile-11", payload.ptr);
+    append("datafile-11", payload.ptr);
 
     dataPayload payload2 ;
     strcpy(payload2.Name, "xxxx xxxx");
-    payload2.Len = 10 ;
-    payload2.Control = 0;
+    payload2.TLen = 0x67 ;
+    payload2.Control = 0x68;
 
-    auto statusRemove = remove("datafile-11");
+    update("datafile-11", payload2.ptr, 1);
 
-    create("datafile-11", dataDescriptor);
+    dataPayload payload3;
 
-    append("datafile-11", payload.dataArea);
-    append("datafile-11", payload.dataArea);
-    append("datafile-11", payload.dataArea);
+    read( "datafile-11" , payload3.ptr, 0);
 
-    update("datafile-11", payload2.dataArea, 1);
+    cout << data.String(payload3.ptr,"Name") << endl;
+    cout << (int) data.Uint(payload3.ptr,"TLen") << endl;
+    cout << (int) data.Byte(payload3.ptr,"Control") << endl;
 
     cout << "use '$xxd datafile-11' to check" << endl;
+
+    {
+    union {
+        char a[8];
+        int b[2];
+    } val;
+
+    val.b[1] = 99;
+    cout << val.b[1] << endl;
+    int c = *(reinterpret_cast<int*>(val.a+4));
+    cout << c << endl;
+    }
 
     // Diagnostic code
 
@@ -516,13 +583,15 @@ int main(int argc, char *argv[])
         cerr << endl;
         cerr << "\x1B[31m";
         cerr << "Warning! This code should run in Debug mode." << endl;
+        cerr << "\033[0m";
+    
+        assert(false); // Note this assert will have no effect!
+
         cerr << "         This is Staging/Testing code." << endl;
         cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
         cerr << "         Rebuild code asap with follwoing command:" << endl;
         cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
-        cerr << "         make install && xstage || echo Fail" << endl;
-        cerr << "\033[0m";
-        assert(false); // Note this assert will have no effect!
+        cerr << "         make install && xstage || echo Fail" << endl;        
     #else
         // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
         struct check_assert{bool ok(){cout << "\x1B[32mOk.\033[0m";return true;}} check;
