@@ -381,15 +381,17 @@ void create(string file, descriptor desc)
     myFile.close();
 }
 
-struct getFromBinary
+struct fromBinary
 {
 
     descriptor *pDesc;
     char *ptr;
-    getFromBinary(descriptor &desc, char *ptr) : pDesc(&desc),
+    fromBinary(descriptor &desc, char *ptr) : pDesc(&desc),
                                                  ptr(ptr)
     {
     }
+
+    fromBinary() = delete;
 
     string make_string(string fieldName)
     {
@@ -532,7 +534,7 @@ int main(int argc, char *argv[])
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
-    getFromBinary dataA(schema["datafile-11"], payload.ptr);
+    fromBinary dataA(schema["datafile-11"], payload.ptr);
     assert(payload.TLen == dataA.cast<int>("TLen"));
 
     append("datafile-11", payload.ptr);
@@ -548,7 +550,7 @@ int main(int argc, char *argv[])
 
     dataPayload payload3;
     read("datafile-11", payload3.ptr, 1);
-    getFromBinary dataB(schema["datafile-11"], payload3.ptr);
+    fromBinary dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
     cout << "Name:" << dataB.make_string("Name") << endl;
