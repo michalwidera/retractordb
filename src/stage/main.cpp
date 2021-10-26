@@ -559,6 +559,7 @@ int main(int argc, char *argv[])
 
     assert(false); // Note this assert will have no effect!
 
+    cerr << endl;
     cerr << "         This is Staging/Testing code." << endl;
     cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
     cerr << "         Rebuild code asap with follwoing command:" << endl;
@@ -572,7 +573,7 @@ int main(int argc, char *argv[])
     {
         bool ok()
         {
-            cout << "\x1B[32mOk.\033[0m";
+            cout << "\x1B[32mDebug Code Ok.\033[0m";
             return true;
         }
     } check;
