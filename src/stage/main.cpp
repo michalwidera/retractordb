@@ -40,27 +40,6 @@ enum fieldColumn
     type = 2
 };
 
-// Look here to explain: https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
-struct synsugar_is_space : ctype<char>
-{
-
-    synsugar_is_space() : ctype<char>(get_table()) {}
-    static mask const *get_table()
-    {
-        static mask rc[table_size];
-        rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = ctype_base::space;
-        return &rc[0];
-    }
-};
-
-string getLenIfString(fieldType e, fieldLen l)
-{
-    if (e == String)
-        return "[" + to_string(l) + "]";
-    else
-        return "";
-}
-
 map<fieldType, string> typeDictionary = {{String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}};
 
 string getFieldType(fieldType e)
@@ -237,10 +216,15 @@ ostream &operator<<(ostream &os, const descriptor &desc)
 {
     os << "{";
     for (auto const &r : desc)
+    {
         os << "\t" << getFieldType(get<type>(r))
-           << " " << get<name>(r)
-           << getLenIfString(get<type>(r), get<len>(r))
-           << endl;
+           << " " << get<name>(r);
+        if (get<type>(r) == String)
+        {
+            os << "[" << to_string(get<len>(r)) << "]";
+        };
+        os << endl;
+    }
     os << "}";
 
     if (desc.fieldNames.size() == 0)
@@ -370,17 +354,17 @@ void create(string file, descriptor desc)
     myFile.close();
 }
 
-struct fromBinary
+struct rawAccessor
 {
 
     descriptor *pDesc;
     char *ptr;
-    fromBinary(descriptor &desc, char *ptr) : pDesc(&desc),
-                                              ptr(ptr)
+    rawAccessor(descriptor &desc, char *ptr) : pDesc(&desc),
+                                               ptr(ptr)
     {
     }
 
-    fromBinary() = delete;
+    rawAccessor() = delete;
 
     string make_string(string fieldName)
     {
@@ -478,14 +462,32 @@ int main(int argc, char *argv[])
     //https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
     streambuf *orig = cin.rdbuf();
     //Note: This mess is intended here in test
-    istringstream input("{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }");
+
+#define TEST_STRING "{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }"
+    istringstream input(TEST_STRING);
     cin.rdbuf(input.rdbuf());
     // Test goes here
 
+    // Look here to explain: https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
+    struct synsugar_is_space : ctype<char>
+    {
+        synsugar_is_space() : ctype<char>(get_table()) {}
+        static mask const *get_table()
+        {
+            static mask rc[table_size];
+            rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = ctype_base::space;
+            return &rc[0];
+        }
+    };
+
     cin.imbue(locale(cin.getloc(), unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
     descriptor data3;
+
+    cout << "START SEND\n"
+         << TEST_STRING << "\nEND SEND" << endl;
     cin >> data3;
-    cout << data3 << endl;
+    cout << "START RCV\n"
+         << data3 << "\nEND RCV" << endl;
 
     // Revert to orginal cin
     std::cin.rdbuf(orig);
@@ -523,7 +525,7 @@ int main(int argc, char *argv[])
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
-    fromBinary dataA(schema["datafile-11"], payload.ptr);
+    rawAccessor dataA(schema["datafile-11"], payload.ptr);
     assert(payload.TLen == dataA.cast<int>("TLen"));
 
     append("datafile-11", payload.ptr);
@@ -539,7 +541,7 @@ int main(int argc, char *argv[])
 
     dataPayload payload3;
     read("datafile-11", payload3.ptr, 1);
-    fromBinary dataB(schema["datafile-11"], payload3.ptr);
+    rawAccessor dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
     cout << "Name:" << dataB.make_string("Name") << endl;
