@@ -391,38 +391,18 @@ struct getFromBinary
     {
     }
 
-    string String(string fieldName)
+    string make_string(string fieldName)
     {
-        auto position = pDesc->Offset(fieldName);
         auto len = pDesc->Len(fieldName);
-        string ret(len, 1);
-        memcpy(&ret[0], ptr + position, len);
+        string ret(len, 0);
+        memcpy(&ret[0], ptr + pDesc->Offset(fieldName), len);
         return ret;
     };
-    int Int(string fieldName)
+
+    template <typename T>
+    auto cast(string fieldName)
     {
-        auto position = pDesc->Offset(fieldName);
-        //cerr << "p:" << position << " " << fieldName << endl ;
-        int ret = *(reinterpret_cast<int *>(ptr + position));
-        //int ret;
-        //memcpy(&ret,ptr+position,sizeof(int));
-        return ret;
-    };
-    uint Uint(string fieldName)
-    {
-        auto position = pDesc->Offset(fieldName);
-        //cerr << "p:" << position << " " << fieldName << endl ;
-        uint ret = *(reinterpret_cast<uint *>(ptr + position));
-        //uint ret;
-        //memcpy(&ret,ptr+position,sizeof(uint));
-        return ret;
-    };
-    uint8_t Byte(string fieldName)
-    {
-        auto position = pDesc->Offset(fieldName);
-        char ret;
-        memcpy(&ret, ptr + position, len);
-        return ret;
+        return *(reinterpret_cast<T*>(ptr + pDesc->Offset(fieldName)));
     };
 };
 
@@ -524,6 +504,11 @@ int main(int argc, char *argv[])
 
     auto dataDescriptor{descriptor("Name", 10, String) | descriptor("Control", Byte) | descriptor("TLen", Int)};
 
+    //This structure is tricky
+    //If not aligned - size is 15
+    //If aligned - size is 16
+    //Note that this should be packed and size should be 15
+
     union dataPayload
     {
         char ptr[15];
@@ -534,8 +519,10 @@ int main(int argc, char *argv[])
             int TLen;        //4
         };
     };
+
     dataPayload payload;
 
+    // This assert will fail is structure is not packed.
     assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
     auto statusRemove = remove("datafile-11");
@@ -546,7 +533,7 @@ int main(int argc, char *argv[])
     payload.Control = 0x22;
 
     getFromBinary dataA(schema["datafile-11"], payload.ptr);
-    assert(payload.TLen == dataA.Int("TLen"));
+    assert(payload.TLen == dataA.cast<int>("TLen"));
 
     append("datafile-11", payload.ptr);
     append("datafile-11", payload.ptr);
@@ -564,9 +551,9 @@ int main(int argc, char *argv[])
     getFromBinary dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
-    cout << "Name:" << dataB.String("Name") << endl;
-    cout << "Tlen:" << (int)dataB.Uint("TLen") << endl;
-    cout << "Control:" << (uint)dataB.Byte("Control") << endl;
+    cout << "Name:" << dataB.make_string("Name") << endl;
+    cout << "Tlen:" << dataB.cast<int>("TLen") << endl;
+    cout << "Control:" << (uint)dataB.cast<uint8_t>("Control") << endl;
     cout << dec;
 
     cout << "use '$xxd datafile-11' to check" << endl;
