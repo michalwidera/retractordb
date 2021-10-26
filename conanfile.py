@@ -10,7 +10,7 @@ class Retractor(ConanFile):
    generators = "cmake"
    testing = []
 
-   options = { "boost": [1.74, 1.75, 1.76, 1.77],
+   options = { "boost": [1.77],
                "gtest": [1.11]
             }
 
@@ -29,6 +29,9 @@ class Retractor(ConanFile):
    def validate(self):
       if not tools.valid_min_cppstd(self, "17"):
          self.output.error("C++17 is required.")
+
+   def configure(self):
+      self.settings.compiler.cppstd=20
 
    def package_info(self):
       self.cpp_info.libs = []
