@@ -61,35 +61,24 @@ string getLenIfString(fieldType e, fieldLen l)
         return "";
 }
 
+map<fieldType, string> typeDictionary = {{String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}};
+
 string getFieldType(fieldType e)
 {
-    switch (e)
-    {
-    case String:
-        return "String";
-    case Uint:
-        return "Uint";
-    case Byte:
-        return "Byte";
-    case Int:
-        return "Int";
-    }
-    assert(false && "Didn't find such filed type name as fieldType");
-    return "";
+    return typeDictionary[e];
 }
 
 fieldType getFieldType(string e)
 {
-    if (e.compare("String") == 0)
-        return String;
-    if (e.compare("Uint") == 0)
-        return Uint;
-    if (e.compare("Byte") == 0)
-        return Byte;
-    if (e.compare("Int") == 0)
-        return Int;
+    for (const auto &[key, value] : typeDictionary)
+        if (value == e)
+            return key;
 
-    assert(false && "Didn't find such filed type name as string");
+    //for (auto it = typeDictionary.begin(); it != typeDictionary.end(); ++it)
+    //if (it->second == e)
+    //    return it->first;
+
+    assert(false);
     return Byte;
 }
 
@@ -292,8 +281,8 @@ istream &operator>>(istream &is, descriptor &desc)
     return is;
 }
 
-//https://en.cppreference.com/w/cpp/io/ios_base/openmode
-//https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
+// https://en.cppreference.com/w/cpp/io/ios_base/openmode
+// https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 void append(string fileName, char *ptrData, uint size)
 {
@@ -387,7 +376,7 @@ struct fromBinary
     descriptor *pDesc;
     char *ptr;
     fromBinary(descriptor &desc, char *ptr) : pDesc(&desc),
-                                                 ptr(ptr)
+                                              ptr(ptr)
     {
     }
 
@@ -404,7 +393,7 @@ struct fromBinary
     template <typename T>
     auto cast(string fieldName)
     {
-        return *(reinterpret_cast<T*>(ptr + pDesc->Offset(fieldName)));
+        return *(reinterpret_cast<T *>(ptr + pDesc->Offset(fieldName)));
     };
 };
 
@@ -575,6 +564,8 @@ int main(int argc, char *argv[])
     cerr << "         Rebuild code asap with follwoing command:" << endl;
     cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
     cerr << "         make install && xstage || echo Fail" << endl;
+
+    // conan install .. -s compiler.cppstd=gnu17 --build=boost --build=gtest
 #else
     // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
     struct check_assert

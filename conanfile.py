@@ -1,13 +1,13 @@
-from conans import ConanFile, CMake
+from conans import tools, ConanFile, CMake
 
 class Retractor(ConanFile):
-   settings = "os", "compiler", "build_type", "arch"
+   settings = "os", "compiler", "build_type", "arch" ,"cppstd"
    requires = ["cmake/3.21.3"]
    license = "MIT"
    author = "Michal Widera"
    description = "RetractorDB time series database"
    homepage = "https://retractordb.com"
-   generators = "cmake", "gcc"
+   generators = "cmake"
    testing = []
 
    options = { "boost": [1.74, 1.75, 1.76, 1.77],
@@ -25,6 +25,10 @@ class Retractor(ConanFile):
                         "boost": options["boost"][0],
                         "gtest": options["gtest"][0]
                      }
+
+   def validate(self):
+      if not tools.valid_min_cppstd(self, "17"):
+         self.output.error("C++17 is required.")
 
    def package_info(self):
       self.cpp_info.libs = []
