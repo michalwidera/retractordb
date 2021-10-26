@@ -210,8 +210,8 @@ struct descriptor : vector<field>
     {
         if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
-        cerr << "[" << name << "]" << endl ;
-        assert(false && "did not find that record id descriptor:{}" );
+        cerr << "[" << name << "]" << endl;
+        assert(false && "did not find that record id descriptor:{}");
         return -1;
     }
 
@@ -276,7 +276,7 @@ istream &operator>>(istream &is, descriptor &desc)
 
         fieldType ft = getFieldType(type);
 
-        if ( ft == String )
+        if (ft == String)
         {
             is >> len;
         }
@@ -343,26 +343,26 @@ void update(string fileName, char *ptrData, uint size, uint position)
 
 map<string, descriptor> schema;
 
-// There should be offsetFromHead - 
+// There should be offsetFromHead -
 // Implementation now works as offsetFrom Begin
 // Neet to fix this.
 
 void update(string file, char *outBuffer, uint offsetFromHead)
 {
     auto size = schema[file].getSize();
-    update(file,outBuffer,size,offsetFromHead*size);
+    update(file, outBuffer, size, offsetFromHead * size);
 }
 
 void read(string file, char *inBuffer, uint offsetFromHead)
 {
     auto size = schema[file].getSize();
-    read(file,inBuffer,size,offsetFromHead*size);
+    read(file, inBuffer, size, offsetFromHead * size);
 }
 
 void append(string file, char *outBuffer)
 {
     auto size = schema[file].getSize();
-    append(file,outBuffer,size);
+    append(file, outBuffer, size);
 }
 
 void create(string file, descriptor desc)
@@ -381,40 +381,47 @@ void create(string file, descriptor desc)
     myFile.close();
 }
 
-struct getFromBinary {
+struct getFromBinary
+{
 
     descriptor *pDesc;
-    getFromBinary( descriptor &desc):
-        pDesc(&desc) {
+    char *ptr;
+    getFromBinary(descriptor &desc, char *ptr) : pDesc(&desc),
+                                                 ptr(ptr)
+    {
     }
 
-    string String(char *ptr, string fieldName) {
+    string String(string fieldName)
+    {
         auto position = pDesc->Offset(fieldName);
         auto len = pDesc->Len(fieldName);
-        string ret(len,1);
-        memcpy(&ret[0],ptr+position,len);
+        string ret(len, 1);
+        memcpy(&ret[0], ptr + position, len);
         return ret;
     };
-    int Int(char *ptr, string fieldName) {
+    int Int(string fieldName)
+    {
         auto position = pDesc->Offset(fieldName);
         //cerr << "p:" << position << " " << fieldName << endl ;
-        int ret = *(reinterpret_cast<int*>(ptr+position));
+        int ret = *(reinterpret_cast<int *>(ptr + position));
         //int ret;
         //memcpy(&ret,ptr+position,sizeof(int));
         return ret;
     };
-    uint Uint(char *ptr, string fieldName) {
+    uint Uint(string fieldName)
+    {
         auto position = pDesc->Offset(fieldName);
         //cerr << "p:" << position << " " << fieldName << endl ;
-        uint ret = *(reinterpret_cast<uint*>(ptr+position));
+        uint ret = *(reinterpret_cast<uint *>(ptr + position));
         //uint ret;
         //memcpy(&ret,ptr+position,sizeof(uint));
         return ret;
     };
-    uint8_t Byte(char *ptr, string fieldName) {
+    uint8_t Byte(string fieldName)
+    {
         auto position = pDesc->Offset(fieldName);
         char ret;
-        memcpy(&ret,ptr+position,len);
+        memcpy(&ret, ptr + position, len);
         return ret;
     };
 };
@@ -422,20 +429,20 @@ struct getFromBinary {
 int main(int argc, char *argv[])
 {
     const uint AREA_SIZE = 10;
-    
+
     auto status = remove("data.bin");
 
     {
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        append("testfile.bin",xData, AREA_SIZE);
-        append("testfile.bin",xData, AREA_SIZE); // Add one extra record
+        append("testfile.bin", xData, AREA_SIZE);
+        append("testfile.bin", xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(xData, "test data") == 0);
 
         char yData[AREA_SIZE];
-        read("testfile.bin",yData, AREA_SIZE, 0);
+        read("testfile.bin", yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -444,15 +451,15 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test updt";
         //                       0123456789
 
-        update("testfile.bin",xData, AREA_SIZE, 0);
+        update("testfile.bin", xData, AREA_SIZE, 0);
 
         char yData[AREA_SIZE];
 
-        read("testfile.bin",yData, AREA_SIZE, 0);
+        read("testfile.bin", yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test updt") == 0);
 
-        read("testfile.bin",yData, AREA_SIZE, AREA_SIZE);
+        read("testfile.bin", yData, AREA_SIZE, AREA_SIZE);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -462,12 +469,12 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        update("testfile.bin",xData, AREA_SIZE, 0);
+        update("testfile.bin", xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         char yData[AREA_SIZE];
-        read("testfile.bin",yData, AREA_SIZE, 0);
+        read("testfile.bin", yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -513,78 +520,85 @@ int main(int argc, char *argv[])
     std::cin.rdbuf(orig);
     // end cin test
 
-
     // ----------------------------------------------------------------------------
 
-    auto dataDescriptor{descriptor("Name", 10, String)  | descriptor("Control", Byte) | descriptor("TLen", Int)};
+    auto dataDescriptor{descriptor("Name", 10, String) | descriptor("Control", Byte) | descriptor("TLen", Int)};
 
-    union dataPayload {
+    union dataPayload
+    {
         char ptr[15];
-        struct __attribute__((packed)) {
-            char Name[10];      //10
-            uint8_t Control;    //1
-            int  TLen;          //4
-        };  
+        struct __attribute__((packed))
+        {
+            char Name[10];   //10
+            uint8_t Control; //1
+            int TLen;        //4
+        };
     };
-    
-    assert( dataDescriptor.getSize() == sizeof(dataPayload));
+    dataPayload payload;
+
+    assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
     auto statusRemove = remove("datafile-11");
     create("datafile-11", dataDescriptor);
-    getFromBinary data(schema["datafile-11"]);
-
-    dataPayload payload ;
 
     strcpy(payload.Name, "test data");
-    payload.TLen = 0x66 ;
-    payload.Control = 0x69;
+    payload.TLen = 0x66;
+    payload.Control = 0x22;
 
-    assert( payload.TLen == data.Int(payload.ptr,"TLen") );
+    getFromBinary dataA(schema["datafile-11"], payload.ptr);
+    assert(payload.TLen == dataA.Int("TLen"));
 
     append("datafile-11", payload.ptr);
     append("datafile-11", payload.ptr);
     append("datafile-11", payload.ptr);
 
-    dataPayload payload2 ;
+    dataPayload payload2;
     strcpy(payload2.Name, "xxxx xxxx");
-    payload2.TLen = 0x67 ;
-    payload2.Control = 0x68;
+    payload2.TLen = 0x67;
+    payload2.Control = 0x33;
 
     update("datafile-11", payload2.ptr, 1);
 
     dataPayload payload3;
-
-    read( "datafile-11" , payload3.ptr, 0);
+    read("datafile-11", payload3.ptr, 1);
+    getFromBinary dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
-    cout << "Name:" << data.String(payload3.ptr,"Name") << endl;
-    cout << "Tlen:" << (int) data.Uint(payload3.ptr,"TLen") << endl;
-    cout << "Control:" << (uint) data.Byte(payload3.ptr,"Control") << endl;
+    cout << "Name:" << dataB.String("Name") << endl;
+    cout << "Tlen:" << (int)dataB.Uint("TLen") << endl;
+    cout << "Control:" << (uint)dataB.Byte("Control") << endl;
     cout << dec;
 
     cout << "use '$xxd datafile-11' to check" << endl;
 
     // Diagnostic code
 
-    #ifdef NDEBUG
-        cerr << endl;
-        cerr << "\x1B[31m";
-        cerr << "Warning! This code should run in Debug mode." << endl;
-        cerr << "\033[0m";
-    
-        assert(false); // Note this assert will have no effect!
+#ifdef NDEBUG
+    cerr << endl;
+    cerr << "\x1B[31m";
+    cerr << "Warning! This code should run in Debug mode." << endl;
+    cerr << "\033[0m";
 
-        cerr << "         This is Staging/Testing code." << endl;
-        cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
-        cerr << "         Rebuild code asap with follwoing command:" << endl;
-        cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
-        cerr << "         make install && xstage || echo Fail" << endl;        
-    #else
-        // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
-        struct check_assert{bool ok(){cout << "\x1B[32mOk.\033[0m";return true;}} check;
-        assert(check.ok());  // This assert show that assert is compiled and works.
-        // Program will show green "Ok." at the end of work if assert is compiled and executed.
-    #endif
+    assert(false); // Note this assert will have no effect!
+
+    cerr << "         This is Staging/Testing code." << endl;
+    cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
+    cerr << "         Rebuild code asap with follwoing command:" << endl;
+    cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
+    cerr << "         make install && xstage || echo Fail" << endl;
+#else
+    // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
+    struct check_assert
+    {
+        bool ok()
+        {
+            cout << "\x1B[32mOk.\033[0m";
+            return true;
+        }
+    } check;
+    assert(check.ok()); // This assert show that assert is compiled and works.
+                        // Program will show green "Ok." at the end of work if assert is compiled and executed.
+#endif
 
     return 0;
 }
