@@ -566,7 +566,9 @@ int main(int argc, char *argv[])
     cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
     cerr << "         make install && xstage || echo Fail" << endl;
 
-    // conan install .. -s compiler.cppstd=gnu17 --build=boost --build=gtest
+    // Rebuild boost&gtest with conanfile.py compiler settings.
+    // conan install .. -s build_type=Debug --build=boost --build=gtest
+
 #else
     // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
     struct check_assert
