@@ -303,7 +303,6 @@ void append(string fileName, char *ptrData, uint size)
 
     myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
     assert((myFile.rdstate() & ofstream::failbit) == 0);
-    //myFile.seekp(0,ios::end); <- not needed due ios::ate
     myFile.write(ptrData, size);
     assert((myFile.rdstate() & ofstream::failbit) == 0);
     myFile.close();
@@ -412,7 +411,7 @@ struct getFromBinary {
         //memcpy(&ret,ptr+position,sizeof(uint));
         return ret;
     };
-    char Byte(char *ptr, string fieldName) {
+    uint8_t Byte(char *ptr, string fieldName) {
         auto position = pDesc->Offset(fieldName);
         char ret;
         memcpy(&ret,ptr+position,len);
@@ -517,19 +516,18 @@ int main(int argc, char *argv[])
 
     // ----------------------------------------------------------------------------
 
-    auto dataDescriptor{descriptor("Name", 10, String) | descriptor("TLen", Int) | descriptor("Control", Byte) | descriptor("Waste", Byte)};
-    assert( dataDescriptor.getSize() == 16);
+    auto dataDescriptor{descriptor("Name", 10, String)  | descriptor("Control", Byte) | descriptor("TLen", Int)};
 
     union dataPayload {
-        char ptr[16];
-        struct {
-            char Name[10];
-            int  TLen;
-            char Control;
-            char Waste;
+        char ptr[15];
+        struct __attribute__((packed)) {
+            char Name[10];      //10
+            uint8_t Control;    //1
+            int  TLen;          //4
         };  
     };
     
+    assert( dataDescriptor.getSize() == sizeof(dataPayload));
 
     auto statusRemove = remove("datafile-11");
     create("datafile-11", dataDescriptor);
@@ -541,8 +539,7 @@ int main(int argc, char *argv[])
     payload.TLen = 0x66 ;
     payload.Control = 0x69;
 
-    cout << "Check:" << payload.TLen << endl;
-    cout << "   Re:" << (int) data.Int(payload.ptr,"TLen") << endl;
+    assert( payload.TLen == data.Int(payload.ptr,"TLen") );
 
     append("datafile-11", payload.ptr);
     append("datafile-11", payload.ptr);
@@ -559,23 +556,13 @@ int main(int argc, char *argv[])
 
     read( "datafile-11" , payload3.ptr, 0);
 
-    cout << data.String(payload3.ptr,"Name") << endl;
-    cout << (int) data.Uint(payload3.ptr,"TLen") << endl;
-    cout << (int) data.Byte(payload3.ptr,"Control") << endl;
+    cout << hex;
+    cout << "Name:" << data.String(payload3.ptr,"Name") << endl;
+    cout << "Tlen:" << (int) data.Uint(payload3.ptr,"TLen") << endl;
+    cout << "Control:" << (uint) data.Byte(payload3.ptr,"Control") << endl;
+    cout << dec;
 
     cout << "use '$xxd datafile-11' to check" << endl;
-
-    {
-    union {
-        char a[8];
-        int b[2];
-    } val;
-
-    val.b[1] = 99;
-    cout << val.b[1] << endl;
-    int c = *(reinterpret_cast<int*>(val.a+4));
-    cout << c << endl;
-    }
 
     // Diagnostic code
 
