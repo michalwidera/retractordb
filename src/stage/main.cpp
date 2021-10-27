@@ -383,6 +383,49 @@ struct rawAccessor
 
 int main(int argc, char *argv[])
 {
+
+    // Diagnostic code
+
+#ifdef NDEBUG
+    cerr << endl;
+    cerr << "\x1B[31m";
+    cerr << "Release Code form - Failure." << endl;
+    cerr << "\033[0m";
+
+    assert(false); // Note this assert will have no effect!
+
+    cerr << endl;
+    cerr << "         This is Staging/Testing code." << endl;
+    cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
+    cerr << "         Rebuild code asap with follwoing command:" << endl;
+    cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
+    cerr << "         make install && xstage || echo Fail" << endl;
+
+    exit(1);
+
+    // If meet: ndefined reference to `boost::program_options::options_description::options_description
+    // There were changes to the <string> class in the C++11 standard which may conflict with versions
+    // of the Boost library that were compiled with a non-C++11 compiler (such as G++-4.8).
+    // Try recompiling boost or using a version of C++ compiler that was used to compile your Boost libraries.
+    // Ref: https://stackoverflow.com/questions/12179154/undefined-reference-to-boostprogram-optionsoptions-descriptionm-default-l
+
+    // Rebuild boost&gtest with conanfile.py compiler settings.
+    // conan install .. -s build_type=Debug --build=boost --build=gtest
+
+#else
+    // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
+    struct check_assert
+    {
+        bool ok()
+        {
+            cout << "\x1B[32mDebug Code Form - Ok.\n\033[0m";
+            return true;
+        }
+    } check;
+    assert(check.ok()); // This assert show that assert is compiled and works.
+                        // Program will show green "Ok." at the end of work if assert is compiled and executed.
+#endif
+
     const uint AREA_SIZE = 10;
 
     auto status = remove("data.bin");
@@ -550,46 +593,6 @@ int main(int argc, char *argv[])
     cout << dec;
 
     cout << "use '$xxd datafile-11' to check" << endl;
-
-    // Diagnostic code
-
-#ifdef NDEBUG
-    cerr << endl;
-    cerr << "\x1B[31m";
-    cerr << "Warning! This code should run in Debug mode." << endl;
-    cerr << "\033[0m";
-
-    assert(false); // Note this assert will have no effect!
-
-    cerr << endl;
-    cerr << "         This is Staging/Testing code." << endl;
-    cerr << "         You compiled it as RELEASE - no assert will affect here!" << endl;
-    cerr << "         Rebuild code asap with follwoing command:" << endl;
-    cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
-    cerr << "         make install && xstage || echo Fail" << endl;
-
-    // If meet: ndefined reference to `boost::program_options::options_description::options_description
-    // There were changes to the <string> class in the C++11 standard which may conflict with versions
-    // of the Boost library that were compiled with a non-C++11 compiler (such as G++-4.8).
-    // Try recompiling boost or using a version of C++ compiler that was used to compile your Boost libraries.
-    // Ref: https://stackoverflow.com/questions/12179154/undefined-reference-to-boostprogram-optionsoptions-descriptionm-default-l
-
-    // Rebuild boost&gtest with conanfile.py compiler settings.
-    // conan install .. -s build_type=Debug --build=boost --build=gtest
-
-#else
-    // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
-    struct check_assert
-    {
-        bool ok()
-        {
-            cout << "\x1B[32mDebug Code Ok.\033[0m";
-            return true;
-        }
-    } check;
-    assert(check.ok()); // This assert show that assert is compiled and works.
-                        // Program will show green "Ok." at the end of work if assert is compiled and executed.
-#endif
 
     return 0;
 }
