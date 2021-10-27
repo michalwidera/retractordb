@@ -568,6 +568,12 @@ int main(int argc, char *argv[])
     cerr << "         conan install .. -s build_type=Debug && conan build .." << endl;
     cerr << "         make install && xstage || echo Fail" << endl;
 
+    // If meet: ndefined reference to `boost::program_options::options_description::options_description
+    // There were changes to the <string> class in the C++11 standard which may conflict with versions
+    // of the Boost library that were compiled with a non-C++11 compiler (such as G++-4.8).
+    // Try recompiling boost or using a version of C++ compiler that was used to compile your Boost libraries.
+    // Ref: https://stackoverflow.com/questions/12179154/undefined-reference-to-boostprogram-optionsoptions-descriptionm-default-l
+
     // Rebuild boost&gtest with conanfile.py compiler settings.
     // conan install .. -s build_type=Debug --build=boost --build=gtest
 
