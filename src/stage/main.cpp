@@ -268,91 +268,97 @@ istream &operator>>(istream &is, descriptor &desc)
 // https://en.cppreference.com/w/cpp/io/ios_base/openmode
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-void append(string fileName, char *ptrData, uint size)
-{
-    fstream myFile;
+map<string, descriptor> schema;
 
-    myFile.rdbuf()->pubsetbuf(0, 0);
+struct fileAccessor {
 
-    myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile.write(ptrData, size);
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile.close();
-}
+    string fileName;
 
-void read(string fileName, char *ptrData, uint size, uint position)
-{
-    fstream myFile;
+    fileAccessor(string fileName,descriptor desc) : fileName(fileName) {
+        create(desc);
+    };
 
-    myFile.rdbuf()->pubsetbuf(0, 0);
+    void append_(char *ptrData, uint size)
+    {
+        fstream myFile;
 
-    myFile.open(fileName, ios::in | ios::binary);
-    assert((myFile.rdstate() & ifstream::failbit) == 0);
-    myFile.seekg(position);
-    assert((myFile.rdstate() & ifstream::failbit) == 0);
-    myFile.read(ptrData, size);
-    assert((myFile.rdstate() & ifstream::failbit) == 0);
-    myFile.close();
-}
+        myFile.rdbuf()->pubsetbuf(0, 0);
 
-void update(string fileName, char *ptrData, uint size, uint position)
-{
-    fstream myFile;
+        myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile.write(ptrData, size);
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile.close();
+    };
 
-    myFile.rdbuf()->pubsetbuf(0, 0);
+    void read_(char *ptrData, uint size, uint position)
+    {
+        fstream myFile;
 
-    myFile.open(fileName, ios::in | ios::out | ios::binary | ios::ate);
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile.seekp(position);
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile.write(ptrData, size);
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile.close();
-}
+        myFile.rdbuf()->pubsetbuf(0, 0);
+
+        myFile.open(fileName, ios::in | ios::binary);
+        assert((myFile.rdstate() & ifstream::failbit) == 0);
+        myFile.seekg(position);
+        assert((myFile.rdstate() & ifstream::failbit) == 0);
+        myFile.read(ptrData, size);
+        assert((myFile.rdstate() & ifstream::failbit) == 0);
+        myFile.close();
+    };
+
+    void update_(char *ptrData, uint size, uint position)
+    {
+        fstream myFile;
+
+        myFile.rdbuf()->pubsetbuf(0, 0);
+
+        myFile.open(fileName, ios::in | ios::out | ios::binary | ios::ate);
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile.seekp(position);
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile.write(ptrData, size);
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile.close();
+    };
+
+    void update(char *outBuffer, uint offsetFromHead)
+    {
+        auto size = schema[fileName].getSize();
+        update_(outBuffer, size, offsetFromHead * size);
+    };
+
+    void read(char *inBuffer, uint offsetFromHead)
+    {
+        auto size = schema[fileName].getSize();
+        read_(inBuffer, size, offsetFromHead * size);
+    };
+
+    void append(char *outBuffer)
+    {
+        auto size = schema[fileName].getSize();
+        append_(outBuffer, size);
+    };
+
+    void create(descriptor desc)
+    {
+        schema[fileName] = desc;
+        fstream myFile;
+
+        myFile.rdbuf()->pubsetbuf(0, 0);
+
+        string fileDesc(fileName);
+        fileDesc.append(".desc");
+
+        myFile.open(fileDesc, ios::out);
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile << desc;
+        assert((myFile.rdstate() & ofstream::failbit) == 0);
+        myFile.close();
+    };
+};
 
 // ------------------------------------------------------------------------
 // Interface
-
-map<string, descriptor> schema;
-
-// There should be offsetFromHead -
-// Implementation now works as offsetFrom Begin
-// Neet to fix this.
-
-void update(string file, char *outBuffer, uint offsetFromHead)
-{
-    auto size = schema[file].getSize();
-    update(file, outBuffer, size, offsetFromHead * size);
-}
-
-void read(string file, char *inBuffer, uint offsetFromHead)
-{
-    auto size = schema[file].getSize();
-    read(file, inBuffer, size, offsetFromHead * size);
-}
-
-void append(string file, char *outBuffer)
-{
-    auto size = schema[file].getSize();
-    append(file, outBuffer, size);
-}
-
-void create(string file, descriptor desc)
-{
-    schema[file] = desc;
-    fstream myFile;
-
-    myFile.rdbuf()->pubsetbuf(0, 0);
-
-    string fileDesc(file.append(".desc"));
-
-    myFile.open(fileDesc, ios::out);
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile << desc;
-    assert((myFile.rdstate() & ofstream::failbit) == 0);
-    myFile.close();
-}
 
 struct rawAccessor
 {
@@ -428,20 +434,23 @@ int main(int argc, char *argv[])
 
     const uint AREA_SIZE = 10;
 
-    auto status = remove("data.bin");
+    descriptor voidDescriptor({descriptor("Name", 10, String)});
+    fileAccessor fAcc("testfile",voidDescriptor) ;
 
     {
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        append("testfile.bin", xData, AREA_SIZE);
-        append("testfile.bin", xData, AREA_SIZE); // Add one extra record
+        fAcc.append_( xData, AREA_SIZE);
+        fAcc.append_( xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(xData, "test data") == 0);
 
         char yData[AREA_SIZE];
-        read("testfile.bin", yData, AREA_SIZE, 0);
-        cout << yData << endl;
+        fAcc.read_(yData, AREA_SIZE, 0);
+        cout << endl;
+        cout << "[" << yData << "]";
+        cout << endl;
         assert(strcmp(yData, "test data") == 0);
     }
 
@@ -449,15 +458,15 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test updt";
         //                       0123456789
 
-        update("testfile.bin", xData, AREA_SIZE, 0);
+        fAcc.update_(xData, AREA_SIZE, 0);
 
         char yData[AREA_SIZE];
 
-        read("testfile.bin", yData, AREA_SIZE, 0);
+        fAcc.read_(yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test updt") == 0);
 
-        read("testfile.bin", yData, AREA_SIZE, AREA_SIZE);
+        fAcc.read_(yData, AREA_SIZE, AREA_SIZE);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -467,12 +476,12 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        update("testfile.bin", xData, AREA_SIZE, 0);
+        fAcc.update_( xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         char yData[AREA_SIZE];
-        read("testfile.bin", yData, AREA_SIZE, 0);
+        fAcc.read_( yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -561,29 +570,34 @@ int main(int argc, char *argv[])
     // This assert will fail is structure is not packed.
     assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
-    auto statusRemove = remove("datafile-11");
-    create("datafile-11", dataDescriptor);
+    fileAccessor fAcc2("datafile-11",dataDescriptor) ;
+
+    auto statusRemove = remove(fAcc2.fileName.c_str());
 
     strcpy(payload.Name, "test data");
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
     rawAccessor dataA(schema["datafile-11"], payload.ptr);
+
+    cout << payload.TLen << endl;
+    cout << dataA.cast<int>("TLen") << endl;
+
     assert(payload.TLen == dataA.cast<int>("TLen"));
 
-    append("datafile-11", payload.ptr);
-    append("datafile-11", payload.ptr);
-    append("datafile-11", payload.ptr);
+    fAcc2.append(payload.ptr);
+    fAcc2.append(payload.ptr);
+    fAcc2.append(payload.ptr);
 
     dataPayload payload2;
     strcpy(payload2.Name, "xxxx xxxx");
     payload2.TLen = 0x67;
     payload2.Control = 0x33;
 
-    update("datafile-11", payload2.ptr, 1);
+    fAcc2.update(payload2.ptr, 1);
 
     dataPayload payload3;
-    read("datafile-11", payload3.ptr, 1);
+    fAcc2.read(payload3.ptr, 1);
     rawAccessor dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
