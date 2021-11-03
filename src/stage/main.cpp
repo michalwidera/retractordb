@@ -272,9 +272,9 @@ istream &operator>>(istream &is, descriptor &desc)
 
 struct binaryFileAccessorInterface
 {
-    virtual void append_(char *ptrData, uint size) = 0;
-    virtual void read_(char *ptrData, uint size, uint position) = 0;
-    virtual void update_(char *ptrData, uint size, uint position) = 0;
+    virtual void append_(byte *ptrData, uint size) = 0;
+    virtual void read_(byte *ptrData, uint size, uint position) = 0;
+    virtual void update_(byte *ptrData, uint size, uint position) = 0;
     virtual string name_() = 0;
 
     virtual inline ~binaryFileAccessorInterface(){};
@@ -287,7 +287,7 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
 
     genericBinaryFileAccessor(string fileName) : fileName(fileName){};
 
-    void append_(char *ptrData, uint size)
+    void append_(byte *ptrData, uint size)
     {
         fstream myFile;
 
@@ -295,12 +295,12 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
 
         myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
-        myFile.write(ptrData, size);
+        myFile.write(reinterpret_cast<char*>(ptrData), size);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.close();
     };
 
-    void read_(char *ptrData, uint size, uint position)
+    void read_(byte *ptrData, uint size, uint position)
     {
         fstream myFile;
 
@@ -310,12 +310,12 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
         assert((myFile.rdstate() & ifstream::failbit) == 0);
         myFile.seekg(position);
         assert((myFile.rdstate() & ifstream::failbit) == 0);
-        myFile.read(ptrData, size);
+        myFile.read(reinterpret_cast<char*>(ptrData), size);
         assert((myFile.rdstate() & ifstream::failbit) == 0);
         myFile.close();
     };
 
-    void update_(char *ptrData, uint size, uint position)
+    void update_(byte *ptrData, uint size, uint position)
     {
         fstream myFile;
 
@@ -325,7 +325,7 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.seekp(position);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
-        myFile.write(ptrData, size);
+        myFile.write(reinterpret_cast<char*>(ptrData), size);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.close();
     };
@@ -348,19 +348,19 @@ struct fileAccessor
         create(desc);
     };
 
-    void update(char *outBuffer, uint offsetFromHead)
+    void update(byte *outBuffer, uint offsetFromHead)
     {
         auto size = schema[pAccessor->name_()].getSize();
         pAccessor->update_(outBuffer, size, offsetFromHead * size);
     };
 
-    void read(char *inBuffer, uint offsetFromHead)
+    void read(byte *inBuffer, uint offsetFromHead)
     {
         auto size = schema[pAccessor->name_()].getSize();
         pAccessor->read_(inBuffer, size, offsetFromHead * size);
     };
 
-    void append(char *outBuffer)
+    void append(byte *outBuffer)
     {
         auto size = schema[pAccessor->name_()].getSize();
         pAccessor->append_(outBuffer, size);
@@ -391,8 +391,8 @@ struct rawAccessor
 {
 
     descriptor *pDesc;
-    char *ptr;
-    rawAccessor(descriptor &desc, char *ptr) : pDesc(&desc),
+    byte *ptr;
+    rawAccessor(descriptor &desc, byte *ptr) : pDesc(&desc),
                                                ptr(ptr)
     {
     }
@@ -466,52 +466,56 @@ int main(int argc, char *argv[])
     fileAccessor fAcc(voidDescriptor, &binaryAccessor);
 
     {
-        char xData[AREA_SIZE] = "test data";
-        //                       0123456789
+
+        byte xData[AREA_SIZE] ;
+        memcpy(xData,"test data",AREA_SIZE);
+        //                                     0123456789
 
         binaryAccessor.append_(xData, AREA_SIZE);
         binaryAccessor.append_(xData, AREA_SIZE); // Add one extra record
 
-        assert(strcmp(xData, "test data") == 0);
+        assert(strcmp(reinterpret_cast<char*>(xData), "test data") == 0);
 
-        char yData[AREA_SIZE];
+        byte yData[AREA_SIZE];
         binaryAccessor.read_(yData, AREA_SIZE, 0);
         cout << endl;
         cout << "[" << yData << "]";
         cout << endl;
-        assert(strcmp(yData, "test data") == 0);
+        assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
 
     {
-        char xData[AREA_SIZE] = "test updt";
-        //                       0123456789
+        byte xData[AREA_SIZE];
+        memcpy(xData,"test updt",AREA_SIZE);
+        //            0123456789
 
         binaryAccessor.update_(xData, AREA_SIZE, 0);
 
-        char yData[AREA_SIZE];
+        byte yData[AREA_SIZE];
 
         binaryAccessor.read_(yData, AREA_SIZE, 0);
         cout << yData << endl;
-        assert(strcmp(yData, "test updt") == 0);
+        assert(strcmp(reinterpret_cast<char*>(yData), "test updt") == 0);
 
         binaryAccessor.read_(yData, AREA_SIZE, AREA_SIZE);
         cout << yData << endl;
-        assert(strcmp(yData, "test data") == 0);
+        assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
 
     // Revert data to default.
     {
-        char xData[AREA_SIZE] = "test data";
-        //                       0123456789
+        byte xData[AREA_SIZE];
+        memcpy(xData,"test data",AREA_SIZE);
+        //            0123456789
 
         binaryAccessor.update_(xData, AREA_SIZE, 0);
 
         // update -> data in file
 
-        char yData[AREA_SIZE];
+        byte yData[AREA_SIZE];
         binaryAccessor.read_(yData, AREA_SIZE, 0);
         cout << yData << endl;
-        assert(strcmp(yData, "test data") == 0);
+        assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
 
     descriptor data1{field("Name3", 10, String), field("Name4", 10, String)};
@@ -584,7 +588,7 @@ int main(int argc, char *argv[])
 
     union dataPayload
     {
-        char ptr[15];
+        byte ptr[15];
         struct __attribute__((packed))
         {
             char Name[10];   //10
@@ -605,7 +609,7 @@ int main(int argc, char *argv[])
 
     auto statusRemove = remove(binaryAccessor2.name_().c_str());
 
-    strcpy(payload.Name, "test data");
+    memcpy(payload.Name, "test data", AREA_SIZE);
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
@@ -621,7 +625,7 @@ int main(int argc, char *argv[])
     fAcc2.append(payload.ptr);
 
     dataPayload payload2;
-    strcpy(payload2.Name, "xxxx xxxx");
+    memcpy(payload2.Name, "xxxx xxxx",AREA_SIZE);
     payload2.TLen = 0x67;
     payload2.Control = 0x33;
 
