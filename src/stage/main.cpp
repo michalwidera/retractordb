@@ -272,9 +272,9 @@ istream &operator>>(istream &is, descriptor &desc)
 
 struct binaryFileAccessorInterface
 {
-    virtual void append_(byte *ptrData, uint size) = 0;
-    virtual void read_(byte *ptrData, uint size, uint position) = 0;
-    virtual void update_(byte *ptrData, uint size, uint position) = 0;
+    virtual void append_(const byte *ptrData, const uint size) = 0;
+    virtual void read_(byte *ptrData, const uint size, const uint position) = 0;
+    virtual void update_(const byte *ptrData, const uint size, const uint position) = 0;
     virtual string name_() = 0;
 
     virtual inline ~binaryFileAccessorInterface(){};
@@ -287,7 +287,7 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
 
     genericBinaryFileAccessor(string fileName) : fileName(fileName){};
 
-    void append_(byte *ptrData, uint size)
+    void append_(const byte *ptrData, const uint size)
     {
         fstream myFile;
 
@@ -295,12 +295,12 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
 
         myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
-        myFile.write(reinterpret_cast<char*>(ptrData), size);
+        myFile.write(reinterpret_cast<const char*>(ptrData), size);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.close();
     };
 
-    void read_(byte *ptrData, uint size, uint position)
+    void read_(byte *ptrData, const uint size, const uint position)
     {
         fstream myFile;
 
@@ -315,7 +315,7 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
         myFile.close();
     };
 
-    void update_(byte *ptrData, uint size, uint position)
+    void update_(const byte *ptrData, const uint size, const uint position)
     {
         fstream myFile;
 
@@ -325,7 +325,7 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.seekp(position);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
-        myFile.write(reinterpret_cast<char*>(ptrData), size);
+        myFile.write(reinterpret_cast<const char*>(ptrData), size);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.close();
     };
@@ -342,31 +342,31 @@ struct fileAccessor
 
     binaryFileAccessorInterface *pAccessor;
 
-    fileAccessor(descriptor desc, binaryFileAccessorInterface *pAccessor)
-        : pAccessor(pAccessor)
+    fileAccessor(const descriptor desc, binaryFileAccessorInterface &accessor)
+        : pAccessor(&accessor)
     {
         create(desc);
     };
 
-    void update(byte *outBuffer, uint offsetFromHead)
+    void update(const byte *outBuffer, const uint offsetFromHead)
     {
         auto size = schema[pAccessor->name_()].getSize();
         pAccessor->update_(outBuffer, size, offsetFromHead * size);
     };
 
-    void read(byte *inBuffer, uint offsetFromHead)
+    void read(byte *inBuffer, const uint offsetFromHead)
     {
         auto size = schema[pAccessor->name_()].getSize();
         pAccessor->read_(inBuffer, size, offsetFromHead * size);
     };
 
-    void append(byte *outBuffer)
+    void append(const byte *outBuffer)
     {
         auto size = schema[pAccessor->name_()].getSize();
         pAccessor->append_(outBuffer, size);
     };
 
-    void create(descriptor desc)
+    void create(const descriptor desc)
     {
         schema[pAccessor->name_()] = desc;
         fstream myFile;
@@ -399,7 +399,7 @@ struct rawAccessor
 
     rawAccessor() = delete;
 
-    string make_string(string fieldName)
+    string make_string(const string fieldName)
     {
         auto len = pDesc->Len(fieldName);
         string ret(len, 0);
@@ -408,7 +408,7 @@ struct rawAccessor
     };
 
     template <typename T>
-    auto cast(string fieldName)
+    auto cast(const string fieldName)
     {
         return *(reinterpret_cast<T *>(ptr + pDesc->Offset(fieldName)));
     };
@@ -463,7 +463,7 @@ int main(int argc, char *argv[])
 
     descriptor voidDescriptor({descriptor("Name", 10, String)});
     genericBinaryFileAccessor binaryAccessor("testfile");
-    fileAccessor fAcc(voidDescriptor, &binaryAccessor);
+    fileAccessor fAcc(voidDescriptor, binaryAccessor);
 
     {
 
@@ -603,7 +603,7 @@ int main(int argc, char *argv[])
     assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
     genericBinaryFileAccessor binaryAccessor2("datafile-11");
-    fileAccessor fAcc2(dataDescriptor,&binaryAccessor2);
+    fileAccessor fAcc2(dataDescriptor,binaryAccessor2);
 
     cerr << binaryAccessor2.name_() << endl ;
 
