@@ -40,25 +40,27 @@ enum fieldColumn
     type = 2
 };
 
-map<fieldType, string> typeDictionary = {{String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}};
+template <typename L, typename R>
+map<R, L>
+makeReverse(map<L, R> list)
+{
+    map<R, L> retVal;
+    for (const auto &[key, value] : list)
+        retVal[value] = key;
+    return retVal;
+}
 
-string getFieldType(fieldType e)
+map<string, fieldType> typeDictionary = {{"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
+map<fieldType, string> typeDictionaryR = makeReverse(typeDictionary);
+
+fieldType getFieldType(string e)
 {
     return typeDictionary[e];
 }
 
-fieldType getFieldType(string e)
+string getFieldType(fieldType e)
 {
-    for (const auto &[key, value] : typeDictionary)
-        if (value == e)
-            return key;
-
-    //for (auto it = typeDictionary.begin(); it != typeDictionary.end(); ++it)
-    //if (it->second == e)
-    //    return it->first;
-
-    assert(false);
-    return Byte;
+    return typeDictionaryR[e];
 }
 
 int getFieldLenFromType(fieldType ft)
@@ -268,15 +270,22 @@ istream &operator>>(istream &is, descriptor &desc)
 // https://en.cppreference.com/w/cpp/io/ios_base/openmode
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-map<string, descriptor> schema;
+struct binaryFileAccessorInterface
+{
+    virtual void append_(char *ptrData, uint size) = 0;
+    virtual void read_(char *ptrData, uint size, uint position) = 0;
+    virtual void update_(char *ptrData, uint size, uint position) = 0;
+    virtual string name_() = 0;
 
-struct fileAccessor {
+    virtual inline ~binaryFileAccessorInterface(){};
+    binaryFileAccessorInterface(){};
+};
 
+struct genericBinaryFileAccessor : public binaryFileAccessorInterface
+{
     string fileName;
 
-    fileAccessor(string fileName,descriptor desc) : fileName(fileName) {
-        create(desc);
-    };
+    genericBinaryFileAccessor(string fileName) : fileName(fileName){};
 
     void append_(char *ptrData, uint size)
     {
@@ -321,32 +330,50 @@ struct fileAccessor {
         myFile.close();
     };
 
+    string name_() {
+        return fileName;
+    }
+};
+
+map<string, descriptor> schema;
+
+struct fileAccessor
+{
+
+    binaryFileAccessorInterface *pAccessor;
+
+    fileAccessor(descriptor desc, binaryFileAccessorInterface *pAccessor)
+        : pAccessor(pAccessor)
+    {
+        create(desc);
+    };
+
     void update(char *outBuffer, uint offsetFromHead)
     {
-        auto size = schema[fileName].getSize();
-        update_(outBuffer, size, offsetFromHead * size);
+        auto size = schema[pAccessor->name_()].getSize();
+        pAccessor->update_(outBuffer, size, offsetFromHead * size);
     };
 
     void read(char *inBuffer, uint offsetFromHead)
     {
-        auto size = schema[fileName].getSize();
-        read_(inBuffer, size, offsetFromHead * size);
+        auto size = schema[pAccessor->name_()].getSize();
+        pAccessor->read_(inBuffer, size, offsetFromHead * size);
     };
 
     void append(char *outBuffer)
     {
-        auto size = schema[fileName].getSize();
-        append_(outBuffer, size);
+        auto size = schema[pAccessor->name_()].getSize();
+        pAccessor->append_(outBuffer, size);
     };
 
     void create(descriptor desc)
     {
-        schema[fileName] = desc;
+        schema[pAccessor->name_()] = desc;
         fstream myFile;
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        string fileDesc(fileName);
+        string fileDesc(pAccessor->name_());
         fileDesc.append(".desc");
 
         myFile.open(fileDesc, ios::out);
@@ -435,19 +462,20 @@ int main(int argc, char *argv[])
     const uint AREA_SIZE = 10;
 
     descriptor voidDescriptor({descriptor("Name", 10, String)});
-    fileAccessor fAcc("testfile",voidDescriptor) ;
+    genericBinaryFileAccessor binaryAccessor("testfile");
+    fileAccessor fAcc(voidDescriptor, &binaryAccessor);
 
     {
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        fAcc.append_( xData, AREA_SIZE);
-        fAcc.append_( xData, AREA_SIZE); // Add one extra record
+        binaryAccessor.append_(xData, AREA_SIZE);
+        binaryAccessor.append_(xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(xData, "test data") == 0);
 
         char yData[AREA_SIZE];
-        fAcc.read_(yData, AREA_SIZE, 0);
+        binaryAccessor.read_(yData, AREA_SIZE, 0);
         cout << endl;
         cout << "[" << yData << "]";
         cout << endl;
@@ -458,15 +486,15 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test updt";
         //                       0123456789
 
-        fAcc.update_(xData, AREA_SIZE, 0);
+        binaryAccessor.update_(xData, AREA_SIZE, 0);
 
         char yData[AREA_SIZE];
 
-        fAcc.read_(yData, AREA_SIZE, 0);
+        binaryAccessor.read_(yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test updt") == 0);
 
-        fAcc.read_(yData, AREA_SIZE, AREA_SIZE);
+        binaryAccessor.read_(yData, AREA_SIZE, AREA_SIZE);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -476,12 +504,12 @@ int main(int argc, char *argv[])
         char xData[AREA_SIZE] = "test data";
         //                       0123456789
 
-        fAcc.update_( xData, AREA_SIZE, 0);
+        binaryAccessor.update_(xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         char yData[AREA_SIZE];
-        fAcc.read_( yData, AREA_SIZE, 0);
+        binaryAccessor.read_(yData, AREA_SIZE, 0);
         cout << yData << endl;
         assert(strcmp(yData, "test data") == 0);
     }
@@ -570,9 +598,12 @@ int main(int argc, char *argv[])
     // This assert will fail is structure is not packed.
     assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
-    fileAccessor fAcc2("datafile-11",dataDescriptor) ;
+    genericBinaryFileAccessor binaryAccessor2("datafile-11");
+    fileAccessor fAcc2(dataDescriptor,&binaryAccessor2);
 
-    auto statusRemove = remove(fAcc2.fileName.c_str());
+    cerr << binaryAccessor2.name_() << endl ;
+
+    auto statusRemove = remove(binaryAccessor2.name_().c_str());
 
     strcpy(payload.Name, "test data");
     payload.TLen = 0x66;
