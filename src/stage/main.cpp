@@ -185,13 +185,13 @@ struct descriptor : vector<field>
         return -1;
     }
 
-    int Len(string name)
+    int Len(const string name)
     {
         auto pos = Position(name);
         return get<len>((*this)[pos]);
     }
 
-    int Offset(string name)
+    int Offset(const string name)
     {
         auto offset = 0;
         for (auto const i : *this)
@@ -204,7 +204,7 @@ struct descriptor : vector<field>
         return -1;
     }
 
-    string Type(string name)
+    string Type(const string name)
     {
         auto pos = Position(name);
         return getFieldType(get<type>((*this)[pos]));
