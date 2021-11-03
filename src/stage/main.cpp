@@ -469,7 +469,7 @@ int main(int argc, char *argv[])
 
         byte xData[AREA_SIZE] ;
         memcpy(xData,"test data",AREA_SIZE);
-        //                                     0123456789
+        //            0123456789
 
         binaryAccessor.append_(xData, AREA_SIZE);
         binaryAccessor.append_(xData, AREA_SIZE); // Add one extra record
@@ -478,8 +478,10 @@ int main(int argc, char *argv[])
 
         byte yData[AREA_SIZE];
         binaryAccessor.read_(yData, AREA_SIZE, 0);
-        cout << endl;
-        cout << "[" << yData << "]";
+
+        cout << "[" << reinterpret_cast<char*>(yData) << "]";
+        cout << "/";
+        cout << "[" << yData << "]" ;
         cout << endl;
         assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
@@ -494,11 +496,20 @@ int main(int argc, char *argv[])
         byte yData[AREA_SIZE];
 
         binaryAccessor.read_(yData, AREA_SIZE, 0);
-        cout << yData << endl;
+
+        cout << "[" << reinterpret_cast<char*>(yData) << "]";
+        cout << "/";
+        cout << "[" << yData << "]" ;
+        cout << endl;
         assert(strcmp(reinterpret_cast<char*>(yData), "test updt") == 0);
 
         binaryAccessor.read_(yData, AREA_SIZE, AREA_SIZE);
-        cout << yData << endl;
+
+        cout << "[" << reinterpret_cast<char*>(yData) << "]";
+        cout << "/";
+        cout << "[" << yData << "]" ;
+        cout << endl;
+    
         assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
 
@@ -514,7 +525,12 @@ int main(int argc, char *argv[])
 
         byte yData[AREA_SIZE];
         binaryAccessor.read_(yData, AREA_SIZE, 0);
-        cout << yData << endl;
+
+        cout << "[" << reinterpret_cast<char*>(yData) << "]";
+        cout << "/";
+        cout << "[" << yData << "]" ;
+        cout << endl;
+
         assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
 
