@@ -22,7 +22,7 @@ using namespace std;
 
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 
-enum fieldType
+enum FieldType
 {
     String,
     Uint,
@@ -32,8 +32,8 @@ enum fieldType
 
 typedef int fieldLen;
 typedef string fieldName;
-typedef tuple<fieldName, fieldLen, fieldType> field;
-enum fieldColumn
+typedef tuple<fieldName, fieldLen, FieldType> field;
+enum FieldColumn
 {
     name = 0,
     len = 1,
@@ -50,20 +50,20 @@ makeReverse(map<L, R> list)
     return retVal;
 }
 
-map<string, fieldType> typeDictionary = {{"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
-map<fieldType, string> typeDictionaryR = makeReverse(typeDictionary);
+map<string, FieldType> typeDictionary = {{"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
+map<FieldType, string> typeDictionaryR = makeReverse(typeDictionary);
 
-fieldType getFieldType(string e)
+FieldType getFieldType(string e)
 {
     return typeDictionary[e];
 }
 
-string getFieldType(fieldType e)
+string getFieldType(FieldType e)
 {
     return typeDictionaryR[e];
 }
 
-int getFieldLenFromType(fieldType ft)
+int getFieldLenFromType(FieldType ft)
 {
     switch (ft)
     {
@@ -82,29 +82,29 @@ int getFieldLenFromType(fieldType ft)
     return 0;
 }
 
-struct descriptor : vector<field>
+struct Descriptor : vector<field>
 {
 
     map<string, int> fieldNames;
 
-    descriptor(initializer_list<field> l) : vector(l)
+    Descriptor(initializer_list<field> l) : vector(l)
     {
     }
 
-    descriptor(fieldName n, fieldLen l, fieldType t)
+    Descriptor(fieldName n, fieldLen l, FieldType t)
     {
         push_back(field(n, l, t));
         updateNames();
     }
 
-    descriptor(fieldName n, fieldType t)
+    Descriptor(fieldName n, FieldType t)
     {
         assert(t != String && "This method does not work for Stings");
         push_back(field(n, getFieldLenFromType(t), t));
         updateNames();
     }
 
-    descriptor()
+    Descriptor()
     {
     }
 
@@ -113,7 +113,7 @@ struct descriptor : vector<field>
         insert(end(), l.begin(), l.end());
     }
 
-    auto &operator|(const descriptor &a)
+    auto &operator|(const Descriptor &a)
     {
         if (this != &a)
         {
@@ -121,7 +121,7 @@ struct descriptor : vector<field>
         }
         else
         {
-            //descriptor b(*this);
+            //Descriptor b(*this);
             //insert(end(), b.begin(), b.end());
             assert(false && "can not merge same to same");
             // can't do safe: data | data
@@ -131,7 +131,7 @@ struct descriptor : vector<field>
         return *this;
     }
 
-    auto &operator=(const descriptor &a)
+    auto &operator=(const Descriptor &a)
     {
         clear();
         insert(end(), a.begin(), a.end());
@@ -139,7 +139,7 @@ struct descriptor : vector<field>
         return *this;
     }
 
-    descriptor(const descriptor &b)
+    Descriptor(const Descriptor &b)
     {
         *this | b;
         updateNames();
@@ -181,7 +181,7 @@ struct descriptor : vector<field>
         if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
         cerr << "[" << name << "]" << endl;
-        assert(false && "did not find that record id descriptor:{}");
+        assert(false && "did not find that record id Descriptor:{}");
         return -1;
     }
 
@@ -210,11 +210,11 @@ struct descriptor : vector<field>
         return getFieldType(get<type>((*this)[pos]));
     }
 
-    friend ostream &operator<<(ostream &os, const descriptor &desc);
-    friend istream &operator>>(istream &is, descriptor &desc);
+    friend ostream &operator<<(ostream &os, const Descriptor &desc);
+    friend istream &operator>>(istream &is, Descriptor &desc);
 };
 
-ostream &operator<<(ostream &os, const descriptor &desc)
+ostream &operator<<(ostream &os, const Descriptor &desc)
 {
     os << "{";
     for (auto const &r : desc)
@@ -235,7 +235,7 @@ ostream &operator<<(ostream &os, const descriptor &desc)
     return os;
 }
 
-istream &operator>>(istream &is, descriptor &desc)
+istream &operator>>(istream &is, Descriptor &desc)
 {
     do
     {
@@ -249,7 +249,7 @@ istream &operator>>(istream &is, descriptor &desc)
         }
         is >> name;
 
-        fieldType ft = getFieldType(type);
+        FieldType ft = getFieldType(type);
 
         if (ft == String)
         {
@@ -260,7 +260,7 @@ istream &operator>>(istream &is, descriptor &desc)
             len = getFieldLenFromType(ft);
         }
 
-        desc | descriptor(name, len, ft);
+        desc | Descriptor(name, len, ft);
 
     } while (!is.eof());
 
@@ -270,24 +270,24 @@ istream &operator>>(istream &is, descriptor &desc)
 // https://en.cppreference.com/w/cpp/io/ios_base/openmode
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-struct binaryFileAccessorInterface
+struct BinaryFileAccessorInterface
 {
-    virtual void append_(const byte *ptrData, const uint size) = 0;
-    virtual void read_(byte *ptrData, const uint size, const uint position) = 0;
-    virtual void update_(const byte *ptrData, const uint size, const uint position) = 0;
+    virtual void append(const byte *ptrData, const uint size) = 0;
+    virtual void read(byte *ptrData, const uint size, const uint position) = 0;
+    virtual void update(const byte *ptrData, const uint size, const uint position) = 0;
     virtual string name_() = 0;
 
-    virtual inline ~binaryFileAccessorInterface(){};
-    binaryFileAccessorInterface(){};
+    virtual inline ~BinaryFileAccessorInterface(){};
+    BinaryFileAccessorInterface(){};
 };
 
-struct genericBinaryFileAccessor : public binaryFileAccessorInterface
+struct genericBinaryFileAccessor : public BinaryFileAccessorInterface
 {
     string fileName;
 
     genericBinaryFileAccessor(string fileName) : fileName(fileName){};
 
-    void append_(const byte *ptrData, const uint size)
+    void append(const byte *ptrData, const uint size) override
     {
         fstream myFile;
 
@@ -300,7 +300,7 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
         myFile.close();
     };
 
-    void read_(byte *ptrData, const uint size, const uint position)
+    void read(byte *ptrData, const uint size, const uint position) override
     {
         fstream myFile;
 
@@ -310,12 +310,12 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
         assert((myFile.rdstate() & ifstream::failbit) == 0);
         myFile.seekg(position);
         assert((myFile.rdstate() & ifstream::failbit) == 0);
-        myFile.read(reinterpret_cast<char*>(ptrData), size);
+        myFile.get(reinterpret_cast<char*>(ptrData), size);
         assert((myFile.rdstate() & ifstream::failbit) == 0);
         myFile.close();
     };
 
-    void update_(const byte *ptrData, const uint size, const uint position)
+    void update(const byte *ptrData, const uint size, const uint position) override
     {
         fstream myFile;
 
@@ -335,38 +335,38 @@ struct genericBinaryFileAccessor : public binaryFileAccessorInterface
     }
 };
 
-map<string, descriptor> schema;
+map<string, Descriptor> schema;
 
-struct fileAccessor
+struct FileAccessor
 {
 
-    binaryFileAccessorInterface *pAccessor;
+    BinaryFileAccessorInterface *pAccessor;
 
-    fileAccessor(const descriptor desc, binaryFileAccessorInterface &accessor)
+    FileAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor)
         : pAccessor(&accessor)
     {
         create(desc);
     };
 
-    void update(const byte *outBuffer, const uint offsetFromHead)
+    void Update(const byte *outBuffer, const uint offsetFromHead)
     {
         auto size = schema[pAccessor->name_()].getSize();
-        pAccessor->update_(outBuffer, size, offsetFromHead * size);
+        pAccessor->update(outBuffer, size, offsetFromHead * size);
     };
 
-    void read(byte *inBuffer, const uint offsetFromHead)
+    void Get(byte *inBuffer, const uint offsetFromHead)
     {
         auto size = schema[pAccessor->name_()].getSize();
-        pAccessor->read_(inBuffer, size, offsetFromHead * size);
+        pAccessor->read(inBuffer, size, offsetFromHead * size);
     };
 
-    void append(const byte *outBuffer)
+    void Put(const byte *outBuffer)
     {
         auto size = schema[pAccessor->name_()].getSize();
-        pAccessor->append_(outBuffer, size);
+        pAccessor->append(outBuffer, size);
     };
 
-    void create(const descriptor desc)
+    void create(const Descriptor desc)
     {
         schema[pAccessor->name_()] = desc;
         fstream myFile;
@@ -387,25 +387,23 @@ struct fileAccessor
 // ------------------------------------------------------------------------
 // Interface
 
-struct rawAccessor
+struct SchemaAccessor
 {
 
-    descriptor *pDesc;
+    Descriptor *pDesc;
     byte *ptr;
-    rawAccessor(descriptor &desc, byte *ptr) : pDesc(&desc),
+    SchemaAccessor(Descriptor &desc, byte *ptr) : pDesc(&desc),
                                                ptr(ptr)
     {
     }
 
-    rawAccessor() = delete;
+    SchemaAccessor() = delete;
 
-    string make_string(const string fieldName)
-    {
-        auto len = pDesc->Len(fieldName);
-        string ret(len, 0);
-        memcpy(&ret[0], ptr + pDesc->Offset(fieldName), len);
-        return ret;
-    };
+    // Return a string that contains the copy of the referenced data.
+    std::string ToString(const string fieldName) const
+    { 
+        return std::string(reinterpret_cast<char*>(ptr + pDesc->Offset(fieldName)), pDesc->Len(fieldName)); 
+    }
 
     template <typename T>
     auto cast(const string fieldName)
@@ -461,9 +459,9 @@ int main(int argc, char *argv[])
 
     const uint AREA_SIZE = 10;
 
-    descriptor voidDescriptor({descriptor("Name", 10, String)});
+    Descriptor voidDescriptor({Descriptor("Name", 10, String)});
     genericBinaryFileAccessor binaryAccessor("testfile");
-    fileAccessor fAcc(voidDescriptor, binaryAccessor);
+    FileAccessor fAcc(voidDescriptor, binaryAccessor);
 
     {
 
@@ -471,13 +469,13 @@ int main(int argc, char *argv[])
         memcpy(xData,"test data",AREA_SIZE);
         //            0123456789
 
-        binaryAccessor.append_(xData, AREA_SIZE);
-        binaryAccessor.append_(xData, AREA_SIZE); // Add one extra record
+        binaryAccessor.append(xData, AREA_SIZE);
+        binaryAccessor.append(xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(reinterpret_cast<char*>(xData), "test data") == 0);
 
         byte yData[AREA_SIZE];
-        binaryAccessor.read_(yData, AREA_SIZE, 0);
+        binaryAccessor.read(yData, AREA_SIZE, 0);
 
         cout << "[" << reinterpret_cast<char*>(yData) << "]";
         cout << "/";
@@ -491,11 +489,11 @@ int main(int argc, char *argv[])
         memcpy(xData,"test updt",AREA_SIZE);
         //            0123456789
 
-        binaryAccessor.update_(xData, AREA_SIZE, 0);
+        binaryAccessor.update(xData, AREA_SIZE, 0);
 
         byte yData[AREA_SIZE];
 
-        binaryAccessor.read_(yData, AREA_SIZE, 0);
+        binaryAccessor.read(yData, AREA_SIZE, 0);
 
         cout << "[" << reinterpret_cast<char*>(yData) << "]";
         cout << "/";
@@ -503,7 +501,7 @@ int main(int argc, char *argv[])
         cout << endl;
         assert(strcmp(reinterpret_cast<char*>(yData), "test updt") == 0);
 
-        binaryAccessor.read_(yData, AREA_SIZE, AREA_SIZE);
+        binaryAccessor.read(yData, AREA_SIZE, AREA_SIZE);
 
         cout << "[" << reinterpret_cast<char*>(yData) << "]";
         cout << "/";
@@ -519,12 +517,12 @@ int main(int argc, char *argv[])
         memcpy(xData,"test data",AREA_SIZE);
         //            0123456789
 
-        binaryAccessor.update_(xData, AREA_SIZE, 0);
+        binaryAccessor.update(xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         byte yData[AREA_SIZE];
-        binaryAccessor.read_(yData, AREA_SIZE, 0);
+        binaryAccessor.read(yData, AREA_SIZE, 0);
 
         cout << "[" << reinterpret_cast<char*>(yData) << "]";
         cout << "/";
@@ -534,7 +532,7 @@ int main(int argc, char *argv[])
         assert(strcmp(reinterpret_cast<char*>(yData), "test data") == 0);
     }
 
-    descriptor data1{field("Name3", 10, String), field("Name4", 10, String)};
+    Descriptor data1{field("Name3", 10, String), field("Name4", 10, String)};
 
     data1.append({field("Name5z", 10, String)});
 
@@ -545,11 +543,11 @@ int main(int argc, char *argv[])
     data1.push_back(field("Name", 10, String));
     data1.push_back(field("TLen", sizeof(uint), Uint));
 
-    data1 | descriptor("Name2", 10, String) | descriptor("Control", Byte) | descriptor("Len3", Uint);
+    data1 | Descriptor("Name2", 10, String) | Descriptor("Control", Byte) | Descriptor("Len3", Uint);
 
     cout << data1 << endl;
 
-    descriptor data2 = descriptor("Name", 10, String) | descriptor("Len3", Uint) | descriptor("Control", Byte);
+    Descriptor data2 = Descriptor("Name", 10, String) | Descriptor("Len3", Uint) | Descriptor("Control", Byte);
 
     cout << data2 << endl;
 
@@ -581,7 +579,7 @@ int main(int argc, char *argv[])
     };
 
     cin.imbue(locale(cin.getloc(), unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
-    descriptor data3;
+    Descriptor data3;
 
     cout << "START SEND\n"
          << TEST_STRING << "\nEND SEND" << endl;
@@ -595,7 +593,7 @@ int main(int argc, char *argv[])
 
     // ----------------------------------------------------------------------------
 
-    auto dataDescriptor{descriptor("Name", 10, String) | descriptor("Control", Byte) | descriptor("TLen", Int)};
+    auto dataDescriptor{Descriptor("Name", 10, String) | Descriptor("Control", Byte) | Descriptor("TLen", Int)};
 
     //This structure is tricky
     //If not aligned - size is 15
@@ -619,7 +617,7 @@ int main(int argc, char *argv[])
     assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
     genericBinaryFileAccessor binaryAccessor2("datafile-11");
-    fileAccessor fAcc2(dataDescriptor,binaryAccessor2);
+    FileAccessor fAcc2(dataDescriptor,binaryAccessor2);
 
     cerr << binaryAccessor2.name_() << endl ;
 
@@ -629,30 +627,30 @@ int main(int argc, char *argv[])
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
-    rawAccessor dataA(schema["datafile-11"], payload.ptr);
+    SchemaAccessor dataA(schema["datafile-11"], payload.ptr);
 
     cout << payload.TLen << endl;
     cout << dataA.cast<int>("TLen") << endl;
 
     assert(payload.TLen == dataA.cast<int>("TLen"));
 
-    fAcc2.append(payload.ptr);
-    fAcc2.append(payload.ptr);
-    fAcc2.append(payload.ptr);
+    fAcc2.Put(payload.ptr);
+    fAcc2.Put(payload.ptr);
+    fAcc2.Put(payload.ptr);
 
     dataPayload payload2;
     memcpy(payload2.Name, "xxxx xxxx",AREA_SIZE);
     payload2.TLen = 0x67;
     payload2.Control = 0x33;
 
-    fAcc2.update(payload2.ptr, 1);
+    fAcc2.Update(payload2.ptr, 1);
 
     dataPayload payload3;
-    fAcc2.read(payload3.ptr, 1);
-    rawAccessor dataB(schema["datafile-11"], payload3.ptr);
+    fAcc2.Get(payload3.ptr, 1);
+    SchemaAccessor dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
-    cout << "Name:" << dataB.make_string("Name") << endl;
+    cout << "Name:" << dataB.ToString("Name") << endl;
     cout << "Tlen:" << dataB.cast<int>("TLen") << endl;
     cout << "Control:" << (uint)dataB.cast<uint8_t>("Control") << endl;
     cout << dec;
