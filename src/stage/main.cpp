@@ -275,7 +275,7 @@ struct BinaryFileAccessorInterface
     virtual void append(const byte *ptrData, const uint size) = 0;
     virtual void read(byte *ptrData, const uint size, const uint position) = 0;
     virtual void update(const byte *ptrData, const uint size, const uint position) = 0;
-    virtual string name_() = 0;
+    virtual string fileName() = 0;
 
     virtual inline ~BinaryFileAccessorInterface(){};
     BinaryFileAccessorInterface(){};
@@ -283,9 +283,9 @@ struct BinaryFileAccessorInterface
 
 struct genericBinaryFileAccessor : public BinaryFileAccessorInterface
 {
-    string fileName;
+    string fileNameStr;
 
-    genericBinaryFileAccessor(string fileName) : fileName(fileName){};
+    genericBinaryFileAccessor(string fileName) : fileNameStr(fileName){};
 
     void append(const byte *ptrData, const uint size) override
     {
@@ -293,7 +293,7 @@ struct genericBinaryFileAccessor : public BinaryFileAccessorInterface
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        myFile.open(fileName, ios::out | ios::binary | ios::app | ios::ate);
+        myFile.open(fileName(), ios::out | ios::binary | ios::app | ios::ate);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.write(reinterpret_cast<const char*>(ptrData), size);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
@@ -306,7 +306,7 @@ struct genericBinaryFileAccessor : public BinaryFileAccessorInterface
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        myFile.open(fileName, ios::in | ios::binary);
+        myFile.open(fileName(), ios::in | ios::binary);
         assert((myFile.rdstate() & ifstream::failbit) == 0);
         myFile.seekg(position);
         assert((myFile.rdstate() & ifstream::failbit) == 0);
@@ -321,7 +321,7 @@ struct genericBinaryFileAccessor : public BinaryFileAccessorInterface
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        myFile.open(fileName, ios::in | ios::out | ios::binary | ios::ate);
+        myFile.open(fileName(), ios::in | ios::out | ios::binary | ios::ate);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
         myFile.seekp(position);
         assert((myFile.rdstate() & ofstream::failbit) == 0);
@@ -330,8 +330,8 @@ struct genericBinaryFileAccessor : public BinaryFileAccessorInterface
         myFile.close();
     };
 
-    string name_() {
-        return fileName;
+    string fileName() override {
+        return fileNameStr;
     }
 };
 
@@ -345,35 +345,35 @@ struct FileAccessor
     FileAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor)
         : pAccessor(&accessor)
     {
-        create(desc);
+        Create(desc);
     };
 
     void Update(const byte *outBuffer, const uint offsetFromHead)
     {
-        auto size = schema[pAccessor->name_()].getSize();
+        auto size = schema[pAccessor->fileName()].getSize();
         pAccessor->update(outBuffer, size, offsetFromHead * size);
     };
 
     void Get(byte *inBuffer, const uint offsetFromHead)
     {
-        auto size = schema[pAccessor->name_()].getSize();
+        auto size = schema[pAccessor->fileName()].getSize();
         pAccessor->read(inBuffer, size, offsetFromHead * size);
     };
 
     void Put(const byte *outBuffer)
     {
-        auto size = schema[pAccessor->name_()].getSize();
+        auto size = schema[pAccessor->fileName()].getSize();
         pAccessor->append(outBuffer, size);
     };
 
-    void create(const Descriptor desc)
+    void Create(const Descriptor desc)
     {
-        schema[pAccessor->name_()] = desc;
+        schema[pAccessor->fileName()] = desc;
         fstream myFile;
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        string fileDesc(pAccessor->name_());
+        string fileDesc(pAccessor->fileName());
         fileDesc.append(".desc");
 
         myFile.open(fileDesc, ios::out);
@@ -619,9 +619,9 @@ int main(int argc, char *argv[])
     genericBinaryFileAccessor binaryAccessor2("datafile-11");
     FileAccessor fAcc2(dataDescriptor,binaryAccessor2);
 
-    cerr << binaryAccessor2.name_() << endl ;
+    cerr << binaryAccessor2.fileName() << endl ;
 
-    auto statusRemove = remove(binaryAccessor2.name_().c_str());
+    auto statusRemove = remove(binaryAccessor2.fileName().c_str());
 
     memcpy(payload.Name, "test data", AREA_SIZE);
     payload.TLen = 0x66;
