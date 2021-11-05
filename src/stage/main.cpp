@@ -113,11 +113,11 @@ struct Descriptor : vector<field>
         insert(end(), l.begin(), l.end());
     }
 
-    auto &operator|(const Descriptor &a)
+    auto &operator|(const Descriptor &rhs)
     {
-        if (this != &a)
+        if (this != &rhs)
         {
-            insert(end(), a.begin(), a.end());
+            insert(end(), rhs.begin(), rhs.end());
         }
         else
         {
@@ -131,17 +131,17 @@ struct Descriptor : vector<field>
         return *this;
     }
 
-    auto &operator=(const Descriptor &a)
+    auto &operator=(const Descriptor &rhs)
     {
         clear();
-        insert(end(), a.begin(), a.end());
+        insert(end(), rhs.begin(), rhs.end());
         updateNames();
         return *this;
     }
 
-    Descriptor(const Descriptor &b)
+    Descriptor(const Descriptor &init)
     {
-        *this | b;
+        *this | init;
         updateNames();
     }
 
@@ -214,10 +214,10 @@ struct Descriptor : vector<field>
     friend istream &operator>>(istream &is, Descriptor &desc);
 };
 
-ostream &operator<<(ostream &os, const Descriptor &desc)
+ostream &operator<<(ostream &os, const Descriptor &rhs)
 {
     os << "{";
-    for (auto const &r : desc)
+    for (auto const &r : rhs)
     {
         os << "\t" << getFieldType(get<type>(r))
            << " " << get<name>(r);
@@ -229,13 +229,13 @@ ostream &operator<<(ostream &os, const Descriptor &desc)
     }
     os << "}";
 
-    if (desc.fieldNames.size() == 0)
+    if (rhs.fieldNames.size() == 0)
         os << "[dirty]";
 
     return os;
 }
 
-istream &operator>>(istream &is, Descriptor &desc)
+istream &operator>>(istream &is, Descriptor &rhs)
 {
     do
     {
@@ -260,7 +260,7 @@ istream &operator>>(istream &is, Descriptor &desc)
             len = getFieldLenFromType(ft);
         }
 
-        desc | Descriptor(name, len, ft);
+        rhs | Descriptor(name, len, ft);
 
     } while (!is.eof());
 
@@ -277,7 +277,7 @@ struct BinaryFileAccessorInterface
     virtual void update(const byte *ptrData, const uint size, const uint position) = 0;
     virtual string fileName() = 0;
 
-    virtual inline ~BinaryFileAccessorInterface(){};
+    virtual ~BinaryFileAccessorInterface(){};
     BinaryFileAccessorInterface(){};
 };
 
@@ -387,17 +387,17 @@ struct FileAccessor
 // ------------------------------------------------------------------------
 // Interface
 
-struct SchemaAccessor
+struct SchemaInterpreter
 {
 
     Descriptor *pDesc;
     byte *ptr;
-    SchemaAccessor(Descriptor &desc, byte *ptr) : pDesc(&desc),
+    SchemaInterpreter(Descriptor &desc, byte *ptr) : pDesc(&desc),
                                                ptr(ptr)
     {
     }
 
-    SchemaAccessor() = delete;
+    SchemaInterpreter() = delete;
 
     // Return a string that contains the copy of the referenced data.
     std::string ToString(const string fieldName) const
@@ -627,7 +627,7 @@ int main(int argc, char *argv[])
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
-    SchemaAccessor dataA(schema["datafile-11"], payload.ptr);
+    SchemaInterpreter dataA(schema["datafile-11"], payload.ptr);
 
     cout << payload.TLen << endl;
     cout << dataA.cast<int>("TLen") << endl;
@@ -647,7 +647,7 @@ int main(int argc, char *argv[])
 
     dataPayload payload3;
     fAcc2.Get(payload3.ptr, 1);
-    SchemaAccessor dataB(schema["datafile-11"], payload3.ptr);
+    SchemaInterpreter dataB(schema["datafile-11"], payload3.ptr);
 
     cout << hex;
     cout << "Name:" << dataB.ToString("Name") << endl;
