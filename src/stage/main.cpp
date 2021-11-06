@@ -29,11 +29,11 @@ namespace rdb
 
     ///------------------------------
 
-    struct FileAccessor
+    struct DataAccessor
     {
         BinaryFileAccessorInterface *pAccessor;
 
-        FileAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor);
+        DataAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor);
         void Update(const std::byte *outBuffer, const uint offsetFromHead);
         void Get(std::byte *inBuffer, const uint offsetFromHead);
         void Put(const std::byte *outBuffer);
@@ -42,31 +42,31 @@ namespace rdb
 
     std::map<std::string, Descriptor> schema;
 
-    FileAccessor::FileAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor)
+    DataAccessor::DataAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor)
         : pAccessor(&accessor)
     {
         Create(desc);
     };
 
-    void FileAccessor::Update(const std::byte *outBuffer, const uint offsetFromHead)
+    void DataAccessor::Update(const std::byte *outBuffer, const uint offsetFromHead)
     {
         auto size = schema[pAccessor->fileName()].getSize();
         pAccessor->update(outBuffer, size, offsetFromHead * size);
     };
 
-    void FileAccessor::Get(std::byte *inBuffer, const uint offsetFromHead)
+    void DataAccessor::Get(std::byte *inBuffer, const uint offsetFromHead)
     {
         auto size = schema[pAccessor->fileName()].getSize();
         pAccessor->read(inBuffer, size, offsetFromHead * size);
     };
 
-    void FileAccessor::Put(const std::byte *outBuffer)
+    void DataAccessor::Put(const std::byte *outBuffer)
     {
         auto size = schema[pAccessor->fileName()].getSize();
         pAccessor->append(outBuffer, size);
     };
 
-    void FileAccessor::Create(const Descriptor desc)
+    void DataAccessor::Create(const Descriptor desc)
     {
         schema[pAccessor->fileName()] = desc;
         std::fstream myFile;
@@ -132,7 +132,7 @@ namespace rdb
 
         Descriptor voidDescriptor({Descriptor("Name", 10, String)});
         genericBinaryFileAccessor binaryAccessor("testfile");
-        FileAccessor fAcc(voidDescriptor, binaryAccessor);
+        DataAccessor fAcc(voidDescriptor, binaryAccessor);
 
         {
 
@@ -288,7 +288,7 @@ namespace rdb
         assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
         genericBinaryFileAccessor binaryAccessor2("datafile-11");
-        FileAccessor fAcc2(dataDescriptor, binaryAccessor2);
+        DataAccessor fAcc2(dataDescriptor, binaryAccessor2);
 
         std::cerr << binaryAccessor2.fileName() << std::endl;
 
