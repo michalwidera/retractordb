@@ -20,17 +20,17 @@ namespace rdb
     std::map<std::string, FieldType> typeDictionary = {{"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
     std::map<FieldType, std::string> typeDictionaryR = makeReverse(typeDictionary);
 
-    FieldType getFieldType(std::string e)
+    FieldType GetFieldType(std::string e)
     {
         return typeDictionary[e];
     }
 
-    std::string getFieldType(FieldType e)
+    std::string GetFieldType(FieldType e)
     {
         return typeDictionaryR[e];
     }
 
-    int getFieldLenFromType(FieldType ft)
+    int GetFieldLenFromType(FieldType ft)
     {
         switch (ft)
         {
@@ -56,21 +56,21 @@ namespace rdb
     Descriptor::Descriptor(fieldName n, fieldLen l, FieldType t)
     {
         push_back(field(n, l, t));
-        updateNames();
+        UpdateNames();
     }
 
     Descriptor::Descriptor(fieldName n, FieldType t)
     {
         assert(t != String && "This method does not work for Stings");
-        push_back(field(n, getFieldLenFromType(t), t));
-        updateNames();
+        push_back(field(n, GetFieldLenFromType(t), t));
+        UpdateNames();
     }
 
     Descriptor::Descriptor()
     {
     }
 
-    void Descriptor::append(std::initializer_list<field> l)
+    void Descriptor::Append(std::initializer_list<field> l)
     {
         insert(end(), l.begin(), l.end());
     }
@@ -89,7 +89,7 @@ namespace rdb
             // can't do safe: data | data
             // due one name policy
         }
-        updateNames();
+        UpdateNames();
         return *this;
     }
 
@@ -97,17 +97,17 @@ namespace rdb
     {
         clear();
         insert(end(), rhs.begin(), rhs.end());
-        updateNames();
+        UpdateNames();
         return *this;
     }
 
     Descriptor::Descriptor(const Descriptor &init)
     {
         *this | init;
-        updateNames();
+        UpdateNames();
     }
 
-    uint Descriptor::getSize() const
+    uint Descriptor::GetSize() const
     {
         uint size = 0;
         for (auto const i : *this)
@@ -117,7 +117,7 @@ namespace rdb
         return size;
     }
 
-    bool Descriptor::updateNames()
+    bool Descriptor::UpdateNames()
     {
         uint position = 0;
         fieldNames.clear();
@@ -169,7 +169,7 @@ namespace rdb
     std::string Descriptor::Type(const std::string name)
     {
         auto pos = Position(name);
-        return getFieldType(std::get<type>((*this)[pos]));
+        return GetFieldType(std::get<type>((*this)[pos]));
     }
 
     std::ostream &operator<<(std::ostream &os, const Descriptor &rhs)
@@ -177,7 +177,7 @@ namespace rdb
         os << "{";
         for (auto const &r : rhs)
         {
-            os << "\t" << getFieldType(std::get<type>(r))
+            os << "\t" << GetFieldType(std::get<type>(r))
                << " " << std::get<name>(r);
             if (std::get<type>(r) == String)
             {
@@ -207,7 +207,7 @@ namespace rdb
             }
             is >> name;
 
-            FieldType ft = getFieldType(type);
+            FieldType ft = GetFieldType(type);
 
             if (ft == String)
             {
@@ -215,7 +215,7 @@ namespace rdb
             }
             else
             {
-                len = getFieldLenFromType(ft);
+                len = GetFieldLenFromType(ft);
             }
 
             rhs | Descriptor(name, len, ft);

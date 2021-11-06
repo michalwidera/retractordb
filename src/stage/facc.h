@@ -9,10 +9,10 @@ namespace rdb
 
     struct BinaryFileAccessorInterface
     {
-        virtual void append(const std::byte *ptrData, const uint size) = 0;
-        virtual void read(std::byte *ptrData, const uint size, const uint position) = 0;
-        virtual void update(const std::byte *ptrData, const uint size, const uint position) = 0;
-        virtual std::string fileName() = 0;
+        virtual void Append(const std::byte *ptrData, const uint size) = 0;
+        virtual void Read(std::byte *ptrData, const uint size, const uint position) = 0;
+        virtual void Update(const std::byte *ptrData, const uint size, const uint position) = 0;
+        virtual std::string FileName() = 0;
 
         virtual ~BinaryFileAccessorInterface(){};
         BinaryFileAccessorInterface(std::string fileName){};
@@ -24,10 +24,10 @@ namespace rdb
 
         genericBinaryFileAccessor(std::string fileName);
 
-        void append(const std::byte *ptrData, const uint size) override;
-        void read(std::byte *ptrData, const uint size, const uint position) override;
-        void update(const std::byte *ptrData, const uint size, const uint position) override;
-        std::string fileName() override;
+        void Append(const std::byte *ptrData, const uint size) override;
+        void Read(std::byte *ptrData, const uint size, const uint position) override;
+        void Update(const std::byte *ptrData, const uint size, const uint position) override;
+        std::string FileName() override;
     };
 
 } // namespace rdb

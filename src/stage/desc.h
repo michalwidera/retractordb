@@ -38,12 +38,12 @@ namespace rdb
         Descriptor(fieldName n, FieldType t);
         Descriptor();
 
-        void append(std::initializer_list<field> l);
+        void Append(std::initializer_list<field> l);
         Descriptor &operator|(const Descriptor &rhs);
         Descriptor &operator=(const Descriptor &rhs);
         Descriptor(const Descriptor &init);
-        uint getSize() const;
-        bool updateNames();
+        uint GetSize() const;
+        bool UpdateNames();
         int Position(std::string name);
         int Len(const std::string name);
         int Offset(const std::string name);

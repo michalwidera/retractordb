@@ -75,13 +75,13 @@ int main(int argc, char *argv[])
         memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.append(xData, AREA_SIZE);
-        binaryAccessor.append(xData, AREA_SIZE); // Add one extra record
+        binaryAccessor.Append(xData, AREA_SIZE);
+        binaryAccessor.Append(xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
 
         std::byte yData[AREA_SIZE];
-        binaryAccessor.read(yData, AREA_SIZE, 0);
+        binaryAccessor.Read(yData, AREA_SIZE, 0);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -95,11 +95,11 @@ int main(int argc, char *argv[])
         memcpy(xData, "test updt", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.update(xData, AREA_SIZE, 0);
+        binaryAccessor.Update(xData, AREA_SIZE, 0);
 
         std::byte yData[AREA_SIZE];
 
-        binaryAccessor.read(yData, AREA_SIZE, 0);
+        binaryAccessor.Read(yData, AREA_SIZE, 0);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
         std::cout << std::endl;
         assert(strcmp(reinterpret_cast<char *>(yData), "test updt") == 0);
 
-        binaryAccessor.read(yData, AREA_SIZE, AREA_SIZE);
+        binaryAccessor.Read(yData, AREA_SIZE, AREA_SIZE);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -123,12 +123,12 @@ int main(int argc, char *argv[])
         memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.update(xData, AREA_SIZE, 0);
+        binaryAccessor.Update(xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         std::byte yData[AREA_SIZE];
-        binaryAccessor.read(yData, AREA_SIZE, 0);
+        binaryAccessor.Read(yData, AREA_SIZE, 0);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -140,8 +140,8 @@ int main(int argc, char *argv[])
 
     rdb::Descriptor data1{rdb::field("Name3", 10, rdb::String), rdb::field("Name4", 10, rdb::String)};
 
-    data1.append({rdb::field("Name5z", 10, rdb::String)});
-    data1.append({rdb::field("Name6z", 10, rdb::String)});
+    data1.Append({rdb::field("Name5z", 10, rdb::String)});
+    data1.Append({rdb::field("Name6z", 10, rdb::String)});
 
     data1.push_back(rdb::field("Name", 10, rdb::String));
     data1.push_back(rdb::field("TLen", sizeof(uint), rdb::Uint));
@@ -220,14 +220,14 @@ int main(int argc, char *argv[])
     dataPayload payload;
 
     // This assert will fail is structure is not packed.
-    assert(dataDescriptor.getSize() == sizeof(dataPayload));
+    assert(dataDescriptor.GetSize() == sizeof(dataPayload));
 
     rdb::genericBinaryFileAccessor binaryAccessor2("datafile-11");
     rdb::DataAccessor dAcc2(dataDescriptor, binaryAccessor2);
 
-    std::cerr << binaryAccessor2.fileName() << std::endl;
+    std::cerr << binaryAccessor2.FileName() << std::endl;
 
-    auto statusRemove = remove(binaryAccessor2.fileName().c_str());
+    auto statusRemove = remove(binaryAccessor2.FileName().c_str());
 
     memcpy(payload.Name, "test data", AREA_SIZE);
     payload.TLen = 0x66;

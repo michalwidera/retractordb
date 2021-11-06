@@ -13,7 +13,7 @@ namespace rdb
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        std::string fileDesc(pAccessor->fileName());
+        std::string fileDesc(pAccessor->FileName());
         fileDesc.append(".desc");
 
         myFile.open(fileDesc, std::ios::out);
@@ -25,19 +25,19 @@ namespace rdb
 
     void DataAccessor::Update(const std::byte *outBuffer, const uint offsetFromHead)
     {
-        auto size = descriptor.getSize();
-        pAccessor->update(outBuffer, size, offsetFromHead * size);
+        auto size = descriptor.GetSize();
+        pAccessor->Update(outBuffer, size, offsetFromHead * size);
     };
 
     void DataAccessor::Get(std::byte *inBuffer, const uint offsetFromHead)
     {
-        auto size = descriptor.getSize();
-        pAccessor->read(inBuffer, size, offsetFromHead * size);
+        auto size = descriptor.GetSize();
+        pAccessor->Read(inBuffer, size, offsetFromHead * size);
     };
 
     void DataAccessor::Put(const std::byte *outBuffer)
     {
-        auto size = descriptor.getSize();
-        pAccessor->append(outBuffer, size);
+        auto size = descriptor.GetSize();
+        pAccessor->Append(outBuffer, size);
     };
 }
