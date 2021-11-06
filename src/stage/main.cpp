@@ -16,19 +16,10 @@
 #include "desc.h"
 #include "dacc.h"
 
-//https://courses.cs.vt.edu/~cs2604/fall02/binio.html
-//https://stackoverflow.com/questions/1658476/c-fopen-vs-open
 
-// Turn off buffering (this must apear before open)
-// http://gcc.gnu.org/onlinedocs/libstdc++/manual/streambufs.html#io.streambuf.buffering
 
 namespace rdb
 {
-
-    // ------------------------------------------------------------------------
-    // Interface
-
-    ///------------------------------
 
 
     ///------------------------------

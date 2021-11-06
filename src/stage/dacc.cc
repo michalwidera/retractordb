@@ -3,10 +3,11 @@
 
 #include "dacc.h"
 
-namespace rdb {
-    
+namespace rdb
+{
+
     DataAccessor::DataAccessor(const Descriptor descriptor, BinaryFileAccessorInterface &accessor)
-        : pAccessor(&accessor) , descriptor(descriptor)
+        : pAccessor(&accessor), descriptor(descriptor)
     {
         std::fstream myFile;
 

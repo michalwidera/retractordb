@@ -5,6 +5,11 @@
 
 namespace rdb
 {
+    // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
+    // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
+
+    // Turn off buffering (this must apear before open)
+    // http://gcc.gnu.org/onlinedocs/libstdc++/manual/streambufs.html#io.streambuf.buffering
 
     // https://en.cppreference.com/w/cpp/io/ios_base/openmode
     // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
