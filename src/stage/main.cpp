@@ -291,7 +291,7 @@ namespace rdb
         }
 
         template <typename T>
-        auto cast(const std::string fieldName)
+        auto Cast(const std::string fieldName)
         {
             return *(reinterpret_cast<T *>(ptr + pDesc->Offset(fieldName)));
         };
@@ -571,9 +571,9 @@ namespace rdb
         SchemaInterpreter dataA(schema["datafile-11"], payload.ptr);
 
         std::cout << payload.TLen << std::endl;
-        std::cout << dataA.cast<int>("TLen") << std::endl;
+        std::cout << dataA.Cast<int>("TLen") << std::endl;
 
-        assert(payload.TLen == dataA.cast<int>("TLen"));
+        assert(payload.TLen == dataA.Cast<int>("TLen"));
 
         fAcc2.Put(payload.ptr);
         fAcc2.Put(payload.ptr);
@@ -592,8 +592,8 @@ namespace rdb
 
         std::cout << std::hex;
         std::cout << "Name:" << dataB.ToString("Name") << std::endl;
-        std::cout << "Tlen:" << dataB.cast<int>("TLen") << std::endl;
-        std::cout << "Control:" << (uint)dataB.cast<uint8_t>("Control") << std::endl;
+        std::cout << "Tlen:" << dataB.Cast<int>("TLen") << std::endl;
+        std::cout << "Control:" << (uint)dataB.Cast<uint8_t>("Control") << std::endl;
         std::cout << std::dec;
 
         std::cout << "use '$xxd datafile-11' to check" << std::endl;
