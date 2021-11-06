@@ -21,6 +21,7 @@ namespace rdb
     typedef int fieldLen;
     typedef std::string fieldName;
     typedef std::tuple<fieldName, fieldLen, FieldType> field;
+
     enum FieldColumn
     {
         name = 0,
@@ -30,7 +31,6 @@ namespace rdb
 
     struct Descriptor : std::vector<field>
     {
-
         std::map<std::string, int> fieldNames;
 
         Descriptor(std::initializer_list<field> l);
@@ -48,6 +48,14 @@ namespace rdb
         int Len(const std::string name);
         int Offset(const std::string name);
         std::string Type(const std::string name);
+        std::string ToString(const std::string name, std::byte *ptr);
+
+        template <typename T>
+        auto Cast(const std::string name, std::byte *ptr)
+        {
+            return *(reinterpret_cast<T *>(ptr + Offset(name)));
+        };
+
         friend std::ostream &operator<<(std::ostream &os, const Descriptor &rhs);
         friend std::istream &operator>>(std::istream &is, Descriptor &rhs);
     };

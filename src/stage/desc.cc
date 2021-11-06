@@ -172,7 +172,6 @@ namespace rdb
         return getFieldType(std::get<type>((*this)[pos]));
     }
 
-
     std::ostream &operator<<(std::ostream &os, const Descriptor &rhs)
     {
         os << "{";
@@ -224,6 +223,11 @@ namespace rdb
         } while (!is.eof());
 
         return is;
+    }
+
+    std::string Descriptor::ToString(const std::string name, std::byte *ptr)
+    {
+        return std::string(reinterpret_cast<char *>(ptr + Offset(name)), Len(name));
     }
 
 } // namespace rdb

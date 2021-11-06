@@ -27,31 +27,6 @@ namespace rdb
     // ------------------------------------------------------------------------
     // Interface
 
-    struct SchemaInterpreter
-    {
-
-        Descriptor *pDesc;
-        std::byte *ptr;
-        SchemaInterpreter(Descriptor &desc, std::byte *ptr) : pDesc(&desc),
-                                                              ptr(ptr)
-        {
-        }
-
-        SchemaInterpreter() = delete;
-
-        // Return a string that contains the copy of the referenced data.
-        std::string ToString(const std::string fieldName) const
-        {
-            return std::string(reinterpret_cast<char *>(ptr + pDesc->Offset(fieldName)), pDesc->Len(fieldName));
-        }
-
-        template <typename T>
-        auto Cast(const std::string fieldName)
-        {
-            return *(reinterpret_cast<T *>(ptr + pDesc->Offset(fieldName)));
-        };
-    };
-
     ///------------------------------
 
     struct FileAccessor
@@ -323,12 +298,10 @@ namespace rdb
         payload.TLen = 0x66;
         payload.Control = 0x22;
 
-        SchemaInterpreter dataA(schema["datafile-11"], payload.ptr);
-
         std::cout << payload.TLen << std::endl;
-        std::cout << dataA.Cast<int>("TLen") << std::endl;
+        std::cout << schema["datafile-11"].Cast<int>("TLen", payload.ptr) << std::endl;
 
-        assert(payload.TLen == dataA.Cast<int>("TLen"));
+        assert(payload.TLen == schema["datafile-11"].Cast<int>("TLen", payload.ptr));
 
         fAcc2.Put(payload.ptr);
         fAcc2.Put(payload.ptr);
@@ -343,12 +316,11 @@ namespace rdb
 
         dataPayload payload3;
         fAcc2.Get(payload3.ptr, 1);
-        SchemaInterpreter dataB(schema["datafile-11"], payload3.ptr);
 
         std::cout << std::hex;
-        std::cout << "Name:" << dataB.ToString("Name") << std::endl;
-        std::cout << "Tlen:" << dataB.Cast<int>("TLen") << std::endl;
-        std::cout << "Control:" << (uint)dataB.Cast<uint8_t>("Control") << std::endl;
+        std::cout << "Name:" << schema["datafile-11"].ToString("Name", payload3.ptr) << std::endl;
+        std::cout << "Tlen:" << schema["datafile-11"].Cast<int>("TLen", payload3.ptr) << std::endl;
+        std::cout << "Control:" << (uint)schema["datafile-11"].Cast<uint8_t>("Control", payload3.ptr) << std::endl;
         std::cout << std::dec;
 
         std::cout << "use '$xxd datafile-11' to check" << std::endl;
