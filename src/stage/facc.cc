@@ -1,5 +1,8 @@
 #include <fstream>
 #include <assert.h>
+#include <limits>
+
+#include <iostream>
 
 #include "facc.h"
 
@@ -16,14 +19,28 @@ namespace rdb
 
     genericBinaryFileAccessor::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {};
 
-    void genericBinaryFileAccessor::Append(const std::byte *ptrData, const size_t size)
+    void genericBinaryFileAccessor::Write(const std::byte *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 
         myFile.rdbuf()->pubsetbuf(0, 0);
 
-        myFile.open(FileName(), std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
-        assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+        if (position == std::numeric_limits<size_t>::max())
+        {
+            myFile.open(FileName(), std::ios::in |std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
+            assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+            // Note: no seekp here!
+            std::cerr << "Append " << size << "b" << std::endl ;
+        }
+        else
+        {
+            myFile.open(FileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+            assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+            myFile.seekp(position);
+            assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+            std::cerr << "Update " << size << "b at " << position << " pos." << std::endl ;
+        }
+
         myFile.write(reinterpret_cast<const char *>(ptrData), size);
         assert((myFile.rdstate() & std::ofstream::failbit) == 0);
         myFile.close();
@@ -42,21 +59,8 @@ namespace rdb
         myFile.get(reinterpret_cast<char *>(ptrData), size);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
         myFile.close();
-    };
 
-    void genericBinaryFileAccessor::Update(const std::byte *ptrData, const size_t size, const size_t position)
-    {
-        std::fstream myFile;
-
-        myFile.rdbuf()->pubsetbuf(0, 0);
-
-        myFile.open(FileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
-        assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-        myFile.seekp(position);
-        assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-        myFile.write(reinterpret_cast<const char *>(ptrData), size);
-        assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-        myFile.close();
+        std::cerr << "Read " << size << "b at " << position << " pos." << std::endl ;
     };
 
     std::string genericBinaryFileAccessor::FileName()

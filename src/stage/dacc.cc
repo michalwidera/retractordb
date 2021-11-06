@@ -23,21 +23,22 @@ namespace rdb
         myFile.close();
     };
 
-    void DataAccessor::Update(const std::byte *outBuffer, const size_t offsetFromHead)
-    {
-        auto size = descriptor.GetSize();
-        pAccessor->Update(outBuffer, size, offsetFromHead * size);
-    };
-
     void DataAccessor::Get(std::byte *inBuffer, const size_t offsetFromHead)
     {
         auto size = descriptor.GetSize();
         pAccessor->Read(inBuffer, size, offsetFromHead * size);
     };
 
-    void DataAccessor::Put(const std::byte *outBuffer)
+    void DataAccessor::Put(const std::byte *outBuffer, const size_t offsetFromHead)
     {
         auto size = descriptor.GetSize();
-        pAccessor->Append(outBuffer, size);
+        if (offsetFromHead == std::numeric_limits<size_t>::max())
+        {
+            pAccessor->Write(outBuffer, size, std::numeric_limits<size_t>::max());
+        }
+        else
+        {
+            pAccessor->Write(outBuffer, size, offsetFromHead * size);
+        }
     };
 }

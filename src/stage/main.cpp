@@ -75,8 +75,8 @@ int main(int argc, char *argv[])
         memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.Append(xData, AREA_SIZE);
-        binaryAccessor.Append(xData, AREA_SIZE); // Add one extra record
+        binaryAccessor.Write(xData, AREA_SIZE);
+        binaryAccessor.Write(xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
 
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
         memcpy(xData, "test updt", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.Update(xData, AREA_SIZE, 0);
+        binaryAccessor.Write(xData, AREA_SIZE, 0);
 
         std::byte yData[AREA_SIZE];
 
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
         memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.Update(xData, AREA_SIZE, 0);
+        binaryAccessor.Write(xData, AREA_SIZE, 0);
 
         // update -> data in file
 
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
     payload2.TLen = 0x67;
     payload2.Control = 0x33;
 
-    dAcc2.Update(payload2.ptr, 1);
+    dAcc2.Put(payload2.ptr, 1);
 
     dataPayload payload3;
     dAcc2.Get(payload3.ptr, 1);

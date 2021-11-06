@@ -18,14 +18,6 @@ namespace rdb
     struct FileAccessorInterface
     {
         /**
-         * @brief Function adds bytes from memory of given size into the storage
-         * 
-         * @param ptrData pointer to table of bytes in memory that will be stored in storage
-         * @param size size of data to be appened
-         */
-        virtual void Append(const std::byte *ptrData, const size_t size) = 0;
-
-        /**
          * @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
          * 
          * @param ptrData pointer to data in memory where data will be feteched from storage
@@ -35,13 +27,13 @@ namespace rdb
         virtual void Read(std::byte *ptrData, const size_t size, const size_t position) = 0;
 
         /**
-         * @brief Updates data in the storage
+         * @brief Updates or appends data in the storage
          * 
          * @param ptrData pointer to table of bytes in memory that will be updated in storage
          * @param size  size of data to be updated
          * @param position position as size * position in bytes
          */
-        virtual void Update(const std::byte *ptrData, const size_t size, const size_t position) = 0;
+        virtual void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
         /**
          * @brief gets name of storage (file name)
@@ -64,9 +56,8 @@ namespace rdb
 
         genericBinaryFileAccessor(std::string fileName);
 
-        void Append(const std::byte *ptrData, const size_t size) override;
         void Read(std::byte *ptrData, const size_t size, const size_t position) override;
-        void Update(const std::byte *ptrData, const size_t size, const size_t position) override;
+        void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
         std::string FileName() override;
 
         genericBinaryFileAccessor() = delete;
