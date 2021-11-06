@@ -30,7 +30,6 @@ namespace rdb
             myFile.open(FileName(), std::ios::in |std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
             assert((myFile.rdstate() & std::ofstream::failbit) == 0);
             // Note: no seekp here!
-            std::cerr << "Append " << size << "b" << std::endl ;
         }
         else
         {
@@ -38,7 +37,6 @@ namespace rdb
             assert((myFile.rdstate() & std::ofstream::failbit) == 0);
             myFile.seekp(position);
             assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-            std::cerr << "Update " << size << "b at " << position << " pos." << std::endl ;
         }
 
         myFile.write(reinterpret_cast<const char *>(ptrData), size);
@@ -59,8 +57,6 @@ namespace rdb
         myFile.get(reinterpret_cast<char *>(ptrData), size);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
         myFile.close();
-
-        std::cerr << "Read " << size << "b at " << position << " pos." << std::endl ;
     };
 
     std::string genericBinaryFileAccessor::FileName()
