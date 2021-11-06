@@ -1,5 +1,5 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCFS_H_
-#define STORAGE_RDB_INCLUDE_FACCFS_H_
+#ifndef STORAGE_RDB_INCLUDE_FACCPOSIX_H_
+#define STORAGE_RDB_INCLUDE_FACCPOSIX_H_
 
 #include "fainterface.h"
 
@@ -8,21 +8,20 @@ namespace rdb
     /**
      * @brief Object that implements storage interface via fstream
      */
-    struct genericBinaryFileAccessor : public FileAccessorInterface
+    struct posixBinaryFileAccessor : public FileAccessorInterface
     {
         std::string fileNameStr;
 
-        genericBinaryFileAccessor(std::string fileName);
+        posixBinaryFileAccessor(std::string fileName);
 
         void Read(std::byte *ptrData, const size_t size, const size_t position) override;
         void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
         std::string FileName() override;
 
-        genericBinaryFileAccessor() = delete;
-        genericBinaryFileAccessor(const genericBinaryFileAccessor&) = delete;
-        genericBinaryFileAccessor& operator=(const genericBinaryFileAccessor&) = delete;
+        posixBinaryFileAccessor() = delete;
+        posixBinaryFileAccessor(const posixBinaryFileAccessor&) = delete;
+        posixBinaryFileAccessor& operator=(const posixBinaryFileAccessor&) = delete;
     };
-
 } // namespace rdb
 
-#endif //STORAGE_RDB_INCLUDE_FACCFS_H_
+#endif //STORAGE_RDB_INCLUDE_FACCPOSIX_H_

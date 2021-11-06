@@ -9,6 +9,7 @@
 #include "dacc.h"
 #include "desc.h"
 #include "faccfs.h"
+#include "faccposix.h"
 
 const uint AREA_SIZE = 10;
 
@@ -61,21 +62,20 @@ int main(int argc, char *argv[])
 {
     check_debug();
 
-    rdb::Descriptor voidDescriptor({rdb::Descriptor("Name", 10, rdb::String)});
-    rdb::genericBinaryFileAccessor binaryAccessor("testfile");
+    rdb::genericBinaryFileAccessor binaryAccessor1("testfile");
     {
 
         std::byte xData[AREA_SIZE];
         std::memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.Write(xData, AREA_SIZE);
-        binaryAccessor.Write(xData, AREA_SIZE); // Add one extra record
+        binaryAccessor1.Write(xData, AREA_SIZE);
+        binaryAccessor1.Write(xData, AREA_SIZE); // Add one extra record
 
         assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
 
         std::byte yData[AREA_SIZE];
-        binaryAccessor.Read(yData, AREA_SIZE, 0);
+        binaryAccessor1.Read(yData, AREA_SIZE, 0);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -89,11 +89,11 @@ int main(int argc, char *argv[])
         std::memcpy(xData, "test updt", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.Write(xData, AREA_SIZE, 0);
+        binaryAccessor1.Write(xData, AREA_SIZE, 0);
 
         std::byte yData[AREA_SIZE];
 
-        binaryAccessor.Read(yData, AREA_SIZE, 0);
+        binaryAccessor1.Read(yData, AREA_SIZE, 0);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
         std::cout << std::endl;
         assert(strcmp(reinterpret_cast<char *>(yData), "test updt") == 0);
 
-        binaryAccessor.Read(yData, AREA_SIZE, AREA_SIZE);
+        binaryAccessor1.Read(yData, AREA_SIZE, AREA_SIZE);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -117,12 +117,12 @@ int main(int argc, char *argv[])
         std::memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
-        binaryAccessor.Write(xData, AREA_SIZE, 0);
+        binaryAccessor1.Write(xData, AREA_SIZE, 0);
 
         // update -> data in file
 
         std::byte yData[AREA_SIZE];
-        binaryAccessor.Read(yData, AREA_SIZE, 0);
+        binaryAccessor1.Read(yData, AREA_SIZE, 0);
 
         std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
         std::cout << "/";
@@ -131,6 +131,82 @@ int main(int argc, char *argv[])
 
         assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
     }
+
+
+// ------------------------- Posix Test Part
+
+
+    rdb::posixBinaryFileAccessor binaryAccessor2("testfile2");
+    {
+
+        std::byte xData[AREA_SIZE];
+        std::memcpy(xData, "test data", AREA_SIZE);
+        //             0123456789
+
+        binaryAccessor2.Write(xData, AREA_SIZE);
+        binaryAccessor2.Write(xData, AREA_SIZE); // Add one extra record
+
+        assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
+
+        std::byte yData[AREA_SIZE];
+        binaryAccessor2.Read(yData, AREA_SIZE, 0);
+
+        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
+        std::cout << "/";
+        std::cout << "[" << yData << "]";
+        std::cout << std::endl;
+        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
+    }
+
+    {
+        std::byte xData[AREA_SIZE];
+        std::memcpy(xData, "test updt", AREA_SIZE);
+        //             0123456789
+
+        binaryAccessor2.Write(xData, AREA_SIZE, 0);
+
+        std::byte yData[AREA_SIZE];
+
+        binaryAccessor2.Read(yData, AREA_SIZE, 0);
+
+        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
+        std::cout << "/";
+        std::cout << "[" << yData << "]";
+        std::cout << std::endl;
+        assert(strcmp(reinterpret_cast<char *>(yData), "test updt") == 0);
+
+        binaryAccessor2.Read(yData, AREA_SIZE, AREA_SIZE);
+
+        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
+        std::cout << "/";
+        std::cout << "[" << yData << "]";
+        std::cout << std::endl;
+
+        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
+    }
+
+    // Revert data to default.
+    {
+        std::byte xData[AREA_SIZE];
+        std::memcpy(xData, "test data", AREA_SIZE);
+        //             0123456789
+
+        binaryAccessor2.Write(xData, AREA_SIZE, 0);
+
+        // update -> data in file
+
+        std::byte yData[AREA_SIZE];
+        binaryAccessor2.Read(yData, AREA_SIZE, 0);
+
+        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
+        std::cout << "/";
+        std::cout << "[" << yData << "]";
+        std::cout << std::endl;
+
+        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
+    }
+
+// -------------------------- Desscriptor Testing
 
     rdb::Descriptor data1{rdb::field("Name3", 10, rdb::String), rdb::field("Name4", 10, rdb::String)};
 
@@ -222,12 +298,10 @@ int main(int argc, char *argv[])
     // This assert will fail is structure is not packed.
     assert(dataDescriptor.GetSize() == sizeof(dataPayload));
 
-    rdb::genericBinaryFileAccessor binaryAccessor2("datafile-11");
-    rdb::DataAccessor dAcc2(dataDescriptor, binaryAccessor2);
+    rdb::genericBinaryFileAccessor binaryAccessor3("datafile-11");
+    rdb::DataAccessor dAcc2(dataDescriptor, binaryAccessor3);
 
-    std::cerr << binaryAccessor2.FileName() << std::endl;
-
-    auto statusRemove = remove(binaryAccessor2.FileName().c_str());
+    std::cerr << binaryAccessor3.FileName() << std::endl;
 
     std::memcpy(payload.Name, "test data", AREA_SIZE);
     payload.TLen = 0x66;
@@ -260,6 +334,13 @@ int main(int argc, char *argv[])
     std::cout << std::dec;
 
     std::cout << "use '$xxd datafile-11' to check" << std::endl;
+
+
+    // clean stuff
+
+    auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
+    auto statusRemove2 = remove(binaryAccessor2.FileName().c_str());
+    auto statusRemove3 = remove(binaryAccessor3.FileName().c_str());
 
     return 0;
 }

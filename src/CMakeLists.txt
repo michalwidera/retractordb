@@ -39,7 +39,8 @@ set(SOURCES_QRY
 
 set(SOURCES_STG
   stage/main.cpp
-  stage/faccfsgit.cc
+  stage/faccfs.cc
+  stage/faccposix.cc
   stage/desc.cc
   stage/dacc.cc
 )
