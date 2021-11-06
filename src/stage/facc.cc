@@ -16,7 +16,7 @@ namespace rdb
 
     genericBinaryFileAccessor::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName), BinaryFileAccessorInterface(fileName){};
 
-    void genericBinaryFileAccessor::Append(const std::byte *ptrData, const uint size)
+    void genericBinaryFileAccessor::Append(const std::byte *ptrData, const size_t size)
     {
         std::fstream myFile;
 
@@ -29,7 +29,7 @@ namespace rdb
         myFile.close();
     };
 
-    void genericBinaryFileAccessor::Read(std::byte *ptrData, const uint size, const uint position)
+    void genericBinaryFileAccessor::Read(std::byte *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 
@@ -44,7 +44,7 @@ namespace rdb
         myFile.close();
     };
 
-    void genericBinaryFileAccessor::Update(const std::byte *ptrData, const uint size, const uint position)
+    void genericBinaryFileAccessor::Update(const std::byte *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 

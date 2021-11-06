@@ -15,8 +15,8 @@ namespace rdb
         Descriptor descriptor;
 
         DataAccessor(const Descriptor descriptor, BinaryFileAccessorInterface &accessor);
-        void Update(const std::byte *outBuffer, const uint offsetFromHead);
-        void Get(std::byte *inBuffer, const uint offsetFromHead);
+        void Update(const std::byte *outBuffer, const size_t offsetFromHead);
+        void Get(std::byte *inBuffer, const size_t offsetFromHead);
         void Put(const std::byte *outBuffer);
     };
 }
