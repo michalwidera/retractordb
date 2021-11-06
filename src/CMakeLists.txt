@@ -40,7 +40,7 @@ set(SOURCES_QRY
 set(SOURCES_STG
   stage/main.cpp
   stage/facc.cc
-  stage/sapplicator.h
+  stage/desc.cc
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )
