@@ -16,10 +16,10 @@
 #include "desc.h"
 #include "dacc.h"
 
-///------------------------------
-int main(int argc, char *argv[])
-{
+const uint AREA_SIZE = 10;
 
+void check_debug()
+{
     // Diagnostic code
 
 #ifdef NDEBUG
@@ -61,8 +61,11 @@ int main(int argc, char *argv[])
     assert(check.ok()); // This assert show that assert is compiled and works.
                         // Program will show green "Ok." at the end of work if assert is compiled and executed.
 #endif
-
-    const uint AREA_SIZE = 10;
+}
+///------------------------------
+int main(int argc, char *argv[])
+{
+    check_debug();
 
     rdb::Descriptor voidDescriptor({rdb::Descriptor("Name", 10, rdb::String)});
     rdb::genericBinaryFileAccessor binaryAccessor("testfile");
@@ -70,7 +73,7 @@ int main(int argc, char *argv[])
 
         std::byte xData[AREA_SIZE];
         memcpy(xData, "test data", AREA_SIZE);
-        //            0123456789
+        //             0123456789
 
         binaryAccessor.append(xData, AREA_SIZE);
         binaryAccessor.append(xData, AREA_SIZE); // Add one extra record
@@ -90,7 +93,7 @@ int main(int argc, char *argv[])
     {
         std::byte xData[AREA_SIZE];
         memcpy(xData, "test updt", AREA_SIZE);
-        //            0123456789
+        //             0123456789
 
         binaryAccessor.update(xData, AREA_SIZE, 0);
 
@@ -118,7 +121,7 @@ int main(int argc, char *argv[])
     {
         std::byte xData[AREA_SIZE];
         memcpy(xData, "test data", AREA_SIZE);
-        //            0123456789
+        //             0123456789
 
         binaryAccessor.update(xData, AREA_SIZE, 0);
 
@@ -138,10 +141,7 @@ int main(int argc, char *argv[])
     rdb::Descriptor data1{rdb::field("Name3", 10, rdb::String), rdb::field("Name4", 10, rdb::String)};
 
     data1.append({rdb::field("Name5z", 10, rdb::String)});
-
-    auto testf = rdb::field("Name6z", 10, rdb::String);
-
-    data1.append({testf});
+    data1.append({rdb::field("Name6z", 10, rdb::String)});
 
     data1.push_back(rdb::field("Name", 10, rdb::String));
     data1.push_back(rdb::field("TLen", sizeof(uint), rdb::Uint));
@@ -214,6 +214,8 @@ int main(int argc, char *argv[])
             int TLen;        //4
         };
     };
+
+    static_assert(sizeof(dataPayload)==15);
 
     dataPayload payload;
 
