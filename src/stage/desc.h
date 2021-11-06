@@ -32,6 +32,9 @@ namespace rdb
         type = 2
     };
 
+    /**
+     * @brief Structure resposible for mapping types into binary struct
+     */
     struct Descriptor : std::vector<field>
     {
         std::map<std::string, int> fieldNames;
@@ -47,10 +50,11 @@ namespace rdb
         Descriptor(const Descriptor &init);
         uint GetSize() const;
         bool UpdateNames();
-        int Position(std::string name);
-        int Len(const std::string name);
-        int Offset(const std::string name);
+        uint Position(std::string name);
+        uint Len(const std::string name);
+        uint Offset(const std::string name);
         std::string Type(const std::string name);
+
         std::string ToString(const std::string name, std::byte *ptr);
 
         template <typename T>

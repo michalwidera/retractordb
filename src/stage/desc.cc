@@ -29,7 +29,7 @@ namespace rdb
         return typeDictionaryR[e];
     }
 
-    int GetFieldLenFromType(FieldType ft)
+    uint GetFieldLenFromType(FieldType ft)
     {
         switch (ft)
         {
@@ -133,7 +133,7 @@ namespace rdb
         return true;
     }
 
-    int Descriptor::Position(std::string name)
+    uint Descriptor::Position(std::string name)
     {
         if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
@@ -142,13 +142,13 @@ namespace rdb
         return -1;
     }
 
-    int Descriptor::Len(const std::string name)
+    uint Descriptor::Len(const std::string name)
     {
         auto pos = Position(name);
         return std::get<len>((*this)[pos]);
     }
 
-    int Descriptor::Offset(const std::string name)
+    uint Descriptor::Offset(const std::string name)
     {
         auto offset = 0;
         for (auto const i : *this)

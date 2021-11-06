@@ -1,16 +1,10 @@
 #include <iostream>
-#include <fstream>
 #include <assert.h>
-#include <map>
-#include <vector>
 #include <string>
-#include <tuple>
-#include <initializer_list>
+#include <cstring>
 #include <locale>
 #include <memory>
 #include <sstream>
-
-#include <boost/type_index.hpp>
 
 #include "dacc.h"
 #include "desc.h"
@@ -72,7 +66,7 @@ int main(int argc, char *argv[])
     {
 
         std::byte xData[AREA_SIZE];
-        memcpy(xData, "test data", AREA_SIZE);
+        std::memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
         binaryAccessor.Write(xData, AREA_SIZE);
@@ -92,7 +86,7 @@ int main(int argc, char *argv[])
 
     {
         std::byte xData[AREA_SIZE];
-        memcpy(xData, "test updt", AREA_SIZE);
+        std::memcpy(xData, "test updt", AREA_SIZE);
         //             0123456789
 
         binaryAccessor.Write(xData, AREA_SIZE, 0);
@@ -120,7 +114,7 @@ int main(int argc, char *argv[])
     // Revert data to default.
     {
         std::byte xData[AREA_SIZE];
-        memcpy(xData, "test data", AREA_SIZE);
+        std::memcpy(xData, "test data", AREA_SIZE);
         //             0123456789
 
         binaryAccessor.Write(xData, AREA_SIZE, 0);
@@ -229,7 +223,7 @@ int main(int argc, char *argv[])
 
     auto statusRemove = remove(binaryAccessor2.FileName().c_str());
 
-    memcpy(payload.Name, "test data", AREA_SIZE);
+    std::memcpy(payload.Name, "test data", AREA_SIZE);
     payload.TLen = 0x66;
     payload.Control = 0x22;
 
@@ -244,7 +238,7 @@ int main(int argc, char *argv[])
     dAcc2.Put(payload.ptr);
 
     dataPayload payload2;
-    memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
+    std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
     payload2.TLen = 0x67;
     payload2.Control = 0x33;
 

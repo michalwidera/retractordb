@@ -2,8 +2,6 @@
 #include <assert.h>
 #include <limits>
 
-#include <iostream>
-
 #include "facc.h"
 
 namespace rdb
