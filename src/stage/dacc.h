@@ -4,7 +4,7 @@
 #include <string>
 #include <cstddef> // std::byte
 
-#include "facc.h"
+#include "fainterface.h"
 #include "desc.h"
 
 namespace rdb

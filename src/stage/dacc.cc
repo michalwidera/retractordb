@@ -35,7 +35,7 @@ namespace rdb
 
         if (recordsFromHead == std::numeric_limits<size_t>::max())
         {
-            pAccessor->Write(outBuffer, size, std::numeric_limits<size_t>::max());
+            pAccessor->Write(outBuffer, size); // <- Call to Append Function
         }
         else
         {

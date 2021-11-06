@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <limits>
 
-#include "facc.h"
+#include "faccfs.h"
 
 namespace rdb
 {
@@ -16,6 +16,11 @@ namespace rdb
     // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
     genericBinaryFileAccessor::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {};
+
+    std::string genericBinaryFileAccessor::FileName()
+    {
+        return fileNameStr;
+    }
 
     void genericBinaryFileAccessor::Write(const std::byte *ptrData, const size_t size, const size_t position)
     {
@@ -56,10 +61,5 @@ namespace rdb
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
         myFile.close();
     };
-
-    std::string genericBinaryFileAccessor::FileName()
-    {
-        return fileNameStr;
-    }
 
 } // namespace rdb

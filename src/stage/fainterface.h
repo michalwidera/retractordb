@@ -1,12 +1,11 @@
-#ifndef STORAGE_RDB_INCLUDE_FACC_H_
-#define STORAGE_RDB_INCLUDE_FACC_H_
+#ifndef STORAGE_RDB_INCLUDE_FAINTERFACE_H_
+#define STORAGE_RDB_INCLUDE_FAINTERFACE_H_
 
 #include <string>
 #include <cstddef> // std::byte
 
 namespace rdb
 {
-
     /**
      * @brief This is interface for accessor interface.
      * 
@@ -44,27 +43,6 @@ namespace rdb
 
         virtual ~FileAccessorInterface(){};
     };
+} // rdb
 
-    /**
-     * @brief Object that implements accessor interface
-     * 
-     * This object reads files from disk via fstream
-     */
-    struct genericBinaryFileAccessor : public FileAccessorInterface
-    {
-        std::string fileNameStr;
-
-        genericBinaryFileAccessor(std::string fileName);
-
-        void Read(std::byte *ptrData, const size_t size, const size_t position) override;
-        void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
-        std::string FileName() override;
-
-        genericBinaryFileAccessor() = delete;
-        genericBinaryFileAccessor(const genericBinaryFileAccessor&) = delete;
-        genericBinaryFileAccessor& operator=(const genericBinaryFileAccessor&) = delete;
-    };
-
-} // namespace rdb
-
-#endif //STORAGE_RDB_INCLUDE_FACC_H_
+#endif // STORAGE_RDB_INCLUDE_FAINTERFACE_H_
