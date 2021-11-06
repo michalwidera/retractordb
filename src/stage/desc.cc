@@ -6,7 +6,6 @@
 namespace rdb
 {
 
-    // https://developers.google.com/protocol-buffers/docs/overview#scalar
     template <typename L, typename R>
     std::map<R, L>
     makeReverse(std::map<L, R> list)
@@ -64,10 +63,6 @@ namespace rdb
         assert(t != String && "This method does not work for Stings");
         push_back(field(n, GetFieldLenFromType(t), t));
         UpdateNames();
-    }
-
-    Descriptor::Descriptor()
-    {
     }
 
     void Descriptor::Append(std::initializer_list<field> l)

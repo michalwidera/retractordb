@@ -11,10 +11,12 @@ namespace rdb
 {
     struct DataAccessor
     {
-        BinaryFileAccessorInterface *pAccessor;
+        FileAccessorInterface *pAccessor;
         Descriptor descriptor;
 
-        DataAccessor(const Descriptor descriptor, BinaryFileAccessorInterface &accessor);
+        DataAccessor() = delete;
+
+        DataAccessor(const Descriptor descriptor, FileAccessorInterface &accessor);
         void Update(const std::byte *outBuffer, const size_t offsetFromHead);
         void Get(std::byte *inBuffer, const size_t offsetFromHead);
         void Put(const std::byte *outBuffer);

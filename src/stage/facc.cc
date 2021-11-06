@@ -14,7 +14,7 @@ namespace rdb
     // https://en.cppreference.com/w/cpp/io/ios_base/openmode
     // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-    genericBinaryFileAccessor::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName), BinaryFileAccessorInterface(fileName){};
+    genericBinaryFileAccessor::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {};
 
     void genericBinaryFileAccessor::Append(const std::byte *ptrData, const size_t size)
     {

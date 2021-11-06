@@ -10,6 +10,9 @@
 namespace rdb
 {
 
+    // https://developers.google.com/protocol-buffers/docs/overview#scalar
+    // https://doc.rust-lang.org/book/ch03-02-data-types.html
+
     enum FieldType
     {
         String,
@@ -36,7 +39,7 @@ namespace rdb
         Descriptor(std::initializer_list<field> l);
         Descriptor(fieldName n, fieldLen l, FieldType t);
         Descriptor(fieldName n, FieldType t);
-        Descriptor();
+        Descriptor() = default;
 
         void Append(std::initializer_list<field> l);
         Descriptor &operator|(const Descriptor &rhs);
