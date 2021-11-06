@@ -6,7 +6,7 @@
 namespace rdb
 {
     /**
-     * @brief Object that implements storage interface via fstream
+     * @brief Object that implements storage interface via posix calls
      */
     struct posixBinaryFileAccessor : public FileAccessorInterface
     {

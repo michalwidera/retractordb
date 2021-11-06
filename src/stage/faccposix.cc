@@ -1,12 +1,4 @@
-#include <dirent.h>
 #include <fcntl.h>
-#include <pthread.h>
-#include <sys/mman.h>
-#ifndef __Fuchsia__
-#include <sys/resource.h>
-#endif
-#include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
