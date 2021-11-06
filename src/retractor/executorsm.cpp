@@ -38,7 +38,7 @@
 #include <boost/filesystem.hpp>
 #include <memory>
 
-#include "Buffer.h"
+#include <iostream>
 
 #include <termios.h>
 #include <unistd.h>
