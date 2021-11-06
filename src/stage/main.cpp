@@ -179,11 +179,17 @@ int main(int argc, char *argv[])
     std::cin.imbue(std::locale(std::cin.getloc(), std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
     rdb::Descriptor data3;
 
-    std::cout << "START SEND\n"
-              << test_string << "\nEND SEND" << std::endl;
+    std::cout << "START SEND\n" ;
+    std::cout << test_string ;
+    std::cout << "\nEND SEND" ;
+    std::cout << std::endl;
+
     std::cin >> data3;
-    std::cout << "START RCV\n"
-              << data3 << "\nEND RCV" << std::endl;
+
+    std::cout << "START RCV\n";
+    std::cout << data3 ;
+    std::cout << "\nEND RCV" ;
+    std::cout << std::endl;
 
     // Revert to orginal cin
     std::cin.rdbuf(orig);

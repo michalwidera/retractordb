@@ -22,7 +22,7 @@ namespace rdb
          * 
          * @param ptrData pointer to data in memory where data will be feteched from storage
          * @param size size of data that will be transfered
-         * @param position position as size * position in bytes
+         * @param position position from the begining of file [unit: Bytes]
          */
         virtual void Read(std::byte *ptrData, const size_t size, const size_t position) = 0;
 
@@ -31,7 +31,7 @@ namespace rdb
          * 
          * @param ptrData pointer to table of bytes in memory that will be updated in storage
          * @param size  size of data to be updated
-         * @param position position as size * position in bytes
+         * @param position position from the begining of file [unit: Bytes]. If max possible value - works as append.
          */
         virtual void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
