@@ -41,6 +41,7 @@ set(SOURCES_STG
   stage/main.cpp
   stage/facc.cc
   stage/desc.cc
+  stage/dacc.cc
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )

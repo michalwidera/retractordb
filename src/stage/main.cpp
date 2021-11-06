@@ -12,8 +12,9 @@
 
 #include <boost/type_index.hpp>
 
-#include "facc.h"
+#include "dacc.h"
 #include "desc.h"
+#include "dacc.h"
 
 //https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 //https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -29,59 +30,7 @@ namespace rdb
 
     ///------------------------------
 
-    struct DataAccessor
-    {
-        BinaryFileAccessorInterface *pAccessor;
 
-        DataAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor);
-        void Update(const std::byte *outBuffer, const uint offsetFromHead);
-        void Get(std::byte *inBuffer, const uint offsetFromHead);
-        void Put(const std::byte *outBuffer);
-        void Create(const Descriptor desc);
-    };
-
-    std::map<std::string, Descriptor> schema;
-
-    DataAccessor::DataAccessor(const Descriptor desc, BinaryFileAccessorInterface &accessor)
-        : pAccessor(&accessor)
-    {
-        Create(desc);
-    };
-
-    void DataAccessor::Update(const std::byte *outBuffer, const uint offsetFromHead)
-    {
-        auto size = schema[pAccessor->fileName()].getSize();
-        pAccessor->update(outBuffer, size, offsetFromHead * size);
-    };
-
-    void DataAccessor::Get(std::byte *inBuffer, const uint offsetFromHead)
-    {
-        auto size = schema[pAccessor->fileName()].getSize();
-        pAccessor->read(inBuffer, size, offsetFromHead * size);
-    };
-
-    void DataAccessor::Put(const std::byte *outBuffer)
-    {
-        auto size = schema[pAccessor->fileName()].getSize();
-        pAccessor->append(outBuffer, size);
-    };
-
-    void DataAccessor::Create(const Descriptor desc)
-    {
-        schema[pAccessor->fileName()] = desc;
-        std::fstream myFile;
-
-        myFile.rdbuf()->pubsetbuf(0, 0);
-
-        std::string fileDesc(pAccessor->fileName());
-        fileDesc.append(".desc");
-
-        myFile.open(fileDesc, std::ios::out);
-        assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-        myFile << desc;
-        assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-        myFile.close();
-    };
     ///------------------------------
     int main_process()
     {
@@ -132,7 +81,8 @@ namespace rdb
 
         Descriptor voidDescriptor({Descriptor("Name", 10, String)});
         genericBinaryFileAccessor binaryAccessor("testfile");
-        DataAccessor fAcc(voidDescriptor, binaryAccessor);
+
+        DataAccessor dAcc1(voidDescriptor, binaryAccessor);
 
         {
 
@@ -288,7 +238,7 @@ namespace rdb
         assert(dataDescriptor.getSize() == sizeof(dataPayload));
 
         genericBinaryFileAccessor binaryAccessor2("datafile-11");
-        DataAccessor fAcc2(dataDescriptor, binaryAccessor2);
+        DataAccessor dAcc2(dataDescriptor, binaryAccessor2);
 
         std::cerr << binaryAccessor2.fileName() << std::endl;
 
@@ -299,28 +249,29 @@ namespace rdb
         payload.Control = 0x22;
 
         std::cout << payload.TLen << std::endl;
-        std::cout << schema["datafile-11"].Cast<int>("TLen", payload.ptr) << std::endl;
 
-        assert(payload.TLen == schema["datafile-11"].Cast<int>("TLen", payload.ptr));
+        std::cout << dAcc2.descriptor.Cast<int>("TLen", payload.ptr) << std::endl;
 
-        fAcc2.Put(payload.ptr);
-        fAcc2.Put(payload.ptr);
-        fAcc2.Put(payload.ptr);
+        assert(payload.TLen == dAcc2.descriptor.Cast<int>("TLen", payload.ptr));
+
+        dAcc2.Put(payload.ptr);
+        dAcc2.Put(payload.ptr);
+        dAcc2.Put(payload.ptr);
 
         dataPayload payload2;
         memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
         payload2.TLen = 0x67;
         payload2.Control = 0x33;
 
-        fAcc2.Update(payload2.ptr, 1);
+        dAcc2.Update(payload2.ptr, 1);
 
         dataPayload payload3;
-        fAcc2.Get(payload3.ptr, 1);
+        dAcc2.Get(payload3.ptr, 1);
 
         std::cout << std::hex;
-        std::cout << "Name:" << schema["datafile-11"].ToString("Name", payload3.ptr) << std::endl;
-        std::cout << "Tlen:" << schema["datafile-11"].Cast<int>("TLen", payload3.ptr) << std::endl;
-        std::cout << "Control:" << (uint)schema["datafile-11"].Cast<uint8_t>("Control", payload3.ptr) << std::endl;
+        std::cout << "Name:" << dAcc2.descriptor.ToString("Name", payload3.ptr) << std::endl;
+        std::cout << "Tlen:" << dAcc2.descriptor.Cast<int>("TLen", payload3.ptr) << std::endl;
+        std::cout << "Control:" << (uint)dAcc2.descriptor.Cast<uint8_t>("Control", payload3.ptr) << std::endl;
         std::cout << std::dec;
 
         std::cout << "use '$xxd datafile-11' to check" << std::endl;
