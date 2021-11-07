@@ -12,6 +12,10 @@ namespace rdb
      * Append data at the end of storage
      * Read data from the storage
      * Update data in the middle of storage
+     * This three has been covered by following interface
+     * Read ::= Read(data, position)
+     * Append :== Write(data, position == max_possible_value )
+     * Update :== Write(data, position)
      */
     template<typename T>
     struct FileAccessorInterface

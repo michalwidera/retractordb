@@ -78,7 +78,6 @@ void test_1()
         assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
     }
     auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
-    std::cout << "Ok1 ";
 }
 
 template <typename T, typename K>
@@ -101,7 +100,6 @@ void test_2()
         assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
     }
     auto statusRemove1 = remove(dataStore.FileName().c_str());
-    std::cout << "Ok2 ";
 }
 
 template <typename T, typename K>
@@ -137,7 +135,6 @@ void test_3()
         assert(strcmp(reinterpret_cast<char *>(yData), "test xxxx") == 0);
     }
     auto statusRemove1 = remove(dataStore.FileName().c_str());
-    std::cout << "Ok3 ";
 }
 
 void test_descriptor()
@@ -170,8 +167,6 @@ void test_descriptor()
     assert(data2.Len("Control") == 1);
     assert(strcmp(data2.Type("Control").c_str(), "Byte") == 0);
     assert(data2.Offset("Control") == 14);
-
-    std::cout << "OkDesc ";
 }
 
 void test_descriptor_read()
@@ -201,7 +196,6 @@ void test_descriptor_read()
     }
 
     // end cin test
-    std::cout << "OkDescRd ";
 }
 
 void test_storage()
@@ -280,8 +274,6 @@ void test_storage()
     }
 
     auto statusRemove = remove(dataStore.FileName().c_str());
-
-    std::cout << "OkStrg ";
 }
 
 
@@ -297,8 +289,6 @@ int main(int argc, char *argv[])
     test_2<char, rdb::genericBinaryFileAccessor<char>>();
     test_3<char, rdb::genericBinaryFileAccessor<char>>();
 
-    std::cout << std::endl;
-
     test_1<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
     test_2<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
     test_3<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
@@ -307,23 +297,16 @@ int main(int argc, char *argv[])
     test_2<char, rdb::posixBinaryFileAccessor<char>>();
     test_3<char, rdb::posixBinaryFileAccessor<char>>();
 
-    std::cout << std::endl;
-
     // -------------------------- Desscriptor Testing
 
     test_descriptor();
 
     test_descriptor_read();
 
-    std::cout << std::endl;
-
     // -------------------------- Storage Testing
 
     test_storage();
 
-    std::cout << std::endl;
-
     // use '$xxd datafile-11' to check
-
     return 0;
 }
