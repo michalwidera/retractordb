@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <assert.h>
 #include <string>
 #include <cstring>
@@ -307,6 +308,56 @@ int main(int argc, char *argv[])
 
     test_storage();
 
+    rdb::genericBinaryFileAccessor<std::byte> *pDataStore = NULL;
+    rdb::Descriptor desc;
+
+    std::string cmd ;
+    do {
+        std::cout << "." ;
+        std::cin >> cmd;
+        if ( cmd == "exit" )
+        {
+            break;
+        }
+        else if ( cmd == "pick" )
+        {
+            std::string file;
+            std::cin >> file;
+
+            if ( pDataStore != NULL )
+            {
+                delete pDataStore;
+            }
+            pDataStore = new rdb::genericBinaryFileAccessor<std::byte>(file.c_str());
+
+            //std::string descriptionFile(file);
+            //descriptionFile.append(".desc");
+
+            //std::ifstream ifs( descriptionFile.c_str() , std::ifstream::in );
+            //ifs << desc;
+            //std::cout << desc ;
+
+            std::cout << "ok." << std::endl;
+        }
+        else if ( cmd == "get" )
+        {
+            std::string record;
+            std::cin >> record;
+        }
+        else if ( cmd == "help" )
+        {
+            std::cout << "exit, pick [file], help" << std::endl ;
+        }
+        else
+        {
+            std::cout << "no." << std::endl ;
+        }
+    } while( true );
+
+    if ( pDataStore != NULL )
+    {
+        delete pDataStore;
+    }
     // use '$xxd datafile-11' to check
     return 0;
 }
