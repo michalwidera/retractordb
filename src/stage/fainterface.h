@@ -8,7 +8,7 @@ namespace rdb
 {
     /**
      * @brief This is interface for accessor interface.
-     * 
+     *
      * There is only 3 opeations over file/object/blob aka storage
      * Append data at the end of storage
      * Read data from the storage
@@ -18,7 +18,7 @@ namespace rdb
     {
         /**
          * @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
-         * 
+         *
          * @param ptrData pointer to data in memory where data will be feteched from storage
          * @param size size of data that will be transfered
          * @param position position from the begining of file [unit: Bytes]
@@ -27,7 +27,7 @@ namespace rdb
 
         /**
          * @brief Updates or appends data in the storage
-         * 
+         *
          * @param ptrData pointer to table of bytes in memory that will be updated in storage
          * @param size  size of data to be updated
          * @param position position from the begining of file [unit: Bytes]. If max possible value - works as append.
@@ -36,7 +36,7 @@ namespace rdb
 
         /**
          * @brief gets name of storage (file name)
-         * 
+         *
          * @return std::string filename
          */
         virtual std::string FileName() = 0;

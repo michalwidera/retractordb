@@ -21,7 +21,7 @@ namespace rdb
 
         /**
          * @brief Construct a new Data Accessor object
-         * 
+         *
          * @param descriptor Definition of binary schema
          * @param accessor storage information
          */
@@ -29,7 +29,7 @@ namespace rdb
 
         /**
          * @brief Reads data package from storage
-         * 
+         *
          * @param inBuffer pointer to area where package will be fetched
          * @param recordsFromHead location from beginging of the storage [unit: Records]
          */
@@ -37,7 +37,7 @@ namespace rdb
 
         /**
          * @brief Sends record to the storage
-         * 
+         *
          * @param outBuffer pointer to area when record is stored
          * @param recordsFromHead location from begining of the storage [unit: Records]
          */

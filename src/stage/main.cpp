@@ -236,23 +236,9 @@ int main(int argc, char *argv[])
 
     const char *test_string = "{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }";
 
-    std::istringstream input(test_string);
-    std::cin.rdbuf(input.rdbuf());
+
     // Test goes here
 
-    // Look here to explain: https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
-    struct synsugar_is_space : std::ctype<char>
-    {
-        synsugar_is_space() : ctype<char>(get_table()) {}
-        static mask const *get_table()
-        {
-            static mask rc[table_size];
-            rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = std::ctype_base::space;
-            return &rc[0];
-        }
-    };
-
-    std::cin.imbue(std::locale(std::cin.getloc(), std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
     rdb::Descriptor data3;
 
     std::cout << "START SEND\n" ;
@@ -260,15 +246,17 @@ int main(int argc, char *argv[])
     std::cout << "\nEND SEND" ;
     std::cout << std::endl;
 
+    std::istringstream input(test_string);
+    std::cin.rdbuf(input.rdbuf());
     std::cin >> data3;
+    // Revert to orginal cin
+    std::cin.rdbuf(orig);
 
     std::cout << "START RCV\n";
     std::cout << data3 ;
     std::cout << "\nEND RCV" ;
     std::cout << std::endl;
 
-    // Revert to orginal cin
-    std::cin.rdbuf(orig);
     // end cin test
 
     // ----------------------------------------------------------------------------

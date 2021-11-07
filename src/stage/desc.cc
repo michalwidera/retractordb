@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <locale>
 #include <iostream>
 
 #include "desc.h"
@@ -137,7 +138,7 @@ namespace rdb
     {
         if (fieldNames.find(name) != fieldNames.end())
             return fieldNames[name];
-        std::cerr << "[" << name << "]" << std::endl;
+
         assert(false && "did not find that record id Descriptor:{}");
         return -1;
     }
@@ -188,8 +189,22 @@ namespace rdb
         return os;
     }
 
+    // Look here to explain: https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
+    struct synsugar_is_space : std::ctype<char>
+    {
+        synsugar_is_space() : ctype<char>(get_table()) {}
+        static mask const *get_table()
+        {
+            static mask rc[table_size];
+            rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = std::ctype_base::space;
+            return &rc[0];
+        }
+    };
+
     std::istream &operator>>(std::istream &is, Descriptor &rhs)
     {
+        is.imbue(std::locale(is.getloc(), std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
+
         do
         {
             std::string type;
