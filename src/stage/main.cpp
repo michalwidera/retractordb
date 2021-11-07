@@ -11,6 +11,8 @@
 #include "faccfs.h"
 #include "faccposix.h"
 
+#include "fainterface.h"
+
 const uint AREA_SIZE = 10;
 
 void check_debug()
@@ -58,7 +60,7 @@ void check_debug()
 #endif
 }
 
-template< typename T, typename K >
+template <typename T, typename K>
 void test_1()
 {
     K binaryAccessor1("testfile-fstream");
@@ -79,7 +81,7 @@ void test_1()
     std::cout << "Ok1 ";
 }
 
-template< typename T, typename K >
+template <typename T, typename K>
 void test_2()
 {
     K dataStore("testfile-fstream");
@@ -102,7 +104,7 @@ void test_2()
     std::cout << "Ok2 ";
 }
 
-template< typename T, typename K >
+template <typename T, typename K>
 void test_3()
 {
     K dataStore("testfile-fstream");
@@ -119,7 +121,7 @@ void test_3()
         dataStore.Write(xData, AREA_SIZE);
 
         std::memcpy(xData, "test xxxx", AREA_SIZE);
-        dataStore.Write(xData, AREA_SIZE, AREA_SIZE);       // <- Update
+        dataStore.Write(xData, AREA_SIZE, AREA_SIZE); // <- Update
 
         std::memcpy(xData, "test dddd", AREA_SIZE);
         dataStore.Write(xData, AREA_SIZE);
@@ -137,33 +139,9 @@ void test_3()
     auto statusRemove1 = remove(dataStore.FileName().c_str());
     std::cout << "Ok3 ";
 }
-///------------------------------
-int main(int argc, char *argv[])
+
+void test_descriptor()
 {
-    check_debug();
-
-    test_1<std::byte,rdb::genericBinaryFileAccessor<std::byte>>();
-    test_2<std::byte,rdb::genericBinaryFileAccessor<std::byte>>();
-    test_3<std::byte,rdb::genericBinaryFileAccessor<std::byte>>();
-
-    test_1<char,rdb::genericBinaryFileAccessor<char>>();
-    test_2<char,rdb::genericBinaryFileAccessor<char>>();
-    test_3<char,rdb::genericBinaryFileAccessor<char>>();
-
-    std::cout << std::endl;
-
-    test_1<std::byte,rdb::posixBinaryFileAccessor<std::byte>>();
-    test_2<std::byte,rdb::posixBinaryFileAccessor<std::byte>>();
-    test_3<std::byte,rdb::posixBinaryFileAccessor<std::byte>>();
-
-    test_1<char,rdb::posixBinaryFileAccessor<char>>();
-    test_2<char,rdb::posixBinaryFileAccessor<char>>();
-    test_3<char,rdb::posixBinaryFileAccessor<char>>();
-
-    std::cout << std::endl;
-
-// -------------------------- Desscriptor Testing
-
     rdb::Descriptor data1{rdb::field("Name3", 10, rdb::String), rdb::field("Name4", 10, rdb::String)};
 
     data1.Append({rdb::field("Name5z", 10, rdb::String)});
@@ -173,18 +151,31 @@ int main(int argc, char *argv[])
     data1.push_back(rdb::field("TLen", sizeof(uint), rdb::Uint));
 
     data1 | rdb::Descriptor("Name2", 10, rdb::String) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("Len3", rdb::Uint);
-
-    std::cout << data1 << std::endl;
+    {
+        std::stringstream coutstring;
+        coutstring << data1;
+        char test[] = "{\tString Name3[10]\n\tString Name4[10]\n\tString Name5z[10]\n\tString Name6z[10]\n\tString Name[10]\n\tUint TLen\n\tString Name2[10]\n\tByte Control\n\tUint Len3\n}";
+        assert(strcmp(coutstring.str().c_str(), test) == 0);
+    }
 
     rdb::Descriptor data2 = rdb::Descriptor("Name", 10, rdb::String) | rdb::Descriptor("Len3", rdb::Uint) | rdb::Descriptor("Control", rdb::Byte);
+    {
+        std::stringstream coutstring;
+        char test[] = "{\tString Name[10]\n\tUint Len3\n\tByte Control\n}";
+        coutstring << data2;
+        assert(strcmp(coutstring.str().c_str(), test) == 0);
+    }
 
-    std::cout << data2 << std::endl;
+    assert(data2.Position("Control") == 2);
+    assert(data2.Len("Control") == 1);
+    assert(strcmp(data2.Type("Control").c_str(), "Byte") == 0);
+    assert(data2.Offset("Control") == 14);
 
-    std::cout << "Field Control is at " << data2.Position("Control") << std::endl;
-    std::cout << "Field Control len is " << data2.Len("Control") << std::endl;
-    std::cout << "Field Control type is " << data2.Type("Control") << std::endl;
-    std::cout << "Field Control offset is " << data2.Offset("Control") << std::endl;
+    std::cout << "OkDesc ";
+}
 
+void test_descriptor_read()
+{
     //start cin test
     //https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
     std::streambuf *orig = std::cin.rdbuf();
@@ -192,15 +183,9 @@ int main(int argc, char *argv[])
 
     const char *test_string = "{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }";
 
-
     // Test goes here
 
     rdb::Descriptor data3;
-
-    std::cout << "START SEND\n" ;
-    std::cout << test_string ;
-    std::cout << "\nEND SEND" ;
-    std::cout << std::endl;
 
     std::istringstream input(test_string);
     std::cin.rdbuf(input.rdbuf());
@@ -208,16 +193,20 @@ int main(int argc, char *argv[])
     // Revert to orginal cin
     std::cin.rdbuf(orig);
 
-    std::cout << "START RCV\n";
-    std::cout << data3 ;
-    std::cout << "\nEND RCV" ;
-    std::cout << std::endl;
+    {
+        std::stringstream coutstring;
+        const char *test = "{\tString Name3[10]\n\tString Name[10]\n\tUint Len\n\tString Name2[10]\n\tByte Control\n\tUint Len3\n}";
+        coutstring << data3;
+        assert(strcmp(coutstring.str().c_str(), test) == 0);
+    }
 
     // end cin test
+    std::cout << "OkDescRd ";
+}
 
-    // ----------------------------------------------------------------------------
-
-    auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::String) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("TLen", rdb::Int)};
+void test_storage()
+{
+    rdb::genericBinaryFileAccessor<std::byte> dataStore("datafile-fstream2");
 
     //This structure is tricky
     //If not aligned - size is 15
@@ -235,31 +224,28 @@ int main(int argc, char *argv[])
         };
     };
 
-    static_assert(sizeof(dataPayload)==15);
+    static_assert(sizeof(dataPayload) == 15);
 
-    dataPayload payload;
+    auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::String) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("TLen", rdb::Int)};
 
     // This assert will fail is structure is not packed.
     assert(dataDescriptor.GetSize() == sizeof(dataPayload));
 
-    rdb::genericBinaryFileAccessor<std::byte> binaryAccessor3("datafile-fstream2");
-    rdb::DataAccessor dAcc2(dataDescriptor, binaryAccessor3);
+    dataPayload payload1;
 
-    std::cerr << binaryAccessor3.FileName() << std::endl;
+    rdb::DataAccessor dAcc2(dataDescriptor, dataStore);
 
-    std::memcpy(payload.Name, "test data", AREA_SIZE);
-    payload.TLen = 0x66;
-    payload.Control = 0x22;
+    assert(strcmp(dataStore.FileName().c_str(), "datafile-fstream2") == 0);
 
-    std::cout << payload.TLen << std::endl;
+    std::memcpy(payload1.Name, "test data", AREA_SIZE);
+    payload1.TLen = 0x66;
+    payload1.Control = 0x22;
 
-    std::cout << dAcc2.descriptor.Cast<int>("TLen", payload.ptr) << std::endl;
+    assert(payload1.TLen == dAcc2.descriptor.Cast<int>("TLen", payload1.ptr));
 
-    assert(payload.TLen == dAcc2.descriptor.Cast<int>("TLen", payload.ptr));
-
-    dAcc2.Put(payload.ptr);
-    dAcc2.Put(payload.ptr);
-    dAcc2.Put(payload.ptr);
+    dAcc2.Put(payload1.ptr);
+    dAcc2.Put(payload1.ptr);
+    dAcc2.Put(payload1.ptr);
 
     dataPayload payload2;
     std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
@@ -268,45 +254,76 @@ int main(int argc, char *argv[])
 
     dAcc2.Put(payload2.ptr, 1);
 
-    dataPayload payload21;
-    dAcc2.Get(payload21.ptr, 1);
+    dataPayload payload3;
+    dAcc2.Get(payload3.ptr, 1);
 
-    std::cout << std::hex;
-    std::cout << "Name:" << dAcc2.descriptor.ToString("Name", payload21.ptr) << std::endl;
-    std::cout << "Tlen:" << dAcc2.descriptor.Cast<int>("TLen", payload21.ptr) << std::endl;
-    std::cout << "Control:" << (uint)dAcc2.descriptor.Cast<uint8_t>("Control", payload21.ptr) << std::endl;
-    std::cout << std::dec;
-
-    std::cout << "use '$xxd datafile-11' to check" << std::endl;
-
-    // There is test for char pointer payload
-
-    rdb::genericBinaryFileAccessor<char> binaryAccessor4("datafile-fstream3");
-    rdb::DataAccessor dAcc3(dataDescriptor, binaryAccessor4);
-
-    union dataPayloadChar
     {
-        char ptr[15];
-        struct __attribute__((packed))
-        {
-            char Name[10];   //10
-            uint8_t Control; //1
-            int TLen;        //4
-        };
-    } payload4;
+        std::stringstream coutstring;
+        coutstring << dAcc2.descriptor.ToString("Name", payload3.ptr);
+        assert(strcmp(coutstring.str().c_str(), "xxxx xxxx") == 0);
+    }
 
-    std::memcpy(payload4.Name, "data test", AREA_SIZE);
-    payload4.TLen = 0x66;
-    payload4.Control = 0x22;
+    {
+        std::stringstream coutstring;
+        coutstring << std::hex;
+        coutstring << dAcc2.descriptor.Cast<int>("TLen", payload3.ptr);
+        coutstring << std::dec;
+        assert(strcmp(coutstring.str().c_str(), "67") == 0);
+    }
 
-    dAcc3.Put(payload4.ptr);
-    dAcc3.Put(payload4.ptr);
-    dAcc3.Put(payload4.ptr);
-    dAcc3.Get(payload4.ptr, 1);
+    {
+        std::stringstream coutstring;
+        coutstring << std::hex;
+        coutstring << (uint)dAcc2.descriptor.Cast<uint8_t>("Control", payload3.ptr);
+        coutstring << std::dec;
+        assert(strcmp(coutstring.str().c_str(), "33") == 0);
+    }
 
-    // clean stuff
+    auto statusRemove = remove(dataStore.FileName().c_str());
 
-    auto statusRemove3 = remove(binaryAccessor3.FileName().c_str());
-    auto statusRemove4 = remove(binaryAccessor4.FileName().c_str());
+    std::cout << "OkStrg ";
+}
+
+
+int main(int argc, char *argv[])
+{
+    check_debug();
+
+    test_1<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
+    test_2<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
+    test_3<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
+
+    test_1<char, rdb::genericBinaryFileAccessor<char>>();
+    test_2<char, rdb::genericBinaryFileAccessor<char>>();
+    test_3<char, rdb::genericBinaryFileAccessor<char>>();
+
+    std::cout << std::endl;
+
+    test_1<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
+    test_2<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
+    test_3<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
+
+    test_1<char, rdb::posixBinaryFileAccessor<char>>();
+    test_2<char, rdb::posixBinaryFileAccessor<char>>();
+    test_3<char, rdb::posixBinaryFileAccessor<char>>();
+
+    std::cout << std::endl;
+
+    // -------------------------- Desscriptor Testing
+
+    test_descriptor();
+
+    test_descriptor_read();
+
+    std::cout << std::endl;
+
+    // -------------------------- Storage Testing
+
+    test_storage();
+
+    std::cout << std::endl;
+
+    // use '$xxd datafile-11' to check
+
     return 0;
 }
