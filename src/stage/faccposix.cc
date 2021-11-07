@@ -15,14 +15,17 @@ constexpr const int kOpenBaseFlags = 0;
 
 namespace rdb
 {
-    posixBinaryFileAccessor::posixBinaryFileAccessor(std::string fileName) : fileNameStr(fileName){};
+    template <class T>
+    posixBinaryFileAccessor<T>::posixBinaryFileAccessor(std::string fileName) : fileNameStr(fileName){};
 
-    std::string posixBinaryFileAccessor::FileName()
+    template <class T>
+    std::string posixBinaryFileAccessor<T>::FileName()
     {
         return fileNameStr;
     }
 
-    void posixBinaryFileAccessor::Write(const std::byte *ptrData, const size_t size, const size_t position)
+    template <class T>
+    void posixBinaryFileAccessor<T>::Write(const T *ptrData, const size_t size, const size_t position)
     {
         int fd;
 
@@ -60,7 +63,8 @@ namespace rdb
         ::close(fd);
     };
 
-    void posixBinaryFileAccessor::Read(std::byte *ptrData, const size_t size, const size_t position)
+    template <class T>
+    void posixBinaryFileAccessor<T>::Read(T *ptrData, const size_t size, const size_t position)
     {
         int fd = -1;
         fd = ::open(fileNameStr.c_str(), O_RDONLY | kOpenBaseFlags);
@@ -69,5 +73,9 @@ namespace rdb
         assert(read_size >= 0 );
         ::close(fd);
     };
+
+    template class posixBinaryFileAccessor<std::byte>;
+    template class posixBinaryFileAccessor<char>;
+    template class posixBinaryFileAccessor<unsigned char>;
 
 } // namespace rdb

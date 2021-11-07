@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 {
     check_debug();
 
-    rdb::genericBinaryFileAccessor binaryAccessor1("testfile-fstream");
+    rdb::genericBinaryFileAccessor<std::byte> binaryAccessor1("testfile-fstream");
     {
 
         std::byte xData[AREA_SIZE];
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 // ------------------------- Posix Test Part
 
 
-    rdb::posixBinaryFileAccessor binaryAccessor2("testfile-posix");
+    rdb::posixBinaryFileAccessor<std::byte> binaryAccessor2("testfile-posix");
     {
 
         std::byte xData[AREA_SIZE];
@@ -286,7 +286,7 @@ int main(int argc, char *argv[])
     // This assert will fail is structure is not packed.
     assert(dataDescriptor.GetSize() == sizeof(dataPayload));
 
-    rdb::genericBinaryFileAccessor binaryAccessor3("datafile-11");
+    rdb::genericBinaryFileAccessor<std::byte> binaryAccessor3("datafile-fstream2");
     rdb::DataAccessor dAcc2(dataDescriptor, binaryAccessor3);
 
     std::cerr << binaryAccessor3.FileName() << std::endl;
@@ -312,23 +312,47 @@ int main(int argc, char *argv[])
 
     dAcc2.Put(payload2.ptr, 1);
 
-    dataPayload payload3;
-    dAcc2.Get(payload3.ptr, 1);
+    dataPayload payload21;
+    dAcc2.Get(payload21.ptr, 1);
 
     std::cout << std::hex;
-    std::cout << "Name:" << dAcc2.descriptor.ToString("Name", payload3.ptr) << std::endl;
-    std::cout << "Tlen:" << dAcc2.descriptor.Cast<int>("TLen", payload3.ptr) << std::endl;
-    std::cout << "Control:" << (uint)dAcc2.descriptor.Cast<uint8_t>("Control", payload3.ptr) << std::endl;
+    std::cout << "Name:" << dAcc2.descriptor.ToString("Name", payload21.ptr) << std::endl;
+    std::cout << "Tlen:" << dAcc2.descriptor.Cast<int>("TLen", payload21.ptr) << std::endl;
+    std::cout << "Control:" << (uint)dAcc2.descriptor.Cast<uint8_t>("Control", payload21.ptr) << std::endl;
     std::cout << std::dec;
 
     std::cout << "use '$xxd datafile-11' to check" << std::endl;
 
+    // There is test for char pointer payload
+
+    rdb::genericBinaryFileAccessor<char> binaryAccessor4("datafile-fstream3");
+    rdb::DataAccessor dAcc3(dataDescriptor, binaryAccessor4);
+
+    union dataPayloadChar
+    {
+        char ptr[15];
+        struct __attribute__((packed))
+        {
+            char Name[10];   //10
+            uint8_t Control; //1
+            int TLen;        //4
+        };
+    } payload4;
+
+    std::memcpy(payload4.Name, "data test", AREA_SIZE);
+    payload4.TLen = 0x66;
+    payload4.Control = 0x22;
+
+    dAcc3.Put(payload4.ptr);
+    dAcc3.Put(payload4.ptr);
+    dAcc3.Put(payload4.ptr);
+    dAcc3.Get(payload4.ptr, 1);
 
     // clean stuff
 
     auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
     auto statusRemove2 = remove(binaryAccessor2.FileName().c_str());
     auto statusRemove3 = remove(binaryAccessor3.FileName().c_str());
-
+    auto statusRemove4 = remove(binaryAccessor4.FileName().c_str());
     return 0;
 }

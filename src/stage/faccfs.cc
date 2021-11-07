@@ -15,14 +15,17 @@ namespace rdb
     // https://en.cppreference.com/w/cpp/io/ios_base/openmode
     // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-    genericBinaryFileAccessor::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {};
+    template <class T>
+    genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {};
 
-    std::string genericBinaryFileAccessor::FileName()
+    template <class T>
+    std::string genericBinaryFileAccessor<T>::FileName()
     {
         return fileNameStr;
     }
 
-    void genericBinaryFileAccessor::Write(const std::byte *ptrData, const size_t size, const size_t position)
+    template <class T>
+    void genericBinaryFileAccessor<T>::Write(const T *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 
@@ -47,7 +50,8 @@ namespace rdb
         myFile.close();
     };
 
-    void genericBinaryFileAccessor::Read(std::byte *ptrData, const size_t size, const size_t position)
+    template <class T>
+    void genericBinaryFileAccessor<T>::Read(T *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 
@@ -61,5 +65,9 @@ namespace rdb
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
         myFile.close();
     };
+
+    template class genericBinaryFileAccessor<std::byte>;
+    template class genericBinaryFileAccessor<char>;
+    template class genericBinaryFileAccessor<unsigned char>;
 
 } // namespace rdb

@@ -8,14 +8,15 @@ namespace rdb
     /**
      * @brief Object that implements storage interface via posix calls
      */
-    struct posixBinaryFileAccessor : public FileAccessorInterface<std::byte>
+    template<typename T>
+    struct posixBinaryFileAccessor : public FileAccessorInterface<T>
     {
         std::string fileNameStr;
 
         posixBinaryFileAccessor(std::string fileName);
 
-        void Read(std::byte *ptrData, const size_t size, const size_t position) override;
-        void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
+        void Read(T *ptrData, const size_t size, const size_t position) override;
+        void Write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
         std::string FileName() override;
 
         posixBinaryFileAccessor() = delete;
