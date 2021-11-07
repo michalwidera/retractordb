@@ -8,7 +8,7 @@ namespace rdb
     /**
      * @brief Object that implements storage interface via posix calls
      */
-    struct posixBinaryFileAccessor : public FileAccessorInterface
+    struct posixBinaryFileAccessor : public FileAccessorInterface<std::byte>
     {
         std::string fileNameStr;
 

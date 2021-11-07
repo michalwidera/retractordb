@@ -8,7 +8,7 @@ namespace rdb
     /**
      * @brief Object that implements storage interface via fstream
      */
-    struct genericBinaryFileAccessor : public FileAccessorInterface
+    struct genericBinaryFileAccessor : public FileAccessorInterface<std::byte>
     {
         std::string fileNameStr;
 

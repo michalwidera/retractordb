@@ -6,7 +6,7 @@
 namespace rdb
 {
 
-    DataAccessor::DataAccessor(const Descriptor descriptor, FileAccessorInterface &accessor)
+    DataAccessor::DataAccessor(const Descriptor descriptor, FileAccessorInterface<std::byte> &accessor)
         : pAccessor(&accessor), descriptor(descriptor)
     {
         std::fstream myFile;

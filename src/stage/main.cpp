@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 {
     check_debug();
 
-    rdb::genericBinaryFileAccessor binaryAccessor1("testfile");
+    rdb::genericBinaryFileAccessor binaryAccessor1("testfile-fstream");
     {
 
         std::byte xData[AREA_SIZE];
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 // ------------------------- Posix Test Part
 
 
-    rdb::posixBinaryFileAccessor binaryAccessor2("testfile2");
+    rdb::posixBinaryFileAccessor binaryAccessor2("testfile-posix");
     {
 
         std::byte xData[AREA_SIZE];

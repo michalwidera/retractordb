@@ -14,6 +14,7 @@ namespace rdb
      * Read data from the storage
      * Update data in the middle of storage
      */
+    template<typename T>
     struct FileAccessorInterface
     {
         /**
@@ -23,7 +24,7 @@ namespace rdb
          * @param size size of data that will be transfered
          * @param position position from the begining of file [unit: Bytes]
          */
-        virtual void Read(std::byte *ptrData, const size_t size, const size_t position) = 0;
+        virtual void Read(T *ptrData, const size_t size, const size_t position) = 0;
 
         /**
          * @brief Updates or appends data in the storage
@@ -32,7 +33,7 @@ namespace rdb
          * @param size  size of data to be updated
          * @param position position from the begining of file [unit: Bytes]. If max possible value - works as append.
          */
-        virtual void Write(const std::byte *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
+        virtual void Write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
         /**
          * @brief gets name of storage (file name)

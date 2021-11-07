@@ -14,7 +14,7 @@ namespace rdb
      */
     struct DataAccessor
     {
-        FileAccessorInterface *pAccessor;
+        FileAccessorInterface<std::byte> *pAccessor;
         Descriptor descriptor;
 
         DataAccessor() = delete;
@@ -25,7 +25,7 @@ namespace rdb
          * @param descriptor Definition of binary schema
          * @param accessor storage information
          */
-        DataAccessor(const Descriptor descriptor, FileAccessorInterface &accessor);
+        DataAccessor(const Descriptor descriptor, FileAccessorInterface<std::byte> &accessor);
 
         /**
          * @brief Reads data package from storage
