@@ -25,23 +25,35 @@ namespace rdb
     }
 
     template <class T>
-    void posixBinaryFileAccessor<T>::Write(const T *ptrData, const size_t size, const size_t position)
+    int posixBinaryFileAccessor<T>::Write(const T *ptrData, const size_t size, const size_t position)
     {
         int fd;
 
         if (position == std::numeric_limits<size_t>::max())
         {
             fd = ::open(fileNameStr.c_str(), O_APPEND | O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
-            assert(fd > 0);
+            assert(fd >= 0);
+            if (fd < 0)
+            {
+                return errno;   // Error status
+            }
             auto result = ::lseek(fd, 0, SEEK_END);
-            assert( result != static_cast<off_t>(-1) );
+            assert(result != static_cast<off_t>(-1));
         }
         else
         {
             fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
-            assert(fd > 0);
+            assert(fd >= 0);
+            if (fd < 0)
+            {
+                return errno;  // Error status
+            }
             auto result = ::lseek(fd, position, SEEK_SET);
-            assert( result != static_cast<off_t>(-1) );
+            assert(result != static_cast<off_t>(-1));
+            if (result == static_cast<off_t>(-1))
+            {
+                return errno; // Error status
+            }
         }
 
         size_t sizesh(size);
@@ -56,22 +68,30 @@ namespace rdb
                     continue; // Retry
                 }
                 assert(errno);
+                return errno;   // Error staus
             }
             ptrData += write_result;
             sizesh -= write_result;
         }
         ::close(fd);
+
+        return EXIT_SUCCESS;
     };
 
     template <class T>
-    void posixBinaryFileAccessor<T>::Read(T *ptrData, const size_t size, const size_t position)
+    int posixBinaryFileAccessor<T>::Read(T *ptrData, const size_t size, const size_t position)
     {
         int fd = -1;
         fd = ::open(fileNameStr.c_str(), O_RDONLY | kOpenBaseFlags);
         assert(fd >= 0);
+        if (fd < 0)
+        {
+            return fd;  // <- Error status
+        }
         ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
-        assert(read_size >= 0 );
         ::close(fd);
+
+        return EXIT_SUCCESS;
     };
 
     template class posixBinaryFileAccessor<std::byte>;

@@ -25,7 +25,7 @@ namespace rdb
     }
 
     template <class T>
-    void genericBinaryFileAccessor<T>::Write(const T *ptrData, const size_t size, const size_t position)
+    int genericBinaryFileAccessor<T>::Write(const T *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 
@@ -48,10 +48,12 @@ namespace rdb
         myFile.write(reinterpret_cast<const char *>(ptrData), size);
         assert((myFile.rdstate() & std::ofstream::failbit) == 0);
         myFile.close();
+
+        return EXIT_SUCCESS;
     };
 
     template <class T>
-    void genericBinaryFileAccessor<T>::Read(T *ptrData, const size_t size, const size_t position)
+    int genericBinaryFileAccessor<T>::Read(T *ptrData, const size_t size, const size_t position)
     {
         std::fstream myFile;
 
@@ -64,6 +66,8 @@ namespace rdb
         myFile.get(reinterpret_cast<char *>(ptrData), size);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
         myFile.close();
+
+        return EXIT_SUCCESS;
     };
 
     template class genericBinaryFileAccessor<std::byte>;
