@@ -57,154 +57,110 @@ void check_debug()
                         // Program will show green "Ok." at the end of work if assert is compiled and executed.
 #endif
 }
+
+template< typename T, typename K >
+void test_1()
+{
+    K binaryAccessor1("testfile-fstream");
+    {
+        T xData[AREA_SIZE];
+        std::memcpy(xData, "test data", AREA_SIZE);
+
+        binaryAccessor1.Write(xData, AREA_SIZE);
+
+        assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
+
+        T yData[AREA_SIZE];
+        binaryAccessor1.Read(yData, AREA_SIZE, 0);
+
+        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
+    }
+    auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
+    std::cout << "Ok1 ";
+}
+
+template< typename T, typename K >
+void test_2()
+{
+    K dataStore("testfile-fstream");
+    {
+
+        T xData[AREA_SIZE];
+        std::memcpy(xData, "test data", AREA_SIZE);
+
+        dataStore.Write(xData, AREA_SIZE);
+        dataStore.Write(xData, AREA_SIZE); // Add one extra record
+
+        assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
+
+        T yData[AREA_SIZE];
+        dataStore.Read(yData, AREA_SIZE, 0);
+
+        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
+    }
+    auto statusRemove1 = remove(dataStore.FileName().c_str());
+    std::cout << "Ok2 ";
+}
+
+template< typename T, typename K >
+void test_3()
+{
+    K dataStore("testfile-fstream");
+    {
+        T xData[AREA_SIZE];
+
+        std::memcpy(xData, "test aaaa", AREA_SIZE);
+        dataStore.Write(xData, AREA_SIZE);
+
+        std::memcpy(xData, "test bbbb", AREA_SIZE);
+        dataStore.Write(xData, AREA_SIZE);
+
+        std::memcpy(xData, "test cccc", AREA_SIZE);
+        dataStore.Write(xData, AREA_SIZE);
+
+        std::memcpy(xData, "test xxxx", AREA_SIZE);
+        dataStore.Write(xData, AREA_SIZE, AREA_SIZE);       // <- Update
+
+        std::memcpy(xData, "test dddd", AREA_SIZE);
+        dataStore.Write(xData, AREA_SIZE);
+
+        T yData[AREA_SIZE];
+
+        dataStore.Read(yData, AREA_SIZE, 0);
+
+        assert(strcmp(reinterpret_cast<char *>(yData), "test aaaa") == 0);
+
+        dataStore.Read(yData, AREA_SIZE, AREA_SIZE);
+
+        assert(strcmp(reinterpret_cast<char *>(yData), "test xxxx") == 0);
+    }
+    auto statusRemove1 = remove(dataStore.FileName().c_str());
+    std::cout << "Ok3 ";
+}
 ///------------------------------
 int main(int argc, char *argv[])
 {
     check_debug();
 
-    rdb::genericBinaryFileAccessor<std::byte> binaryAccessor1("testfile-fstream");
-    {
+    test_1<std::byte,rdb::genericBinaryFileAccessor<std::byte>>();
+    test_2<std::byte,rdb::genericBinaryFileAccessor<std::byte>>();
+    test_3<std::byte,rdb::genericBinaryFileAccessor<std::byte>>();
 
-        std::byte xData[AREA_SIZE];
-        std::memcpy(xData, "test data", AREA_SIZE);
-        //             0123456789
+    test_1<char,rdb::genericBinaryFileAccessor<char>>();
+    test_2<char,rdb::genericBinaryFileAccessor<char>>();
+    test_3<char,rdb::genericBinaryFileAccessor<char>>();
 
-        binaryAccessor1.Write(xData, AREA_SIZE);
-        binaryAccessor1.Write(xData, AREA_SIZE); // Add one extra record
+    std::cout << std::endl;
 
-        assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
+    test_1<std::byte,rdb::posixBinaryFileAccessor<std::byte>>();
+    test_2<std::byte,rdb::posixBinaryFileAccessor<std::byte>>();
+    test_3<std::byte,rdb::posixBinaryFileAccessor<std::byte>>();
 
-        std::byte yData[AREA_SIZE];
-        binaryAccessor1.Read(yData, AREA_SIZE, 0);
+    test_1<char,rdb::posixBinaryFileAccessor<char>>();
+    test_2<char,rdb::posixBinaryFileAccessor<char>>();
+    test_3<char,rdb::posixBinaryFileAccessor<char>>();
 
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
-    }
-
-    {
-        std::byte xData[AREA_SIZE];
-        std::memcpy(xData, "test updt", AREA_SIZE);
-        //             0123456789
-
-        binaryAccessor1.Write(xData, AREA_SIZE, 0);
-
-        std::byte yData[AREA_SIZE];
-
-        binaryAccessor1.Read(yData, AREA_SIZE, 0);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-        assert(strcmp(reinterpret_cast<char *>(yData), "test updt") == 0);
-
-        binaryAccessor1.Read(yData, AREA_SIZE, AREA_SIZE);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-
-        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
-    }
-
-    // Revert data to default.
-    {
-        std::byte xData[AREA_SIZE];
-        std::memcpy(xData, "test data", AREA_SIZE);
-        //             0123456789
-
-        binaryAccessor1.Write(xData, AREA_SIZE, 0);
-
-        // update -> data in file
-
-        std::byte yData[AREA_SIZE];
-        binaryAccessor1.Read(yData, AREA_SIZE, 0);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-
-        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
-    }
-
-
-// ------------------------- Posix Test Part
-
-
-    rdb::posixBinaryFileAccessor<std::byte> binaryAccessor2("testfile-posix");
-    {
-
-        std::byte xData[AREA_SIZE];
-        std::memcpy(xData, "test data", AREA_SIZE);
-        //             0123456789
-
-        binaryAccessor2.Write(xData, AREA_SIZE);
-        binaryAccessor2.Write(xData, AREA_SIZE); // Add one extra record
-
-        assert(strcmp(reinterpret_cast<char *>(xData), "test data") == 0);
-
-        std::byte yData[AREA_SIZE];
-        binaryAccessor2.Read(yData, AREA_SIZE, 0);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
-    }
-
-    {
-        std::byte xData[AREA_SIZE];
-        std::memcpy(xData, "test updt", AREA_SIZE);
-        //             0123456789
-
-        binaryAccessor2.Write(xData, AREA_SIZE, 0);
-
-        std::byte yData[AREA_SIZE];
-
-        binaryAccessor2.Read(yData, AREA_SIZE, 0);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-        assert(strcmp(reinterpret_cast<char *>(yData), "test updt") == 0);
-
-        binaryAccessor2.Read(yData, AREA_SIZE, AREA_SIZE);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-
-        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
-    }
-
-    // Revert data to default.
-    {
-        std::byte xData[AREA_SIZE];
-        std::memcpy(xData, "test data", AREA_SIZE);
-        //             0123456789
-
-        binaryAccessor2.Write(xData, AREA_SIZE, 0);
-
-        // update -> data in file
-
-        std::byte yData[AREA_SIZE];
-        binaryAccessor2.Read(yData, AREA_SIZE, 0);
-
-        std::cout << "[" << reinterpret_cast<char *>(yData) << "]";
-        std::cout << "/";
-        std::cout << "[" << yData << "]";
-        std::cout << std::endl;
-
-        assert(strcmp(reinterpret_cast<char *>(yData), "test data") == 0);
-    }
+    std::cout << std::endl;
 
 // -------------------------- Desscriptor Testing
 
@@ -350,8 +306,6 @@ int main(int argc, char *argv[])
 
     // clean stuff
 
-    auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
-    auto statusRemove2 = remove(binaryAccessor2.FileName().c_str());
     auto statusRemove3 = remove(binaryAccessor3.FileName().c_str());
     auto statusRemove4 = remove(binaryAccessor4.FileName().c_str());
     return 0;

@@ -1,6 +1,7 @@
 #include <fstream>
 #include <assert.h>
 #include <limits>
+#include <cstddef> // std::byte
 
 #include "faccfs.h"
 

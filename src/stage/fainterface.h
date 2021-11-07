@@ -2,7 +2,6 @@
 #define STORAGE_RDB_INCLUDE_FAINTERFACE_H_
 
 #include <string>
-#include <cstddef> // std::byte
 
 namespace rdb
 {
