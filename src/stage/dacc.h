@@ -12,9 +12,10 @@ namespace rdb
     /**
      * @brief This object purpose is to access data via descriptor
      */
+    template <class T>
     struct DataAccessor
     {
-        FileAccessorInterface<std::byte> *pAccessor;
+        FileAccessorInterface<T> *pAccessor;
         Descriptor descriptor;
 
         DataAccessor() = delete;
@@ -25,7 +26,7 @@ namespace rdb
          * @param descriptor Definition of binary schema
          * @param accessor storage information
          */
-        DataAccessor(const Descriptor descriptor, FileAccessorInterface<std::byte> &accessor);
+        DataAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor);
 
         /**
          * @brief Reads data package from storage
@@ -33,7 +34,7 @@ namespace rdb
          * @param inBuffer pointer to area where package will be fetched
          * @param recordsFromHead location from beginging of the storage [unit: Records]
          */
-        void Get(std::byte *inBuffer, const size_t recordsFromHead);
+        void Get(T *inBuffer, const size_t recordsFromHead);
 
         /**
          * @brief Sends record to the storage
@@ -41,7 +42,7 @@ namespace rdb
          * @param outBuffer pointer to area when record is stored
          * @param recordsFromHead location from begining of the storage [unit: Records]
          */
-        void Put(const std::byte *outBuffer, const size_t recordsFromHead = std::numeric_limits<size_t>::max());
+        void Put(const T *outBuffer, const size_t recordsFromHead = std::numeric_limits<size_t>::max());
     };
 }
 

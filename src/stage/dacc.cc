@@ -5,8 +5,8 @@
 
 namespace rdb
 {
-
-    DataAccessor::DataAccessor(const Descriptor descriptor, FileAccessorInterface<std::byte> &accessor)
+    template <class T>
+    DataAccessor<T>::DataAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor)
         : pAccessor(&accessor), descriptor(descriptor)
     {
         std::fstream myFile;
@@ -23,13 +23,15 @@ namespace rdb
         myFile.close();
     };
 
-    void DataAccessor::Get(std::byte *inBuffer, const size_t recordsFromHead)
+    template <class T>
+    void DataAccessor<T>::Get(T *inBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
         pAccessor->Read(inBuffer, size, recordsFromHead * size);
     };
 
-    void DataAccessor::Put(const std::byte *outBuffer, const size_t recordsFromHead)
+    template <class T>
+    void DataAccessor<T>::Put(const T *outBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
 
@@ -42,4 +44,8 @@ namespace rdb
             pAccessor->Write(outBuffer, size, recordsFromHead * size);
         }
     };
+
+    template class DataAccessor<std::byte>;
+    template class DataAccessor<char>;
+    template class DataAccessor<unsigned char>;
 }

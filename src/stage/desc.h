@@ -165,7 +165,11 @@ namespace rdb
          * @param ptr Pointer to std::byte table / begininng package
          * @return std::string Returned string from field.
          */
-        std::string ToString(const std::string name, std::byte *ptr);
+        template <typename T>
+        std::string ToString(const std::string name, T *ptr)
+        {
+            return std::string(reinterpret_cast<char *>(ptr + Offset(name)), Len(name));
+        }
 
         /**
          * @brief Reads data from binary package via tuple-data from inner container
@@ -175,8 +179,8 @@ namespace rdb
          * @param ptr pointer to begininng of package
          * @return auto Value from binary package that corresponds to field from container
          */
-        template <typename T>
-        auto Cast(const std::string name, std::byte *ptr)
+        template <typename T, typename K>
+        auto Cast(const std::string name, K *ptr)
         {
             return *(reinterpret_cast<T *>(ptr + Offset(name)));
         };

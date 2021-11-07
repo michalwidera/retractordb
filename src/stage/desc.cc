@@ -235,9 +235,4 @@ namespace rdb
         return is;
     }
 
-    std::string Descriptor::ToString(const std::string name, std::byte *ptr)
-    {
-        return std::string(reinterpret_cast<char *>(ptr + Offset(name)), Len(name));
-    }
-
 } // namespace rdb
