@@ -16,7 +16,7 @@ namespace rdb
     // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
     template <class T>
-    genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {};
+    genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName){};
 
     template <class T>
     std::string genericBinaryFileAccessor<T>::FileName()
@@ -33,20 +33,36 @@ namespace rdb
 
         if (position == std::numeric_limits<size_t>::max())
         {
-            myFile.open(FileName(), std::ios::in |std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
+            myFile.open(FileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
             assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+            if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+            {
+                return EXIT_FAILURE;
+            }
             // Note: no seekp here!
         }
         else
         {
             myFile.open(FileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
             assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+            if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+            {
+                return EXIT_FAILURE;
+            }
             myFile.seekp(position);
             assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+            if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+            {
+                return EXIT_FAILURE;
+            }
         }
 
         myFile.write(reinterpret_cast<const char *>(ptrData), size);
         assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+        if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+        {
+            return EXIT_FAILURE;
+        }
         myFile.close();
 
         return EXIT_SUCCESS;
@@ -61,10 +77,22 @@ namespace rdb
 
         myFile.open(FileName(), std::ios::in | std::ios::binary);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+        if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+        {
+            return EXIT_FAILURE;
+        }
         myFile.seekg(position);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+        if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+        {
+            return EXIT_FAILURE;
+        }
         myFile.get(reinterpret_cast<char *>(ptrData), size);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+        if ((myFile.rdstate() & std::ofstream::failbit) != 0)
+        {
+            return EXIT_FAILURE;
+        }
         myFile.close();
 
         return EXIT_SUCCESS;
