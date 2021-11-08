@@ -1,33 +1,38 @@
 #include <assert.h>
 #include <locale>
 #include <iostream>
+#include <cctype>
 
 #include "desc.h"
 
 namespace rdb
 {
-
-    template <typename L, typename R>
-    std::map<R, L>
-    makeReverse(std::map<L, R> list)
-    {
-        std::map<R, L> retVal;
-        for (const auto &[key, value] : list)
-            retVal[value] = key;
-        return retVal;
+    static inline void ltrim(std::string &s) {
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }));
     }
 
-    std::map<std::string, FieldType> typeDictionary = {{"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
-    std::map<FieldType, std::string> typeDictionaryR = makeReverse(typeDictionary);
-
-    FieldType GetFieldType(std::string e)
-    {
-        return typeDictionary[e];
+    static inline void rtrim(std::string &s) {
+        s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }).base(), s.end());
     }
 
     std::string GetFieldType(FieldType e)
     {
-        return typeDictionaryR[e];
+        std::map<FieldType, std::string> typeDictionary = {
+            {String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}};
+        return typeDictionary[e];
+    }
+
+    FieldType GetFieldType(std::string name)
+    {
+        ltrim(name);
+        rtrim(name);
+        std::map<std::string, FieldType> typeDictionary = {
+            {"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
+        return typeDictionary[name];
     }
 
     uint GetFieldLenFromType(FieldType ft)
@@ -218,7 +223,7 @@ namespace rdb
             }
             is >> name;
 
-            FieldType ft = GetFieldType(type);
+            auto ft = GetFieldType(type);
 
             if (ft == String)
             {

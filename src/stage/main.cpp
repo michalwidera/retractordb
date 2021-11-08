@@ -348,6 +348,8 @@ int main(int argc, char *argv[])
 
             uPtr_dataArray.reset(new std::byte[desc.GetSize()]);
 
+            memset(uPtr_dataArray.get(),0,desc.GetSize());
+
             std::cout << "ok." << std::endl;
         }
         else if ( cmd == "create" )
@@ -391,17 +393,74 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "not connected\n";
+                std::cout << "not connection\n";
+            }
+        }
+        else if ( cmd == "set")
+        {
+            std::string fieldName ;
+            std::cin >> fieldName;
+
+            if ( uPtr_dacc && desc.size() > 0 )
+            {
+                if ( desc.Type(fieldName) == "String" )
+                {
+                    std::cout << "String" << std::endl;
+                    std::string record;
+                    std::getline(std::cin >> std::ws, record);
+                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), record.c_str(), std::min( (size_t)desc.GetSize(), record.size()));
+                }
+                else if ( desc.Type(fieldName) == "Uint")
+                {
+                    std::cout << "Uint" << std::endl;
+                    uint data;
+                    std::cin >> data;
+                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), &data, sizeof(uint));
+                }
+                else if ( desc.Type(fieldName) == "Int")
+                {
+                    std::cout << "Int" << std::endl;
+                    int data;
+                    std::cin >> data;
+                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), &data, sizeof(int));
+                }
+                else if ( desc.Type(fieldName) == "Byte")
+                {
+                    std::cout << "Byte" << std::endl;
+                    uint8_t data;
+                    std::cin >> data;
+                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), &data, sizeof(uint8_t));
+                }
+                else
+                {
+                    std::cout << "field not found\n";
+                    continue;
+                }
+                std::cout << "ok\n";
+            }
+            else
+            {
+                std::cout << "no connection\n" ;
+            }
+        }
+        else if ( cmd == "print" )
+        {
+            if ( uPtr_dacc && desc.size() > 0 )
+            {
+                rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
+
+                std::cout << payload << std::endl ;
+                std::cout << "ok\n";
+            }
+            else
+            {
+                std::cout << "no connection\n" ;
             }
         }
         else if ( cmd == "put")
         {
-            std::string record;
-            std::getline(std::cin >> std::ws, record);      // <-https://stackoverflow.com/questions/45322228/c-how-to-skip-first-whitespace-while-using-getline-with-ifstream-object-to
-
             if (uPtr_store && uPtr_dacc)
             {
-                memcpy( uPtr_dataArray.get(), record.c_str(), std::min( (size_t)desc.GetSize(), record.size()));
                 uPtr_dacc->Put(uPtr_dataArray.get());
 
                 rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
@@ -411,7 +470,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "not connected\n";
+                std::cout << "not connection\n";
             }
         }
         else if ( cmd == "help" )

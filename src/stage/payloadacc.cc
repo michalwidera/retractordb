@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cstddef> // std::byte
+#include <cstring> // std:memcpy
+#include <assert.h>
 
 #include "payloadacc.h"
 
@@ -18,16 +20,35 @@ namespace rdb
         {
             os << "\t" << std::get<rname>(r) << ":" ;
 
+            auto desc = rhs.descriptor;
+            auto offset_ = desc.Offset(std::get<rname>(r));
+
             if (std::get<rtype>(r) == String)
             {
-                auto desc = rhs.descriptor;
-                auto offset_ = desc.Offset(std::get<rname>(r));
                 auto len_ = desc.Len(std::get<rname>(r));
                 os << std::string(reinterpret_cast<char *>(rhs.ptr + offset_), len_)  ;
             }
+            else if (std::get<rtype>(r) == Int)
+            {
+                int i;
+                memcpy( &i , rhs.ptr + offset_ , sizeof(int) );
+                os << i;
+            }
+            else if (std::get<rtype>(r) == Uint)
+            {
+                unsigned int i;
+                memcpy( &i , rhs.ptr + offset_ , sizeof(unsigned int) );
+                os << i;
+            }
+            else if (std::get<rtype>(r) == Byte)
+            {
+                uint8_t i;
+                memcpy( &i , rhs.ptr + offset_ , sizeof(uint8_t) );
+                os << i;
+            }
             else
             {
-                os << "todo" ;
+                assert(false && "Unrecognized type");
             }
 
             os << std::endl;
