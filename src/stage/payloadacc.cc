@@ -12,6 +12,51 @@ namespace rdb
     {
     }
 
+    std::istream &operator>>(std::istream &is, const payLoadAccessor<std::byte> &rhs)
+    {
+        std::string fieldName;
+        is >> fieldName;
+
+        if (is.eof())
+        {
+            return is;
+        }
+
+        Descriptor desc(rhs.descriptor);
+
+        if (desc.Type(fieldName) == "String")
+        {
+            std::string record;
+            std::getline(is >> std::ws, record);
+            memcpy(rhs.ptr + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.GetSize(), record.size()));
+        }
+        else if (desc.Type(fieldName) == "Uint")
+        {
+            uint data;
+            is >> data;
+            memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(uint));
+        }
+        else if (desc.Type(fieldName) == "Int")
+        {
+            int data;
+            is >> data;
+            memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(int));
+        }
+        else if (desc.Type(fieldName) == "Byte")
+        {
+            int data;
+            is >> data;
+            uint8_t data8 = data;
+            memcpy(rhs.ptr + desc.Offset(fieldName), &data8, sizeof(uint8_t));
+        }
+        else
+        {
+            std::cerr << "field not found\n";
+        }
+
+        return is;
+    }
+
     std::ostream &operator<<(std::ostream &os, const payLoadAccessor<std::byte> &rhs)
     {
         os << "{";

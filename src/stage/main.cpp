@@ -395,42 +395,11 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "set")
         {
-            std::string fieldName;
-            std::cin >> fieldName;
-
             if (uPtr_dacc && desc.size() > 0)
             {
-                if (desc.Type(fieldName) == "String")
-                {
-                    std::string record;
-                    std::getline(std::cin >> std::ws, record);
-                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.GetSize(), record.size()));
-                }
-                else if (desc.Type(fieldName) == "Uint")
-                {
-                    uint data;
-                    std::cin >> data;
-                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(uint));
-                }
-                else if (desc.Type(fieldName) == "Int")
-                {
-                    int data;
-                    std::cin >> data;
-                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(int));
-                }
-                else if (desc.Type(fieldName) == "Byte")
-                {
-                    int data;
-                    std::cin >> data;
-                    uint8_t data8 = data;
-                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data8, sizeof(uint8_t));
-                }
-                else
-                {
-                    std::cout << "field not found\n";
-                    continue;
-                }
-                std::cout << "ok\n";
+                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
+
+                std::cin >> payload;
             }
             else
             {
@@ -455,10 +424,6 @@ int main(int argc, char *argv[])
             if (uPtr_store && uPtr_dacc)
             {
                 uPtr_dacc->Put(uPtr_payload.get());
-
-                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
-
-                std::cout << payload << std::endl;
                 std::cout << "ok\n";
             }
             else

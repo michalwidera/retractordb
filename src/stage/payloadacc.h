@@ -17,6 +17,8 @@ namespace rdb
         payLoadAccessor(Descriptor descriptor , T *ptr );
 
         friend std::ostream &operator<<(std::ostream &os, const payLoadAccessor<std::byte> &rhs);
+        friend std::istream &operator>>(std::istream &is, const payLoadAccessor<std::byte> &rhs);
+
     };
 }
 

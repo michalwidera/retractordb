@@ -223,6 +223,9 @@ namespace rdb
             }
             is >> name;
 
+            ltrim(name);
+            rtrim(name);
+
             auto ft = GetFieldType(type);
 
             if (ft == String)
