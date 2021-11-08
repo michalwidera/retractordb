@@ -29,14 +29,6 @@ namespace rdb
         DataStorageAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor);
 
         /**
-         * @brief Construct a new Data Accessor object without descriptor file
-         *
-         * @param descriptor Definition of binary schema
-         * @param accessor storage information
-         */
-        DataStorageAccessor(FileAccessorInterface<T> &accessor);
-
-        /**
          * @brief Reads data package from storage
          *
          * @param inBuffer pointer to area where package will be fetched

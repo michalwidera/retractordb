@@ -279,7 +279,6 @@ void test_storage()
     auto statusRemove = remove(dataStore.FileName().c_str());
 }
 
-
 int main(int argc, char *argv[])
 {
     check_debug();
@@ -312,29 +311,29 @@ int main(int argc, char *argv[])
 
     std::unique_ptr<rdb::genericBinaryFileAccessor<std::byte>> uPtr_store;
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
-    std::unique_ptr<std::byte[]> uPtr_dataArray;
+    std::unique_ptr<std::byte[]> uPtr_payload;
     rdb::Descriptor desc;
     std::string file;
 
-    std::string cmd ;
-    do {
-        std::cout << "." ;
+    std::string cmd;
+    do
+    {
+        std::cout << ".";
         std::cin >> cmd;
-        if ( cmd == "exit" || cmd == "quit" )
+        if (cmd == "exit" || cmd == "quit")
         {
             break;
         }
-        else if ( cmd == "desc" )
+        else if (cmd == "desc")
         {
             std::cout << desc << std::endl;
             std::cout << "ok." << std::endl;
         }
-        else if ( cmd == "open" )
+        else if (cmd == "open")
         {
             std::cin >> file;
 
             uPtr_store.reset(new rdb::genericBinaryFileAccessor<std::byte>(file.c_str()));
-            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(*(uPtr_store.get())));
 
             std::string descriptionFileName(file);
             descriptionFileName.append(".desc");
@@ -346,13 +345,15 @@ int main(int argc, char *argv[])
             desc.clear();
             buffer >> desc;
 
-            uPtr_dataArray.reset(new std::byte[desc.GetSize()]);
+            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc,*(uPtr_store.get())));
 
-            memset(uPtr_dataArray.get(),0,desc.GetSize());
+            uPtr_payload.reset(new std::byte[desc.GetSize()]);
+
+            memset(uPtr_payload.get(), 0, desc.GetSize());
 
             std::cout << "ok." << std::endl;
         }
-        else if ( cmd == "create" )
+        else if (cmd == "create")
         {
             std::cin >> file;
 
@@ -361,11 +362,12 @@ int main(int argc, char *argv[])
             std::string sschema;
             std::string object;
 
-            do {
-                std::cin >> object ;
-                sschema.append( object );
-                sschema.append( " ");
-            } while ( object.find("}") == std::string::npos );
+            do
+            {
+                std::cin >> object;
+                sschema.append(object);
+                sschema.append(" ");
+            } while (object.find("}") == std::string::npos);
 
             std::stringstream scheamStringStream(sschema);
 
@@ -376,16 +378,16 @@ int main(int argc, char *argv[])
 
             std::cout << desc << "\nok\n";
         }
-        else if ( cmd == "get" )
+        else if (cmd == "get")
         {
             int record;
             std::cin >> record;
 
             if (uPtr_store && uPtr_dacc)
             {
-                uPtr_dacc->Get(uPtr_dataArray.get(),record);
+                uPtr_dacc->Get(uPtr_payload.get(), record);
 
-                rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
+                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
 
                 std::cout << "Restored:" << payload;
 
@@ -396,40 +398,40 @@ int main(int argc, char *argv[])
                 std::cout << "not connection\n";
             }
         }
-        else if ( cmd == "set")
+        else if (cmd == "set")
         {
-            std::string fieldName ;
+            std::string fieldName;
             std::cin >> fieldName;
 
-            if ( uPtr_dacc && desc.size() > 0 )
+            if (uPtr_dacc && desc.size() > 0)
             {
-                if ( desc.Type(fieldName) == "String" )
+                if (desc.Type(fieldName) == "String")
                 {
                     std::cout << "String" << std::endl;
                     std::string record;
                     std::getline(std::cin >> std::ws, record);
-                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), record.c_str(), std::min( (size_t)desc.GetSize(), record.size()));
+                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.GetSize(), record.size()));
                 }
-                else if ( desc.Type(fieldName) == "Uint")
+                else if (desc.Type(fieldName) == "Uint")
                 {
                     std::cout << "Uint" << std::endl;
                     uint data;
                     std::cin >> data;
-                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), &data, sizeof(uint));
+                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(uint));
                 }
-                else if ( desc.Type(fieldName) == "Int")
+                else if (desc.Type(fieldName) == "Int")
                 {
                     std::cout << "Int" << std::endl;
                     int data;
                     std::cin >> data;
-                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), &data, sizeof(int));
+                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(int));
                 }
-                else if ( desc.Type(fieldName) == "Byte")
+                else if (desc.Type(fieldName) == "Byte")
                 {
                     std::cout << "Byte" << std::endl;
                     uint8_t data;
                     std::cin >> data;
-                    memcpy( uPtr_dataArray.get() + desc.Offset(fieldName), &data, sizeof(uint8_t));
+                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(uint8_t));
                 }
                 else
                 {
@@ -440,32 +442,32 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "no connection\n" ;
+                std::cout << "no connection\n";
             }
         }
-        else if ( cmd == "print" )
+        else if (cmd == "print")
         {
-            if ( uPtr_dacc && desc.size() > 0 )
+            if (uPtr_dacc && desc.size() > 0)
             {
-                rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
+                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
 
-                std::cout << payload << std::endl ;
+                std::cout << payload << std::endl;
                 std::cout << "ok\n";
             }
             else
             {
-                std::cout << "no connection\n" ;
+                std::cout << "no connection\n";
             }
         }
-        else if ( cmd == "put")
+        else if (cmd == "put")
         {
             if (uPtr_store && uPtr_dacc)
             {
-                uPtr_dacc->Put(uPtr_dataArray.get());
+                uPtr_dacc->Put(uPtr_payload.get());
 
-                rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
+                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
 
-                std::cout << payload << std::endl ;
+                std::cout << payload << std::endl;
                 std::cout << "ok\n";
             }
             else
@@ -473,15 +475,15 @@ int main(int argc, char *argv[])
                 std::cout << "not connection\n";
             }
         }
-        else if ( cmd == "help" )
+        else if (cmd == "help")
         {
-            std::cout << "exit|quit, open [file], create [file][schema], desc, get [n], help" << std::endl ;
+            std::cout << "exit|quit, open [file], create [file][schema], desc, get [n], help" << std::endl;
         }
         else
         {
-            std::cout << "no." << std::endl ;
+            std::cout << "no." << std::endl;
         }
-    } while( true );
+    } while (true);
 
     // use '$xxd datafile-11' to check
     return 0;

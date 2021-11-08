@@ -44,7 +44,7 @@ namespace rdb
             {
                 uint8_t i;
                 memcpy( &i , rhs.ptr + offset_ , sizeof(uint8_t) );
-                os << i;
+                os << (int)i;
             }
             else
             {

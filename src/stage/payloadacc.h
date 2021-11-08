@@ -16,7 +16,6 @@ namespace rdb
 
         payLoadAccessor(Descriptor descriptor , T *ptr );
 
-
         /**
          * @brief In case of string types this funcion will get binary representation and convert it to string
          * by accessing name

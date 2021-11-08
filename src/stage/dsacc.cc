@@ -24,16 +24,11 @@ namespace rdb
     };
 
     template <class T>
-    DataStorageAccessor<T>::DataStorageAccessor(FileAccessorInterface<T> &accessor)
-        : pAccessor(&accessor)
-    {
-    };
-
-    template <class T>
     void DataStorageAccessor<T>::Get(T *inBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
-        pAccessor->Read(inBuffer, size, recordsFromHead * size);
+        auto result = pAccessor->Read(inBuffer, size, recordsFromHead * size);
+        assert(result == 0);
     };
 
     template <class T>
@@ -43,11 +38,13 @@ namespace rdb
 
         if (recordsFromHead == std::numeric_limits<size_t>::max())
         {
-            pAccessor->Write(outBuffer, size); // <- Call to Append Function
+            auto result = pAccessor->Write(outBuffer, size); // <- Call to Append Function
+            assert(result == 0);
         }
         else
         {
-            pAccessor->Write(outBuffer, size, recordsFromHead * size);
+            auto result = pAccessor->Write(outBuffer, size, recordsFromHead * size);
+            assert(result == 0);
         }
     };
 
