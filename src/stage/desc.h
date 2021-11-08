@@ -33,13 +33,13 @@ namespace rdb
     typedef std::tuple<fieldName, fieldLen, FieldType> field;
 
     /**
-     * @brief This enum helps write std::get<len>(i) instead std::get<1>(i)
+     * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
      */
     enum FieldColumn
     {
-        name = 0,
-        len = 1,
-        type = 2
+        rname = 0,
+        rlen = 1,
+        rtype = 2
     };
 
     /**

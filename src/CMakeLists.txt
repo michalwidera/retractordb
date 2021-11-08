@@ -43,6 +43,7 @@ set(SOURCES_STG
   stage/faccposix.cc
   stage/desc.cc
   stage/dsacc.cc
+  stage/payloadacc.cc
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )

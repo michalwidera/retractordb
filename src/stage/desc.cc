@@ -41,10 +41,10 @@ namespace rdb
         case Byte:
             return 1;
         case String:
-            assert(len != 0 && "String has other method of len-type id");
+            assert("String has other method of len-type id");
             break;
         default:
-            assert(len != 0 && "Undefined type");
+            assert("Undefined type");
         }
         return 0;
     }
@@ -108,7 +108,7 @@ namespace rdb
         uint size = 0;
         for (auto const i : *this)
         {
-            size += std::get<len>(i);
+            size += std::get<rlen>(i);
         }
         return size;
     }
@@ -146,7 +146,7 @@ namespace rdb
     uint Descriptor::Len(const std::string name)
     {
         auto pos = Position(name);
-        return std::get<len>((*this)[pos]);
+        return std::get<rlen>((*this)[pos]);
     }
 
     uint Descriptor::Offset(const std::string name)
@@ -156,7 +156,7 @@ namespace rdb
         {
             if (name == std::get<fieldName>(i))
                 return offset;
-            offset += std::get<len>(i);
+            offset += std::get<rlen>(i);
         }
         assert(false && "record not found with that name");
         return -1;
@@ -165,7 +165,7 @@ namespace rdb
     std::string Descriptor::Type(const std::string name)
     {
         auto pos = Position(name);
-        return GetFieldType(std::get<type>((*this)[pos]));
+        return GetFieldType(std::get<rtype>((*this)[pos]));
     }
 
     std::ostream &operator<<(std::ostream &os, const Descriptor &rhs)
@@ -173,11 +173,11 @@ namespace rdb
         os << "{";
         for (auto const &r : rhs)
         {
-            os << "\t" << GetFieldType(std::get<type>(r))
-               << " " << std::get<name>(r);
-            if (std::get<type>(r) == String)
+            os << "\t" << GetFieldType(std::get<rtype>(r))
+               << " " << std::get<rname>(r);
+            if (std::get<rtype>(r) == String)
             {
-                os << "[" << std::to_string(std::get<len>(r)) << "]";
+                os << "[" << std::to_string(std::get<rlen>(r)) << "]";
             };
             os << std::endl;
         }

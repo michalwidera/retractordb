@@ -6,11 +6,13 @@
 #include <locale>
 #include <memory>
 #include <sstream>
+#include <algorithm>
 
 #include "dsacc.h"
 #include "desc.h"
 #include "faccfs.h"
 #include "faccposix.h"
+#include "payloadacc.h"
 
 #include "fainterface.h"
 
@@ -379,8 +381,33 @@ int main(int argc, char *argv[])
 
             if (uPtr_store && uPtr_dacc)
             {
-                std::cout << "ok\n";
                 uPtr_dacc->Get(uPtr_dataArray.get(),record);
+
+                rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
+
+                std::cout << "Restored:" << payload;
+
+                std::cout << "ok\n";
+            }
+            else
+            {
+                std::cout << "not connected\n";
+            }
+        }
+        else if ( cmd == "put")
+        {
+            std::string record;
+            std::getline(std::cin >> std::ws, record);      // <-https://stackoverflow.com/questions/45322228/c-how-to-skip-first-whitespace-while-using-getline-with-ifstream-object-to
+
+            if (uPtr_store && uPtr_dacc)
+            {
+                memcpy( uPtr_dataArray.get(), record.c_str(), std::min( (size_t)desc.GetSize(), record.size()));
+                uPtr_dacc->Put(uPtr_dataArray.get());
+
+                rdb::payLoadAccessor payload(desc, uPtr_dataArray.get());
+
+                std::cout << payload << std::endl ;
+                std::cout << "ok\n";
             }
             else
             {
