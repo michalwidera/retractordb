@@ -1,12 +1,12 @@
 #include <fstream>
 #include <assert.h>
 
-#include "dacc.h"
+#include "dsacc.h"
 
 namespace rdb
 {
     template <class T>
-    DataAccessor<T>::DataAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor)
+    DataStorageAccessor<T>::DataStorageAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor)
         : pAccessor(&accessor), descriptor(descriptor)
     {
         std::fstream myFile;
@@ -24,14 +24,20 @@ namespace rdb
     };
 
     template <class T>
-    void DataAccessor<T>::Get(T *inBuffer, const size_t recordsFromHead)
+    DataStorageAccessor<T>::DataStorageAccessor(FileAccessorInterface<T> &accessor)
+        : pAccessor(&accessor)
+    {
+    };
+
+    template <class T>
+    void DataStorageAccessor<T>::Get(T *inBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
         pAccessor->Read(inBuffer, size, recordsFromHead * size);
     };
 
     template <class T>
-    void DataAccessor<T>::Put(const T *outBuffer, const size_t recordsFromHead)
+    void DataStorageAccessor<T>::Put(const T *outBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
 
@@ -45,7 +51,7 @@ namespace rdb
         }
     };
 
-    template class DataAccessor<std::byte>;
-    template class DataAccessor<char>;
-    template class DataAccessor<unsigned char>;
+    template class DataStorageAccessor<std::byte>;
+    template class DataStorageAccessor<char>;
+    template class DataStorageAccessor<unsigned char>;
 }

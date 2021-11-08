@@ -13,20 +13,28 @@ namespace rdb
      * @brief This object purpose is to access data via descriptor
      */
     template <class T>
-    struct DataAccessor
+    struct DataStorageAccessor
     {
         FileAccessorInterface<T> *pAccessor;
         Descriptor descriptor;
 
-        DataAccessor() = delete;
+        DataStorageAccessor() = delete;
 
         /**
-         * @brief Construct a new Data Accessor object
+         * @brief Construct a new Data Accessor object and create descriptor file
          *
          * @param descriptor Definition of binary schema
          * @param accessor storage information
          */
-        DataAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor);
+        DataStorageAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor);
+
+        /**
+         * @brief Construct a new Data Accessor object without descriptor file
+         *
+         * @param descriptor Definition of binary schema
+         * @param accessor storage information
+         */
+        DataStorageAccessor(FileAccessorInterface<T> &accessor);
 
         /**
          * @brief Reads data package from storage

@@ -203,7 +203,8 @@ namespace rdb
 
     std::istream &operator>>(std::istream &is, Descriptor &rhs)
     {
-        is.imbue(std::locale(is.getloc(), std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
+        auto origLocale = is.getloc();
+        is.imbue(std::locale(origLocale, std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
 
         do
         {
@@ -231,6 +232,8 @@ namespace rdb
             rhs | Descriptor(name, len, ft);
 
         } while (!is.eof());
+
+        is.imbue(origLocale);
 
         return is;
     }

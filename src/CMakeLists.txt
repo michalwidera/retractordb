@@ -42,7 +42,7 @@ set(SOURCES_STG
   stage/faccfs.cc
   stage/faccposix.cc
   stage/desc.cc
-  stage/dacc.cc
+  stage/dsacc.cc
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )

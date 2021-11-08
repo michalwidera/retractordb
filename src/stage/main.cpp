@@ -7,7 +7,7 @@
 #include <memory>
 #include <sstream>
 
-#include "dacc.h"
+#include "dsacc.h"
 #include "desc.h"
 #include "faccfs.h"
 #include "faccposix.h"
@@ -228,7 +228,7 @@ void test_storage()
 
     dataPayload payload1;
 
-    rdb::DataAccessor dAcc2(dataDescriptor, dataStore);
+    rdb::DataStorageAccessor dAcc2(dataDescriptor, dataStore);
 
     assert(strcmp(dataStore.FileName().c_str(), "datafile-fstream2") == 0);
 
@@ -308,8 +308,11 @@ int main(int argc, char *argv[])
 
     test_storage();
 
-    rdb::genericBinaryFileAccessor<std::byte> *pDataStore = NULL;
+    std::unique_ptr<rdb::genericBinaryFileAccessor<std::byte>> uPtr_store;
+    std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
+    std::unique_ptr<std::byte[]> uPtr_dataArray;
     rdb::Descriptor desc;
+    std::string file;
 
     std::string cmd ;
     do {
@@ -319,34 +322,74 @@ int main(int argc, char *argv[])
         {
             break;
         }
-        else if ( cmd == "pick" )
+        else if ( cmd == "desc" )
         {
-            std::string file;
+            std::cout << desc << std::endl;
+            std::cout << "ok." << std::endl;
+        }
+        else if ( cmd == "open" )
+        {
             std::cin >> file;
 
-            if ( pDataStore != NULL )
-            {
-                delete pDataStore;
-            }
-            pDataStore = new rdb::genericBinaryFileAccessor<std::byte>(file.c_str());
+            uPtr_store.reset(new rdb::genericBinaryFileAccessor<std::byte>(file.c_str()));
+            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(*(uPtr_store.get())));
 
-            //std::string descriptionFile(file);
-            //descriptionFile.append(".desc");
+            std::string descriptionFileName(file);
+            descriptionFileName.append(".desc");
 
-            //std::ifstream ifs( descriptionFile.c_str() , std::ifstream::in );
-            //ifs << desc;
-            //std::cout << desc ;
+            std::ifstream streamDescriptorFile(descriptionFileName.c_str());
+            std::stringstream buffer;
+            buffer << streamDescriptorFile.rdbuf();
+
+            desc.clear();
+            buffer >> desc;
+
+            uPtr_dataArray.reset(new std::byte[desc.GetSize()]);
 
             std::cout << "ok." << std::endl;
         }
+        else if ( cmd == "create" )
+        {
+            std::cin >> file;
+
+            uPtr_store.reset(new rdb::genericBinaryFileAccessor<std::byte>(file.c_str()));
+
+            std::string sschema;
+            std::string object;
+
+            do {
+                std::cin >> object ;
+                sschema.append( object );
+                sschema.append( " ");
+            } while ( object.find("}") == std::string::npos );
+
+            std::stringstream scheamStringStream(sschema);
+
+            desc.clear();
+            scheamStringStream >> desc;
+
+            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
+
+            std::cout << desc << "\nok\n";
+        }
         else if ( cmd == "get" )
         {
-            std::string record;
+            int record;
             std::cin >> record;
+
+            if (uPtr_store && uPtr_dacc)
+            {
+                std::cout << "ok\n";
+                uPtr_dacc->Get(uPtr_dataArray.get(),record);
+            }
+            else
+            {
+                std::cout << "not connected\n";
+            }
         }
         else if ( cmd == "help" )
         {
-            std::cout << "exit|quit, pick [file], help" << std::endl ;
+            std::cout << "exit|quit, open [file], create [file][schema], desc, get [n], help" << std::endl ;
         }
         else
         {
@@ -354,10 +397,6 @@ int main(int argc, char *argv[])
         }
     } while( true );
 
-    if ( pDataStore != NULL )
-    {
-        delete pDataStore;
-    }
     // use '$xxd datafile-11' to check
     return 0;
 }
