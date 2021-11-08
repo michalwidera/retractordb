@@ -327,7 +327,6 @@ int main(int argc, char *argv[])
         else if (cmd == "desc")
         {
             std::cout << desc << std::endl;
-            std::cout << "ok." << std::endl;
         }
         else if (cmd == "open")
         {
@@ -351,7 +350,7 @@ int main(int argc, char *argv[])
 
             memset(uPtr_payload.get(), 0, desc.GetSize());
 
-            std::cout << "ok." << std::endl;
+            std::cout << "ok" << std::endl;
         }
         else if (cmd == "create")
         {
@@ -387,15 +386,11 @@ int main(int argc, char *argv[])
             {
                 uPtr_dacc->Get(uPtr_payload.get(), record);
 
-                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
-
-                std::cout << "Restored:" << payload;
-
                 std::cout << "ok\n";
             }
             else
             {
-                std::cout << "not connection\n";
+                std::cout << "no connection\n";
             }
         }
         else if (cmd == "set")
@@ -407,31 +402,28 @@ int main(int argc, char *argv[])
             {
                 if (desc.Type(fieldName) == "String")
                 {
-                    std::cout << "String" << std::endl;
                     std::string record;
                     std::getline(std::cin >> std::ws, record);
                     memcpy(uPtr_payload.get() + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.GetSize(), record.size()));
                 }
                 else if (desc.Type(fieldName) == "Uint")
                 {
-                    std::cout << "Uint" << std::endl;
                     uint data;
                     std::cin >> data;
                     memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(uint));
                 }
                 else if (desc.Type(fieldName) == "Int")
                 {
-                    std::cout << "Int" << std::endl;
                     int data;
                     std::cin >> data;
                     memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(int));
                 }
                 else if (desc.Type(fieldName) == "Byte")
                 {
-                    std::cout << "Byte" << std::endl;
-                    uint8_t data;
+                    int data;
                     std::cin >> data;
-                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data, sizeof(uint8_t));
+                    uint8_t data8 = data;
+                    memcpy(uPtr_payload.get() + desc.Offset(fieldName), &data8, sizeof(uint8_t));
                 }
                 else
                 {
@@ -452,7 +444,6 @@ int main(int argc, char *argv[])
                 rdb::payLoadAccessor payload(desc, uPtr_payload.get());
 
                 std::cout << payload << std::endl;
-                std::cout << "ok\n";
             }
             else
             {
@@ -477,11 +468,11 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "help")
         {
-            std::cout << "exit|quit, open [file], create [file][schema], desc, get [n], help" << std::endl;
+            std::cout << "exit|quit, open [file], create [file][schema], desc, get [n], help, put, set [name][value], print" << std::endl;
         }
         else
         {
-            std::cout << "no." << std::endl;
+            std::cout << "?" << std::endl;
         }
     } while (true);
 
