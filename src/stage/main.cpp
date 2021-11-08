@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
     do {
         std::cout << "." ;
         std::cin >> cmd;
-        if ( cmd == "exit" )
+        if ( cmd == "exit" || cmd == "quit" )
         {
             break;
         }
@@ -346,7 +346,7 @@ int main(int argc, char *argv[])
         }
         else if ( cmd == "help" )
         {
-            std::cout << "exit, pick [file], help" << std::endl ;
+            std::cout << "exit|quit, pick [file], help" << std::endl ;
         }
         else
         {

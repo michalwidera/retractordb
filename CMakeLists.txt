@@ -4,6 +4,8 @@ project (retractordb)
 
 enable_testing()
 
+SET(CONAN_DISABLE_CHECK_COMPILER TRUE)
+
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
