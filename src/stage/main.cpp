@@ -320,7 +320,7 @@ int main(int argc, char *argv[])
     {
         std::cout << ".";
         std::cin >> cmd;
-        if (cmd == "exit" || cmd == "quit")
+        if (cmd == "exit" || cmd == "quit" || cmd == "q")
         {
             break;
         }
@@ -344,7 +344,7 @@ int main(int argc, char *argv[])
             desc.clear();
             buffer >> desc;
 
-            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc,*(uPtr_store.get())));
+            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
 
@@ -375,9 +375,12 @@ int main(int argc, char *argv[])
 
             uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
 
-            std::cout << desc << "\nok\n";
+            uPtr_payload.reset(new std::byte[desc.GetSize()]);
+            memset(uPtr_payload.get(), 0, desc.GetSize());
+
+            std::cout << "ok\n";
         }
-        else if (cmd == "get")
+        else if (cmd == "read")
         {
             int record;
             std::cin >> record;
@@ -419,11 +422,14 @@ int main(int argc, char *argv[])
                 std::cout << "no connection\n";
             }
         }
-        else if (cmd == "put")
+        else if (cmd == "write")
         {
             if (uPtr_store && uPtr_dacc)
             {
-                uPtr_dacc->Put(uPtr_payload.get());
+                size_t record;
+                std::cin >> record;
+                uPtr_dacc->Put(uPtr_payload.get(), record);
+
                 std::cout << "ok\n";
             }
             else
@@ -431,9 +437,36 @@ int main(int argc, char *argv[])
                 std::cout << "not connection\n";
             }
         }
+        else if (cmd == "append")
+        {
+            if (uPtr_store && uPtr_dacc)
+            {
+                uPtr_dacc->Put(uPtr_payload.get());
+
+                std::cout << "ok\n";
+            }
+            else
+            {
+                std::cout << "not connection\n";
+            }
+        }
+        else if (cmd == "size")
+        {
+            std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
+            std::cout << int(in.tellg() / desc.GetSize()) << " Record(s)\n";
+        }
         else if (cmd == "help")
         {
-            std::cout << "exit|quit, open [file], create [file][schema], desc, get [n], help, put, set [name][value], print" << std::endl;
+            std::cout << "exit|quit|q \t\t exit program\n";
+            std::cout << "open [file] \t\t open database - create connection\n";
+            std::cout << "create [file][schema] \t create database with schema\n";
+            std::cout << "desc \t\t\t show schema\n";
+            std::cout << "read [n] \t\t read record from database into payload\n";
+            std::cout << "write [n] \t\t update record in database from payload\n";
+            std::cout << "append \t\t\t append payload record to database\n";
+            std::cout << "set [name][value] \t set payload value\n";
+            std::cout << "print \t\t\t show payload\n";
+            std::cout << "size \t\t\t show database size in records\n";
         }
         else
         {
