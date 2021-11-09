@@ -28,8 +28,8 @@ namespace rdb
         {
             std::string record;
             std::getline(is >> std::ws, record);
-            memset(rhs.ptr + desc.Offset(fieldName), 0, desc.GetSize());
-            memcpy(rhs.ptr + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.GetSize(), record.size()));
+            memset(rhs.ptr + desc.Offset(fieldName), 0, desc.Len(fieldName));
+            memcpy(rhs.ptr + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.Len(fieldName), record.size()));
         }
         else if (desc.Type(fieldName) == "Uint")
         {

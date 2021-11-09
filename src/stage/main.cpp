@@ -7,6 +7,7 @@
 #include <memory>
 #include <sstream>
 #include <algorithm>
+#include <iomanip>
 
 #include "dsacc.h"
 #include "desc.h"
@@ -455,6 +456,27 @@ int main(int argc, char *argv[])
             std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
             std::cout << int(in.tellg() / desc.GetSize()) << " Record(s)\n";
         }
+        else if (cmd == "dump")
+        {
+            char *ptr = reinterpret_cast<char*>(uPtr_payload.get());
+            if (uPtr_payload)
+            {
+                for( auto i = 0 ; i < desc.GetSize() ; i ++ )
+                {
+                    std::cout << std::hex;
+                    std::cout << std::setfill('0') ;
+                    std::cout << std::setw(2);
+                    std::cout << int(*(ptr + i));
+                    std::cout << std::dec;
+                    std::cout << " ";
+                };
+                std::cout << "\n";
+            }
+            else
+            {
+                std::cout << "not connection\n";
+            }
+        }
         else if (cmd == "help")
         {
             std::cout << "exit|quit|q \t\t exit program\n";
@@ -467,6 +489,7 @@ int main(int argc, char *argv[])
             std::cout << "set [name][value] \t set payload value\n";
             std::cout << "print \t\t\t show payload\n";
             std::cout << "size \t\t\t show database size in records\n";
+            std::cout << "dump \t\t\t show payload memory\n";
         }
         else
         {
