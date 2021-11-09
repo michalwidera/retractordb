@@ -4,7 +4,7 @@
 
 #include <assert.h>
 
-#include "faccposix.h"
+#include "rdb/faccposix.h"
 
 // Common flags defined for all posix open operations
 #if defined(HAVE_O_CLOEXEC)

@@ -17,7 +17,7 @@
 
 #include <boost/stacktrace.hpp>
 
-#include "../share/QStruct.h"
+#include "QStruct.h"
 
 #include "compiler.hpp"
 

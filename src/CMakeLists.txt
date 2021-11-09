@@ -2,7 +2,7 @@
 
 project( retractordb-src )
 
-include_directories( ${Boost_INCLUDE_DIR} "share" )
+include_directories( ${Boost_INCLUDE_DIR} "share" "include" )
 
 set(SOURCES_RETRACTOR
   retractor/Processor.cpp
@@ -37,25 +37,25 @@ set(SOURCES_QRY
   qry/qry.cpp
 )
 
-set(SOURCES_STG
-  stage/main.cpp
-  stage/faccfs.cc
-  stage/faccposix.cc
-  stage/desc.cc
-  stage/dsacc.cc
-  stage/payloadacc.cc
+set(SOURCES_RDB
+  rdb/main.cpp
+  rdb/faccfs.cc
+  rdb/faccposix.cc
+  rdb/desc.cc
+  rdb/dsacc.cc
+  rdb/payloadacc.cc
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )
 add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
-add_executable( xstage ${SOURCES_STG} )
+add_executable( xrdb ${SOURCES_RDB} )
 
 target_link_libraries( xretractor ${CONAN_LIBS} )
 target_link_libraries( xcompiler ${CONAN_LIBS} )
 target_link_libraries( xdumper ${CONAN_LIBS} )
 target_link_libraries( xqry ${CONAN_LIBS} )
-target_link_libraries( xstage ${CONAN_LIBS} )
+target_link_libraries( xrdb ${CONAN_LIBS} )
 
-install(TARGETS xretractor xcompiler xdumper xqry xstage DESTINATION ~/.local/bin)
+install(TARGETS xretractor xcompiler xdumper xqry xrdb DESTINATION ~/.local/bin)
