@@ -88,7 +88,15 @@ namespace rdb
         {
             return EXIT_FAILURE;
         }
-        myFile.get(reinterpret_cast<char *>(ptrData), size);
+
+        // This (+1) look's like error (need investigate)
+        // During test posix interface have properly read size data
+        // but fstream get read instead 12 bytes only 11
+        // Therefore +1 appears.
+        // Last byte was ommited.
+        // Look's like some inconsistency is here.
+
+        myFile.get(reinterpret_cast<char *>(ptrData), size + 1);
         assert((myFile.rdstate() & std::ifstream::failbit) == 0);
         if ((myFile.rdstate() & std::ofstream::failbit) != 0)
         {

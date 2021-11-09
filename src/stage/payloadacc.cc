@@ -47,8 +47,8 @@ namespace rdb
         {
             int data;
             is >> data;
-            uint8_t data8 = data;
-            memcpy(rhs.ptr + desc.Offset(fieldName), &data8, sizeof(uint8_t));
+            unsigned char data8 = static_cast<unsigned char>(data);
+            memcpy(rhs.ptr + desc.Offset(fieldName), &data8, sizeof(unsigned char));
         }
         else
         {
@@ -88,8 +88,8 @@ namespace rdb
             }
             else if (std::get<rtype>(r) == Byte)
             {
-                uint8_t i;
-                memcpy( &i , rhs.ptr + offset_ , sizeof(uint8_t) );
+                unsigned char i;
+                memcpy( &i , rhs.ptr + offset_ , sizeof(unsigned char) );
                 os << (int)i;
             }
             else

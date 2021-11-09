@@ -310,7 +310,15 @@ int main(int argc, char *argv[])
 
     test_storage();
 
-    std::unique_ptr<rdb::genericBinaryFileAccessor<std::byte>> uPtr_store;
+    // -------------------------- Database Terminal
+
+
+    //#define STORAGE_TYPE rdb::posixBinaryFileAccessor<std::byte>
+
+    #define STORAGE_TYPE rdb::genericBinaryFileAccessor<std::byte>
+
+
+    std::unique_ptr<STORAGE_TYPE> uPtr_store;
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
     std::unique_ptr<std::byte[]> uPtr_payload;
     rdb::Descriptor desc;
@@ -333,7 +341,7 @@ int main(int argc, char *argv[])
         {
             std::cin >> file;
 
-            uPtr_store.reset(new rdb::genericBinaryFileAccessor<std::byte>(file.c_str()));
+            uPtr_store.reset(new STORAGE_TYPE(file.c_str()));
 
             std::string descriptionFileName(file);
             descriptionFileName.append(".desc");
@@ -357,7 +365,7 @@ int main(int argc, char *argv[])
         {
             std::cin >> file;
 
-            uPtr_store.reset(new rdb::genericBinaryFileAccessor<std::byte>(file.c_str()));
+            uPtr_store.reset(new STORAGE_TYPE(file.c_str()));
 
             std::string sschema;
             std::string object;
@@ -458,7 +466,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "dump")
         {
-            char *ptr = reinterpret_cast<char*>(uPtr_payload.get());
+            auto *ptr = reinterpret_cast<unsigned char*>(uPtr_payload.get());
             if (uPtr_payload)
             {
                 for( auto i = 0 ; i < desc.GetSize() ; i ++ )
@@ -466,7 +474,7 @@ int main(int argc, char *argv[])
                     std::cout << std::hex;
                     std::cout << std::setfill('0') ;
                     std::cout << std::setw(2);
-                    std::cout << int(*(ptr + i));
+                    std::cout << static_cast<unsigned>(*(ptr + i));
                     std::cout << std::dec;
                     std::cout << " ";
                 };
