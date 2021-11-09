@@ -8,6 +8,7 @@
 #include <sstream>
 #include <algorithm>
 #include <iomanip>
+#include <filesystem>
 
 #include "rdb/dsacc.h"
 #include "rdb/desc.h"
@@ -17,15 +18,20 @@
 
 #include "rdb/fainterface.h"
 
+#define GREEN "\x1B[32m"
+#define BLACK "\033[0m"
+#define RED "\x1B[31m"
+#define ORANGE "\x1B[33m"
+#define BLUE "\x1B[34m"
+#define YELLOW "\x1B[93m"
+
 void check_debug()
 {
     // Diagnostic code
 
 #ifdef NDEBUG
 
-    std::cerr << "\x1B[31m";
-    std::cerr << "Warn: Release Code form.\n";
-    std::cerr << "\033[0m";
+    std::cerr << RED "Warn: Release Code form.\n" BLACK;
 
     assert(false); // Note this assert will have no effect!
 
@@ -35,7 +41,7 @@ void check_debug()
     {
         bool ok()
         {
-            std::cout << "\x1B[32mDebug Code Form.\n\033[0m";
+            std::cout << GREEN "Debug Code Form.\n" BLACK;
             return true;
         }
     } check;
@@ -48,13 +54,9 @@ int main(int argc, char *argv[])
 {
     check_debug();
 
-    // -------------------------- Database Terminal
-
-
     //#define STORAGE_TYPE rdb::posixBinaryFileAccessor<std::byte>
 
-    #define STORAGE_TYPE rdb::genericBinaryFileAccessor<std::byte>
-
+#define STORAGE_TYPE rdb::genericBinaryFileAccessor<std::byte>
 
     std::unique_ptr<STORAGE_TYPE> uPtr_store;
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
@@ -73,31 +75,45 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "desc")
         {
-            std::cout << desc << std::endl;
+            std::cout << YELLOW << desc << BLACK << std::endl;
         }
         else if (cmd == "open")
         {
             std::cin >> file;
 
-            uPtr_store.reset(new STORAGE_TYPE(file.c_str()));
+            if (std::filesystem::exists(file))
+            {
+                uPtr_store.reset(new STORAGE_TYPE(file.c_str()));
 
-            std::string descriptionFileName(file);
-            descriptionFileName.append(".desc");
+                std::string descriptionFileName(file);
+                descriptionFileName.append(".desc");
 
-            std::ifstream streamDescriptorFile(descriptionFileName.c_str());
-            std::stringstream buffer;
-            buffer << streamDescriptorFile.rdbuf();
+                if (std::filesystem::exists(descriptionFileName))
+                {
+                    std::ifstream streamDescriptorFile(descriptionFileName.c_str());
+                    std::stringstream buffer;
+                    buffer << streamDescriptorFile.rdbuf();
 
-            desc.clear();
-            buffer >> desc;
+                    desc.clear();
+                    buffer >> desc;
 
-            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
+                    uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
 
-            uPtr_payload.reset(new std::byte[desc.GetSize()]);
+                    uPtr_payload.reset(new std::byte[desc.GetSize()]);
 
-            memset(uPtr_payload.get(), 0, desc.GetSize());
+                    memset(uPtr_payload.get(), 0, desc.GetSize());
 
-            std::cout << "ok" << std::endl;
+                    std::cout << "ok" << std::endl;
+                }
+                else
+                {
+                    std::cout << RED "File exist, description file missing (.desc)\n" BLACK;
+                }
+            }
+            else
+            {
+                std::cout << RED "File does not exist\n" BLACK;
+            }
         }
         else if (cmd == "create")
         {
@@ -134,13 +150,22 @@ int main(int argc, char *argv[])
 
             if (uPtr_store && uPtr_dacc)
             {
-                uPtr_dacc->Get(uPtr_payload.get(), record);
+                std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
+                auto size = int(in.tellg() / desc.GetSize());
 
-                std::cout << "ok\n";
+                if (record >= size)
+                {
+                    std::cout << RED "record out of range\n" BLACK;
+                }
+                else
+                {
+                    uPtr_dacc->Get(uPtr_payload.get(), record);
+                    std::cout << "ok\n";
+                }
             }
             else
             {
-                std::cout << "no connection\n";
+                std::cout << RED "unconnected\n" BLACK;
             }
         }
         else if (cmd == "set")
@@ -153,7 +178,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "no connection\n";
+                std::cout << RED "unconnected\n" BLACK;
             }
         }
         else if (cmd == "print")
@@ -166,7 +191,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "no connection\n";
+                std::cout << RED "unconnected\n" BLACK;
             }
         }
         else if (cmd == "write")
@@ -181,7 +206,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "not connection\n";
+                std::cout << RED "unconnected\n" BLACK;
             }
         }
         else if (cmd == "append")
@@ -194,7 +219,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "not connection\n";
+                std::cout << RED "unconnected\n" BLACK;
             }
         }
         else if (cmd == "size")
@@ -204,13 +229,13 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "dump")
         {
-            auto *ptr = reinterpret_cast<unsigned char*>(uPtr_payload.get());
+            auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
             if (uPtr_payload)
             {
-                for( auto i = 0 ; i < desc.GetSize() ; i ++ )
+                for (auto i = 0; i < desc.GetSize(); i++)
                 {
                     std::cout << std::hex;
-                    std::cout << std::setfill('0') ;
+                    std::cout << std::setfill('0');
                     std::cout << std::setw(2);
                     std::cout << static_cast<unsigned>(*(ptr + i));
                     std::cout << std::dec;
@@ -220,11 +245,12 @@ int main(int argc, char *argv[])
             }
             else
             {
-                std::cout << "not connection\n";
+                std::cout << RED "unconnected\n" BLACK;
             }
         }
         else if (cmd == "help")
         {
+            std::cout << GREEN;
             std::cout << "exit|quit|q \t\t exit program\n";
             std::cout << "open [file] \t\t open database - create connection\n";
             std::cout << "create [file][schema] \t create database with schema\n";
@@ -236,10 +262,11 @@ int main(int argc, char *argv[])
             std::cout << "print \t\t\t show payload\n";
             std::cout << "size \t\t\t show database size in records\n";
             std::cout << "dump \t\t\t show payload memory\n";
+            std::cout << BLACK;
         }
         else
         {
-            std::cout << "?" << std::endl;
+            std::cout << RED "?\n" BLACK;
         }
     } while (true);
 
