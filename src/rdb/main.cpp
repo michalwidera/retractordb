@@ -3,20 +3,20 @@
 #include <assert.h>
 #include <string>
 #include <cstring>
-#include <locale>
-#include <memory>
-#include <sstream>
-#include <algorithm>
-#include <iomanip>
 #include <filesystem>
 
 #include "rdb/dsacc.h"
 #include "rdb/desc.h"
-#include "rdb/faccfs.h"
-#include "rdb/faccposix.h"
 #include "rdb/payloadacc.h"
 
-#include "rdb/fainterface.h"
+// This define switches posix/fstream type of file data accessor
+//#define STORAGE_POSIX
+
+#ifdef STORAGE_POSIX
+#include "rdb/faccposix.h"
+#else
+#include "rdb/faccfs.h"
+#endif
 
 #define GREEN "\x1B[32m"
 #define BLACK "\033[0m"
@@ -54,11 +54,13 @@ int main(int argc, char *argv[])
 {
     check_debug();
 
-    //#define STORAGE_TYPE rdb::posixBinaryFileAccessor<std::byte>
+#ifdef STORAGE_POSIX
+#define STORAGE_ACCESSOR rdb::posixBinaryFileAccessor<std::byte>
+#else
+#define STORAGE_ACCESSOR rdb::genericBinaryFileAccessor<std::byte>
+#endif
 
-#define STORAGE_TYPE rdb::genericBinaryFileAccessor<std::byte>
-
-    std::unique_ptr<STORAGE_TYPE> uPtr_store;
+    std::unique_ptr<STORAGE_ACCESSOR> uPtr_store;
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
     std::unique_ptr<std::byte[]> uPtr_payload;
     rdb::Descriptor desc;
@@ -83,7 +85,7 @@ int main(int argc, char *argv[])
 
             if (std::filesystem::exists(file))
             {
-                uPtr_store.reset(new STORAGE_TYPE(file.c_str()));
+                uPtr_store.reset(new STORAGE_ACCESSOR(file.c_str()));
 
                 std::string descriptionFileName(file);
                 descriptionFileName.append(".desc");
@@ -119,7 +121,7 @@ int main(int argc, char *argv[])
         {
             std::cin >> file;
 
-            uPtr_store.reset(new STORAGE_TYPE(file.c_str()));
+            uPtr_store.reset(new STORAGE_ACCESSOR(file.c_str()));
 
             std::string sschema;
             std::string object;
