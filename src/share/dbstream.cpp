@@ -14,17 +14,9 @@ CBuffer<std::string> cbuf ;
 using namespace std ;
 using namespace boost ;
 
-void saveStreamsToFile(string filename)
-{
-    cbuf.Save(filename.c_str());
-}
 long streamStoredSize(string filename)
 {
     return cbuf.GetLen(filename) ;
-}
-void Dump(std::ostream &os)
-{
-    cbuf.Dump(os, NULL);
 }
 
 dbStream::dbStream(std::string streamName, list < std::string > schema) :

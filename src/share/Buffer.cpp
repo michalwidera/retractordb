@@ -161,7 +161,6 @@ public:
     void DecycleBlockType(IDTYPE blockID, arrayPointer_t pBlockBuffer) ;
     void MemorizeBlockType(IDTYPE blockID, arrayPointer_t pBlockBuffer) ;
     long syncToDisk(IDTYPE blockID) ;
-    void Dump(std::ostream &os, std::set < string >* pQset) ;
 };
 
 template class CBlock<CRandomFile> ;
@@ -411,70 +410,6 @@ long CBufferImpl<IDTYPE>::syncToDisk(IDTYPE blockID)
 {
     MAP_SWICH(RefBlock(eval(blockID)).SyncToDisk(), return);
     return 0 ;
-}
-
-template <class IDTYPE>
-void CBufferImpl<IDTYPE>::Dump(ostream &os,  set < string >* pQset)
-{
-    os << "Count\tFSize\tLoc\tBlockID" << std::endl ;
-
-    for (BMap::iterator it = blok.begin() ; it != blok.end() ; it ++)
-    {
-        switch ((*it).second)
-        {
-            case BF:
-                os << (*recordInFile).RefBlock((*it).first).frameCount ;
-                os << "\t" ;
-                os << (*recordInFile).RefBlock((*it).first).frameSize ;
-                os << "\t" ;
-                os <<  "File" ;
-                break ;
-
-            case BM:
-                os << (*recordInMemory).RefBlock((*it).first).frameCount ;
-                os << "\t" ;
-                os << (*recordInMemory).RefBlock((*it).first).frameSize ;
-                os << "\t" ;
-                os << "Memory" ;
-                break ;
-
-            case BCF:
-                os << (*recordInCycleFile).RefBlock((*it).first).frameCount ;
-                os << "\t" ;
-                os << (*recordInCycleFile).RefBlock((*it).first).frameSize ;
-                os << "\t" ;
-                os << "Cycle File" ;
-                break ;
-
-            case BCM:
-                os << (*recordInCycleMemory).RefBlock((*it).first).frameCount ;
-                os << "\t" ;
-                os << (*recordInCycleMemory).RefBlock((*it).first).frameSize ;
-                os << "\t" ;
-                os << "Cycle Memory" ;
-                break ;
-
-            default:
-                assert(false);
-        }
-
-        os << "\t" ;
-
-        if (pQset == NULL)
-        {
-            os << (*it).first ;
-        }
-        else
-            for (auto qid : * pQset)
-            {
-                if (eval(qid) == (*it).first)
-                {
-                    os << qid ;
-                }
-            }
-
-        os << std::endl ;
-    }
 }
 
 #undef MAP_SWICH
@@ -961,14 +896,6 @@ template <class IDTYPE>
 long CBuffer<IDTYPE>::syncToDisk(IDTYPE blockID)
 {
     return pImpl->syncToDisk(blockID);
-}
-
-template <class IDTYPE>
-void CBuffer<IDTYPE>::Dump(
-    std::ostream &os,
-    std::set < string >* pQset)
-{
-    pImpl->Dump(os, pQset);
 }
 
 template class CBuffer<std::string> ;

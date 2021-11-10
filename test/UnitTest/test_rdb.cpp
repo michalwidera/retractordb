@@ -262,7 +262,8 @@ bool test_storage()
             return false;
     }
 
-    auto statusRemove = remove(dataStore.FileName().c_str());
+    auto statusRemove1 = remove(dataStore.FileName().c_str());
+    auto statusRemove2 = remove("datafile-fstream2.desc");
 
     return true;
 }

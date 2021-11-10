@@ -42,5 +42,4 @@ public:
     void DecycleBlockType(IDTYPE blockID, arrayPointer_t pBlockBuffer) ;    /**< Cyclic -> Flat type conversion */
     void MemorizeBlockType(IDTYPE blockID, arrayPointer_t pBlockBuffer) ;    /**< Move block to memory */
     long syncToDisk(IDTYPE blockID) ;       /** Store and materialize stream on disk */
-    void Dump(std::ostream &os, std::set < std::string >* pQset) ;    /** Testing and reporting */
 };

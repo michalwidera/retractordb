@@ -40,8 +40,4 @@ public:
     void get(int offset = 0, bool reverse = false); /**< Get data from archive */
 };
 
-void saveStreamsToFile(std::string filename);
-
 long streamStoredSize(std::string filename);
-
-void Dump(std::ostream &os);

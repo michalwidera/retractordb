@@ -748,14 +748,6 @@ int main(int argc, char* argv[])
                 cout << "Query limit (-m) waiting for fullfil" << endl ;
             }
         }
-
-        saveStreamsToFile(sDumpFile);
-
-        if (vm.count("verbose"))
-        {
-            cout << "Dump  :" << sDumpFile << endl;
-            Dump(std::cout);
-        }
     }
     catch (IPC::interprocess_exception &ex)
     {
