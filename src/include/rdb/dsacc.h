@@ -23,31 +23,44 @@ namespace rdb
 
         Descriptor descriptor;
 
+        bool reverse;
+
+        size_t recordsCount;
+
         DataStorageAccessor() = delete;
 
         /**
          * @brief Construct a new Data Accessor object and create descriptor file
          *
          * @param descriptor Definition of binary schema
-         * @param fileName storage file
+         * @param fileName Storage file
+         * @param reverse type of Get/Set operations index - from head or from tail
          */
-        DataStorageAccessor(const Descriptor descriptor, std::string fileName);
+        DataStorageAccessor(const Descriptor descriptor, std::string fileName, bool reverse = false);
+
+        /**
+         * @brief Open existing Data Accessor object and check descriptor file
+         *
+         * @param fileName Storage file
+         * @param reverse type of Get/Set operations index - from head or from tail
+         */
+        DataStorageAccessor(std::string fileName, bool reverse = false);
 
         /**
          * @brief Reads data package from storage
          *
          * @param inBuffer pointer to area where package will be fetched
-         * @param recordsFromHead location from beginging of the storage [unit: Records]
+         * @param recordIndex location from beginging of the storage [unit: Records]
          */
-        void Get(T *inBuffer, const size_t recordsFromHead);
+        void Get(T *inBuffer, const size_t recordIndex);
 
         /**
          * @brief Sends record to the storage
          *
          * @param outBuffer pointer to area when record is stored
-         * @param recordsFromHead location from begining of the storage [unit: Records]
+         * @param recordIndex location from begining of the storage [unit: Records]
          */
-        void Put(const T *outBuffer, const size_t recordsFromHead = std::numeric_limits<size_t>::max());
+        void Put(const T *outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
     };
 }
 

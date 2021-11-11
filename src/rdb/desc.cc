@@ -35,7 +35,7 @@ namespace rdb
         return typeDictionary[name];
     }
 
-    uint GetFieldLenFromType(FieldType ft)
+    constexpr uint GetFieldLenFromType(FieldType ft)
     {
         switch (ft)
         {

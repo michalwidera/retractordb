@@ -87,23 +87,14 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            std::string descriptionFileName(file);
-            descriptionFileName.append(".desc");
+            uPtr_dacc.reset(new rdb::DataStorageAccessor(file));
 
-            if (!std::filesystem::exists(descriptionFileName))
+            if ( uPtr_dacc->descriptor.GetSize() == 0 )
             {
                 std::cout << RED "File exist, description file missing (.desc)\n" BLACK;
                 continue;
             }
-
-            std::ifstream streamDescriptorFile(descriptionFileName);
-            std::stringstream buffer;
-            buffer << streamDescriptorFile.rdbuf();
-
-            desc.clear();
-            buffer >> desc;
-
-            uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file));
+            desc = uPtr_dacc->descriptor ;
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
             memset(uPtr_payload.get(), 0, desc.GetSize());
@@ -290,6 +281,7 @@ int main(int argc, char *argv[])
         else
         {
             std::cout << RED "?\n" BLACK;
+            continue;
         }
         std::cout << "ok\n";
     } while (true);
