@@ -21,7 +21,8 @@ namespace rdb
         memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(T));
     }
 
-    std::istream &operator>>(std::istream &is, const payLoadAccessor<std::byte> &rhs)
+    template <typename K>
+    std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs)
     {
         std::string fieldName;
         is >> fieldName;
@@ -49,19 +50,19 @@ namespace rdb
         }
         else if (desc.Type(fieldName) == "Uint")
         {
-            copyToMemory<uint, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+            copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName);
         }
         else if (desc.Type(fieldName) == "Int")
         {
-            copyToMemory<int, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+            copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName);
         }
         else if (desc.Type(fieldName) == "Float")
         {
-            copyToMemory<float, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+            copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName);
         }
         else if (desc.Type(fieldName) == "Double")
         {
-            copyToMemory<double, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+            copyToMemory<double, payLoadAccessor<K>>(is, rhs, fieldName);
         }
         else
         {
@@ -71,7 +72,8 @@ namespace rdb
         return is;
     }
 
-    std::ostream &operator<<(std::ostream &os, const payLoadAccessor<std::byte> &rhs)
+    template< class K >
+    std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs)
     {
         os << "{";
 
@@ -135,4 +137,12 @@ namespace rdb
     template class payLoadAccessor<std::byte>;
     template class payLoadAccessor<char>;
     template class payLoadAccessor<unsigned char>;
+
+    template std::istream &operator>>(std::istream &is, const payLoadAccessor<std::byte> &rhs);
+    template std::istream &operator>>(std::istream &is, const payLoadAccessor<char> &rhs);
+    template std::istream &operator>>(std::istream &is, const payLoadAccessor<unsigned char> &rhs);
+
+    template std::ostream &operator<<(std::ostream &os, const payLoadAccessor<std::byte> &rhs);
+    template std::ostream &operator<<(std::ostream &os, const payLoadAccessor<char> &rhs);
+    template std::ostream &operator<<(std::ostream &os, const payLoadAccessor<unsigned char> &rhs);
 }
