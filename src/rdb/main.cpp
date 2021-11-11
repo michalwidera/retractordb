@@ -138,10 +138,7 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
-            auto size = int(in.tellg() / desc.GetSize());
-
-            if (record >= size)
+            if (record >= uPtr_dacc->recordsCount)
             {
                 std::cout << RED "record out of range\n" RESET;
                 continue;

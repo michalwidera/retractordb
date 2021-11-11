@@ -67,26 +67,28 @@ namespace rdb
     };
 
     template <class T, class K>
-    void DataStorageAccessor<T, K>::Get(T *inBuffer, const size_t recordIndex)
+    bool DataStorageAccessor<T, K>::Get(T *inBuffer, const size_t recordIndex)
     {
         auto size = descriptor.GetSize();
         auto recordIndexRv = reverse ? ( recordsCount - 1 ) - recordIndex : recordIndex;
+        int result = 0;
 
         if ( recordsCount > 0 && recordIndex < recordsCount )
         {
-            auto result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
+            result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
             assert(result == 0);
         }
+        return result == 0;
     };
 
     template <class T, class K>
-    void DataStorageAccessor<T, K>::Put(const T *outBuffer, const size_t recordIndex)
+    bool DataStorageAccessor<T, K>::Put(const T *outBuffer, const size_t recordIndex)
     {
         auto size = descriptor.GetSize();
-
+        int result = 0;
         if (recordIndex == std::numeric_limits<size_t>::max())
         {
-            auto result = pAccessor->Write(outBuffer, size); // <- Call to Append Function
+            result = pAccessor->Write(outBuffer, size); // <- Call to Append Function
             assert(result == 0);
             if ( result == 0 )
             {
@@ -98,10 +100,11 @@ namespace rdb
             if ( recordsCount > 0 && recordIndex < recordsCount )
             {
                 auto recordIndexRv = reverse ? ( recordsCount - 1 ) - recordIndex : recordIndex;
-                auto result = pAccessor->Write(outBuffer, size, recordIndexRv * size);
+                result = pAccessor->Write(outBuffer, size, recordIndexRv * size);
                 assert(result == 0);
             }
         }
+        return result == 0;
     };
 
     template class DataStorageAccessor<std::byte, rdb::genericBinaryFileAccessor<std::byte>>;
