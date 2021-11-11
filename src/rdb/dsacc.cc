@@ -72,7 +72,7 @@ namespace rdb
         auto size = descriptor.GetSize();
         auto recordIndexRv = reverse ? ( recordsCount - 1 ) - recordIndex : recordIndex;
 
-        if ( recordsCount > 0 )
+        if ( recordsCount > 0 && recordIndex < recordsCount )
         {
             auto result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
             assert(result == 0);
@@ -95,7 +95,7 @@ namespace rdb
         }
         else
         {
-            if ( recordsCount > 0 )
+            if ( recordsCount > 0 && recordIndex < recordsCount )
             {
                 auto recordIndexRv = reverse ? ( recordsCount - 1 ) - recordIndex : recordIndex;
                 auto result = pAccessor->Write(outBuffer, size, recordIndexRv * size);
