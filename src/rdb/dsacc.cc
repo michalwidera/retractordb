@@ -5,9 +5,9 @@
 
 namespace rdb
 {
-    template <class T>
-    DataStorageAccessor<T>::DataStorageAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor)
-        : pAccessor(&accessor), descriptor(descriptor)
+    template <class T, class K>
+    DataStorageAccessor<T, K>::DataStorageAccessor(const Descriptor descriptor, std::string fileName)
+        : pAccessor(new K(fileName)), descriptor(descriptor)
     {
         std::fstream myFile;
 
@@ -23,16 +23,16 @@ namespace rdb
         myFile.close();
     };
 
-    template <class T>
-    void DataStorageAccessor<T>::Get(T *inBuffer, const size_t recordsFromHead)
+    template <class T, class K>
+    void DataStorageAccessor<T, K>::Get(T *inBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
         auto result = pAccessor->Read(inBuffer, size, recordsFromHead * size);
         assert(result == 0);
     };
 
-    template <class T>
-    void DataStorageAccessor<T>::Put(const T *outBuffer, const size_t recordsFromHead)
+    template <class T, class K>
+    void DataStorageAccessor<T, K>::Put(const T *outBuffer, const size_t recordsFromHead)
     {
         auto size = descriptor.GetSize();
 
@@ -48,7 +48,7 @@ namespace rdb
         }
     };
 
-    template class DataStorageAccessor<std::byte>;
-    template class DataStorageAccessor<char>;
-    template class DataStorageAccessor<unsigned char>;
+    template class DataStorageAccessor<std::byte, rdb::genericBinaryFileAccessor<std::byte>>;
+    template class DataStorageAccessor<char, rdb::genericBinaryFileAccessor<char>>;
+    template class DataStorageAccessor<unsigned char, rdb::genericBinaryFileAccessor<unsigned char>>;
 }

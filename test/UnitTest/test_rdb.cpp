@@ -183,8 +183,6 @@ bool test_descriptor_read()
 
 bool test_storage()
 {
-    rdb::genericBinaryFileAccessor<std::byte> dataStore("datafile-fstream2");
-
     //This structure is tricky
     //If not aligned - size is 15
     //If aligned - size is 16
@@ -211,10 +209,7 @@ bool test_storage()
 
     dataPayload payload1;
 
-    rdb::DataStorageAccessor dAcc2(dataDescriptor, dataStore);
-
-    if (strcmp(dataStore.FileName().c_str(), "datafile-fstream2") != 0)
-        return false;
+    rdb::DataStorageAccessor dAcc2(dataDescriptor, "datafile-fstream2");
 
     std::memcpy(payload1.Name, "test data", AREA_SIZE);
     payload1.TLen = 0x66;
@@ -262,7 +257,7 @@ bool test_storage()
             return false;
     }
 
-    auto statusRemove1 = remove(dataStore.FileName().c_str());
+    auto statusRemove1 = remove("datafile-fstream2");
     auto statusRemove2 = remove("datafile-fstream2.desc");
 
     return true;

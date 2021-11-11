@@ -3,19 +3,24 @@
 
 #include <string>
 #include <cstddef> // std::byte
+#include <memory>  // std::unique_ptr
 
 #include "fainterface.h"
 #include "desc.h"
+
+#include "faccfs.h"
+#include "faccposix.h"
 
 namespace rdb
 {
     /**
      * @brief This object purpose is to access data via descriptor
      */
-    template <class T>
+    template <class T = std::byte, class K = rdb::genericBinaryFileAccessor<T> >
     struct DataStorageAccessor
     {
-        FileAccessorInterface<T> *pAccessor;
+        std::unique_ptr<K> pAccessor;
+
         Descriptor descriptor;
 
         DataStorageAccessor() = delete;
@@ -24,9 +29,9 @@ namespace rdb
          * @brief Construct a new Data Accessor object and create descriptor file
          *
          * @param descriptor Definition of binary schema
-         * @param accessor storage information
+         * @param fileName storage file
          */
-        DataStorageAccessor(const Descriptor descriptor, FileAccessorInterface<T> &accessor);
+        DataStorageAccessor(const Descriptor descriptor, std::string fileName);
 
         /**
          * @brief Reads data package from storage

@@ -9,14 +9,9 @@
 #include "rdb/desc.h"
 #include "rdb/payloadacc.h"
 
-// This define switches posix/fstream type of file data accessor
-//#define STORAGE_POSIX
 
-#ifdef STORAGE_POSIX
 #include "rdb/faccposix.h"
-#else
 #include "rdb/faccfs.h"
-#endif
 
 #define GREEN "\x1B[32m"
 #define BLACK "\033[0m"
@@ -63,13 +58,6 @@ int main(int argc, char *argv[])
 {
     check_debug();
 
-#ifdef STORAGE_POSIX
-#define STORAGE_ACCESSOR rdb::posixBinaryFileAccessor<std::byte>
-#else
-#define STORAGE_ACCESSOR rdb::genericBinaryFileAccessor<std::byte>
-#endif
-
-    std::unique_ptr<STORAGE_ACCESSOR> uPtr_store;
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
     std::unique_ptr<std::byte[]> uPtr_payload;
     rdb::Descriptor desc;
@@ -99,8 +87,6 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            uPtr_store.reset(new STORAGE_ACCESSOR(file.c_str()));
-
             std::string descriptionFileName(file);
             descriptionFileName.append(".desc");
 
@@ -110,14 +96,14 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            std::ifstream streamDescriptorFile(descriptionFileName.c_str());
+            std::ifstream streamDescriptorFile(descriptionFileName);
             std::stringstream buffer;
             buffer << streamDescriptorFile.rdbuf();
 
             desc.clear();
             buffer >> desc;
 
-            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
+            uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file));
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
             memset(uPtr_payload.get(), 0, desc.GetSize());
@@ -127,8 +113,6 @@ int main(int argc, char *argv[])
         else if (cmd == "create")
         {
             std::cin >> file;
-
-            uPtr_store.reset(new STORAGE_ACCESSOR(file.c_str()));
 
             std::string sschema;
             std::string object;
@@ -145,7 +129,7 @@ int main(int argc, char *argv[])
             desc.clear();
             scheamStringStream >> desc;
 
-            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
+            uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file));
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
             memset(uPtr_payload.get(), 0, desc.GetSize());
@@ -157,7 +141,7 @@ int main(int argc, char *argv[])
             int record;
             std::cin >> record;
 
-            if (!uPtr_store || !uPtr_dacc)
+            if (!uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" BLACK;
                 continue;
@@ -205,7 +189,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "write")
         {
-            if (!uPtr_store || !uPtr_dacc)
+            if (!uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" BLACK;
                 continue;
@@ -228,7 +212,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "append")
         {
-            if (!uPtr_store && !uPtr_dacc)
+            if (!uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" BLACK;
                 continue;
