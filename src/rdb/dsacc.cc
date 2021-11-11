@@ -47,6 +47,8 @@ namespace rdb
         std::string fileDesc(pAccessor->FileName());
         fileDesc.append(".desc");
 
+        // Creating .desc file
+
         myFile.open(fileDesc, std::ios::out);
         assert((myFile.rdstate() & std::ofstream::failbit) == 0);
         myFile << descriptor;
@@ -54,10 +56,13 @@ namespace rdb
         myFile.close();
 
         recordsCount = 0;
-        std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
-        if ( ! in.fail() )
+        if ( descriptor.GetSize() > 0 )
         {
-            recordsCount = int(in.tellg() / descriptor.GetSize());
+            std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
+            if ( in.good() )
+            {
+                recordsCount = int(in.tellg() / descriptor.GetSize());
+            }
         }
     };
 
@@ -65,8 +70,13 @@ namespace rdb
     void DataStorageAccessor<T, K>::Get(T *inBuffer, const size_t recordIndex)
     {
         auto size = descriptor.GetSize();
-        auto result = pAccessor->Read(inBuffer, size, recordIndex * size);
-        assert(result == 0);
+        auto recordIndexRv = reverse ? ( recordsCount - 1 ) - recordIndex : recordIndex;
+
+        if ( recordsCount > 0 )
+        {
+            auto result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
+            assert(result == 0);
+        }
     };
 
     template <class T, class K>
@@ -78,11 +88,19 @@ namespace rdb
         {
             auto result = pAccessor->Write(outBuffer, size); // <- Call to Append Function
             assert(result == 0);
+            if ( result == 0 )
+            {
+                recordsCount ++;
+            }
         }
         else
         {
-            auto result = pAccessor->Write(outBuffer, size, recordIndex * size);
-            assert(result == 0);
+            if ( recordsCount > 0 )
+            {
+                auto recordIndexRv = reverse ? ( recordsCount - 1 ) - recordIndex : recordIndex;
+                auto result = pAccessor->Write(outBuffer, size, recordIndexRv * size);
+                assert(result == 0);
+            }
         }
     };
 

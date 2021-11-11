@@ -14,11 +14,11 @@
 #include "rdb/faccfs.h"
 
 #define GREEN "\x1B[32m"
-#define BLACK "\033[0m"
 #define RED "\x1B[31m"
 #define ORANGE "\x1B[33m"
 #define BLUE "\x1B[34m"
 #define YELLOW "\x1B[93m"
+#define RESET "\033[0m"
 
 enum payloadStatusType {
     fetched,
@@ -35,7 +35,7 @@ void check_debug()
 
 #ifdef NDEBUG
 
-    std::cerr << RED "Warn: Release Code form.\n" BLACK;
+    std::cerr << RED "Warn: Release Code form.\n" RESET;
 
     assert(false); // Note this assert will have no effect!
 
@@ -45,7 +45,7 @@ void check_debug()
     {
         bool ok()
         {
-            std::cout << GREEN "Debug Code Form.\n" BLACK;
+            std::cout << GREEN "Debug Code Form.\n" RESET;
             return true;
         }
     } check;
@@ -74,24 +74,24 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "desc")
         {
-            std::cout << YELLOW << desc << BLACK << std::endl;
+            std::cout << YELLOW << desc << RESET << std::endl;
             continue;
         }
-        else if (cmd == "open")
+        else if (cmd == "open" || cmd == "ropen")
         {
             std::cin >> file;
 
             if (!std::filesystem::exists(file))
             {
-                std::cout << RED "File does not exist\n" BLACK;
+                std::cout << RED "File does not exist\n" RESET;
                 continue;
             }
 
-            uPtr_dacc.reset(new rdb::DataStorageAccessor(file));
+            uPtr_dacc.reset(new rdb::DataStorageAccessor(file, cmd == "ropen"));
 
             if ( uPtr_dacc->descriptor.GetSize() == 0 )
             {
-                std::cout << RED "File exist, description file missing (.desc)\n" BLACK;
+                std::cout << RED "File exist, description file missing (.desc)\n" RESET;
                 continue;
             }
             desc = uPtr_dacc->descriptor ;
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 
             payloadStatus = clean;
         }
-        else if (cmd == "create")
+        else if (cmd == "create" || cmd == "rcreate" )
         {
             std::cin >> file;
 
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
             desc.clear();
             scheamStringStream >> desc;
 
-            uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file));
+            uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file, cmd == "rcreate" ));
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
             memset(uPtr_payload.get(), 0, desc.GetSize());
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 
             if (!uPtr_dacc)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
 
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 
             if (record >= size)
             {
-                std::cout << RED "record out of range\n" BLACK;
+                std::cout << RED "record out of range\n" RESET;
                 continue;
             }
 
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
         {
             if (!uPtr_dacc || desc.size() == 0)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
 
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
         {
             if (!uPtr_dacc || desc.size() == 0)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
 
@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
         {
             if (!uPtr_dacc)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
 
@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
 
             if (record >= size)
             {
-                std::cout << RED "record out of range - Check append command.\n" BLACK;
+                std::cout << RED "record out of range - Check append command.\n" RESET;
                 continue;
             }
 
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
         {
             if (!uPtr_dacc)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
             uPtr_dacc->Put(uPtr_payload.get());
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
         {
             if (!uPtr_payload)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
             switch (payloadStatus)
@@ -238,15 +238,20 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "size")
         {
-            std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
-            std::cout << int(in.tellg() / desc.GetSize()) << " Record(s)\n";
+            if (!uPtr_dacc)
+            {
+                std::cout << RED "unconnected\n" RESET;
+                continue;
+            }
+
+            std::cout << uPtr_dacc->recordsCount << " Record(s)\n";
             continue;
         }
         else if (cmd == "dump")
         {
             if (!uPtr_payload)
             {
-                std::cout << RED "unconnected\n" BLACK;
+                std::cout << RED "unconnected\n" RESET;
                 continue;
             }
             auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
@@ -266,7 +271,9 @@ int main(int argc, char *argv[])
             std::cout << GREEN;
             std::cout << "exit|quit|q \t\t exit program\n";
             std::cout << "open [file] \t\t open database - create connection\n";
+            std::cout << "ropen [file] \t\t open database - create connection - reverse iterator\n";
             std::cout << "create [file][schema] \t create database with schema\n";
+            std::cout << "rcreate [file][schema] \t create database with schema - reverse iterator\n";
             std::cout << "desc \t\t\t show schema\n";
             std::cout << "read [n] \t\t read record from database into payload\n";
             std::cout << "write [n] \t\t update record in database from payload\n";
@@ -276,11 +283,11 @@ int main(int argc, char *argv[])
             std::cout << "print \t\t\t show payload\n";
             std::cout << "size \t\t\t show database size in records\n";
             std::cout << "dump \t\t\t show payload memory\n";
-            std::cout << BLACK;
+            std::cout << RESET;
         }
         else
         {
-            std::cout << RED "?\n" BLACK;
+            std::cout << RED "?\n" RESET;
             continue;
         }
         std::cout << "ok\n";
