@@ -25,6 +25,15 @@
 #define BLUE "\x1B[34m"
 #define YELLOW "\x1B[93m"
 
+enum payloadStatusType {
+    fetched,
+    clean,
+    stored,
+    changed
+};
+
+payloadStatusType payloadStatus(clean) ;
+
 void check_debug()
 {
     // Diagnostic code
@@ -111,8 +120,9 @@ int main(int argc, char *argv[])
             uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
-
             memset(uPtr_payload.get(), 0, desc.GetSize());
+
+            payloadStatus = clean;
         }
         else if (cmd == "create")
         {
@@ -139,6 +149,8 @@ int main(int argc, char *argv[])
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
             memset(uPtr_payload.get(), 0, desc.GetSize());
+
+            payloadStatus = clean;
         }
         else if (cmd == "read")
         {
@@ -161,6 +173,7 @@ int main(int argc, char *argv[])
             }
 
             uPtr_dacc->Get(uPtr_payload.get(), record);
+            payloadStatus = fetched;
         }
         else if (cmd == "set")
         {
@@ -173,6 +186,8 @@ int main(int argc, char *argv[])
             rdb::payLoadAccessor payload(desc, uPtr_payload.get());
 
             std::cin >> payload;
+
+            payloadStatus = changed;
             continue;
         }
         else if (cmd == "print")
@@ -209,6 +224,7 @@ int main(int argc, char *argv[])
             }
 
             uPtr_dacc->Put(uPtr_payload.get(), record);
+            payloadStatus = stored;
         }
         else if (cmd == "append")
         {
@@ -218,6 +234,32 @@ int main(int argc, char *argv[])
                 continue;
             }
             uPtr_dacc->Put(uPtr_payload.get());
+            payloadStatus = stored;
+        }
+        else if (cmd == "status")
+        {
+            if (!uPtr_payload)
+            {
+                std::cout << RED "unconnected\n" BLACK;
+                continue;
+            }
+            switch (payloadStatus)
+            {
+            case (fetched):
+                std::cout << "fetched\n";
+                break;
+            case (clean):
+                std::cout << "clean\n";
+                break;
+            case (stored):
+                std::cout << "stored\n";
+                break;
+            case (changed):
+                std::cout << "changed\n";
+                break;
+            defualt:
+                std::cout << "unknown\n";
+            }
         }
         else if (cmd == "size")
         {
@@ -255,6 +297,7 @@ int main(int argc, char *argv[])
             std::cout << "write [n] \t\t update record in database from payload\n";
             std::cout << "append \t\t\t append payload record to database\n";
             std::cout << "set [name][value] \t set payload value\n";
+            std::cout << "status \t\t\t show status of payload\n";
             std::cout << "print \t\t\t show payload\n";
             std::cout << "size \t\t\t show database size in records\n";
             std::cout << "dump \t\t\t show payload memory\n";
