@@ -266,20 +266,18 @@ int main(int argc, char *argv[])
         else if (cmd == "help")
         {
             std::cout << GREEN;
-            std::cout << "exit|quit|q \t\t exit program\n";
-            std::cout << "open [file] \t\t open database - create connection\n";
-            std::cout << "ropen [file] \t\t open database - create connection - reverse iterator\n";
-            std::cout << "create [file][schema] \t create database with schema\n";
-            std::cout << "rcreate [file][schema] \t create database with schema - reverse iterator\n";
-            std::cout << "desc \t\t\t show schema\n";
-            std::cout << "read [n] \t\t read record from database into payload\n";
-            std::cout << "write [n] \t\t update record in database from payload\n";
-            std::cout << "append \t\t\t append payload record to database\n";
-            std::cout << "set [name][value] \t set payload value\n";
-            std::cout << "status \t\t\t show status of payload\n";
-            std::cout << "print \t\t\t show payload\n";
-            std::cout << "size \t\t\t show database size in records\n";
-            std::cout << "dump \t\t\t show payload memory\n";
+            std::cout << "exit|quit|q \t\t\t exit\n";
+            std::cout << "open|ropen [file] \t\t open database - create connection (r-reverse iterator)\n";
+            std::cout << "create|rcreate [file][schema] \t create database with schema (r-reverse iterator)\n";
+            std::cout << "desc \t\t\t\t show schema\n";
+            std::cout << "read [n] \t\t\t read record from database into payload\n";
+            std::cout << "write [n] \t\t\t send record to database from payload\n";
+            std::cout << "append \t\t\t\t append payload to database\n";
+            std::cout << "set [field][value] \t\t set payload field value\n";
+            std::cout << "status \t\t\t\t show status of payload\n";
+            std::cout << "print \t\t\t\t show payload\n";
+            std::cout << "size \t\t\t\t show database size in records\n";
+            std::cout << "dump \t\t\t\t show payload memory\n";
             std::cout << RESET;
         }
         else
