@@ -11,6 +11,11 @@ namespace rdb
     template<typename T>
     struct posixBinaryFileAccessor : public FileAccessorInterface<T>
     {
+#ifdef REMAIN_OPEN_FILES
+#else
+        int fd;
+        ~posixBinaryFileAccessor();
+#endif
         std::string fileNameStr;
 
         posixBinaryFileAccessor(std::string fileName);
