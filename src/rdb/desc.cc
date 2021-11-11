@@ -22,7 +22,7 @@ namespace rdb
     std::string GetFieldType(FieldType e)
     {
         std::map<FieldType, std::string> typeDictionary = {
-            {String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}};
+            {String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"}, {Double, "Double"}};
         return typeDictionary[e];
     }
 
@@ -31,7 +31,7 @@ namespace rdb
         ltrim(name);
         rtrim(name);
         std::map<std::string, FieldType> typeDictionary = {
-            {"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}};
+            {"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}, {"Float", Float}, {"Double",Double}};
         return typeDictionary[name];
     }
 
@@ -43,6 +43,10 @@ namespace rdb
             return sizeof(uint);
         case Int:
             return sizeof(int);
+        case Float:
+            return sizeof(float);
+        case Double:
+            return sizeof(double);
         case Byte:
             return 1;
         case String:

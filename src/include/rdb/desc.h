@@ -21,7 +21,9 @@ namespace rdb
         String,
         Uint,
         Byte,
-        Int
+        Int,
+        Float,
+        Double
     };
 
     typedef int fieldLen;

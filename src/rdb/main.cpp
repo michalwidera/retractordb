@@ -198,6 +198,16 @@ int main(int argc, char *argv[])
 
             size_t record;
             std::cin >> record;
+
+            std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
+            auto size = int(in.tellg() / desc.GetSize());
+
+            if (record >= size)
+            {
+                std::cout << RED "record out of range - Check append command.\n" BLACK;
+                continue;
+            }
+
             uPtr_dacc->Put(uPtr_payload.get(), record);
         }
         else if (cmd == "append")

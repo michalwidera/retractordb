@@ -12,6 +12,15 @@ namespace rdb
     {
     }
 
+    template< typename T , typename K >
+    void copyToMemory(std::istream &is, const K &rhs, std::string fieldName)
+    {
+        T data;
+        is >> data;
+        Descriptor desc(rhs.descriptor);
+        memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(T));
+    }
+
     std::istream &operator>>(std::istream &is, const payLoadAccessor<std::byte> &rhs)
     {
         std::string fieldName;
@@ -31,24 +40,28 @@ namespace rdb
             memset(rhs.ptr + desc.Offset(fieldName), 0, desc.Len(fieldName));
             memcpy(rhs.ptr + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.Len(fieldName), record.size()));
         }
-        else if (desc.Type(fieldName) == "Uint")
-        {
-            uint data;
-            is >> data;
-            memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(uint));
-        }
-        else if (desc.Type(fieldName) == "Int")
-        {
-            int data;
-            is >> data;
-            memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(int));
-        }
         else if (desc.Type(fieldName) == "Byte")
         {
             int data;
             is >> data;
             unsigned char data8 = static_cast<unsigned char>(data);
             memcpy(rhs.ptr + desc.Offset(fieldName), &data8, sizeof(unsigned char));
+        }
+        else if (desc.Type(fieldName) == "Uint")
+        {
+            copyToMemory<uint, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+        }
+        else if (desc.Type(fieldName) == "Int")
+        {
+            copyToMemory<int, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+        }
+        else if (desc.Type(fieldName) == "Float")
+        {
+            copyToMemory<float, payLoadAccessor<std::byte>>(is, rhs, fieldName);
+        }
+        else if (desc.Type(fieldName) == "Double")
+        {
+            copyToMemory<double, payLoadAccessor<std::byte>>(is, rhs, fieldName);
         }
         else
         {
@@ -91,6 +104,18 @@ namespace rdb
                 unsigned char i;
                 memcpy( &i , rhs.ptr + offset_ , sizeof(unsigned char) );
                 os << (int)i;
+            }
+            else if (std::get<rtype>(r) == Float)
+            {
+                float i;
+                memcpy( &i , rhs.ptr + offset_ , sizeof(float) );
+                os << i;
+            }
+            else if (std::get<rtype>(r) == Double)
+            {
+                double i;
+                memcpy( &i , rhs.ptr + offset_ , sizeof(double) );
+                os << i;
             }
             else
             {
