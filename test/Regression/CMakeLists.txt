@@ -4,7 +4,7 @@ project( regression-test )
 
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 
-#add_test( 
+#add_test(
 #  NAME check_if_installed
 #  COMMAND test -f ~/.local/bin/xcompiler
 #)
@@ -17,7 +17,7 @@ add_test(
 
 # -----------------------------------------------------------------------------------------------
 
-add_test( 
+add_test(
   NAME compile_pattern_source-1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
   COMMAND sh -c "xcompiler -q query.rql > out.txt ; xdumper >> out.txt"
@@ -33,7 +33,7 @@ set_tests_properties(compare_output_with_pattern-1 PROPERTIES DEPENDS compile_pa
 
 # -----------------------------------------------------------------------------------------------
 
-add_test( 
+add_test(
   NAME compile_pattern_source-2
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
   COMMAND sh -c "xcompiler query.rql > out.txt ; xdumper >> out.txt"
@@ -89,19 +89,19 @@ add_test(
 
 set_tests_properties(dumper-test PROPERTIES DEPENDS compiler-test-on-query)
 
-add_test( 
+add_test(
   NAME retractor-waterfall
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND sh -c "xcompiler query-lnx.rql; xretractor -m 20 --waterfall"
 )
 
-add_test( 
+add_test(
   NAME workflow-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-workflow.sh query-lnx.rql
 )
 
-add_test( 
+add_test(
   NAME workflow-all-operators
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-all-operators.sh query-all.rql

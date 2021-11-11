@@ -78,44 +78,41 @@ int main(int argc, char *argv[])
         else if (cmd == "desc")
         {
             std::cout << YELLOW << desc << BLACK << std::endl;
+            continue;
         }
         else if (cmd == "open")
         {
             std::cin >> file;
 
-            if (std::filesystem::exists(file))
-            {
-                uPtr_store.reset(new STORAGE_ACCESSOR(file.c_str()));
-
-                std::string descriptionFileName(file);
-                descriptionFileName.append(".desc");
-
-                if (std::filesystem::exists(descriptionFileName))
-                {
-                    std::ifstream streamDescriptorFile(descriptionFileName.c_str());
-                    std::stringstream buffer;
-                    buffer << streamDescriptorFile.rdbuf();
-
-                    desc.clear();
-                    buffer >> desc;
-
-                    uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
-
-                    uPtr_payload.reset(new std::byte[desc.GetSize()]);
-
-                    memset(uPtr_payload.get(), 0, desc.GetSize());
-
-                    std::cout << "ok" << std::endl;
-                }
-                else
-                {
-                    std::cout << RED "File exist, description file missing (.desc)\n" BLACK;
-                }
-            }
-            else
+            if (!std::filesystem::exists(file))
             {
                 std::cout << RED "File does not exist\n" BLACK;
+                continue;
             }
+
+            uPtr_store.reset(new STORAGE_ACCESSOR(file.c_str()));
+
+            std::string descriptionFileName(file);
+            descriptionFileName.append(".desc");
+
+            if (!std::filesystem::exists(descriptionFileName))
+            {
+                std::cout << RED "File exist, description file missing (.desc)\n" BLACK;
+                continue;
+            }
+
+            std::ifstream streamDescriptorFile(descriptionFileName.c_str());
+            std::stringstream buffer;
+            buffer << streamDescriptorFile.rdbuf();
+
+            desc.clear();
+            buffer >> desc;
+
+            uPtr_dacc.reset(new rdb::DataStorageAccessor<std::byte>(desc, *(uPtr_store.get())));
+
+            uPtr_payload.reset(new std::byte[desc.GetSize()]);
+
+            memset(uPtr_payload.get(), 0, desc.GetSize());
         }
         else if (cmd == "create")
         {
@@ -142,113 +139,100 @@ int main(int argc, char *argv[])
 
             uPtr_payload.reset(new std::byte[desc.GetSize()]);
             memset(uPtr_payload.get(), 0, desc.GetSize());
-
-            std::cout << "ok\n";
         }
         else if (cmd == "read")
         {
             int record;
             std::cin >> record;
 
-            if (uPtr_store && uPtr_dacc)
-            {
-                std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
-                auto size = int(in.tellg() / desc.GetSize());
-
-                if (record >= size)
-                {
-                    std::cout << RED "record out of range\n" BLACK;
-                }
-                else
-                {
-                    uPtr_dacc->Get(uPtr_payload.get(), record);
-                    std::cout << "ok\n";
-                }
-            }
-            else
+            if (!uPtr_store || !uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" BLACK;
+                continue;
             }
+
+            std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
+            auto size = int(in.tellg() / desc.GetSize());
+
+            if (record >= size)
+            {
+                std::cout << RED "record out of range\n" BLACK;
+                continue;
+            }
+
+            uPtr_dacc->Get(uPtr_payload.get(), record);
         }
         else if (cmd == "set")
         {
-            if (uPtr_dacc && desc.size() > 0)
-            {
-                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
-
-                std::cin >> payload;
-            }
-            else
+            if (!uPtr_dacc || desc.size() == 0)
             {
                 std::cout << RED "unconnected\n" BLACK;
+                continue;
             }
+
+            rdb::payLoadAccessor payload(desc, uPtr_payload.get());
+
+            std::cin >> payload;
+            continue;
         }
         else if (cmd == "print")
         {
-            if (uPtr_dacc && desc.size() > 0)
-            {
-                rdb::payLoadAccessor payload(desc, uPtr_payload.get());
-
-                std::cout << payload << std::endl;
-            }
-            else
+            if (!uPtr_dacc || desc.size() == 0)
             {
                 std::cout << RED "unconnected\n" BLACK;
+                continue;
             }
+
+            rdb::payLoadAccessor payload(desc, uPtr_payload.get());
+
+            std::cout << payload << std::endl;
+            continue;
         }
         else if (cmd == "write")
         {
-            if (uPtr_store && uPtr_dacc)
-            {
-                size_t record;
-                std::cin >> record;
-                uPtr_dacc->Put(uPtr_payload.get(), record);
-
-                std::cout << "ok\n";
-            }
-            else
+            if (!uPtr_store || !uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" BLACK;
+                continue;
             }
+
+            size_t record;
+            std::cin >> record;
+            uPtr_dacc->Put(uPtr_payload.get(), record);
         }
         else if (cmd == "append")
         {
-            if (uPtr_store && uPtr_dacc)
-            {
-                uPtr_dacc->Put(uPtr_payload.get());
-
-                std::cout << "ok\n";
-            }
-            else
+            if (!uPtr_store && !uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" BLACK;
+                continue;
             }
+            uPtr_dacc->Put(uPtr_payload.get());
         }
         else if (cmd == "size")
         {
             std::ifstream in(file.c_str(), std::ifstream::ate | std::ifstream::binary);
             std::cout << int(in.tellg() / desc.GetSize()) << " Record(s)\n";
+            continue;
         }
         else if (cmd == "dump")
         {
-            auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
-            if (uPtr_payload)
-            {
-                for (auto i = 0; i < desc.GetSize(); i++)
-                {
-                    std::cout << std::hex;
-                    std::cout << std::setfill('0');
-                    std::cout << std::setw(2);
-                    std::cout << static_cast<unsigned>(*(ptr + i));
-                    std::cout << std::dec;
-                    std::cout << " ";
-                };
-                std::cout << "\n";
-            }
-            else
+            if (!uPtr_payload)
             {
                 std::cout << RED "unconnected\n" BLACK;
+                continue;
             }
+            auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
+            for (auto i = 0; i < desc.GetSize(); i++)
+            {
+                std::cout << std::hex;
+                std::cout << std::setfill('0');
+                std::cout << std::setw(2);
+                std::cout << static_cast<unsigned>(*(ptr + i));
+                std::cout << std::dec;
+                std::cout << " ";
+            };
+            std::cout << "\n";
         }
         else if (cmd == "help")
         {
@@ -270,6 +254,7 @@ int main(int argc, char *argv[])
         {
             std::cout << RED "?\n" BLACK;
         }
+        std::cout << "ok\n";
     } while (true);
 
     // use '$xxd datafile-11' to check
