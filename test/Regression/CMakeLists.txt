@@ -4,11 +4,6 @@ project( regression-test )
 
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 
-#add_test(
-#  NAME check_if_installed
-#  COMMAND test -f ~/.local/bin/xcompiler
-#)
-
 add_test(
   NAME compiler-test-on-query
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}

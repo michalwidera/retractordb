@@ -56,3 +56,5 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/bin/test_xrdb
 )
+
+set_tests_properties(unittest-test-xrdb unittest-test-xcompiler unittest-test-xqry PROPERTIES RUN_SERIAL TRUE)
