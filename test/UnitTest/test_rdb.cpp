@@ -14,6 +14,7 @@
 #include "rdb/desc.h"
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"
+#include "rdb/faccposixprm.h"
 #include "rdb/payloadacc.h"
 
 #include "rdb/fainterface.h"
@@ -315,5 +316,25 @@ TEST( crdb , posixBinaryFileAccessor_char )
     auto result2 = test_2<char, rdb::posixBinaryFileAccessor<char>>();
     ASSERT_TRUE ( result2 );
     auto result3 = test_3<char, rdb::posixBinaryFileAccessor<char>>();
+    ASSERT_TRUE ( result3 );
+}
+
+TEST( crdb , posixPrmBinaryFileAccessor_byte )
+{
+    auto result1 = test_1<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+    ASSERT_TRUE ( result1 );
+    auto result2 = test_2<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+    ASSERT_TRUE ( result2 );
+    auto result3 = test_3<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+    ASSERT_TRUE ( result3 );
+}
+
+TEST( crdb , posixPrmBinaryFileAccessor_char )
+{
+    auto result1 = test_1<char, rdb::posixPrmBinaryFileAccessor<char>>();
+    ASSERT_TRUE ( result1 );
+    auto result2 = test_2<char, rdb::posixPrmBinaryFileAccessor<char>>();
+    ASSERT_TRUE ( result2 );
+    auto result3 = test_3<char, rdb::posixPrmBinaryFileAccessor<char>>();
     ASSERT_TRUE ( result3 );
 }

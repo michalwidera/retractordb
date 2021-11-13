@@ -41,6 +41,7 @@ set(SOURCES_RDB
   rdb/main.cpp
   rdb/faccfs.cc
   rdb/faccposix.cc
+  rdb/faccposixprm.cc
   rdb/desc.cc
   rdb/dsacc.cc
   rdb/payloadacc.cc

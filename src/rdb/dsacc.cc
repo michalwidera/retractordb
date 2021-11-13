@@ -114,4 +114,8 @@ namespace rdb
     template class DataStorageAccessor<std::byte, rdb::posixBinaryFileAccessor<std::byte>>;
     template class DataStorageAccessor<char, rdb::posixBinaryFileAccessor<char>>;
     template class DataStorageAccessor<unsigned char, rdb::posixBinaryFileAccessor<unsigned char>>;
+
+    template class DataStorageAccessor<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>;
+    template class DataStorageAccessor<char, rdb::posixPrmBinaryFileAccessor<char>>;
+    template class DataStorageAccessor<unsigned char, rdb::posixPrmBinaryFileAccessor<unsigned char>>;
 }

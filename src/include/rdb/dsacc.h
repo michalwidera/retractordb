@@ -10,13 +10,14 @@
 
 #include "faccfs.h"
 #include "faccposix.h"
+#include "faccposixprm.h"
 
 namespace rdb
 {
     /**
      * @brief This object purpose is to access data via descriptor
      */
-    template <class T = std::byte, class K = rdb::genericBinaryFileAccessor<T> >
+    template <class T = std::byte, class K = rdb::posixPrmBinaryFileAccessor<T> >
     struct DataStorageAccessor
     {
         std::unique_ptr<K> pAccessor;
