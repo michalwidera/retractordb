@@ -91,3 +91,38 @@ ok
 .append
 ok
 ```
+
+## Modify data in storage
+```
+.open testfile
+ok
+.read 0
+ok
+.print
+{       name:test1
+        data:5 7 8
+        control:233
+        intdata:345678
+        measurment:3.14159
+}
+.set name test2
+.print
+{       name:test2
+        data:5 7 8
+        control:233
+        intdata:345678
+        measurment:3.14159
+}
+.append
+ok
+.read 0
+ok
+.print
+{       name:test1
+        data:5 7 8
+        control:233
+        intdata:345678
+        measurment:3.14159
+}
+.
+```
