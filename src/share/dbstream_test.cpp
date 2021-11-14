@@ -11,16 +11,14 @@
 // stacktrace -> -ldl in CMakeList.txt
 #include <boost/stacktrace.hpp>
 
-CBuffer<std::string> cbuf ;
-
-rdb::dataSet cbuf2;
+rdb::dataSet cbuf;
 
 using namespace std ;
 using namespace boost ;
 
 long streamStoredSize(string filename)
 {
-    return cbuf2.GetLen(filename) ;
+    return cbuf.GetLen(filename) ;
 }
 
 dbStream::dbStream(std::string streamName, list < std::string > schema) :
@@ -31,7 +29,7 @@ dbStream::dbStream(std::string streamName, list < std::string > schema) :
     frameSize(schema.size() * sizeof(number)),
     pRawData(new char[ frameSize ])
 {
-    cbuf2.DefBlock(streamName, frameSize);
+    cbuf.DefBlock(streamName, frameSize);
     mpShadow.resize(schema.size());
     mpRead.resize(schema.size());
 }
@@ -54,7 +52,7 @@ void dbStream::store()
         cnt ++;
     }
 
-    cbuf2.PutBlock(streamName, pRawData.get());
+    cbuf.PutBlock(streamName, pRawData.get());
     mpLenNr = -1 ;
     mpReadNr = -1 ;
 }
@@ -79,7 +77,7 @@ void dbStream::get(int offset, bool reverse)
     }
 
     assert(offset >= 0) ;
-    int len = cbuf2.GetLen(streamName) ;
+    int len = cbuf.GetLen(streamName) ;
 
     if (mpReadNr == offset && mpLenNr == len)
     {
@@ -107,11 +105,11 @@ void dbStream::get(int offset, bool reverse)
 
     if (reverse)
     {
-        ret = cbuf2.GetBlock(streamName, offset, pRawData.get());
+        ret = cbuf.GetBlock(streamName, offset, pRawData.get());
     }
     else
     {
-        ret = cbuf2.GetBlock(streamName, len - offset - 1, pRawData.get());
+        ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData.get());
     }
 
     assert(ret != 0);

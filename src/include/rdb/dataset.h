@@ -9,38 +9,24 @@
 
 namespace rdb
 {
+    /**
+     * @brief This is temporary class required to seamless kick ofo of CBuffer crap.
+     *
+     */
     struct dataSet
     {
         std::map < std::string , std::unique_ptr<rdb::DataStorageAccessor<std::byte>>> data;
 
         int recordSize = 0;
+        int count = 0;
 
         dataSet(){}
 
-        long streamStoredSize(std::string filename)
-        {
-            return data[filename]->recordsCount ;
-        }
-
-        long GetLen(std::string filename)
-        {
-            return data[filename]->recordsCount * recordSize;
-        }
-
-        void DefBlock(std::string filename, int frameSize)
-        {
-
-        }
-
-        void PutBlock(std::string filename, char *pRawData)
-        {
-
-        }
-
-        int GetBlock(std::string filename, int offset, char *pRawData)
-        {
-            return 0;
-        }
+        long streamStoredSize(std::string filename);
+        long GetLen(std::string filename);
+        void DefBlock(std::string filename, int frameSize);
+        void PutBlock(std::string filename, char *pRawData);
+        int GetBlock(std::string filename, int offset, char *pRawData);
     };
 }
 
