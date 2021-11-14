@@ -305,6 +305,7 @@ int main(int argc, char *argv[])
             std::cout << "status \t\t\t\t show status of payload\n";
             std::cout << "flip \t\t\t\t flip reverse iterator\n";
             std::cout << "print \t\t\t\t show payload\n";
+            std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
             std::cout << "size \t\t\t\t show database size in records\n";
             std::cout << "dump \t\t\t\t show payload memory\n";
             std::cout << RESET;
