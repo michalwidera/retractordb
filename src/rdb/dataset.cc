@@ -6,6 +6,16 @@
 
 namespace rdb
 {
+        dataSet::~dataSet()
+        {
+            for (auto const& [key, val] : data)
+            {
+                auto statusRemove1 = remove(val.get()->pAccessor->FileName().c_str());
+                auto descFilename( val.get()->pAccessor->FileName() + ".desc" );
+                auto statusRemove2 = remove(descFilename.c_str());
+            }
+        }
+
         long dataSet::streamStoredSize(std::string filename)
         {
             return data[filename]->recordsCount ;

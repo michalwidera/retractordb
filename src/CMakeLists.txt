@@ -14,6 +14,14 @@ set(SOURCES_RETRACTOR
   share/RandomFile.cpp
   share/inputFileInstance.cpp
   share/SOperations.cpp
+
+  rdb/faccfs.cc
+  rdb/faccposix.cc
+  rdb/faccposixprm.cc
+  rdb/desc.cc
+  rdb/dsacc.cc
+  rdb/payloadacc.cc
+  rdb/dataset.cc
 )
 
 set(SOURCES_COMPILER
@@ -30,6 +38,14 @@ set(SOURCES_DUMPER
   share/dbstream.cpp
   share/QStruct.cpp
   share/RandomFile.cpp
+
+  rdb/faccfs.cc
+  rdb/faccposix.cc
+  rdb/faccposixprm.cc
+  rdb/desc.cc
+  rdb/dsacc.cc
+  rdb/payloadacc.cc
+  rdb/dataset.cc
 )
 
 set(SOURCES_QRY

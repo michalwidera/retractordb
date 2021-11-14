@@ -21,6 +21,7 @@ namespace rdb
         int count = 0;
 
         dataSet(){}
+        ~dataSet();
 
         long streamStoredSize(std::string filename);
         long GetLen(std::string filename);
