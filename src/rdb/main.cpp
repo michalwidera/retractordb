@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "set")
         {
-            if (!uPtr_dacc || desc.size() == 0)
+            if (!uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" RESET;
                 continue;
@@ -162,9 +162,18 @@ int main(int argc, char *argv[])
             payloadStatus = changed;
             continue;
         }
+        else if (cmd == "flip")
+        {
+            if (!uPtr_dacc)
+            {
+                std::cout << RED "unconnected\n" RESET;
+                continue;
+            }
+            uPtr_dacc->reverse = !uPtr_dacc->reverse;
+        }
         else if (cmd == "print")
         {
-            if (!uPtr_dacc || desc.size() == 0)
+            if (!uPtr_dacc)
             {
                 std::cout << RED "unconnected\n" RESET;
                 continue;
@@ -260,7 +269,7 @@ int main(int argc, char *argv[])
             };
             std::cout << "\n";
         }
-        else if (cmd == "help")
+        else if (cmd == "help" || cmd == "h")
         {
             std::cout << GREEN;
             std::cout << "exit|quit|q \t\t\t exit\n";
@@ -272,6 +281,7 @@ int main(int argc, char *argv[])
             std::cout << "append \t\t\t\t append payload to database\n";
             std::cout << "set [field][value] \t\t set payload field value\n";
             std::cout << "status \t\t\t\t show status of payload\n";
+            std::cout << "flip \t\t\t\t flip reverse iterator\n";
             std::cout << "print \t\t\t\t show payload\n";
             std::cout << "size \t\t\t\t show database size in records\n";
             std::cout << "dump \t\t\t\t show payload memory\n";

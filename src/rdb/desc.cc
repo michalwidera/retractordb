@@ -22,7 +22,7 @@ namespace rdb
     std::string GetFieldType(FieldType e)
     {
         std::map<FieldType, std::string> typeDictionary = {
-            {String, "String"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"}, {Double, "Double"}};
+            {String, "String"}, {Bytearray, "Bytearray"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"}, {Double, "Double"}};
         return typeDictionary[e];
     }
 
@@ -31,7 +31,7 @@ namespace rdb
         ltrim(name);
         rtrim(name);
         std::map<std::string, FieldType> typeDictionary = {
-            {"String", String}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}, {"Float", Float}, {"Double",Double}};
+            {"String", String}, {"Bytearray", Bytearray}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}, {"Float", Float}, {"Double",Double}};
         return typeDictionary[name];
     }
 
@@ -50,7 +50,8 @@ namespace rdb
         case Byte:
             return 1;
         case String:
-            assert("String has other method of len-type id");
+        case Bytearray:
+            assert("This type has other method of len-type id");
             break;
         default:
             assert("Undefined type");
@@ -70,7 +71,7 @@ namespace rdb
 
     Descriptor::Descriptor(fieldName n, FieldType t)
     {
-        assert(t != String && "This method does not work for Stings");
+        assert((t != String || t != Bytearray )  && "This method does not work for Stings and Bytearrays.");
         push_back(field(n, GetFieldLenFromType(t), t));
         UpdateNames();
     }
@@ -184,7 +185,7 @@ namespace rdb
         {
             os << "\t" << GetFieldType(std::get<rtype>(r))
                << " " << std::get<rname>(r);
-            if (std::get<rtype>(r) == String)
+            if (std::get<rtype>(r) == String || std::get<rtype>(r) == Bytearray)
             {
                 os << "[" << std::to_string(std::get<rlen>(r)) << "]";
             };
@@ -232,7 +233,7 @@ namespace rdb
 
             auto ft = GetFieldType(type);
 
-            if (ft == String)
+            if (ft == String || ft == Bytearray)
             {
                 is >> len;
             }

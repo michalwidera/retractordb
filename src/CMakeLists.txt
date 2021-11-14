@@ -45,6 +45,7 @@ set(SOURCES_RDB
   rdb/desc.cc
   rdb/dsacc.cc
   rdb/payloadacc.cc
+  rdb/dataset.cc
 )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )

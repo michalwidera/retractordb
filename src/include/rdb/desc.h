@@ -19,6 +19,7 @@ namespace rdb
     enum FieldType
     {
         String,
+        Bytearray,
         Uint,
         Byte,
         Int,

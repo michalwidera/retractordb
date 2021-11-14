@@ -41,6 +41,16 @@ namespace rdb
             memset(rhs.ptr + desc.Offset(fieldName), 0, desc.Len(fieldName));
             memcpy(rhs.ptr + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.Len(fieldName), record.size()));
         }
+        else if (desc.Type(fieldName) == "Bytearray")
+        {
+            for ( auto i = 0; i < desc.Len(fieldName);  i ++)
+            {
+                int data;
+                is >> data;
+                unsigned char data8 = static_cast<unsigned char>(data);
+                memcpy(rhs.ptr + desc.Offset(fieldName) + i, &data8, sizeof(unsigned char));
+            }
+        }
         else if (desc.Type(fieldName) == "Byte")
         {
             int data;
@@ -89,35 +99,48 @@ namespace rdb
                 auto len_ = desc.Len(std::get<rname>(r));
                 os << std::string(reinterpret_cast<char *>(rhs.ptr + offset_), len_)  ;
             }
-            else if (std::get<rtype>(r) == Int)
+            else if (std::get<rtype>(r) == Bytearray)
             {
-                int i;
-                memcpy( &i , rhs.ptr + offset_ , sizeof(int) );
-                os << i;
-            }
-            else if (std::get<rtype>(r) == Uint)
-            {
-                unsigned int i;
-                memcpy( &i , rhs.ptr + offset_ , sizeof(unsigned int) );
-                os << i;
+                for ( auto i = 0 ; i < std::get<rlen>(r) ; i ++ )
+                {
+                    unsigned char data;
+                    memcpy( &data , rhs.ptr + offset_ + i , sizeof(unsigned char) );
+                    os << (int)data;
+                    if ( i != std::get<rlen>(r) )
+                    {
+                        os << " ";
+                    }
+                }
             }
             else if (std::get<rtype>(r) == Byte)
             {
-                unsigned char i;
-                memcpy( &i , rhs.ptr + offset_ , sizeof(unsigned char) );
-                os << (int)i;
+                unsigned char data;
+                memcpy( &data , rhs.ptr + offset_ , sizeof(unsigned char) );
+                os << (int)data;
+            }
+            else if (std::get<rtype>(r) == Int)
+            {
+                int data;
+                memcpy( &data , rhs.ptr + offset_ , sizeof(int) );
+                os << data;
+            }
+            else if (std::get<rtype>(r) == Uint)
+            {
+                unsigned int data;
+                memcpy( &data , rhs.ptr + offset_ , sizeof(unsigned int) );
+                os << data;
             }
             else if (std::get<rtype>(r) == Float)
             {
-                float i;
-                memcpy( &i , rhs.ptr + offset_ , sizeof(float) );
-                os << i;
+                float data;
+                memcpy( &data , rhs.ptr + offset_ , sizeof(float) );
+                os << data;
             }
             else if (std::get<rtype>(r) == Double)
             {
-                double i;
-                memcpy( &i , rhs.ptr + offset_ , sizeof(double) );
-                os << i;
+                double data;
+                memcpy( &data , rhs.ptr + offset_ , sizeof(double) );
+                os << data;
             }
             else
             {
