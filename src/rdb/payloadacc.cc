@@ -2,13 +2,14 @@
 #include <cstddef> // std::byte
 #include <cstring> // std:memcpy
 #include <assert.h>
+#include <iomanip>
 
 #include "rdb/payloadacc.h"
 
 namespace rdb
 {
     template< typename T >
-    payLoadAccessor<T>::payLoadAccessor(Descriptor descriptor, T *ptr ) : descriptor(descriptor) , ptr(ptr)
+    payLoadAccessor<T>::payLoadAccessor(Descriptor descriptor, T *ptr , bool hexFormat) : descriptor(descriptor) , ptr(ptr), hexFormat(hexFormat)
     {
     }
 
@@ -30,6 +31,15 @@ namespace rdb
         if (is.eof())
         {
             return is;
+        }
+
+        if ( rhs.hexFormat )
+        {
+            is >> std::hex;
+        }
+        else
+        {
+            is >> std::dec;
         }
 
         Descriptor desc(rhs.descriptor);
@@ -87,6 +97,15 @@ namespace rdb
     {
         os << "{";
 
+        if ( rhs.hexFormat )
+        {
+            os << std::hex;
+        }
+        else
+        {
+            os << std::dec;
+        }
+
         for (auto const &r : rhs.descriptor)
         {
             os << "\t" << std::get<rname>(r) << ":" ;
@@ -105,6 +124,11 @@ namespace rdb
                 {
                     unsigned char data;
                     memcpy( &data , rhs.ptr + offset_ + i , sizeof(unsigned char) );
+                    if ( rhs.hexFormat )
+                    {
+                        os << std::setfill('0');
+                        os << std::setw(2);
+                    }
                     os << (int)data;
                     if ( i != std::get<rlen>(r) )
                     {
@@ -116,18 +140,33 @@ namespace rdb
             {
                 unsigned char data;
                 memcpy( &data , rhs.ptr + offset_ , sizeof(unsigned char) );
+                if ( rhs.hexFormat )
+                {
+                    os << std::setfill('0');
+                    os << std::setw(2);
+                }
                 os << (int)data;
             }
             else if (std::get<rtype>(r) == Int)
             {
                 int data;
                 memcpy( &data , rhs.ptr + offset_ , sizeof(int) );
+                if ( rhs.hexFormat )
+                {
+                    os << std::setfill('0');
+                    os << std::setw(8);
+                }
                 os << data;
             }
             else if (std::get<rtype>(r) == Uint)
             {
                 unsigned int data;
                 memcpy( &data , rhs.ptr + offset_ , sizeof(unsigned int) );
+                if ( rhs.hexFormat )
+                {
+                    os << std::setfill('0');
+                    os << std::setw(8);
+                }
                 os << data;
             }
             else if (std::get<rtype>(r) == Float)

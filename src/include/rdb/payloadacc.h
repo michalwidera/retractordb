@@ -14,7 +14,9 @@ namespace rdb
 
         T *ptr ;
 
-        payLoadAccessor(Descriptor descriptor , T *ptr );
+        bool hexFormat;
+
+        payLoadAccessor(Descriptor descriptor , T *ptr , bool hexFormat = false );
 
         template <typename K>
         friend std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs);

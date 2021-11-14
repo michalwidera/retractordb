@@ -63,6 +63,8 @@ int main(int argc, char *argv[])
     rdb::Descriptor desc;
     std::string file;
 
+    bool hexFormat = false;
+
     std::string cmd;
     do
     {
@@ -155,7 +157,7 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            rdb::payLoadAccessor payload(desc, uPtr_payload.get());
+            rdb::payLoadAccessor payload(desc, uPtr_payload.get(), hexFormat);
 
             std::cin >> payload;
 
@@ -179,7 +181,7 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            rdb::payLoadAccessor payload(desc, uPtr_payload.get());
+            rdb::payLoadAccessor payload(desc, uPtr_payload.get(), hexFormat);
 
             std::cout << payload << std::endl;
             continue;
@@ -249,6 +251,26 @@ int main(int argc, char *argv[])
 
             std::cout << uPtr_dacc->recordsCount << " Record(s)\n";
             continue;
+        }
+        else if (cmd == "hex")
+        {
+            if (!uPtr_payload)
+            {
+                std::cout << RED "unconnected\n" RESET;
+                continue;
+            }
+
+            hexFormat = true;
+        }
+        else if (cmd == "dec")
+        {
+            if (!uPtr_payload)
+            {
+                std::cout << RED "unconnected\n" RESET;
+                continue;
+            }
+
+            hexFormat = false;
         }
         else if (cmd == "dump")
         {
