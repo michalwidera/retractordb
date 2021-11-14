@@ -10,7 +10,7 @@ class Retractor(ConanFile):
    generators = "cmake", "gcc"
    testing = []
 
-   options = { "boost": [1.74, 1.75, 1.76, 1.77],
+   options = { "boost": [1.77],
                "gtest": [1.11]
             }
 
