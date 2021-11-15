@@ -24,7 +24,7 @@ Table 1. Supported types by :Rdb
 
 ## Storage terminal
 
-Terminal is called xrdb.
+Terminal is called xtrdb.
 After call you will see . (dot prompt)
 type h for help
 ```
@@ -49,7 +49,7 @@ ok
 ## Create file with data
 
 ```
-$ xrdb
+$ xtrdb
 .create testfile { String name[5] Bytearray data[3] Byte control Int intdata Float measurment }
 ok
 .desc
