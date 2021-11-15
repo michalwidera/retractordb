@@ -35,11 +35,11 @@ set(SOURCES_RDB_TEST
 
 add_executable( test_xqry ${SOURCES_QRY_TEST} )
 add_executable( test_xcompiler ${SOURCES_COMPILER_TEST} )
-add_executable( test_xrdb ${SOURCES_RDB_TEST} )
+add_executable( test_xtrdb ${SOURCES_RDB_TEST} )
 
 target_link_libraries(test_xqry ${CONAN_LIBS})
 target_link_libraries(test_xcompiler ${CONAN_LIBS})
-target_link_libraries(test_xrdb ${CONAN_LIBS})
+target_link_libraries(test_xtrdb ${CONAN_LIBS})
 
 add_test(
   NAME unittest-test-xqry
@@ -54,9 +54,9 @@ add_test(
 )
 
 add_test(
-  NAME unittest-test-xrdb
+  NAME unittest-test-xtrdb
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND ${CMAKE_BINARY_DIR}/bin/test_xrdb
+  COMMAND ${CMAKE_BINARY_DIR}/bin/test_xtrdb
 )
 
-set_tests_properties(unittest-test-xrdb unittest-test-xcompiler unittest-test-xqry PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(unittest-test-xtrdb unittest-test-xcompiler unittest-test-xqry PROPERTIES RUN_SERIAL TRUE)

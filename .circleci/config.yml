@@ -32,37 +32,6 @@ jobs:
           name: Test product
           command: 'cd build && make test'
 
-  build-edge:
-    working_directory: ~
-    docker:
-      - image: circleci/buildpack-deps:latest
-    steps:
-      - checkout
-      - run:
-          name: Present build platform info
-          command: 'uname -a && cat /proc/version && cat /etc/issue'
-      - run:
-          name: Install required libs
-          command: 'sudo apt-get -y install gcc cmake make build-essential python3 python3-pip'
-      - run:
-          name: Install conan build system
-          command: 'pip install conan'
-      - run:
-          name: Set libstdc++11 (new ABI)
-          command: 'conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default'
-      - run:
-          name: Source project
-          command: 'cd build && conan source ..'
-      - run:
-          name: Build from source
-          command: 'cd build && conan install .. -o boost=1.77;gtest=1.11'
-      - run:
-          name: Install product
-          command: 'cd build && conan build ..'
-      - run:
-          name: Test product
-          command: 'cd build && make test'
-
 workflows:
   version: 2
   commit:
@@ -87,6 +56,3 @@ workflows:
                 - master
     jobs:
       - build-buildpack
-      - build-edge:
-          requires:
-            - build-buildpack
