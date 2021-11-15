@@ -40,11 +40,11 @@ set(SOURCES_QRY
 add_executable( xretractor ${SOURCES_RETRACTOR} )
 add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
-add_executable( xqry ${SOURCES_QRY} )
+add_executable( xtqry ${SOURCES_QRY} )
 
 target_link_libraries( xretractor ${CONAN_LIBS} )
 target_link_libraries( xcompiler ${CONAN_LIBS} )
 target_link_libraries( xdumper ${CONAN_LIBS} )
-target_link_libraries( xqry ${CONAN_LIBS} )
+target_link_libraries( xtqry ${CONAN_LIBS} )
 
-install(TARGETS xretractor xcompiler xdumper xqry DESTINATION ~/.local/bin)
+install(TARGETS xretractor xcompiler xdumper xtqry DESTINATION ~/.local/bin)
