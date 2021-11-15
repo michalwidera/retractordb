@@ -7,7 +7,7 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB time series database"
     homepage = "https://retractordb.com"
-    generators = "cmake"
+    generators = "cmake" , "cmake_find_package"
     testing = []
 
     options = {"boost": [1.77],
