@@ -74,6 +74,6 @@ target_link_libraries( xretractor ${CONAN_LIBS} )
 target_link_libraries( xcompiler ${CONAN_LIBS} )
 target_link_libraries( xdumper ${CONAN_LIBS} )
 target_link_libraries( xqry ${CONAN_LIBS} )
-target_link_libraries( xrdb ${CONAN_LIBS} )
+target_link_libraries( xtrdb ${CONAN_LIBS} )
 
 install(TARGETS xretractor xcompiler xdumper xqry xtrdb DESTINATION ~/.local/bin)
