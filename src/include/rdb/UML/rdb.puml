@@ -4,6 +4,7 @@ class dataSet {
     {field} data
     {field} recordSize
     {field} count
+
     {method} streamStoredSize
     {method} GetLen
     {method} DefBlock
@@ -13,6 +14,7 @@ class dataSet {
 
 class Descriptor {
     {field} fieldNames
+
     {method} Append
     {method} operator|
     {method} operator=
@@ -42,28 +44,39 @@ class posixPrmBinaryFileAccessor {
 }
 
 
-class FileAccessorInterface {
+interface FileAccessorInterface {
     {method} Read
     {method} Write
     {method} FileName
 }
 
 class payLoadAccessor {
-        {field} descriptor
-        {field} ptr
-        {field} hexFormat
+    {field} descriptor
+    {field} ptr
+    {field} hexFormat
 
-        {method} operator>>
-        {method} operator<<
+    {method} operator>>
+    {method} operator<<
 }
 
 class DataStorageAccessor {
-        {field} pAccessor
-        {field} descriptor
-        {field} reverse
-        {field} recordsCount
-        {method} Get
-        {method} Put
+    {field} pAccessor
+    {field} descriptor
+    {field} reverse
+    {field} recordsCount
+
+    {method} Get
+    {method} Put
+}
+
+enum FieldType {
+    String
+    Bytearray
+    Uint
+    Byte
+    Int
+    Float
+    Double
 }
 
 FileAccessorInterface --> genericBinaryFileAccessor
@@ -75,6 +88,8 @@ posixBinaryFileAccessor --* DataStorageAccessor
 posixPrmBinaryFileAccessor --* DataStorageAccessor
 
 Descriptor --* DataStorageAccessor
+
+Descriptor --- FieldType
 
 payLoadAccessor --* Descriptor
 
