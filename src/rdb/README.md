@@ -11,14 +11,14 @@ Retractor DB is using inner database format. This format supports read,update, a
 Storage supports data of following types:
 
 | type | size(bytes) | range | meaning |
-|---|--:|:--|---|
-|Byte  |     1|0..255|8-bit byte|
-|Int   |     4|-2147483648 to 2147483647|C++ Integer|
-|Unit  |     4|0 to 4294967295|Unsigned int|
-|String|[defined]|Array of Bytes|Array of bytes dedicated for strings|
-|Bytearray|[defined]|Array of Bytes|Array of bytes dedicated for binary payloads|
-|Float|      4||Floating point value|
-|Double|     8||Floating point value|
+| --- | ---: | --- | --- |
+| Byte | 1 | 0..255|8-bit byte|
+|Int   | 4 |-2147483648 to 2147483647|C++ Integer|
+|Unit  | 4 |0 to 4294967295|Unsigned int|
+|String|[declared]|Array of Bytes|Array of bytes dedicated for strings|
+|Bytearray|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
+|Float| 4 | ... | Floating point value|
+|Double| 8 | ... | Floating point value (double size)|
 
 Table 1. Supported types by :Rdb
 

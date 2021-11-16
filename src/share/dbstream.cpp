@@ -112,13 +112,9 @@ void dbStream::get(int offset, bool reverse)
     }
     else
     {
-#ifdef OLD
-        ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData);
-#else
         database.reverse(streamName, true);
         database.GetBlock(streamName, offset, pRawData.get());
         database.reverse(streamName, false);
-#endif
     }
 
     assert(ret != 0);
