@@ -8,8 +8,7 @@ set(SOURCES_RETRACTOR
   retractor/Processor.cpp
   retractor/executorsm.cpp
   retractor/CRSMath.cpp
-  share/Buffer.cpp
-  share/dbstream.cpp
+        share/dbstream.cpp
   share/QStruct.cpp
   share/RandomFile.cpp
   share/inputFileInstance.cpp
@@ -34,8 +33,7 @@ set(SOURCES_COMPILER
 
 set(SOURCES_DUMPER
   dumper/dumper.cpp
-  share/Buffer.cpp
-  share/dbstream.cpp
+        share/dbstream.cpp
   share/QStruct.cpp
   share/RandomFile.cpp
 
