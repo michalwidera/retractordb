@@ -18,7 +18,11 @@ Temporary field means that this file most probably will disapear during next dev
 
 [https://www.visual-paradigm.com/guide/uml-unified-modeling-language/uml-aggregation-vs-composition/]: <>
 
+
+
 ```plantuml
+@startuml
+
 class dataSet {
     {field} data
     {field} recordSize
@@ -89,9 +93,13 @@ FileAccessorInterface --> genericBinaryFileAccessor
 FileAccessorInterface --> posixBinaryFileAccessor
 FileAccessorInterface --> posixPrmBinaryFileAccessor
 
-genericBinaryFileAccessor *-- DataStorageAccessor
-posixBinaryFileAccessor *-- DataStorageAccessor
-posixPrmBinaryFileAccessor *-- DataStorageAccessor
+genericBinaryFileAccessor --* DataStorageAccessor
+posixBinaryFileAccessor --* DataStorageAccessor
+posixPrmBinaryFileAccessor --* DataStorageAccessor
 
-Descriptor *-- DataStorageAccessor
+Descriptor --* DataStorageAccessor
+
+payLoadAccessor --* Descriptor
+
+@enduml
 ```
