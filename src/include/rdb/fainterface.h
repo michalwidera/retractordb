@@ -17,6 +17,8 @@ namespace rdb
      * Read ::= Read(data, position)
      * Append :== Write(data, position == max_possible_value )
      * Update :== Write(data, position)
+     *
+     * @tparam T Type of stored data - std::byte or char
      */
     template<typename T>
     struct FileAccessorInterface
