@@ -44,4 +44,9 @@ namespace rdb
             bool success = data[filename]->Get(reinterpret_cast<std::byte *>(pRawData),offset);
             return success ? 1 : 0 ;
         }
+
+        void dataSet::reverse(std::string filename, bool val)
+        {
+            data[filename]->reverse = val;
+        }
 }

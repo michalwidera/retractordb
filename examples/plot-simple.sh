@@ -58,6 +58,7 @@ echo 'YDIM:' $YDIM
 
 if ! xcompiler -q $FILE ; then exit 1 ; fi
 
+rm nohup.out
 nohup xretractor &
 
 sleep 2

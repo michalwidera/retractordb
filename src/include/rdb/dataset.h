@@ -28,6 +28,7 @@ namespace rdb
         void DefBlock(std::string filename, int frameSize);
         void PutBlock(std::string filename, char *pRawData);
         int GetBlock(std::string filename, int offset, char *pRawData);
+        void reverse(std::string filename, bool val);
     };
 }
 

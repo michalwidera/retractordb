@@ -6,21 +6,36 @@
 #include <iostream>            // for basic_ostream::operator<<, operator<<
 #include "Buffer.h"            // for CBuffer, BF
 
+#include "rdb/dataset.h"
+
 // stacktrace -> -ldl in CMakeList.txt
 #include <boost/stacktrace.hpp>
 
+//#define OLD
+
+#ifdef OLD
 CBuffer<std::string> cbuf ;
+#else
+rdb::dataSet database;
+#endif
 
 using namespace std ;
 using namespace boost ;
 
 void saveStreamsToFile(string filename)
 {
-    cbuf.Save(filename.c_str());
+#ifdef OLD
+cbuf.Save(filename.c_str());
+#endif
+    // no support here for data
 }
 long streamStoredSize(string filename)
 {
+#ifdef OLD
     return cbuf.GetLen(filename) ;
+#else
+    return database.streamStoredSize(filename);
+#endif
 }
 void Dump(std::ostream &os)
 {
@@ -35,7 +50,11 @@ dbStream::dbStream(std::string streamName, list < std::string > schema) :
     frameSize(schema.size() * sizeof(number)),
     pRawData(new char[ frameSize ])
 {
+#ifdef OLD
     cbuf.DefBlock(streamName, frameSize, BF);
+#else
+    database.DefBlock(streamName, frameSize);
+#endif
     mpShadow.resize(schema.size());
     mpRead.resize(schema.size());
 }
@@ -58,7 +77,11 @@ void dbStream::store()
         cnt ++;
     }
 
-    cbuf.PutBlock(streamName, pRawData);
+#ifdef OLD
+cbuf.PutBlock(streamName, pRawData);
+#else
+    database.PutBlock(streamName,pRawData.get());
+#endif
     mpLenNr = -1 ;
     mpReadNr = -1 ;
 }
@@ -83,8 +106,11 @@ void dbStream::get(int offset, bool reverse)
     }
 
     assert(offset >= 0) ;
+#ifdef OLD
     int len = cbuf.GetLen(streamName) ;
-
+#else
+    int len = database.GetLen(streamName);
+#endif
     if (mpReadNr == offset && mpLenNr == len)
     {
         return;
@@ -111,11 +137,21 @@ void dbStream::get(int offset, bool reverse)
 
     if (reverse)
     {
+#ifdef OLD
         ret = cbuf.GetBlock(streamName, offset, pRawData);
+#else
+        ret = database.GetBlock(streamName, offset, pRawData.get()) ;
+#endif
     }
     else
     {
+#ifdef OLD
         ret = cbuf.GetBlock(streamName, len - offset - 1, pRawData);
+#else
+        database.reverse(streamName, true);
+        database.GetBlock(streamName, offset, pRawData.get());
+        database.reverse(streamName, false);
+#endif
     }
 
     assert(ret != 0);
