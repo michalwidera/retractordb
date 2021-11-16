@@ -10,7 +10,7 @@
 namespace rdb
 {
     /**
-     * @brief This is temporary class required to seamless kick ofo of CBuffer crap.
+     * @brief This is temporary class required to seamless kick off CBuffer crap.
      *
      */
     struct dataSet
