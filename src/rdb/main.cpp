@@ -49,7 +49,7 @@ void check_debug()
             return true;
         }
     } check;
-    assert(check.ok()); // This assert show that assert is compiled and works.
+    assert(check.ok()); // This asserts show that assert is compiled and works.
                         // Program will show green "Ok." at the end of work if assert is compiled and executed.
 #endif
 }

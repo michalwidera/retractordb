@@ -8,7 +8,7 @@ namespace rdb
 {
         dataSet::~dataSet()
         {
-            for (auto const& [key, val] : data)
+            for (auto const& [_, val] : data)
             {
                 auto statusRemove1 = remove(val.get()->pAccessor->FileName().c_str());
                 auto descFilename( val.get()->pAccessor->FileName() + ".desc" );

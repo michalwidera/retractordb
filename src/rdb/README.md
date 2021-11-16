@@ -25,7 +25,7 @@ Table 1. Supported types by :Rdb
 ## Storage terminal
 
 Terminal is called xtrdb.
-After call you will see . (dot prompt)
+After call, you will see . (dot prompt)
 type h for help
 ```
 .h
@@ -62,7 +62,7 @@ ok
 ```
 
 That will create two files: testfile and testfile.desc.
-File testfile will contian only binary data - testfile.desc will containt data descriptor (in text format)
+File testfile will contain only binary data - testfile.desc will contain data descriptor (in text format)
 
 ### Add data to storage
 

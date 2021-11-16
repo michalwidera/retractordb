@@ -10,7 +10,7 @@ namespace rdb
     // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
     // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
 
-    // Turn off buffering (this must apear before open)
+    // Turn off buffering (this must appear before open)
     // http://gcc.gnu.org/onlinedocs/libstdc++/manual/streambufs.html#io.streambuf.buffering
 
     // https://en.cppreference.com/w/cpp/io/ios_base/openmode
@@ -93,7 +93,7 @@ namespace rdb
         // During test posix interface have properly read size data
         // but fstream get read instead 12 bytes only 11
         // Therefore +1 appears.
-        // Last byte was ommited.
+        // Last byte was omitted.
         // Look's like some inconsistency is here.
 
         myFile.get(reinterpret_cast<char *>(ptrData), size + 1);
