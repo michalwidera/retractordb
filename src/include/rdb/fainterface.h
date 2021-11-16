@@ -2,6 +2,7 @@
 #define STORAGE_RDB_INCLUDE_FAINTERFACE_H_
 
 #include <string>
+#include <limits>
 
 namespace rdb
 {

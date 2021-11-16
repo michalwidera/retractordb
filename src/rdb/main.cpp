@@ -60,7 +60,6 @@ int main(int argc, char *argv[])
 
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
     std::unique_ptr<std::byte[]> uPtr_payload;
-    rdb::Descriptor desc;
     std::string file;
 
     bool hexFormat = false;
@@ -74,12 +73,8 @@ int main(int argc, char *argv[])
         {
             break;
         }
-        else if (cmd == "desc")
-        {
-            std::cout << YELLOW << desc << RESET << std::endl;
-            continue;
-        }
-        else if (cmd == "open" || cmd == "ropen")
+
+        if (cmd == "open" || cmd == "ropen")
         {
             std::cin >> file;
 
@@ -96,10 +91,9 @@ int main(int argc, char *argv[])
                 std::cout << RED "File exist, description file missing (.desc)\n" RESET;
                 continue;
             }
-            desc = uPtr_dacc->descriptor ;
 
-            uPtr_payload.reset(new std::byte[desc.GetSize()]);
-            memset(uPtr_payload.get(), 0, desc.GetSize());
+            uPtr_payload.reset(new std::byte[uPtr_dacc->descriptor.GetSize()]);
+            memset(uPtr_payload.get(), 0, uPtr_dacc->descriptor.GetSize());
 
             payloadStatus = clean;
         }
@@ -119,177 +113,15 @@ int main(int argc, char *argv[])
 
             std::stringstream scheamStringStream(sschema);
 
-            desc.clear();
+            rdb::Descriptor desc;
             scheamStringStream >> desc;
 
             uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file, cmd == "rcreate" ));
 
-            uPtr_payload.reset(new std::byte[desc.GetSize()]);
-            memset(uPtr_payload.get(), 0, desc.GetSize());
+            uPtr_payload.reset(new std::byte[uPtr_dacc->descriptor.GetSize()]);
+            memset(uPtr_payload.get(), 0, uPtr_dacc->descriptor.GetSize());
 
             payloadStatus = clean;
-        }
-        else if (cmd == "read")
-        {
-            int record;
-            std::cin >> record;
-
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            if (record >= uPtr_dacc->recordsCount)
-            {
-                std::cout << RED "record out of range\n" RESET;
-                continue;
-            }
-
-            uPtr_dacc->Get(uPtr_payload.get(), record);
-            payloadStatus = fetched;
-        }
-        else if (cmd == "set")
-        {
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            rdb::payLoadAccessor payload(desc, uPtr_payload.get(), hexFormat);
-
-            std::cin >> payload;
-
-            payloadStatus = changed;
-            continue;
-        }
-        else if (cmd == "flip")
-        {
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-            uPtr_dacc->reverse = !uPtr_dacc->reverse;
-        }
-        else if (cmd == "print")
-        {
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            rdb::payLoadAccessor payload(desc, uPtr_payload.get(), hexFormat);
-
-            std::cout << payload << std::endl;
-            continue;
-        }
-        else if (cmd == "write")
-        {
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            size_t record;
-            std::cin >> record;
-
-            if (record >= uPtr_dacc->recordsCount)
-            {
-                std::cout << RED "record out of range - Check append command.\n" RESET;
-                continue;
-            }
-
-            uPtr_dacc->Put(uPtr_payload.get(), record);
-            payloadStatus = stored;
-        }
-        else if (cmd == "append")
-        {
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-            uPtr_dacc->Put(uPtr_payload.get());
-            payloadStatus = stored;
-        }
-        else if (cmd == "status")
-        {
-            if (!uPtr_payload)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-            switch (payloadStatus)
-            {
-            case (fetched):
-                std::cout << "fetched\n";
-                break;
-            case (clean):
-                std::cout << "clean\n";
-                break;
-            case (stored):
-                std::cout << "stored\n";
-                break;
-            case (changed):
-                std::cout << "changed\n";
-                break;
-            defualt:
-                std::cout << "unknown\n";
-            }
-        }
-        else if (cmd == "size")
-        {
-            if (!uPtr_dacc)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            std::cout << uPtr_dacc->recordsCount << " Record(s)\n";
-            continue;
-        }
-        else if (cmd == "hex")
-        {
-            if (!uPtr_payload)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            hexFormat = true;
-        }
-        else if (cmd == "dec")
-        {
-            if (!uPtr_payload)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-
-            hexFormat = false;
-        }
-        else if (cmd == "dump")
-        {
-            if (!uPtr_payload)
-            {
-                std::cout << RED "unconnected\n" RESET;
-                continue;
-            }
-            auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
-            for (auto i = 0; i < desc.GetSize(); i++)
-            {
-                std::cout << std::hex;
-                std::cout << std::setfill('0');
-                std::cout << std::setw(2);
-                std::cout << static_cast<unsigned>(*(ptr + i));
-                std::cout << std::dec;
-                std::cout << " ";
-            };
-            std::cout << "\n";
         }
         else if (cmd == "help" || cmd == "h")
         {
@@ -310,11 +142,122 @@ int main(int argc, char *argv[])
             std::cout << "dump \t\t\t\t show payload memory\n";
             std::cout << RESET;
         }
+        else if (!uPtr_dacc)
+        {
+            std::cout << RED "unconnected\n" RESET;
+            continue;
+        }
+        else if (cmd == "desc")
+        {
+            std::cout << YELLOW << uPtr_dacc->descriptor << RESET << std::endl;
+            continue;
+        }
+        else if (cmd == "read")
+        {
+            int record;
+            std::cin >> record;
+
+            if (record >= uPtr_dacc->recordsCount)
+            {
+                std::cout << RED "record out of range\n" RESET;
+                continue;
+            }
+
+            uPtr_dacc->Get(uPtr_payload.get(), record);
+            payloadStatus = fetched;
+        }
+        else if (cmd == "set")
+        {
+            rdb::payLoadAccessor payload(uPtr_dacc->descriptor, uPtr_payload.get(), hexFormat);
+
+            std::cin >> payload;
+
+            payloadStatus = changed;
+            continue;
+        }
+        else if (cmd == "flip")
+        {
+            uPtr_dacc->reverse = !uPtr_dacc->reverse;
+        }
+        else if (cmd == "print")
+        {
+            rdb::payLoadAccessor payload(uPtr_dacc->descriptor, uPtr_payload.get(), hexFormat);
+
+            std::cout << payload << std::endl;
+            continue;
+        }
+        else if (cmd == "write")
+        {
+            size_t record;
+            std::cin >> record;
+
+            if (record >= uPtr_dacc->recordsCount)
+            {
+                std::cout << RED "record out of range - Check append command.\n" RESET;
+                continue;
+            }
+
+            uPtr_dacc->Put(uPtr_payload.get(), record);
+            payloadStatus = stored;
+        }
+        else if (cmd == "append")
+        {
+            uPtr_dacc->Put(uPtr_payload.get());
+            payloadStatus = stored;
+        }
+        else if (cmd == "status")
+        {
+            switch (payloadStatus)
+            {
+            case (fetched):
+                std::cout << "fetched\n";
+                break;
+            case (clean):
+                std::cout << "clean\n";
+                break;
+            case (stored):
+                std::cout << "stored\n";
+                break;
+            case (changed):
+                std::cout << "changed\n";
+                break;
+            defualt:
+                std::cout << "unknown\n";
+            }
+        }
+        else if (cmd == "size")
+        {
+            std::cout << uPtr_dacc->recordsCount << " Record(s)\n";
+            continue;
+        }
+        else if (cmd == "hex")
+        {
+            hexFormat = true;
+        }
+        else if (cmd == "dec")
+        {
+            hexFormat = false;
+        }
+        else if (cmd == "dump")
+        {
+            auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
+            for (auto i = 0; i < uPtr_dacc->descriptor.GetSize(); i++)
+            {
+                std::cout << std::hex;
+                std::cout << std::setfill('0');
+                std::cout << std::setw(2);
+                std::cout << static_cast<unsigned>(*(ptr + i));
+                std::cout << std::dec;
+                std::cout << " ";
+            };
+            std::cout << "\n";
+        }
         else
         {
             std::cout << RED "?\n" RESET;
             continue;
         }
+
         std::cout << "ok\n";
     } while (true);
 
