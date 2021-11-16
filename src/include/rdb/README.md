@@ -20,4 +20,3 @@ Temporary field means that this file most probably will disapear during next dev
 
 
 ![Class Diagram](http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/michalwidera/retractordb/issue_17/src/include/rdb/rdb.puml)
-![Class Diagram](http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/michalwidera/retractordb/src/include/rdb/rdb.puml)
