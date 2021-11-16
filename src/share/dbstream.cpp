@@ -19,10 +19,6 @@ long streamStoredSize(string filename)
 {
     return database.streamStoredSize(filename);
 }
-void Dump(std::ostream &os)
-{
-    //cbuf.Dump(os, NULL);
-}
 
 dbStream::dbStream(std::string streamName, list < std::string > schema) :
     streamName(streamName),
