@@ -76,6 +76,11 @@ namespace rdb
         UpdateNames();
     }
 
+    bool Descriptor::isDirty() const
+    {
+        return fieldNames.size() == 0;
+    }
+
     void Descriptor::Append(std::initializer_list<field> l)
     {
         insert(end(), l.begin(), l.end());

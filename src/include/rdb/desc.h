@@ -48,14 +48,27 @@ namespace rdb
     /**
      * @brief Structure resposible for mapping types into binary struct
      */
-    struct Descriptor : std::vector<field>
+    class Descriptor : public std::vector<field>
     {
+
         /**
          * @brief This is map of field names. Each field name should be unique for each descriptor
          * If two or more tuples have same name this fieldNames object is empty.
          *
          */
         std::map<std::string, int> fieldNames;
+
+        /**
+         * @brief Internal function that will check names consistency in object
+         *
+         * @return true - no double names found
+         * @return false - found doubled names fields
+         */
+        bool UpdateNames();
+
+    public:
+
+        bool isDirty() const ;
 
         /**
          * @brief Construct a new Descriptor object
@@ -193,14 +206,6 @@ namespace rdb
         friend std::ostream &operator<<(std::ostream &os, const Descriptor &rhs);
         friend std::istream &operator>>(std::istream &is, Descriptor &rhs);
 
-    private:
-        /**
-         * @brief Internal function that will check names consistency in object
-         *
-         * @return true - no double names found
-         * @return false - found doubled names fields
-         */
-        bool UpdateNames();
     };
 
 } // namespace rdb

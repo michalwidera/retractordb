@@ -13,8 +13,9 @@ namespace rdb
      * @tparam T Type of stored data - std::byte or char
      */
     template <typename T>
-    struct payLoadAccessor
+    class payLoadAccessor
     {
+
         /**
          * Descriptor of managed payload area
          */
@@ -29,6 +30,22 @@ namespace rdb
          * Type of dumped or read numeric formats
          */
         bool hexFormat;
+
+    public:
+
+        /**
+         * @brief Accessor to descriptor object
+         *
+         * @return Descriptor
+         */
+        Descriptor getDescriptor() const;
+
+        /**
+         * @brief Accessor to pointer to payload
+         *
+         * @return T* pointer to payload
+         */
+        T* getPayloadPtr() const;
 
         /**
          * Constructor of payLoadAccessor object

@@ -18,8 +18,20 @@ namespace rdb
     {
         T data;
         is >> data;
-        Descriptor desc(rhs.descriptor);
-        memcpy(rhs.ptr + desc.Offset(fieldName), &data, sizeof(T));
+        Descriptor desc(rhs.getDescriptor());
+        memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), &data, sizeof(T));
+    }
+
+    template< typename T >
+    Descriptor payLoadAccessor<T>::getDescriptor() const
+    {
+        return descriptor;
+    }
+
+    template< typename T >
+    T* payLoadAccessor<T>::getPayloadPtr() const
+    {
+        return ptr;
     }
 
     template <typename K>
@@ -42,14 +54,14 @@ namespace rdb
             is >> std::dec;
         }
 
-        Descriptor desc(rhs.descriptor);
+        Descriptor desc(rhs.getDescriptor());
 
         if (desc.Type(fieldName) == "String")
         {
             std::string record;
             std::getline(is >> std::ws, record);
-            memset(rhs.ptr + desc.Offset(fieldName), 0, desc.Len(fieldName));
-            memcpy(rhs.ptr + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.Len(fieldName), record.size()));
+            memset(rhs.getPayloadPtr() + desc.Offset(fieldName), 0, desc.Len(fieldName));
+            memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.Len(fieldName), record.size()));
         }
         else if (desc.Type(fieldName) == "Bytearray")
         {
@@ -58,7 +70,7 @@ namespace rdb
                 int data;
                 is >> data;
                 unsigned char data8 = static_cast<unsigned char>(data);
-                memcpy(rhs.ptr + desc.Offset(fieldName) + i, &data8, sizeof(unsigned char));
+                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i, &data8, sizeof(unsigned char));
             }
         }
         else if (desc.Type(fieldName) == "Byte")
@@ -66,7 +78,7 @@ namespace rdb
             int data;
             is >> data;
             unsigned char data8 = static_cast<unsigned char>(data);
-            memcpy(rhs.ptr + desc.Offset(fieldName), &data8, sizeof(unsigned char));
+            memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), &data8, sizeof(unsigned char));
         }
         else if (desc.Type(fieldName) == "Uint")
         {
@@ -106,24 +118,24 @@ namespace rdb
             os << std::dec;
         }
 
-        for (auto const &r : rhs.descriptor)
+        for (auto const &r : rhs.getDescriptor())
         {
             os << "\t" << std::get<rname>(r) << ":" ;
 
-            auto desc = rhs.descriptor;
+            auto desc = rhs.getDescriptor();
             auto offset_ = desc.Offset(std::get<rname>(r));
 
             if (std::get<rtype>(r) == String)
             {
                 auto len_ = desc.Len(std::get<rname>(r));
-                os << std::string(reinterpret_cast<char *>(rhs.ptr + offset_), len_)  ;
+                os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_), len_)  ;
             }
             else if (std::get<rtype>(r) == Bytearray)
             {
                 for ( auto i = 0 ; i < std::get<rlen>(r) ; i ++ )
                 {
                     unsigned char data;
-                    memcpy( &data , rhs.ptr + offset_ + i , sizeof(unsigned char) );
+                    memcpy( &data , rhs.getPayloadPtr() + offset_ + i , sizeof(unsigned char) );
                     if ( rhs.hexFormat )
                     {
                         os << std::setfill('0');
@@ -139,7 +151,7 @@ namespace rdb
             else if (std::get<rtype>(r) == Byte)
             {
                 unsigned char data;
-                memcpy( &data , rhs.ptr + offset_ , sizeof(unsigned char) );
+                memcpy( &data , rhs.getPayloadPtr() + offset_ , sizeof(unsigned char) );
                 if ( rhs.hexFormat )
                 {
                     os << std::setfill('0');
@@ -150,7 +162,7 @@ namespace rdb
             else if (std::get<rtype>(r) == Int)
             {
                 int data;
-                memcpy( &data , rhs.ptr + offset_ , sizeof(int) );
+                memcpy( &data , rhs.getPayloadPtr() + offset_ , sizeof(int) );
                 if ( rhs.hexFormat )
                 {
                     os << std::setfill('0');
@@ -161,7 +173,7 @@ namespace rdb
             else if (std::get<rtype>(r) == Uint)
             {
                 unsigned int data;
-                memcpy( &data , rhs.ptr + offset_ , sizeof(unsigned int) );
+                memcpy( &data , rhs.getPayloadPtr() + offset_ , sizeof(unsigned int) );
                 if ( rhs.hexFormat )
                 {
                     os << std::setfill('0');
@@ -172,13 +184,13 @@ namespace rdb
             else if (std::get<rtype>(r) == Float)
             {
                 float data;
-                memcpy( &data , rhs.ptr + offset_ , sizeof(float) );
+                memcpy( &data , rhs.getPayloadPtr() + offset_ , sizeof(float) );
                 os << data;
             }
             else if (std::get<rtype>(r) == Double)
             {
                 double data;
-                memcpy( &data , rhs.ptr + offset_ , sizeof(double) );
+                memcpy( &data , rhs.getPayloadPtr() + offset_ , sizeof(double) );
                 os << data;
             }
             else
@@ -190,8 +202,10 @@ namespace rdb
         }
         os << "}";
 
-        if (rhs.descriptor.fieldNames.size() == 0)
+        if (rhs.getDescriptor().isDirty())
+        {
             os << "[dirty]";
+        }
 
         return os;
     }
