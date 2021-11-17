@@ -38,7 +38,7 @@ namespace CRationalStreamMath
           * Times that are multiplicity of other values are removed
           * Prepared list is then taken as argument by getNextTimeSlot function
           */
-        TimeLine(const set< rational<int>> inSet) ;
+        TimeLine(set< rational<int>> const &inSet) ;
 
         /** Function return true if given delta is in current time slot
           * Note: This is not trivial

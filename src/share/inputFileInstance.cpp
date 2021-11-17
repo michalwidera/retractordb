@@ -1,5 +1,5 @@
 #include <inputFileInstance.h>
-#include <assert.h>                                // for assert
+#include <cassert>                                // for assert
 #include <ctype.h>                                 // for tolower
 #include <algorithm>                               // for transform
 #include <boost/algorithm/string/trim.hpp>         // for trim_right

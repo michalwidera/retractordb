@@ -304,7 +304,7 @@ string simplifyLProgram()
         for (
             list < token >::iterator it2 = (*it).lProgram.begin() ;
             it2 != (*it).lProgram.end() ;
-            it2 ++
+            ++it2
         )
         {
             t0 = t1 ;
@@ -318,7 +318,7 @@ string simplifyLProgram()
             {
                 token newVal(t2.getTokenCommand(), t1.getCRValue(), t1.getValue());
                 it2 = (*it).lProgram.erase(it2);
-                it2 -- ;
+                --it2 ;
                 it2 = (*it).lProgram.erase(it2);
                 (*it).lProgram.insert(it2, newVal);
                 it2 = (*it).lProgram.begin() ;
@@ -332,7 +332,7 @@ string simplifyLProgram()
             for (
                 list < token >::iterator it2 = (*it).lProgram.begin() ;
                 it2 != (*it).lProgram.end() ;
-                it2 ++
+                ++it2
             )
             {
                 if (
@@ -349,7 +349,7 @@ string simplifyLProgram()
                         newQuery.lProgram.push_front(newVal);
                         cmd = (*it2).getTokenCommand() ;
                         it2 = (*it).lProgram.erase(it2);
-                        it2 -- ;
+                        --it2 ;
                     }
                     {
                         token newVal(*it2);
@@ -359,9 +359,9 @@ string simplifyLProgram()
                         arg1 =  string(s.str()) ;
                         affectedField = (*it2).getValue() ;
                         it2 = (*it).lProgram.erase(it2);
-                        it2 -- ;
+                        --it2 ;
                     }
-                    it2 ++ ;
+                    ++it2 ;
                     list < token > lSchema;
                     lSchema.push_back(token(PUSH_TSCAN));
                     newQuery.lSchema.push_back(field("*", lSchema, field::BAD, "*")) ;
@@ -386,7 +386,7 @@ string simplifyLProgram()
                         newQuery.lProgram.push_front(newVal);
                         cmd = (*it2).getTokenCommand() ;
                         it2 = (*it).lProgram.erase(it2);
-                        it2 -- ;
+                        --it2 ;
                     }
                     {
                         token newVal(*it2);
@@ -395,7 +395,7 @@ string simplifyLProgram()
                         s << (*it2).getValue() ;
                         arg1 =  string(s.str()) ;
                         it2 = (*it).lProgram.erase(it2);
-                        it2 -- ;
+                        --it2 ;
                     }
                     {
                         token newVal(*it2);
@@ -404,9 +404,9 @@ string simplifyLProgram()
                         s << (*it2).getValue() ;
                         arg2 =  string(s.str()) ;
                         it2 = (*it).lProgram.erase(it2);
-                        it2 -- ;
+                        --it2 ;
                     }
-                    it2 ++ ;
+                    ++it2 ;
                     list < token > lSchema;
                     lSchema.push_back(token(PUSH_TSCAN));
                     newQuery.lSchema.push_back(field("*", lSchema, field::BAD, "*")) ;
@@ -819,7 +819,7 @@ string convertReferences()
                                         }
                                         else
                                         {
-                                            offset1 ++ ;
+                                            ++ offset1 ;
                                         }
                                     }
 
@@ -879,7 +879,7 @@ string convertReferences()
                             list < token >::iterator eIt = q.lProgram.begin();
                             string schema1, schema2 ;
                             command_id cmd ;
-                            query* pQ1(NULL), *pQ2(NULL);
+                            query* pQ1(nullptr), *pQ2(nullptr);
 
                             if (q.lProgram.size() == 1)
                             {
@@ -908,7 +908,7 @@ string convertReferences()
                             bool bFieldFound(false);
                             int offset1(0);
 
-                            if (pQ1 != NULL)
+                            if (pQ1 != nullptr)
                             {
                                 offset1 = 0;
 
@@ -920,11 +920,11 @@ string convertReferences()
                                         bFieldFound = true ;
                                     }
 
-                                    offset1 ++ ;
+                                    ++offset1 ;
                                 }
                             }
 
-                            if (pQ2 != NULL && bFieldFound == false)
+                            if (pQ2 != nullptr && bFieldFound == false)
                             {
                                 offset1 = 0 ;
 
@@ -936,7 +936,7 @@ string convertReferences()
                                         bFieldFound = true ;
                                     }
 
-                                    offset1 ++ ;
+                                    ++ offset1 ;
                                 }
                             }
 

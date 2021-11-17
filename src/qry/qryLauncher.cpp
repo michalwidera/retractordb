@@ -28,9 +28,7 @@ int main(int argc, char* argv[])
 
         if (len > 0)
             if (argv[i][len - 1] == 13)
-            {
-                argv[i][len - 1] = 0 ;
-            }
+                argv[i][len - 1] = 0;
     }
 
     try
@@ -59,7 +57,7 @@ int main(int argc, char* argv[])
         po::store(po::command_line_parser(argc, argv).
             options(desc).positional(p).run(), vm);
         po::notify(vm);
-        setbuf(stdout, NULL);
+        setbuf(stdout, nullptr);
 
         if (vm.count("json"))
         {

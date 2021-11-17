@@ -9,7 +9,7 @@ How xqry terminal works
 */
 
 #include <ctime>
-#include <assert.h>
+#include <cassert>
 #include <cstdio>
 #include <chrono>
 
@@ -63,7 +63,7 @@ How xqry terminal works
 // boost::this_process::get_id()
 #include <boost/process/environment.hpp>
 
-#include <time.h>
+#include <ctime>
 
 using namespace std ;
 using namespace boost ;
@@ -120,7 +120,7 @@ ptree schema ;
 string sInputStream ;
 
 
-void setmode(std::string mode)
+void setmode(std::string const &mode)
 {
     if (mode == "XML")
     {
@@ -220,7 +220,7 @@ void consumer()
                             sInputStream.c_str(),
                             v.second.get<std::string> ("").c_str(),
                             e_value.get(boost::lexical_cast<string> (i++), "").c_str(),
-                            (unsigned long long) time(NULL)
+                            (unsigned long long) time(nullptr)
                         );
                     }
                 }
@@ -255,9 +255,7 @@ void consumer()
 
                 //This part is time limited (-m) resposbile
                 if (iTimeLimitCnt > 1)
-                {
-                    iTimeLimitCnt -- ;
-                }
+                    --iTimeLimitCnt;
             }
         }
 

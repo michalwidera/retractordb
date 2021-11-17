@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstddef> // std::byte
 #include <cstring> // std:memcpy
-#include <assert.h>
+#include <cassert>
 #include <iomanip>
 
 #include "rdb/payloadacc.h"

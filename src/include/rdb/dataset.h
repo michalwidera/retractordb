@@ -13,12 +13,14 @@ namespace rdb
      * @brief This is temporary class required to seamless kick off CBuffer crap.
      *
      */
-    struct dataSet
+    class dataSet
     {
         std::map < std::string , std::unique_ptr<rdb::DataStorageAccessor<std::byte>>> data;
 
         int recordSize = 0;
         int count = 0;
+
+    public:
 
         dataSet(){}
 

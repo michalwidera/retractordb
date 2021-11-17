@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <cassert>
 #include <locale>
 #include <iostream>
 #include <cctype>

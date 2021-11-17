@@ -22,7 +22,7 @@
 
 extern "C" qTree coreInstance ;
 
-Processor* pProc = NULL ;
+Processor* pProc = nullptr ;
 
 extern enum mode
 {

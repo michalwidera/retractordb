@@ -1,9 +1,9 @@
 #include "CRSMath.h"
-#include <assert.h>  // for assert
+#include <cassert>  // for assert
 
 using namespace CRationalStreamMath ;
 
-TimeLine::TimeLine(const set< boost::rational<int>> inSet) :
+TimeLine::TimeLine(set< boost::rational<int>> const &inSet) :
     ctSlot(0)
 {
     assert(inSet.size() > 0);

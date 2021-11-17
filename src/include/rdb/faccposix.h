@@ -9,10 +9,11 @@ namespace rdb
      * @brief Object that implements storage interface via posix calls
      */
     template<typename T>
-    struct posixBinaryFileAccessor : public FileAccessorInterface<T>
+    class posixBinaryFileAccessor : public FileAccessorInterface<T>
     {
         std::string fileNameStr;
 
+    public:
         posixBinaryFileAccessor(std::string fileName);
 
         int Read(T *ptrData, const size_t size, const size_t position) override;

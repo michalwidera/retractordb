@@ -18,5 +18,5 @@ public:
 
     CRandomFile(string murExt = "mur", const bool destroyOnDestructor = true);
     virtual ~CRandomFile();
-    const CRandomFile &operator << (string &text);
+    //const CRandomFile &operator << (string &text);
 };

@@ -12,6 +12,7 @@ sources:
     - 'scripts'
     - 'conanfile.py'
     - '.git'
+    - 'src/compiler/parser.cpp'
     
 # Specify the languages you would like to Scan. Default is all Detected
 languages: 'CPP, PYTHON'

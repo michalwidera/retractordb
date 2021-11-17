@@ -13,6 +13,8 @@ namespace rdb
     {
         std::string fileNameStr;
 
+    public:
+
         genericBinaryFileAccessor(std::string fileName);
 
         int Read(T *ptrData, const size_t size, const size_t position) override;

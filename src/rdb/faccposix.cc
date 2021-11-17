@@ -2,7 +2,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <assert.h>
+#include <cassert>
 
 #include "rdb/faccposix.h"
 

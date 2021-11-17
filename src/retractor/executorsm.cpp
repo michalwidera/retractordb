@@ -2,7 +2,7 @@
 #include "CRSMath.h"
 #include "Processor.h"
 
-// This define is required to remove deprecation of boost/bind.hpp
+// This defines is required to remove deprecation of boost/bind.hpp
 // some boost libraries still didn't remove dependency to boost bin
 // remove this is boost will clean up on own side.
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
@@ -46,7 +46,7 @@
 
 namespace IPC = boost::interprocess ;
 
-// Definicje for IPC purposes - maps i strings (most important IPCString i IPCMap)
+// Define for IPC purposes - maps & strings (most important IPCString i IPCMap)
 typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
 
 typedef IPC::allocator<char, segment_manager_t> CharAllocator;
@@ -65,7 +65,7 @@ using namespace CRationalStreamMath ;
 // IPC::managed_shared_memory strSegment(IPC::open_or_create, "RetractorShmemStr", 65536);
 // const StringAllocator allocatorShmemStrInstance (strSegment.get_segment_manager());
 
-// Maps stores realtions processId -> sended stream
+// Map stores realtions processId -> sended stream
 std::map < const int, std::string > id2StreamName_Relation ;
 
 std::vector < IPC::message_queue > qset ;
@@ -153,7 +153,7 @@ getAwaitedStreamsSet(TimeLine &tl)
 {
     set < string > retVal ;
 
-    while (pProc == NULL)
+    while (pProc == nullptr)
     {
         boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
     }
@@ -256,7 +256,7 @@ ptree commandProcessor(ptree ptInval)
         //
         // This command return stream idenifiers
         //
-        if (command == "get" && pProc != NULL)
+        if (command == "get" && pProc != nullptr)
         {
             std::cerr << "get cmd rcv." << std::endl ;
 
@@ -266,7 +266,7 @@ ptree commandProcessor(ptree ptInval)
                 ptRetval.put(string("db.stream.") + q.id + string(".duration"), boost::lexical_cast<std::string> (q.rInterval));
                 long recordsCount = 0 ;
 
-                if (q.isDeclaration() == false)
+                if (!q.isDeclaration())
                 {
                     recordsCount = streamStoredSize(q.id);
                 }
@@ -275,7 +275,7 @@ ptree commandProcessor(ptree ptInval)
                     recordsCount = -1 ;
                 }
 
-                int processCount = (pProc == NULL) ? 0 : pProc->getStreamCount(q.id) ;
+                int processCount = (pProc == nullptr) ? 0 : pProc->getStreamCount(q.id) ;
                 ptRetval.put(string("db.stream.") + q.id + string(".size"), boost::lexical_cast<std::string> (recordsCount));
                 ptRetval.put(string("db.stream.") + q.id + string(".count"), boost::lexical_cast<std::string> (processCount));
             }
@@ -284,7 +284,7 @@ ptree commandProcessor(ptree ptInval)
         //
         // This command return what stream contains of
         //
-        if (command == "detail" && pProc != NULL)
+        if (command == "detail" && pProc != nullptr)
         {
             string streamName = ptInval.get("db.argument", "") ;
             assert(streamName != "");
@@ -301,10 +301,10 @@ ptree commandProcessor(ptree ptInval)
         // there are created next queue with stream for client
         // and map indentifier with this stream
         //
-        if (command == "show"  && pProc != NULL)
+        if (command == "show"  && pProc != nullptr)
         {
             string streamName = ptInval.get("db.argument", "") ;
-            // Probably someone call show w/o stream name
+            // Probably someone calls show w/o stream name
             assert(streamName != "");
             // check if command present id of process
             assert(ptInval.get("db.id", "") != "");
@@ -399,7 +399,7 @@ void commmandProcessorLoop()
         IPCMap* mymap = mapSegment.construct<IPCMap> ("MyMap")     //object name
             (std::less<int>(), allocatorShmemMapInstance);
         //
-        // This need to be clean up - There are some mess..
+        // This need to be clean up - There are some mess.
         //
         char message[1000];
         unsigned int priority;

@@ -1,5 +1,5 @@
 #include <fstream>
-#include <assert.h>
+#include <cassert>
 #include <limits>
 #include <cstddef> // std::byte
 

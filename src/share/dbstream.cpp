@@ -1,7 +1,7 @@
 #include "dbstream.h"
-#include <assert.h>            // for assert
+#include <cassert>            // for assert
 #include <ext/alloc_traits.h>  // for __alloc_traits<>::value_type
-#include <string.h>            // for memcpy, NULL
+#include <cstring>            // for memcpy, NULL
 #include <algorithm>           // for max
 #include <iostream>            // for basic_ostream::operator<<, operator<<
 

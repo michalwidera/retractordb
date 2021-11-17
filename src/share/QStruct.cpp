@@ -1,6 +1,6 @@
 #include "QStruct.h"
 
-#include <assert.h>                  // for assert
+#include <cassert>                  // for assert
 #include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
 #include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
 #include <iostream>                  // for cerr
@@ -179,7 +179,7 @@ void qTree::tsort()
     while (! v.empty())
         for (vector < query >::iterator it = v.begin() ;
             it != v.end() ;
-            it ++)
+            ++it)
         {
             if (v.empty())
             {
@@ -431,37 +431,37 @@ bool query::isReductionRequired()
     {
         if (t.getTokenCommand() == STREAM_HASH)
         {
-            streamOperatorCount ++ ;
+            ++ streamOperatorCount ;
         }
 
         if (t.getTokenCommand() == STREAM_DEHASH_DIV)
         {
-            streamOperatorCount ++ ;
+            ++ streamOperatorCount ;
         }
 
         if (t.getTokenCommand() == STREAM_DEHASH_MOD)
         {
-            streamOperatorCount ++ ;
+            ++ streamOperatorCount ;
         }
 
         if (t.getTokenCommand() == STREAM_ADD)
         {
-            streamOperatorCount ++ ;
+            ++ streamOperatorCount ;
         }
 
         if (t.getTokenCommand() == STREAM_SUBSTRACT)
         {
-            streamOperatorCount ++ ;
+            ++streamOperatorCount ;
         }
 
         if (t.getTokenCommand() == STREAM_TIMEMOVE)
         {
-            streamOperatorCount ++ ;
+            ++streamOperatorCount ;
         }
 
         if (t.getTokenCommand() == STREAM_AGSE)
         {
-            streamOperatorCount ++ ;
+            ++streamOperatorCount ;
         }
     }
 
@@ -493,7 +493,7 @@ list < string > query::getDepStreamNameList(int reqDep)
                 }
             }
 
-            reqDep ++ ;
+            ++reqDep ;
         }
     }
 

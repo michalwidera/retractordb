@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include <assert.h>
+#include <cassert>
 #include <string>
 #include <cstring>
 #include <filesystem>
