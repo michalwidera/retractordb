@@ -9,7 +9,7 @@ namespace rdb
 {
     template <class T, class K>
     DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName, bool reverse)
-        : pAccessor(new K(fileName)), reverse(reverse)
+        : pAccessor(new K(fileName)), reverse(reverse), filename(fileName)
     {
         std::fstream myFile;
 
@@ -38,7 +38,7 @@ namespace rdb
 
     template <class T, class K>
     DataStorageAccessor<T, K>::DataStorageAccessor(const Descriptor descriptor, std::string fileName, bool reverse)
-        : pAccessor(new K(fileName)), descriptor(descriptor), reverse(reverse)
+        : pAccessor(new K(fileName)), descriptor(descriptor), reverse(reverse), filename(fileName)
     {
         std::fstream myFile;
 
@@ -67,6 +67,14 @@ namespace rdb
     };
 
     template <class T, class K>
+    DataStorageAccessor<T, K>::~DataStorageAccessor()
+    {
+        auto statusRemove1 = remove(filename.c_str());
+        auto descFilename( filename + ".desc" );
+        auto statusRemove2 = remove(descFilename.c_str());
+    };
+
+    template <class T, class K>
     bool DataStorageAccessor<T, K>::Get(T *inBuffer, const size_t recordIndex)
     {
         auto size = descriptor.GetSize();
@@ -80,6 +88,25 @@ namespace rdb
         }
         return result == 0;
     };
+
+    template <class T, class K>
+    Descriptor &DataStorageAccessor<T, K>::getDescriptor()
+    {
+        return descriptor;
+    }
+
+    template <class T, class K>
+    void DataStorageAccessor<T, K>::setReverse( bool value )
+    {
+        reverse = value;
+    }
+
+    template <class T, class K>
+    const size_t DataStorageAccessor<T, K>::getRecordsCount()
+    {
+        return recordsCount;
+    }
+
 
     template <class T, class K>
     bool DataStorageAccessor<T, K>::Put(const T *outBuffer, const size_t recordIndex)

@@ -18,7 +18,7 @@ namespace rdb
      * @brief This object purpose is to access data via descriptor
      */
     template <class T = std::byte, class K = rdb::posixPrmBinaryFileAccessor<T> >
-    struct DataStorageAccessor
+    class DataStorageAccessor
     {
         std::unique_ptr<K> pAccessor;
 
@@ -28,7 +28,35 @@ namespace rdb
 
         size_t recordsCount;
 
+        std::string filename;
+
+    public:
+
         DataStorageAccessor() = delete;
+
+        ~DataStorageAccessor();
+
+
+        /**
+         * @brief Accessor method - get ref to descriptor
+         *
+         * @return Descriptor& reference to descriptor inner object
+         */
+        Descriptor &getDescriptor();
+
+        /**
+         * @brief Set the Reverse value
+         *
+         * @param value reverse iterator status
+         */
+        void setReverse( bool value );
+
+        /**
+         * @brief Get the Records Count object - how many payloads are in file
+         *
+         * @return const size_t count of records/payloads
+         */
+        const size_t getRecordsCount();
 
         /**
          * @brief Construct a new Data Accessor object and create descriptor file

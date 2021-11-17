@@ -33,12 +33,12 @@ Payload --> Client : Read payload area
 
 == Write data ==
 
-Client --> Payload: Fill Payload with Data
+Client --> Payload: Fill Payload area
 Client -> Rdb: Put()
 Activate Rdb
 Description -> Rdb : Get Size of Payload
 Rdb -> Storage : FileAccessor.Write()
-Payload -> Storage: Write data to disk
+Payload --> Storage: Write data to disk
 Rdb --> Client : Status
 deactivate Rdb
 

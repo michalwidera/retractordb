@@ -62,6 +62,8 @@ int main(int argc, char *argv[])
     std::unique_ptr<std::byte[]> uPtr_payload;
     std::string file;
 
+    bool reverse = false;
+
     bool hexFormat = false;
 
     std::string cmd;
@@ -86,14 +88,14 @@ int main(int argc, char *argv[])
 
             uPtr_dacc.reset(new rdb::DataStorageAccessor(file, cmd == "ropen"));
 
-            if ( uPtr_dacc->descriptor.GetSize() == 0 )
+            if ( uPtr_dacc->getDescriptor().GetSize() == 0 )
             {
                 std::cout << RED "File exist, description file missing (.desc)\n" RESET;
                 continue;
             }
 
-            uPtr_payload.reset(new std::byte[uPtr_dacc->descriptor.GetSize()]);
-            memset(uPtr_payload.get(), 0, uPtr_dacc->descriptor.GetSize());
+            uPtr_payload.reset(new std::byte[uPtr_dacc->getDescriptor().GetSize()]);
+            memset(uPtr_payload.get(), 0, uPtr_dacc->getDescriptor().GetSize());
 
             payloadStatus = clean;
         }
@@ -118,8 +120,8 @@ int main(int argc, char *argv[])
 
             uPtr_dacc.reset(new rdb::DataStorageAccessor(desc, file, cmd == "rcreate" ));
 
-            uPtr_payload.reset(new std::byte[uPtr_dacc->descriptor.GetSize()]);
-            memset(uPtr_payload.get(), 0, uPtr_dacc->descriptor.GetSize());
+            uPtr_payload.reset(new std::byte[uPtr_dacc->getDescriptor().GetSize()]);
+            memset(uPtr_payload.get(), 0, uPtr_dacc->getDescriptor().GetSize());
 
             payloadStatus = clean;
         }
@@ -149,7 +151,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "desc")
         {
-            std::cout << YELLOW << uPtr_dacc->descriptor << RESET << std::endl;
+            std::cout << YELLOW << uPtr_dacc->getDescriptor() << RESET << std::endl;
             continue;
         }
         else if (cmd == "read")
@@ -157,7 +159,7 @@ int main(int argc, char *argv[])
             int record;
             std::cin >> record;
 
-            if (record >= uPtr_dacc->recordsCount)
+            if (record >= uPtr_dacc->getRecordsCount())
             {
                 std::cout << RED "record out of range\n" RESET;
                 continue;
@@ -168,7 +170,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "set")
         {
-            rdb::payLoadAccessor payload(uPtr_dacc->descriptor, uPtr_payload.get(), hexFormat);
+            rdb::payLoadAccessor payload(uPtr_dacc->getDescriptor(), uPtr_payload.get(), hexFormat);
 
             std::cin >> payload;
 
@@ -177,11 +179,12 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "flip")
         {
-            uPtr_dacc->reverse = !uPtr_dacc->reverse;
+            reverse = !reverse;
+            uPtr_dacc->setReverse( reverse );
         }
         else if (cmd == "print")
         {
-            rdb::payLoadAccessor payload(uPtr_dacc->descriptor, uPtr_payload.get(), hexFormat);
+            rdb::payLoadAccessor payload(uPtr_dacc->getDescriptor(), uPtr_payload.get(), hexFormat);
 
             std::cout << payload << std::endl;
             continue;
@@ -191,7 +194,7 @@ int main(int argc, char *argv[])
             size_t record;
             std::cin >> record;
 
-            if (record >= uPtr_dacc->recordsCount)
+            if (record >= uPtr_dacc->getRecordsCount())
             {
                 std::cout << RED "record out of range - Check append command.\n" RESET;
                 continue;
@@ -227,7 +230,7 @@ int main(int argc, char *argv[])
         }
         else if (cmd == "size")
         {
-            std::cout << uPtr_dacc->recordsCount << " Record(s)\n";
+            std::cout << uPtr_dacc->getRecordsCount() << " Record(s)\n";
             continue;
         }
         else if (cmd == "hex")
@@ -241,7 +244,7 @@ int main(int argc, char *argv[])
         else if (cmd == "dump")
         {
             auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
-            for (auto i = 0; i < uPtr_dacc->descriptor.GetSize(); i++)
+            for (auto i = 0; i < uPtr_dacc->getDescriptor().GetSize(); i++)
             {
                 std::cout << std::hex;
                 std::cout << std::setfill('0');

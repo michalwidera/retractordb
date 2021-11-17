@@ -6,24 +6,14 @@
 
 namespace rdb
 {
-        dataSet::~dataSet()
-        {
-            for (auto const& [_, val] : data)
-            {
-                auto statusRemove1 = remove(val.get()->pAccessor->FileName().c_str());
-                auto descFilename( val.get()->pAccessor->FileName() + ".desc" );
-                auto statusRemove2 = remove(descFilename.c_str());
-            }
-        }
-
         long dataSet::streamStoredSize(std::string filename)
         {
-            return data[filename]->recordsCount ;
+            return data[filename]->getRecordsCount() ;
         }
 
         long dataSet::GetLen(std::string filename)
         {
-            return data[filename]->recordsCount * recordSize;
+            return data[filename]->getRecordsCount() * recordSize;
         }
 
         void dataSet::DefBlock(std::string filename, int frameSize)
@@ -47,6 +37,6 @@ namespace rdb
 
         void dataSet::reverse(std::string filename, bool val)
         {
-            data[filename]->reverse = val;
+            data[filename]->setReverse( val );
         }
 }

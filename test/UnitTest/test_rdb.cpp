@@ -216,7 +216,7 @@ bool test_storage()
     payload1.TLen = 0x66;
     payload1.Control = 0x22;
 
-    if (payload1.TLen != dAcc2.descriptor.Cast<int>("TLen", payload1.ptr))
+    if (payload1.TLen != dAcc2.getDescriptor().Cast<int>("TLen", payload1.ptr))
         return false;
 
     dAcc2.Put(payload1.ptr);
@@ -235,7 +235,7 @@ bool test_storage()
 
     {
         std::stringstream coutstring;
-        coutstring << dAcc2.descriptor.ToString("Name", payload3.ptr);
+        coutstring << dAcc2.getDescriptor().ToString("Name", payload3.ptr);
         if (strcmp(coutstring.str().c_str(), "xxxx xxxx") != 0)
             return false;
     }
@@ -243,7 +243,7 @@ bool test_storage()
     {
         std::stringstream coutstring;
         coutstring << std::hex;
-        coutstring << dAcc2.descriptor.Cast<int>("TLen", payload3.ptr);
+        coutstring << dAcc2.getDescriptor().Cast<int>("TLen", payload3.ptr);
         coutstring << std::dec;
         if (strcmp(coutstring.str().c_str(), "67") != 0)
             return false;
@@ -252,7 +252,7 @@ bool test_storage()
     {
         std::stringstream coutstring;
         coutstring << std::hex;
-        coutstring << (uint)dAcc2.descriptor.Cast<uint8_t>("Control", payload3.ptr);
+        coutstring << (uint)dAcc2.getDescriptor().Cast<uint8_t>("Control", payload3.ptr);
         coutstring << std::dec;
         if (strcmp(coutstring.str().c_str(), "33") != 0)
             return false;
