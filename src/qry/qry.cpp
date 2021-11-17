@@ -220,7 +220,7 @@ void consumer()
                             sInputStream.c_str(),
                             v.second.get<std::string> ("").c_str(),
                             e_value.get(boost::lexical_cast<string> (i++), "").c_str(),
-                            (long long) time(NULL)
+                            (unsigned long long) time(NULL)
                         );
                     }
                 }

@@ -29,35 +29,8 @@ enum payloadStatusType {
 
 payloadStatusType payloadStatus(clean) ;
 
-void check_debug()
-{
-    // Diagnostic code
-
-#ifdef NDEBUG
-
-    std::cerr << RED "Warn: Release Code form.\n" RESET;
-
-    assert(false); // Note this assert will have no effect!
-
-#else
-    // https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
-    struct check_assert
-    {
-        bool ok()
-        {
-            std::cout << GREEN "Debug Code Form.\n" RESET;
-            return true;
-        }
-    } check;
-    assert(check.ok()); // This asserts show that assert is compiled and works.
-                        // Program will show green "Ok." at the end of work if assert is compiled and executed.
-#endif
-}
-
 int main(int argc, char *argv[])
 {
-    check_debug();
-
     std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
     std::unique_ptr<std::byte[]> uPtr_payload;
     std::string file;
@@ -224,8 +197,6 @@ int main(int argc, char *argv[])
             case (changed):
                 std::cout << "changed\n";
                 break;
-            defualt:
-                std::cout << "unknown\n";
             }
         }
         else if (cmd == "size")
