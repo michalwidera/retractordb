@@ -8,6 +8,9 @@ conan build ..
 xstage
 make install
 xstage
+
+sudo apt install antlr4
+antlr4 -o Parser -Dlanguage=Cpp Expr.g4
 ...
 ```
 
