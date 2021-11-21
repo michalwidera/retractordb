@@ -2,10 +2,11 @@
 
 project( retractordb-src )
 
-include_directories( ${Boost_INCLUDE_DIR} "share" "include" )
+include_directories( ${Boost_INCLUDE_DIR} share include )
 
-# include_directories(/usr/include/)
-# include_directories(/usr/include/antlr4-runtime/)
+#waiting for conan repository update
+#include_directories(/usr/include)
+#include_directories(/usr/local/include/antlr4-runtime/)
 
 set(SOURCES_RETRACTOR
   retractor/Processor.cpp
@@ -65,28 +66,31 @@ set(SOURCES_RDB
   rdb/dataset.cc
 )
 
-set(SOURCES_STAGE
-        stage/main.cpp
-        stage/Parser/ExprLexer.cpp
-        stage/Parser/ExprParser.cpp
-        )
+#set(SOURCES_STAGE
+#        stage/main.cpp
+#        stage/Parser/RQLLexer.cpp
+#        stage/Parser/RQLParser.cpp
+#        )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )
 add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
 add_executable( xtrdb ${SOURCES_RDB} )
-# add_executable( xstage ${SOURCES_STAGE} )
+#add_executable( xstage ${SOURCES_STAGE} )
 
 target_link_libraries( xretractor ${CONAN_LIBS} )
 target_link_libraries( xcompiler ${CONAN_LIBS} )
 target_link_libraries( xdumper ${CONAN_LIBS} )
 target_link_libraries( xqry ${CONAN_LIBS} )
 target_link_libraries( xtrdb ${CONAN_LIBS} )
-# target_link_libraries( xstage ${CONAN_LIBS} antlr4-runtime -std=c++11 -fexec-charset=UTF-8 )
+#target_link_libraries( xstage ${CONAN_LIBS} /usr/local/lib/libantlr4-runtime.so.4.9.3 -std=c++11 -fexec-charset=UTF-8 )
 
+#SET(CMAKE_EXE_LINKER_FLAGS
+#        "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath -Wl,/usr/local/lib")
 
 #target_include_directories( xstage PUBLIC
 #        stage/Parser )
 
+#install(TARGETS xretractor xcompiler xdumper xqry xtrdb xstage DESTINATION ~/.local/bin)
 install(TARGETS xretractor xcompiler xdumper xqry xtrdb DESTINATION ~/.local/bin)
