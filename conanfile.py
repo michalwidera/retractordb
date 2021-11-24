@@ -10,9 +10,6 @@ class Retractor(ConanFile):
     generators = "cmake" , "cmake_find_package"
     testing = []
 
-    options = {"boost": [1.77],
-               "gtest": [1.11]
-               }
 
     default_options = {"boost:shared": False,
                        "boost:without_serialization": False,
@@ -21,9 +18,7 @@ class Retractor(ConanFile):
                        "boost:without_test": False,
                        "boost:multithreading": True,
                        "boost:without_system": False,
-                       "boost:without_filesystem": False,
-                       "boost": options["boost"][0],
-                       "gtest": options["gtest"][0]
+                       "boost:without_filesystem": False
                        }
 
     def validate(self):
@@ -39,8 +34,9 @@ class Retractor(ConanFile):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
 
     def requirements(self):
-        self.requires("boost/"+str(self.options.boost)+".0")
-        self.requires("gtest/"+str(self.options.gtest)+".0")
+        self.requires("boost/1.77.0")
+        self.requires("gtest/1.11.0")
+        self.requires("antlr4-cppruntime/4.9.3")
 
     def build(self):
         cmake = CMake(self)
