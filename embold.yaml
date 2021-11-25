@@ -9,10 +9,10 @@ sources:
     - 'test'
     - 'examples'
     - 'build'
-    - 'scripts'
     - 'conanfile.py'
     - '.git'
     - 'src/compiler/parser.cpp'
+    - 'src/stage'
     
 # Specify the languages you would like to Scan. Default is all Detected
 languages: 'CPP, PYTHON'
