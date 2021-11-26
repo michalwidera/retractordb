@@ -1,5 +1,5 @@
 
-// Generated from RQLParser.g4 by ANTLR 4.9.3
+// Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
 
@@ -13,7 +13,7 @@
  * This class defines an abstract visitor for a parse tree
  * produced by RQLParser.
  */
-class  RQLParserVisitor : public antlr4::tree::AbstractParseTreeVisitor {
+class  RQLVisitor : public antlr4::tree::AbstractParseTreeVisitor {
 public:
 
   /**
@@ -25,7 +25,7 @@ public:
 
     virtual antlrcpp::Any visitDeclare_statement(RQLParser::Declare_statementContext *context) = 0;
 
-    virtual antlrcpp::Any visitFull_column_name_list(RQLParser::Full_column_name_listContext *context) = 0;
+    virtual antlrcpp::Any visitColumn_name_list(RQLParser::Column_name_listContext *context) = 0;
 
     virtual antlrcpp::Any visitSelect_list(RQLParser::Select_listContext *context) = 0;
 

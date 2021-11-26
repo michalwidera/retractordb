@@ -1,5 +1,5 @@
 
-// Generated from RQLLexer.g4 by ANTLR 4.9.3
+// Generated from RQL.g4 by ANTLR 4.9.3
 
 
 #include "RQLLexer.h"
@@ -17,7 +17,7 @@ RQLLexer::~RQLLexer() {
 }
 
 std::string RQLLexer::getGrammarFileName() const {
-  return "RQLLexer.g4";
+  return "RQL.g4";
 }
 
 const std::vector<std::string>& RQLLexer::getRuleNames() const {

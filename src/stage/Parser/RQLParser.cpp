@@ -1,8 +1,8 @@
 
-// Generated from RQLParser.g4 by ANTLR 4.9.3
+// Generated from RQL.g4 by ANTLR 4.9.3
 
 
-#include "RQLParserVisitor.h"
+#include "RQLVisitor.h"
 
 #include "RQLParser.h"
 
@@ -19,7 +19,7 @@ RQLParser::~RQLParser() {
 }
 
 std::string RQLParser::getGrammarFileName() const {
-  return "RQLParser.g4";
+  return "RQL.g4";
 }
 
 const std::vector<std::string>& RQLParser::getRuleNames() const {
@@ -52,7 +52,7 @@ size_t RQLParser::ClausesContext::getRuleIndex() const {
 
 
 antlrcpp::Any RQLParser::ClausesContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLParserVisitor*>(visitor))
+  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
     return parserVisitor->visitClauses(this);
   else
     return visitor->visitChildren(this);
@@ -138,7 +138,7 @@ size_t RQLParser::Select_statementContext::getRuleIndex() const {
 
 
 antlrcpp::Any RQLParser::Select_statementContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLParserVisitor*>(visitor))
+  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
     return parserVisitor->visitSelect_statement(this);
   else
     return visitor->visitChildren(this);
@@ -190,8 +190,8 @@ tree::TerminalNode* RQLParser::Declare_statementContext::DECLARE() {
   return getToken(RQLParser::DECLARE, 0);
 }
 
-RQLParser::Full_column_name_listContext* RQLParser::Declare_statementContext::full_column_name_list() {
-  return getRuleContext<RQLParser::Full_column_name_listContext>(0);
+RQLParser::Column_name_listContext* RQLParser::Declare_statementContext::column_name_list() {
+  return getRuleContext<RQLParser::Column_name_listContext>(0);
 }
 
 tree::TerminalNode* RQLParser::Declare_statementContext::STREAM() {
@@ -217,7 +217,7 @@ size_t RQLParser::Declare_statementContext::getRuleIndex() const {
 
 
 antlrcpp::Any RQLParser::Declare_statementContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLParserVisitor*>(visitor))
+  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
     return parserVisitor->visitDeclare_statement(this);
   else
     return visitor->visitChildren(this);
@@ -240,7 +240,7 @@ RQLParser::Declare_statementContext* RQLParser::declare_statement() {
     setState(23);
     match(RQLParser::DECLARE);
     setState(24);
-    full_column_name_list();
+    column_name_list();
     setState(25);
     match(RQLParser::STREAM);
     setState(26);
@@ -266,44 +266,44 @@ RQLParser::Declare_statementContext* RQLParser::declare_statement() {
   return _localctx;
 }
 
-//----------------- Full_column_name_listContext ------------------------------------------------------------------
+//----------------- Column_name_listContext ------------------------------------------------------------------
 
-RQLParser::Full_column_name_listContext::Full_column_name_listContext(ParserRuleContext *parent, size_t invokingState)
+RQLParser::Column_name_listContext::Column_name_listContext(ParserRuleContext *parent, size_t invokingState)
   : ParserRuleContext(parent, invokingState) {
 }
 
-std::vector<tree::TerminalNode *> RQLParser::Full_column_name_listContext::ID() {
+std::vector<tree::TerminalNode *> RQLParser::Column_name_listContext::ID() {
   return getTokens(RQLParser::ID);
 }
 
-tree::TerminalNode* RQLParser::Full_column_name_listContext::ID(size_t i) {
+tree::TerminalNode* RQLParser::Column_name_listContext::ID(size_t i) {
   return getToken(RQLParser::ID, i);
 }
 
-std::vector<tree::TerminalNode *> RQLParser::Full_column_name_listContext::COMMA() {
+std::vector<tree::TerminalNode *> RQLParser::Column_name_listContext::COMMA() {
   return getTokens(RQLParser::COMMA);
 }
 
-tree::TerminalNode* RQLParser::Full_column_name_listContext::COMMA(size_t i) {
+tree::TerminalNode* RQLParser::Column_name_listContext::COMMA(size_t i) {
   return getToken(RQLParser::COMMA, i);
 }
 
 
-size_t RQLParser::Full_column_name_listContext::getRuleIndex() const {
-  return RQLParser::RuleFull_column_name_list;
+size_t RQLParser::Column_name_listContext::getRuleIndex() const {
+  return RQLParser::RuleColumn_name_list;
 }
 
 
-antlrcpp::Any RQLParser::Full_column_name_listContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLParserVisitor*>(visitor))
-    return parserVisitor->visitFull_column_name_list(this);
+antlrcpp::Any RQLParser::Column_name_listContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
+    return parserVisitor->visitColumn_name_list(this);
   else
     return visitor->visitChildren(this);
 }
 
-RQLParser::Full_column_name_listContext* RQLParser::full_column_name_list() {
-  Full_column_name_listContext *_localctx = _tracker.createInstance<Full_column_name_listContext>(_ctx, getState());
-  enterRule(_localctx, 6, RQLParser::RuleFull_column_name_list);
+RQLParser::Column_name_listContext* RQLParser::column_name_list() {
+  Column_name_listContext *_localctx = _tracker.createInstance<Column_name_listContext>(_ctx, getState());
+  enterRule(_localctx, 6, RQLParser::RuleColumn_name_list);
   size_t _la = 0;
 
 #if __cplusplus > 201703L
@@ -316,8 +316,8 @@ RQLParser::Full_column_name_listContext* RQLParser::full_column_name_list() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(31);
-    antlrcpp::downCast<Full_column_name_listContext *>(_localctx)->idToken = match(RQLParser::ID);
-    antlrcpp::downCast<Full_column_name_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Full_column_name_listContext *>(_localctx)->idToken);
+    antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken = match(RQLParser::ID);
+    antlrcpp::downCast<Column_name_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken);
     setState(36);
     _errHandler->sync(this);
     _la = _input->LA(1);
@@ -325,8 +325,8 @@ RQLParser::Full_column_name_listContext* RQLParser::full_column_name_list() {
       setState(32);
       match(RQLParser::COMMA);
       setState(33);
-      antlrcpp::downCast<Full_column_name_listContext *>(_localctx)->idToken = match(RQLParser::ID);
-      antlrcpp::downCast<Full_column_name_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Full_column_name_listContext *>(_localctx)->idToken);
+      antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken = match(RQLParser::ID);
+      antlrcpp::downCast<Column_name_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken);
       setState(38);
       _errHandler->sync(this);
       _la = _input->LA(1);
@@ -359,7 +359,7 @@ size_t RQLParser::Select_listContext::getRuleIndex() const {
 
 
 antlrcpp::Any RQLParser::Select_listContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLParserVisitor*>(visitor))
+  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
     return parserVisitor->visitSelect_list(this);
   else
     return visitor->visitChildren(this);
@@ -408,7 +408,7 @@ size_t RQLParser::Stream_expressionContext::getRuleIndex() const {
 
 
 antlrcpp::Any RQLParser::Stream_expressionContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLParserVisitor*>(visitor))
+  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
     return parserVisitor->visitStream_expression(this);
   else
     return visitor->visitChildren(this);
@@ -449,7 +449,7 @@ atn::ATN RQLParser::_atn;
 std::vector<uint16_t> RQLParser::_serializedATN;
 
 std::vector<std::string> RQLParser::_ruleNames = {
-  "clauses", "select_statement", "declare_statement", "full_column_name_list", 
+  "clauses", "select_statement", "declare_statement", "column_name_list", 
   "select_list", "stream_expression"
 };
 

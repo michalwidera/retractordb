@@ -4,7 +4,6 @@
 #include "Parser/RQLLexer.h"
 #include "Parser/RQLParser.h"
 
-// antlr4 -o Parser -lib Parser  -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLLexer.g4
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 
 using namespace antlrcpp;

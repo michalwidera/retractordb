@@ -90,3 +90,9 @@ target_link_libraries( xtrdb ${CONAN_LIBS} )
 target_link_libraries( xstage ${CONAN_LIBS} )
 
 install(TARGETS xretractor xcompiler xdumper xqry xtrdb xstage DESTINATION ~/.local/bin)
+
+add_custom_target(grammar
+        COMMAND antlr4call.sh RQL.g4
+        WORKING_DIRECTORY ../../src/stage
+        SOURCES stage/RQL.g4
+        )

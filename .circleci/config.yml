@@ -25,6 +25,9 @@ jobs:
       - run:
           name: Build from source
           command: 'cd build && conan install ..'
+      #- run:
+      #    name: Recreate grammar
+      #    command: 'cd build && make grammar'
       - run:
           name: Install product
           command: 'cd build && conan build ..'

@@ -84,7 +84,7 @@ rule names:
 clauses
 select_statement
 declare_statement
-full_column_name_list
+column_name_list
 select_list
 stream_expression
 

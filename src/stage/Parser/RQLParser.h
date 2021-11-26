@@ -1,5 +1,5 @@
 
-// Generated from RQLParser.g4 by ANTLR 4.9.3
+// Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
 
@@ -23,7 +23,7 @@ public:
 
   enum {
     RuleClauses = 0, RuleSelect_statement = 1, RuleDeclare_statement = 2, 
-    RuleFull_column_name_list = 3, RuleSelect_list = 4, RuleStream_expression = 5
+    RuleColumn_name_list = 3, RuleSelect_list = 4, RuleStream_expression = 5
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -39,7 +39,7 @@ public:
   class ClausesContext;
   class Select_statementContext;
   class Declare_statementContext;
-  class Full_column_name_listContext;
+  class Column_name_listContext;
   class Select_listContext;
   class Stream_expressionContext; 
 
@@ -82,7 +82,7 @@ public:
     Declare_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *DECLARE();
-    Full_column_name_listContext *full_column_name_list();
+    Column_name_listContext *column_name_list();
     antlr4::tree::TerminalNode *STREAM();
     std::vector<antlr4::tree::TerminalNode *> ID();
     antlr4::tree::TerminalNode* ID(size_t i);
@@ -95,11 +95,11 @@ public:
 
   Declare_statementContext* declare_statement();
 
-  class  Full_column_name_listContext : public antlr4::ParserRuleContext {
+  class  Column_name_listContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *idToken = nullptr;
     std::vector<antlr4::Token *> column;
-    Full_column_name_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    Column_name_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     std::vector<antlr4::tree::TerminalNode *> ID();
     antlr4::tree::TerminalNode* ID(size_t i);
@@ -111,7 +111,7 @@ public:
    
   };
 
-  Full_column_name_listContext* full_column_name_list();
+  Column_name_listContext* column_name_list();
 
   class  Select_listContext : public antlr4::ParserRuleContext {
   public:
