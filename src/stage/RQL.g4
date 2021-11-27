@@ -30,10 +30,23 @@ column_name_list    : column+=ID (',' column+=ID)*
 select_list         : column+=ID (',' column+=ID)*
                     ;
 
-stream_expression   : id=ID
-                    {
-                    std::cout << "::stream_expression ID:" << $id.text << std::endl;
-                    }
+stream_expression   : stream_term
+                      ( GREATER DECIMAL
+                      | PLUS stream_term
+                      | MINUS RATIONAL
+                      ) *
+                    ;
+
+stream_term         : ID
+                      ( SHARP ID
+                      | AND RATIONAL
+                      | MOD RATIONAL
+                      | AT LR_BRACKET DECIMAL COMMA SIGNED_DECIMAL RR_BRACKET
+                      | DOT agregator
+                      ) *
+                    ;
+
+agregator           : MIN | MAX | AVG | SUMC
                     ;
 
 SELECT:             'SELECT';
@@ -42,10 +55,17 @@ FROM:               'FROM';
 DECLARE:            'DECLARE';
 FILE:               'FILE';
 
-ID:                 ( [A-Z_#] ) ( [A-Z_#$@0-9] )*;
+MIN:                'MIN';
+MAX:                'MAX';
+AVG:                'AVG';
+SUMC:               'SUMC';
+
+ID:                 ( [A-Z_] ) ( [A-Z_$@0-9] )*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
+SIGNED_DECIMAL:     [+-]? DEC_DIGIT+;
+RATIONAL:           DECIMAL DIVIDE DECIMAL;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';
@@ -57,6 +77,8 @@ DOT:                '.';
 UNDERLINE:          '_';
 AT:                 '@';
 SHARP:              '#';
+AND:                '&';
+MOD:                '%';
 DOLLAR:             '$';
 LR_BRACKET:         '(';
 RR_BRACKET:         ')';
@@ -66,12 +88,10 @@ COLON:              ':';
 DOUBLE_COLON:       '::';
 STAR:               '*';
 DIVIDE:             '/';
-MODULE:             '%';
 PLUS:               '+';
 MINUS:              '-';
 BIT_NOT:            '~';
 BIT_OR:             '|';
-BIT_AND:            '&';
 BIT_XOR:            '^';
 
 SPACE:              [ \t\r\n]+    -> skip;

@@ -43,6 +43,14 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitStream_term(RQLParser::Stream_termContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitAgregator(RQLParser::AgregatorContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
 
 };
 

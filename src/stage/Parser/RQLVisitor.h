@@ -35,6 +35,10 @@ public:
 
     virtual antlrcpp::Any visitStream_expression(RQLParser::Stream_expressionContext *context) = 0;
 
+    virtual antlrcpp::Any visitStream_term(RQLParser::Stream_termContext *context) = 0;
+
+    virtual antlrcpp::Any visitAgregator(RQLParser::AgregatorContext *context) = 0;
+
 
 };
 
