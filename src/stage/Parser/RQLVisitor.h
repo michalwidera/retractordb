@@ -1,4 +1,8 @@
 
+    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
+    #include <iostream>
+
+
 // Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
@@ -19,7 +23,7 @@ public:
   /**
    * Visit parse trees produced by RQLParser.
    */
-    virtual antlrcpp::Any visitClauses(RQLParser::ClausesContext *context) = 0;
+    virtual antlrcpp::Any visitProg(RQLParser::ProgContext *context) = 0;
 
     virtual antlrcpp::Any visitSelect_statement(RQLParser::Select_statementContext *context) = 0;
 

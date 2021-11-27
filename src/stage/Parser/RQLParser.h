@@ -1,4 +1,8 @@
 
+    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
+    #include <iostream>
+
+
 // Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
@@ -22,8 +26,8 @@ public:
   };
 
   enum {
-    RuleClauses = 0, RuleSelect_statement = 1, RuleDeclare_statement = 2, 
-    RuleColumn_name_list = 3, RuleSelect_list = 4, RuleStream_expression = 5
+    RuleProg = 0, RuleSelect_statement = 1, RuleDeclare_statement = 2, RuleColumn_name_list = 3, 
+    RuleSelect_list = 4, RuleStream_expression = 5
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -36,38 +40,42 @@ public:
   virtual antlr4::dfa::Vocabulary& getVocabulary() const override;
 
 
-  class ClausesContext;
+  class ProgContext;
   class Select_statementContext;
   class Declare_statementContext;
   class Column_name_listContext;
   class Select_listContext;
   class Stream_expressionContext; 
 
-  class  ClausesContext : public antlr4::ParserRuleContext {
+  class  ProgContext : public antlr4::ParserRuleContext {
   public:
-    ClausesContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    ProgContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    Select_statementContext *select_statement();
-    Declare_statementContext *declare_statement();
+    antlr4::tree::TerminalNode *EOF();
+    std::vector<Select_statementContext *> select_statement();
+    Select_statementContext* select_statement(size_t i);
+    std::vector<Declare_statementContext *> declare_statement();
+    Declare_statementContext* declare_statement(size_t i);
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
-  ClausesContext* clauses();
+  ProgContext* prog();
 
   class  Select_statementContext : public antlr4::ParserRuleContext {
   public:
     RQLParser::Select_listContext *columns = nullptr;
+    antlr4::Token *id = nullptr;
     RQLParser::Stream_expressionContext *from = nullptr;
     Select_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *SELECT();
     antlr4::tree::TerminalNode *STREAM();
-    antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FROM();
     Select_listContext *select_list();
+    antlr4::tree::TerminalNode *ID();
     Stream_expressionContext *stream_expression();
 
 
@@ -115,9 +123,14 @@ public:
 
   class  Select_listContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *idToken = nullptr;
+    std::vector<antlr4::Token *> column;
     Select_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *ID();
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -128,6 +141,7 @@ public:
 
   class  Stream_expressionContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *id = nullptr;
     Stream_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *ID();

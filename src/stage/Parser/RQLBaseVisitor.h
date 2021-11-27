@@ -1,4 +1,8 @@
 
+    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
+    #include <iostream>
+
+
 // Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
@@ -15,7 +19,7 @@
 class  RQLBaseVisitor : public RQLVisitor {
 public:
 
-  virtual antlrcpp::Any visitClauses(RQLParser::ClausesContext *ctx) override {
+  virtual antlrcpp::Any visitProg(RQLParser::ProgContext *ctx) override {
     return visitChildren(ctx);
   }
 

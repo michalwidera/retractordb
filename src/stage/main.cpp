@@ -29,7 +29,7 @@ int main(int argc, const char *args[])
     // Create a parser which parses the token stream
     // to create a parse tree.
     RQLParser parser(&tokens);
-    tree::ParseTree *tree = parser.clauses();
+    tree::ParseTree *tree = parser.prog();
     // Print the parse tree in Lisp format.
     cout << endl << "Parse tree (Lisp format):" << endl;
     std::cout << tree->toStringTree(&parser) << endl;

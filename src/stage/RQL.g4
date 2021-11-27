@@ -1,14 +1,22 @@
 grammar RQL;
 
-// https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
+@header {
+    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
+    #include <iostream>
+}
 
-clauses             : select_statement
-                    | declare_statement
+prog                : ( select_statement | declare_statement )+ EOF
                     ;
 
 select_statement    : SELECT columns=select_list
-                      STREAM ID
+                      STREAM id=ID
                       FROM from=stream_expression
+                      {
+                      std::cout << "::columns ID:" << $columns.text << std::endl;
+                      std::cout << "::id ID:" << $id.text << std::endl;
+                      std::cout << "::from ID:" << $from.text << std::endl;
+                      }
+
                     ;
 
 declare_statement   : DECLARE column_name_list
@@ -19,10 +27,13 @@ declare_statement   : DECLARE column_name_list
 column_name_list    : column+=ID (',' column+=ID)*
                     ;
 
-select_list         : ID
+select_list         : column+=ID (',' column+=ID)*
                     ;
 
-stream_expression   : ID
+stream_expression   : id=ID
+                    {
+                    std::cout << "::stream_expression ID:" << $id.text << std::endl;
+                    }
                     ;
 
 SELECT:             'SELECT';
