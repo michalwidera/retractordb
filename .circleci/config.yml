@@ -23,13 +23,13 @@ jobs:
           name: Source project
           command: 'cd build && conan source ..'
       - run:
-          name: Build from source
+          name: Fetch required libraries from conan
           command: 'cd build && conan install ..'
       #- run:
       #    name: Recreate grammar
       #    command: 'cd build && make grammar'
       - run:
-          name: Install product
+          name: Build project and Install
           command: 'cd build && conan build ..'
       - run:
           name: Test product

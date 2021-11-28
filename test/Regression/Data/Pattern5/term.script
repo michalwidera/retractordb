@@ -1,0 +1,24 @@
+create test2 { String name[5] Intarray data[3] Bytearray bt[3] Byte Control Float m1 Integer m2 }
+size
+set name test1
+set data 1 2 3
+set bt 1 2 3
+set Control 2
+set m1 1.23
+set m2 234
+append
+print
+set name test2
+set data 3 4 5
+set bt 4 5 6
+set Control 3
+set m1 3.14
+set m2 5567
+append
+read 0
+print
+read 1
+print
+size
+desc
+quit

@@ -79,7 +79,7 @@ set_tests_properties(compare_output_with_pattern-4 PROPERTIES DEPENDS compile_pa
 add_test(
         NAME create_output_xtrdb-5
         WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
-        COMMAND sh -c "xtrdb < xt.script > out.txt"
+        COMMAND sh -c "xtrdb < term.script > out.txt"
 )
 
 add_test(
