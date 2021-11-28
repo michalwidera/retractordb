@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     std::string file;
 
     bool reverse = false;
-    bool rox = false;
+    bool rox = true;
     bool hexFormat = false;
 
     std::string cmd;

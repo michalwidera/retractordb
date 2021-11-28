@@ -77,6 +77,21 @@ set_tests_properties(compare_output_with_pattern-4 PROPERTIES DEPENDS compile_pa
 # -----------------------------------------------------------------------------------------------
 
 add_test(
+        NAME create_output_xtrdb-5
+        WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
+        COMMAND sh -c "xtrdb < xt.script > out.txt"
+)
+
+add_test(
+        NAME compare_output_with_pattern-5
+        WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
+        COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
+)
+
+set_tests_properties(compare_output_with_pattern-5 PROPERTIES DEPENDS create_output_xtrdb-5)
+
+# -----------------------------------------------------------------------------------------------
+add_test(
   NAME dumper-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND sh -c "xcompiler -q query-lnx.rql; xdumper -d"
