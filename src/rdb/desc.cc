@@ -51,6 +51,7 @@ namespace rdb
             return 1;
         case String:
         case Bytearray:
+        case Intarray:
             assert("This type has other method of len-type id");
             break;
         default:
@@ -190,10 +191,14 @@ namespace rdb
         {
             os << "\t" << GetFieldType(std::get<rtype>(r))
                << " " << std::get<rname>(r);
-            if (std::get<rtype>(r) == String || std::get<rtype>(r) == Bytearray || std::get<rtype>(r) == Intarray)
+            if (std::get<rtype>(r) == String || std::get<rtype>(r) == Bytearray)
             {
                 os << "[" << std::to_string(std::get<rlen>(r)) << "]";
-            };
+            }
+            else if ( std::get<rtype>(r) == Intarray )
+            {
+                os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
+            }
             os << std::endl;
         }
         os << "}";
@@ -238,9 +243,14 @@ namespace rdb
 
             auto ft = GetFieldType(type);
 
-            if (ft == String || ft == Bytearray || ft == Intarray)
+            if (ft == String || ft == Bytearray )
             {
                 is >> len;
+            }
+            else if ( ft == Intarray )
+            {
+                is >> len;
+                len *= sizeof(int);
             }
             else
             {

@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     std::string file;
 
     bool reverse = false;
-
+    bool rox = false;
     bool hexFormat = false;
 
     std::string cmd;
@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
             std::cout << "set [field][value] \t\t set payload field value\n";
             std::cout << "status \t\t\t\t show status of payload\n";
             std::cout << "flip \t\t\t\t flip reverse iterator\n";
+            std::cout << "rox \t\t\t\t remove on exit filt\n";
             std::cout << "print \t\t\t\t show payload\n";
             std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
             std::cout << "size \t\t\t\t show database size in records\n";
@@ -154,6 +155,11 @@ int main(int argc, char *argv[])
         {
             reverse = !reverse;
             uPtr_dacc->setReverse( reverse );
+        }
+        else if (cmd == "rox")
+        {
+            rox = !rox;
+            uPtr_dacc->setRemoveOnExit( rox );
         }
         else if (cmd == "print")
         {
@@ -202,6 +208,7 @@ int main(int argc, char *argv[])
         else if (cmd == "size")
         {
             std::cout << uPtr_dacc->getRecordsCount() << " Record(s)\n";
+            std::cout << uPtr_dacc->getDescriptor().GetSize() << " Byte(s) per record.\n";
             continue;
         }
         else if (cmd == "hex")

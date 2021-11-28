@@ -9,7 +9,7 @@ namespace rdb
 {
     template <class T, class K>
     DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName, bool reverse)
-        : pAccessor(new K(fileName)), reverse(reverse), filename(fileName)
+        : pAccessor(new K(fileName)), reverse(reverse), filename(fileName), removeOnExit(false)
     {
         std::fstream myFile;
 
@@ -38,7 +38,7 @@ namespace rdb
 
     template <class T, class K>
     DataStorageAccessor<T, K>::DataStorageAccessor(const Descriptor descriptor, std::string fileName, bool reverse)
-        : pAccessor(new K(fileName)), descriptor(descriptor), reverse(reverse), filename(fileName)
+        : pAccessor(new K(fileName)), descriptor(descriptor), reverse(reverse), filename(fileName), removeOnExit(false)
     {
         std::fstream myFile;
 
@@ -69,9 +69,12 @@ namespace rdb
     template <class T, class K>
     DataStorageAccessor<T, K>::~DataStorageAccessor()
     {
-        auto statusRemove1 = remove(filename.c_str());
-        auto descFilename( filename + ".desc" );
-        auto statusRemove2 = remove(descFilename.c_str());
+        if ( removeOnExit )
+        {
+            auto statusRemove1 = remove(filename.c_str());
+            auto descFilename(filename + ".desc");
+            auto statusRemove2 = remove(descFilename.c_str());
+        }
     };
 
     template <class T, class K>
@@ -97,6 +100,12 @@ namespace rdb
 
     template <class T, class K>
     void DataStorageAccessor<T, K>::setReverse( bool value )
+    {
+        reverse = value;
+    }
+
+    template <class T, class K>
+    void DataStorageAccessor<T, K>::setRemoveOnExit( bool value )
     {
         reverse = value;
     }

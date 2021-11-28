@@ -26,6 +26,8 @@ namespace rdb
 
         bool reverse;
 
+        bool removeOnExit;
+
         size_t recordsCount;
 
         std::string filename;
@@ -50,6 +52,12 @@ namespace rdb
          * @param value reverse iterator status
          */
         void setReverse( bool value );
+
+        /**
+         * @brief Set if files should remain after program exits
+         * @param value remove on exit mode
+         */
+        void setRemoveOnExit( bool value );
 
         /**
          * @brief Get the Records Count object - how many payloads are in file

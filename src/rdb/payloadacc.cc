@@ -68,16 +68,16 @@ namespace rdb
                 int data;
                 is >> data;
                 unsigned char data8 = static_cast<unsigned char>(data);
-                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i, &data8, sizeof(unsigned char));
+                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i * sizeof(unsigned char), &data8, sizeof(unsigned char));
             }
         }
         else if (desc.Type(fieldName) == "Intarray")
         {
-            for ( auto i = 0; i < desc.Len(fieldName);  i ++)
+            for ( auto i = 0; i < desc.Len(fieldName) / sizeof(int);  i ++)
             {
                 int data;
                 is >> data;
-                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i, &data, sizeof(int));
+                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i * sizeof(int), &data, sizeof(int));
             }
         }
         else if (desc.Type(fieldName) == "Byte")
@@ -140,7 +140,7 @@ namespace rdb
             else if (std::get<rtype>(r) == Bytearray) {
                 for (auto i = 0; i < std::get<rlen>(r); i++) {
                     unsigned char data;
-                    memcpy(&data, rhs.getPayloadPtr() + offset_ + i, sizeof(unsigned char));
+                    memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(unsigned char), sizeof(unsigned char));
                     if (rhs.hexFormat) {
                         os << std::setfill('0');
                         os << std::setw(2);
@@ -153,10 +153,10 @@ namespace rdb
             }
             else if (std::get<rtype>(r) == Intarray)
             {
-                for ( auto i = 0 ; i < std::get<rlen>(r) ; i ++ )
+                for ( auto i = 0 ; i < std::get<rlen>(r) / sizeof(int) ; i ++ )
                 {
                     int data;
-                    memcpy( &data , rhs.getPayloadPtr() + offset_ + i , sizeof(int) );
+                    memcpy( &data , rhs.getPayloadPtr() + offset_ + i * sizeof(int) , sizeof(int) );
                     if ( rhs.hexFormat )
                     {
                         os << std::setfill('0');
