@@ -20,6 +20,7 @@ namespace rdb
     {
         String,
         Bytearray,
+        Intarray,
         Uint,
         Byte,
         Int,

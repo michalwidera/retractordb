@@ -22,7 +22,7 @@ namespace rdb
     std::string GetFieldType(FieldType e)
     {
         std::map<FieldType, std::string> typeDictionary = {
-            {String, "String"}, {Bytearray, "Bytearray"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"}, {Double, "Double"}};
+            {String, "String"}, {Bytearray, "Bytearray"},  {Intarray, "Intarray"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"}, {Double, "Double"}};
         return typeDictionary[e];
     }
 
@@ -31,7 +31,7 @@ namespace rdb
         ltrim(name);
         rtrim(name);
         std::map<std::string, FieldType> typeDictionary = {
-            {"String", String}, {"Bytearray", Bytearray}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}, {"Float", Float}, {"Double",Double}};
+            {"String", String}, {"Bytearray", Bytearray}, {"Intarray", Intarray}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}, {"Float", Float}, {"Double",Double}};
         return typeDictionary[name];
     }
 
@@ -71,7 +71,7 @@ namespace rdb
 
     Descriptor::Descriptor(fieldName n, FieldType t)
     {
-        assert((t != String || t != Bytearray )  && "This method does not work for Stings and Bytearrays.");
+        assert((t != String || t != Bytearray || t != Intarray )  && "This method does not work for Stings and Bytearrays.");
         push_back(field(n, GetFieldLenFromType(t), t));
         UpdateNames();
     }
@@ -190,7 +190,7 @@ namespace rdb
         {
             os << "\t" << GetFieldType(std::get<rtype>(r))
                << " " << std::get<rname>(r);
-            if (std::get<rtype>(r) == String || std::get<rtype>(r) == Bytearray)
+            if (std::get<rtype>(r) == String || std::get<rtype>(r) == Bytearray || std::get<rtype>(r) == Intarray)
             {
                 os << "[" << std::to_string(std::get<rlen>(r)) << "]";
             };
@@ -238,7 +238,7 @@ namespace rdb
 
             auto ft = GetFieldType(type);
 
-            if (ft == String || ft == Bytearray)
+            if (ft == String || ft == Bytearray || ft == Intarray)
             {
                 is >> len;
             }

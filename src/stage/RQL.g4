@@ -1,11 +1,10 @@
 grammar RQL;
 
 @header {
-    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
     #include <iostream>
 }
 
-prog                : ( select_statement | declare_statement )+ EOF
+prog                : (select_statement | declare_statement)+ EOF
                     ;
 
 select_statement    : SELECT columns=select_list
@@ -20,15 +19,15 @@ select_statement    : SELECT columns=select_list
                     ;
 
 declare_statement   : DECLARE column_name_list
-                      STREAM ID COMMA ( DECIMAL | FLOAT | RATIONAL )
+                      STREAM ID COMMA RATIONAL
                       (FILE STRING)?
                     ;
 
 column_name_list    : column+=ID column_type (COMMA column+=ID column_type)*
                     ;
 
-column_type         : ( ( FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T )
-                        | ( ( STRING_T | ARRAY_B_T | ARRAY_I_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET )
+column_type         : ((FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
+                        | ((STRING_T | ARRAY_B_T | ARRAY_I_T) LS_BRACKET type_size=DECIMAL RS_BRACKET)
                       )
                     ;
 
@@ -40,31 +39,22 @@ select_list_elem    : asterisk
                     ;
 
 field_id            : column_name=ID // id
-                    | column_name=ID LS_BRACKET UNDERLINE RS_BRACKET // id[_]
+                    | tablename=ID LS_BRACKET UNDERLINE RS_BRACKET // id[_]
                     | tablename=ID DOT column_name=ID  // id.id
-                    | tablename=ID LS_BRACKET column_index=DECIMAL RS_BRACKET // id[id]
+                    | tablename=ID LS_BRACKET column_index=DECIMAL RS_BRACKET // id[x]
                     ;
-/*
-expression
-    :
-    | function_call
-    | unary_op_expression
-    | expression op=('*' | '/' | '%') expression
-    | expression op=('+' | '-' | '&' | '^' | '|' | '||') expression
-    ;
-*/
-unary_op_expression
-    : BIT_NOT expression
-    | op=( PLUS | MINUS ) expression
-    ;
+
+unary_op_expression : BIT_NOT expression
+                    | op=(PLUS | MINUS) expression
+                    ;
 
 asterisk            : (ID DOT)? STAR
                     ;
 
-expression          : term ( PLUS term | MINUS term )*
+expression          : term (PLUS term | MINUS term)*
                     ;
 
-term                : factor ( STAR factor | DIVIDE factor )*
+term                : factor (STAR factor | DIVIDE factor)*
                     ;
 
 factor              : FLOAT
@@ -78,17 +68,17 @@ factor              : FLOAT
                     ;
 
 stream_expression   : stream_term
-                      ( GREATER DECIMAL
-                      | PLUS stream_term
-                      | MINUS RATIONAL
+                      ( timemove=GREATER DECIMAL
+                      | stream_add=PLUS stream_term
+                      | stream_sub=MINUS RATIONAL
                       ) *
                     ;
 
 stream_term         : ID
-                      ( SHARP ID
-                      | AND RATIONAL
-                      | MOD RATIONAL
-                      | AT LR_BRACKET DECIMAL COMMA (PLUS|MINUS)? DECIMAL RR_BRACKET
+                      ( hash=SHARP ID
+                      | dehash_div=AND RATIONAL
+                      | dehash_mod=MOD RATIONAL
+                      | agse=AT LR_BRACKET DECIMAL COMMA (PLUS | MINUS)? DECIMAL RR_BRACKET
                       | DOT agregator
                       ) *
                     ;
@@ -98,17 +88,26 @@ agregator           : MIN | MAX | AVG | SUMC
 
 function_call       : function = (SQRT | CEIL | ABS | FLOOR | SIGN | CHR
                        | LENGTH | TO_NUMBER | TO_TIMESTAMP | FLOAT_CAST
-                       | INT_CAST | COUNT | CRC | SUM | ISZERO | ISNONZERO )
+                       | INT_CAST | COUNT | CRC | SUM | ISZERO | ISNONZERO)
                       LR_BRACKET expression RR_BRACKET
                     ;
 
-FLOAT_T:            'FLOAT';
+// src/include/rdb/desc.h
+//        String,
+//        Bytearray,
+//        Uint,
+//        Byte,
+//        Int,
+//        Float,
+//        Double
 STRING_T:           'STRING';
-BYTE_T:             'BYTE';
 INTEGER_T:          'INT';
+BYTE_T:             'BYTE';
 UNSIGNED_T:         'UNSIGNED';
-ARRAY_B_T:          'ARRAY_BYTE';
-ARRAY_I_T:          'ARRAY_INTEGER';
+ARRAY_B_T:          'BYTEARRAY';
+ARRAY_I_T:          'INTARRAY';
+FLOAT_T:            'FLOAT';
+DOUBLE_T:           'DOUBLE';
 
 SELECT:             'SELECT';
 STREAM:             'STREAM';
@@ -138,11 +137,12 @@ SUM:                'SUM';
 ISZERO:             'ISZERO';
 ISNONZERO:          'ISNONZERO';
 
-ID:                 ( [A-Za-z] ) ( [A-Za-z$0-9] )*;
+ID:                 ([A-Za-z]) ([A-Za-z$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
-RATIONAL:           DECIMAL DIVIDE DECIMAL;
+RATIONAL:           (DECIMAL | FLOAT | RATIONAL_PURE)
+RATIONAL_PURE       ( DECIMAL DIVIDE DECIMAL ) | FLOAT ;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';

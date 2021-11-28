@@ -1,5 +1,4 @@
 
-    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
     #include <iostream>
 
 

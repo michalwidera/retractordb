@@ -1,5 +1,4 @@
 
-    // https://github.com/antlr/grammars-v4/blob/master/sql/tsql/TSqlParser.g4
     #include <iostream>
 
 
@@ -769,7 +768,7 @@ RQLParser::Field_idContext* RQLParser::field_id() {
     case 2: {
       enterOuterAlt(_localctx, 2);
       setState(90);
-      antlrcpp::downCast<Field_idContext *>(_localctx)->column_name = match(RQLParser::ID);
+      antlrcpp::downCast<Field_idContext *>(_localctx)->tablename = match(RQLParser::ID);
       setState(91);
       match(RQLParser::LS_BRACKET);
       setState(92);

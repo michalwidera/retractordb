@@ -63,14 +63,21 @@ namespace rdb
             memset(rhs.getPayloadPtr() + desc.Offset(fieldName), 0, desc.Len(fieldName));
             memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), record.c_str(), std::min((size_t)desc.Len(fieldName), record.size()));
         }
-        else if (desc.Type(fieldName) == "Bytearray")
+        else if (desc.Type(fieldName) == "Bytearray") {
+            for (auto i = 0; i < desc.Len(fieldName); i++) {
+                int data;
+                is >> data;
+                unsigned char data8 = static_cast<unsigned char>(data);
+                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i, &data8, sizeof(unsigned char));
+            }
+        }
+        else if (desc.Type(fieldName) == "Intarray")
         {
             for ( auto i = 0; i < desc.Len(fieldName);  i ++)
             {
                 int data;
                 is >> data;
-                unsigned char data8 = static_cast<unsigned char>(data);
-                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i, &data8, sizeof(unsigned char));
+                memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i, &data, sizeof(int));
             }
         }
         else if (desc.Type(fieldName) == "Byte")
@@ -130,16 +137,30 @@ namespace rdb
                 auto len_ = desc.Len(std::get<rname>(r));
                 os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_), len_)  ;
             }
-            else if (std::get<rtype>(r) == Bytearray)
+            else if (std::get<rtype>(r) == Bytearray) {
+                for (auto i = 0; i < std::get<rlen>(r); i++) {
+                    unsigned char data;
+                    memcpy(&data, rhs.getPayloadPtr() + offset_ + i, sizeof(unsigned char));
+                    if (rhs.hexFormat) {
+                        os << std::setfill('0');
+                        os << std::setw(2);
+                    }
+                    os << (int) data;
+                    if (i != std::get<rlen>(r)) {
+                        os << " ";
+                    }
+                }
+            }
+            else if (std::get<rtype>(r) == Intarray)
             {
                 for ( auto i = 0 ; i < std::get<rlen>(r) ; i ++ )
                 {
-                    unsigned char data;
-                    memcpy( &data , rhs.getPayloadPtr() + offset_ + i , sizeof(unsigned char) );
+                    int data;
+                    memcpy( &data , rhs.getPayloadPtr() + offset_ + i , sizeof(int) );
                     if ( rhs.hexFormat )
                     {
                         os << std::setfill('0');
-                        os << std::setw(2);
+                        os << std::setw(8);
                     }
                     os << (int)data;
                     if ( i != std::get<rlen>(r) )

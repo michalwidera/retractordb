@@ -17,6 +17,7 @@ Storage supports data of following types:
 |Unit  | 4 |0 to 4294967295|Unsigned int|
 |String|[declared]|Array of Bytes|Array of bytes dedicated for strings|
 |Bytearray|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
+|Intarray|[declared]|Array of Integers|Array of integers dedicated for integer array payloads|
 |Float| 4 | ... | Floating point value|
 |Double| 8 | ... | Floating point value (double size)|
 

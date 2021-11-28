@@ -1,20 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <cstring>
 #include <locale>
-#include <memory>
-#include <sstream>
 #include <algorithm>
-#include <iomanip>
 
 #include "rdb/dsacc.h"
-#include "rdb/desc.h"
-#include "rdb/faccfs.h"
-#include "rdb/faccposix.h"
-#include "rdb/faccposixprm.h"
 #include "rdb/payloadacc.h"
 
 #include "rdb/fainterface.h"
