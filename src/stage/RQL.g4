@@ -20,14 +20,61 @@ select_statement    : SELECT columns=select_list
                     ;
 
 declare_statement   : DECLARE column_name_list
-                      STREAM ID
-                      (FILE ID)?
+                      STREAM ID COMMA ( DECIMAL | FLOAT | RATIONAL )
+                      (FILE STRING)?
                     ;
 
-column_name_list    : column+=ID (',' column+=ID)*
+column_name_list    : column+=ID column_type (COMMA column+=ID column_type)*
                     ;
 
-select_list         : column+=ID (',' column+=ID)*
+column_type         : ( ( FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T )
+                        | ( ( STRING_T | ARRAY_B_T | ARRAY_I_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET )
+                      )
+                    ;
+
+select_list         : column+=select_list_elem (COMMA column+=select_list_elem)*
+                    ;
+
+select_list_elem    : asterisk
+                    | expression
+                    ;
+
+field_id            : column_name=ID // id
+                    | column_name=ID LS_BRACKET UNDERLINE RS_BRACKET // id[_]
+                    | tablename=ID DOT column_name=ID  // id.id
+                    | tablename=ID LS_BRACKET column_index=DECIMAL RS_BRACKET // id[id]
+                    ;
+/*
+expression
+    :
+    | function_call
+    | unary_op_expression
+    | expression op=('*' | '/' | '%') expression
+    | expression op=('+' | '-' | '&' | '^' | '|' | '||') expression
+    ;
+*/
+unary_op_expression
+    : BIT_NOT expression
+    | op=( PLUS | MINUS ) expression
+    ;
+
+asterisk            : (ID DOT)? STAR
+                    ;
+
+expression          : term ( PLUS term | MINUS term )*
+                    ;
+
+term                : factor ( STAR factor | DIVIDE factor )*
+                    ;
+
+factor              : FLOAT
+                    | REAL
+                    | DECIMAL
+                    | unary_op_expression
+                    | function_call
+                    | field_id
+                    | agregator
+                    | LR_BRACKET expression RR_BRACKET
                     ;
 
 stream_expression   : stream_term
@@ -41,13 +88,27 @@ stream_term         : ID
                       ( SHARP ID
                       | AND RATIONAL
                       | MOD RATIONAL
-                      | AT LR_BRACKET DECIMAL COMMA SIGNED_DECIMAL RR_BRACKET
+                      | AT LR_BRACKET DECIMAL COMMA (PLUS|MINUS)? DECIMAL RR_BRACKET
                       | DOT agregator
                       ) *
                     ;
 
 agregator           : MIN | MAX | AVG | SUMC
                     ;
+
+function_call       : function = (SQRT | CEIL | ABS | FLOOR | SIGN | CHR
+                       | LENGTH | TO_NUMBER | TO_TIMESTAMP | FLOAT_CAST
+                       | INT_CAST | COUNT | CRC | SUM | ISZERO | ISNONZERO )
+                      LR_BRACKET expression RR_BRACKET
+                    ;
+
+FLOAT_T:            'FLOAT';
+STRING_T:           'STRING';
+BYTE_T:             'BYTE';
+INTEGER_T:          'INT';
+UNSIGNED_T:         'UNSIGNED';
+ARRAY_B_T:          'ARRAY_BYTE';
+ARRAY_I_T:          'ARRAY_INTEGER';
 
 SELECT:             'SELECT';
 STREAM:             'STREAM';
@@ -60,11 +121,27 @@ MAX:                'MAX';
 AVG:                'AVG';
 SUMC:               'SUMC';
 
-ID:                 ( [A-Z_] ) ( [A-Z_$@0-9] )*;
+SQRT:               'SQRT';
+CEIL:               'CEIL';
+ABS:                'ABS';
+FLOOR:              'FLOOR';
+SIGN:               'SIGN';
+CHR:                'CHR';
+LENGTH:             'LENGTH';
+TO_NUMBER:          'TO_NUMBER';
+TO_TIMESTAMP:       'TO_TIMESTAMP';
+FLOAT_CAST:         'FLOATC';
+INT_CAST:           'INTC';
+COUNT:              'COUNT';
+CRC:                'CRC';
+SUM:                'SUM';
+ISZERO:             'ISZERO';
+ISNONZERO:          'ISNONZERO';
+
+ID:                 ( [A-Za-z] ) ( [A-Za-z$0-9] )*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
-SIGNED_DECIMAL:     [+-]? DEC_DIGIT+;
 RATIONAL:           DECIMAL DIVIDE DECIMAL;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
@@ -82,6 +159,10 @@ MOD:                '%';
 DOLLAR:             '$';
 LR_BRACKET:         '(';
 RR_BRACKET:         ')';
+LS_BRACKET:         '[';
+RS_BRACKET:         ']';
+LC_BRACKET:         '{';
+RC_BRACKET:         '}';
 COMMA:              ',';
 SEMI:               ';';
 COLON:              ':';

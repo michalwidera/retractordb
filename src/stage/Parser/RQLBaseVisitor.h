@@ -35,7 +35,39 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitColumn_type(RQLParser::Column_typeContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual antlrcpp::Any visitSelect_list(RQLParser::Select_listContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitSelect_list_elem(RQLParser::Select_list_elemContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitField_id(RQLParser::Field_idContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitAsterisk(RQLParser::AsteriskContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitExpression(RQLParser::ExpressionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitTerm(RQLParser::TermContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitFactor(RQLParser::FactorContext *ctx) override {
     return visitChildren(ctx);
   }
 
@@ -48,6 +80,10 @@ public:
   }
 
   virtual antlrcpp::Any visitAgregator(RQLParser::AgregatorContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitFunction_call(RQLParser::Function_callContext *ctx) override {
     return visitChildren(ctx);
   }
 

@@ -5,6 +5,8 @@
 #include "Parser/RQLParser.h"
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
+// https://github.com/antlr/grammars-v4/tree/master/sql/tsql
+// make grammar && make install && xstage ../src/stage/example.txt
 
 using namespace antlrcpp;
 using namespace antlr4;

@@ -1,0 +1,10 @@
+/* declarations */
+DECLARE coef ARRAY_INTEGER[25] STREAM filter, 1 FILE 'filterremez.txt'
+DECLARE data BYTE STREAM source, 0.02 FILE '/dev/urandom'
+
+/* queries */
+SELECT * STREAM signalRow FROM source@(1,25)
+SELECT signalRow[_] * filter[_] STREAM accRow FROM signalRow+filter
+SELECT accRow[0] STREAM output FROM accRow.SUMC
+SELECT output[0]/25,source[0] STREAM outputAll FROM output+source
+
