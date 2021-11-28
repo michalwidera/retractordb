@@ -1,6 +1,6 @@
 /* declarations */
-DECLARE coef ARRAY_INTEGER[25] STREAM filter, 1 FILE 'filterremez.txt'
-DECLARE data BYTE STREAM source, 0.02 FILE '/dev/urandom'
+DECLARE coef INT[25] STREAM filter, 0.01 FILE 'filterremez.txt'
+DECLARE data BYTE STREAM source, 1/3 FILE '/dev/urandom'
 
 /* queries */
 SELECT * STREAM signalRow FROM source@(1,25)

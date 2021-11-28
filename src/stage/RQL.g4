@@ -19,15 +19,15 @@ select_statement    : SELECT columns=select_list
                     ;
 
 declare_statement   : DECLARE column_name_list
-                      STREAM ID COMMA RATIONAL
+                      STREAM stream_name=ID COMMA (DECIMAL | FLOAT | RATIONAL)
                       (FILE STRING)?
                     ;
 
 column_name_list    : column+=ID column_type (COMMA column+=ID column_type)*
                     ;
 
-column_type         : ((FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
-                        | ((STRING_T | ARRAY_B_T | ARRAY_I_T) LS_BRACKET type_size=DECIMAL RS_BRACKET)
+column_type         : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
+                        | (FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
                       )
                     ;
 
@@ -70,14 +70,14 @@ factor              : FLOAT
 stream_expression   : stream_term
                       ( timemove=GREATER DECIMAL
                       | stream_add=PLUS stream_term
-                      | stream_sub=MINUS RATIONAL
+                      | stream_sub=MINUS (DECIMAL | FLOAT | RATIONAL)
                       ) *
                     ;
 
 stream_term         : ID
                       ( hash=SHARP ID
-                      | dehash_div=AND RATIONAL
-                      | dehash_mod=MOD RATIONAL
+                      | dehash_div=AND (DECIMAL | FLOAT | RATIONAL)
+                      | dehash_mod=MOD (DECIMAL | FLOAT | RATIONAL)
                       | agse=AT LR_BRACKET DECIMAL COMMA (PLUS | MINUS)? DECIMAL RR_BRACKET
                       | DOT agregator
                       ) *
@@ -104,8 +104,6 @@ STRING_T:           'STRING';
 INTEGER_T:          'INT';
 BYTE_T:             'BYTE';
 UNSIGNED_T:         'UNSIGNED';
-ARRAY_B_T:          'BYTEARRAY';
-ARRAY_I_T:          'INTARRAY';
 FLOAT_T:            'FLOAT';
 DOUBLE_T:           'DOUBLE';
 
@@ -141,8 +139,7 @@ ID:                 ([A-Za-z]) ([A-Za-z$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
-RATIONAL:           (DECIMAL | FLOAT | RATIONAL_PURE)
-RATIONAL_PURE       ( DECIMAL DIVIDE DECIMAL ) | FLOAT ;
+RATIONAL:           DECIMAL DIVIDE DECIMAL;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';
