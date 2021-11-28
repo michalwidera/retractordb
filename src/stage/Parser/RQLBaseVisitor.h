@@ -26,6 +26,10 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual antlrcpp::Any visitRational(RQLParser::RationalContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual antlrcpp::Any visitDeclare_statement(RQLParser::Declare_statementContext *ctx) override {
     return visitChildren(ctx);
   }
@@ -75,6 +79,10 @@ public:
   }
 
   virtual antlrcpp::Any visitStream_term(RQLParser::Stream_termContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual antlrcpp::Any visitStream_factor(RQLParser::Stream_factorContext *ctx) override {
     return visitChildren(ctx);
   }
 

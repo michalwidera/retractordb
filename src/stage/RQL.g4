@@ -15,11 +15,12 @@ select_statement    : SELECT columns=select_list
                       std::cout << "::id ID:" << $id.text << std::endl;
                       std::cout << "::from ID:" << $from.text << std::endl;
                       }
-
                     ;
 
+rational            : FLOAT | REAL | DECIMAL | RATIONAL;
+
 declare_statement   : DECLARE column_name_list
-                      STREAM stream_name=ID COMMA (DECIMAL | FLOAT | RATIONAL)
+                      STREAM stream_name=ID COMMA rational
                       (FILE STRING)?
                     ;
 
@@ -70,17 +71,21 @@ factor              : FLOAT
 stream_expression   : stream_term
                       ( timemove=GREATER DECIMAL
                       | stream_add=PLUS stream_term
-                      | stream_sub=MINUS (DECIMAL | FLOAT | RATIONAL)
+                      | stream_sub=MINUS rational
                       ) *
                     ;
 
-stream_term         : ID
+stream_term         : stream_factor
                       ( hash=SHARP ID
-                      | dehash_div=AND (DECIMAL | FLOAT | RATIONAL)
-                      | dehash_mod=MOD (DECIMAL | FLOAT | RATIONAL)
+                      | dehash_div=AND rational
+                      | dehash_mod=MOD rational
                       | agse=AT LR_BRACKET DECIMAL COMMA (PLUS | MINUS)? DECIMAL RR_BRACKET
                       | DOT agregator
                       ) *
+                    ;
+
+stream_factor       : ID
+                    | LR_BRACKET stream_expression RR_BRACKET
                     ;
 
 agregator           : MIN | MAX | AVG | SUMC
@@ -118,24 +123,24 @@ MAX:                'MAX';
 AVG:                'AVG';
 SUMC:               'SUMC';
 
-SQRT:               'SQRT';
-CEIL:               'CEIL';
-ABS:                'ABS';
-FLOOR:              'FLOOR';
-SIGN:               'SIGN';
-CHR:                'CHR';
-LENGTH:             'LENGTH';
-TO_NUMBER:          'TO_NUMBER';
-TO_TIMESTAMP:       'TO_TIMESTAMP';
-FLOAT_CAST:         'FLOATC';
-INT_CAST:           'INTC';
-COUNT:              'COUNT';
-CRC:                'CRC';
-SUM:                'SUM';
-ISZERO:             'ISZERO';
-ISNONZERO:          'ISNONZERO';
+SQRT:               'Sqrt';
+CEIL:               'Ceil';
+ABS:                'Abs';
+FLOOR:              'Floor';
+SIGN:               'Sign';
+CHR:                'Chr';
+LENGTH:             'Length';
+TO_NUMBER:          'ToNumber';
+TO_TIMESTAMP:       'ToTimeStamp';
+FLOAT_CAST:         'FloatCast';
+INT_CAST:           'InstCast';
+COUNT:              'Count';
+CRC:                'Crc';
+SUM:                'Sum';
+ISZERO:             'IsZero';
+ISNONZERO:          'IsNonZero';
 
-ID:                 ([A-Za-z]) ([A-Za-z$0-9])*;
+ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;

@@ -30,11 +30,12 @@ public:
   };
 
   enum {
-    RuleProg = 0, RuleSelect_statement = 1, RuleDeclare_statement = 2, RuleColumn_name_list = 3, 
-    RuleColumn_type = 4, RuleSelect_list = 5, RuleSelect_list_elem = 6, 
-    RuleField_id = 7, RuleUnary_op_expression = 8, RuleAsterisk = 9, RuleExpression = 10, 
-    RuleTerm = 11, RuleFactor = 12, RuleStream_expression = 13, RuleStream_term = 14, 
-    RuleAgregator = 15, RuleFunction_call = 16
+    RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleDeclare_statement = 3, 
+    RuleColumn_name_list = 4, RuleColumn_type = 5, RuleSelect_list = 6, 
+    RuleSelect_list_elem = 7, RuleField_id = 8, RuleUnary_op_expression = 9, 
+    RuleAsterisk = 10, RuleExpression = 11, RuleTerm = 12, RuleFactor = 13, 
+    RuleStream_expression = 14, RuleStream_term = 15, RuleStream_factor = 16, 
+    RuleAgregator = 17, RuleFunction_call = 18
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -49,6 +50,7 @@ public:
 
   class ProgContext;
   class Select_statementContext;
+  class RationalContext;
   class Declare_statementContext;
   class Column_name_listContext;
   class Column_typeContext;
@@ -62,6 +64,7 @@ public:
   class FactorContext;
   class Stream_expressionContext;
   class Stream_termContext;
+  class Stream_factorContext;
   class AgregatorContext;
   class Function_callContext; 
 
@@ -103,6 +106,22 @@ public:
 
   Select_statementContext* select_statement();
 
+  class  RationalContext : public antlr4::ParserRuleContext {
+  public:
+    RationalContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *FLOAT();
+    antlr4::tree::TerminalNode *REAL();
+    antlr4::tree::TerminalNode *DECIMAL();
+    antlr4::tree::TerminalNode *RATIONAL();
+
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  RationalContext* rational();
+
   class  Declare_statementContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *stream_name = nullptr;
@@ -112,10 +131,8 @@ public:
     Column_name_listContext *column_name_list();
     antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *COMMA();
+    RationalContext *rational();
     antlr4::tree::TerminalNode *ID();
-    antlr4::tree::TerminalNode *DECIMAL();
-    antlr4::tree::TerminalNode *FLOAT();
-    antlr4::tree::TerminalNode *RATIONAL();
     antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *STRING();
 
@@ -322,16 +339,14 @@ public:
     Stream_termContext* stream_term(size_t i);
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    std::vector<RationalContext *> rational();
+    RationalContext* rational(size_t i);
     std::vector<antlr4::tree::TerminalNode *> GREATER();
     antlr4::tree::TerminalNode* GREATER(size_t i);
     std::vector<antlr4::tree::TerminalNode *> PLUS();
     antlr4::tree::TerminalNode* PLUS(size_t i);
     std::vector<antlr4::tree::TerminalNode *> MINUS();
     antlr4::tree::TerminalNode* MINUS(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> FLOAT();
-    antlr4::tree::TerminalNode* FLOAT(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> RATIONAL();
-    antlr4::tree::TerminalNode* RATIONAL(size_t i);
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -348,8 +363,11 @@ public:
     antlr4::Token *agse = nullptr;
     Stream_termContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    Stream_factorContext *stream_factor();
     std::vector<antlr4::tree::TerminalNode *> ID();
     antlr4::tree::TerminalNode* ID(size_t i);
+    std::vector<RationalContext *> rational();
+    RationalContext* rational(size_t i);
     std::vector<antlr4::tree::TerminalNode *> LR_BRACKET();
     antlr4::tree::TerminalNode* LR_BRACKET(size_t i);
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
@@ -366,10 +384,6 @@ public:
     antlr4::tree::TerminalNode* SHARP(size_t i);
     std::vector<antlr4::tree::TerminalNode *> AND();
     antlr4::tree::TerminalNode* AND(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> FLOAT();
-    antlr4::tree::TerminalNode* FLOAT(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> RATIONAL();
-    antlr4::tree::TerminalNode* RATIONAL(size_t i);
     std::vector<antlr4::tree::TerminalNode *> MOD();
     antlr4::tree::TerminalNode* MOD(size_t i);
     std::vector<antlr4::tree::TerminalNode *> AT();
@@ -385,6 +399,22 @@ public:
   };
 
   Stream_termContext* stream_term();
+
+  class  Stream_factorContext : public antlr4::ParserRuleContext {
+  public:
+    Stream_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *LR_BRACKET();
+    Stream_expressionContext *stream_expression();
+    antlr4::tree::TerminalNode *RR_BRACKET();
+
+
+    virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  Stream_factorContext* stream_factor();
 
   class  AgregatorContext : public antlr4::ParserRuleContext {
   public:

@@ -26,6 +26,8 @@ public:
 
     virtual antlrcpp::Any visitSelect_statement(RQLParser::Select_statementContext *context) = 0;
 
+    virtual antlrcpp::Any visitRational(RQLParser::RationalContext *context) = 0;
+
     virtual antlrcpp::Any visitDeclare_statement(RQLParser::Declare_statementContext *context) = 0;
 
     virtual antlrcpp::Any visitColumn_name_list(RQLParser::Column_name_listContext *context) = 0;
@@ -51,6 +53,8 @@ public:
     virtual antlrcpp::Any visitStream_expression(RQLParser::Stream_expressionContext *context) = 0;
 
     virtual antlrcpp::Any visitStream_term(RQLParser::Stream_termContext *context) = 0;
+
+    virtual antlrcpp::Any visitStream_factor(RQLParser::Stream_factorContext *context) = 0;
 
     virtual antlrcpp::Any visitAgregator(RQLParser::AgregatorContext *context) = 0;
 
