@@ -1,7 +1,14 @@
 grammar RQL;
 
 @header {
-    #include <iostream>
+// @header from RQL.g4
+#include <iostream>
+// End of @header
+}
+
+@members {
+// @members from RQL.g4
+// End of @members
 }
 
 prog                : (select_statement | declare_statement)+ EOF
@@ -9,8 +16,7 @@ prog                : (select_statement | declare_statement)+ EOF
 
 select_statement    : SELECT columns=select_list
                       STREAM id=ID
-                      FROM from=stream_expression
-                      {
+                      FROM from=stream_expression {
                       std::cout << "::columns ID:" << $columns.text << std::endl;
                       std::cout << "::id ID:" << $id.text << std::endl;
                       std::cout << "::from ID:" << $from.text << std::endl;
@@ -49,13 +55,19 @@ unary_op_expression : BIT_NOT expression
                     | op=(PLUS | MINUS) expression
                     ;
 
-asterisk            : (ID DOT)? STAR
+asterisk            : (ID DOT)? STAR {std::cout << "# Scan All" << std::endl;}
                     ;
 
-expression          : term (PLUS term | MINUS term)*
+expression returns [std::string e]
+                    : expression PLUS expression {std::cout << "# Op +" << std::endl;}
+                    | expression MINUS expression {std::cout << "# Op +" << std::endl;}
+                    | term
                     ;
 
-term                : factor (STAR factor | DIVIDE factor)*
+term returns [std::string e]
+                    : term STAR term {std::cout << "# Op *" << std::endl;}
+                    | term DIVIDE term {std::cout << "# Op /" << std::endl;}
+                    | t=factor {$e = $t.text; std::cout << "# term:" << $t.text << std::endl;}
                     ;
 
 factor              : FLOAT

@@ -1,5 +1,7 @@
 
-    #include <iostream>
+// @header from RQL.g4
+#include <iostream>
+// End of @header
 
 
 // Generated from RQL.g4 by ANTLR 4.9.3
@@ -46,6 +48,10 @@ public:
   virtual const std::vector<std::string>& getTokenNames() const override { return _tokenNames; }; // deprecated: use vocabulary instead.
   virtual const std::vector<std::string>& getRuleNames() const override;
   virtual antlr4::dfa::Vocabulary& getVocabulary() const override;
+
+
+  // @members from RQL.g4
+  // End of @members
 
 
   class ProgContext;
@@ -272,14 +278,14 @@ public:
 
   class  ExpressionContext : public antlr4::ParserRuleContext {
   public:
+    std::string e;
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    std::vector<TermContext *> term();
-    TermContext* term(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> PLUS();
-    antlr4::tree::TerminalNode* PLUS(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> MINUS();
-    antlr4::tree::TerminalNode* MINUS(size_t i);
+    TermContext *term();
+    std::vector<ExpressionContext *> expression();
+    ExpressionContext* expression(size_t i);
+    antlr4::tree::TerminalNode *PLUS();
+    antlr4::tree::TerminalNode *MINUS();
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -287,17 +293,18 @@ public:
   };
 
   ExpressionContext* expression();
-
+  ExpressionContext* expression(int precedence);
   class  TermContext : public antlr4::ParserRuleContext {
   public:
+    std::string e;
+    RQLParser::FactorContext *t = nullptr;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    std::vector<FactorContext *> factor();
-    FactorContext* factor(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> STAR();
-    antlr4::tree::TerminalNode* STAR(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DIVIDE();
-    antlr4::tree::TerminalNode* DIVIDE(size_t i);
+    FactorContext *factor();
+    std::vector<TermContext *> term();
+    TermContext* term(size_t i);
+    antlr4::tree::TerminalNode *STAR();
+    antlr4::tree::TerminalNode *DIVIDE();
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -305,7 +312,7 @@ public:
   };
 
   TermContext* term();
-
+  TermContext* term(int precedence);
   class  FactorContext : public antlr4::ParserRuleContext {
   public:
     FactorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -464,6 +471,10 @@ public:
 
   Function_callContext* function_call();
 
+
+  virtual bool sempred(antlr4::RuleContext *_localctx, size_t ruleIndex, size_t predicateIndex) override;
+  bool expressionSempred(ExpressionContext *_localctx, size_t predicateIndex);
+  bool termSempred(TermContext *_localctx, size_t predicateIndex);
 
 private:
   static std::vector<antlr4::dfa::DFA> _decisionToDFA;

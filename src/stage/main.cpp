@@ -22,12 +22,15 @@ int main(int argc, const char *args[])
     RQLLexer lexer(&input);
     CommonTokenStream tokens(&lexer);
     // Print the token stream.
-    cout << "Tokens:" << endl;
-    tokens.fill();
-    for (Token *token : tokens.getTokens())
+    //cout << "Tokens:" << endl;
+    //tokens.fill();
+    /*
+     for (Token *token : tokens.getTokens())
     {
         std::cout << token->toString() << std::endl;
     }
+    */
+
     // Create a parser which parses the token stream
     // to create a parse tree.
     RQLParser parser(&tokens);
