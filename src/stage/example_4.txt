@@ -1,0 +1,7 @@
+/* Example Set 4 - Testing area */
+DECLARE a INT STREAM inputdata,1/4 FILE 'datasum.dat'
+
+SELECT (wy[0]+wy[1])*2+(wy[2]-wy[3])/3,IsZero(err[0])*10 STREAM wy1 FROM do
+SELECT * STREAM graph_all FROM ((err>1) + inputData)
+SELECT * STREAM graph FROM graph_all & 1
+

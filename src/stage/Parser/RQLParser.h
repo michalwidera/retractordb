@@ -300,6 +300,9 @@ public:
     RQLParser::FactorContext *t = nullptr;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *LR_BRACKET();
+    ExpressionContext *expression();
+    antlr4::tree::TerminalNode *RR_BRACKET();
     FactorContext *factor();
     std::vector<TermContext *> term();
     TermContext* term(size_t i);
@@ -324,9 +327,6 @@ public:
     Function_callContext *function_call();
     Field_idContext *field_id();
     AgregatorContext *agregator();
-    antlr4::tree::TerminalNode *LR_BRACKET();
-    ExpressionContext *expression();
-    antlr4::tree::TerminalNode *RR_BRACKET();
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;

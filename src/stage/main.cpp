@@ -38,5 +38,6 @@ int main(int argc, const char *args[])
     // Print the parse tree in Lisp format.
     cout << endl << "Parse tree (Lisp format):" << endl;
     std::cout << tree->toStringTree(&parser) << endl;
+    std::cout << endl ;
     return 0;
 }

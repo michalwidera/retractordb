@@ -67,6 +67,7 @@ expression returns [std::string e]
 term returns [std::string e]
                     : term STAR term {std::cout << "# Op *" << std::endl;}
                     | term DIVIDE term {std::cout << "# Op /" << std::endl;}
+                    | LR_BRACKET expression RR_BRACKET
                     | t=factor {$e = $t.text; std::cout << "# term:" << $t.text << std::endl;}
                     ;
 
@@ -77,7 +78,6 @@ factor              : FLOAT
                     | function_call
                     | field_id
                     | agregator
-                    | LR_BRACKET expression RR_BRACKET
                     ;
 
 stream_expression   : stream_term
