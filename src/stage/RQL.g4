@@ -8,18 +8,21 @@ grammar RQL;
 
 @members {
 // @members from RQL.g4
+int instructionCount = 0;
 // End of @members
 }
 
-prog                : (select_statement | declare_statement)+ EOF
+prog                : ( select_statement {std::cout << $select_statement.text << std::endl;}
+                      | declare_statement {std::cout << $declare_statement.text << std::endl;}
+                      )+ EOF
                     ;
 
-select_statement    : SELECT columns=select_list
-                      STREAM id=ID
-                      FROM from=stream_expression {
-                      std::cout << "::columns ID:" << $columns.text << std::endl;
-                      std::cout << "::id ID:" << $id.text << std::endl;
-                      std::cout << "::from ID:" << $from.text << std::endl;
+select_statement    : SELECT select_list {std::cout << "::select_list:" << $select_list.text << std::endl;}
+                      STREAM ID {std::cout << "::ID:" << $ID.text << std::endl;}
+                      FROM stream_expression {
+                      std::cout << "::stream_expression:" << $stream_expression.text << std::endl;
+                      std::cout << instructionCount << std::endl;
+                      instructionCount ++;
                       }
                     ;
 
@@ -71,10 +74,10 @@ term returns [std::string e]
                     | t=factor {$e = $t.text; std::cout << "# term:" << $t.text << std::endl;}
                     ;
 
-factor              : FLOAT
-                    | REAL
-                    | DECIMAL
-                    | unary_op_expression
+factor              : w=FLOAT {std::cout << "FLOAT!! " << $w.text << std::endl;}
+                    | w=REAL {std::cout << "REAL!! " << $w.text << std::endl;}
+                    | w=DECIMAL {std::cout << "INT!! " << $w.int << std::endl;}
+                    | unary_op_expression {std::cout << "Unary!! " << $unary_op_expression.text << std::endl;}
                     | function_call
                     | field_id
                     | agregator

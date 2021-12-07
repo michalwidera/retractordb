@@ -36,6 +36,7 @@ public:
 
 
   // @members from RQL.g4
+  int instructionCount = 0;
   // End of @members
 
   virtual std::string getGrammarFileName() const override;

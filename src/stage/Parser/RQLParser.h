@@ -51,6 +51,7 @@ public:
 
 
   // @members from RQL.g4
+  int instructionCount = 0;
   // End of @members
 
 
@@ -76,6 +77,8 @@ public:
 
   class  ProgContext : public antlr4::ParserRuleContext {
   public:
+    RQLParser::Select_statementContext *select_statementContext = nullptr;
+    RQLParser::Declare_statementContext *declare_statementContext = nullptr;
     ProgContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EOF();
@@ -93,16 +96,16 @@ public:
 
   class  Select_statementContext : public antlr4::ParserRuleContext {
   public:
-    RQLParser::Select_listContext *columns = nullptr;
-    antlr4::Token *id = nullptr;
-    RQLParser::Stream_expressionContext *from = nullptr;
+    RQLParser::Select_listContext *select_listContext = nullptr;
+    antlr4::Token *idToken = nullptr;
+    RQLParser::Stream_expressionContext *stream_expressionContext = nullptr;
     Select_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *SELECT();
-    antlr4::tree::TerminalNode *STREAM();
-    antlr4::tree::TerminalNode *FROM();
     Select_listContext *select_list();
+    antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *FROM();
     Stream_expressionContext *stream_expression();
 
 
@@ -318,6 +321,8 @@ public:
   TermContext* term(int precedence);
   class  FactorContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *w = nullptr;
+    RQLParser::Unary_op_expressionContext *unary_op_expressionContext = nullptr;
     FactorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *FLOAT();
