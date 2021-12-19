@@ -4,6 +4,19 @@ project( regression-test )
 
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 
+# Purpose of this test is to fail if someone will create xrdb artifact
+# If such file will appear in .local/bin folder or in a path
+# this will cause to system hang during startup
+# My fail count #2
+
+add_test(
+        NAME check-output-artifacts
+        WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+        COMMAND test-artifacts.sh xrdb
+)
+
+# -----------------------------------------------------------------------------------------------
+
 add_test(
   NAME compiler-test-on-query
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
@@ -118,3 +131,4 @@ add_test(
 )
 
 set_tests_properties(retractor-waterfall workflow-test workflow-all-operators PROPERTIES RUN_SERIAL TRUE)
+
