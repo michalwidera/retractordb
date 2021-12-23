@@ -43,6 +43,9 @@ class ParserListener : public RQLBaseListener {
 public:
     void exitSelect(RQLParser::SelectContext * ctx) {
         std::cout << "!*! " << ctx->select_list()->getText() << std::endl ;
+
+        for ( auto i : ctx->select_list()->select_list_elem() )
+            std::cout << "!!  >" << i->getText() << std::endl ;
     }
 };
 
