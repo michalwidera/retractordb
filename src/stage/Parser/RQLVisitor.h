@@ -1,9 +1,4 @@
 
-// @header from RQL.g4
-#include <iostream>
-// End of @header
-
-
 // Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
@@ -26,11 +21,11 @@ public:
    */
     virtual antlrcpp::Any visitProg(RQLParser::ProgContext *context) = 0;
 
-    virtual antlrcpp::Any visitSelect_statement(RQLParser::Select_statementContext *context) = 0;
+    virtual antlrcpp::Any visitSelect(RQLParser::SelectContext *context) = 0;
 
     virtual antlrcpp::Any visitRational(RQLParser::RationalContext *context) = 0;
 
-    virtual antlrcpp::Any visitDeclare_statement(RQLParser::Declare_statementContext *context) = 0;
+    virtual antlrcpp::Any visitDeclare(RQLParser::DeclareContext *context) = 0;
 
     virtual antlrcpp::Any visitColumn_name_list(RQLParser::Column_name_listContext *context) = 0;
 

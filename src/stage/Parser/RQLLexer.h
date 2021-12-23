@@ -1,9 +1,4 @@
 
-// @header from RQL.g4
-#include <iostream>
-// End of @header
-
-
 // Generated from RQL.g4 by ANTLR 4.9.3
 
 #pragma once
@@ -33,11 +28,6 @@ public:
 
   explicit RQLLexer(antlr4::CharStream *input);
   ~RQLLexer();
-
-
-  // @members from RQL.g4
-  int instructionCount = 0;
-  // End of @members
 
   virtual std::string getGrammarFileName() const override;
   virtual const std::vector<std::string>& getRuleNames() const override;

@@ -3,6 +3,8 @@
 
 #include "Parser/RQLLexer.h"
 #include "Parser/RQLParser.h"
+#include "Parser/RQLBaseListener.h"
+#include "Parser/RQLBaseVisitor.h"
 
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
@@ -18,7 +20,7 @@ using namespace std;
 class LexerErrorListener : public BaseErrorListener {
 public:
 
-    virtual void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
+    void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                              const std::string &msg, std::exception_ptr e) override {
         std::cerr << "?? line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg ;
     }
@@ -27,9 +29,16 @@ public:
 class ParserErrorListener : public BaseErrorListener {
 public:
 
-    virtual void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
+    void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                              const std::string &msg, std::exception_ptr e) override {
         std::cerr << "?? line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg ;
+    }
+};
+
+class ParserListener : public RQLBaseListener {
+public:
+    void exitSelect(RQLParser::SelectContext * ctx) {
+        std::cout << "!*! " << ctx->select_list()->getText() << std::endl ;
     }
 };
 
@@ -63,9 +72,11 @@ int main(int argc, const char *args[])
 
     RQLParser parser(&tokens);
     ParserErrorListener parserErrorListener;
+    ParserListener parserListener;
     parser.removeParseListeners();
     parser.removeErrorListeners();
     parser.addErrorListener(&parserErrorListener);
+    parser.addParseListener(&parserListener);
     tree::ParseTree *tree = parser.prog();
 
     // Print the parse tree in Lisp format.

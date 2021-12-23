@@ -1,29 +1,14 @@
 grammar RQL;
 
-@header {
-// @header from RQL.g4
-#include <iostream>
-// End of @header
-}
-
-@members {
-// @members from RQL.g4
-int instructionCount = 0;
-// End of @members
-}
-
-prog                : ( select_statement {std::cout << $select_statement.text << std::endl;}
-                      | declare_statement {std::cout << $declare_statement.text << std::endl;}
+prog                : ( select_statement
+                      | declare_statement
                       )+ EOF
                     ;
 
-select_statement    : SELECT select_list {std::cout << "::select_list:" << $select_list.text << std::endl;}
-                      STREAM ID {std::cout << "::ID:" << $ID.text << std::endl;}
-                      FROM stream_expression {
-                      std::cout << "::stream_expression:" << $stream_expression.text << std::endl;
-                      std::cout << instructionCount << std::endl;
-                      instructionCount ++;
-                      }
+select_statement    : SELECT select_list
+                      STREAM ID
+                      FROM stream_expression
+                    # Select
                     ;
 
 rational            : FLOAT | REAL | DECIMAL | RATIONAL;
@@ -31,6 +16,7 @@ rational            : FLOAT | REAL | DECIMAL | RATIONAL;
 declare_statement   : DECLARE column_name_list
                       STREAM stream_name=ID COMMA rational
                       (FILE STRING)?
+                    # Declare
                     ;
 
 column_name_list    : column+=ID column_type (COMMA column+=ID column_type)*
@@ -58,26 +44,26 @@ unary_op_expression : BIT_NOT expression
                     | op=(PLUS | MINUS) expression
                     ;
 
-asterisk            : (ID DOT)? STAR {std::cout << "# Scan All" << std::endl;}
+asterisk            : (ID DOT)? STAR
                     ;
 
-expression returns [std::string e]
-                    : expression PLUS expression {std::cout << "# Op +" << std::endl;}
-                    | expression MINUS expression {std::cout << "# Op +" << std::endl;}
+expression
+                    : expression PLUS expression
+                    | expression MINUS expression
                     | term
                     ;
 
-term returns [std::string e]
-                    : term STAR term {std::cout << "# Op *" << std::endl;}
-                    | term DIVIDE term {std::cout << "# Op /" << std::endl;}
+term
+                    : term STAR term
+                    | term DIVIDE term
                     | LR_BRACKET expression RR_BRACKET
-                    | t=factor {$e = $t.text; std::cout << "# term:" << $t.text << std::endl;}
+                    | t=factor
                     ;
 
-factor              : w=FLOAT {std::cout << "FLOAT!! " << $w.text << std::endl;}
-                    | w=REAL {std::cout << "REAL!! " << $w.text << std::endl;}
-                    | w=DECIMAL {std::cout << "INT!! " << $w.int << std::endl;}
-                    | unary_op_expression {std::cout << "Unary!! " << $unary_op_expression.text << std::endl;}
+factor              : w=FLOAT
+                    | w=REAL
+                    | w=DECIMAL
+                    | unary_op_expression
                     | function_call
                     | field_id
                     | agregator
