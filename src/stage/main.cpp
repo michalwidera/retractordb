@@ -4,12 +4,16 @@
 #include "Parser/RQLLexer.h"
 #include "Parser/RQLParser.h"
 #include "Parser/RQLBaseListener.h"
-#include "Parser/RQLBaseVisitor.h"
+// #include "Parser/RQLBaseVisitor.h"
 
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
+// Regenerate grammare
 // make grammar && make install && xstage ../src/stage/example_1.txt
+//
+// Generate grammar
+// cd ../src/stage && sh -c ../../scripts/antlr4call.sh RQL.g4 && cd ../../build
 
 using namespace antlrcpp;
 using namespace antlr4;

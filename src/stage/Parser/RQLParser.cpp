@@ -3,7 +3,6 @@
 
 
 #include "RQLListener.h"
-#include "RQLVisitor.h"
 
 #include "RQLParser.h"
 
@@ -73,14 +72,6 @@ void RQLParser::ProgContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitProg(this);
-}
-
-
-antlrcpp::Any RQLParser::ProgContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitProg(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::ProgContext* RQLParser::prog() {
@@ -191,13 +182,6 @@ void RQLParser::SelectContext::exitRule(tree::ParseTreeListener *listener) {
   if (parserListener != nullptr)
     parserListener->exitSelect(this);
 }
-
-antlrcpp::Any RQLParser::SelectContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitSelect(this);
-  else
-    return visitor->visitChildren(this);
-}
 RQLParser::Select_statementContext* RQLParser::select_statement() {
   Select_statementContext *_localctx = _tracker.createInstance<Select_statementContext>(_ctx, getState());
   enterRule(_localctx, 2, RQLParser::RuleSelect_statement);
@@ -272,14 +256,6 @@ void RQLParser::RationalContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRational(this);
-}
-
-
-antlrcpp::Any RQLParser::RationalContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitRational(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::RationalContext* RQLParser::rational() {
@@ -381,13 +357,6 @@ void RQLParser::DeclareContext::exitRule(tree::ParseTreeListener *listener) {
   if (parserListener != nullptr)
     parserListener->exitDeclare(this);
 }
-
-antlrcpp::Any RQLParser::DeclareContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitDeclare(this);
-  else
-    return visitor->visitChildren(this);
-}
 RQLParser::Declare_statementContext* RQLParser::declare_statement() {
   Declare_statementContext *_localctx = _tracker.createInstance<Declare_statementContext>(_ctx, getState());
   enterRule(_localctx, 6, RQLParser::RuleDeclare_statement);
@@ -481,14 +450,6 @@ void RQLParser::Column_name_listContext::exitRule(tree::ParseTreeListener *liste
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitColumn_name_list(this);
-}
-
-
-antlrcpp::Any RQLParser::Column_name_listContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitColumn_name_list(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::Column_name_listContext* RQLParser::column_name_list() {
@@ -589,14 +550,6 @@ void RQLParser::Column_typeContext::exitRule(tree::ParseTreeListener *listener) 
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitColumn_type(this);
-}
-
-
-antlrcpp::Any RQLParser::Column_typeContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitColumn_type(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::Column_typeContext* RQLParser::column_type() {
@@ -708,14 +661,6 @@ void RQLParser::Select_listContext::exitRule(tree::ParseTreeListener *listener) 
     parserListener->exitSelect_list(this);
 }
 
-
-antlrcpp::Any RQLParser::Select_listContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitSelect_list(this);
-  else
-    return visitor->visitChildren(this);
-}
-
 RQLParser::Select_listContext* RQLParser::select_list() {
   Select_listContext *_localctx = _tracker.createInstance<Select_listContext>(_ctx, getState());
   enterRule(_localctx, 12, RQLParser::RuleSelect_list);
@@ -786,14 +731,6 @@ void RQLParser::Select_list_elemContext::exitRule(tree::ParseTreeListener *liste
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSelect_list_elem(this);
-}
-
-
-antlrcpp::Any RQLParser::Select_list_elemContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitSelect_list_elem(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::Select_list_elemContext* RQLParser::select_list_elem() {
@@ -888,14 +825,6 @@ void RQLParser::Field_idContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitField_id(this);
-}
-
-
-antlrcpp::Any RQLParser::Field_idContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitField_id(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::Field_idContext* RQLParser::field_id() {
@@ -1010,14 +939,6 @@ void RQLParser::Unary_op_expressionContext::exitRule(tree::ParseTreeListener *li
     parserListener->exitUnary_op_expression(this);
 }
 
-
-antlrcpp::Any RQLParser::Unary_op_expressionContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitUnary_op_expression(this);
-  else
-    return visitor->visitChildren(this);
-}
-
 RQLParser::Unary_op_expressionContext* RQLParser::unary_op_expression() {
   Unary_op_expressionContext *_localctx = _tracker.createInstance<Unary_op_expressionContext>(_ctx, getState());
   enterRule(_localctx, 18, RQLParser::RuleUnary_op_expression);
@@ -1112,14 +1033,6 @@ void RQLParser::AsteriskContext::exitRule(tree::ParseTreeListener *listener) {
     parserListener->exitAsterisk(this);
 }
 
-
-antlrcpp::Any RQLParser::AsteriskContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitAsterisk(this);
-  else
-    return visitor->visitChildren(this);
-}
-
 RQLParser::AsteriskContext* RQLParser::asterisk() {
   AsteriskContext *_localctx = _tracker.createInstance<AsteriskContext>(_ctx, getState());
   enterRule(_localctx, 20, RQLParser::RuleAsterisk);
@@ -1198,14 +1111,6 @@ void RQLParser::ExpressionContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpression(this);
-}
-
-
-antlrcpp::Any RQLParser::ExpressionContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitExpression(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 
@@ -1344,14 +1249,6 @@ void RQLParser::TermContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTerm(this);
-}
-
-
-antlrcpp::Any RQLParser::TermContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitTerm(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 
@@ -1534,14 +1431,6 @@ void RQLParser::FactorContext::exitRule(tree::ParseTreeListener *listener) {
     parserListener->exitFactor(this);
 }
 
-
-antlrcpp::Any RQLParser::FactorContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitFactor(this);
-  else
-    return visitor->visitChildren(this);
-}
-
 RQLParser::FactorContext* RQLParser::factor() {
   FactorContext *_localctx = _tracker.createInstance<FactorContext>(_ctx, getState());
   enterRule(_localctx, 26, RQLParser::RuleFactor);
@@ -1709,14 +1598,6 @@ void RQLParser::Stream_expressionContext::exitRule(tree::ParseTreeListener *list
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStream_expression(this);
-}
-
-
-antlrcpp::Any RQLParser::Stream_expressionContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitStream_expression(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::Stream_expressionContext* RQLParser::stream_expression() {
@@ -1926,14 +1807,6 @@ void RQLParser::Stream_termContext::exitRule(tree::ParseTreeListener *listener) 
     parserListener->exitStream_term(this);
 }
 
-
-antlrcpp::Any RQLParser::Stream_termContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitStream_term(this);
-  else
-    return visitor->visitChildren(this);
-}
-
 RQLParser::Stream_termContext* RQLParser::stream_term() {
   Stream_termContext *_localctx = _tracker.createInstance<Stream_termContext>(_ctx, getState());
   enterRule(_localctx, 30, RQLParser::RuleStream_term);
@@ -2086,14 +1959,6 @@ void RQLParser::Stream_factorContext::exitRule(tree::ParseTreeListener *listener
     parserListener->exitStream_factor(this);
 }
 
-
-antlrcpp::Any RQLParser::Stream_factorContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitStream_factor(this);
-  else
-    return visitor->visitChildren(this);
-}
-
 RQLParser::Stream_factorContext* RQLParser::stream_factor() {
   Stream_factorContext *_localctx = _tracker.createInstance<Stream_factorContext>(_ctx, getState());
   enterRule(_localctx, 32, RQLParser::RuleStream_factor);
@@ -2178,14 +2043,6 @@ void RQLParser::AgregatorContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitAgregator(this);
-}
-
-
-antlrcpp::Any RQLParser::AgregatorContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitAgregator(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::AgregatorContext* RQLParser::agregator() {
@@ -2323,14 +2180,6 @@ void RQLParser::Function_callContext::exitRule(tree::ParseTreeListener *listener
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFunction_call(this);
-}
-
-
-antlrcpp::Any RQLParser::Function_callContext::accept(tree::ParseTreeVisitor *visitor) {
-  if (auto parserVisitor = dynamic_cast<RQLVisitor*>(visitor))
-    return parserVisitor->visitFunction_call(this);
-  else
-    return visitor->visitChildren(this);
 }
 
 RQLParser::Function_callContext* RQLParser::function_call() {
