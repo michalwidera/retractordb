@@ -6,6 +6,9 @@
 #include "Parser/RQLBaseListener.h"
 // #include "Parser/RQLBaseVisitor.h"
 
+#include <boost/json.hpp>
+
+namespace json = boost::json;
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
@@ -17,7 +20,6 @@
 
 using namespace antlrcpp;
 using namespace antlr4;
-using namespace std;
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
@@ -64,7 +66,40 @@ public:
 
 int main(int argc, const char *args[])
 {
-    ifstream ins;
+    json::object obj;                                                     // construct an empty object
+    obj[ "pi" ] = 3.141;                                            // insert a double
+    obj[ "happy" ] = true;                                          // insert a bool
+    obj[ "name" ] = "Boost";                                        // insert a string
+    obj[ "nothing" ] = nullptr;                                     // insert a null
+    obj[ "answer" ].emplace_object()["everything"] = {{"test2",42}} ;            // insert an object with 2 element
+    obj[ "list" ] = { 1, 0, 2 };                                    // insert an array with 3 elements
+    obj[ "object" ] = { {"currency", "USD"}, {"value", 42.99} };    // insert an object with 2 elements
+
+    json::object obj2;
+    obj2["test2"] = "1";
+    obj2["test3"] = "Test2";
+
+    obj["insert"] = obj2;
+
+    std::cout << obj << std::endl ;
+
+    json::value jv = {
+            { "pi", 3.141 },
+            { "happy", true },
+            { "name", "Boost" },
+            { "nothing", nullptr },
+            { "answer", {
+                            { "everything", {{"test2",42}} } } },
+            {"list", {1, 0, 2}},
+            {"object", {
+                            { "currency", "USD" },
+                         { "value", 42.99 }
+                    } }
+    };
+
+    std::cout << jv << std::endl ;
+
+    std::ifstream ins;
     // Create the input stream.
     ins.open(args[1]);
     ANTLRInputStream input(ins);
@@ -100,8 +135,8 @@ int main(int argc, const char *args[])
     tree::ParseTree *tree = parser.prog();
 
     // Print the parse tree in Lisp format.
-    cout << endl << "Parse tree (Lisp format):" << endl;
-    std::cout << tree->toStringTree(&parser) << endl;
-    std::cout << endl ;
+    std::cout << std::endl << "Parse tree (Lisp format):" << std::endl;
+    std::cout << tree->toStringTree(&parser) << std::endl;
+    std::cout << std::endl ;
     return 0;
 }
