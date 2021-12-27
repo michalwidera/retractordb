@@ -147,10 +147,10 @@ prog
 select_statement
 rational
 declare_statement
-column_name_list
-column_type
+declare_list
+declare_type
 select_list
-select_list_elem
+select_elem
 field_id
 unary_op_expression
 asterisk

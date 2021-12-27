@@ -317,8 +317,8 @@ tree::TerminalNode* RQLParser::DeclareContext::DECLARE() {
   return getToken(RQLParser::DECLARE, 0);
 }
 
-RQLParser::Column_name_listContext* RQLParser::DeclareContext::column_name_list() {
-  return getRuleContext<RQLParser::Column_name_listContext>(0);
+RQLParser::Declare_listContext* RQLParser::DeclareContext::declare_list() {
+  return getRuleContext<RQLParser::Declare_listContext>(0);
 }
 
 tree::TerminalNode* RQLParser::DeclareContext::STREAM() {
@@ -375,7 +375,7 @@ RQLParser::Declare_statementContext* RQLParser::declare_statement() {
     setState(55);
     match(RQLParser::DECLARE);
     setState(56);
-    column_name_list();
+    declare_list();
     setState(57);
     match(RQLParser::STREAM);
     setState(58);
@@ -405,56 +405,62 @@ RQLParser::Declare_statementContext* RQLParser::declare_statement() {
   return _localctx;
 }
 
-//----------------- Column_name_listContext ------------------------------------------------------------------
+//----------------- Declare_listContext ------------------------------------------------------------------
 
-RQLParser::Column_name_listContext::Column_name_listContext(ParserRuleContext *parent, size_t invokingState)
+RQLParser::Declare_listContext::Declare_listContext(ParserRuleContext *parent, size_t invokingState)
   : ParserRuleContext(parent, invokingState) {
 }
 
-std::vector<RQLParser::Column_typeContext *> RQLParser::Column_name_listContext::column_type() {
-  return getRuleContexts<RQLParser::Column_typeContext>();
+
+size_t RQLParser::Declare_listContext::getRuleIndex() const {
+  return RQLParser::RuleDeclare_list;
 }
 
-RQLParser::Column_typeContext* RQLParser::Column_name_listContext::column_type(size_t i) {
-  return getRuleContext<RQLParser::Column_typeContext>(i);
+void RQLParser::Declare_listContext::copyFrom(Declare_listContext *ctx) {
+  ParserRuleContext::copyFrom(ctx);
 }
 
-std::vector<tree::TerminalNode *> RQLParser::Column_name_listContext::ID() {
+//----------------- DeclarationContext ------------------------------------------------------------------
+
+std::vector<tree::TerminalNode *> RQLParser::DeclarationContext::ID() {
   return getTokens(RQLParser::ID);
 }
 
-tree::TerminalNode* RQLParser::Column_name_listContext::ID(size_t i) {
+tree::TerminalNode* RQLParser::DeclarationContext::ID(size_t i) {
   return getToken(RQLParser::ID, i);
 }
 
-std::vector<tree::TerminalNode *> RQLParser::Column_name_listContext::COMMA() {
+std::vector<RQLParser::Declare_typeContext *> RQLParser::DeclarationContext::declare_type() {
+  return getRuleContexts<RQLParser::Declare_typeContext>();
+}
+
+RQLParser::Declare_typeContext* RQLParser::DeclarationContext::declare_type(size_t i) {
+  return getRuleContext<RQLParser::Declare_typeContext>(i);
+}
+
+std::vector<tree::TerminalNode *> RQLParser::DeclarationContext::COMMA() {
   return getTokens(RQLParser::COMMA);
 }
 
-tree::TerminalNode* RQLParser::Column_name_listContext::COMMA(size_t i) {
+tree::TerminalNode* RQLParser::DeclarationContext::COMMA(size_t i) {
   return getToken(RQLParser::COMMA, i);
 }
 
+RQLParser::DeclarationContext::DeclarationContext(Declare_listContext *ctx) { copyFrom(ctx); }
 
-size_t RQLParser::Column_name_listContext::getRuleIndex() const {
-  return RQLParser::RuleColumn_name_list;
-}
-
-void RQLParser::Column_name_listContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::DeclarationContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterColumn_name_list(this);
+    parserListener->enterDeclaration(this);
 }
-
-void RQLParser::Column_name_listContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::DeclarationContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitColumn_name_list(this);
+    parserListener->exitDeclaration(this);
 }
-
-RQLParser::Column_name_listContext* RQLParser::column_name_list() {
-  Column_name_listContext *_localctx = _tracker.createInstance<Column_name_listContext>(_ctx, getState());
-  enterRule(_localctx, 8, RQLParser::RuleColumn_name_list);
+RQLParser::Declare_listContext* RQLParser::declare_list() {
+  Declare_listContext *_localctx = _tracker.createInstance<Declare_listContext>(_ctx, getState());
+  enterRule(_localctx, 8, RQLParser::RuleDeclare_list);
   size_t _la = 0;
 
 #if __cplusplus > 201703L
@@ -465,12 +471,12 @@ RQLParser::Column_name_listContext* RQLParser::column_name_list() {
     exitRule();
   });
   try {
+    _localctx = _tracker.createInstance<RQLParser::DeclarationContext>(_localctx);
     enterOuterAlt(_localctx, 1);
     setState(65);
-    antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken = match(RQLParser::ID);
-    antlrcpp::downCast<Column_name_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken);
+    match(RQLParser::ID);
     setState(66);
-    column_type();
+    declare_type();
     setState(72);
     _errHandler->sync(this);
     _la = _input->LA(1);
@@ -478,10 +484,9 @@ RQLParser::Column_name_listContext* RQLParser::column_name_list() {
       setState(67);
       match(RQLParser::COMMA);
       setState(68);
-      antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken = match(RQLParser::ID);
-      antlrcpp::downCast<Column_name_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Column_name_listContext *>(_localctx)->idToken);
+      match(RQLParser::ID);
       setState(69);
-      column_type();
+      declare_type();
       setState(74);
       _errHandler->sync(this);
       _la = _input->LA(1);
@@ -497,64 +502,64 @@ RQLParser::Column_name_listContext* RQLParser::column_name_list() {
   return _localctx;
 }
 
-//----------------- Column_typeContext ------------------------------------------------------------------
+//----------------- Declare_typeContext ------------------------------------------------------------------
 
-RQLParser::Column_typeContext::Column_typeContext(ParserRuleContext *parent, size_t invokingState)
+RQLParser::Declare_typeContext::Declare_typeContext(ParserRuleContext *parent, size_t invokingState)
   : ParserRuleContext(parent, invokingState) {
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::FLOAT_T() {
+tree::TerminalNode* RQLParser::Declare_typeContext::FLOAT_T() {
   return getToken(RQLParser::FLOAT_T, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::BYTE_T() {
+tree::TerminalNode* RQLParser::Declare_typeContext::BYTE_T() {
   return getToken(RQLParser::BYTE_T, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::INTEGER_T() {
+tree::TerminalNode* RQLParser::Declare_typeContext::INTEGER_T() {
   return getToken(RQLParser::INTEGER_T, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::UNSIGNED_T() {
+tree::TerminalNode* RQLParser::Declare_typeContext::UNSIGNED_T() {
   return getToken(RQLParser::UNSIGNED_T, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::LS_BRACKET() {
+tree::TerminalNode* RQLParser::Declare_typeContext::LS_BRACKET() {
   return getToken(RQLParser::LS_BRACKET, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::RS_BRACKET() {
+tree::TerminalNode* RQLParser::Declare_typeContext::RS_BRACKET() {
   return getToken(RQLParser::RS_BRACKET, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::STRING_T() {
+tree::TerminalNode* RQLParser::Declare_typeContext::STRING_T() {
   return getToken(RQLParser::STRING_T, 0);
 }
 
-tree::TerminalNode* RQLParser::Column_typeContext::DECIMAL() {
+tree::TerminalNode* RQLParser::Declare_typeContext::DECIMAL() {
   return getToken(RQLParser::DECIMAL, 0);
 }
 
 
-size_t RQLParser::Column_typeContext::getRuleIndex() const {
-  return RQLParser::RuleColumn_type;
+size_t RQLParser::Declare_typeContext::getRuleIndex() const {
+  return RQLParser::RuleDeclare_type;
 }
 
-void RQLParser::Column_typeContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::Declare_typeContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterColumn_type(this);
+    parserListener->enterDeclare_type(this);
 }
 
-void RQLParser::Column_typeContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::Declare_typeContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitColumn_type(this);
+    parserListener->exitDeclare_type(this);
 }
 
-RQLParser::Column_typeContext* RQLParser::column_type() {
-  Column_typeContext *_localctx = _tracker.createInstance<Column_typeContext>(_ctx, getState());
-  enterRule(_localctx, 10, RQLParser::RuleColumn_type);
+RQLParser::Declare_typeContext* RQLParser::declare_type() {
+  Declare_typeContext *_localctx = _tracker.createInstance<Declare_typeContext>(_ctx, getState());
+  enterRule(_localctx, 10, RQLParser::RuleDeclare_type);
   size_t _la = 0;
 
 #if __cplusplus > 201703L
@@ -585,7 +590,7 @@ RQLParser::Column_typeContext* RQLParser::column_type() {
       setState(76);
       match(RQLParser::LS_BRACKET);
       setState(77);
-      antlrcpp::downCast<Column_typeContext *>(_localctx)->type_size = match(RQLParser::DECIMAL);
+      antlrcpp::downCast<Declare_typeContext *>(_localctx)->type_size = match(RQLParser::DECIMAL);
       setState(78);
       match(RQLParser::RS_BRACKET);
       break;
@@ -628,12 +633,12 @@ RQLParser::Select_listContext::Select_listContext(ParserRuleContext *parent, siz
   : ParserRuleContext(parent, invokingState) {
 }
 
-std::vector<RQLParser::Select_list_elemContext *> RQLParser::Select_listContext::select_list_elem() {
-  return getRuleContexts<RQLParser::Select_list_elemContext>();
+std::vector<RQLParser::Select_elemContext *> RQLParser::Select_listContext::select_elem() {
+  return getRuleContexts<RQLParser::Select_elemContext>();
 }
 
-RQLParser::Select_list_elemContext* RQLParser::Select_listContext::select_list_elem(size_t i) {
-  return getRuleContext<RQLParser::Select_list_elemContext>(i);
+RQLParser::Select_elemContext* RQLParser::Select_listContext::select_elem(size_t i) {
+  return getRuleContext<RQLParser::Select_elemContext>(i);
 }
 
 std::vector<tree::TerminalNode *> RQLParser::Select_listContext::COMMA() {
@@ -676,8 +681,7 @@ RQLParser::Select_listContext* RQLParser::select_list() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(82);
-    antlrcpp::downCast<Select_listContext *>(_localctx)->select_list_elemContext = select_list_elem();
-    antlrcpp::downCast<Select_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Select_listContext *>(_localctx)->select_list_elemContext);
+    select_elem();
     setState(87);
     _errHandler->sync(this);
     _la = _input->LA(1);
@@ -685,8 +689,7 @@ RQLParser::Select_listContext* RQLParser::select_list() {
       setState(83);
       match(RQLParser::COMMA);
       setState(84);
-      antlrcpp::downCast<Select_listContext *>(_localctx)->select_list_elemContext = select_list_elem();
-      antlrcpp::downCast<Select_listContext *>(_localctx)->column.push_back(antlrcpp::downCast<Select_listContext *>(_localctx)->select_list_elemContext);
+      select_elem();
       setState(89);
       _errHandler->sync(this);
       _la = _input->LA(1);
@@ -702,40 +705,40 @@ RQLParser::Select_listContext* RQLParser::select_list() {
   return _localctx;
 }
 
-//----------------- Select_list_elemContext ------------------------------------------------------------------
+//----------------- Select_elemContext ------------------------------------------------------------------
 
-RQLParser::Select_list_elemContext::Select_list_elemContext(ParserRuleContext *parent, size_t invokingState)
+RQLParser::Select_elemContext::Select_elemContext(ParserRuleContext *parent, size_t invokingState)
   : ParserRuleContext(parent, invokingState) {
 }
 
-RQLParser::AsteriskContext* RQLParser::Select_list_elemContext::asterisk() {
+RQLParser::AsteriskContext* RQLParser::Select_elemContext::asterisk() {
   return getRuleContext<RQLParser::AsteriskContext>(0);
 }
 
-RQLParser::ExpressionContext* RQLParser::Select_list_elemContext::expression() {
+RQLParser::ExpressionContext* RQLParser::Select_elemContext::expression() {
   return getRuleContext<RQLParser::ExpressionContext>(0);
 }
 
 
-size_t RQLParser::Select_list_elemContext::getRuleIndex() const {
-  return RQLParser::RuleSelect_list_elem;
+size_t RQLParser::Select_elemContext::getRuleIndex() const {
+  return RQLParser::RuleSelect_elem;
 }
 
-void RQLParser::Select_list_elemContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::Select_elemContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterSelect_list_elem(this);
+    parserListener->enterSelect_elem(this);
 }
 
-void RQLParser::Select_list_elemContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::Select_elemContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitSelect_list_elem(this);
+    parserListener->exitSelect_elem(this);
 }
 
-RQLParser::Select_list_elemContext* RQLParser::select_list_elem() {
-  Select_list_elemContext *_localctx = _tracker.createInstance<Select_list_elemContext>(_ctx, getState());
-  enterRule(_localctx, 14, RQLParser::RuleSelect_list_elem);
+RQLParser::Select_elemContext* RQLParser::select_elem() {
+  Select_elemContext *_localctx = _tracker.createInstance<Select_elemContext>(_ctx, getState());
+  enterRule(_localctx, 14, RQLParser::RuleSelect_elem);
 
 #if __cplusplus > 201703L
   auto onExit = finally([=, this] {
@@ -2281,8 +2284,8 @@ atn::ATN RQLParser::_atn;
 std::vector<uint16_t> RQLParser::_serializedATN;
 
 std::vector<std::string> RQLParser::_ruleNames = {
-  "prog", "select_statement", "rational", "declare_statement", "column_name_list", 
-  "column_type", "select_list", "select_list_elem", "field_id", "unary_op_expression", 
+  "prog", "select_statement", "rational", "declare_statement", "declare_list", 
+  "declare_type", "select_list", "select_elem", "field_id", "unary_op_expression", 
   "asterisk", "expression", "term", "factor", "stream_expression", "stream_term", 
   "stream_factor", "agregator", "function_call"
 };

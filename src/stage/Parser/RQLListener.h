@@ -26,17 +26,17 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
   virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
 
-  virtual void enterColumn_name_list(RQLParser::Column_name_listContext *ctx) = 0;
-  virtual void exitColumn_name_list(RQLParser::Column_name_listContext *ctx) = 0;
+  virtual void enterDeclaration(RQLParser::DeclarationContext *ctx) = 0;
+  virtual void exitDeclaration(RQLParser::DeclarationContext *ctx) = 0;
 
-  virtual void enterColumn_type(RQLParser::Column_typeContext *ctx) = 0;
-  virtual void exitColumn_type(RQLParser::Column_typeContext *ctx) = 0;
+  virtual void enterDeclare_type(RQLParser::Declare_typeContext *ctx) = 0;
+  virtual void exitDeclare_type(RQLParser::Declare_typeContext *ctx) = 0;
 
   virtual void enterSelect_list(RQLParser::Select_listContext *ctx) = 0;
   virtual void exitSelect_list(RQLParser::Select_listContext *ctx) = 0;
 
-  virtual void enterSelect_list_elem(RQLParser::Select_list_elemContext *ctx) = 0;
-  virtual void exitSelect_list_elem(RQLParser::Select_list_elemContext *ctx) = 0;
+  virtual void enterSelect_elem(RQLParser::Select_elemContext *ctx) = 0;
+  virtual void exitSelect_elem(RQLParser::Select_elemContext *ctx) = 0;
 
   virtual void enterField_id(RQLParser::Field_idContext *ctx) = 0;
   virtual void exitField_id(RQLParser::Field_idContext *ctx) = 0;

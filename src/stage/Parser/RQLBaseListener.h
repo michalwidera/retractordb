@@ -28,17 +28,17 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
   virtual void exitDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
 
-  virtual void enterColumn_name_list(RQLParser::Column_name_listContext * /*ctx*/) override { }
-  virtual void exitColumn_name_list(RQLParser::Column_name_listContext * /*ctx*/) override { }
+  virtual void enterDeclaration(RQLParser::DeclarationContext * /*ctx*/) override { }
+  virtual void exitDeclaration(RQLParser::DeclarationContext * /*ctx*/) override { }
 
-  virtual void enterColumn_type(RQLParser::Column_typeContext * /*ctx*/) override { }
-  virtual void exitColumn_type(RQLParser::Column_typeContext * /*ctx*/) override { }
+  virtual void enterDeclare_type(RQLParser::Declare_typeContext * /*ctx*/) override { }
+  virtual void exitDeclare_type(RQLParser::Declare_typeContext * /*ctx*/) override { }
 
   virtual void enterSelect_list(RQLParser::Select_listContext * /*ctx*/) override { }
   virtual void exitSelect_list(RQLParser::Select_listContext * /*ctx*/) override { }
 
-  virtual void enterSelect_list_elem(RQLParser::Select_list_elemContext * /*ctx*/) override { }
-  virtual void exitSelect_list_elem(RQLParser::Select_list_elemContext * /*ctx*/) override { }
+  virtual void enterSelect_elem(RQLParser::Select_elemContext * /*ctx*/) override { }
+  virtual void exitSelect_elem(RQLParser::Select_elemContext * /*ctx*/) override { }
 
   virtual void enterField_id(RQLParser::Field_idContext * /*ctx*/) override { }
   virtual void exitField_id(RQLParser::Field_idContext * /*ctx*/) override { }

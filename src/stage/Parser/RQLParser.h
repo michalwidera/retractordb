@@ -28,11 +28,10 @@ public:
 
   enum {
     RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleDeclare_statement = 3, 
-    RuleColumn_name_list = 4, RuleColumn_type = 5, RuleSelect_list = 6, 
-    RuleSelect_list_elem = 7, RuleField_id = 8, RuleUnary_op_expression = 9, 
-    RuleAsterisk = 10, RuleExpression = 11, RuleTerm = 12, RuleFactor = 13, 
-    RuleStream_expression = 14, RuleStream_term = 15, RuleStream_factor = 16, 
-    RuleAgregator = 17, RuleFunction_call = 18
+    RuleDeclare_list = 4, RuleDeclare_type = 5, RuleSelect_list = 6, RuleSelect_elem = 7, 
+    RuleField_id = 8, RuleUnary_op_expression = 9, RuleAsterisk = 10, RuleExpression = 11, 
+    RuleTerm = 12, RuleFactor = 13, RuleStream_expression = 14, RuleStream_term = 15, 
+    RuleStream_factor = 16, RuleAgregator = 17, RuleFunction_call = 18
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -49,10 +48,10 @@ public:
   class Select_statementContext;
   class RationalContext;
   class Declare_statementContext;
-  class Column_name_listContext;
-  class Column_typeContext;
+  class Declare_listContext;
+  class Declare_typeContext;
   class Select_listContext;
-  class Select_list_elemContext;
+  class Select_elemContext;
   class Field_idContext;
   class Unary_op_expressionContext;
   class AsteriskContext;
@@ -146,7 +145,7 @@ public:
 
     antlr4::Token *stream_name = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
-    Column_name_listContext *column_name_list();
+    Declare_listContext *declare_list();
     antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *COMMA();
     RationalContext *rational();
@@ -159,30 +158,39 @@ public:
 
   Declare_statementContext* declare_statement();
 
-  class  Column_name_listContext : public antlr4::ParserRuleContext {
+  class  Declare_listContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *idToken = nullptr;
-    std::vector<antlr4::Token *> column;
-    Column_name_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    std::vector<Column_typeContext *> column_type();
-    Column_typeContext* column_type(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> ID();
-    antlr4::tree::TerminalNode* ID(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode* COMMA(size_t i);
+    Declare_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Declare_listContext() = default;
+    void copyFrom(Declare_listContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual size_t getRuleIndex() const override;
+
    
   };
 
-  Column_name_listContext* column_name_list();
+  class  DeclarationContext : public Declare_listContext {
+  public:
+    DeclarationContext(Declare_listContext *ctx);
 
-  class  Column_typeContext : public antlr4::ParserRuleContext {
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
+    std::vector<Declare_typeContext *> declare_type();
+    Declare_typeContext* declare_type(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Declare_listContext* declare_list();
+
+  class  Declare_typeContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *type_size = nullptr;
-    Column_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    Declare_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *FLOAT_T();
     antlr4::tree::TerminalNode *BYTE_T();
@@ -198,16 +206,14 @@ public:
    
   };
 
-  Column_typeContext* column_type();
+  Declare_typeContext* declare_type();
 
   class  Select_listContext : public antlr4::ParserRuleContext {
   public:
-    RQLParser::Select_list_elemContext *select_list_elemContext = nullptr;
-    std::vector<Select_list_elemContext *> column;
     Select_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    std::vector<Select_list_elemContext *> select_list_elem();
-    Select_list_elemContext* select_list_elem(size_t i);
+    std::vector<Select_elemContext *> select_elem();
+    Select_elemContext* select_elem(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
 
@@ -218,9 +224,9 @@ public:
 
   Select_listContext* select_list();
 
-  class  Select_list_elemContext : public antlr4::ParserRuleContext {
+  class  Select_elemContext : public antlr4::ParserRuleContext {
   public:
-    Select_list_elemContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    Select_elemContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     AsteriskContext *asterisk();
     ExpressionContext *expression();
@@ -230,7 +236,7 @@ public:
    
   };
 
-  Select_list_elemContext* select_list_elem();
+  Select_elemContext* select_elem();
 
   class  Field_idContext : public antlr4::ParserRuleContext {
   public:

@@ -13,24 +13,25 @@ select_statement    : SELECT select_list
 
 rational            : FLOAT | REAL | DECIMAL | RATIONAL;
 
-declare_statement   : DECLARE column_name_list
+declare_statement   : DECLARE declare_list
                       STREAM stream_name=ID COMMA rational
                       (FILE STRING)?
                     # Declare
                     ;
 
-column_name_list    : column+=ID column_type (COMMA column+=ID column_type)*
+declare_list        : ID declare_type (COMMA ID declare_type)*
+                    # Declaration
                     ;
 
-column_type         : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
+declare_type        : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
                         | (FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
                       )
                     ;
 
-select_list         : column+=select_list_elem (COMMA column+=select_list_elem)*
+select_list         : select_elem (COMMA select_elem)*
                     ;
 
-select_list_elem    : asterisk
+select_elem         : asterisk
                     | expression
                     ;
 
@@ -180,7 +181,7 @@ BIT_XOR:            '^';
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
-LINE_COMMENT:       '--' ~[\r\n]* -> channel(HIDDEN);
+LINE_COMMENT:       '# ' ~[\r\n]* -> channel(HIDDEN);
 
 fragment LETTER:    [A-Z_];
 fragment DEC_DOT_DEC: (DEC_DIGIT+ '.' DEC_DIGIT+ |  DEC_DIGIT+ '.' | '.' DEC_DIGIT+);

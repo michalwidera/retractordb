@@ -10,7 +10,7 @@
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
 // Regenerate grammare
-// make grammar && make install && xstage ../src/stage/example_1.txt
+// make grammar && make install && xstage ../src/stage/example_5.txt
 //
 // Generate grammar
 // cd ../src/stage && sh -c ../../scripts/antlr4call.sh RQL.g4 && cd ../../build
@@ -42,10 +42,23 @@ public:
 class ParserListener : public RQLBaseListener {
 public:
     void exitSelect(RQLParser::SelectContext * ctx) {
-        std::cout << "!*! " << ctx->select_list()->getText() << std::endl ;
+        std::cout << "Select: " << ctx->select_list()->getText() << " " << std::endl ;
 
-        for ( auto i : ctx->select_list()->select_list_elem() )
+        for ( auto i : ctx->select_list()->select_elem() )
             std::cout << "!!  >" << i->getText() << std::endl ;
+    }
+
+    void exitDeclare(RQLParser::DeclareContext * ctx) {
+        std::cout << "Declare: " << ctx->declare_list()->getText() << std::endl ;
+
+        //for ( auto i : ctx->declare_list()->children )
+        //    std::cout << "** >" << i->getText() << std::endl  ;
+    }
+
+    void exitDeclaration(RQLParser::DeclarationContext * ctx) {
+        for ( auto i : ctx->declare_type() ) {
+            std::cout << "Declarations: " << i->getText() << std::endl;
+        }
     }
 };
 
