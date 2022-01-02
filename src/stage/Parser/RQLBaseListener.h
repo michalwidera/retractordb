@@ -28,8 +28,8 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
   virtual void exitDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
 
-  virtual void enterDeclaration(RQLParser::DeclarationContext * /*ctx*/) override { }
-  virtual void exitDeclaration(RQLParser::DeclarationContext * /*ctx*/) override { }
+  virtual void enterDeclarationList(RQLParser::DeclarationListContext * /*ctx*/) override { }
+  virtual void exitDeclarationList(RQLParser::DeclarationListContext * /*ctx*/) override { }
 
   virtual void enterDeclare_type(RQLParser::Declare_typeContext * /*ctx*/) override { }
   virtual void exitDeclare_type(RQLParser::Declare_typeContext * /*ctx*/) override { }

@@ -420,43 +420,43 @@ void RQLParser::Declare_listContext::copyFrom(Declare_listContext *ctx) {
   ParserRuleContext::copyFrom(ctx);
 }
 
-//----------------- DeclarationContext ------------------------------------------------------------------
+//----------------- DeclarationListContext ------------------------------------------------------------------
 
-std::vector<tree::TerminalNode *> RQLParser::DeclarationContext::ID() {
+std::vector<tree::TerminalNode *> RQLParser::DeclarationListContext::ID() {
   return getTokens(RQLParser::ID);
 }
 
-tree::TerminalNode* RQLParser::DeclarationContext::ID(size_t i) {
+tree::TerminalNode* RQLParser::DeclarationListContext::ID(size_t i) {
   return getToken(RQLParser::ID, i);
 }
 
-std::vector<RQLParser::Declare_typeContext *> RQLParser::DeclarationContext::declare_type() {
+std::vector<RQLParser::Declare_typeContext *> RQLParser::DeclarationListContext::declare_type() {
   return getRuleContexts<RQLParser::Declare_typeContext>();
 }
 
-RQLParser::Declare_typeContext* RQLParser::DeclarationContext::declare_type(size_t i) {
+RQLParser::Declare_typeContext* RQLParser::DeclarationListContext::declare_type(size_t i) {
   return getRuleContext<RQLParser::Declare_typeContext>(i);
 }
 
-std::vector<tree::TerminalNode *> RQLParser::DeclarationContext::COMMA() {
+std::vector<tree::TerminalNode *> RQLParser::DeclarationListContext::COMMA() {
   return getTokens(RQLParser::COMMA);
 }
 
-tree::TerminalNode* RQLParser::DeclarationContext::COMMA(size_t i) {
+tree::TerminalNode* RQLParser::DeclarationListContext::COMMA(size_t i) {
   return getToken(RQLParser::COMMA, i);
 }
 
-RQLParser::DeclarationContext::DeclarationContext(Declare_listContext *ctx) { copyFrom(ctx); }
+RQLParser::DeclarationListContext::DeclarationListContext(Declare_listContext *ctx) { copyFrom(ctx); }
 
-void RQLParser::DeclarationContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::DeclarationListContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterDeclaration(this);
+    parserListener->enterDeclarationList(this);
 }
-void RQLParser::DeclarationContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::DeclarationListContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitDeclaration(this);
+    parserListener->exitDeclarationList(this);
 }
 RQLParser::Declare_listContext* RQLParser::declare_list() {
   Declare_listContext *_localctx = _tracker.createInstance<Declare_listContext>(_ctx, getState());
@@ -471,7 +471,7 @@ RQLParser::Declare_listContext* RQLParser::declare_list() {
     exitRule();
   });
   try {
-    _localctx = _tracker.createInstance<RQLParser::DeclarationContext>(_localctx);
+    _localctx = _tracker.createInstance<RQLParser::DeclarationListContext>(_localctx);
     enterOuterAlt(_localctx, 1);
     setState(65);
     match(RQLParser::ID);

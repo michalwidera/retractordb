@@ -8,8 +8,6 @@
 
 #include <boost/json.hpp>
 
-namespace json = boost::json;
-
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
 // Regenerate grammar
@@ -18,6 +16,14 @@ namespace json = boost::json;
 // Generate grammar
 // rm ../src/stage/Parser/*
 // cd ../src/stage && antlr4call.sh RQL.g4 && cd ../../build
+// :
+// cd ../src/stage && sh -c ../../scripts/antlr4call.sh RQL.g4 && cd ../../build
+//
+// Check:
+// xcompiler ../src/stage/example_5.txt && xdumper
+
+namespace json = boost::json;
+>>>>>>> ae92846 (Put changes)
 
 using namespace antlrcpp;
 using namespace antlr4;
@@ -58,7 +64,7 @@ public:
         //    std::cout << "** >" << i->getText() << std::endl  ;
     }
 
-    void exitDeclaration(RQLParser::DeclarationContext * ctx) {
+    void exitDeclarationList(RQLParser::DeclarationListContext * ctx) {
         for ( auto i : ctx->declare_type() ) {
             std::cout << "Declarations: " << i->getText() << std::endl;
         }
@@ -83,7 +89,7 @@ int main(int argc, const char *args[])
     obj["insert"] = obj2;
 
     std::cout << obj << std::endl ;
-
+/*
     json::value jv = {
             { "pi", 3.141 },
             { "happy", true },
@@ -99,7 +105,7 @@ int main(int argc, const char *args[])
     };
 
     std::cout << jv << std::endl ;
-
+*/
     std::ifstream ins;
     // Create the input stream.
     ins.open(args[1]);

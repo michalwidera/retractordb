@@ -20,7 +20,7 @@ declare_statement   : DECLARE declare_list
                     ;
 
 declare_list        : ID declare_type (COMMA ID declare_type)*
-                    # Declaration
+                    # DeclarationList
                     ;
 
 declare_type        : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)

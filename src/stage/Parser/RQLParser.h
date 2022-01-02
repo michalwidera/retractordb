@@ -171,9 +171,9 @@ public:
    
   };
 
-  class  DeclarationContext : public Declare_listContext {
+  class  DeclarationListContext : public Declare_listContext {
   public:
-    DeclarationContext(Declare_listContext *ctx);
+    DeclarationListContext(Declare_listContext *ctx);
 
     std::vector<antlr4::tree::TerminalNode *> ID();
     antlr4::tree::TerminalNode* ID(size_t i);
