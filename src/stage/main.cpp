@@ -12,7 +12,7 @@ namespace json = boost::json;
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
-// Regenerate grammare
+// Regenerate grammar
 // make grammar && make install && xstage ../src/stage/example_5.txt
 //
 // Generate grammar
