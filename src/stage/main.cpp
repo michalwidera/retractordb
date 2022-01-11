@@ -16,7 +16,8 @@ namespace json = boost::json;
 // make grammar && make install && xstage ../src/stage/example_5.txt
 //
 // Generate grammar
-// cd ../src/stage && sh -c ../../scripts/antlr4call.sh RQL.g4 && cd ../../build
+// rm ../src/stage/Parser/*
+// cd ../src/stage && antlr4call.sh RQL.g4 && cd ../../build
 
 using namespace antlrcpp;
 using namespace antlr4;
