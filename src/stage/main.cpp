@@ -23,7 +23,6 @@
 // xcompiler ../src/stage/example_5.txt && xdumper
 
 namespace json = boost::json;
->>>>>>> ae92846 (Put changes)
 
 using namespace antlrcpp;
 using namespace antlr4;
