@@ -19,13 +19,17 @@ declare_statement   : DECLARE declare_list
                     # Declare
                     ;
 
-declare_list        : ID declare_type (COMMA ID declare_type)*
+declare_list        : field_declaration (COMMA field_declaration)*
                     # DeclarationList
                     ;
 
-declare_type        : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
-                        | (FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
-                      )
+field_declaration   : ID field_type
+                    # Declaration
+                    ;
+
+field_type          : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
+                    | (FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
+                    )
                     ;
 
 select_list         : select_elem (COMMA select_elem)*

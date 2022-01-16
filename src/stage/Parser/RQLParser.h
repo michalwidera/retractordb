@@ -28,10 +28,11 @@ public:
 
   enum {
     RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleDeclare_statement = 3, 
-    RuleDeclare_list = 4, RuleDeclare_type = 5, RuleSelect_list = 6, RuleSelect_elem = 7, 
-    RuleField_id = 8, RuleUnary_op_expression = 9, RuleAsterisk = 10, RuleExpression = 11, 
-    RuleTerm = 12, RuleFactor = 13, RuleStream_expression = 14, RuleStream_term = 15, 
-    RuleStream_factor = 16, RuleAgregator = 17, RuleFunction_call = 18
+    RuleDeclare_list = 4, RuleField_declaration = 5, RuleField_type = 6, 
+    RuleSelect_list = 7, RuleSelect_elem = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
+    RuleAsterisk = 11, RuleExpression = 12, RuleTerm = 13, RuleFactor = 14, 
+    RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
+    RuleAgregator = 18, RuleFunction_call = 19
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -49,7 +50,8 @@ public:
   class RationalContext;
   class Declare_statementContext;
   class Declare_listContext;
-  class Declare_typeContext;
+  class Field_declarationContext;
+  class Field_typeContext;
   class Select_listContext;
   class Select_elemContext;
   class Field_idContext;
@@ -175,10 +177,8 @@ public:
   public:
     DeclarationListContext(Declare_listContext *ctx);
 
-    std::vector<antlr4::tree::TerminalNode *> ID();
-    antlr4::tree::TerminalNode* ID(size_t i);
-    std::vector<Declare_typeContext *> declare_type();
-    Declare_typeContext* declare_type(size_t i);
+    std::vector<Field_declarationContext *> field_declaration();
+    Field_declarationContext* field_declaration(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -187,10 +187,35 @@ public:
 
   Declare_listContext* declare_list();
 
-  class  Declare_typeContext : public antlr4::ParserRuleContext {
+  class  Field_declarationContext : public antlr4::ParserRuleContext {
+  public:
+    Field_declarationContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Field_declarationContext() = default;
+    void copyFrom(Field_declarationContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  DeclarationContext : public Field_declarationContext {
+  public:
+    DeclarationContext(Field_declarationContext *ctx);
+
+    antlr4::tree::TerminalNode *ID();
+    Field_typeContext *field_type();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Field_declarationContext* field_declaration();
+
+  class  Field_typeContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *type_size = nullptr;
-    Declare_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    Field_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *FLOAT_T();
     antlr4::tree::TerminalNode *BYTE_T();
@@ -206,7 +231,7 @@ public:
    
   };
 
-  Declare_typeContext* declare_type();
+  Field_typeContext* field_type();
 
   class  Select_listContext : public antlr4::ParserRuleContext {
   public:

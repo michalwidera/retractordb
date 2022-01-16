@@ -1,2 +1,3 @@
-DECLARE intfield INT[2], bytefield BYTE STREAM filter, 0.01 FILE 'filterremez.txt'
 DECLARE data BYTE STREAM source, 1/3 FILE '/dev/urandom'
+
+SELECT * STREAM signalRow FROM source
