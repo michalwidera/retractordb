@@ -7,6 +7,7 @@
 // #include "Parser/RQLBaseVisitor.h"
 
 #include <boost/json.hpp>
+#include <boost/cerrno.hpp>
 
 #include "QStruct.h"
 
@@ -29,7 +30,7 @@ stack < std::shared_ptr<query>> stk ;
 // cd ../src/stage && sh -c ../../scripts/antlr4call.sh RQL.g4 && cd ../../build
 //
 // Check:
-// xcompiler ../src/stage/example_5.txt && xdumper
+// xcompiler ../src/stage/example_5.txt -d && xdumper query.qry.lg1
 
 namespace json = boost::json;
 
@@ -62,7 +63,6 @@ void do_insert_into_schema()
     do_reset();
 }
 
-
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
 class LexerErrorListener : public BaseErrorListener {
@@ -70,7 +70,9 @@ public:
 
     void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                              const std::string &msg, std::exception_ptr e) override {
-        std::cerr << "?? line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg ;
+        std::cerr << "Syntax error - ";
+        std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg ;
+        exit(EPERM);
     }
 };
 
@@ -79,7 +81,9 @@ public:
 
     void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                              const std::string &msg, std::exception_ptr e) override {
-        std::cerr << "?? line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg ;
+        std::cerr << "Syntax error - " ;
+        std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg ;
+        exit(EPERM);
     }
 };
 
@@ -96,6 +100,11 @@ public:
     void exitStream_expression(RQLParser::Stream_expressionContext *ctx) {
         for ( auto i : ctx->stream_term() )
             std::cout << "--"  << i->getText() << std::endl;
+    }
+
+    void exitField_id(RQLParser::Field_idContext *ctx) {
+        for ( auto i : ctx->ID() )
+            std::cout << "PUSH:"  << i->getText() << std::endl;
     }
 
     void exitDeclare(RQLParser::DeclareContext * ctx) {
