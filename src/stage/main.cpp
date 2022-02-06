@@ -93,6 +93,11 @@ public:
             std::cout << "!!  >" << i->getText() << std::endl ;
     }
 
+    void exitStream_expression(RQLParser::Stream_expressionContext *ctx) {
+        for ( auto i : ctx->stream_term() )
+            std::cout << "--"  << i->getText() << std::endl;
+    }
+
     void exitDeclare(RQLParser::DeclareContext * ctx) {
         //do_insert_into_schema
         std::cout << "Declare: " << ctx->declare_list()->getText() << std::endl ;
