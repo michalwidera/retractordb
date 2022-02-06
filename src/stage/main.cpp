@@ -89,41 +89,29 @@ public:
 
 class ParserListener : public RQLBaseListener {
 public:
+
     void exitSelect(RQLParser::SelectContext * ctx) {
         //do_insert_into_schema
-        std::cout << "Select: " << ctx->select_list()->getText() << " " << std::endl ;
+        std::cout << "!! Select: " << ctx->select_list()->getText() << " " << std::endl ;
 
         for ( auto i : ctx->select_list()->select_elem() )
-            std::cout << "!!  >" << i->getText() << std::endl ;
+            std::cout << "!! >" << i->getText() << std::endl ;
     }
 
     void exitStream_expression(RQLParser::Stream_expressionContext *ctx) {
         for ( auto i : ctx->stream_term() )
-            std::cout << "--"  << i->getText() << std::endl;
-    }
-
-    void exitField_id(RQLParser::Field_idContext *ctx) {
-        for ( auto i : ctx->ID() )
-            std::cout << "PUSH:"  << i->getText() << std::endl;
+            std::cout << "-- >"  << i->getText() << std::endl;
     }
 
     void exitDeclare(RQLParser::DeclareContext * ctx) {
         //do_insert_into_schema
-        std::cout << "Declare: " << ctx->declare_list()->getText() << std::endl ;
-
-        //for ( auto i : ctx->declare_list()->children )
-        //    std::cout << "** >" << i->getText() << std::endl  ;
+        std::cout << "&& exitDeclare" << std::endl ;
     }
 
-    void exitDeclarationList(RQLParser::DeclarationListContext * ctx) {
-        for ( auto i : ctx->field_declaration() ) {
-            std::cout << "DeclarationList: " << i->getText() << std::endl;
-        }
-    }
-
-    void exitDeclaration(RQLParser::DeclarationContext * ctx) {
-        std::cout << "Declaration ID: " << ctx->ID()->getText() << std::endl;
-        std::cout << "Declaration type: " << ctx->field_type()->getText() << std::endl;
+    void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {
+        std::cout << "&& exitSingleDeclaration(";
+        std::cout << "ID: " << ctx->ID()->getText() ;
+        std::cout << ",type: " << ctx->field_type()->getText() << ")" << std::endl;
     }
 };
 

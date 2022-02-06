@@ -29,8 +29,8 @@ public:
   virtual void enterDeclarationList(RQLParser::DeclarationListContext *ctx) = 0;
   virtual void exitDeclarationList(RQLParser::DeclarationListContext *ctx) = 0;
 
-  virtual void enterDeclaration(RQLParser::DeclarationContext *ctx) = 0;
-  virtual void exitDeclaration(RQLParser::DeclarationContext *ctx) = 0;
+  virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
+  virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
 
   virtual void enterField_type(RQLParser::Field_typeContext *ctx) = 0;
   virtual void exitField_type(RQLParser::Field_typeContext *ctx) = 0;

@@ -200,9 +200,9 @@ public:
    
   };
 
-  class  DeclarationContext : public Field_declarationContext {
+  class  SingleDeclarationContext : public Field_declarationContext {
   public:
-    DeclarationContext(Field_declarationContext *ctx);
+    SingleDeclarationContext(Field_declarationContext *ctx);
 
     antlr4::tree::TerminalNode *ID();
     Field_typeContext *field_type();

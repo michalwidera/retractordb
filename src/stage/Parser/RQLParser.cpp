@@ -505,27 +505,27 @@ void RQLParser::Field_declarationContext::copyFrom(Field_declarationContext *ctx
   ParserRuleContext::copyFrom(ctx);
 }
 
-//----------------- DeclarationContext ------------------------------------------------------------------
+//----------------- SingleDeclarationContext ------------------------------------------------------------------
 
-tree::TerminalNode* RQLParser::DeclarationContext::ID() {
+tree::TerminalNode* RQLParser::SingleDeclarationContext::ID() {
   return getToken(RQLParser::ID, 0);
 }
 
-RQLParser::Field_typeContext* RQLParser::DeclarationContext::field_type() {
+RQLParser::Field_typeContext* RQLParser::SingleDeclarationContext::field_type() {
   return getRuleContext<RQLParser::Field_typeContext>(0);
 }
 
-RQLParser::DeclarationContext::DeclarationContext(Field_declarationContext *ctx) { copyFrom(ctx); }
+RQLParser::SingleDeclarationContext::SingleDeclarationContext(Field_declarationContext *ctx) { copyFrom(ctx); }
 
-void RQLParser::DeclarationContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::SingleDeclarationContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterDeclaration(this);
+    parserListener->enterSingleDeclaration(this);
 }
-void RQLParser::DeclarationContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::SingleDeclarationContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitDeclaration(this);
+    parserListener->exitSingleDeclaration(this);
 }
 RQLParser::Field_declarationContext* RQLParser::field_declaration() {
   Field_declarationContext *_localctx = _tracker.createInstance<Field_declarationContext>(_ctx, getState());
@@ -539,7 +539,7 @@ RQLParser::Field_declarationContext* RQLParser::field_declaration() {
     exitRule();
   });
   try {
-    _localctx = _tracker.createInstance<RQLParser::DeclarationContext>(_localctx);
+    _localctx = _tracker.createInstance<RQLParser::SingleDeclarationContext>(_localctx);
     enterOuterAlt(_localctx, 1);
     setState(75);
     match(RQLParser::ID);

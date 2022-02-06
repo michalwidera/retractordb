@@ -31,8 +31,8 @@ public:
   virtual void enterDeclarationList(RQLParser::DeclarationListContext * /*ctx*/) override { }
   virtual void exitDeclarationList(RQLParser::DeclarationListContext * /*ctx*/) override { }
 
-  virtual void enterDeclaration(RQLParser::DeclarationContext * /*ctx*/) override { }
-  virtual void exitDeclaration(RQLParser::DeclarationContext * /*ctx*/) override { }
+  virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext * /*ctx*/) override { }
+  virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext * /*ctx*/) override { }
 
   virtual void enterField_type(RQLParser::Field_typeContext * /*ctx*/) override { }
   virtual void exitField_type(RQLParser::Field_typeContext * /*ctx*/) override { }

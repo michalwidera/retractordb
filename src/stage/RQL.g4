@@ -24,7 +24,7 @@ declare_list        : field_declaration (COMMA field_declaration)*
                     ;
 
 field_declaration   : ID field_type
-                    # Declaration
+                    # SingleDeclaration
                     ;
 
 field_type          : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
