@@ -92,20 +92,33 @@ public:
 
     void exitSelect(RQLParser::SelectContext * ctx) {
         //do_insert_into_schema
-        std::cout << "!! Select: " << ctx->select_list()->getText() << " " << std::endl ;
-
         for ( auto i : ctx->select_list()->select_elem() )
-            std::cout << "!! >" << i->getText() << std::endl ;
+            std::cout << "select item: " << i->getText() << std::endl ;
+
+        std::cout << "stream expression: " << ctx->stream_expression()->getText() << std::endl ;
+
+        std::cout << "== exitSelect:" << ctx->select_list()->getText() << std::endl;
     }
 
     void exitStream_expression(RQLParser::Stream_expressionContext *ctx) {
+        //do_from_section
+
+        //this loop in partial wrong
         for ( auto i : ctx->stream_term() )
             std::cout << "-- >"  << i->getText() << std::endl;
     }
 
+    void exitStream_factor(RQLParser::Stream_factorContext *ctx) {
+        std::cout << "SF exitStream_factor:" << ctx->ID()->getText() << std::endl ;
+    }
+
+    //void exitStream_term(RQLParser::Stream_termContext *ctx) {
+    //    std::cout << "ST exitStream_term:" << ctx->  << std::endl ;
+    //}
+
     void exitDeclare(RQLParser::DeclareContext * ctx) {
         //do_insert_into_schema
-        std::cout << "&& exitDeclare" << std::endl ;
+        std::cout << "== exitDeclare:" << ctx->declare_list()->getText() << std::endl ;
     }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {

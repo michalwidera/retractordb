@@ -12,18 +12,18 @@
 class  RQLParser : public antlr4::Parser {
 public:
   enum {
-    STRING_T = 1, INTEGER_T = 2, BYTE_T = 3, UNSIGNED_T = 4, FLOAT_T = 5, 
-    DOUBLE_T = 6, SELECT = 7, STREAM = 8, FROM = 9, DECLARE = 10, FILE = 11, 
-    MIN = 12, MAX = 13, AVG = 14, SUMC = 15, SQRT = 16, CEIL = 17, ABS = 18, 
-    FLOOR = 19, SIGN = 20, CHR = 21, LENGTH = 22, TO_NUMBER = 23, TO_TIMESTAMP = 24, 
-    FLOAT_CAST = 25, INT_CAST = 26, COUNT = 27, CRC = 28, SUM = 29, ISZERO = 30, 
-    ISNONZERO = 31, ID = 32, STRING = 33, FLOAT = 34, DECIMAL = 35, RATIONAL = 36, 
-    REAL = 37, EQUAL = 38, GREATER = 39, LESS = 40, EXCLAMATION = 41, DOUBLE_BAR = 42, 
-    DOT = 43, UNDERLINE = 44, AT = 45, SHARP = 46, AND = 47, MOD = 48, DOLLAR = 49, 
-    LR_BRACKET = 50, RR_BRACKET = 51, LS_BRACKET = 52, RS_BRACKET = 53, 
-    LC_BRACKET = 54, RC_BRACKET = 55, COMMA = 56, SEMI = 57, COLON = 58, 
-    DOUBLE_COLON = 59, STAR = 60, DIVIDE = 61, PLUS = 62, MINUS = 63, BIT_NOT = 64, 
-    BIT_OR = 65, BIT_XOR = 66, SPACE = 67, COMMENT = 68, LINE_COMMENT = 69
+    T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, STRING_T = 5, INTEGER_T = 6, 
+    BYTE_T = 7, UNSIGNED_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, 
+    STREAM = 12, FROM = 13, DECLARE = 14, FILE = 15, MIN = 16, MAX = 17, 
+    AVG = 18, SUMC = 19, SQRT = 20, CEIL = 21, ABS = 22, FLOOR = 23, SIGN = 24, 
+    CHR = 25, LENGTH = 26, TO_NUMBER = 27, TO_TIMESTAMP = 28, FLOAT_CAST = 29, 
+    INT_CAST = 30, COUNT = 31, CRC = 32, SUM = 33, ISZERO = 34, ISNONZERO = 35, 
+    ID = 36, STRING = 37, FLOAT = 38, DECIMAL = 39, RATIONAL = 40, REAL = 41, 
+    EQUAL = 42, GREATER = 43, LESS = 44, EXCLAMATION = 45, DOUBLE_BAR = 46, 
+    DOT = 47, UNDERLINE = 48, AT = 49, SHARP = 50, AND = 51, MOD = 52, DOLLAR = 53, 
+    COMMA = 54, SEMI = 55, COLON = 56, DOUBLE_COLON = 57, STAR = 58, DIVIDE = 59, 
+    PLUS = 60, MINUS = 61, BIT_NOT = 62, BIT_OR = 63, BIT_XOR = 64, SPACE = 65, 
+    COMMENT = 66, LINE_COMMENT = 67
   };
 
   enum {
@@ -221,8 +221,6 @@ public:
     antlr4::tree::TerminalNode *BYTE_T();
     antlr4::tree::TerminalNode *INTEGER_T();
     antlr4::tree::TerminalNode *UNSIGNED_T();
-    antlr4::tree::TerminalNode *LS_BRACKET();
-    antlr4::tree::TerminalNode *RS_BRACKET();
     antlr4::tree::TerminalNode *STRING_T();
     antlr4::tree::TerminalNode *DECIMAL();
 
@@ -272,9 +270,7 @@ public:
     virtual size_t getRuleIndex() const override;
     std::vector<antlr4::tree::TerminalNode *> ID();
     antlr4::tree::TerminalNode* ID(size_t i);
-    antlr4::tree::TerminalNode *LS_BRACKET();
     antlr4::tree::TerminalNode *UNDERLINE();
-    antlr4::tree::TerminalNode *RS_BRACKET();
     antlr4::tree::TerminalNode *DOT();
     antlr4::tree::TerminalNode *DECIMAL();
 
@@ -339,9 +335,7 @@ public:
     RQLParser::FactorContext *t = nullptr;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *LR_BRACKET();
     ExpressionContext *expression();
-    antlr4::tree::TerminalNode *RR_BRACKET();
     FactorContext *factor();
     std::vector<TermContext *> term();
     TermContext* term(size_t i);
@@ -415,14 +409,10 @@ public:
     antlr4::tree::TerminalNode* ID(size_t i);
     std::vector<RationalContext *> rational();
     RationalContext* rational(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> LR_BRACKET();
-    antlr4::tree::TerminalNode* LR_BRACKET(size_t i);
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode* DECIMAL(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> RR_BRACKET();
-    antlr4::tree::TerminalNode* RR_BRACKET(size_t i);
     std::vector<antlr4::tree::TerminalNode *> DOT();
     antlr4::tree::TerminalNode* DOT(size_t i);
     std::vector<AgregatorContext *> agregator();
@@ -452,9 +442,7 @@ public:
     Stream_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *ID();
-    antlr4::tree::TerminalNode *LR_BRACKET();
     Stream_expressionContext *stream_expression();
-    antlr4::tree::TerminalNode *RR_BRACKET();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -484,9 +472,7 @@ public:
     antlr4::Token *function = nullptr;
     Function_callContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *LR_BRACKET();
     ExpressionContext *expression();
-    antlr4::tree::TerminalNode *RR_BRACKET();
     antlr4::tree::TerminalNode *SQRT();
     antlr4::tree::TerminalNode *CEIL();
     antlr4::tree::TerminalNode *ABS();

@@ -27,7 +27,7 @@ field_declaration   : ID field_type
                     # SingleDeclaration
                     ;
 
-field_type          : ( ( (STRING_T | INTEGER_T | BYTE_T ) LS_BRACKET type_size=DECIMAL RS_BRACKET)
+field_type          : ( ( (STRING_T | INTEGER_T | BYTE_T ) '[' type_size=DECIMAL ']')
                     | (FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
                     )
                     ;
@@ -40,9 +40,9 @@ select_elem         : asterisk
                     ;
 
 field_id            : column_name=ID // id
-                    | tablename=ID LS_BRACKET UNDERLINE RS_BRACKET // id[_]
+                    | tablename=ID '[' UNDERLINE ']' // id[_]
                     | tablename=ID DOT column_name=ID  // id.id
-                    | tablename=ID LS_BRACKET column_index=DECIMAL RS_BRACKET // id[x]
+                    | tablename=ID '[' column_index=DECIMAL ']' // id[x]
                     ;
 
 unary_op_expression : BIT_NOT expression
@@ -61,7 +61,7 @@ expression
 term
                     : term STAR term
                     | term DIVIDE term
-                    | LR_BRACKET expression RR_BRACKET
+                    | '(' expression ')'
                     | t=factor
                     ;
 
@@ -85,13 +85,13 @@ stream_term         : stream_factor
                       ( hash=SHARP ID
                       | dehash_div=AND rational
                       | dehash_mod=MOD rational
-                      | agse=AT LR_BRACKET DECIMAL COMMA (PLUS | MINUS)? DECIMAL RR_BRACKET
+                      | agse=AT '(' DECIMAL COMMA (PLUS | MINUS)? DECIMAL ')'
                       | DOT agregator
                       ) *
                     ;
 
 stream_factor       : ID
-                    | LR_BRACKET stream_expression RR_BRACKET
+                    | '(' stream_expression ')'
                     ;
 
 agregator           : MIN | MAX | AVG | SUMC
@@ -100,7 +100,7 @@ agregator           : MIN | MAX | AVG | SUMC
 function_call       : function = (SQRT | CEIL | ABS | FLOOR | SIGN | CHR
                        | LENGTH | TO_NUMBER | TO_TIMESTAMP | FLOAT_CAST
                        | INT_CAST | COUNT | CRC | SUM | ISZERO | ISNONZERO)
-                      LR_BRACKET expression RR_BRACKET
+                      '(' expression ')'
                     ;
 
 // src/include/rdb/desc.h
@@ -165,12 +165,6 @@ SHARP:              '#';
 AND:                '&';
 MOD:                '%';
 DOLLAR:             '$';
-LR_BRACKET:         '(';
-RR_BRACKET:         ')';
-LS_BRACKET:         '[';
-RS_BRACKET:         ']';
-LC_BRACKET:         '{';
-RC_BRACKET:         '}';
 COMMA:              ',';
 SEMI:               ';';
 COLON:              ':';
