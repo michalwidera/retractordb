@@ -22,7 +22,6 @@ sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
 pip install conan
 git clone https://github.com/michalwidera/retractordb.git
 cd build
-conan source ..
 conan install ..
 conan build ..
 make test
