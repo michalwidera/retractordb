@@ -392,7 +392,7 @@ RQLParser::Declare_statementContext* RQLParser::declare_statement() {
       setState(63);
       match(RQLParser::FILE);
       setState(64);
-      match(RQLParser::STRING);
+      antlrcpp::downCast<DeclareContext *>(_localctx)->file_name = match(RQLParser::STRING);
     }
    
   }

@@ -146,6 +146,7 @@ public:
     DeclareContext(Declare_statementContext *ctx);
 
     antlr4::Token *stream_name = nullptr;
+    antlr4::Token *file_name = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
     Declare_listContext *declare_list();
     antlr4::tree::TerminalNode *STREAM();

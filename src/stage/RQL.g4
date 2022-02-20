@@ -15,7 +15,7 @@ rational            : FLOAT | REAL | DECIMAL | RATIONAL;
 
 declare_statement   : DECLARE declare_list
                       STREAM stream_name=ID COMMA rational
-                      (FILE STRING)?
+                      (FILE file_name=STRING)?
                     # Declare
                     ;
 

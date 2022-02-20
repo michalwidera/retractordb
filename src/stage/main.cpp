@@ -118,7 +118,9 @@ public:
 
     void exitDeclare(RQLParser::DeclareContext * ctx) {
         //do_insert_into_schema
-        std::cout << "== exitDeclare:" << ctx->declare_list()->getText() << std::endl ;
+        std::cout << "== exitDeclare: declare_list:" << ctx->declare_list()->getText() << std::endl ;
+        std::cout << "== exitDeclare: stream_name:" << ctx->ID()->getText() << std::endl ;
+        std::cout << "== exitDeclare: file_name:" << ctx->STRING()->getText() << std::endl ;
     }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {
