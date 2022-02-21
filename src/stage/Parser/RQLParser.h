@@ -264,20 +264,61 @@ public:
 
   class  Field_idContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *column_name = nullptr;
-    antlr4::Token *tablename = nullptr;
-    antlr4::Token *column_index = nullptr;
     Field_idContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    std::vector<antlr4::tree::TerminalNode *> ID();
-    antlr4::tree::TerminalNode* ID(size_t i);
-    antlr4::tree::TerminalNode *UNDERLINE();
-    antlr4::tree::TerminalNode *DOT();
-    antlr4::tree::TerminalNode *DECIMAL();
+   
+    Field_idContext() = default;
+    void copyFrom(Field_idContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  FieldIDUnderlineContext : public Field_idContext {
+  public:
+    FieldIDUnderlineContext(Field_idContext *ctx);
+
+    antlr4::Token *tablename = nullptr;
+    antlr4::tree::TerminalNode *UNDERLINE();
+    antlr4::tree::TerminalNode *ID();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  FieldIDTableContext : public Field_idContext {
+  public:
+    FieldIDTableContext(Field_idContext *ctx);
+
+    antlr4::Token *tablename = nullptr;
+    antlr4::Token *column_index = nullptr;
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  FieldIDContext : public Field_idContext {
+  public:
+    FieldIDContext(Field_idContext *ctx);
+
+    antlr4::Token *column_name = nullptr;
+    antlr4::tree::TerminalNode *ID();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  FieldIDColumnnameContext : public Field_idContext {
+  public:
+    FieldIDColumnnameContext(Field_idContext *ctx);
+
+    antlr4::Token *tablename = nullptr;
+    antlr4::Token *column_name = nullptr;
+    antlr4::tree::TerminalNode *DOT();
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Field_idContext* field_id();

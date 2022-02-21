@@ -112,15 +112,17 @@ public:
         std::cout << "SF exitStream_factor:" << ctx->ID()->getText() << std::endl ;
     }
 
-    //void exitStream_term(RQLParser::Stream_termContext *ctx) {
-    //    std::cout << "ST exitStream_term:" << ctx->  << std::endl ;
-    //}
-
+    // page 119 - The Definitive ANTL4 Reference Guide
     void exitDeclare(RQLParser::DeclareContext * ctx) {
         //do_insert_into_schema
-        std::cout << "== exitDeclare: declare_list:" << ctx->declare_list()->getText() << std::endl ;
-        std::cout << "== exitDeclare: stream_name:" << ctx->ID()->getText() << std::endl ;
-        std::cout << "== exitDeclare: file_name:" << ctx->STRING()->getText() << std::endl ;
+        std::cout << "== exitDeclare {" << std::endl << "  ";
+        std::cout << ctx->children.size() << std::endl << "  ";
+        std::cout << ctx->stream_name->getText() << std::endl << "  ";
+        std::cout << ctx->declare_list()->getText() << std::endl << "  ";
+        std::cout << ctx->ID()->getText() << std::endl << "  ";  // source
+        std::cout << ctx->STRING()->getText() << std::endl << "  ";
+        std::cout << ctx->children[0]->getText() << std::endl ; // DECLARE   values.get(ctx.getChild(0))
+        std::cout << "== exitDeclare }" << std::endl;
     }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {

@@ -39,10 +39,10 @@ select_elem         : asterisk
                     | expression
                     ;
 
-field_id            : column_name=ID // id
-                    | tablename=ID '[' UNDERLINE ']' // id[_]
-                    | tablename=ID DOT column_name=ID  // id.id
-                    | tablename=ID '[' column_index=DECIMAL ']' // id[x]
+field_id            : column_name=ID                            # FieldID            // id
+                    | tablename=ID '[' UNDERLINE ']'            # FieldIDUnderline   // id[_]
+                    | tablename=ID DOT column_name=ID           # FieldIDColumnname  // id.id
+                    | tablename=ID '[' column_index=DECIMAL ']' # FieldIDTable       // id[x]
                     ;
 
 unary_op_expression : BIT_NOT expression

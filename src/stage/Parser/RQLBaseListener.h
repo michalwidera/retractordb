@@ -43,8 +43,17 @@ public:
   virtual void enterSelect_elem(RQLParser::Select_elemContext * /*ctx*/) override { }
   virtual void exitSelect_elem(RQLParser::Select_elemContext * /*ctx*/) override { }
 
-  virtual void enterField_id(RQLParser::Field_idContext * /*ctx*/) override { }
-  virtual void exitField_id(RQLParser::Field_idContext * /*ctx*/) override { }
+  virtual void enterFieldID(RQLParser::FieldIDContext * /*ctx*/) override { }
+  virtual void exitFieldID(RQLParser::FieldIDContext * /*ctx*/) override { }
+
+  virtual void enterFieldIDUnderline(RQLParser::FieldIDUnderlineContext * /*ctx*/) override { }
+  virtual void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext * /*ctx*/) override { }
+
+  virtual void enterFieldIDColumnname(RQLParser::FieldIDColumnnameContext * /*ctx*/) override { }
+  virtual void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext * /*ctx*/) override { }
+
+  virtual void enterFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
+  virtual void exitFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
 
   virtual void enterUnary_op_expression(RQLParser::Unary_op_expressionContext * /*ctx*/) override { }
   virtual void exitUnary_op_expression(RQLParser::Unary_op_expressionContext * /*ctx*/) override { }

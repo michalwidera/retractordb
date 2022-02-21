@@ -41,8 +41,17 @@ public:
   virtual void enterSelect_elem(RQLParser::Select_elemContext *ctx) = 0;
   virtual void exitSelect_elem(RQLParser::Select_elemContext *ctx) = 0;
 
-  virtual void enterField_id(RQLParser::Field_idContext *ctx) = 0;
-  virtual void exitField_id(RQLParser::Field_idContext *ctx) = 0;
+  virtual void enterFieldID(RQLParser::FieldIDContext *ctx) = 0;
+  virtual void exitFieldID(RQLParser::FieldIDContext *ctx) = 0;
+
+  virtual void enterFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) = 0;
+  virtual void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) = 0;
+
+  virtual void enterFieldIDColumnname(RQLParser::FieldIDColumnnameContext *ctx) = 0;
+  virtual void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext *ctx) = 0;
+
+  virtual void enterFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
+  virtual void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
 
   virtual void enterUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) = 0;
   virtual void exitUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) = 0;
