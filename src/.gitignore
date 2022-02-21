@@ -1,3 +1,4 @@
+.antlr/
 CMakeCache.txt
 CMakeFiles/*
 CMakeLists.txt.user

@@ -152,8 +152,8 @@ public:
     antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *COMMA();
     RationalContext *rational();
-    antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FILE();
+    antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
