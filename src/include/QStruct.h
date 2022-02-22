@@ -157,6 +157,8 @@ public:
     list < string > getDepStreamNameList(int reqDep = 0) ;
 
     int getFieldIndex(field f);
+
+    void reset();
 } ;
 
 bool operator< (const query &lhs, const query &rhs) ;

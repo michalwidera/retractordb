@@ -105,12 +105,12 @@ public:
         //do_from_section
 
         //this loop in partial wrong
-        for ( auto i : ctx->stream_term() )
-            std::cout << "-- >"  << i->getText() << std::endl;
+        //for ( auto i : ctx->() )
+        //    std::cout << "-- >"  << i->getText() << std::endl;
     }
 
     void exitStream_factor(RQLParser::Stream_factorContext *ctx) {
-        std::cout << "SF" << __func__ << " " << ctx->ID()->getText() << std::endl ;
+        std::cout << "SF " << __func__ << std::endl ;
     }
 
     // page 119 - The Definitive ANTL4 Reference Guide
@@ -125,6 +125,9 @@ public:
         std::cout << ctx->STRING()->getText() << std::endl << "  ";
         std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
         std::cout << "}" << __func__ << std::endl;
+
+        coreInstance_parser.push_back(qry);
+        qry.reset();
     }
 
     void exitSelect(RQLParser::SelectContext * ctx) {
@@ -133,6 +136,7 @@ public:
         std::cout << "}" << __func__ << std::endl;
 
         coreInstance_parser.push_back(qry);
+        qry.reset();
     }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {

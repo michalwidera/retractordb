@@ -101,11 +101,35 @@ public:
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
 
-  virtual void enterStream_expression(RQLParser::Stream_expressionContext *ctx) = 0;
-  virtual void exitStream_expression(RQLParser::Stream_expressionContext *ctx) = 0;
+  virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
+  virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
 
-  virtual void enterStream_term(RQLParser::Stream_termContext *ctx) = 0;
-  virtual void exitStream_term(RQLParser::Stream_termContext *ctx) = 0;
+  virtual void enterSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
+  virtual void exitSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
+
+  virtual void enterSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
+  virtual void exitSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
+
+  virtual void enterSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
+  virtual void exitSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
+
+  virtual void enterSExpHash(RQLParser::SExpHashContext *ctx) = 0;
+  virtual void exitSExpHash(RQLParser::SExpHashContext *ctx) = 0;
+
+  virtual void enterSExpAnd(RQLParser::SExpAndContext *ctx) = 0;
+  virtual void exitSExpAnd(RQLParser::SExpAndContext *ctx) = 0;
+
+  virtual void enterSExpMod(RQLParser::SExpModContext *ctx) = 0;
+  virtual void exitSExpMod(RQLParser::SExpModContext *ctx) = 0;
+
+  virtual void enterSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
+  virtual void exitSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
+
+  virtual void enterSExpAgregate(RQLParser::SExpAgregateContext *ctx) = 0;
+  virtual void exitSExpAgregate(RQLParser::SExpAgregateContext *ctx) = 0;
+
+  virtual void enterSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
+  virtual void exitSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
 
   virtual void enterStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
   virtual void exitStream_factor(RQLParser::Stream_factorContext *ctx) = 0;

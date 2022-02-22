@@ -544,68 +544,140 @@ public:
 
   class  Stream_expressionContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *timemove = nullptr;
-    antlr4::Token *stream_add = nullptr;
-    antlr4::Token *stream_sub = nullptr;
     Stream_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Stream_expressionContext() = default;
+    void copyFrom(Stream_expressionContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  SExpPlusContext : public Stream_expressionContext {
+  public:
+    SExpPlusContext(Stream_expressionContext *ctx);
+
     std::vector<Stream_termContext *> stream_term();
     Stream_termContext* stream_term(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode* DECIMAL(size_t i);
-    std::vector<RationalContext *> rational();
-    RationalContext* rational(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> GREATER();
-    antlr4::tree::TerminalNode* GREATER(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> PLUS();
-    antlr4::tree::TerminalNode* PLUS(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> MINUS();
-    antlr4::tree::TerminalNode* MINUS(size_t i);
-
+    antlr4::tree::TerminalNode *PLUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  SExpTermContext : public Stream_expressionContext {
+  public:
+    SExpTermContext(Stream_expressionContext *ctx);
+
+    Stream_termContext *stream_term();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpTimeMoveContext : public Stream_expressionContext {
+  public:
+    SExpTimeMoveContext(Stream_expressionContext *ctx);
+
+    Stream_termContext *stream_term();
+    antlr4::tree::TerminalNode *GREATER();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpMinusContext : public Stream_expressionContext {
+  public:
+    SExpMinusContext(Stream_expressionContext *ctx);
+
+    Stream_termContext *stream_term();
+    antlr4::tree::TerminalNode *MINUS();
+    RationalContext *rational();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Stream_expressionContext* stream_expression();
 
   class  Stream_termContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *hash = nullptr;
-    antlr4::Token *dehash_div = nullptr;
-    antlr4::Token *dehash_mod = nullptr;
-    antlr4::Token *agse = nullptr;
     Stream_termContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    Stream_factorContext *stream_factor();
-    std::vector<antlr4::tree::TerminalNode *> ID();
-    antlr4::tree::TerminalNode* ID(size_t i);
-    std::vector<RationalContext *> rational();
-    RationalContext* rational(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode* DECIMAL(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode* COMMA(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DOT();
-    antlr4::tree::TerminalNode* DOT(size_t i);
-    std::vector<AgregatorContext *> agregator();
-    AgregatorContext* agregator(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> SHARP();
-    antlr4::tree::TerminalNode* SHARP(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> AND();
-    antlr4::tree::TerminalNode* AND(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> MOD();
-    antlr4::tree::TerminalNode* MOD(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> AT();
-    antlr4::tree::TerminalNode* AT(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> PLUS();
-    antlr4::tree::TerminalNode* PLUS(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> MINUS();
-    antlr4::tree::TerminalNode* MINUS(size_t i);
+   
+    Stream_termContext() = default;
+    void copyFrom(Stream_termContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  SExpFactorContext : public Stream_termContext {
+  public:
+    SExpFactorContext(Stream_termContext *ctx);
+
+    Stream_factorContext *stream_factor();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  SExpHashContext : public Stream_termContext {
+  public:
+    SExpHashContext(Stream_termContext *ctx);
+
+    std::vector<Stream_factorContext *> stream_factor();
+    Stream_factorContext* stream_factor(size_t i);
+    antlr4::tree::TerminalNode *SHARP();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpModContext : public Stream_termContext {
+  public:
+    SExpModContext(Stream_termContext *ctx);
+
+    Stream_factorContext *stream_factor();
+    antlr4::tree::TerminalNode *MOD();
+    RationalContext *rational();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpAgseContext : public Stream_termContext {
+  public:
+    SExpAgseContext(Stream_termContext *ctx);
+
+    Stream_factorContext *stream_factor();
+    antlr4::tree::TerminalNode *AT();
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    antlr4::tree::TerminalNode *COMMA();
+    antlr4::tree::TerminalNode *PLUS();
+    antlr4::tree::TerminalNode *MINUS();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpAgregateContext : public Stream_termContext {
+  public:
+    SExpAgregateContext(Stream_termContext *ctx);
+
+    Stream_factorContext *stream_factor();
+    antlr4::tree::TerminalNode *DOT();
+    AgregatorContext *agregator();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpAndContext : public Stream_termContext {
+  public:
+    SExpAndContext(Stream_termContext *ctx);
+
+    Stream_factorContext *stream_factor();
+    antlr4::tree::TerminalNode *AND();
+    RationalContext *rational();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Stream_termContext* stream_term();

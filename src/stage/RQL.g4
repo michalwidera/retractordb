@@ -71,20 +71,18 @@ factor              : w=FLOAT                      # ExpFloat
                     | agregator                    # ExpAgg
                     ;
 
-stream_expression   : stream_term
-                      ( timemove=GREATER DECIMAL
-                      | stream_add=PLUS stream_term
-                      | stream_sub=MINUS rational
-                      ) *
+stream_expression   : stream_term GREATER DECIMAL  # SExpTimeMove
+                    | stream_term PLUS stream_term # SExpPlus
+                    | stream_term MINUS rational   # SExpMinus
+                    | stream_term                  # SExpTerm
                     ;
 
-stream_term         : stream_factor
-                      ( hash=SHARP ID
-                      | dehash_div=AND rational
-                      | dehash_mod=MOD rational
-                      | agse=AT '(' DECIMAL COMMA (PLUS | MINUS)? DECIMAL ')'
-                      | DOT agregator
-                      ) *
+stream_term         : stream_factor SHARP stream_factor # SExpHash
+                    | stream_factor AND rational        # SExpAnd
+                    | stream_factor MOD rational        # SExpMod
+                    | stream_factor AT '(' DECIMAL COMMA (PLUS | MINUS)? DECIMAL ')' # SExpAgse
+                    | stream_factor DOT agregator       # SExpAgregate
+                    | stream_factor                     # SExpFactor
                     ;
 
 stream_factor       : ID

@@ -153,6 +153,16 @@ field &query::getField(string sField)
     return * new field();
 }
 
+void query::reset()
+{
+    id.clear();
+    filename.clear();
+    rInterval = 0;
+    lSchema.clear();
+    lProgram.clear();
+    return;
+}
+
 bool isThere(vector < query > v, string query_name)
 {
     for (auto &q : v)

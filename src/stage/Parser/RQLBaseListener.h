@@ -103,11 +103,35 @@ public:
   virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
   virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
 
-  virtual void enterStream_expression(RQLParser::Stream_expressionContext * /*ctx*/) override { }
-  virtual void exitStream_expression(RQLParser::Stream_expressionContext * /*ctx*/) override { }
+  virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
+  virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
 
-  virtual void enterStream_term(RQLParser::Stream_termContext * /*ctx*/) override { }
-  virtual void exitStream_term(RQLParser::Stream_termContext * /*ctx*/) override { }
+  virtual void enterSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
+  virtual void exitSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
+
+  virtual void enterSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
+  virtual void exitSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
+
+  virtual void enterSExpTerm(RQLParser::SExpTermContext * /*ctx*/) override { }
+  virtual void exitSExpTerm(RQLParser::SExpTermContext * /*ctx*/) override { }
+
+  virtual void enterSExpHash(RQLParser::SExpHashContext * /*ctx*/) override { }
+  virtual void exitSExpHash(RQLParser::SExpHashContext * /*ctx*/) override { }
+
+  virtual void enterSExpAnd(RQLParser::SExpAndContext * /*ctx*/) override { }
+  virtual void exitSExpAnd(RQLParser::SExpAndContext * /*ctx*/) override { }
+
+  virtual void enterSExpMod(RQLParser::SExpModContext * /*ctx*/) override { }
+  virtual void exitSExpMod(RQLParser::SExpModContext * /*ctx*/) override { }
+
+  virtual void enterSExpAgse(RQLParser::SExpAgseContext * /*ctx*/) override { }
+  virtual void exitSExpAgse(RQLParser::SExpAgseContext * /*ctx*/) override { }
+
+  virtual void enterSExpAgregate(RQLParser::SExpAgregateContext * /*ctx*/) override { }
+  virtual void exitSExpAgregate(RQLParser::SExpAgregateContext * /*ctx*/) override { }
+
+  virtual void enterSExpFactor(RQLParser::SExpFactorContext * /*ctx*/) override { }
+  virtual void exitSExpFactor(RQLParser::SExpFactorContext * /*ctx*/) override { }
 
   virtual void enterStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
   virtual void exitStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
