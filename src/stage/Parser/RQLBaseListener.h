@@ -22,8 +22,17 @@ public:
   virtual void enterSelect(RQLParser::SelectContext * /*ctx*/) override { }
   virtual void exitSelect(RQLParser::SelectContext * /*ctx*/) override { }
 
-  virtual void enterRational(RQLParser::RationalContext * /*ctx*/) override { }
-  virtual void exitRational(RQLParser::RationalContext * /*ctx*/) override { }
+  virtual void enterRationalAsFraction(RQLParser::RationalAsFractionContext * /*ctx*/) override { }
+  virtual void exitRationalAsFraction(RQLParser::RationalAsFractionContext * /*ctx*/) override { }
+
+  virtual void enterRationalAsFloat(RQLParser::RationalAsFloatContext * /*ctx*/) override { }
+  virtual void exitRationalAsFloat(RQLParser::RationalAsFloatContext * /*ctx*/) override { }
+
+  virtual void enterRationalAsDecimal(RQLParser::RationalAsDecimalContext * /*ctx*/) override { }
+  virtual void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext * /*ctx*/) override { }
+
+  virtual void enterFraction(RQLParser::FractionContext * /*ctx*/) override { }
+  virtual void exitFraction(RQLParser::FractionContext * /*ctx*/) override { }
 
   virtual void enterDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
   virtual void exitDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
@@ -84,9 +93,6 @@ public:
 
   virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
   virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
-
-  virtual void enterExpReal(RQLParser::ExpRealContext * /*ctx*/) override { }
-  virtual void exitExpReal(RQLParser::ExpRealContext * /*ctx*/) override { }
 
   virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
   virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }

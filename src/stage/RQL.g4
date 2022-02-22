@@ -11,7 +11,13 @@ select_statement    : SELECT select_list
                     # Select
                     ;
 
-rational            : FLOAT | REAL | DECIMAL | RATIONAL;
+rational            : fraction # RationalAsFraction
+                    | FLOAT    # RationalAsFloat
+                    | DECIMAL  # RationalAsDecimal
+                    ;
+
+fraction            : DECIMAL DIVIDE DECIMAL
+                    ;
 
 declare_statement   : DECLARE declare_list
                       STREAM stream_name=ID COMMA rational
@@ -36,10 +42,10 @@ select_list         : asterisk                       # SelectListFullscan
                     | expression (COMMA expression)* # SelectList
                     ;
 
-field_id            : column_name=ID                            # FieldID            // id
-                    | tablename=ID '[' UNDERLINE ']'            # FieldIDUnderline   // id[_]
-                    | tablename=ID DOT column_name=ID           # FieldIDColumnname  // id.id
-                    | tablename=ID '[' column_index=DECIMAL ']' # FieldIDTable       // id[x]
+field_id            : column_name=ID                            # FieldID            // id    - ID3
+                    | tablename=ID '[' UNDERLINE ']'            # FieldIDUnderline   // id[_] - IDX
+                    | tablename=ID DOT column_name=ID           # FieldIDColumnname  // id.id - ID1
+                    | tablename=ID '[' column_index=DECIMAL ']' # FieldIDTable       // id[x] - ID2
                     ;
 
 unary_op_expression : BIT_NOT expression
@@ -63,7 +69,6 @@ term
                     ;
 
 factor              : w=FLOAT                      # ExpFloat
-                    | w=REAL                       # ExpReal
                     | w=DECIMAL                    # ExpDec
                     | unary_op_expression          # ExpUnary
                     | function_call                # ExpFnCall
@@ -97,6 +102,7 @@ function_call       : function = (SQRT | CEIL | ABS | FLOOR | SIGN | CHR
                        | INT_CAST | COUNT | CRC | SUM | ISZERO | ISNONZERO)
                       '(' expression ')'
                     ;
+
 
 // src/include/rdb/desc.h
 //        String,
@@ -145,7 +151,6 @@ ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
-RATIONAL:           DECIMAL DIVIDE DECIMAL;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';

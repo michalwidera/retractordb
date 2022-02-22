@@ -18,21 +18,21 @@ public:
     AVG = 18, SUMC = 19, SQRT = 20, CEIL = 21, ABS = 22, FLOOR = 23, SIGN = 24, 
     CHR = 25, LENGTH = 26, TO_NUMBER = 27, TO_TIMESTAMP = 28, FLOAT_CAST = 29, 
     INT_CAST = 30, COUNT = 31, CRC = 32, SUM = 33, ISZERO = 34, ISNONZERO = 35, 
-    ID = 36, STRING = 37, FLOAT = 38, DECIMAL = 39, RATIONAL = 40, REAL = 41, 
-    EQUAL = 42, GREATER = 43, LESS = 44, EXCLAMATION = 45, DOUBLE_BAR = 46, 
-    DOT = 47, UNDERLINE = 48, AT = 49, SHARP = 50, AND = 51, MOD = 52, DOLLAR = 53, 
-    COMMA = 54, SEMI = 55, COLON = 56, DOUBLE_COLON = 57, STAR = 58, DIVIDE = 59, 
-    PLUS = 60, MINUS = 61, BIT_NOT = 62, BIT_OR = 63, BIT_XOR = 64, SPACE = 65, 
-    COMMENT = 66, LINE_COMMENT = 67
+    ID = 36, STRING = 37, FLOAT = 38, DECIMAL = 39, REAL = 40, EQUAL = 41, 
+    GREATER = 42, LESS = 43, EXCLAMATION = 44, DOUBLE_BAR = 45, DOT = 46, 
+    UNDERLINE = 47, AT = 48, SHARP = 49, AND = 50, MOD = 51, DOLLAR = 52, 
+    COMMA = 53, SEMI = 54, COLON = 55, DOUBLE_COLON = 56, STAR = 57, DIVIDE = 58, 
+    PLUS = 59, MINUS = 60, BIT_NOT = 61, BIT_OR = 62, BIT_XOR = 63, SPACE = 64, 
+    COMMENT = 65, LINE_COMMENT = 66
   };
 
   enum {
-    RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleDeclare_statement = 3, 
-    RuleDeclare_list = 4, RuleField_declaration = 5, RuleField_type = 6, 
-    RuleSelect_list = 7, RuleField_id = 8, RuleUnary_op_expression = 9, 
-    RuleAsterisk = 10, RuleExpression = 11, RuleTerm = 12, RuleFactor = 13, 
-    RuleStream_expression = 14, RuleStream_term = 15, RuleStream_factor = 16, 
-    RuleAgregator = 17, RuleFunction_call = 18
+    RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleFraction = 3, 
+    RuleDeclare_statement = 4, RuleDeclare_list = 5, RuleField_declaration = 6, 
+    RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
+    RuleAsterisk = 11, RuleExpression = 12, RuleTerm = 13, RuleFactor = 14, 
+    RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
+    RuleAgregator = 18, RuleFunction_call = 19
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -48,6 +48,7 @@ public:
   class ProgContext;
   class Select_statementContext;
   class RationalContext;
+  class FractionContext;
   class Declare_statementContext;
   class Declare_listContext;
   class Field_declarationContext;
@@ -114,18 +115,59 @@ public:
   class  RationalContext : public antlr4::ParserRuleContext {
   public:
     RationalContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    RationalContext() = default;
+    void copyFrom(RationalContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *FLOAT();
-    antlr4::tree::TerminalNode *REAL();
+
+   
+  };
+
+  class  RationalAsDecimalContext : public RationalContext {
+  public:
+    RationalAsDecimalContext(RationalContext *ctx);
+
     antlr4::tree::TerminalNode *DECIMAL();
-    antlr4::tree::TerminalNode *RATIONAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  RationalAsFloatContext : public RationalContext {
+  public:
+    RationalAsFloatContext(RationalContext *ctx);
+
+    antlr4::tree::TerminalNode *FLOAT();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  RationalAsFractionContext : public RationalContext {
+  public:
+    RationalAsFractionContext(RationalContext *ctx);
+
+    FractionContext *fraction();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  RationalContext* rational();
+
+  class  FractionContext : public antlr4::ParserRuleContext {
+  public:
+    FractionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    antlr4::tree::TerminalNode *DIVIDE();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
    
   };
 
-  RationalContext* rational();
+  FractionContext* fraction();
 
   class  Declare_statementContext : public antlr4::ParserRuleContext {
   public:
@@ -526,16 +568,6 @@ public:
     ExpUnaryContext(FactorContext *ctx);
 
     Unary_op_expressionContext *unary_op_expression();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpRealContext : public FactorContext {
-  public:
-    ExpRealContext(FactorContext *ctx);
-
-    antlr4::Token *w = nullptr;
-    antlr4::tree::TerminalNode *REAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

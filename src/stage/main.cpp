@@ -16,10 +16,10 @@ qTree coreInstance_parser ;
 std::string sFieldName = "" ;
 field::eType fieldType = field::BAD ;
 stack < std::shared_ptr<query>> stk ;
-query qry;
+
 
 #define RECPTOKEN(x)  { qry.lProgram.push_back( token( x ) ) ; }
-#define RECPSTRTK(x)  { qry.lProgram.push_back( token( x , string( str,end ) ) ) ; }
+#define RECPSTRTK(x)  { qry.lProgram.push_back( token( x , ctx->getText())) ; }
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
@@ -39,32 +39,6 @@ namespace json = boost::json;
 
 using namespace antlrcpp;
 using namespace antlr4;
-
-void do_reset()
-{
-    qry.lProgram.clear();
-    qry.lSchema.clear();
-    sFieldName = "" ;
-    fieldType = field::BAD ;
-}
-
-void do_insert_into_schema()
-{
-    for (auto &q : coreInstance_parser)
-    {
-        if (q.id == (stk.top())->id)
-        {
-            throw std::invalid_argument(string("Duplicate stream name:") + q.id);
-        }
-    }
-
-    if (! stk.top()->id.empty())
-    {
-        coreInstance_parser.push_back(* (stk.top()));
-    }
-
-    do_reset();
-}
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
@@ -91,15 +65,29 @@ public:
 };
 
 class ParserListener : public RQLBaseListener {
+
+    /* Helper variable required for rational numbers processing */
+    boost::rational<int> rationalResult;
+
+    /* Helper variable required to build query or declaration */
+    query qry;
+
 public:
 
-    void exitSelectList(RQLParser::SelectListContext * ctx) {
+    void exitSelectList(RQLParser::SelectListContext *ctx) {
         //do_insert_into_schema
         for ( auto i : ctx->expression() )
             std::cout << "## select item: " << i->getText() << std::endl ;
 
         std::cout << "## exitSelectList" << std::endl;
+
+        //
     }
+
+    void exitFieldID(RQLParser::FieldIDContext *ctx) RECPSTRTK(PUSH_ID3)
+    void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) RECPSTRTK(PUSH_IDX)
+    void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext *ctx) RECPSTRTK(PUSH_ID1)
+    void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) RECPSTRTK(PUSH_ID2)
 
     void exitStream_expression(RQLParser::Stream_expressionContext *ctx) {
         //do_from_section
@@ -107,14 +95,12 @@ public:
         //this loop in partial wrong
         //for ( auto i : ctx->() )
         //    std::cout << "-- >"  << i->getText() << std::endl;
-    }
 
-    void exitStream_factor(RQLParser::Stream_factorContext *ctx) {
-        std::cout << "SF " << __func__ << std::endl ;
+        //qry.lSchema =
     }
 
     // page 119 - The Definitive ANTL4 Reference Guide
-    void exitDeclare(RQLParser::DeclareContext * ctx) {
+    void exitDeclare(RQLParser::DeclareContext *ctx) {
         //do_insert_into_schema
         std::cout << "=={" << __func__ << std::endl << "  ";
         std::cout << ctx->children.size() << std::endl << "  ";
@@ -126,11 +112,29 @@ public:
         std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
         std::cout << "}" << __func__ << std::endl;
 
+        qry.rInterval = rationalResult;
         coreInstance_parser.push_back(qry);
         qry.reset();
     }
 
-    void exitSelect(RQLParser::SelectContext * ctx) {
+    // https://www.programiz.com/cpp-programming/string-float-conversion
+    // https://www.geeksforgeeks.org/converting-strings-numbers-cc/
+
+    void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) {
+        rationalResult = Rationalize(std::stod(ctx->FLOAT()->getText()));
+    }
+
+    void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) {
+        rationalResult = std::stoi(ctx->DECIMAL()->getText());
+    }
+
+    void exitFraction(RQLParser::FractionContext *ctx) {
+        const int nom = std::stoi(ctx->children[0]->getText());
+        const int den = std::stoi(ctx->children[2]->getText());
+        rationalResult = boost::rational<int>(nom,den);
+    }
+
+    void exitSelect(RQLParser::SelectContext *ctx) {
         std::cout << "=={" << __func__ << std::endl << "  ";
         for ( auto a : ctx->children ) std::cout << "|" << a->getText() << std::endl << "  ";
         std::cout << "}" << __func__ << std::endl;
@@ -139,10 +143,21 @@ public:
         qry.reset();
     }
 
-    void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {
+    void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) {
         std::cout << "&&{" << __func__ ;
         std::cout << " ID: " << ctx->ID()->getText() ;
         std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
+    }
+
+    void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) {
+        qry.lProgram.push_back(token(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText())));
+    }
+
+    void exitStream_factor(RQLParser::Stream_factorContext *ctx) {
+        if (ctx->children.size()==1)
+        {
+            qry.lProgram.push_back(token(PUSH_STREAM, ctx->ID()->getText()));
+        }
     }
 };
 

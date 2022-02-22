@@ -20,8 +20,17 @@ public:
   virtual void enterSelect(RQLParser::SelectContext *ctx) = 0;
   virtual void exitSelect(RQLParser::SelectContext *ctx) = 0;
 
-  virtual void enterRational(RQLParser::RationalContext *ctx) = 0;
-  virtual void exitRational(RQLParser::RationalContext *ctx) = 0;
+  virtual void enterRationalAsFraction(RQLParser::RationalAsFractionContext *ctx) = 0;
+  virtual void exitRationalAsFraction(RQLParser::RationalAsFractionContext *ctx) = 0;
+
+  virtual void enterRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) = 0;
+  virtual void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) = 0;
+
+  virtual void enterRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) = 0;
+  virtual void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) = 0;
+
+  virtual void enterFraction(RQLParser::FractionContext *ctx) = 0;
+  virtual void exitFraction(RQLParser::FractionContext *ctx) = 0;
 
   virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
   virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
@@ -82,9 +91,6 @@ public:
 
   virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
   virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
-
-  virtual void enterExpReal(RQLParser::ExpRealContext *ctx) = 0;
-  virtual void exitExpReal(RQLParser::ExpRealContext *ctx) = 0;
 
   virtual void enterExpDec(RQLParser::ExpDecContext *ctx) = 0;
   virtual void exitExpDec(RQLParser::ExpDecContext *ctx) = 0;
