@@ -70,7 +70,8 @@ std::map < const int, std::string > id2StreamName_Relation ;
 
 std::vector < IPC::message_queue > qset ;
 
-qTree coreInstance ;
+// Object coreInstance in QStruct.cpp
+extern "C" qTree coreInstance ;
 
 extern Processor* pProc ;
 

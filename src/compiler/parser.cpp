@@ -277,12 +277,6 @@ namespace
         lProgram.push_back(token(PUSH_STREAM, streamNameLoc));
     };
 
-    void do_print(char const* str, char const* end)
-    {
-        string s(str, end);
-    }
-
-
     void do_reset()
     {
         lProgram.clear();

@@ -17,6 +17,10 @@ using namespace boost::lambda;
 
 #define UNDEFINIED_TOKEN "UNDEFINIED TOKEN"
 
+extern "C" {
+    qTree coreInstance ;
+}
+
 //int _floor( boost::rational<int> & value ) {
 //    return static_cast<int> (
 //            floor ( rational_cast<double>( value ) )
@@ -148,8 +152,6 @@ field &query::getField(string sField)
     throw std::logic_error("No such field in schema");
     return * new field();
 }
-
-extern "C" qTree coreInstance ;
 
 bool isThere(vector < query > v, string query_name)
 {

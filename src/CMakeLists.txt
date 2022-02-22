@@ -70,6 +70,7 @@ set(SOURCES_STAGE
         stage/main.cpp
         stage/Parser/RQLLexer.cpp
         stage/Parser/RQLParser.cpp
+        share/QStruct.cpp
         )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )

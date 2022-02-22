@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdlib>
 #include "antlr4-runtime/antlr4-runtime.h"
 
 #include "Parser/RQLLexer.h"
@@ -12,11 +13,13 @@
 #include "QStruct.h"
 
 qTree coreInstance_parser ;
-list < token > lProgram ;
-list < field > lSchema ;
 std::string sFieldName = "" ;
 field::eType fieldType = field::BAD ;
 stack < std::shared_ptr<query>> stk ;
+query qry;
+
+#define RECPTOKEN(x)  { qry.lProgram.push_back( token( x ) ) ; }
+#define RECPSTRTK(x)  { qry.lProgram.push_back( token( x , string( str,end ) ) ) ; }
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
@@ -39,8 +42,8 @@ using namespace antlr4;
 
 void do_reset()
 {
-    lProgram.clear();
-    lSchema.clear();
+    qry.lProgram.clear();
+    qry.lSchema.clear();
     sFieldName = "" ;
     fieldType = field::BAD ;
 }
@@ -90,14 +93,12 @@ public:
 class ParserListener : public RQLBaseListener {
 public:
 
-    void exitSelect(RQLParser::SelectContext * ctx) {
+    void exitSelectList(RQLParser::SelectListContext * ctx) {
         //do_insert_into_schema
-        for ( auto i : ctx->select_list()->select_elem() )
-            std::cout << "select item: " << i->getText() << std::endl ;
+        for ( auto i : ctx->expression() )
+            std::cout << "## select item: " << i->getText() << std::endl ;
 
-        std::cout << "stream expression: " << ctx->stream_expression()->getText() << std::endl ;
-
-        std::cout << "== exitSelect:" << ctx->select_list()->getText() << std::endl;
+        std::cout << "## exitSelectList" << std::endl;
     }
 
     void exitStream_expression(RQLParser::Stream_expressionContext *ctx) {
@@ -109,26 +110,35 @@ public:
     }
 
     void exitStream_factor(RQLParser::Stream_factorContext *ctx) {
-        std::cout << "SF exitStream_factor:" << ctx->ID()->getText() << std::endl ;
+        std::cout << "SF" << __func__ << " " << ctx->ID()->getText() << std::endl ;
     }
 
     // page 119 - The Definitive ANTL4 Reference Guide
     void exitDeclare(RQLParser::DeclareContext * ctx) {
         //do_insert_into_schema
-        std::cout << "== exitDeclare {" << std::endl << "  ";
+        std::cout << "=={" << __func__ << std::endl << "  ";
         std::cout << ctx->children.size() << std::endl << "  ";
+        for ( auto a : ctx->children ) std::cout << "|" << a->getText() << std::endl << "  ";
         std::cout << ctx->stream_name->getText() << std::endl << "  ";
         std::cout << ctx->declare_list()->getText() << std::endl << "  ";
         std::cout << ctx->ID()->getText() << std::endl << "  ";  // source
         std::cout << ctx->STRING()->getText() << std::endl << "  ";
-        std::cout << ctx->children[0]->getText() << std::endl ; // DECLARE   values.get(ctx.getChild(0))
-        std::cout << "== exitDeclare }" << std::endl;
+        std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
+        std::cout << "}" << __func__ << std::endl;
+    }
+
+    void exitSelect(RQLParser::SelectContext * ctx) {
+        std::cout << "=={" << __func__ << std::endl << "  ";
+        for ( auto a : ctx->children ) std::cout << "|" << a->getText() << std::endl << "  ";
+        std::cout << "}" << __func__ << std::endl;
+
+        coreInstance_parser.push_back(qry);
     }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext * ctx) {
-        std::cout << "&& exitSingleDeclaration(";
-        std::cout << "ID: " << ctx->ID()->getText() ;
-        std::cout << ",type: " << ctx->field_type()->getText() << ")" << std::endl;
+        std::cout << "&&{" << __func__ ;
+        std::cout << " ID: " << ctx->ID()->getText() ;
+        std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
     }
 };
 
@@ -206,5 +216,17 @@ int main(int argc, const char *args[])
     std::cout << std::endl << "Parse tree (Lisp format):" << std::endl;
     std::cout << tree->toStringTree(&parser) << std::endl;
     std::cout << std::endl ;
+
+    // This code is for test purposes only
+    // Remove before merge
+    {
+    const qTree coreInstance2(coreInstance_parser) ;
+    std::ofstream ofs("query-stg.qry");
+    boost::archive::text_oarchive oa(ofs);
+    oa << coreInstance2 ;
+    } // Destructor here will create query-stg.qry file so std::system can see it in next line.
+    std::system("xdumper -i query-stg.qry");
+    std::remove("query-stg.qry");
+
     return 0;
 }

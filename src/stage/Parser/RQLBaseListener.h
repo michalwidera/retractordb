@@ -37,11 +37,11 @@ public:
   virtual void enterField_type(RQLParser::Field_typeContext * /*ctx*/) override { }
   virtual void exitField_type(RQLParser::Field_typeContext * /*ctx*/) override { }
 
-  virtual void enterSelect_list(RQLParser::Select_listContext * /*ctx*/) override { }
-  virtual void exitSelect_list(RQLParser::Select_listContext * /*ctx*/) override { }
+  virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
+  virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
 
-  virtual void enterSelect_elem(RQLParser::Select_elemContext * /*ctx*/) override { }
-  virtual void exitSelect_elem(RQLParser::Select_elemContext * /*ctx*/) override { }
+  virtual void enterSelectList(RQLParser::SelectListContext * /*ctx*/) override { }
+  virtual void exitSelectList(RQLParser::SelectListContext * /*ctx*/) override { }
 
   virtual void enterFieldID(RQLParser::FieldIDContext * /*ctx*/) override { }
   virtual void exitFieldID(RQLParser::FieldIDContext * /*ctx*/) override { }
@@ -61,14 +61,47 @@ public:
   virtual void enterAsterisk(RQLParser::AsteriskContext * /*ctx*/) override { }
   virtual void exitAsterisk(RQLParser::AsteriskContext * /*ctx*/) override { }
 
-  virtual void enterExpression(RQLParser::ExpressionContext * /*ctx*/) override { }
-  virtual void exitExpression(RQLParser::ExpressionContext * /*ctx*/) override { }
+  virtual void enterExpPlus(RQLParser::ExpPlusContext * /*ctx*/) override { }
+  virtual void exitExpPlus(RQLParser::ExpPlusContext * /*ctx*/) override { }
 
-  virtual void enterTerm(RQLParser::TermContext * /*ctx*/) override { }
-  virtual void exitTerm(RQLParser::TermContext * /*ctx*/) override { }
+  virtual void enterExpMinus(RQLParser::ExpMinusContext * /*ctx*/) override { }
+  virtual void exitExpMinus(RQLParser::ExpMinusContext * /*ctx*/) override { }
 
-  virtual void enterFactor(RQLParser::FactorContext * /*ctx*/) override { }
-  virtual void exitFactor(RQLParser::FactorContext * /*ctx*/) override { }
+  virtual void enterExpTerm(RQLParser::ExpTermContext * /*ctx*/) override { }
+  virtual void exitExpTerm(RQLParser::ExpTermContext * /*ctx*/) override { }
+
+  virtual void enterExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
+  virtual void exitExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
+
+  virtual void enterExpDiv(RQLParser::ExpDivContext * /*ctx*/) override { }
+  virtual void exitExpDiv(RQLParser::ExpDivContext * /*ctx*/) override { }
+
+  virtual void enterExpFactor(RQLParser::ExpFactorContext * /*ctx*/) override { }
+  virtual void exitExpFactor(RQLParser::ExpFactorContext * /*ctx*/) override { }
+
+  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+
+  virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
+  virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
+
+  virtual void enterExpReal(RQLParser::ExpRealContext * /*ctx*/) override { }
+  virtual void exitExpReal(RQLParser::ExpRealContext * /*ctx*/) override { }
+
+  virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
+  virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
+
+  virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
+  virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
+
+  virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+  virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+
+  virtual void enterExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
+  virtual void exitExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
+
+  virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
+  virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
 
   virtual void enterStream_expression(RQLParser::Stream_expressionContext * /*ctx*/) override { }
   virtual void exitStream_expression(RQLParser::Stream_expressionContext * /*ctx*/) override { }

@@ -8,9 +8,8 @@
 #include <boost/program_options.hpp>                        // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
 
-extern "C" {
-    qTree coreInstance ;
-}
+// Object coreInstance in QStruct.cpp
+extern "C" qTree coreInstance ;
 
 //
 //1. dumper.exe out_p.qry --dot >out.dot

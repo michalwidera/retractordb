@@ -29,10 +29,10 @@ public:
   enum {
     RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleDeclare_statement = 3, 
     RuleDeclare_list = 4, RuleField_declaration = 5, RuleField_type = 6, 
-    RuleSelect_list = 7, RuleSelect_elem = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
-    RuleAsterisk = 11, RuleExpression = 12, RuleTerm = 13, RuleFactor = 14, 
-    RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
-    RuleAgregator = 18, RuleFunction_call = 19
+    RuleSelect_list = 7, RuleField_id = 8, RuleUnary_op_expression = 9, 
+    RuleAsterisk = 10, RuleExpression = 11, RuleTerm = 12, RuleFactor = 13, 
+    RuleStream_expression = 14, RuleStream_term = 15, RuleStream_factor = 16, 
+    RuleAgregator = 17, RuleFunction_call = 18
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -53,7 +53,6 @@ public:
   class Field_declarationContext;
   class Field_typeContext;
   class Select_listContext;
-  class Select_elemContext;
   class Field_idContext;
   class Unary_op_expressionContext;
   class AsteriskContext;
@@ -235,32 +234,38 @@ public:
   class  Select_listContext : public antlr4::ParserRuleContext {
   public:
     Select_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Select_listContext() = default;
+    void copyFrom(Select_listContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
-    std::vector<Select_elemContext *> select_elem();
-    Select_elemContext* select_elem(size_t i);
+
+   
+  };
+
+  class  SelectListContext : public Select_listContext {
+  public:
+    SelectListContext(Select_listContext *ctx);
+
+    std::vector<ExpressionContext *> expression();
+    ExpressionContext* expression(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
-
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  SelectListFullscanContext : public Select_listContext {
+  public:
+    SelectListFullscanContext(Select_listContext *ctx);
+
+    AsteriskContext *asterisk();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Select_listContext* select_list();
-
-  class  Select_elemContext : public antlr4::ParserRuleContext {
-  public:
-    Select_elemContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    AsteriskContext *asterisk();
-    ExpressionContext *expression();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  Select_elemContext* select_elem();
 
   class  Field_idContext : public antlr4::ParserRuleContext {
   public:
@@ -358,55 +363,181 @@ public:
   class  ExpressionContext : public antlr4::ParserRuleContext {
   public:
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    ExpressionContext() = default;
+    void copyFrom(ExpressionContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
-    TermContext *term();
+
+   
+  };
+
+  class  ExpPlusContext : public ExpressionContext {
+  public:
+    ExpPlusContext(ExpressionContext *ctx);
+
     std::vector<ExpressionContext *> expression();
     ExpressionContext* expression(size_t i);
     antlr4::tree::TerminalNode *PLUS();
-    antlr4::tree::TerminalNode *MINUS();
-
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  ExpMinusContext : public ExpressionContext {
+  public:
+    ExpMinusContext(ExpressionContext *ctx);
+
+    std::vector<ExpressionContext *> expression();
+    ExpressionContext* expression(size_t i);
+    antlr4::tree::TerminalNode *MINUS();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpTermContext : public ExpressionContext {
+  public:
+    ExpTermContext(ExpressionContext *ctx);
+
+    TermContext *term();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   ExpressionContext* expression();
   ExpressionContext* expression(int precedence);
   class  TermContext : public antlr4::ParserRuleContext {
   public:
-    RQLParser::FactorContext *t = nullptr;
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    TermContext() = default;
+    void copyFrom(TermContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  ExpInContext : public TermContext {
+  public:
+    ExpInContext(TermContext *ctx);
+
     ExpressionContext *expression();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpDivContext : public TermContext {
+  public:
+    ExpDivContext(TermContext *ctx);
+
+    std::vector<TermContext *> term();
+    TermContext* term(size_t i);
+    antlr4::tree::TerminalNode *DIVIDE();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFactorContext : public TermContext {
+  public:
+    ExpFactorContext(TermContext *ctx);
+
     FactorContext *factor();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpMultContext : public TermContext {
+  public:
+    ExpMultContext(TermContext *ctx);
+
     std::vector<TermContext *> term();
     TermContext* term(size_t i);
     antlr4::tree::TerminalNode *STAR();
-    antlr4::tree::TerminalNode *DIVIDE();
-
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
   };
 
   TermContext* term();
   TermContext* term(int precedence);
   class  FactorContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *w = nullptr;
     FactorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *FLOAT();
-    antlr4::tree::TerminalNode *REAL();
-    antlr4::tree::TerminalNode *DECIMAL();
-    Unary_op_expressionContext *unary_op_expression();
-    Function_callContext *function_call();
-    Field_idContext *field_id();
-    AgregatorContext *agregator();
+   
+    FactorContext() = default;
+    void copyFrom(FactorContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  ExpFloatContext : public FactorContext {
+  public:
+    ExpFloatContext(FactorContext *ctx);
+
+    antlr4::Token *w = nullptr;
+    antlr4::tree::TerminalNode *FLOAT();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  ExpDecContext : public FactorContext {
+  public:
+    ExpDecContext(FactorContext *ctx);
+
+    antlr4::Token *w = nullptr;
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFnCallContext : public FactorContext {
+  public:
+    ExpFnCallContext(FactorContext *ctx);
+
+    Function_callContext *function_call();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpAggContext : public FactorContext {
+  public:
+    ExpAggContext(FactorContext *ctx);
+
+    AgregatorContext *agregator();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFieldContext : public FactorContext {
+  public:
+    ExpFieldContext(FactorContext *ctx);
+
+    Field_idContext *field_id();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpUnaryContext : public FactorContext {
+  public:
+    ExpUnaryContext(FactorContext *ctx);
+
+    Unary_op_expressionContext *unary_op_expression();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpRealContext : public FactorContext {
+  public:
+    ExpRealContext(FactorContext *ctx);
+
+    antlr4::Token *w = nullptr;
+    antlr4::tree::TerminalNode *REAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   FactorContext* factor();

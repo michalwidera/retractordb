@@ -16,9 +16,8 @@ using boost::lexical_cast;
 
 extern int fieldCount;
 
-extern "C" {
-    qTree coreInstance ;
-}
+// Object coreInstance in QStruct.cpp
+extern "C" qTree coreInstance ;
 
 std::vector<std::string> load_file(std::string sInputFile)
 {

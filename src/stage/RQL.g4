@@ -32,11 +32,8 @@ field_type          : ( ( (STRING_T | INTEGER_T | BYTE_T ) '[' type_size=DECIMAL
                     )
                     ;
 
-select_list         : select_elem (COMMA select_elem)*
-                    ;
-
-select_elem         : asterisk
-                    | expression
+select_list         : asterisk                       # SelectListFullscan
+                    | expression (COMMA expression)* # SelectList
                     ;
 
 field_id            : column_name=ID                            # FieldID            // id
@@ -53,25 +50,25 @@ asterisk            : (ID DOT)? STAR
                     ;
 
 expression
-                    : expression PLUS expression
-                    | expression MINUS expression
-                    | term
+                    : expression PLUS expression   # ExpPlus
+                    | expression MINUS expression  # ExpMinus
+                    | term                         # ExpTerm
                     ;
 
 term
-                    : term STAR term
-                    | term DIVIDE term
-                    | '(' expression ')'
-                    | t=factor
+                    : term STAR term               # ExpMult
+                    | term DIVIDE term             # ExpDiv
+                    | '(' expression ')'           # ExpIn
+                    | factor                       # ExpFactor
                     ;
 
-factor              : w=FLOAT
-                    | w=REAL
-                    | w=DECIMAL
-                    | unary_op_expression
-                    | function_call
-                    | field_id
-                    | agregator
+factor              : w=FLOAT                      # ExpFloat
+                    | w=REAL                       # ExpReal
+                    | w=DECIMAL                    # ExpDec
+                    | unary_op_expression          # ExpUnary
+                    | function_call                # ExpFnCall
+                    | field_id                     # ExpField
+                    | agregator                    # ExpAgg
                     ;
 
 stream_expression   : stream_term
