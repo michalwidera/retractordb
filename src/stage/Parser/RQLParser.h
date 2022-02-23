@@ -30,9 +30,9 @@ public:
     RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleFraction = 3, 
     RuleDeclare_statement = 4, RuleDeclare_list = 5, RuleField_declaration = 6, 
     RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
-    RuleAsterisk = 11, RuleExpression = 12, RuleTerm = 13, RuleFactor = 14, 
-    RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
-    RuleAgregator = 18, RuleFunction_call = 19
+    RuleAsterisk = 11, RuleExpression = 12, RuleExpression_factor = 13, 
+    RuleTerm = 14, RuleFactor = 15, RuleStream_expression = 16, RuleStream_term = 17, 
+    RuleStream_factor = 18, RuleAgregator = 19, RuleFunction_call = 20
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -58,6 +58,7 @@ public:
   class Unary_op_expressionContext;
   class AsteriskContext;
   class ExpressionContext;
+  class Expression_factorContext;
   class TermContext;
   class FactorContext;
   class Stream_expressionContext;
@@ -405,9 +406,22 @@ public:
   class  ExpressionContext : public antlr4::ParserRuleContext {
   public:
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    Expression_factorContext *expression_factor();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
    
-    ExpressionContext() = default;
-    void copyFrom(ExpressionContext *context);
+  };
+
+  ExpressionContext* expression();
+
+  class  Expression_factorContext : public antlr4::ParserRuleContext {
+  public:
+    Expression_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Expression_factorContext() = default;
+    void copyFrom(Expression_factorContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
@@ -415,39 +429,39 @@ public:
    
   };
 
-  class  ExpPlusContext : public ExpressionContext {
+  class  ExpPlusContext : public Expression_factorContext {
   public:
-    ExpPlusContext(ExpressionContext *ctx);
+    ExpPlusContext(Expression_factorContext *ctx);
 
-    std::vector<ExpressionContext *> expression();
-    ExpressionContext* expression(size_t i);
+    std::vector<Expression_factorContext *> expression_factor();
+    Expression_factorContext* expression_factor(size_t i);
     antlr4::tree::TerminalNode *PLUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  ExpMinusContext : public ExpressionContext {
+  class  ExpMinusContext : public Expression_factorContext {
   public:
-    ExpMinusContext(ExpressionContext *ctx);
+    ExpMinusContext(Expression_factorContext *ctx);
 
-    std::vector<ExpressionContext *> expression();
-    ExpressionContext* expression(size_t i);
+    std::vector<Expression_factorContext *> expression_factor();
+    Expression_factorContext* expression_factor(size_t i);
     antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  ExpTermContext : public ExpressionContext {
+  class  ExpTermContext : public Expression_factorContext {
   public:
-    ExpTermContext(ExpressionContext *ctx);
+    ExpTermContext(Expression_factorContext *ctx);
 
     TermContext *term();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  ExpressionContext* expression();
-  ExpressionContext* expression(int precedence);
+  Expression_factorContext* expression_factor();
+  Expression_factorContext* expression_factor(int precedence);
   class  TermContext : public antlr4::ParserRuleContext {
   public:
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -776,7 +790,7 @@ public:
 
 
   virtual bool sempred(antlr4::RuleContext *_localctx, size_t ruleIndex, size_t predicateIndex) override;
-  bool expressionSempred(ExpressionContext *_localctx, size_t predicateIndex);
+  bool expression_factorSempred(Expression_factorContext *_localctx, size_t predicateIndex);
   bool termSempred(TermContext *_localctx, size_t predicateIndex);
 
 private:

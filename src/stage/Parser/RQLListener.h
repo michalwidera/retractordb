@@ -68,6 +68,9 @@ public:
   virtual void enterAsterisk(RQLParser::AsteriskContext *ctx) = 0;
   virtual void exitAsterisk(RQLParser::AsteriskContext *ctx) = 0;
 
+  virtual void enterExpression(RQLParser::ExpressionContext *ctx) = 0;
+  virtual void exitExpression(RQLParser::ExpressionContext *ctx) = 0;
+
   virtual void enterExpPlus(RQLParser::ExpPlusContext *ctx) = 0;
   virtual void exitExpPlus(RQLParser::ExpPlusContext *ctx) = 0;
 

@@ -70,6 +70,9 @@ public:
   virtual void enterAsterisk(RQLParser::AsteriskContext * /*ctx*/) override { }
   virtual void exitAsterisk(RQLParser::AsteriskContext * /*ctx*/) override { }
 
+  virtual void enterExpression(RQLParser::ExpressionContext * /*ctx*/) override { }
+  virtual void exitExpression(RQLParser::ExpressionContext * /*ctx*/) override { }
+
   virtual void enterExpPlus(RQLParser::ExpPlusContext * /*ctx*/) override { }
   virtual void exitExpPlus(RQLParser::ExpPlusContext * /*ctx*/) override { }
 

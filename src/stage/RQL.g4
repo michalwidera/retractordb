@@ -55,10 +55,12 @@ unary_op_expression : BIT_NOT expression
 asterisk            : (ID DOT)? STAR
                     ;
 
-expression
-                    : expression PLUS expression   # ExpPlus
-                    | expression MINUS expression  # ExpMinus
-                    | term                         # ExpTerm
+expression          : expression_factor
+                    ;
+
+expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
+                    | expression_factor MINUS expression_factor  # ExpMinus
+                    | term                                       # ExpTerm
                     ;
 
 term

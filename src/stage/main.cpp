@@ -99,13 +99,13 @@ public:
     void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) RECPSTRTK(PUSH_ID1)
     void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) RECPSTRTK(PUSH_ID2)
 
-    void exitStream_expression(RQLParser::Stream_expressionContext* ctx)
-    {
-        //do_from_section
-        //this loop in partial wrong
-        //for ( auto i : ctx->() )
-        //    std::cout << "-- >"  << i->getText() << std::endl;
-        //qry.lSchema =
+    void exitExpPlus(RQLParser::ExpPlusContext *ctx) RECPTOKEN(ADD)
+    void exitExpMinus(RQLParser::ExpMinusContext *ctx) RECPTOKEN(SUBTRACT)
+    void exitExpMult(RQLParser::ExpMultContext *ctx) RECPTOKEN(MULTIPLY)
+    void exitExpDiv(RQLParser::ExpDivContext *ctx) RECPTOKEN(DIVIDE)
+
+    void exitExpDec(RQLParser::ExpDecContext *ctx) {
+        program.push_back(token(PUSH_VAL, ctx->DECIMAL()->getText()));
     }
 
     // page 119 - The Definitive ANTL4 Reference Guide
@@ -126,6 +126,7 @@ public:
         std::cout << ctx->STRING()->getText() << std::endl << "  ";
         std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
         std::cout << "}" << __func__ << std::endl;
+
         qry.rInterval = rationalResult;
         coreInstance_parser.push_back(qry);
         qry.reset();
@@ -161,9 +162,12 @@ public:
         }
 
         std::cout << "}" << __func__ << std::endl;
+
+        qry.lProgram = program;
         coreInstance_parser.push_back(qry);
         qry.reset();
     }
+
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
@@ -187,6 +191,17 @@ public:
 
     void exitExpression(RQLParser::ExpressionContext* ctx)
     {
+        std::cout << "=={" << __func__ << std::endl << "  ";
+
+        for (auto a : ctx->children)
+        {
+            std::cout << "|" << a->getText() << std::endl << "  ";
+        }
+
+        std::cout << "}" << __func__ << std::endl;
+
+        qry.lSchema.push_back(field("todo 1", program, field::INTEGER, "todo 2"));
+        program.clear();
     }
 };
 
