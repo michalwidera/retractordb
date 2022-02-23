@@ -99,12 +99,13 @@ public:
     void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) RECPSTRTK(PUSH_ID1)
     void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) RECPSTRTK(PUSH_ID2)
 
-    void exitExpPlus(RQLParser::ExpPlusContext *ctx) RECPTOKEN(ADD)
-    void exitExpMinus(RQLParser::ExpMinusContext *ctx) RECPTOKEN(SUBTRACT)
-    void exitExpMult(RQLParser::ExpMultContext *ctx) RECPTOKEN(MULTIPLY)
-    void exitExpDiv(RQLParser::ExpDivContext *ctx) RECPTOKEN(DIVIDE)
+    void exitExpPlus(RQLParser::ExpPlusContext* ctx) RECPTOKEN(ADD)
+    void exitExpMinus(RQLParser::ExpMinusContext* ctx) RECPTOKEN(SUBTRACT)
+    void exitExpMult(RQLParser::ExpMultContext* ctx) RECPTOKEN(MULTIPLY)
+    void exitExpDiv(RQLParser::ExpDivContext* ctx) RECPTOKEN(DIVIDE)
 
-    void exitExpDec(RQLParser::ExpDecContext *ctx) {
+    void exitExpDec(RQLParser::ExpDecContext* ctx)
+    {
         program.push_back(token(PUSH_VAL, ctx->DECIMAL()->getText()));
     }
 
@@ -126,7 +127,6 @@ public:
         std::cout << ctx->STRING()->getText() << std::endl << "  ";
         std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
         std::cout << "}" << __func__ << std::endl;
-
         qry.rInterval = rationalResult;
         coreInstance_parser.push_back(qry);
         qry.reset();
@@ -162,7 +162,6 @@ public:
         }
 
         std::cout << "}" << __func__ << std::endl;
-
         qry.lProgram = program;
         coreInstance_parser.push_back(qry);
         qry.reset();
@@ -199,7 +198,6 @@ public:
         }
 
         std::cout << "}" << __func__ << std::endl;
-
         qry.lSchema.push_back(field("todo 1", program, field::INTEGER, "todo 2"));
         program.clear();
     }
