@@ -97,3 +97,8 @@ add_custom_target(grammar
         WORKING_DIRECTORY ../../src/stage
         SOURCES stage/RQL.g4
         )
+
+add_custom_target(astyle
+        COMMAND astyle --options=../../src/astyle.options main.cpp
+        WORKING_DIRECTORY ../../src/stage
+)

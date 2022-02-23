@@ -14,3 +14,4 @@ CTestTestfile.cmake
 Testing/
 query.dot
 query.jpg
+*.orig
