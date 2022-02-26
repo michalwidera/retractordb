@@ -114,23 +114,23 @@ function_call       : function = (SQRT | CEIL | ABS | FLOOR | SIGN | CHR
 //        Int,
 //        Float,
 //        Double
-STRING_T:           'STRING';
-INTEGER_T:          'INT';
-BYTE_T:             'BYTE';
-UNSIGNED_T:         'UNSIGNED';
-FLOAT_T:            'FLOAT';
-DOUBLE_T:           'DOUBLE';
+STRING_T:           'STRING'|'string';
+INTEGER_T:          'INT'|'int';
+BYTE_T:             'BYTE'|'byte';
+UNSIGNED_T:         'UNSIGNED'|'unsigned';
+FLOAT_T:            'FLOAT'|'float';
+DOUBLE_T:           'DOUBLE'|'double';
 
-SELECT:             'SELECT';
-STREAM:             'STREAM';
-FROM:               'FROM';
-DECLARE:            'DECLARE';
-FILE:               'FILE';
+SELECT:             'SELECT'|'select';
+STREAM:             'STREAM'|'stream';
+FROM:               'FROM'|'from';
+DECLARE:            'DECLARE'|'declare';
+FILE:               'FILE'|'file';
 
-MIN:                'MIN';
-MAX:                'MAX';
-AVG:                'AVG';
-SUMC:               'SUMC';
+MIN:                'MIN'|'min';
+MAX:                'MAX'|'max';
+AVG:                'AVG'|'avg';
+SUMC:               'SUMC'|'sumc';
 
 SQRT:               'Sqrt';
 CEIL:               'Ceil';

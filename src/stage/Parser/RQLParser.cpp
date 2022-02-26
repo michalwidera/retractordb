@@ -2775,14 +2775,13 @@ std::vector<std::string> RQLParser::_ruleNames = {
 };
 
 std::vector<std::string> RQLParser::_literalNames = {
-  "", "'['", "']'", "'('", "')'", "'STRING'", "'INT'", "'BYTE'", "'UNSIGNED'", 
-  "'FLOAT'", "'DOUBLE'", "'SELECT'", "'STREAM'", "'FROM'", "'DECLARE'", 
-  "'FILE'", "'MIN'", "'MAX'", "'AVG'", "'SUMC'", "'Sqrt'", "'Ceil'", "'Abs'", 
-  "'Floor'", "'Sign'", "'Chr'", "'Length'", "'ToNumber'", "'ToTimeStamp'", 
-  "'FloatCast'", "'InstCast'", "'Count'", "'Crc'", "'Sum'", "'IsZero'", 
-  "'IsNonZero'", "", "", "", "", "", "'='", "'>'", "'<'", "'!'", "'||'", 
-  "'.'", "'_'", "'@'", "'#'", "'&'", "'%'", "'$'", "','", "';'", "':'", 
-  "'::'", "'*'", "'/'", "'+'", "'-'", "'~'", "'|'", "'^'"
+  "", "'['", "']'", "'('", "')'", "", "", "", "", "", "", "", "", "", "", 
+  "", "", "", "", "", "'Sqrt'", "'Ceil'", "'Abs'", "'Floor'", "'Sign'", 
+  "'Chr'", "'Length'", "'ToNumber'", "'ToTimeStamp'", "'FloatCast'", "'InstCast'", 
+  "'Count'", "'Crc'", "'Sum'", "'IsZero'", "'IsNonZero'", "", "", "", "", 
+  "", "'='", "'>'", "'<'", "'!'", "'||'", "'.'", "'_'", "'@'", "'#'", "'&'", 
+  "'%'", "'$'", "','", "';'", "':'", "'::'", "'*'", "'/'", "'+'", "'-'", 
+  "'~'", "'|'", "'^'"
 };
 
 std::vector<std::string> RQLParser::_symbolicNames = {
