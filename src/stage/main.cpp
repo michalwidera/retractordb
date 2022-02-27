@@ -9,6 +9,7 @@
 
 #include <boost/json.hpp>
 #include <boost/cerrno.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "QStruct.h"
 
@@ -80,7 +81,14 @@ class ParserListener : public RQLBaseListener
     /* */
     list < token > program;
 
+    int fieldCount;
+
 public:
+
+    void enterProg(RQLParser::ProgContext* ctx)
+    {
+        fieldCount = 0;
+    }
 
     void exitSelectList(RQLParser::SelectListContext* ctx)
     {
@@ -127,6 +135,8 @@ public:
         std::cout << ctx->STRING()->getText() << std::endl << "  ";
         std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
         std::cout << "}" << __func__ << std::endl;
+        qry.filename = ctx->file_name->getText();
+        qry.id = ctx->ID()->getText();
         qry.rInterval = rationalResult;
         coreInstance_parser.push_back(qry);
         qry.reset();
@@ -162,17 +172,10 @@ public:
         }
 
         std::cout << "}" << __func__ << std::endl;
+        qry.id = ctx->ID()->getText();
         qry.lProgram = program;
         coreInstance_parser.push_back(qry);
         qry.reset();
-    }
-
-
-    void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
-    {
-        std::cout << "&&{" << __func__ ;
-        std::cout << " ID: " << ctx->ID()->getText() ;
-        std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
     }
 
     void exitSExpTimeMove(RQLParser::SExpTimeMoveContext* ctx)
@@ -198,8 +201,17 @@ public:
         }
 
         std::cout << "}" << __func__ << std::endl;
-        qry.lSchema.push_back(field("todo 1", program, field::INTEGER, "todo 2"));
+        qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 2"));
         program.clear();
+    }
+
+    void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
+    {
+        std::cout << "&&{" << __func__ ;
+        std::cout << " ID: " << ctx->ID()->getText() ;
+        std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
+        list < token > emptyProgram;
+        qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, field::INTEGER, "todo 3"));
     }
 };
 
