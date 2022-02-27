@@ -73,8 +73,8 @@ term
                     | factor                       # ExpFactor
                     ;
 
-factor              : w=FLOAT                      # ExpFloat
-                    | w=DECIMAL                    # ExpDec
+factor              : FLOAT                        # ExpFloat
+                    | DECIMAL                      # ExpDec
                     | unary_op_expression          # ExpUnary
                     | function_call                # ExpFnCall
                     | field_id                     # ExpField

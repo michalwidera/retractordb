@@ -114,6 +114,14 @@ public:
     void exitExpMult(RQLParser::ExpMultContext* ctx) RECPTOKEN(MULTIPLY)
     void exitExpDiv(RQLParser::ExpDivContext* ctx) RECPTOKEN(DIVIDE)
 
+    void exitSExpHash(RQLParser::SExpHashContext* ctx) RECPTOKEN(STREAM_HASH)
+    void exitSExpAnd(RQLParser::SExpAndContext* ctx) RECPTOKEN(STREAM_DEHASH_DIV)
+    void exitSExpMod(RQLParser::SExpModContext* ctx) RECPTOKEN(STREAM_DEHASH_MOD)
+    void exitSExpAgse(RQLParser::SExpAgseContext* ctx) RECPTOKEN(STREAM_AGSE)
+    //void exitSExpAgregate(RQLParser::SExpAgregateContext* ctx) RECPTOKEN()
+    void exitSExpPlus(RQLParser::SExpPlusContext* ctx) RECPTOKEN(STREAM_ADD)
+    //void exitSExpMinus(RQLParser::SExpMinusContext* ctx) RECPTOKEN(STREAM_SUBSTRACT,arg)
+
     void exitExpDec(RQLParser::ExpDecContext* ctx)
     {
         program.push_back(token(PUSH_VAL, ctx->DECIMAL()->getText()));

@@ -162,21 +162,23 @@ namespace
     void do_mult(char const*, char const*)           RECPTOKEN(MULTIPLY)
     void do_div(char const*, char const*)            RECPTOKEN(DIVIDE)
     void do_neg(char const*, char const*)            RECPTOKEN(NEGATE)
-    void do_band(char const*, char const*)           RECPTOKEN(AND)
-    void do_bor(char const*, char const*)            RECPTOKEN(OR)
-    void do_bneg(char const*, char const*)           RECPTOKEN(NOT)
+//    void do_band(char const*, char const*)           RECPTOKEN(AND)
+//    void do_bor(char const*, char const*)            RECPTOKEN(OR)
+//    void do_bneg(char const*, char const*)           RECPTOKEN(NOT)
+
     void do_shash(char const* a, char const* b)        RECPTOKEN(STREAM_HASH)
     void do_sdein(char const*, char const*)          RECPTOKEN(STREAM_DEHASH_DIV)
     void do_sdmin(char const*, char const*)          RECPTOKEN(STREAM_DEHASH_MOD)
     void do_sadd(char const*, char const*)           RECPTOKEN(STREAM_ADD)
     void do_sagse(char const*, char const*)          RECPTOKEN(STREAM_AGSE)
-
+/*
     void do_CMP_eq(char const*, char const*)         RECPTOKEN(CMP_EQUAL)
     void do_CMP_lt(char const*, char const*)         RECPTOKEN(CMP_LT)
     void do_CMP_gt(char const*, char const*)         RECPTOKEN(CMP_GT)
     void do_CMP_le(char const*, char const*)         RECPTOKEN(CMP_LE)
     void do_CMP_ge(char const*, char const*)         RECPTOKEN(CMP_GE)
     void do_CMP_neq(char const*, char const*)        RECPTOKEN(CMP_NOT_EQUAL)
+*/
     void do_avg(char const*, char const*)            RECPTOKEN(STREAM_AVG)
     void do_min(char const*, char const*)            RECPTOKEN(STREAM_MIN)
     void do_max(char const*, char const*)            RECPTOKEN(STREAM_MAX)
@@ -472,6 +474,7 @@ struct ql_parser : public grammar<ql_parser>
                 =
                     (!(stream_id >> ch_p('.')) >> ch_p('*'))       [&do_TScan]
                     ;
+/*
             condition
                 =
                     !(NOT [ &do_bneg])
@@ -496,6 +499,7 @@ struct ql_parser : public grammar<ql_parser>
                         | (LE >> expression)          [&do_CMP_le]
                     )
                     ;
+*/
             stream_id
                 =
                     id
@@ -632,7 +636,7 @@ struct ql_parser : public grammar<ql_parser>
                     natural, schema, type_id,
                     funct,
                     rational,
-                    condition, logical_term, logical_factor,
+                    //condition, logical_term, logical_factor,
                     table_scan,
                     command
                     ;
