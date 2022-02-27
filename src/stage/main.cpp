@@ -85,8 +85,6 @@ class ParserListener : public RQLBaseListener
 
     int typelen;
 
-    field::eType typetype;
-
 public:
 
     void enterProg(RQLParser::ProgContext* ctx)
@@ -125,12 +123,13 @@ public:
     void exitDeclare(RQLParser::DeclareContext* ctx)
     {
         //do_insert_into_schema
-        std::cout << "&&" << __func__ << "{";
-        std::cout << ctx->children.size() << std::endl << "  ";
+        std::cout << "&&" << __func__ << "{" << std::endl;
+
+        std::cout << "size:" << ctx->children.size() << std::endl ;
 
         for (auto a : ctx->children)
         {
-            std::cout << "|" << a->getText() << std::endl << "  ";
+            std::cout << "  |" << a->getText() << std::endl ;
         }
 
         std::cout << ctx->stream_name->getText() << std::endl << "  ";
@@ -169,11 +168,11 @@ public:
 
     void exitSelect(RQLParser::SelectContext* ctx)
     {
-        std::cout << "&&" << __func__ << "{";
+        std::cout << "&&" << __func__ << "{" << std::endl;
 
         for (auto a : ctx->children)
         {
-            std::cout << "|" << a->getText() << std::endl << "  ";
+            std::cout << "  |" << a->getText() << std::endl;
         }
 
         std::cout << "}" << __func__ << std::endl;
@@ -198,11 +197,11 @@ public:
 
     void exitExpression(RQLParser::ExpressionContext* ctx)
     {
-        std::cout << "&&" << __func__ << "{";
+        std::cout << "&&" << __func__ << "{" << std::endl;
 
         for (auto a : ctx->children)
         {
-            std::cout << "|" << a->getText() << std::endl << "  ";
+            std::cout << "  |" << a->getText() << std::endl ;
         }
 
         std::cout << "}" << __func__ << std::endl;
@@ -212,7 +211,7 @@ public:
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
-        std::cout << "&&" << __func__ << "{";
+        std::cout << "&&" << __func__ << "{" << std::endl;
         std::cout << " ID: " << ctx->ID()->getText() ;
         std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
 
@@ -224,7 +223,7 @@ public:
 
     void exitField_type(RQLParser::Field_typeContext *ctx)
     {
-        std::cout << "&&" << __func__ << "{";
+        std::cout << "&&" << __func__ << "{" << std::endl;
 
         if (ctx->children.size() == 1)
         {
@@ -240,7 +239,7 @@ public:
 
         for (auto a : ctx->children)
         {
-            std::cout << "|" << a->getText() << std::endl << "  ";
+            std::cout << "  |" << a->getText() << std::endl;
         }
 
         std::cout << "}" << __func__ << std::endl;

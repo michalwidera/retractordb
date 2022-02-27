@@ -21,8 +21,8 @@ namespace rdb
         String,
         Bytearray,
         Intarray,
-        Uint,
         Byte,
+        Uint,
         Int,
         Float,
         Double

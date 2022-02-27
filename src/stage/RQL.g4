@@ -33,11 +33,12 @@ field_declaration   : ID field_type
                     # SingleDeclaration
                     ;
 
-field_type          : (STRING_T | INTEGER_T | BYTE_T ) '[' type_size=DECIMAL ']'
-                    | FLOAT_T
+field_type          : (STRING_T | INTARRAY_T | BYTEARRAY_T) '[' type_size=DECIMAL ']'
                     | BYTE_T
                     | INTEGER_T
                     | UNSIGNED_T
+                    | FLOAT_T
+                    | DOUBLE_T
                     ;
 
 select_list         : asterisk                       # SelectListFullscan
@@ -105,20 +106,16 @@ function_call       : FUNCTION '(' expression ')'
                     ;
 
 
-// src/include/rdb/desc.h
-//        String,
-//        Bytearray,
-//        Uint,
-//        Byte,
-//        Int,
-//        Float,
-//        Double
-STRING_T:           'STRING'|'string';
-INTEGER_T:          'INT'|'int';
-BYTE_T:             'BYTE'|'byte';
-UNSIGNED_T:         'UNSIGNED'|'unsigned';
-FLOAT_T:            'FLOAT'|'float';
-DOUBLE_T:           'DOUBLE'|'double';
+// sync types with: src/include/rdb/desc.h
+
+STRING_T:           'STRING'|'String';
+BYTEARRAY_T:        'BYTEARRAY'|'Bytearray';
+INTARRAY_T:         'INTARRAY'|'Intarray';
+BYTE_T:             'BYTE'|'Byte';
+UNSIGNED_T:         'UNSIGNED'|'Uint';
+INTEGER_T:          'INT'|'Int';
+FLOAT_T:            'FLOAT'|'Float';
+DOUBLE_T:           'DOUBLE'|'Double';
 
 SELECT:             'SELECT'|'select';
 STREAM:             'STREAM'|'stream';
