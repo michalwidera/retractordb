@@ -260,12 +260,12 @@ public:
     antlr4::Token *type_size = nullptr;
     Field_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *FLOAT_T();
-    antlr4::tree::TerminalNode *BYTE_T();
-    antlr4::tree::TerminalNode *INTEGER_T();
-    antlr4::tree::TerminalNode *UNSIGNED_T();
     antlr4::tree::TerminalNode *STRING_T();
+    antlr4::tree::TerminalNode *INTEGER_T();
+    antlr4::tree::TerminalNode *BYTE_T();
     antlr4::tree::TerminalNode *DECIMAL();
+    antlr4::tree::TerminalNode *FLOAT_T();
+    antlr4::tree::TerminalNode *UNSIGNED_T();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

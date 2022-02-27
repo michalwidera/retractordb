@@ -210,6 +210,7 @@ public:
         std::cout << "&&{" << __func__ ;
         std::cout << " ID: " << ctx->ID()->getText() ;
         std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
+
         list < token > emptyProgram;
         qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, field::INTEGER, "todo 3"));
     }

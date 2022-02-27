@@ -33,9 +33,11 @@ field_declaration   : ID field_type
                     # SingleDeclaration
                     ;
 
-field_type          : ( ( (STRING_T | INTEGER_T | BYTE_T ) '[' type_size=DECIMAL ']')
-                    | (FLOAT_T | BYTE_T | INTEGER_T | UNSIGNED_T)
-                    )
+field_type          : (STRING_T | INTEGER_T | BYTE_T ) '[' type_size=DECIMAL ']'
+                    | FLOAT_T
+                    | BYTE_T
+                    | INTEGER_T
+                    | UNSIGNED_T
                     ;
 
 select_list         : asterisk                       # SelectListFullscan
