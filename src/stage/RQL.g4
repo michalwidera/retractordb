@@ -101,10 +101,7 @@ stream_factor       : ID
 agregator           : MIN | MAX | AVG | SUMC
                     ;
 
-function_call       : function = (SQRT | CEIL | ABS | FLOOR | SIGN | CHR
-                       | LENGTH | TO_NUMBER | TO_TIMESTAMP | FLOAT_CAST
-                       | INT_CAST | COUNT | CRC | SUM | ISZERO | ISNONZERO)
-                      '(' expression ')'
+function_call       : FUNCTION '(' expression ')'
                     ;
 
 
@@ -134,28 +131,29 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-SQRT:               'Sqrt';
-CEIL:               'Ceil';
-ABS:                'Abs';
-FLOOR:              'Floor';
-SIGN:               'Sign';
-CHR:                'Chr';
-LENGTH:             'Length';
-TO_NUMBER:          'ToNumber';
-TO_TIMESTAMP:       'ToTimeStamp';
-FLOAT_CAST:         'FloatCast';
-INT_CAST:           'InstCast';
-COUNT:              'Count';
-CRC:                'Crc';
-SUM:                'Sum';
-ISZERO:             'IsZero';
-ISNONZERO:          'IsNonZero';
-
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
+
+FUNCTION            : 'Sqrt'
+                    | 'Ceil'
+                    | 'Abs'
+                    | 'Floor'
+                    | 'Sign'
+                    | 'Chr'
+                    | 'Length'
+                    | 'ToNumber'
+                    | 'ToTimeStamp'
+                    | 'FloatCast'
+                    | 'InstCast'
+                    | 'Count'
+                    | 'Crc'
+                    | 'Sum'
+                    | 'IsZero'
+                    | 'IsNonZero'
+                    ;
 
 EQUAL:              '=';
 GREATER:            '>';

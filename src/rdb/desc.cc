@@ -7,6 +7,8 @@
 
 namespace rdb
 {
+    // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
+
     static inline void ltrim(std::string &s) {
         s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
             return !std::isspace(ch);
@@ -18,14 +20,14 @@ namespace rdb
             return !std::isspace(ch);
         }).base(), s.end());
     }
-
+/*
     std::string GetFieldType(FieldType e)
     {
         std::map<FieldType, std::string> typeDictionary = {
             {String, "String"}, {Bytearray, "Bytearray"},  {Intarray, "Intarray"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"}, {Double, "Double"}};
         return typeDictionary[e];
     }
-
+*/
     FieldType GetFieldType(std::string name)
     {
         ltrim(name);
@@ -33,6 +35,24 @@ namespace rdb
         std::map<std::string, FieldType> typeDictionary = {
             {"String", String}, {"Bytearray", Bytearray}, {"Intarray", Intarray}, {"Uint", Uint}, {"Byte", Byte}, {"Int", Int}, {"Float", Float}, {"Double",Double}};
         return typeDictionary[name];
+    }
+
+    constexpr const char * GetFieldType(FieldType e) noexcept
+    {
+        switch (e)
+        {
+            case String: return "String";
+            case Bytearray: return "Bytearray";
+            case Intarray: return "Intarray";
+            case Uint: return "Uint";
+            case Byte: return "Byte";
+            case Int: return "Int";
+            case Float: return "Float";
+            case Double: return "Double";
+            default:
+                assert("Undefined type");
+                return "error";
+        }
     }
 
     constexpr uint GetFieldLenFromType(FieldType ft)

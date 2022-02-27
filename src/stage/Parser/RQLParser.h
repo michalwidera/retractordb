@@ -15,15 +15,12 @@ public:
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, STRING_T = 5, INTEGER_T = 6, 
     BYTE_T = 7, UNSIGNED_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, 
     STREAM = 12, FROM = 13, DECLARE = 14, FILE = 15, MIN = 16, MAX = 17, 
-    AVG = 18, SUMC = 19, SQRT = 20, CEIL = 21, ABS = 22, FLOOR = 23, SIGN = 24, 
-    CHR = 25, LENGTH = 26, TO_NUMBER = 27, TO_TIMESTAMP = 28, FLOAT_CAST = 29, 
-    INT_CAST = 30, COUNT = 31, CRC = 32, SUM = 33, ISZERO = 34, ISNONZERO = 35, 
-    ID = 36, STRING = 37, FLOAT = 38, DECIMAL = 39, REAL = 40, EQUAL = 41, 
-    GREATER = 42, LESS = 43, EXCLAMATION = 44, DOUBLE_BAR = 45, DOT = 46, 
-    UNDERLINE = 47, AT = 48, SHARP = 49, AND = 50, MOD = 51, DOLLAR = 52, 
-    COMMA = 53, SEMI = 54, COLON = 55, DOUBLE_COLON = 56, STAR = 57, DIVIDE = 58, 
-    PLUS = 59, MINUS = 60, BIT_NOT = 61, BIT_OR = 62, BIT_XOR = 63, SPACE = 64, 
-    COMMENT = 65, LINE_COMMENT = 66
+    AVG = 18, SUMC = 19, ID = 20, STRING = 21, FLOAT = 22, DECIMAL = 23, 
+    REAL = 24, FUNCTION = 25, EQUAL = 26, GREATER = 27, LESS = 28, EXCLAMATION = 29, 
+    DOUBLE_BAR = 30, DOT = 31, UNDERLINE = 32, AT = 33, SHARP = 34, AND = 35, 
+    MOD = 36, DOLLAR = 37, COMMA = 38, SEMI = 39, COLON = 40, DOUBLE_COLON = 41, 
+    STAR = 42, DIVIDE = 43, PLUS = 44, MINUS = 45, BIT_NOT = 46, BIT_OR = 47, 
+    BIT_XOR = 48, SPACE = 49, COMMENT = 50, LINE_COMMENT = 51
   };
 
   enum {
@@ -760,26 +757,10 @@ public:
 
   class  Function_callContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *function = nullptr;
     Function_callContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *FUNCTION();
     ExpressionContext *expression();
-    antlr4::tree::TerminalNode *SQRT();
-    antlr4::tree::TerminalNode *CEIL();
-    antlr4::tree::TerminalNode *ABS();
-    antlr4::tree::TerminalNode *FLOOR();
-    antlr4::tree::TerminalNode *SIGN();
-    antlr4::tree::TerminalNode *CHR();
-    antlr4::tree::TerminalNode *LENGTH();
-    antlr4::tree::TerminalNode *TO_NUMBER();
-    antlr4::tree::TerminalNode *TO_TIMESTAMP();
-    antlr4::tree::TerminalNode *FLOAT_CAST();
-    antlr4::tree::TerminalNode *INT_CAST();
-    antlr4::tree::TerminalNode *COUNT();
-    antlr4::tree::TerminalNode *CRC();
-    antlr4::tree::TerminalNode *SUM();
-    antlr4::tree::TerminalNode *ISZERO();
-    antlr4::tree::TerminalNode *ISNONZERO();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

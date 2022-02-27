@@ -83,6 +83,10 @@ class ParserListener : public RQLBaseListener
 
     int fieldCount;
 
+    int typelen;
+
+    field::eType typetype;
+
 public:
 
     void enterProg(RQLParser::ProgContext* ctx)
@@ -121,7 +125,7 @@ public:
     void exitDeclare(RQLParser::DeclareContext* ctx)
     {
         //do_insert_into_schema
-        std::cout << "=={" << __func__ << std::endl << "  ";
+        std::cout << "&&" << __func__ << "{";
         std::cout << ctx->children.size() << std::endl << "  ";
 
         for (auto a : ctx->children)
@@ -135,6 +139,7 @@ public:
         std::cout << ctx->STRING()->getText() << std::endl << "  ";
         std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
         std::cout << "}" << __func__ << std::endl;
+
         qry.filename = ctx->file_name->getText();
         qry.id = ctx->ID()->getText();
         qry.rInterval = rationalResult;
@@ -164,7 +169,7 @@ public:
 
     void exitSelect(RQLParser::SelectContext* ctx)
     {
-        std::cout << "=={" << __func__ << std::endl << "  ";
+        std::cout << "&&" << __func__ << "{";
 
         for (auto a : ctx->children)
         {
@@ -193,7 +198,7 @@ public:
 
     void exitExpression(RQLParser::ExpressionContext* ctx)
     {
-        std::cout << "=={" << __func__ << std::endl << "  ";
+        std::cout << "&&" << __func__ << "{";
 
         for (auto a : ctx->children)
         {
@@ -207,12 +212,38 @@ public:
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
-        std::cout << "&&{" << __func__ ;
+        std::cout << "&&" << __func__ << "{";
         std::cout << " ID: " << ctx->ID()->getText() ;
         std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
 
         list < token > emptyProgram;
         qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, field::INTEGER, "todo 3"));
+    }
+
+    // Working here - trying to unificate rdb types and RQL types
+
+    void exitField_type(RQLParser::Field_typeContext *ctx)
+    {
+        std::cout << "&&" << __func__ << "{";
+
+        if (ctx->children.size() == 1)
+        {
+            typelen = 1;
+        }
+        else
+        {
+            assert(ctx->children.size() == 4);
+            typelen = std::stoi(ctx->children[2]->getText());
+        }
+
+        std::cout << "typelen:" << typelen << std::endl;
+
+        for (auto a : ctx->children)
+        {
+            std::cout << "|" << a->getText() << std::endl << "  ";
+        }
+
+        std::cout << "}" << __func__ << std::endl;
     }
 };
 

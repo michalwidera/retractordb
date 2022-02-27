@@ -103,7 +103,7 @@ private:
 
 public:
 
-    enum eType { BAD, BYTE, INTEGER, RATIONAL } ;
+    enum eType { BAD, BYTE, INTEGER, UNSIGNED, RATIONAL, FLOAT, STRING} ;
 
     set< string > setFieldName ;
     eType dFieldType ;
