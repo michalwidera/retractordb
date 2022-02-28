@@ -114,6 +114,9 @@ public:
     void exitExpMult(RQLParser::ExpMultContext* ctx) RECPTOKEN(MULTIPLY)
     void exitExpDiv(RQLParser::ExpDivContext* ctx) RECPTOKEN(DIVIDE)
 
+    void exitExpFloat(RQLParser::ExpFloatContext* ctx) RECPSTRTK(PUSH_VAL)
+    void exitExpDec(RQLParser::ExpDecContext* ctx) RECPSTRTK(PUSH_VAL)
+
     void exitSExpHash(RQLParser::SExpHashContext* ctx) RECPTOKEN(STREAM_HASH)
     void exitSExpAnd(RQLParser::SExpAndContext* ctx) RECPTOKEN(STREAM_DEHASH_DIV)
     void exitSExpMod(RQLParser::SExpModContext* ctx) RECPTOKEN(STREAM_DEHASH_MOD)
@@ -122,11 +125,12 @@ public:
     void exitSExpPlus(RQLParser::SExpPlusContext* ctx) RECPTOKEN(STREAM_ADD)
     //void exitSExpMinus(RQLParser::SExpMinusContext* ctx) RECPTOKEN(STREAM_SUBSTRACT,arg)
 
+/*
     void exitExpDec(RQLParser::ExpDecContext* ctx)
     {
         program.push_back(token(PUSH_VAL, ctx->DECIMAL()->getText()));
     }
-
+*/
     // page 119 - The Definitive ANTL4 Reference Guide
     void exitDeclare(RQLParser::DeclareContext* ctx)
     {

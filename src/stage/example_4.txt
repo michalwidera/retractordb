@@ -1,4 +1,3 @@
-/* Example Set 4 - Testing area */
 DECLARE a INT STREAM inputdata,1/4 FILE 'datasum.dat'
 
 SELECT (wy[0]+wy[1])*2.5+(wy[2]-wy[3]+12)/3+(-1),IsZero(err[0])*10 STREAM wy1 FROM do

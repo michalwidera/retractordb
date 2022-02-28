@@ -102,7 +102,22 @@ stream_factor       : ID
 agregator           : MIN | MAX | AVG | SUMC
                     ;
 
-function_call       : FUNCTION '(' expression ')'
+function_call       : ( 'Sqrt'
+                    | 'Ceil'
+                    | 'Abs'
+                    | 'Floor'
+                    | 'Sign'
+                    | 'Chr'
+                    | 'Length'
+                    | 'ToNumber'
+                    | 'ToTimeStamp'
+                    | 'FloatCast'
+                    | 'InstCast'
+                    | 'Count'
+                    | 'Crc'
+                    | 'Sum'
+                    | 'IsZero'
+                    | 'IsNonZero' ) '(' expression_factor ')'
                     ;
 
 
@@ -133,24 +148,6 @@ STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
-
-FUNCTION            : 'Sqrt'
-                    | 'Ceil'
-                    | 'Abs'
-                    | 'Floor'
-                    | 'Sign'
-                    | 'Chr'
-                    | 'Length'
-                    | 'ToNumber'
-                    | 'ToTimeStamp'
-                    | 'FloatCast'
-                    | 'InstCast'
-                    | 'Count'
-                    | 'Crc'
-                    | 'Sum'
-                    | 'IsZero'
-                    | 'IsNonZero'
-                    ;
 
 EQUAL:              '=';
 GREATER:            '>';

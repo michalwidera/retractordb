@@ -12,15 +12,18 @@
 class  RQLParser : public antlr4::Parser {
 public:
   enum {
-    T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, STRING_T = 5, BYTEARRAY_T = 6, 
-    INTARRAY_T = 7, BYTE_T = 8, UNSIGNED_T = 9, INTEGER_T = 10, FLOAT_T = 11, 
-    DOUBLE_T = 12, SELECT = 13, STREAM = 14, FROM = 15, DECLARE = 16, FILE = 17, 
-    MIN = 18, MAX = 19, AVG = 20, SUMC = 21, ID = 22, STRING = 23, FLOAT = 24, 
-    DECIMAL = 25, REAL = 26, FUNCTION = 27, EQUAL = 28, GREATER = 29, LESS = 30, 
-    EXCLAMATION = 31, DOUBLE_BAR = 32, DOT = 33, UNDERLINE = 34, AT = 35, 
-    SHARP = 36, AND = 37, MOD = 38, DOLLAR = 39, COMMA = 40, SEMI = 41, 
-    COLON = 42, DOUBLE_COLON = 43, STAR = 44, DIVIDE = 45, PLUS = 46, MINUS = 47, 
-    BIT_NOT = 48, BIT_OR = 49, BIT_XOR = 50, SPACE = 51, COMMENT = 52, LINE_COMMENT = 53
+    T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
+    T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
+    T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
+    STRING_T = 21, BYTEARRAY_T = 22, INTARRAY_T = 23, BYTE_T = 24, UNSIGNED_T = 25, 
+    INTEGER_T = 26, FLOAT_T = 27, DOUBLE_T = 28, SELECT = 29, STREAM = 30, 
+    FROM = 31, DECLARE = 32, FILE = 33, MIN = 34, MAX = 35, AVG = 36, SUMC = 37, 
+    ID = 38, STRING = 39, FLOAT = 40, DECIMAL = 41, REAL = 42, EQUAL = 43, 
+    GREATER = 44, LESS = 45, EXCLAMATION = 46, DOUBLE_BAR = 47, DOT = 48, 
+    UNDERLINE = 49, AT = 50, SHARP = 51, AND = 52, MOD = 53, DOLLAR = 54, 
+    COMMA = 55, SEMI = 56, COLON = 57, DOUBLE_COLON = 58, STAR = 59, DIVIDE = 60, 
+    PLUS = 61, MINUS = 62, BIT_NOT = 63, BIT_OR = 64, BIT_XOR = 65, SPACE = 66, 
+    COMMENT = 67, LINE_COMMENT = 68
   };
 
   enum {
@@ -534,7 +537,6 @@ public:
   public:
     ExpFloatContext(FactorContext *ctx);
 
-    antlr4::Token *w = nullptr;
     antlr4::tree::TerminalNode *FLOAT();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -544,7 +546,6 @@ public:
   public:
     ExpDecContext(FactorContext *ctx);
 
-    antlr4::Token *w = nullptr;
     antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -762,8 +763,7 @@ public:
   public:
     Function_callContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *FUNCTION();
-    ExpressionContext *expression();
+    Expression_factorContext *expression_factor();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
