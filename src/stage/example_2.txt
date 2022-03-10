@@ -1,4 +1,3 @@
-/* Example Set 2 */
 DECLARE a INT STREAM inputdata,1/4 FILE 'datasum.dat'
 
 SELECT * STREAM do FROM (inputData>1)@(4,4)
@@ -6,4 +5,3 @@ SELECT wy[0]+wy[1]+wy[2]-wy[3] STREAM wy FROM do
 SELECT IsZero(err[0])*10 STREAM err FROM wy
 SELECT * STREAM graph_all FROM ((err>1) + inputData)
 SELECT * STREAM graph FROM graph_all & 1
-

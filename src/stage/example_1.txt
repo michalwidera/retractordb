@@ -1,4 +1,3 @@
-/* Example Set 1 */
 # Test of line comment
 DECLARE coef INTARRAY[25] STREAM filter, 0.01 FILE 'filterremez.txt'
 DECLARE data BYTE STREAM source, 1/3 FILE '/dev/urandom'

@@ -1,8 +1,6 @@
-/* Example Set 3 */
 DECLARE a INT STREAM core0, 0.5 FILE 'datafile3.dat'
 
 SELECT * STREAM str1 FROM core0@(2,3)
 SELECT * STREAM str2 FROM core0@(2,-3)
 SELECT * STREAM str3 FROM core0@(1,2)
 SELECT * STREAM str4 FROM core0@(1,-2)
-
