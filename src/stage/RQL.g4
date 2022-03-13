@@ -90,7 +90,7 @@ stream_expression   : stream_term GREATER DECIMAL  # SExpTimeMove
 stream_term         : stream_factor SHARP stream_factor # SExpHash
                     | stream_factor AND rational        # SExpAnd
                     | stream_factor MOD rational        # SExpMod
-                    | stream_factor AT '(' DECIMAL COMMA (PLUS | MINUS)? DECIMAL ')' # SExpAgse
+                    | stream_factor AT '(' window=DECIMAL COMMA step=DECIMAL ')' # SExpAgse
                     | stream_factor DOT agregator       # SExpAgregate
                     | stream_factor                     # SExpFactor
                     ;
@@ -128,7 +128,7 @@ BYTEARRAY_T:        'BYTEARRAY'|'Bytearray';
 INTARRAY_T:         'INTARRAY'|'Intarray';
 BYTE_T:             'BYTE'|'Byte';
 UNSIGNED_T:         'UNSIGNED'|'Uint';
-INTEGER_T:          'INT'|'Int';
+INTEGER_T:          'INT'|'Int'|'INTEGER';
 FLOAT_T:            'FLOAT'|'Float';
 DOUBLE_T:           'DOUBLE'|'Double';
 
@@ -146,7 +146,8 @@ SUMC:               'SUMC'|'sumc';
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
-DECIMAL:            DEC_DIGIT+;
+DECIMAL:            MINUS? DEC_DIGIT+;
+UDECIMAL:           DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';

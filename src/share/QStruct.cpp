@@ -188,11 +188,20 @@ void qTree::tsort()
     vector < query > v = *this ;
     vector < query > des ;
 
+    // this function is broken - this watchdog prevents hang
+    int watchdog = 100 ;
+
     while (! v.empty())
         for (vector < query >::iterator it = v.begin() ;
             it != v.end() ;
             ++it)
         {
+            watchdog --;
+            if (watchdog == 0)
+            {
+                abort();
+            }
+
             if (v.empty())
             {
                 break ;

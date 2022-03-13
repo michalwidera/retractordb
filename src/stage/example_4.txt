@@ -1,5 +1,9 @@
-DECLARE a INT STREAM inputdata,1/4 FILE 'datasum.dat'
+# Declarations
+declare a INTEGER stream inputdata,1/4 file 'datasum.dat'
 
-SELECT (wy[0]+wy[1])*2.5+(wy[2]-wy[3]+12)/3+(-1),IsZero(err[0])*10 STREAM wy1 FROM do
-SELECT * STREAM graph_all FROM ((err>1) + inputData)
-SELECT * STREAM graph FROM graph_all & 1
+# Queries
+select * stream do from (inputdata>1)@(4,4)
+select wy[0]+wy[1]+wy[2]-wy[3] stream wy from do
+select IsZero(err[0])*10 stream err from wy
+select * stream graph_all from ((err>1) + inputdata)
+select * stream graph from graph_all & 1

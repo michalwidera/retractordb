@@ -440,7 +440,15 @@ struct ql_parser : public grammar<ql_parser>
                         >>
                         (
                             FILE
-                            >> (* anychar_p)                    [&do_stream_assign_file]
+                            >> (
+                                    (* anychar_p)  [&do_stream_assign_file]
+                                    |
+                                    (
+                                    ch_p("'")
+                                    >> (* anychar_p) [&do_stream_assign_file]
+                                    >> ch_p("'")
+                                    )
+                            )
                         )
                     )
                     [&do_insert_into_schema]
