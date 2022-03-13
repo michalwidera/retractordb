@@ -137,6 +137,7 @@ namespace
     {
         stk.top()->id = string(str, end);
         stk.top()->filename = "";
+        stk.top()->rInterval = 0;
     }
 
 

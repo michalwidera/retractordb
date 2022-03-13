@@ -1,8 +1,5 @@
 Input file:query-crc.rql
 Compile result:OK
-datasrc(1/2)	datafile2.dat
-	a:
-	b:
 out2(1/2)
 	:- PUSH_STREAM(datasrc)
 	Field_3:
@@ -23,3 +20,6 @@ out1(1/2)
 		PUSH_VAL(16)
 		PUSH_VAL(1234)
 		CALL(crc)
+datasrc(1/2)	datafile2.dat
+	a:
+	b:

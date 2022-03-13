@@ -8,9 +8,6 @@ str1(1/3)
 		PUSH_ID(core0[0/1])
 	Field_1:
 		PUSH_ID(core0[1/1])
-core1(1/2)	datafile3.dat
-	c:
-	d:
 str2(1/2)
 	:- PUSH_STREAM(core1)
 	:- STREAM_SUBSTRACT(1_2)
@@ -32,6 +29,9 @@ str3(1/2)
 		PUSH_ID(core0[0/1])
 	Field_5:
 		PUSH_ID(core0[1/1])
+core1(1/2)	datafile3.dat
+	c:
+	d:
 core0(1/1)	datafile2.dat
 	a:
 	b:
