@@ -233,10 +233,10 @@ public:
 
     void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx)
     {
-/*
-        qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
-        // PUSH_TSCAN
-*/
+        /*
+                qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
+                // PUSH_TSCAN
+        */
         RECPSTRTK(PUSH_TSCAN)
         qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 3"));
         program.clear();
@@ -264,7 +264,6 @@ public:
     void exitTypeArray(RQLParser::TypeArrayContext* ctx)
     {
         std::string name = ctx->children[0]->getText();
-
         boost::to_upper(name);
 
         if (name == "STRING")
@@ -279,7 +278,10 @@ public:
         {
             fType = field::INTEGER;
         }
-        else abort();
+        else
+        {
+            abort();
+        }
 
         fTypeSize = std::stoi(ctx->type_size->getText());
     }
@@ -309,18 +311,19 @@ public:
 #endif
         list < token > emptyProgram;
 
-        if ( fTypeSize == 1 )
+        if (fTypeSize == 1)
         {
             qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
         }
         else
         {
-            for ( auto i = 0 ; i < fTypeSize ; i ++ )
+            for (auto i = 0 ; i < fTypeSize ; i ++)
             {
                 string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);
                 qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
             }
         }
+
         fType = field::BAD;
         fTypeSize = 1;
     }
