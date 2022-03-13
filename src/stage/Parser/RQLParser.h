@@ -16,14 +16,13 @@ public:
     T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     STRING_T = 21, BYTEARRAY_T = 22, INTARRAY_T = 23, BYTE_T = 24, UNSIGNED_T = 25, 
-    INTEGER_T = 26, FLOAT_T = 27, DOUBLE_T = 28, SELECT = 29, STREAM = 30, 
-    FROM = 31, DECLARE = 32, FILE = 33, MIN = 34, MAX = 35, AVG = 36, SUMC = 37, 
-    ID = 38, STRING = 39, FLOAT = 40, DECIMAL = 41, UDECIMAL = 42, REAL = 43, 
-    EQUAL = 44, GREATER = 45, LESS = 46, EXCLAMATION = 47, DOUBLE_BAR = 48, 
-    DOT = 49, UNDERLINE = 50, AT = 51, SHARP = 52, AND = 53, MOD = 54, DOLLAR = 55, 
-    COMMA = 56, SEMI = 57, COLON = 58, DOUBLE_COLON = 59, STAR = 60, DIVIDE = 61, 
-    PLUS = 62, MINUS = 63, BIT_NOT = 64, BIT_OR = 65, BIT_XOR = 66, SPACE = 67, 
-    COMMENT = 68, LINE_COMMENT = 69
+    INTEGER_T = 26, FLOAT_T = 27, SELECT = 28, STREAM = 29, FROM = 30, DECLARE = 31, 
+    FILE = 32, MIN = 33, MAX = 34, AVG = 35, SUMC = 36, ID = 37, STRING = 38, 
+    FLOAT = 39, DECIMAL = 40, REAL = 41, EQUAL = 42, GREATER = 43, LESS = 44, 
+    EXCLAMATION = 45, DOUBLE_BAR = 46, DOT = 47, UNDERLINE = 48, AT = 49, 
+    SHARP = 50, AND = 51, MOD = 52, DOLLAR = 53, COMMA = 54, SEMI = 55, 
+    COLON = 56, DOUBLE_COLON = 57, STAR = 58, DIVIDE = 59, PLUS = 60, MINUS = 61, 
+    BIT_NOT = 62, BIT_OR = 63, BIT_XOR = 64, SPACE = 65, COMMENT = 66, LINE_COMMENT = 67
   };
 
   enum {
@@ -257,22 +256,64 @@ public:
 
   class  Field_typeContext : public antlr4::ParserRuleContext {
   public:
-    antlr4::Token *type_size = nullptr;
     Field_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Field_typeContext() = default;
+    void copyFrom(Field_typeContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  TypeArrayContext : public Field_typeContext {
+  public:
+    TypeArrayContext(Field_typeContext *ctx);
+
+    antlr4::Token *type_size = nullptr;
     antlr4::tree::TerminalNode *STRING_T();
     antlr4::tree::TerminalNode *INTARRAY_T();
     antlr4::tree::TerminalNode *BYTEARRAY_T();
     antlr4::tree::TerminalNode *DECIMAL();
-    antlr4::tree::TerminalNode *BYTE_T();
-    antlr4::tree::TerminalNode *INTEGER_T();
-    antlr4::tree::TerminalNode *UNSIGNED_T();
-    antlr4::tree::TerminalNode *FLOAT_T();
-    antlr4::tree::TerminalNode *DOUBLE_T();
-
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  TypeIntContext : public Field_typeContext {
+  public:
+    TypeIntContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *INTEGER_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  TypeFloatContext : public Field_typeContext {
+  public:
+    TypeFloatContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *FLOAT_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  TypeUnsigedContext : public Field_typeContext {
+  public:
+    TypeUnsigedContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *UNSIGNED_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  TypeByteContext : public Field_typeContext {
+  public:
+    TypeByteContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *BYTE_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Field_typeContext* field_type();
@@ -746,15 +787,50 @@ public:
   class  AgregatorContext : public antlr4::ParserRuleContext {
   public:
     AgregatorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *MIN();
-    antlr4::tree::TerminalNode *MAX();
-    antlr4::tree::TerminalNode *AVG();
-    antlr4::tree::TerminalNode *SUMC();
+   
+    AgregatorContext() = default;
+    void copyFrom(AgregatorContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  StreamMinContext : public AgregatorContext {
+  public:
+    StreamMinContext(AgregatorContext *ctx);
+
+    antlr4::tree::TerminalNode *MIN();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
+  };
+
+  class  StreamAvgContext : public AgregatorContext {
+  public:
+    StreamAvgContext(AgregatorContext *ctx);
+
+    antlr4::tree::TerminalNode *AVG();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  StreamMaxContext : public AgregatorContext {
+  public:
+    StreamMaxContext(AgregatorContext *ctx);
+
+    antlr4::tree::TerminalNode *MAX();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  StreamSumContext : public AgregatorContext {
+  public:
+    StreamSumContext(AgregatorContext *ctx);
+
+    antlr4::tree::TerminalNode *SUMC();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   AgregatorContext* agregator();

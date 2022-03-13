@@ -33,22 +33,21 @@ field_declaration   : ID field_type
                     # SingleDeclaration
                     ;
 
-field_type          : (STRING_T | INTARRAY_T | BYTEARRAY_T) '[' type_size=DECIMAL ']'
-                    | BYTE_T
-                    | INTEGER_T
-                    | UNSIGNED_T
-                    | FLOAT_T
-                    | DOUBLE_T
+field_type          : (STRING_T | INTARRAY_T | BYTEARRAY_T) '[' type_size=DECIMAL ']' # typeArray
+                    | BYTE_T     # typeByte
+                    | INTEGER_T  # typeInt
+                    | UNSIGNED_T # typeUnsiged
+                    | FLOAT_T    # typeFloat
                     ;
 
 select_list         : asterisk                       # SelectListFullscan
                     | expression (COMMA expression)* # SelectList
                     ;
 
-field_id            : column_name=ID                            # FieldID            // id    - ID3
-                    | tablename=ID '[' UNDERLINE ']'            # FieldIDUnderline   // id[_] - IDX
-                    | tablename=ID DOT column_name=ID           # FieldIDColumnname  // id.id - ID1
-                    | tablename=ID '[' column_index=DECIMAL ']' # FieldIDTable       // id[x] - ID2
+field_id            : column_name=ID                             # FieldID            // id    - ID3
+                    | tablename=ID '[' UNDERLINE ']'             # FieldIDUnderline   // id[_] - IDX
+                    | tablename=ID DOT column_name=ID            # FieldIDColumnname  // id.id - ID1
+                    | tablename=ID '[' column_index=DECIMAL ']'  # FieldIDTable       // id[x] - ID2
                     ;
 
 unary_op_expression : BIT_NOT expression
@@ -99,7 +98,10 @@ stream_factor       : ID
                     | '(' stream_expression ')'
                     ;
 
-agregator           : MIN | MAX | AVG | SUMC
+agregator           : MIN   # StreamMin
+                    | MAX   # StreamMax
+                    | AVG   # StreamAvg
+                    | SUMC  # StreamSum
                     ;
 
 function_call       : ( 'Sqrt'
@@ -130,7 +132,6 @@ BYTE_T:             'BYTE'|'Byte';
 UNSIGNED_T:         'UNSIGNED'|'Uint';
 INTEGER_T:          'INT'|'Int'|'INTEGER';
 FLOAT_T:            'FLOAT'|'Float';
-DOUBLE_T:           'DOUBLE'|'Double';
 
 SELECT:             'SELECT'|'select';
 STREAM:             'STREAM'|'stream';
@@ -145,9 +146,8 @@ SUMC:               'SUMC'|'sumc';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
-FLOAT:              DEC_DOT_DEC;
+FLOAT:              MINUS? DEC_DOT_DEC;
 DECIMAL:            MINUS? DEC_DIGIT+;
-UDECIMAL:           DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';

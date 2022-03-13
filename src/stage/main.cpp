@@ -10,6 +10,7 @@
 #include <boost/json.hpp>
 #include <boost/cerrno.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "QStruct.h"
 
@@ -23,6 +24,7 @@ stack <std::shared_ptr<query>> stk ;
 
 #define RECPTOKEN(x)  { program.push_back( token( x ) ) ; }
 #define RECPSTRTK(x)  { program.push_back( token( x , ctx->getText())) ; }
+
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
@@ -125,6 +127,11 @@ public:
     void exitSExpAnd(RQLParser::SExpAndContext* ctx) RECPTOKEN(STREAM_DEHASH_DIV)
     void exitSExpMod(RQLParser::SExpModContext* ctx) RECPTOKEN(STREAM_DEHASH_MOD)
 
+    void exitStreamMin(RQLParser::StreamMinContext* ctx) RECPTOKEN(STREAM_MIN)
+    void exitStreamMax(RQLParser::StreamMaxContext* ctx) RECPTOKEN(STREAM_MAX)
+    void exitStreamAvg(RQLParser::StreamAvgContext* ctx) RECPTOKEN(STREAM_AVG)
+    void exitStreamSum(RQLParser::StreamSumContext* ctx) RECPTOKEN(STREAM_SUM)
+
     //void exitSExpAgregate(RQLParser::SExpAgregateContext* ctx) RECPTOKEN()
     void exitSExpPlus(RQLParser::SExpPlusContext* ctx) RECPTOKEN(STREAM_ADD)
     //void exitSExpMinus(RQLParser::SExpMinusContext* ctx) RECPTOKEN(STREAM_SUBSTRACT,arg)
@@ -143,6 +150,7 @@ public:
         program.push_back(token(PUSH_VAL, std::stoi(ctx->step->getText())));
         program.push_back(token(STREAM_AGSE)) ;
     }
+
 
     // page 119 - The Definitive ANTL4 Reference Guide
     void exitDeclare(RQLParser::DeclareContext* ctx)
@@ -206,6 +214,7 @@ public:
         qry.id = ctx->ID()->getText();
         qry.lProgram = program;
         coreInstance_parser.push_back(qry);
+        program.clear();
         qry.reset();
     }
 
@@ -220,6 +229,17 @@ public:
         {
             program.push_back(token(PUSH_STREAM, ctx->ID()->getText()));
         }
+    }
+
+    void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx)
+    {
+/*
+        qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
+        // PUSH_TSCAN
+*/
+        RECPSTRTK(PUSH_TSCAN)
+        qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 3"));
+        program.clear();
     }
 
     void exitExpression(RQLParser::ExpressionContext* ctx)
@@ -238,6 +258,48 @@ public:
         program.clear();
     }
 
+    field::eType fType = field::BAD;
+    int fTypeSize = 1;
+
+    void exitTypeArray(RQLParser::TypeArrayContext* ctx)
+    {
+        std::string name = ctx->children[0]->getText();
+
+        boost::to_upper(name);
+
+        if (name == "STRING")
+        {
+            fType = field::BYTE;
+        }
+        else if (name == "BYTEARRAY")
+        {
+            fType = field::BYTE;
+        }
+        else if (name == "INTARRAY")
+        {
+            fType = field::INTEGER;
+        }
+        else abort();
+
+        fTypeSize = std::stoi(ctx->type_size->getText());
+    }
+    void exitTypeByte(RQLParser::TypeByteContext* ctx)
+    {
+        fType = field::BYTE;
+    }
+    void exitTypeInt(RQLParser::TypeIntContext* ctx)
+    {
+        fType = field::INTEGER;
+    }
+    void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx)
+    {
+        fType = field::UNSIGNED;
+    }
+    void exitTypeFloat(RQLParser::TypeFloatContext* ctx)
+    {
+        fType = field::FLOAT;
+    }
+
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
 #ifdef DBG_LVL
@@ -246,7 +308,21 @@ public:
         std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
 #endif
         list < token > emptyProgram;
-        qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, field::INTEGER, "todo 3"));
+
+        if ( fTypeSize == 1 )
+        {
+            qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
+        }
+        else
+        {
+            for ( auto i = 0 ; i < fTypeSize ; i ++ )
+            {
+                string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);
+                qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
+            }
+        }
+        fType = field::BAD;
+        fTypeSize = 1;
     }
 
     // Working here - trying to unificate rdb types and RQL types

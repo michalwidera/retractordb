@@ -1,7 +1,10 @@
-DECLARE a INT STREAM inputdata,1/4 FILE 'datasum.dat'
+# old compiler
+# dd count=1000 bs=1 if=/dev/urandom 2>/dev/null | hexdump -v -e '/1 "%u\n " ' > signal.txt
 
-SELECT * STREAM do FROM (inputData>1)@(4,4)
-SELECT wy[0]+wy[1]+wy[2]-wy[3] STREAM wy FROM do
-SELECT IsZero(err[0])*10 STREAM err FROM wy
-SELECT * STREAM graph_all FROM ((err>1) + inputData)
-SELECT * STREAM graph FROM graph_all & 1
+declare coef INTEGER[25] stream filter, 1 file filterremez.txt
+declare data INTEGER stream source, 0.02 file signal.txt
+
+select * stream signalRow from source@(1,25)
+select signalRow[_] * filter[_] stream accRow from signalRow+filter
+select accRow[0] stream output from accRow.sum
+select output[0]/26,source[0] stream outputAll from output+source

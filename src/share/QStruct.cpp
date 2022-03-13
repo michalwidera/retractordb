@@ -199,6 +199,7 @@ void qTree::tsort()
             watchdog --;
             if (watchdog == 0)
             {
+                std::cerr<<"Tsort failure."<<std::endl;
                 abort();
             }
 

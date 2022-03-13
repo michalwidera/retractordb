@@ -41,8 +41,20 @@ public:
   virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
   virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
 
-  virtual void enterField_type(RQLParser::Field_typeContext *ctx) = 0;
-  virtual void exitField_type(RQLParser::Field_typeContext *ctx) = 0;
+  virtual void enterTypeArray(RQLParser::TypeArrayContext *ctx) = 0;
+  virtual void exitTypeArray(RQLParser::TypeArrayContext *ctx) = 0;
+
+  virtual void enterTypeByte(RQLParser::TypeByteContext *ctx) = 0;
+  virtual void exitTypeByte(RQLParser::TypeByteContext *ctx) = 0;
+
+  virtual void enterTypeInt(RQLParser::TypeIntContext *ctx) = 0;
+  virtual void exitTypeInt(RQLParser::TypeIntContext *ctx) = 0;
+
+  virtual void enterTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) = 0;
+  virtual void exitTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) = 0;
+
+  virtual void enterTypeFloat(RQLParser::TypeFloatContext *ctx) = 0;
+  virtual void exitTypeFloat(RQLParser::TypeFloatContext *ctx) = 0;
 
   virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) = 0;
   virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) = 0;
@@ -143,8 +155,17 @@ public:
   virtual void enterStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
   virtual void exitStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
 
-  virtual void enterAgregator(RQLParser::AgregatorContext *ctx) = 0;
-  virtual void exitAgregator(RQLParser::AgregatorContext *ctx) = 0;
+  virtual void enterStreamMin(RQLParser::StreamMinContext *ctx) = 0;
+  virtual void exitStreamMin(RQLParser::StreamMinContext *ctx) = 0;
+
+  virtual void enterStreamMax(RQLParser::StreamMaxContext *ctx) = 0;
+  virtual void exitStreamMax(RQLParser::StreamMaxContext *ctx) = 0;
+
+  virtual void enterStreamAvg(RQLParser::StreamAvgContext *ctx) = 0;
+  virtual void exitStreamAvg(RQLParser::StreamAvgContext *ctx) = 0;
+
+  virtual void enterStreamSum(RQLParser::StreamSumContext *ctx) = 0;
+  virtual void exitStreamSum(RQLParser::StreamSumContext *ctx) = 0;
 
   virtual void enterFunction_call(RQLParser::Function_callContext *ctx) = 0;
   virtual void exitFunction_call(RQLParser::Function_callContext *ctx) = 0;

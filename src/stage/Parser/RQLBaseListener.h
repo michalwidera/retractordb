@@ -43,8 +43,20 @@ public:
   virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext * /*ctx*/) override { }
   virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext * /*ctx*/) override { }
 
-  virtual void enterField_type(RQLParser::Field_typeContext * /*ctx*/) override { }
-  virtual void exitField_type(RQLParser::Field_typeContext * /*ctx*/) override { }
+  virtual void enterTypeArray(RQLParser::TypeArrayContext * /*ctx*/) override { }
+  virtual void exitTypeArray(RQLParser::TypeArrayContext * /*ctx*/) override { }
+
+  virtual void enterTypeByte(RQLParser::TypeByteContext * /*ctx*/) override { }
+  virtual void exitTypeByte(RQLParser::TypeByteContext * /*ctx*/) override { }
+
+  virtual void enterTypeInt(RQLParser::TypeIntContext * /*ctx*/) override { }
+  virtual void exitTypeInt(RQLParser::TypeIntContext * /*ctx*/) override { }
+
+  virtual void enterTypeUnsiged(RQLParser::TypeUnsigedContext * /*ctx*/) override { }
+  virtual void exitTypeUnsiged(RQLParser::TypeUnsigedContext * /*ctx*/) override { }
+
+  virtual void enterTypeFloat(RQLParser::TypeFloatContext * /*ctx*/) override { }
+  virtual void exitTypeFloat(RQLParser::TypeFloatContext * /*ctx*/) override { }
 
   virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
   virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
@@ -145,8 +157,17 @@ public:
   virtual void enterStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
   virtual void exitStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
 
-  virtual void enterAgregator(RQLParser::AgregatorContext * /*ctx*/) override { }
-  virtual void exitAgregator(RQLParser::AgregatorContext * /*ctx*/) override { }
+  virtual void enterStreamMin(RQLParser::StreamMinContext * /*ctx*/) override { }
+  virtual void exitStreamMin(RQLParser::StreamMinContext * /*ctx*/) override { }
+
+  virtual void enterStreamMax(RQLParser::StreamMaxContext * /*ctx*/) override { }
+  virtual void exitStreamMax(RQLParser::StreamMaxContext * /*ctx*/) override { }
+
+  virtual void enterStreamAvg(RQLParser::StreamAvgContext * /*ctx*/) override { }
+  virtual void exitStreamAvg(RQLParser::StreamAvgContext * /*ctx*/) override { }
+
+  virtual void enterStreamSum(RQLParser::StreamSumContext * /*ctx*/) override { }
+  virtual void exitStreamSum(RQLParser::StreamSumContext * /*ctx*/) override { }
 
   virtual void enterFunction_call(RQLParser::Function_callContext * /*ctx*/) override { }
   virtual void exitFunction_call(RQLParser::Function_callContext * /*ctx*/) override { }
