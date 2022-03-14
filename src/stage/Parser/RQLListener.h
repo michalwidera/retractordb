@@ -20,8 +20,8 @@ public:
   virtual void enterSelect(RQLParser::SelectContext *ctx) = 0;
   virtual void exitSelect(RQLParser::SelectContext *ctx) = 0;
 
-  virtual void enterRationalAsFraction(RQLParser::RationalAsFractionContext *ctx) = 0;
-  virtual void exitRationalAsFraction(RQLParser::RationalAsFractionContext *ctx) = 0;
+  virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
+  virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
 
   virtual void enterRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) = 0;
   virtual void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) = 0;
@@ -146,8 +146,8 @@ public:
   virtual void enterSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
   virtual void exitSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
 
-  virtual void enterSExpAgregate(RQLParser::SExpAgregateContext *ctx) = 0;
-  virtual void exitSExpAgregate(RQLParser::SExpAgregateContext *ctx) = 0;
+  virtual void enterSExpAgregate_proforma(RQLParser::SExpAgregate_proformaContext *ctx) = 0;
+  virtual void exitSExpAgregate_proforma(RQLParser::SExpAgregate_proformaContext *ctx) = 0;
 
   virtual void enterSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
   virtual void exitSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;

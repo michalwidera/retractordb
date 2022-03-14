@@ -143,9 +143,9 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  RationalAsFractionContext : public RationalContext {
+  class  RationalAsFraction_proformaContext : public RationalContext {
   public:
-    RationalAsFractionContext(RationalContext *ctx);
+    RationalAsFraction_proformaContext(RationalContext *ctx);
 
     FractionContext *fraction();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -731,6 +731,17 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  SExpAgregate_proformaContext : public Stream_termContext {
+  public:
+    SExpAgregate_proformaContext(Stream_termContext *ctx);
+
+    Stream_factorContext *stream_factor();
+    antlr4::tree::TerminalNode *DOT();
+    AgregatorContext *agregator();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  SExpAgseContext : public Stream_termContext {
   public:
     SExpAgseContext(Stream_termContext *ctx);
@@ -742,17 +753,6 @@ public:
     antlr4::tree::TerminalNode *COMMA();
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode* DECIMAL(size_t i);
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  SExpAgregateContext : public Stream_termContext {
-  public:
-    SExpAgregateContext(Stream_termContext *ctx);
-
-    Stream_factorContext *stream_factor();
-    antlr4::tree::TerminalNode *DOT();
-    AgregatorContext *agregator();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

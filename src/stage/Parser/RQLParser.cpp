@@ -270,23 +270,23 @@ void RQLParser::RationalAsFloatContext::exitRule(tree::ParseTreeListener *listen
   if (parserListener != nullptr)
     parserListener->exitRationalAsFloat(this);
 }
-//----------------- RationalAsFractionContext ------------------------------------------------------------------
+//----------------- RationalAsFraction_proformaContext ------------------------------------------------------------------
 
-RQLParser::FractionContext* RQLParser::RationalAsFractionContext::fraction() {
+RQLParser::FractionContext* RQLParser::RationalAsFraction_proformaContext::fraction() {
   return getRuleContext<RQLParser::FractionContext>(0);
 }
 
-RQLParser::RationalAsFractionContext::RationalAsFractionContext(RationalContext *ctx) { copyFrom(ctx); }
+RQLParser::RationalAsFraction_proformaContext::RationalAsFraction_proformaContext(RationalContext *ctx) { copyFrom(ctx); }
 
-void RQLParser::RationalAsFractionContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::RationalAsFraction_proformaContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterRationalAsFraction(this);
+    parserListener->enterRationalAsFraction_proforma(this);
 }
-void RQLParser::RationalAsFractionContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::RationalAsFraction_proformaContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitRationalAsFraction(this);
+    parserListener->exitRationalAsFraction_proforma(this);
 }
 RQLParser::RationalContext* RQLParser::rational() {
   RationalContext *_localctx = _tracker.createInstance<RationalContext>(_ctx, getState());
@@ -304,7 +304,7 @@ RQLParser::RationalContext* RQLParser::rational() {
     _errHandler->sync(this);
     switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 2, _ctx)) {
     case 1: {
-      _localctx = _tracker.createInstance<RQLParser::RationalAsFractionContext>(_localctx);
+      _localctx = _tracker.createInstance<RQLParser::RationalAsFraction_proformaContext>(_localctx);
       enterOuterAlt(_localctx, 1);
       setState(57);
       fraction();
@@ -2291,6 +2291,32 @@ void RQLParser::SExpModContext::exitRule(tree::ParseTreeListener *listener) {
   if (parserListener != nullptr)
     parserListener->exitSExpMod(this);
 }
+//----------------- SExpAgregate_proformaContext ------------------------------------------------------------------
+
+RQLParser::Stream_factorContext* RQLParser::SExpAgregate_proformaContext::stream_factor() {
+  return getRuleContext<RQLParser::Stream_factorContext>(0);
+}
+
+tree::TerminalNode* RQLParser::SExpAgregate_proformaContext::DOT() {
+  return getToken(RQLParser::DOT, 0);
+}
+
+RQLParser::AgregatorContext* RQLParser::SExpAgregate_proformaContext::agregator() {
+  return getRuleContext<RQLParser::AgregatorContext>(0);
+}
+
+RQLParser::SExpAgregate_proformaContext::SExpAgregate_proformaContext(Stream_termContext *ctx) { copyFrom(ctx); }
+
+void RQLParser::SExpAgregate_proformaContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterSExpAgregate_proforma(this);
+}
+void RQLParser::SExpAgregate_proformaContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitSExpAgregate_proforma(this);
+}
 //----------------- SExpAgseContext ------------------------------------------------------------------
 
 RQLParser::Stream_factorContext* RQLParser::SExpAgseContext::stream_factor() {
@@ -2324,32 +2350,6 @@ void RQLParser::SExpAgseContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpAgse(this);
-}
-//----------------- SExpAgregateContext ------------------------------------------------------------------
-
-RQLParser::Stream_factorContext* RQLParser::SExpAgregateContext::stream_factor() {
-  return getRuleContext<RQLParser::Stream_factorContext>(0);
-}
-
-tree::TerminalNode* RQLParser::SExpAgregateContext::DOT() {
-  return getToken(RQLParser::DOT, 0);
-}
-
-RQLParser::AgregatorContext* RQLParser::SExpAgregateContext::agregator() {
-  return getRuleContext<RQLParser::AgregatorContext>(0);
-}
-
-RQLParser::SExpAgregateContext::SExpAgregateContext(Stream_termContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::SExpAgregateContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterSExpAgregate(this);
-}
-void RQLParser::SExpAgregateContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitSExpAgregate(this);
 }
 //----------------- SExpAndContext ------------------------------------------------------------------
 
@@ -2449,7 +2449,7 @@ RQLParser::Stream_termContext* RQLParser::stream_term() {
     }
 
     case 5: {
-      _localctx = _tracker.createInstance<RQLParser::SExpAgregateContext>(_localctx);
+      _localctx = _tracker.createInstance<RQLParser::SExpAgregate_proformaContext>(_localctx);
       enterOuterAlt(_localctx, 5);
       setState(211);
       stream_factor();

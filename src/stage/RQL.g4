@@ -11,7 +11,7 @@ select_statement    : SELECT select_list
                     # Select
                     ;
 
-rational            : fraction # RationalAsFraction
+rational            : fraction # RationalAsFraction_proforma
                     | FLOAT    # RationalAsFloat
                     | DECIMAL  # RationalAsDecimal
                     ;
@@ -90,7 +90,7 @@ stream_term         : stream_factor SHARP stream_factor # SExpHash
                     | stream_factor AND rational        # SExpAnd
                     | stream_factor MOD rational        # SExpMod
                     | stream_factor AT '(' window=DECIMAL COMMA step=DECIMAL ')' # SExpAgse
-                    | stream_factor DOT agregator       # SExpAgregate
+                    | stream_factor DOT agregator       # SExpAgregate_proforma
                     | stream_factor                     # SExpFactor
                     ;
 

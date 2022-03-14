@@ -15,16 +15,6 @@
 #include "QStruct.h"
 
 qTree coreInstance_parser ;
-std::string sFieldName = "" ;
-field::eType fieldType = field::BAD ;
-stack <std::shared_ptr<query>> stk ;
-
-
-//#define DBG_LVL 0
-
-#define RECPTOKEN(x)  { program.push_back( token( x ) ) ; }
-#define RECPSTRTK(x)  { program.push_back( token( x , ctx->getText())) ; }
-
 
 // antlr4 -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -no-listener -visitor RQLParser.g4
 // https://github.com/antlr/grammars-v4/tree/master/sql/tsql
@@ -85,65 +75,54 @@ class ParserListener : public RQLBaseListener
     /* */
     list < token > program;
 
-    int fieldCount;
+    int fieldCount = 0;
 
-    int typelen;
+    int typelen = 1;
+
+    field::eType fType = field::BAD;
+
+    int fTypeSize = 1;
+
+    void recpToken(command_id id)
+    {
+        program.push_back(token(id));
+    };
+
+    template< typename T >
+    void recpToken(command_id id, T arg)
+    {
+        program.push_back(token(id, arg));
+    };
 
 public:
 
     void enterProg(RQLParser::ProgContext* ctx)
     {
-        fieldCount = 0;
     }
 
-    void exitSelectList(RQLParser::SelectListContext* ctx)
-    {
-#ifdef DBG_LVL
+    void exitFieldID(RQLParser::FieldIDContext* ctx) { recpToken(PUSH_ID3, ctx->getText()); }
+    void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext* ctx) { recpToken(PUSH_IDX, ctx->getText()); }
+    void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) { recpToken(PUSH_ID1, ctx->getText()); }
+    void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) { recpToken(PUSH_ID2, ctx->getText()); }
 
-        //do_insert_into_schema
-        for (auto i : ctx->expression())
-        {
-            std::cout << "## select item: " << i->getText() << std::endl ;
-        }
+    void exitExpPlus(RQLParser::ExpPlusContext* ctx) { recpToken(ADD); }
+    void exitExpMinus(RQLParser::ExpMinusContext* ctx) { recpToken(SUBTRACT); }
+    void exitExpMult(RQLParser::ExpMultContext* ctx) { recpToken(MULTIPLY); }
+    void exitExpDiv(RQLParser::ExpDivContext* ctx) { recpToken(DIVIDE); }
 
-        std::cout << "## exitSelectList" << std::endl;
-#endif
-    }
+    void exitExpFloat(RQLParser::ExpFloatContext* ctx) { recpToken(PUSH_VAL, ctx->getText()); }
+    void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, ctx->getText()); }
 
-    void exitFieldID(RQLParser::FieldIDContext* ctx) RECPSTRTK(PUSH_ID3)
-    void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext* ctx) RECPSTRTK(PUSH_IDX)
-    void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) RECPSTRTK(PUSH_ID1)
-    void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) RECPSTRTK(PUSH_ID2)
+    void exitSExpHash(RQLParser::SExpHashContext* ctx) { recpToken(STREAM_HASH); }
+    void exitSExpAnd(RQLParser::SExpAndContext* ctx) { recpToken(STREAM_DEHASH_DIV); }
+    void exitSExpMod(RQLParser::SExpModContext* ctx) { recpToken(STREAM_DEHASH_MOD); }
+    void exitStreamMin(RQLParser::StreamMinContext* ctx) { recpToken(STREAM_MIN); }
+    void exitStreamMax(RQLParser::StreamMaxContext* ctx) { recpToken(STREAM_MAX); }
+    void exitStreamAvg(RQLParser::StreamAvgContext* ctx) { recpToken(STREAM_AVG); }
+    void exitStreamSum(RQLParser::StreamSumContext* ctx) { recpToken(STREAM_SUM); }
+    void exitSExpPlus(RQLParser::SExpPlusContext* ctx) { recpToken(STREAM_ADD); }
+    void exitSExpMinus(RQLParser::SExpPlusContext* ctx) { recpToken(STREAM_SUBSTRACT, rationalResult); }
 
-    void exitExpPlus(RQLParser::ExpPlusContext* ctx) RECPTOKEN(ADD)
-    void exitExpMinus(RQLParser::ExpMinusContext* ctx) RECPTOKEN(SUBTRACT)
-    void exitExpMult(RQLParser::ExpMultContext* ctx) RECPTOKEN(MULTIPLY)
-    void exitExpDiv(RQLParser::ExpDivContext* ctx) RECPTOKEN(DIVIDE)
-
-    void exitExpFloat(RQLParser::ExpFloatContext* ctx) RECPSTRTK(PUSH_VAL)
-    void exitExpDec(RQLParser::ExpDecContext* ctx) RECPSTRTK(PUSH_VAL)
-
-    void exitSExpHash(RQLParser::SExpHashContext* ctx) RECPTOKEN(STREAM_HASH)
-    void exitSExpAnd(RQLParser::SExpAndContext* ctx) RECPTOKEN(STREAM_DEHASH_DIV)
-    void exitSExpMod(RQLParser::SExpModContext* ctx) RECPTOKEN(STREAM_DEHASH_MOD)
-
-    void exitStreamMin(RQLParser::StreamMinContext* ctx) RECPTOKEN(STREAM_MIN)
-    void exitStreamMax(RQLParser::StreamMaxContext* ctx) RECPTOKEN(STREAM_MAX)
-    void exitStreamAvg(RQLParser::StreamAvgContext* ctx) RECPTOKEN(STREAM_AVG)
-    void exitStreamSum(RQLParser::StreamSumContext* ctx) RECPTOKEN(STREAM_SUM)
-
-    //void exitSExpAgregate(RQLParser::SExpAgregateContext* ctx) RECPTOKEN()
-    void exitSExpPlus(RQLParser::SExpPlusContext* ctx) RECPTOKEN(STREAM_ADD)
-    //void exitSExpMinus(RQLParser::SExpMinusContext* ctx) RECPTOKEN(STREAM_SUBSTRACT,arg)
-
-    /*
-        void exitExpDec(RQLParser::ExpDecContext* ctx)
-        {
-            program.push_back(token(PUSH_VAL, ctx->DECIMAL()->getText()));
-        }
-    */
-
-//  void exitSExpAgse(RQLParser::SExpAgseContext* ctx) RECPTOKEN(STREAM_AGSE)
     void exitSExpAgse(RQLParser::SExpAgseContext* ctx)
     {
         program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
@@ -151,27 +130,9 @@ public:
         program.push_back(token(STREAM_AGSE)) ;
     }
 
-
     // page 119 - The Definitive ANTL4 Reference Guide
     void exitDeclare(RQLParser::DeclareContext* ctx)
     {
-#ifdef DBG_LVL
-        //do_insert_into_schema
-        std::cout << "&&" << __func__ << "{" << std::endl;
-        std::cout << "size:" << ctx->children.size() << std::endl ;
-
-        for (auto a : ctx->children)
-        {
-            std::cout << "  |" << a->getText() << std::endl ;
-        }
-
-        std::cout << ctx->stream_name->getText() << std::endl << "  ";
-        std::cout << ctx->declare_list()->getText() << std::endl << "  ";
-        std::cout << ctx->ID()->getText() << std::endl << "  ";  // source
-        std::cout << ctx->STRING()->getText() << std::endl << "  ";
-        std::cout << ctx->children[0]->getText() << std::endl << "  "; // DECLARE   values.get(ctx.getChild(0))
-        std::cout << "}" << __func__ << std::endl;
-#endif
         qry.filename = ctx->file_name->getText();
         qry.id = ctx->ID()->getText();
         qry.rInterval = rationalResult;
@@ -201,16 +162,6 @@ public:
 
     void exitSelect(RQLParser::SelectContext* ctx)
     {
-#ifdef DBG_LVL
-        std::cout << "&&" << __func__ << "{" << std::endl;
-
-        for (auto a : ctx->children)
-        {
-            std::cout << "  |" << a->getText() << std::endl;
-        }
-
-        std::cout << "}" << __func__ << std::endl;
-#endif
         qry.id = ctx->ID()->getText();
         qry.lProgram = program;
         coreInstance_parser.push_back(qry);
@@ -220,135 +171,68 @@ public:
 
     void exitSExpTimeMove(RQLParser::SExpTimeMoveContext* ctx)
     {
-        program.push_back(token(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText())));
+        recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
     }
 
     void exitStream_factor(RQLParser::Stream_factorContext* ctx)
     {
         if (ctx->children.size() == 1)
-        {
             program.push_back(token(PUSH_STREAM, ctx->ID()->getText()));
-        }
     }
 
     void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx)
     {
-        /*
-                qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
-                // PUSH_TSCAN
-        */
-        RECPSTRTK(PUSH_TSCAN)
+        recpToken(PUSH_TSCAN, ctx->getText());
         qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 3"));
         program.clear();
     }
 
     void exitExpression(RQLParser::ExpressionContext* ctx)
     {
-#ifdef DBG_LVL
-        std::cout << "&&" << __func__ << "{" << std::endl;
-
-        for (auto a : ctx->children)
-        {
-            std::cout << "  |" << a->getText() << std::endl ;
-        }
-
-        std::cout << "}" << __func__ << std::endl;
-#endif
         qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 2"));
         program.clear();
     }
-
-    field::eType fType = field::BAD;
-    int fTypeSize = 1;
 
     void exitTypeArray(RQLParser::TypeArrayContext* ctx)
     {
         std::string name = ctx->children[0]->getText();
         boost::to_upper(name);
-
         if (name == "STRING")
-        {
             fType = field::BYTE;
-        }
         else if (name == "BYTEARRAY")
-        {
             fType = field::BYTE;
-        }
         else if (name == "INTARRAY")
-        {
             fType = field::INTEGER;
-        }
         else
-        {
             abort();
-        }
-
         fTypeSize = std::stoi(ctx->type_size->getText());
     }
-    void exitTypeByte(RQLParser::TypeByteContext* ctx)
-    {
-        fType = field::BYTE;
-    }
-    void exitTypeInt(RQLParser::TypeIntContext* ctx)
-    {
-        fType = field::INTEGER;
-    }
-    void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx)
-    {
-        fType = field::UNSIGNED;
-    }
-    void exitTypeFloat(RQLParser::TypeFloatContext* ctx)
-    {
-        fType = field::FLOAT;
-    }
+
+    void exitTypeByte(RQLParser::TypeByteContext* ctx) { fType = field::BYTE; }
+    void exitTypeInt(RQLParser::TypeIntContext* ctx) { fType = field::INTEGER; }
+    void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx) { fType = field::UNSIGNED; }
+    void exitTypeFloat(RQLParser::TypeFloatContext* ctx) { fType = field::FLOAT; }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
-#ifdef DBG_LVL
-        std::cout << "&&" << __func__ << "{" << std::endl;
-        std::cout << " ID: " << ctx->ID()->getText() ;
-        std::cout << ",type: " << ctx->field_type()->getText() << "}" << std::endl;
-#endif
         list < token > emptyProgram;
-
         if (fTypeSize == 1)
-        {
             qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
-        }
-        else
-        {
-            for (auto i = 0 ; i < fTypeSize ; i ++)
-            {
+        else {
+            for (auto i = 0 ; i < fTypeSize ; i ++) {
                 string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);
                 qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
             }
         }
-
         fType = field::BAD;
         fTypeSize = 1;
     }
 
-    // Working here - trying to unificate rdb types and RQL types
-
     void exitField_type(RQLParser::Field_typeContext* ctx)
     {
-#ifdef DBG_LVL
-        std::cout << "&&" << __func__ << "{" << std::endl;
-
-        for (auto a : ctx->children)
-        {
-            std::cout << "  |" << a->getText() << std::endl;
-        }
-
-        std::cout << "}" << __func__ << std::endl;
-#endif
-
         if (ctx->children.size() == 1)
-        {
             typelen = 1;
-        }
-        else
-        {
+        else {
             assert(ctx->children.size() == 4);
             typelen = std::stoi(ctx->children[2]->getText());
         }
