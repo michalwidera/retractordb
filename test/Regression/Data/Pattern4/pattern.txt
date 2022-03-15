@@ -9,7 +9,7 @@ out2(1/2)
 	Field_5:
 		PUSH_VAL(8)
 		PUSH_VAL(12)
-		CALL(crc)
+		CALL(Crc)
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
 	Field_0:
@@ -19,7 +19,7 @@ out1(1/2)
 	Field_2:
 		PUSH_VAL(16)
 		PUSH_VAL(1234)
-		CALL(crc)
+		CALL(Crc)
 datasrc(1/2)	datafile2.dat
 	a:
 	b:

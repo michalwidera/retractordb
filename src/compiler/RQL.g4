@@ -68,28 +68,28 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
 term
                     : term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
-                    | '(' expression ')'           # ExpIn
+                    | '(' expression_factor ')'    # ExpIn
                     | factor                       # ExpFactor
                     ;
 
-factor              : FLOAT                        # ExpFloat
-                    | DECIMAL                      # ExpDec
+factor              : '-'? FLOAT                   # ExpFloat
+                    | '-'? DECIMAL                 # ExpDec
                     | unary_op_expression          # ExpUnary
-                    | function_call                # ExpFnCall
                     | field_id                     # ExpField
                     | agregator                    # ExpAgg
+                    | function_call                # ExpFnCall
                     ;
 
 stream_expression   : stream_term GREATER DECIMAL  # SExpTimeMove
-                    | stream_term PLUS stream_term # SExpPlus
                     | stream_term MINUS rational   # SExpMinus
+                    | stream_term PLUS stream_term # SExpPlus
                     | stream_term                  # SExpTerm
                     ;
 
 stream_term         : stream_factor SHARP stream_factor # SExpHash
                     | stream_factor AND rational        # SExpAnd
                     | stream_factor MOD rational        # SExpMod
-                    | stream_factor AT '(' window=DECIMAL COMMA step=DECIMAL ')' # SExpAgse
+                    | stream_factor AT '(' '-'? window=DECIMAL COMMA step=DECIMAL ')' # SExpAgse
                     | stream_factor DOT agregator       # SExpAgregate_proforma
                     | stream_factor                     # SExpFactor
                     ;
@@ -119,9 +119,8 @@ function_call       : ( 'Sqrt'
                     | 'Crc'
                     | 'Sum'
                     | 'IsZero'
-                    | 'IsNonZero' ) '(' expression_factor ')'
+                    | 'IsNonZero' ) '(' expression_factor ( COMMA expression_factor )* ')'
                     ;
-
 
 // sync types with: src/include/rdb/desc.h
 
@@ -145,9 +144,9 @@ AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
-STRING:             'N'? '\'' (~'\'' | '\'\'')* '\'';
-FLOAT:              MINUS? DEC_DOT_DEC;
-DECIMAL:            MINUS? DEC_DIGIT+;
+STRING:             '\'' (~'\'' | '\'\'')* '\'';
+FLOAT:              DEC_DOT_DEC;
+DECIMAL:            DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
 EQUAL:              '=';

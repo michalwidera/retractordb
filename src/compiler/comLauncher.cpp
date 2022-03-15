@@ -26,7 +26,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern string parser(vector<string> vsInputFile);
+extern string parser(string sInputFile);
 extern string storeParseResult(string sOutputFile);
 extern string getParseResult();
 
@@ -99,7 +99,9 @@ int main(int argc, char* argv[])
             }
         }
         cout << "Input file:" << sQueryFile << endl ;
-        cout << "Compile result:" << parser(load_file(sQueryFile)) << endl ;
+
+        cout << "Compile result:" << parser(sQueryFile) << endl;
+
         //
         // Main Algorithm body
         //

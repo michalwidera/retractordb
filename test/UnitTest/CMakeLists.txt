@@ -17,6 +17,8 @@ set(SOURCES_COMPILER_TEST
   ${CMAKE_SOURCE_DIR}/src/compiler/parser.cpp
   ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
   ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
+  ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLLexer.cpp
+  ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLParser.cpp
   test_compiler.cpp
   main.cpp
 )

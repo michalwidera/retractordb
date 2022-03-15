@@ -33,6 +33,8 @@ set(SOURCES_COMPILER
   compiler/parser.cpp
   share/QStruct.cpp
   share/SOperations.cpp
+  compiler/Parser/RQLLexer.cpp
+  compiler/Parser/RQLParser.cpp
 )
 
 set(SOURCES_DUMPER
@@ -66,39 +68,23 @@ set(SOURCES_RDB
   rdb/dataset.cc
 )
 
-set(SOURCES_STAGE
-        stage/main.cpp
-        stage/Parser/RQLLexer.cpp
-        stage/Parser/RQLParser.cpp
-        share/QStruct.cpp
-        )
 
 add_executable( xretractor ${SOURCES_RETRACTOR} )
 add_executable( xcompiler ${SOURCES_COMPILER} )
 add_executable( xdumper ${SOURCES_DUMPER} )
 add_executable( xqry ${SOURCES_QRY} )
 add_executable( xtrdb ${SOURCES_RDB} )
-add_executable( xstage ${SOURCES_STAGE} )
-
-target_include_directories( xstage PUBLIC
-        stage/Parser )
 
 target_link_libraries( xretractor ${CONAN_LIBS} )
 target_link_libraries( xcompiler ${CONAN_LIBS} )
 target_link_libraries( xdumper ${CONAN_LIBS} )
 target_link_libraries( xqry ${CONAN_LIBS} )
 target_link_libraries( xtrdb ${CONAN_LIBS} )
-target_link_libraries( xstage ${CONAN_LIBS} )
 
-install(TARGETS xretractor xcompiler xdumper xqry xtrdb xstage DESTINATION ~/.local/bin)
+install(TARGETS xretractor xcompiler xdumper xqry xtrdb DESTINATION ~/.local/bin)
 
 add_custom_target(grammar
         COMMAND antlr4call.sh RQL.g4
-        WORKING_DIRECTORY ../../src/stage
-        SOURCES stage/RQL.g4
+        WORKING_DIRECTORY ../../src/compiler
+        SOURCES ../../src/compiler/RQL.g4
         )
-
-add_custom_target(astyle
-        COMMAND astyle --options=../../src/astyle.options main.cpp
-        WORKING_DIRECTORY ../../src/stage
-)

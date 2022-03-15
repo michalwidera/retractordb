@@ -1,6 +1,0 @@
-DECLARE data1 BYTE,data2 BYTEARRAY[2] STREAM source, 1/3 FILE '/dev/urandom'
-
-# This is old type version
-# DECLARE data1 BYTE,data2 BYTE[2] STREAM source, 1/3 FILE '/dev/urandom'
-
-SELECT source[0]+1,source[1]*2 STREAM signalRow FROM source>1

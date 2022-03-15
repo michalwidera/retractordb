@@ -523,7 +523,7 @@ public:
   public:
     ExpInContext(TermContext *ctx);
 
-    ExpressionContext *expression();
+    Expression_factorContext *expression_factor();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -579,6 +579,7 @@ public:
     ExpFloatContext(FactorContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT();
+    antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -588,15 +589,7 @@ public:
     ExpDecContext(FactorContext *ctx);
 
     antlr4::tree::TerminalNode *DECIMAL();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpFnCallContext : public FactorContext {
-  public:
-    ExpFnCallContext(FactorContext *ctx);
-
-    Function_callContext *function_call();
+    antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -606,6 +599,15 @@ public:
     ExpAggContext(FactorContext *ctx);
 
     AgregatorContext *agregator();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFnCallContext : public FactorContext {
+  public:
+    ExpFnCallContext(FactorContext *ctx);
+
+    Function_callContext *function_call();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -753,6 +755,7 @@ public:
     antlr4::tree::TerminalNode *COMMA();
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -839,7 +842,10 @@ public:
   public:
     Function_callContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    Expression_factorContext *expression_factor();
+    std::vector<Expression_factorContext *> expression_factor();
+    Expression_factorContext* expression_factor(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

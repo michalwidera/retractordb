@@ -115,23 +115,23 @@ public:
   virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
   virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
 
-  virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
-  virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
-
   virtual void enterExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
   virtual void exitExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
 
   virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
   virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
 
+  virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+  virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+
   virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
   virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
 
-  virtual void enterSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
-  virtual void exitSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
-
   virtual void enterSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
   virtual void exitSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
+
+  virtual void enterSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
+  virtual void exitSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
 
   virtual void enterSExpTerm(RQLParser::SExpTermContext * /*ctx*/) override { }
   virtual void exitSExpTerm(RQLParser::SExpTermContext * /*ctx*/) override { }

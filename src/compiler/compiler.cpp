@@ -19,6 +19,7 @@ extern int fieldCount;
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance ;
 
+/*
 std::vector<std::string> load_file(std::string sInputFile)
 {
     vector<string> retVal;
@@ -45,6 +46,7 @@ std::vector<std::string> load_file(std::string sInputFile)
 
     return retVal ;
 }
+*/
 
 /** This procedure computes time delays (delata) for generated streams */
 string intervalCounter()
@@ -125,6 +127,7 @@ string intervalCounter()
 
                         if (delta1 > delta)
                         {
+                            std::cerr << "Fail:" << q.id << std::endl;
                             throw std::out_of_range("You cannot make faster div from slower source");
                         }
                     }
@@ -151,6 +154,7 @@ string intervalCounter()
 
                         if (delta1 > delta)
                         {
+                            std::cerr << "Fail:" << q.id << std::endl;
                             throw std::out_of_range("You cannot make faster mod from slower source");
                         }
                     }

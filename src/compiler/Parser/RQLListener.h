@@ -113,23 +113,23 @@ public:
   virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
   virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
 
-  virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
-  virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
-
   virtual void enterExpField(RQLParser::ExpFieldContext *ctx) = 0;
   virtual void exitExpField(RQLParser::ExpFieldContext *ctx) = 0;
 
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
 
+  virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
+  virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
+
   virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
   virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
 
-  virtual void enterSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
-  virtual void exitSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
-
   virtual void enterSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
   virtual void exitSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
+
+  virtual void enterSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
+  virtual void exitSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
 
   virtual void enterSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
   virtual void exitSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
