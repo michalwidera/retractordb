@@ -1,0 +1,6 @@
+# this test will check if agse function is compiled correctly
+
+DECLARE b BYTE STREAM core, 1 FILE '/dev/urandom'
+
+SELECT * STREAM test_1 FROM core@(1,10)
+SELECT * STREAM test_2 FROM core@(-1,10)

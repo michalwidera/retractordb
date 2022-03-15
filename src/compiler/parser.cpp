@@ -124,7 +124,10 @@ public:
 
     void exitSExpAgse(RQLParser::SExpAgseContext* ctx)
     {
-        program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
+        if ( ctx->children[3]->getText() == "-" )
+            program.push_back(token(PUSH_VAL, - std::stoi(ctx->window->getText())));
+        else
+            program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
         program.push_back(token(PUSH_VAL, std::stoi(ctx->step->getText())));
         program.push_back(token(STREAM_AGSE)) ;
     }

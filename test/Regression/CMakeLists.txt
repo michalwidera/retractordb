@@ -104,6 +104,22 @@ add_test(
 set_tests_properties(compare_output_with_pattern-5 PROPERTIES DEPENDS create_output_xtrdb-5)
 
 # -----------------------------------------------------------------------------------------------
+
+add_test(
+        NAME compile_pattern_agse-6
+        WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
+        COMMAND sh -c "xcompiler query.rql > out.txt ; xdumper >> out.txt"
+)
+
+add_test(
+        NAME compare_output_with_pattern-6
+        WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
+        COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
+)
+
+set_tests_properties(compare_output_with_pattern-6 PROPERTIES DEPENDS compile_pattern_agse-6)
+
+# -----------------------------------------------------------------------------------------------
 add_test(
   NAME dumper-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
