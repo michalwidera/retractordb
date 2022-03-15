@@ -14,7 +14,6 @@ set(SOURCES_RETRACTOR
   retractor/CRSMath.cpp
         share/dbstream.cpp
   share/QStruct.cpp
-  share/RandomFile.cpp
   share/inputFileInstance.cpp
   share/SOperations.cpp
 
@@ -41,7 +40,6 @@ set(SOURCES_DUMPER
   dumper/dumper.cpp
         share/dbstream.cpp
   share/QStruct.cpp
-  share/RandomFile.cpp
 
   rdb/faccfs.cc
   rdb/faccposix.cc
