@@ -128,6 +128,8 @@ string intervalCounter()
                         if (delta1 > delta)
                         {
                             std::cerr << "Fail:" << q.id << std::endl;
+                            std::cerr << "D1=" << delta1 << std::endl;
+                            std::cerr << "D2=" << delta2 << std::endl;
                             throw std::out_of_range("You cannot make faster div from slower source");
                         }
                     }
@@ -155,6 +157,8 @@ string intervalCounter()
                         if (delta1 > delta)
                         {
                             std::cerr << "Fail:" << q.id << std::endl;
+                            std::cerr << "D1=" << delta1 << std::endl;
+                            std::cerr << "D2=" << delta2 << std::endl;
                             throw std::out_of_range("You cannot make faster mod from slower source");
                         }
                     }

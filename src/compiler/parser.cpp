@@ -102,17 +102,25 @@ public:
     void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, ctx->getText()); }
 
     void exitSExpHash(RQLParser::SExpHashContext* ctx) { recpToken(STREAM_HASH); }
-    void exitSExpAnd(RQLParser::SExpAndContext* ctx) { recpToken(STREAM_DEHASH_DIV); }
-    void exitSExpMod(RQLParser::SExpModContext* ctx) { recpToken(STREAM_DEHASH_MOD); }
+
+    void exitSExpAnd(RQLParser::SExpAndContext* ctx)
+    {
+        recpToken(PUSH_VAL, rationalResult);
+        recpToken(STREAM_DEHASH_DIV);
+    }
+
+    void exitSExpMod(RQLParser::SExpModContext* ctx)
+    {
+        recpToken(PUSH_VAL, rationalResult);
+        recpToken(STREAM_DEHASH_MOD);
+    }
+
     void exitStreamMin(RQLParser::StreamMinContext* ctx) { recpToken(STREAM_MIN); }
     void exitStreamMax(RQLParser::StreamMaxContext* ctx) { recpToken(STREAM_MAX); }
     void exitStreamAvg(RQLParser::StreamAvgContext* ctx) { recpToken(STREAM_AVG); }
     void exitStreamSum(RQLParser::StreamSumContext* ctx) { recpToken(STREAM_SUM); }
     void exitSExpPlus(RQLParser::SExpPlusContext* ctx) { recpToken(STREAM_ADD); }
-    void exitSExpMinus(RQLParser::SExpMinusContext* ctx)
-    {
-        recpToken(STREAM_SUBSTRACT, rationalResult);
-    }
+    void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, rationalResult); }
 
     void exitSExpAgse(RQLParser::SExpAgseContext* ctx)
     {
