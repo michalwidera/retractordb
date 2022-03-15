@@ -138,11 +138,9 @@ public:
     void exitDeclare(RQLParser::DeclareContext* ctx)
     {
         qry.filename = ctx->file_name->getText();
-
         // This removes ''
         qry.filename.erase(qry.filename.size() - 1);
-        qry.filename.erase(0,1);
-
+        qry.filename.erase(0, 1);
         qry.id = ctx->ID()->getText();
         qry.rInterval = rationalResult;
         coreInstance.push_back(qry);
@@ -245,7 +243,6 @@ string parser(std::string sInputFile)
     // Create the input stream.
     ins.open(sInputFile.c_str());
     ANTLRInputStream input(ins);
-
     // Create a lexer which scans the input stream
     // to create a token stream.
     RQLLexer lexer(&input);
@@ -253,7 +250,6 @@ string parser(std::string sInputFile)
     LexerErrorListener lexerErrorListener;
     lexer.removeErrorListeners();
     lexer.addErrorListener(&lexerErrorListener);
-
     // Create a parser which parses the token stream
     // to create a parse tree.
     RQLParser parser(&tokens);
@@ -264,7 +260,6 @@ string parser(std::string sInputFile)
     parser.addErrorListener(&parserErrorListener);
     parser.addParseListener(&parserListener);
     tree::ParseTree* tree = parser.prog();
-
     return status;
 }
 

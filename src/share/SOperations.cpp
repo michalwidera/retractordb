@@ -45,16 +45,11 @@ bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i,
     assert(deltaB > 0);
     const rational<int> delta = deltaB / (deltaA + deltaB) ;
     bool ret = floor(delta * i) == floor(delta * (i + 1));
-
-    if (ret)
-    {
+    if (ret) {
         retPos = i - (floor((i + 1) * delta));        //B
-    }
-    else
-    {
+    } else {
         retPos = floor(i * delta);    //A
     }
-
     return ret ;
 }
 
@@ -122,12 +117,8 @@ int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, 
 rational<int> deltaDivMod(const rational<int> &arg1, const rational<int> &arg2)
 {
     assert(arg1 != arg2);
-
     if (arg1 == arg2)
-    {
         throw std::out_of_range("Delta are equal in DehashDiv - undefinied.");
-    }
-
     return (arg1 * arg2) / abs(arg1 - arg2);
 }
 

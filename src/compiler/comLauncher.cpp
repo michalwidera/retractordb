@@ -40,19 +40,13 @@ int main(int argc, char* argv[])
     // C99: The parameters argc and argv and the strings pointed to by the argv array
     // shall be modifiable by the program, and retain their last-stored values
     // between program startup and program termination.
-    for (int i = 0 ; i < argc ;  i ++)
-    {
+    for (int i = 0 ; i < argc ;  i ++) {
         auto len = strlen(argv[i]) ;
-
         if (len > 0)
             if (argv[i][len - 1] == 13)
-            {
                 argv[i][len - 1] = 0 ;
-            }
     }
-
-    try
-    {
+    try {
         std::unique_ptr<ostream> p_ofs;
         namespace po = boost::program_options;
         string sOutputFile ;
@@ -70,20 +64,15 @@ int main(int argc, char* argv[])
         po::store(po::command_line_parser(argc, argv).
             options(desc).positional(p).run(), vm);
         po::notify(vm);
-
-        if (vm.count("help"))
-        {
+        if (vm.count("help")) {
             cout << desc ;
             return system::errc::success;
         }
-
-        if (vm.count("queryfile") == 0)
-        {
+        if (vm.count("queryfile") == 0) {
             cout << argv[0] << ": fatal error: no input file" << endl ;
             cout << "compilation terminated." << endl ;
             return EPERM ; //ERROR defined in errno-base.h
         }
-
         string sQueryFile = vm["queryfile"].as< string >() ;
         string sOutFile   = vm["outfile"].as< string >() ;
         string sSubsetFile = "query.sub" ;
@@ -91,54 +80,38 @@ int main(int argc, char* argv[])
         {
             boost::regex filenameRe("(\\w*).(\\w*)");    //filename.extension
             boost::cmatch what;
-
-            if (regex_match(sQueryFile.c_str(), what, filenameRe))
-            {
+            if (regex_match(sQueryFile.c_str(), what, filenameRe)) {
                 string filenameNoExt = string(what[1]) ;
                 sSubsetFile = filenameNoExt + ".sub" ;
             }
         }
         cout << "Input file:" << sQueryFile << endl ;
-
         cout << "Compile result:" << parser(sQueryFile) << endl;
-
         //
         // Main Algorithm body
         //
         std::istringstream iss(getParseResult(), std::ios::binary);
         boost::archive::text_iarchive ia(iss);
         ia >> coreInstance ;
-
         if (coreInstance.size() == 0)
-        {
             throw std::out_of_range("No queries to process found");
-        }
-
-        if (vm.count("dumpcross"))
-        {
+        if (vm.count("dumpcross")) {
             string sOutFileLog1   = vm["outfile"].as< string >() + ".lg1" ;
             dumpInstance(sOutFileLog1);
         }
-
         int dAfterParserSize((int) coreInstance.size());
         string response ;
         response = simplifyLProgram() ;
-
-        if (vm.count("dumpcross"))
-        {
+        if (vm.count("dumpcross")) {
             string sOutFileLog2   = vm["outfile"].as< string >() + ".lg2" ;
             dumpInstance(sOutFileLog2);
         }
-
         response = prepareFields();
         assert(response == "OK");
-
-        if (vm.count("dumpcross"))
-        {
+        if (vm.count("dumpcross")) {
             string sOutFileLog3   = vm["outfile"].as< string >() + ".lg3" ;
             dumpInstance(sOutFileLog3);
         }
-
         response = intervalCounter() ;
         assert(response == "OK");
         response = convertReferences();
@@ -149,20 +122,15 @@ int main(int argc, char* argv[])
         dumpInstance(sOutFile);
         int dSize(dAfterCompilingSize - dAfterParserSize) ;
         string sSize("") ;
-
-        if (dSize > 0)
-        {
+        if (dSize > 0) {
             stringstream s ;
             s << dSize ;
             sSize = string(" + ") + string(s.str()) ;
         }
-    }
-    catch (std::exception &e)
-    {
+    } catch (std::exception &e) {
         cerr << e.what() << "\n";
         //cerr << boost::stacktrace::stacktrace() << endl ;
         return system::errc::interrupted;
     }
-
     return system::errc::success;
 }

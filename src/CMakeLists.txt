@@ -88,3 +88,8 @@ add_custom_target(grammar
         WORKING_DIRECTORY ../../src/compiler
         SOURCES ../../src/compiler/RQL.g4
         )
+
+add_custom_target(astyle
+        COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp
+        WORKING_DIRECTORY ../../src
+)

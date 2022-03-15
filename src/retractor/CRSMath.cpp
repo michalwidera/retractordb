@@ -7,17 +7,12 @@ TimeLine::TimeLine(set< boost::rational<int>> const &inSet) :
     ctSlot(0)
 {
     assert(inSet.size() > 0);
-
-    for (auto val : inSet)
-    {
+    for (auto val : inSet) {
         // Latch - catch true if val is divided
         // bu any number from the set
         bool isDivided(false);
-
-        for (auto x : inSet)
-        {
-            if (x < val)
-            {
+        for (auto x : inSet) {
+            if (x < val) {
                 // Main task of this function is crate set as
                 // {1, 4, 1/2, 3/4} -> { 1/2 , 3/4 }
                 // because 1/2 * 2 == 1 , 1 * 4 == 4 and 1/2 * 2 == 1
@@ -25,19 +20,12 @@ TimeLine::TimeLine(set< boost::rational<int>> const &inSet) :
                 // other words: removing all values that have
                 // second value muliplicated by natural number
                 if (boost::rational<int> (rational_cast<int> (x / val), 1) == (x / val))
-                {
                     isDivided = true  ;
-                }
-
                 if (boost::rational<int> (rational_cast<int> (val / x), 1) == (val / x))
-                {
                     isDivided = true  ;
-                }
             }
         }
-
-        if (isDivided == false)
-        {
+        if (isDivided == false) {
             // If number is not divided we add sr set
             // ONLY HERE IS SR.INSERT
             // Here we insert only theses deltas to se set which are not delta = delta * n
@@ -62,29 +50,17 @@ boost::rational<int> &TimeLine::getNextTimeSlot()
     // Take first value from tje edge
     // even good we can take maxrational here.
     ctSlot = *sr.begin() * boost::rational<int> (counter[ *sr.begin() ]) ;
-
     // Note: These two loops cannot be mixed together!
-
     // Find lowest time slot in set
     // time slots are valued delta * counter
-
-    for (auto val : sr)
-    {
+    for (auto val : sr) {
         if (ctSlot > val * boost::rational<int> (counter[ val ]))
-        {
             ctSlot = val * boost::rational<int> (counter[ val ]) ;
-        }
     }
-
     // Increase (+1) lowest time slots
-
-    for (auto val : sr)
-    {
+    for (auto val : sr) {
         if (ctSlot == val * boost::rational<int> (counter[ val ]))
-        {
             ++ counter[ val ] ;
-        }
     }
-
     return ctSlot ;
 }
