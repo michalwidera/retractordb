@@ -4,7 +4,7 @@ jobs:
   build-buildpack:
     working_directory: ~
     docker:
-      - image: circleci/buildpack-deps:latest
+      - image: cimg/base:stable
     steps:
       - checkout
       - run:
@@ -35,7 +35,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: circleci/buildpack-deps:latest
+      - image: cimg/base:stable
     steps:
       - checkout
       - run:
