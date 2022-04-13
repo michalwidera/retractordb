@@ -58,7 +58,7 @@ jobs:
           command: 'cd build && conan source ..'
       - run:
           name: Build from source
-          command: 'cd build && conan install .. -o boost=1.77;gtest=1.11'
+          command: 'cd build && conan install .. -o boost=1.78;gtest=1.11'
       - run:
           name: Install product
           command: 'cd build && conan build ..'
@@ -86,5 +86,5 @@ workflows:
               only:
                 - master
     jobs:
-      - build-stable
-      - build-edge
+      - build-buildpack
+
