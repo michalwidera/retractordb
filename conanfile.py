@@ -34,7 +34,7 @@ class Retractor(ConanFile):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
 
     def requirements(self):
-        self.requires("boost/1.77.0")
+        self.requires("boost/1.78.0")
         self.requires("gtest/1.11.0")
         self.requires("antlr4-cppruntime/4.9.3")
 
