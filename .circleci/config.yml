@@ -35,7 +35,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:edge
     steps:
       - checkout
       - run:
