@@ -1,7 +1,7 @@
 version: 2
 jobs:
 
-  build-buildpack:
+  build-stable:
     working_directory: ~
     docker:
       - image: cimg/base:stable
@@ -29,10 +29,7 @@ jobs:
       #    name: Recreate grammar
       #    command: 'cd build && make grammar'
       - run:
-<<<<<<< HEAD
           name: Build project and Install
-=======
-          name: Install product
           command: 'cd build && conan build ..'
       - run:
           name: Test product
@@ -41,7 +38,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:edge
     steps:
       - checkout
       - run:
@@ -64,7 +61,6 @@ jobs:
           command: 'cd build && conan install .. -o boost=1.77;gtest=1.11'
       - run:
           name: Install product
->>>>>>> origin/master
           command: 'cd build && conan build ..'
       - run:
           name: Test product
@@ -90,4 +86,5 @@ workflows:
               only:
                 - master
     jobs:
-      - build-buildpack
+      - build-stable
+      - build-edge
