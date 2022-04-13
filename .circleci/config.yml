@@ -18,18 +18,15 @@ jobs:
           command: 'pip install conan'
       - run:
           name: Set libstdc++11 (new ABI)
-          command: 'conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default && cat /home/circleci/.conan/profiles/default'
+          command: 'conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default'
       - run:
           name: Source project
           command: 'cd build && conan source ..'
       - run:
-          name: Fetch required libraries from conan
+          name: Build from source
           command: 'cd build && conan install ..'
-      #- run:
-      #    name: Recreate grammar
-      #    command: 'cd build && make grammar'
       - run:
-          name: Build project and Install
+          name: Install product
           command: 'cd build && conan build ..'
       - run:
           name: Test product
@@ -38,7 +35,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: cimg/base:edge
+      - image: cimg/base:stable
     steps:
       - checkout
       - run:
@@ -70,12 +67,15 @@ workflows:
   version: 2
   commit:
     jobs:
-      - build-buildpack:
+      - build-stable:
           filters:
             branches:
               only:
                  - master
                  - /issue_.*/
+      - build-edge:
+          requires:
+            - build-stable
   nightly:
     triggers:
       - schedule:
@@ -86,5 +86,7 @@ workflows:
               only:
                 - master
     jobs:
-      - build-buildpack
-
+      - build-stable
+      - build-edge:
+          requires:
+            - build-stable
