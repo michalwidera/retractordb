@@ -4,7 +4,7 @@ jobs:
   build-buildpack:
     working_directory: ~
     docker:
-      - image: cimg/python:latest
+      - image: cimg/python:3.10.4
     steps:
       - checkout
       - run:
@@ -35,7 +35,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: circleci/buildpack-deps:latest
+      - image: cimg/python:3.10.4
     steps:
       - checkout
       - run:
