@@ -4,7 +4,7 @@ jobs:
   build-buildpack:
     working_directory: ~
     docker:
-      - image: circleci/build-tools:latest
+      - image: ubuntu-2004:current
     steps:
       - checkout
       - run:
@@ -35,7 +35,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: circleci/build-tools:latest
+      - image: ubuntu-2004:current
     steps:
       - checkout
       - run:
