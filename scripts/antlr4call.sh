@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This file is auto-generted by retractordb/conanfile.py by conan install ..
+
 export ANTLR_HOME="~/.local/bin"
 export ANTLR_JAR="$ANTLR_HOME/antlr-4.9.3-complete.jar"
 export CLASSPATH=".:$ANTLR_JAR:$CLASSPATH"

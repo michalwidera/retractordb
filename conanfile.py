@@ -1,6 +1,24 @@
 from curses import keyname
 from conans import tools, ConanFile, CMake
 
+script = """#!/bin/bash
+
+# This file is auto-generted by retractordb/conanfile.py by conan install ..
+
+export ANTLR_HOME="~/.local/bin"
+export ANTLR_JAR="$ANTLR_HOME/antlr-VERSION-complete.jar"
+export CLASSPATH=".:$ANTLR_JAR:$CLASSPATH"
+alias antlr4="java -jar $ANTLR_JAR"
+alias grun="java org.antlr.v4.gui.TestRig"
+
+cd ~/.local/bin && [ ! -f "antlr-VERSION-complete.jar" ] && wget https://www.antlr.org/download/antlr-VERSION-complete.jar
+cd -
+
+if [ $1 ] ; then
+  java -jar ~/.local/bin/antlr-VERSION-complete.jar -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -listener $1
+fi
+"""
+
 class Retractor(ConanFile):
     settings = "os", "compiler", "build_type", "arch", "cppstd"
     requires = ["cmake/3.21.3"]
@@ -46,6 +64,12 @@ class Retractor(ConanFile):
         self.requires("boost/"+self.default_options["boost"])
         self.requires("gtest/"+self.default_options["gtest"])
         self.requires("antlr4-cppruntime/"+self.default_options["antlr4-cppruntime"])
+
+        # Auto-generation of antlr4call.sh script
+
+        antlr4_version_file = open("../scripts/antlr4call.sh","w")
+        antlr4_version_file.write(script.replace('VERSION',self.default_options["antlr4-cppruntime"]))
+        antlr4_version_file.close()
 
     def build(self):
         cmake = CMake(self)
