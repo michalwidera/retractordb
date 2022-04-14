@@ -32,7 +32,7 @@ class Retractor(ConanFile):
     options = {
         "boost": ["1.77.0","1.78.0"],
         "gtest": ["1.11.0"],
-        "antlr4-cppruntime" : ["4.9.3","4.10"]
+        "antlr4" : ["4.9.3","4.10"]
     }
 
     default_options = {"boost:shared": False,
@@ -45,7 +45,7 @@ class Retractor(ConanFile):
                        "boost:without_filesystem": False,
                        "boost": "1.78.0",
                        "gtest": "1.11.0",
-                       "antlr4-cppruntime": "4.9.3"
+                       "antlr4": "4.9.3"
                        }
 
     def validate(self):
@@ -61,14 +61,14 @@ class Retractor(ConanFile):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
 
     def requirements(self):
-        self.requires("boost/"+self.default_options["boost"])
-        self.requires("gtest/"+self.default_options["gtest"])
-        self.requires("antlr4-cppruntime/"+self.default_options["antlr4-cppruntime"])
+        self.requires("boost/"+str(self.options.boost))
+        self.requires("gtest/"+str(self.options.gtest))
+        self.requires("antlr4-cppruntime/"+str(self.options.antlr4))
 
         # Auto-generation of antlr4call.sh script
 
         antlr4_version_file = open("../scripts/antlr4call.sh","w")
-        antlr4_version_file.write(script.replace('VERSION',self.default_options["antlr4-cppruntime"]))
+        antlr4_version_file.write(script.replace('VERSION',str(self.options.antlr4)))
         antlr4_version_file.close()
 
     def build(self):
