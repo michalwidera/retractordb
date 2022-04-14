@@ -13,7 +13,7 @@ sources:
     - '.git'
     - 'src/compiler/Parser/*'
     - 'src/stage'
-    
+
 # Specify the languages you would like to Scan. Default is all Detected
 languages: 'CPP, PYTHON'
 

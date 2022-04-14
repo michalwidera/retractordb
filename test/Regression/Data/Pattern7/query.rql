@@ -1,0 +1,8 @@
+# Check if fields are identified correctly
+DECLARE a BYTE, b BYTE, c BYTE STREAM core, 1 FILE '/dev/urandom'
+
+SELECT a,b STREAM strAB FROM core
+SELECT b,c STREAM strBC FROM core
+
+SELECT * STREAM outOk FROM strAB+strBC
+SELECT strAB[0],strBC[1] STREAM outBug FROM strAB+strBC

@@ -6,7 +6,7 @@ enable_testing()
 
 SET(CONAN_DISABLE_CHECK_COMPILER TRUE)
 
-SET (CMAKE_CXX_STANDARD 14)
+SET (CMAKE_CXX_STANDARD 20)
 
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()

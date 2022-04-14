@@ -1,3 +1,4 @@
+from curses import keyname
 from conans import tools, ConanFile, CMake
 
 class Retractor(ConanFile):
@@ -10,6 +11,11 @@ class Retractor(ConanFile):
     generators = "cmake" , "cmake_find_package"
     testing = []
 
+    options = {
+        "boost": ["1.77.0","1.78.0"],
+        "gtest": ["1.11.0"],
+        "antlr4-cppruntime" : ["4.9.3","4.10"]
+    }
 
     default_options = {"boost:shared": False,
                        "boost:without_serialization": False,
@@ -18,7 +24,10 @@ class Retractor(ConanFile):
                        "boost:without_test": False,
                        "boost:multithreading": True,
                        "boost:without_system": False,
-                       "boost:without_filesystem": False
+                       "boost:without_filesystem": False,
+                       "boost": "1.78.0",
+                       "gtest": "1.11.0",
+                       "antlr4-cppruntime": "4.9.3"
                        }
 
     def validate(self):
