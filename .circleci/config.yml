@@ -1,10 +1,41 @@
 version: 2
 jobs:
 
-  build-buildpack:
+  build-stable:
     working_directory: ~
     docker:
       - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Present build platform info
+          command: 'uname -a && cat /proc/version && cat /etc/issue'
+      - run:
+          name: Install required libs
+          command: 'sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip'
+      - run:
+          name: Install conan build system
+          command: 'pip install conan'
+      - run:
+          name: Set libstdc++11 (new ABI)
+          command: 'conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default'
+      - run:
+          name: Source project
+          command: 'cd build && conan source ..'
+      - run:
+          name: Build from source
+          command: 'cd build && conan install ..'
+      - run:
+          name: Install product
+          command: 'cd build && conan build ..'
+      - run:
+          name: Test product
+          command: 'cd build && make test'
+
+  build-edge:
+    working_directory: ~
+    docker:
+      - image: cimg/base:edge
     steps:
       - checkout
       - run:
@@ -36,12 +67,15 @@ workflows:
   version: 2
   commit:
     jobs:
-      - build-buildpack:
+      - build-stable:
           filters:
             branches:
               only:
                  - master
                  - /issue_.*/
+      - build-edge:
+          requires:
+            - build-stable
   nightly:
     triggers:
       - schedule:
@@ -52,4 +86,7 @@ workflows:
               only:
                 - master
     jobs:
-      - build-buildpack
+      - build-stable
+      - build-edge:
+          requires:
+            - build-stable
