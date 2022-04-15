@@ -72,9 +72,9 @@ workflows:
                  - /issue_.*/
     jobs:
       - build-stable
-      - build-edge
+      - build-edge:
           requires:
            - build-stable
-      - build-edge-2204
+      - build-edge-2204:
           requires:
             - build-edge
