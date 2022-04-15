@@ -19,6 +19,21 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
+      - image: cimg/base:edge
+    steps:
+      - checkout
+      - run: uname -a && cat /proc/version && cat /etc/issue
+      - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+      - run: pip install conan
+      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
+      - run: cd build && conan source ..
+      - run: cd build && conan install ..
+      - run: cd build && conan build ..
+      - run: cd build && make test
+
+  build-edge-2204:
+    working_directory: ~
+    docker:
       - image: cimg/base:edge-22.04
     resource_class: large
     steps:
@@ -54,8 +69,12 @@ workflows:
             branches:
               only:
                 - master
+                 - /issue_.*/
     jobs:
       - build-stable
-      - build-edge:
+      - build-edge
           requires:
-            - build-stable
+           - build-stable
+      - build-edge-2204
+          requires:
+            - build-edge
