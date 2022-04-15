@@ -1,4 +1,4 @@
-version: 2
+version: 2.1
 jobs:
 
   build-stable:
@@ -19,7 +19,7 @@ jobs:
   build-edge:
     working_directory: ~
     docker:
-      - image: cimg/base:edge
+      - image: cimg/base:edge-22.04
     steps:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
