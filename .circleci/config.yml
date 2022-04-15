@@ -27,7 +27,7 @@ jobs:
       - run: pip install conan
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
       - run: cd build && conan source ..
-      - run: cd build && conan install ..
+      - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
       - run: cd build && make test
 
