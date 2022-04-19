@@ -81,7 +81,7 @@ target_link_libraries( xtrdb ${CONAN_LIBS} )
 install(TARGETS xretractor xcompiler xdumper xqry xtrdb DESTINATION ~/.local/bin)
 
 add_custom_target(grammar
-        COMMAND antlr4call.sh RQL.g4
+        COMMAND ../../scripts/antlr4call.sh RQL.g4
         WORKING_DIRECTORY ../../src/compiler
         SOURCES ../../src/compiler/RQL.g4
         )
