@@ -1,8 +1,8 @@
-# Check if fields are identified correctly
-DECLARE a BYTE, b BYTE, c BYTE STREAM core, 1 FILE '/dev/urandom'
+# Check if fields are identified correctly - Covering #issue_17
 
-SELECT a,b STREAM strAB FROM core
-SELECT b,c STREAM strBC FROM core
+DECLARE a BYTE, b BYTE STREAM coreAB, 1 FILE '/dev/urandom'
+DECLARE c BYTE, d BYTE STREAM coreCD, 0.5 FILE '/dev/urandom'
 
-SELECT * STREAM outOk FROM strAB+strBC
-SELECT strAB[0],strBC[1] STREAM outBug FROM strAB+strBC
+SELECT coreAB[0],coreCD[0] STREAM out1 FROM coreAB+coreCD
+SELECT * STREAM out2 FROM coreAB+coreCD
+SELECT out1[0],out1[1] STREAM out3 FROM out1
