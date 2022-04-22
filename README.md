@@ -3,7 +3,11 @@ RetractorDB
 ![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb?ref=badge_shield)
 
-Sources of RetractorDB Time Series Database System prototype.
+These are sources of RetractorDB Time Series Database System prototype. This is work in progress.
+
+Project Web Page
+-----------------------------------------------------------------------
+[https://retractordb.com](https://retractordb.com)
 
 Commands
 -----------------------------------------------------------------------
@@ -77,9 +81,6 @@ Author
 Project created in 2003-2022 by Michal Widera
 (michal@widera.com.pl)
 
-## Project Web Page
------------------------------------------------------------------------
-[https://retractordb.com](https://retractordb.com)
 
 ## License
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb?ref=badge_large)
