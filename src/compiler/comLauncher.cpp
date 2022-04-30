@@ -28,7 +28,6 @@ using boost::lexical_cast;
 
 extern string parser(string sInputFile);
 extern string storeParseResult(string sOutputFile);
-extern string getParseResult();
 
 extern qTree coreInstance ;
 
@@ -90,7 +89,7 @@ int main(int argc, char* argv[])
         //
         // Main Algorithm body
         //
-        std::istringstream iss(getParseResult(), std::ios::binary);
+        std::istringstream iss(dumpInstance(""), std::ios::binary);
         boost::archive::text_iarchive ia(iss);
         ia >> coreInstance ;
         if (coreInstance.size() == 0)

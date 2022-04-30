@@ -124,7 +124,7 @@ public:
 
     void exitSExpAgse(RQLParser::SExpAgseContext* ctx)
     {
-        if ( ctx->children[3]->getText() == "-" )
+        if (ctx->children[3]->getText() == "-")
             program.push_back(token(PUSH_VAL, - std::stoi(ctx->window->getText())));
         else
             program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
@@ -148,6 +148,11 @@ public:
         qry.rInterval = rationalResult;
         coreInstance.push_back(qry);
         qry.reset();
+    }
+
+    void exitStorage(RQLParser::StorageContext* ctx)
+    {
+        std::cerr << ctx->folder_name->getText() << std::endl;
     }
 
     // https://www.programiz.com/cpp-programming/string-float-conversion
@@ -264,13 +269,4 @@ string parser(std::string sInputFile)
     parser.addParseListener(&parserListener);
     tree::ParseTree* tree = parser.prog();
     return status;
-}
-
-string getParseResult()
-{
-    const qTree coreInstance2(coreInstance) ;
-    std::stringstream retval;
-    boost::archive::text_oarchive oa(retval);
-    oa << coreInstance2 ;
-    return retval.str();
 }

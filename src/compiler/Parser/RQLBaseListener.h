@@ -19,6 +19,9 @@ public:
   virtual void enterProg(RQLParser::ProgContext * /*ctx*/) override { }
   virtual void exitProg(RQLParser::ProgContext * /*ctx*/) override { }
 
+  virtual void enterStorage(RQLParser::StorageContext * /*ctx*/) override { }
+  virtual void exitStorage(RQLParser::StorageContext * /*ctx*/) override { }
+
   virtual void enterSelect(RQLParser::SelectContext * /*ctx*/) override { }
   virtual void exitSelect(RQLParser::SelectContext * /*ctx*/) override { }
 

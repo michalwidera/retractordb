@@ -17,21 +17,21 @@ public:
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     STRING_T = 21, BYTEARRAY_T = 22, INTARRAY_T = 23, BYTE_T = 24, UNSIGNED_T = 25, 
     INTEGER_T = 26, FLOAT_T = 27, SELECT = 28, STREAM = 29, FROM = 30, DECLARE = 31, 
-    FILE = 32, MIN = 33, MAX = 34, AVG = 35, SUMC = 36, ID = 37, STRING = 38, 
-    FLOAT = 39, DECIMAL = 40, REAL = 41, EQUAL = 42, GREATER = 43, LESS = 44, 
-    EXCLAMATION = 45, DOUBLE_BAR = 46, DOT = 47, UNDERLINE = 48, AT = 49, 
-    SHARP = 50, AND = 51, MOD = 52, DOLLAR = 53, COMMA = 54, SEMI = 55, 
-    COLON = 56, DOUBLE_COLON = 57, STAR = 58, DIVIDE = 59, PLUS = 60, MINUS = 61, 
-    BIT_NOT = 62, BIT_OR = 63, BIT_XOR = 64, SPACE = 65, COMMENT = 66, LINE_COMMENT = 67
+    FILE = 32, STORAGE = 33, MIN = 34, MAX = 35, AVG = 36, SUMC = 37, ID = 38, 
+    STRING = 39, FLOAT = 40, DECIMAL = 41, REAL = 42, EQUAL = 43, GREATER = 44, 
+    LESS = 45, EXCLAMATION = 46, DOUBLE_BAR = 47, DOT = 48, UNDERLINE = 49, 
+    AT = 50, SHARP = 51, AND = 52, MOD = 53, DOLLAR = 54, COMMA = 55, SEMI = 56, 
+    COLON = 57, DOUBLE_COLON = 58, STAR = 59, DIVIDE = 60, PLUS = 61, MINUS = 62, 
+    BIT_NOT = 63, BIT_OR = 64, BIT_XOR = 65, SPACE = 66, COMMENT = 67, LINE_COMMENT = 68
   };
 
   enum {
-    RuleProg = 0, RuleSelect_statement = 1, RuleRational = 2, RuleFraction = 3, 
-    RuleDeclare_statement = 4, RuleDeclare_list = 5, RuleField_declaration = 6, 
-    RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
-    RuleAsterisk = 11, RuleExpression = 12, RuleExpression_factor = 13, 
-    RuleTerm = 14, RuleFactor = 15, RuleStream_expression = 16, RuleStream_term = 17, 
-    RuleStream_factor = 18, RuleAgregator = 19, RuleFunction_call = 20
+    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleRational = 3, 
+    RuleFraction = 4, RuleDeclare_statement = 5, RuleDeclare_list = 6, RuleField_declaration = 7, 
+    RuleField_type = 8, RuleSelect_list = 9, RuleField_id = 10, RuleUnary_op_expression = 11, 
+    RuleAsterisk = 12, RuleExpression = 13, RuleExpression_factor = 14, 
+    RuleTerm = 15, RuleFactor = 16, RuleStream_expression = 17, RuleStream_term = 18, 
+    RuleStream_factor = 19, RuleAgregator = 20, RuleFunction_call = 21
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -52,6 +52,7 @@ public:
 
 
   class ProgContext;
+  class Storage_statementContext;
   class Select_statementContext;
   class RationalContext;
   class FractionContext;
@@ -82,6 +83,8 @@ public:
     Select_statementContext* select_statement(size_t i);
     std::vector<Declare_statementContext *> declare_statement();
     Declare_statementContext* declare_statement(size_t i);
+    std::vector<Storage_statementContext *> storage_statement();
+    Storage_statementContext* storage_statement(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -89,6 +92,32 @@ public:
   };
 
   ProgContext* prog();
+
+  class  Storage_statementContext : public antlr4::ParserRuleContext {
+  public:
+    Storage_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Storage_statementContext() = default;
+    void copyFrom(Storage_statementContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  StorageContext : public Storage_statementContext {
+  public:
+    StorageContext(Storage_statementContext *ctx);
+
+    antlr4::Token *folder_name = nullptr;
+    antlr4::tree::TerminalNode *STORAGE();
+    antlr4::tree::TerminalNode *STRING();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Storage_statementContext* storage_statement();
 
   class  Select_statementContext : public antlr4::ParserRuleContext {
   public:

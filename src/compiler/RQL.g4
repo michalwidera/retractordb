@@ -2,7 +2,12 @@ grammar RQL;
 
 prog                : ( select_statement
                       | declare_statement
+                      | storage_statement
                       )+ EOF
+                    ;
+
+storage_statement   : STORAGE folder_name=STRING
+                    # Storage
                     ;
 
 select_statement    : SELECT select_list
@@ -137,6 +142,7 @@ STREAM:             'STREAM'|'stream';
 FROM:               'FROM'|'from';
 DECLARE:            'DECLARE'|'declare';
 FILE:               'FILE'|'file';
+STORAGE:            'STORAGE'|'storage';
 
 MIN:                'MIN'|'min';
 MAX:                'MAX'|'max';
