@@ -119,13 +119,6 @@ int main(int argc, char* argv[])
         assert(response == "OK");
         int dAfterCompilingSize((int) coreInstance.size());
         dumpInstance(sOutFile);
-        int dSize(dAfterCompilingSize - dAfterParserSize) ;
-        string sSize("") ;
-        if (dSize > 0) {
-            stringstream s ;
-            s << dSize ;
-            sSize = string(" + ") + string(s.str()) ;
-        }
     } catch (std::exception &e) {
         cerr << e.what() << "\n";
         //cerr << boost::stacktrace::stacktrace() << endl ;
