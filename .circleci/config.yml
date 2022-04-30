@@ -64,7 +64,7 @@ workflows:
     triggers:
       - schedule:
           # https://crontab.guru/#0_1_*_*_3
-          cron: "0 1 * * *"
+          cron: "0 1 * * 1,3,6"
           filters:
             branches:
               only:
