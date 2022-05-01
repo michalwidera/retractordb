@@ -9,6 +9,6 @@
 #define GIT_CURRENT_BRANCH "issue_17"
 #define CMAKE_CXX_COMPILER_ID "GNU"
 #define CMAKE_CXX_COMPILER_VERSION "10.2.1"
-#define GIT_PREV_COMMIT "db0cced"
+#define GIT_PREV_COMMIT "6c407d5"
 
 #endif // CONFIG_H_IN

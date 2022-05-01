@@ -77,20 +77,24 @@ add_custom_target(
 add_custom_target(
   astyle
   COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
+  COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
   WORKING_DIRECTORY ../../src)
 
 find_package(Git QUIET)
 
-if(GIT_FOUND)
+if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
   execute_process(
     COMMAND ${GIT_EXECUTABLE} branch --show-current
     OUTPUT_VARIABLE GIT_CURRENT_BRANCH
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   string(STRIP "${GIT_CURRENT_BRANCH}" GIT_CURRENT_BRANCH)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
     OUTPUT_VARIABLE GIT_PREV_COMMIT
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   string(STRIP "${GIT_PREV_COMMIT}" GIT_PREV_COMMIT)
+else()
+  set(GIT_CURRENT_BRANCH Deatached)
+  set(GIT_PREV_COMMIT none)
 endif()
 configure_file(config.h.in ${PROJECT_SOURCE_DIR}/include/config.h @ONLY)
