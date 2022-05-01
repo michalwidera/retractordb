@@ -31,10 +31,11 @@ jobs:
       - run: cd build && conan build ..
       - run: cd build && make test
 
-  build-edge-clang:
+  build-edge-2204-clang:
     working_directory: ~
     docker:
-      - image: cimg/base:edge
+      - image: cimg/base:edge-22.04
+    resource_class: large
     steps:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
@@ -77,7 +78,7 @@ workflows:
       - build-edge:
           requires:
             - build-stable
-      - build-edge-clang:
+      - build-edge-2204-clang:
           requires:
             - build-stable
   nightly:
