@@ -14,6 +14,7 @@ jobs:
       - run: cd build && conan source ..
       - run: cd build && conan install ..
       - run: cd build && conan build ..
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build && make test
 
   build-edge:
@@ -29,6 +30,7 @@ jobs:
       - run: cd build && conan source ..
       - run: cd build && conan install ..
       - run: cd build && conan build ..
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build && make test
 
   build-edge-2204-clang:
@@ -47,6 +49,7 @@ jobs:
       - run: cd build && conan source ..
       - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build && make test
 
   build-edge-2204:
@@ -63,6 +66,7 @@ jobs:
       - run: cd build && conan source ..
       - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build && make test
 
 workflows:
