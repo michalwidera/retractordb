@@ -8,6 +8,8 @@
 
 #include "qry.hpp"
 
+#include "config.h" // Add an automatically generated configuration file
+
 using namespace std ;
 using namespace boost ;
 using boost::property_tree::ptree;
@@ -68,7 +70,11 @@ int main(int argc, char* argv[])
             setmode("INFLUXDB") ;
         if (vm.count("help")) {
             cerr << argv[0] << " - xretractor communication tool." << std::endl;
-            cerr << desc << endl ;
+            cerr << desc ;
+            cout << "Git Branch:" << GIT_CURRENT_BRANCH ;
+            cout << ", prev commit:" << GIT_PREV_COMMIT << endl;
+            cout << "Compiler:" << CMAKE_CXX_COMPILER_ID;
+            cout << ", version:" << CMAKE_CXX_COMPILER_VERSION ;
             return system::errc::success;
         } else if (vm.count("hello"))
             return hello();

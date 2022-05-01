@@ -14,7 +14,7 @@ namespace rdb
     }
 
     template< typename T, typename K >
-    void copyToMemory(std::istream &is, const K &rhs, const char *fieldName)
+    void copyToMemory(std::istream &is, const K &rhs, const char* fieldName)
     {
         T data;
         is >> data;

@@ -4,9 +4,6 @@ project(retractordb-src)
 
 include_directories(${Boost_INCLUDE_DIR} share include)
 
-# waiting for conan repository update include_directories(/usr/include)
-# include_directories(/usr/local/include/antlr4-runtime/)
-
 set(SOURCES_RETRACTOR
     retractor/Processor.cpp
     retractor/executorsm.cpp
@@ -81,3 +78,19 @@ add_custom_target(
   astyle
   COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
   WORKING_DIRECTORY ../../src)
+
+find_package(Git QUIET)
+
+if(GIT_FOUND)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} branch --show-current
+    OUTPUT_VARIABLE GIT_CURRENT_BRANCH
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+  string(STRIP "${GIT_CURRENT_BRANCH}" GIT_CURRENT_BRANCH)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+    OUTPUT_VARIABLE GIT_PREV_COMMIT
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+  string(STRIP "${GIT_PREV_COMMIT}" GIT_PREV_COMMIT)
+endif()
+configure_file(config.h.in ${PROJECT_SOURCE_DIR}/include/config.h @ONLY)

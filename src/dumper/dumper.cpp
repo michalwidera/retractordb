@@ -8,6 +8,8 @@
 #include <boost/program_options.hpp>                        // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
 
+#include "config.h" // Add an automatically generated configuration file
+
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance ;
 
@@ -358,7 +360,11 @@ int main(int argc, char* argv[])
         if (vm.count("verbose") || vm.count("help"))
             cerr << argv[0] << " - qry file decoder.\n";
         if (vm.count("help")) {
-            cerr << desc << endl ;
+            cerr << desc ;
+            cout << "Git Branch:" << GIT_CURRENT_BRANCH;
+            cout << ", prev commit:" << GIT_PREV_COMMIT << endl;
+            cout << "Compiler:" << CMAKE_CXX_COMPILER_ID;
+            cout << ", version:" << CMAKE_CXX_COMPILER_VERSION;
             return system::errc::success;
         }
         string sPlikDanych = vm["infile"].as< string >() ;

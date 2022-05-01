@@ -44,6 +44,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "config.h" // Add an automatically generated configuration file
+
 namespace IPC = boost::interprocess ;
 
 // Define for IPC purposes - maps & strings (most important IPCString i IPCMap)
@@ -394,7 +396,11 @@ int main(int argc, char* argv[])
         if (vm.count("verbose"))
             cerr << argv[0] << " - query plan executor." << std::endl;
         if (vm.count("help")) {
-            cout << desc << "\n";
+            cout << desc ;
+            cout << "Git Branch:" << GIT_CURRENT_BRANCH;
+            cout << ", prev commit:" << GIT_PREV_COMMIT << endl;
+            cout << "Compiler:" << CMAKE_CXX_COMPILER_ID;
+            cout << ", version:" << CMAKE_CXX_COMPILER_VERSION;
             return system::errc::success;
         }
         if (!boost::filesystem::exists(sInputFile)) {
