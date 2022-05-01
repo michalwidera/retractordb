@@ -14,7 +14,7 @@ namespace rdb
     }
 
     template< typename T, typename K >
-    constexpr void copyToMemory(std::istream &is, const K &rhs, std::string fieldName)
+    void copyToMemory(std::istream &is, const K &rhs, const char *fieldName)
     {
         T data;
         is >> data;
@@ -70,13 +70,13 @@ namespace rdb
             unsigned char data8 = static_cast<unsigned char>(data);
             memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), &data8, sizeof(unsigned char));
         } else if (desc.Type(fieldName) == "Uint")
-            copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName);
+            copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
         else if (desc.Type(fieldName) == "Int")
-            copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName);
+            copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
         else if (desc.Type(fieldName) == "Float")
-            copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName);
+            copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
         else if (desc.Type(fieldName) == "Double")
-            copyToMemory<double, payLoadAccessor<K>>(is, rhs, fieldName);
+            copyToMemory<double, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
         else
             std::cerr << "field not found\n";
         return is;
