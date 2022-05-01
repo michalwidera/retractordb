@@ -78,9 +78,6 @@ workflows:
       - build-edge:
           requires:
             - build-stable
-      - build-edge-2204-clang:
-          requires:
-            - build-stable
   nightly:
     triggers:
       - schedule:
@@ -99,3 +96,6 @@ workflows:
       - build-edge-2204:
           requires:
             - build-edge
+      - build-edge-2204-clang:
+          requires:
+            - build-edge-2204
