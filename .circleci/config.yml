@@ -31,6 +31,21 @@ jobs:
       - run: cd build && conan build ..
       - run: cd build && make test
 
+  build-edge-clang:
+    working_directory: ~
+    docker:
+      - image: cimg/base:edge
+    steps:
+      - checkout
+      - run: uname -a && cat /proc/version && cat /etc/issue
+      - run: sudo apt-get update && sudo apt-get -y install clang cmake make build-essential python3 python3-pip
+      - run: pip install conan
+      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
+      - run: cd build && conan source ..
+      - run: cd build && conan install ..
+      - run: cd build && conan build ..
+      - run: cd build && make test
+
   build-edge-2204:
     working_directory: ~
     docker:
@@ -58,6 +73,9 @@ workflows:
                  - master
                  - /issue_.*/
       - build-edge:
+          requires:
+            - build-stable
+      - build-edge-clang:
           requires:
             - build-stable
   nightly:
