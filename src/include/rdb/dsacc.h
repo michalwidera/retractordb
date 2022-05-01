@@ -17,7 +17,7 @@ namespace rdb
     /**
      * @brief This object purpose is to access data via descriptor
      */
-    template <class T = std::byte, class K = rdb::posixPrmBinaryFileAccessor<T> >
+    template <class T = std::byte, class K = rdb::posixPrmBinaryFileAccessor<T>>
     class DataStorageAccessor
     {
         std::unique_ptr<K> pAccessor;
@@ -51,13 +51,13 @@ namespace rdb
          *
          * @param value reverse iterator status
          */
-        void setReverse( bool value );
+        void setReverse(bool value);
 
         /**
          * @brief Set if files should remain after program exits
          * @param value remove on exit mode
          */
-        void setRemoveOnExit( bool value );
+        void setRemoveOnExit(bool value);
 
         /**
          * @brief Get the Records Count object - how many payloads are in file
@@ -90,7 +90,7 @@ namespace rdb
          * @param recordIndex location from beginging of the storage [unit: Records]
          * @return success status - true eq. success
          */
-        bool Get(T *inBuffer, const size_t recordIndex);
+        bool Get(T* inBuffer, const size_t recordIndex);
 
         /**
          * @brief Sends record to the storage
@@ -99,7 +99,7 @@ namespace rdb
          * @param recordIndex location from begining of the storage [unit: Records]
          * @return success status- true eq. success
          */
-        bool Put(const T *outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
+        bool Put(const T* outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
     };
 }
 

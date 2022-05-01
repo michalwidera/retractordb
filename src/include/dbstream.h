@@ -41,3 +41,6 @@ public:
 };
 
 long streamStoredSize(std::string filename);
+
+// Set location of all database files - location is a path/folder in system
+void setStorageLocation(std::string location);

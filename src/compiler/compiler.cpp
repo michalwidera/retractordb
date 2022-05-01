@@ -734,7 +734,7 @@ string convertReferences()
 
 string dumpInstance(std::string sOutFile)
 {
-    //These object must be const
+    //dumped object must be const
     const qTree coreInstanceCopy(coreInstance) ;
     std::stringstream retval;
     if (sOutFile == "") {

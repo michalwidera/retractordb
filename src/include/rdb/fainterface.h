@@ -21,8 +21,7 @@ namespace rdb
      * @tparam T Type of stored data - std::byte or char
      */
     template<typename T>
-    struct FileAccessorInterface
-    {
+    struct FileAccessorInterface {
         /**
          * @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
          *
@@ -31,7 +30,7 @@ namespace rdb
          * @param position position from the begining of file [unit: Bytes]
          * @return status of operation - 0/EXIT_SUCCESS success
          */
-        virtual int Read(T *ptrData, const size_t size, const size_t position) = 0;
+        virtual int Read(T* ptrData, const size_t size, const size_t position) = 0;
 
         /**
          * @brief Updates or appends data in the storage
@@ -41,7 +40,7 @@ namespace rdb
          * @param position position from the begining of file [unit: Bytes]. If max possible value - works as append.
          * @return status of operation - 0/EXIT_SUCCESS success
          */
-        virtual int Write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
+        virtual int Write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
         /**
          * @brief gets name of storage (file name)
@@ -50,7 +49,7 @@ namespace rdb
          */
         virtual std::string FileName() = 0;
 
-        virtual ~FileAccessorInterface(){};
+        virtual ~FileAccessorInterface() {};
     };
 } // rdb
 

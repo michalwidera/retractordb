@@ -9,21 +9,20 @@ namespace rdb
      * @brief Object that implements storage interface via fstream
      */
     template< typename T >
-    struct genericBinaryFileAccessor : public FileAccessorInterface<T>
-    {
+    struct genericBinaryFileAccessor : public FileAccessorInterface<T> {
         std::string fileNameStr;
 
     public:
 
         genericBinaryFileAccessor(std::string fileName);
 
-        int Read(T *ptrData, const size_t size, const size_t position) override;
-        int Write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
+        int Read(T* ptrData, const size_t size, const size_t position) override;
+        int Write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
         std::string FileName() override;
 
         genericBinaryFileAccessor() = delete;
-        genericBinaryFileAccessor(const genericBinaryFileAccessor&) = delete;
-        genericBinaryFileAccessor& operator=(const genericBinaryFileAccessor&) = delete;
+        genericBinaryFileAccessor(const genericBinaryFileAccessor &) = delete;
+        genericBinaryFileAccessor &operator=(const genericBinaryFileAccessor &) = delete;
     };
 
 } // namespace rdb

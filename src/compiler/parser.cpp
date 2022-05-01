@@ -1,5 +1,7 @@
 #include <iostream>
 #include <cstdlib>
+#include <filesystem>
+
 #include "antlr4-runtime/antlr4-runtime.h"
 
 #include "Parser/RQLLexer.h"
@@ -150,11 +152,6 @@ public:
         qry.reset();
     }
 
-    void exitStorage(RQLParser::StorageContext* ctx)
-    {
-        std::cerr << ctx->folder_name->getText() << std::endl;
-    }
-
     // https://www.programiz.com/cpp-programming/string-float-conversion
     // https://www.geeksforgeeks.org/converting-strings-numbers-cc/
 
@@ -179,6 +176,24 @@ public:
     {
         qry.id = ctx->ID()->getText();
         qry.lProgram = program;
+        coreInstance.push_back(qry);
+        program.clear();
+        qry.reset();
+    }
+
+    void exitStorage(RQLParser::StorageContext* ctx)
+    {
+        qry.id = ":STORAGE";
+        qry.filename = ctx->folder_name->getText();
+        // Remove ''
+        qry.filename.erase(qry.filename.size() - 1);
+        qry.filename.erase(0, 1);
+        // Add / at the end of path
+        if (qry.filename[qry.filename.size() - 1] != '/')
+            qry.filename.push_back('/');
+        // This should set paths correct on compiled system
+        std::filesystem::path native_system_path{qry.filename};
+        qry.filename = native_system_path.make_preferred().string();
         coreInstance.push_back(qry);
         program.clear();
         qry.reset();

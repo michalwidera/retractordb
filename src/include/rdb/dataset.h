@@ -15,20 +15,22 @@ namespace rdb
      */
     class dataSet
     {
-        std::map < std::string , std::unique_ptr<rdb::DataStorageAccessor<std::byte>>> data;
+        std::map < std::string, std::unique_ptr<rdb::DataStorageAccessor<std::byte>>> data;
 
         int recordSize = 0;
         int count = 0;
 
+        std::string path;
+
     public:
+        dataSet() : path("") {};
 
-        dataSet(){}
-
+        void setStoragePath(std::string pathParam);
         long streamStoredSize(std::string filename);
         long GetLen(std::string filename);
         void DefBlock(std::string filename, int frameSize);
-        void PutBlock(std::string filename, char *pRawData);
-        int GetBlock(std::string filename, int offset, char *pRawData);
+        void PutBlock(std::string filename, char* pRawData);
+        int GetBlock(std::string filename, int offset, char* pRawData);
         void reverse(std::string filename, bool val);
     };
 }

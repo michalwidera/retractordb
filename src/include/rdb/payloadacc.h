@@ -24,7 +24,7 @@ namespace rdb
         /**
          * Pointer to payload
          */
-        T *ptr ;
+        T* ptr ;
 
         /**
          * Type of dumped or read numeric formats
@@ -54,7 +54,7 @@ namespace rdb
          * @param ptr pointer to payload
          * @param hexFormat type of default stored data
          */
-        payLoadAccessor(Descriptor descriptor , T *ptr , bool hexFormat = false );
+        payLoadAccessor(Descriptor descriptor, T* ptr, bool hexFormat = false);
 
         /**
          * Default constructor is dissalowed

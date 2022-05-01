@@ -87,6 +87,6 @@ add_custom_target(grammar
         )
 
 add_custom_target(astyle
-        COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp
+        COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
         WORKING_DIRECTORY ../../src
 )

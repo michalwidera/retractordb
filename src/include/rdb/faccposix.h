@@ -16,13 +16,13 @@ namespace rdb
     public:
         posixBinaryFileAccessor(std::string fileName);
 
-        int Read(T *ptrData, const size_t size, const size_t position) override;
-        int Write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
+        int Read(T* ptrData, const size_t size, const size_t position) override;
+        int Write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
         std::string FileName() override;
 
         posixBinaryFileAccessor() = delete;
-        posixBinaryFileAccessor(const posixBinaryFileAccessor&) = delete;
-        posixBinaryFileAccessor& operator=(const posixBinaryFileAccessor&) = delete;
+        posixBinaryFileAccessor(const posixBinaryFileAccessor &) = delete;
+        posixBinaryFileAccessor &operator=(const posixBinaryFileAccessor &) = delete;
     };
 } // namespace rdb
 

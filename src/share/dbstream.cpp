@@ -20,6 +20,11 @@ long streamStoredSize(string filename)
     return database.streamStoredSize(filename);
 }
 
+void setStorageLocation(std::string location)
+{
+    database.setStoragePath(location);
+}
+
 dbStream::dbStream(std::string streamName, list < std::string > schema) :
     streamName(streamName),
     schema(schema),

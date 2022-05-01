@@ -416,8 +416,27 @@ int main(int argc, char* argv[])
             cerr << sInputFile << " - no input file" << endl;
             return system::errc::invalid_argument;
         }
+        //
+        // Load of compiled query from file
+        //
         boost::archive::text_iarchive ia(ifs);
         ia >> coreInstance ;
+        //
+        // Special parameters support in qurey set
+        // fetch all ':*' - and remove them from coreInstance
+        //
+        string storagePath("");
+        for (auto qry : coreInstance) {
+            if (qry.id == ":STORAGE")
+                storagePath = qry.filename;
+        }
+        auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),
+        [](const query & qry) { return qry.id[0] == ':' ; });
+        coreInstance.erase(new_end, coreInstance.end());
+        setStorageLocation(storagePath);
+        //
+        // End of special parameters support
+        //
         Processor proc;
         //
         // option query was created for single query testing
@@ -450,7 +469,6 @@ int main(int argc, char* argv[])
         TimeLine tl(getListFromCore());
         //
         // Main loop of data processing
-        //
         //
         // When this value is 0 - means we are waiting for key - other way watchdog
         //

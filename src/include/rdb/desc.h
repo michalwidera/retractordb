@@ -16,8 +16,7 @@ namespace rdb
     /**
      * @brief Supported field types.
      */
-    enum FieldType
-    {
+    enum FieldType {
         String,
         Bytearray,
         Intarray,
@@ -39,8 +38,7 @@ namespace rdb
     /**
      * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
      */
-    enum FieldColumn
-    {
+    enum FieldColumn {
         rname = 0,
         rlen = 1,
         rtype = 2
@@ -183,9 +181,9 @@ namespace rdb
          * @return std::string Returned string from field.
          */
         template <typename T>
-        std::string ToString(const std::string name, T *ptr)
+        std::string ToString(const std::string name, T* ptr)
         {
-            return std::string(reinterpret_cast<char *>(ptr + Offset(name)), Len(name));
+            return std::string(reinterpret_cast<char*>(ptr + Offset(name)), Len(name));
         }
 
         /**
@@ -197,9 +195,9 @@ namespace rdb
          * @return auto Value from binary package that corresponds to field from container
          */
         template <typename T, typename K>
-        auto Cast(const std::string name, K *ptr)
+        auto Cast(const std::string name, K* ptr)
         {
-            return *(reinterpret_cast<T *>(ptr + Offset(name)));
+            return *(reinterpret_cast<T*>(ptr + Offset(name)));
         };
 
         // Operators that enables read and write Descriptor to file/scereen i Human Readable Form.
