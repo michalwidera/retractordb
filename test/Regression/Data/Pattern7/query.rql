@@ -1,6 +1,6 @@
 # Check if fields are identified correctly - Covering #issue_17
 
-STORAGE '/home/michal'
+STORAGE '/home/michal/test'
 
 DECLARE a BYTE, b BYTE STREAM coreAB, 1 FILE '/dev/urandom'
 DECLARE c BYTE, d BYTE STREAM coreCD, 0.5 FILE '/dev/urandom'

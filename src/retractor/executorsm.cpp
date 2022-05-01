@@ -128,7 +128,6 @@ set< boost::rational<int>> getListFromCore()
 
 void dumpCore(std::ostream &xout)
 {
-    xout << "In core:" << endl ;
     xout << "Seqence\tItrval\tQuery id" << endl ;
     for (const auto &it : coreInstance) {
         xout << getSeqNr(it.id) << "\t";
@@ -463,8 +462,9 @@ int main(int argc, char* argv[])
             return system::errc::success;
         }
         if (vm.count("verbose")) {
-            cerr << "Objects:" ;
+            cerr << "Objects:" << endl;
             dumpCore(cerr);
+            cerr << "Storage location:" << storagePath << endl;
         }
         TimeLine tl(getListFromCore());
         //

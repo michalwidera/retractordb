@@ -25,7 +25,8 @@ namespace rdb
     {
         recordSize = frameSize;
         auto desc{rdb::Descriptor("payload", frameSize, rdb::Bytearray)};
-        data[path + filename] = std::unique_ptr<rdb::DataStorageAccessor<std::byte>>(new rdb::DataStorageAccessor(desc, filename, false));
+        data[path + filename] = std::unique_ptr<rdb::DataStorageAccessor<std::byte>>(new rdb::DataStorageAccessor(desc, path + filename,
+                    false));
         recordSize = desc.GetSize();
     }
 
