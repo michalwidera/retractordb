@@ -9,8 +9,8 @@
 #define GIT_CURRENT_BRANCH "issue_17"
 #define CMAKE_CXX_COMPILER_ID "GNU"
 #define CMAKE_CXX_COMPILER_VERSION "10.2.1"
-#define GIT_PREV_COMMIT "1914745"
-#define CONFIG_LINE "Branch: issue_17:1914745, " \
-                    "Assembled: GNU Ver. 10.2.1\n"
+#define GIT_PREV_COMMIT "26f843f"
+#define CONFIG_LINE "Branch: issue_17:26f843f, " \
+                    "Code compiler: GNU Ver. 10.2.1\n"
 
 #endif // CONFIG_H_IN
