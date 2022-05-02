@@ -23,13 +23,12 @@
 
 #include "config.h" // Add an automatically generated configuration file
 
-using namespace std;
 using namespace boost;
 
 using boost::lexical_cast;
 
-extern string parser(string sInputFile);
-extern string storeParseResult(string sOutputFile);
+extern std::string parser(std::string sInputFile);
+extern std::string storeParseResult(std::string sOutputFile);
 
 extern qTree coreInstance ;
 
@@ -48,15 +47,15 @@ int main(int argc, char* argv[])
                 argv[i][len - 1] = 0 ;
     }
     try {
-        std::unique_ptr<ostream> p_ofs;
+        std::unique_ptr<std::ostream> p_ofs;
         namespace po = boost::program_options;
-        string sOutputFile ;
-        string sInputFile ;
+        std::string sOutputFile ;
+        std::string sInputFile;
         po::options_description desc("Avaiable options");
         desc.add_options()
         ("help,h", "Show program options")
-        ("queryfile,q", po::value<string> (&sInputFile), "query set file")
-        ("outfile,o", po::value<string> (&sOutputFile)->default_value("query.qry"), "output file")
+        ("queryfile,q", po::value<std::string> (&sInputFile), "query set file")
+        ("outfile,o", po::value<std::string> (&sOutputFile)->default_value("query.qry"), "output file")
         ("dumpcross,d", "dump diagnostic cross compilation forms")
         ;
         po::positional_options_description p;       //Assume that infile is the first option
@@ -66,29 +65,29 @@ int main(int argc, char* argv[])
             options(desc).positional(p).run(), vm);
         po::notify(vm);
         if (vm.count("help")) {
-            cout << desc ;
-            cout << CONFIG_LINE;
+            std::cout << desc;
+            std::cout << CONFIG_LINE;
             return system::errc::success;
         }
         if (vm.count("queryfile") == 0) {
-            cout << argv[0] << ": fatal error: no input file" << endl ;
-            cout << "compilation terminated." << endl ;
+            std::cout << argv[0] << ": fatal error: no input file" << std::endl;
+            std::cout << "compilation terminated." << std::endl;
             return EPERM ; //ERROR defined in errno-base.h
         }
-        string sQueryFile = vm["queryfile"].as< string >() ;
-        string sOutFile   = vm["outfile"].as< string >() ;
-        string sSubsetFile = "query.sub" ;
+        std::string sQueryFile = vm["queryfile"].as<std::string>();
+        std::string sOutFile = vm["outfile"].as<std::string>();
+        std::string sSubsetFile = "query.sub";
         //override defaults if filename is matching regexp
         {
             boost::regex filenameRe("(\\w*).(\\w*)");    //filename.extension
             boost::cmatch what;
             if (regex_match(sQueryFile.c_str(), what, filenameRe)) {
-                string filenameNoExt = string(what[1]) ;
+                std::string filenameNoExt = std::string(what[1]);
                 sSubsetFile = filenameNoExt + ".sub" ;
             }
         }
-        cout << "Input file:" << sQueryFile << endl ;
-        cout << "Compile result:" << parser(sQueryFile) << endl;
+        std::cout << "Input file:" << sQueryFile << std::endl;
+        std::cout << "Compile result:" << parser(sQueryFile) << std::endl;
         //
         // Main Algorithm body
         //
@@ -98,20 +97,20 @@ int main(int argc, char* argv[])
         if (coreInstance.size() == 0)
             throw std::out_of_range("No queries to process found");
         if (vm.count("dumpcross")) {
-            string sOutFileLog1   = vm["outfile"].as< string >() + ".lg1" ;
+            std::string sOutFileLog1 = vm["outfile"].as<std::string>() + ".lg1";
             dumpInstance(sOutFileLog1);
         }
         int dAfterParserSize((int) coreInstance.size());
-        string response ;
+        std::string response;
         response = simplifyLProgram() ;
         if (vm.count("dumpcross")) {
-            string sOutFileLog2   = vm["outfile"].as< string >() + ".lg2" ;
+            std::string sOutFileLog2 = vm["outfile"].as<std::string>() + ".lg2";
             dumpInstance(sOutFileLog2);
         }
         response = prepareFields();
         assert(response == "OK");
         if (vm.count("dumpcross")) {
-            string sOutFileLog3   = vm["outfile"].as< string >() + ".lg3" ;
+            std::string sOutFileLog3 = vm["outfile"].as<std::string>() + ".lg3";
             dumpInstance(sOutFileLog3);
         }
         response = intervalCounter() ;
@@ -123,7 +122,7 @@ int main(int argc, char* argv[])
         int dAfterCompilingSize((int) coreInstance.size());
         dumpInstance(sOutFile);
     } catch (std::exception &e) {
-        cerr << e.what() << "\n";
+        std::cerr << e.what() << "\n";
         //cerr << boost::stacktrace::stacktrace() << endl ;
         return system::errc::interrupted;
     }
