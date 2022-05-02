@@ -397,10 +397,7 @@ int main(int argc, char* argv[])
             cerr << argv[0] << " - query plan executor." << std::endl;
         if (vm.count("help")) {
             cout << desc ;
-            cout << "Git Branch:" << GIT_CURRENT_BRANCH;
-            cout << ", prev commit:" << GIT_PREV_COMMIT << endl;
-            cout << "Compiler:" << CMAKE_CXX_COMPILER_ID;
-            cout << ", version:" << CMAKE_CXX_COMPILER_VERSION;
+            cout << CONFIG_LINE;
             return system::errc::success;
         }
         if (!boost::filesystem::exists(sInputFile)) {

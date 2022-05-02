@@ -360,11 +360,8 @@ int main(int argc, char* argv[])
         if (vm.count("verbose") || vm.count("help"))
             cerr << argv[0] << " - qry file decoder.\n";
         if (vm.count("help")) {
-            cerr << desc ;
-            cout << "Git Branch:" << GIT_CURRENT_BRANCH;
-            cout << ", prev commit:" << GIT_PREV_COMMIT << endl;
-            cout << "Compiler:" << CMAKE_CXX_COMPILER_ID;
-            cout << ", version:" << CMAKE_CXX_COMPILER_VERSION;
+            cout << desc ;
+            cout << CONFIG_LINE ;
             return system::errc::success;
         }
         string sPlikDanych = vm["infile"].as< string >() ;

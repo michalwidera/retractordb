@@ -69,12 +69,9 @@ int main(int argc, char* argv[])
         if (vm.count("influxdb"))
             setmode("INFLUXDB") ;
         if (vm.count("help")) {
-            cerr << argv[0] << " - xretractor communication tool." << std::endl;
-            cerr << desc ;
-            cout << "Git Branch:" << GIT_CURRENT_BRANCH ;
-            cout << ", prev commit:" << GIT_PREV_COMMIT << endl;
-            cout << "Compiler:" << CMAKE_CXX_COMPILER_ID;
-            cout << ", version:" << CMAKE_CXX_COMPILER_VERSION ;
+            cerr << argv[0] << " - data processing tool." << std::endl;
+            cout << desc;
+            cout << CONFIG_LINE;
             return system::errc::success;
         } else if (vm.count("hello"))
             return hello();
