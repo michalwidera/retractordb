@@ -80,6 +80,11 @@ add_custom_target(
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
   WORKING_DIRECTORY ../../src)
 
+add_custom_target(
+  vim
+  COMMAND [ ! -f ~/.vim ] && mkdir -p ~/.vim
+  COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)
+
 find_package(Git QUIET)
 
 if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")

@@ -6,10 +6,8 @@ if exists("b:current_syntax")
   finish
 endif
 
-syn case ignore
-
 " basic
-syn keyword rqlKey declare file select stream from
+syn keyword rqlKey DECLARE FILE SELECT STREAM FROM STORAGE
 
 " comment
 syn match  rqlComment       "^#.*$"
@@ -28,7 +26,7 @@ syn match rqlNumber         "\<[0-9]*\/[0-9]*\>"
 syn match rqlNumber         "\<0x[abcdef0-9]*\>"
 
 " Types
-syn keyword rqlType         byte char i8 i16 integer int rational rat
+syn keyword rqlType         BYTE Byte UNSIGNED Unsigned FLOAT Float INT Int INTARRAY Intarray BYTEARRAY Bytearray STRING String
 
 hi def link rqlNumber       Number
 hi def link rqlString       String
