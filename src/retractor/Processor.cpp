@@ -20,8 +20,6 @@
 
 #include <boost/stacktrace.hpp>
 
-using namespace std;
-
 extern "C" qTree coreInstance ;
 
 Processor* pProc = nullptr ;
@@ -130,7 +128,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
                 boost::rational <int> ret = 0 ; /* limits.h */
                 for (auto f : getQuery(arg[0].getValue()).lSchema) {
                     int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                    string schema = f.getFirstFieldToken().getValue();
+                    std::string schema = f.getFirstFieldToken().getValue();
                     boost::rational <int> val =
                         boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                     ret += val;
@@ -160,8 +158,8 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
             // if (mirror) - two conditions
             {
                 assert(q.lProgram.size() == 3) ;
-                string nameSrc = arg[0].getValue();
-                string nameOut = q.id ;
+                std::string nameSrc = arg[0].getValue();
+                std::string nameOut = q.id;
                 bool mirror = arg[2].getCRValue() < 0 ;
                 // step - means step of how long moving window will over data stream
                 // step is counted in tuples/atribute
@@ -210,8 +208,8 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
             }
             assert(false);    //TODO
     }
-    cerr << "cmd=" << cmd << endl ;
-    cerr << "progsize=" << progSize << endl ;
+    std::cerr << "cmd=" << cmd << std::endl;
+    std::cerr << "progsize=" << progSize << std::endl;
     assert(false);    // Unknown operator catched here
     return number(0) ;    /* pro forma */
 }
@@ -231,7 +229,7 @@ Processor::Processor()
     }
     // Initializing fill of context and lenght of data stream
     for (auto q : coreInstance) {   // For all queries in systes
-        vector< number > rowValues ;
+        std::vector<number> rowValues;
         for (auto i = 0; i < getSizeOfRollup(q); i ++)
             rowValues.push_back(boost::rational<int> (0));
         gContextValMap[ q.id ] = rowValues;
@@ -241,7 +239,7 @@ Processor::Processor()
     pProc = this ;
 }
 
-void Processor::processRows(set<string> inSet)
+void Processor::processRows(std::set<std::string> inSet)
 {
     for (auto q : coreInstance) {
         // Drop rows that not come with this to compute
@@ -253,7 +251,7 @@ void Processor::processRows(set<string> inSet)
             assert(!q.filename.empty());
             gFileMap[ q.id ].processRow() ;    // Fetch next row form file that have schema
         }
-        vector <number> ctxRowValue;
+        std::vector<number> ctxRowValue;
         if (q.isDeclaration()) {
             for (auto f : q.lSchema)
                 ctxRowValue.push_back(gFileMap[ q.id ].getCR(f));
@@ -264,7 +262,7 @@ void Processor::processRows(set<string> inSet)
         gContextValMap[q.id] = ctxRowValue;
         // here should be computer values of stream tuples
         // computed value shoud be stored in file
-        vector <number> rowValue;
+        std::vector<number> rowValue;
         int cnt(0);
         for (auto &f : q.lSchema) {
             boost::rational<int> value(computeValue(f, q));
@@ -277,16 +275,16 @@ void Processor::processRows(set<string> inSet)
     }
 }
 
-vector<number> Processor::getRow(string streamName, int timeOffset, bool reverse)
+std::vector<number> Processor::getRow(std::string streamName, int timeOffset, bool reverse)
 {
-    vector<number> retVal ;
+    std::vector<number> retVal;
     int column = 0 ;
     for (auto f : getQuery(streamName).lSchema)
         retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
     return retVal ;
 }
 
-int Processor::getArgumentOffset(const string &streamName, const string &streamArgument)
+int Processor::getArgumentOffset(const std::string &streamName, const std::string &streamArgument)
 {
     int retVal = 0;
     query &q(getQuery(streamName)) ;
@@ -301,11 +299,11 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
             else if (B.getValue() == streamArgument)
                 retVal = getQuery(A.getValue()).lSchema.size();
             else {
-                cerr << "currnet stream:" << streamName << endl;
-                cerr << "argument:" << streamArgument << endl;
-                cerr << "1st: " << A.getValue() << endl;
-                cerr << "2nd: " << B.getValue() << endl;
-                cerr << "@:" << boost::stacktrace::stacktrace() << endl;
+                std::cerr << "currnet stream:" << streamName << std::endl;
+                std::cerr << "argument:" << streamArgument << std::endl;
+                std::cerr << "1st: " << A.getValue() << std::endl;
+                std::cerr << "2nd: " << B.getValue() << std::endl;
+                std::cerr << "@:" << boost::stacktrace::stacktrace() << std::endl;
                 throw  std::out_of_range("Call to schema that not exist");
             }
         }
@@ -313,7 +311,7 @@ int Processor::getArgumentOffset(const string &streamName, const string &streamA
     return retVal ;
 }
 
-number Processor::getValueProc(string streamName, int timeOffset, int schemaOffset, bool reverse)
+number Processor::getValueProc(std::string streamName, int timeOffset, int schemaOffset, bool reverse)
 {
     number retval;
     query &q(getQuery(streamName));
@@ -332,7 +330,7 @@ number Processor::getValueProc(string streamName, int timeOffset, int schemaOffs
     return retval;
 }
 
-void Processor::updateContext(set < string > inSet)
+void Processor::updateContext(std::set<std::string> inSet)
 {
     // Update of context variable
     for (auto q : coreInstance) {   // For all queries in system
@@ -343,7 +341,7 @@ void Processor::updateContext(set < string > inSet)
         // there is no sens to make computed twice
         if (gContextLenMap[ q.id ] == gStreamSize[ q.id ])
             continue;
-        vector<number> rowValues;
+        std::vector<number> rowValues;
         if (q.isDeclaration()) {
             // If argument is declared -
             // we read source and store in context
@@ -354,10 +352,10 @@ void Processor::updateContext(set < string > inSet)
             // execution of stream program and store data
             assert(q.lProgram.size() < 4);      //we assume that all stream programs are optimized and 1v2v3 size
             assert(q.lProgram.size() > 0);      //we assume that optimized streams are ready and filled
-            list<token>::iterator it = q.lProgram.begin();
+            std::list<token>::iterator it = q.lProgram.begin();
             token operation = q.lProgram.back() ;  // Operation is always last element on stack
             token argument1, argument2;            // This arugments are optionally fullfiled
-            string streamNameArg;                 // Same as argument
+            std::string streamNameArg;             // Same as argument
             int TimeOffset(-1);                   // This -1 is intentionally wrong to catch errors
             assert(rowValues.empty());
             //all stream operations cover
@@ -370,7 +368,7 @@ void Processor::updateContext(set < string > inSet)
                         auto pos = 0;
                         for (auto f : getQuery(streamNameArg).lSchema) {
                             //rowValues.push_back(gContextValMap[streamNameArg][pos++]);
-                            string schema = f.getFirstFieldToken().getValue();
+                            std::string schema = f.getFirstFieldToken().getValue();
                             rowValues.push_back(getValueProc(schema, 0, pos++));
                         }
                     }
@@ -422,7 +420,7 @@ void Processor::updateContext(set < string > inSet)
                         boost::rational <int> ret = 0 ;
                         for (auto f : getQuery(streamNameArg).lSchema) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                            string schema = f.getFirstFieldToken().getValue();
+                            std::string schema = f.getFirstFieldToken().getValue();
                             ret = ret + boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                         }
                         ret = ret / static_cast<int>(q.lSchema.size());
@@ -438,7 +436,7 @@ void Processor::updateContext(set < string > inSet)
                         boost::rational <int> ret = INT_MIN ; /* limits.h */
                         for (auto f : getQuery(streamNameArg).lSchema) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                            string schema = f.getFirstFieldToken().getValue();
+                            std::string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
                                 boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                             if (val > ret)
@@ -456,7 +454,7 @@ void Processor::updateContext(set < string > inSet)
                         boost::rational <int> ret = INT_MAX ; /* limits.h */
                         for (auto f : getQuery(streamNameArg).lSchema) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                            string schema = f.getFirstFieldToken().getValue();
+                            std::string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
                                 boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                             if (val < ret)
@@ -474,7 +472,7 @@ void Processor::updateContext(set < string > inSet)
                         boost::rational <int> ret = 0 ; /* limits.h */
                         for (auto f : getQuery(streamNameArg).lSchema) {
                             int pos = boost::rational_cast<int> (f.getFirstFieldToken().getCRValue());
-                            string schema = f.getFirstFieldToken().getValue();
+                            std::string schema = f.getFirstFieldToken().getValue();
                             boost::rational <int> val =
                                 boost::get< boost::rational<int>> (getValueProc(schema, 0, pos));
                             ret += val;
@@ -529,8 +527,8 @@ void Processor::updateContext(set < string > inSet)
                     {
                         argument1 = * (it++);
                         argument2 = * (it++);
-                        string nameSrc = argument1.getValue();
-                        string nameOut = q.id ;
+                        std::string nameSrc = argument1.getValue();
+                        std::string nameOut = q.id;
                         bool mirror = operation.getCRValue() < 0 ;
                         // step - means step of how long moving window will over data stream
                         // step is counted in tuples/atribute
@@ -603,7 +601,7 @@ void Processor::updateContext(set < string > inSet)
 
 boost::rational<int> Processor::computeValue(field &f, query &q)
 {
-    stack < boost::rational<int>> rStack ;
+    std::stack<boost::rational<int>> rStack;
     boost::rational<int> a, b ;
     for (auto tk : f.lProgram) {
         switch (tk.getTokenCommand()) {
@@ -695,7 +693,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q)
                         rStack.pop();
                         if (a == 8) {
                             boost::crc_basic<8> crcfn(rational_cast<unsigned char>(b), 0x0, 0x0, false, false);
-                            vector<unsigned char> data_v;
+                            std::vector<unsigned char> data_v;
                             for (int i = 0; i < getSizeOfRollup(q); i++) {
                                 boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
                                 byteConverter.int_type = rational_cast<int>(val);
@@ -706,7 +704,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q)
                             rStack.push(val);
                         } else if (a == 16) {
                             boost::crc_basic<16> crcfn(rational_cast<unsigned short>(b), 0x0, 0x0, false, false);
-                            vector<unsigned short> data_v;
+                            std::vector<unsigned short> data_v;
                             for (int i = 0; i < getSizeOfRollup(q); i++) {
                                 boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
                                 byteConverter.int_type = rational_cast<int>(val) ;
@@ -717,7 +715,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q)
                             rStack.push(val);
                         } else if (a == 32) {
                             boost::crc_basic<32> crcfn(rational_cast<unsigned long>(b), 0x0, 0x0, false, false);
-                            vector<unsigned long> data_v;
+                            std::vector<unsigned long> data_v;
                             for (int i = 0; i < getSizeOfRollup(q); i++) {
                                 boost::rational<int> val = boost::get< boost::rational<int>>(getValueOfRollup(q, i, 0));
                                 byteConverter.int_type = rational_cast<int>(val) ;
@@ -737,7 +735,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q)
                          * (x,y) means count from X to Y in schema
                          * (x,y,t) means count X to Y in schemat and t probes back
                          */
-                        vector<int> args ;
+                        std::vector<int> args;
                         while (!rStack.empty()) {
                             args.push_back(rational_cast<int> (rStack.top()));
                             rStack.pop();
@@ -781,7 +779,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q)
                 break ;
             case PUSH_ID: { //Schema_name[indeks,indeks] like PUSH_ID4
                     int offsetInSchema(rational_cast<int> (tk.getCRValue()));
-                    string argument(tk.getValue());
+                    std::string argument(tk.getValue());
                     // If operation ADD exist - then position schema will be moved
                     // first argument
                     int offsetFromArg = getArgumentOffset(q.id, argument);
@@ -806,7 +804,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q)
     return boost::rational<int>(0);   /* pro forma */
 }
 
-int Processor::getStreamCount(const string query_name)
+int Processor::getStreamCount(const std::string query_name)
 {
     return gStreamSize[query_name];
 }
