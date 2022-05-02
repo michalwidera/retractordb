@@ -20,8 +20,6 @@ extern qTree coreInstance ;
 using namespace antlrcpp;
 using namespace antlr4;
 
-using namespace std;
-
 std::string status = "OK";
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
@@ -67,7 +65,7 @@ class ParserListener : public RQLBaseListener
     query qry;
 
     /* sequence of tokens - same variable for stream and field program*/
-    list < token > program;
+    std::list < token > program;
 
     /* Type of field */
     field::eType fType = field::BAD;
@@ -247,12 +245,12 @@ public:
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
-        list < token > emptyProgram;
+        std::list < token > emptyProgram;
         if (fTypeSize == 1)
             qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
         else {
             for (auto i = 0 ; i < fTypeSize ; i ++) {
-                string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);
+                std::string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);
                 qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
             }
         }
@@ -262,7 +260,7 @@ public:
 
 };
 
-string parser(std::string sInputFile)
+std::string parser(std::string sInputFile)
 {
     std::ifstream ins;
     // Create the input stream.

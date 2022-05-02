@@ -5,9 +5,7 @@
 #include <string>
 #include <vector>
 
-using namespace std;
-
-extern string parser(string sInputFile);
+extern std::string parser(std::string sInputFile);
 
 bool check_compile_function() {
 
