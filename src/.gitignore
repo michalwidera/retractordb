@@ -15,4 +15,3 @@ Testing/
 query.dot
 query.jpg
 *.orig
-include/config.h
