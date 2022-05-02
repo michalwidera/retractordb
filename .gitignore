@@ -10,13 +10,9 @@ cmake_install.cmake
 out.*
 query.dmp
 query.lkn
-query.qry*
 testfile
 CTestTestfile.cmake
 Testing/
-thesis-data/
-query.dot
-query.jpg
 nohup.out
 build/
 scripts/CMakeFiles/*
