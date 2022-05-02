@@ -20,6 +20,8 @@
 
 #include <boost/stacktrace.hpp>
 
+using namespace std;
+
 extern "C" qTree coreInstance ;
 
 Processor* pProc = nullptr ;

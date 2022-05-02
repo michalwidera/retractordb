@@ -14,6 +14,8 @@
 
 using boost::lexical_cast;
 
+using namespace std;
+
 extern int fieldCount;
 
 // Object coreInstance in QStruct.cpp

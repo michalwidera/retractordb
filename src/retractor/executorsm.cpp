@@ -46,6 +46,8 @@
 
 #include "config.h" // Add an automatically generated configuration file
 
+using namespace std;
+
 namespace IPC = boost::interprocess ;
 
 // Define for IPC purposes - maps & strings (most important IPCString i IPCMap)

@@ -4,4 +4,3 @@ project(database-scripts)
 
 install(PROGRAMS plotblock.py plothistgram.py xdisplay antlr4call.sh
         DESTINATION ~/.local/bin)
-

@@ -16,7 +16,7 @@ class inputFileInstance
     int len ; /**< Length of file in bytes */
     int curPos ; /**< Actual position in file */
     void goBegin();
-    string extension;
+    std::string extension;
 
 public:
 

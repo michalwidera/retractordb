@@ -20,6 +20,8 @@ extern qTree coreInstance ;
 using namespace antlrcpp;
 using namespace antlr4;
 
+using namespace std;
+
 std::string status = "OK";
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4

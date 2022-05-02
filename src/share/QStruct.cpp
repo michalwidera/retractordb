@@ -67,7 +67,7 @@ command_id token::getTokenCommand()
     return command ;
 }
 
-string token::getStrTokenName()
+std::string token::getStrTokenName()
 {
     switch (getTokenCommand()) {
 #define DEF_CASE( _A_ ) case _A_ : return #_A_ ;
@@ -79,7 +79,7 @@ string token::getStrTokenName()
 
 boost::rational<int> Rationalize(double inValue, double DIFF/*=1E-6*/,  int ttl/*=11*/)
 {
-    stack<int> st ;
+    std::stack<int> st;
     double startx(inValue), diff, err1, err2;
     unsigned int val ;
     for (;;) {
@@ -111,7 +111,7 @@ boost::rational<int> Rationalize(double inValue, double DIFF/*=1E-6*/,  int ttl/
     return err1 > err2 ? result2 : result1 ;
 }
 
-field &query::getField(string sField)
+field &query::getField(std::string sField)
 {
     for (auto &f : lSchema) {
         if (f.setFieldName.find(sField) != f.setFieldName.end())
@@ -131,7 +131,7 @@ void query::reset()
     return;
 }
 
-bool isThere(vector < query > v, string query_name)
+bool isThere(std::vector<query> v, std::string query_name)
 {
     for (auto &q : v) {
         if (q.id == query_name)
@@ -164,7 +164,7 @@ void qTree::tsort()
             }
             if (v.empty())
                 break ;
-            list < string > ls = (*it).getDepStreamNameList() ;
+            std::list<std::string> ls = (*it).getDepStreamNameList();
             bool fullDependent(true);
             for (auto s : ls) {
                 if (! isThere(des, s))
@@ -181,29 +181,29 @@ void qTree::tsort()
         push_back(q);
 }
 
-boost::rational<int> qTree::getDelta(string query_name)
+boost::rational<int> qTree::getDelta(std::string query_name)
 {
     return getQuery(query_name).rInterval ;
 }
 
-query &getQuery(string query_name)
+query &getQuery(std::string query_name)
 {
     assert(query_name != "");
     for (auto &q : coreInstance) {
         if (q.id == query_name)
             return q ;
     }
-    cerr << "Missing:" << endl ;
-    cerr << " " << query_name << endl ;
-    cerr << "Avaiable:" << endl ;
+    std::cerr << "Missing:" << std::endl;
+    std::cerr << " " << query_name << std::endl;
+    std::cerr << "Avaiable:" << std::endl;
     for (auto &q : coreInstance)
-        cerr << " " << q.id << endl ;
+        std::cerr << " " << q.id << std::endl;
     throw std::logic_error("No such stream in set - getQuery");
     static query void_query ;
     return (void_query) ;   //proforma
 }
 
-int getSeqNr(string query_name)
+int getSeqNr(std::string query_name)
 {
     int cnt(0);
     for (auto &q : coreInstance) {
@@ -216,7 +216,7 @@ int getSeqNr(string query_name)
     return -1 ; //INVALID QUERY_NR
 }
 
-bool isDeclared(string query_name)
+bool isDeclared(std::string query_name)
 {
     for (auto &q : coreInstance) {
         if (query_name == q.id)
@@ -225,7 +225,7 @@ bool isDeclared(string query_name)
     return false ;
 }
 
-bool isExist(string query_name)
+bool isExist(std::string query_name)
 {
     for (auto &q : coreInstance) {
         if (query_name == q.id)
@@ -239,16 +239,16 @@ boost::rational<int> token::getCRValue()
     return crValue ;
 }
 
-string token::getValue()
+std::string token::getValue()
 {
     if (sValue_.empty()) {
-        stringstream ss ;
+        std::stringstream ss;
         ss << crValue.numerator() ;
         if (crValue.denominator() != 1) {
             ss << "_" ;
             ss << crValue.denominator() ;
         }
-        return string(ss.str()) ;
+        return std::string(ss.str());
     } else
         return sValue_ ;
 }
@@ -269,22 +269,22 @@ field::field()
 {}
 
 field::field(
-    string sFieldName,
-    list < token > &lProgram,
+    std::string sFieldName,
+    std::list<token> &lProgram,
     eType dFieldType,
-    string sFieldText) :
-    lProgram(lProgram),
+    std::string sFieldText) : lProgram(lProgram),
     dFieldType(dFieldType),
     sFieldText(sFieldText)
 {
     setFieldName.insert(sFieldName) ;
 }
-string field::getFieldText()
+
+std::string field::getFieldText()
 {
     return sFieldText ;
 }
 
-string field::getFirstFieldName()
+std::string field::getFirstFieldName()
 {
     return * setFieldName.begin() ;
 }
@@ -295,9 +295,9 @@ token field::getFirstFieldToken()
     return * lProgram.begin() ;
 }
 
-string field::getFieldNameSet()
+std::string field::getFieldNameSet()
 {
-    stringstream retVal;
+    std::stringstream retVal;
     for (const auto &s : setFieldName)
         retVal << s << " " ;
     return retVal.str() ;
@@ -305,12 +305,10 @@ string field::getFieldNameSet()
 
 /** Construktor set */
 
-token::token(command_id id, string sValue) :
-    command(id), crValue(0), sValue_(sValue)
+token::token(command_id id, std::string sValue) : command(id), crValue(0), sValue_(sValue)
 {}
 
-token::token(command_id id, boost::rational<int> crValue, string sValue) :
-    command(id), crValue(crValue), sValue_(sValue)
+token::token(command_id id, boost::rational<int> crValue, std::string sValue) : command(id), crValue(crValue), sValue_(sValue)
 {}
 
 token::token(command_id id, double dValue) :
@@ -319,17 +317,15 @@ token::token(command_id id, double dValue) :
 
 /** Construktor set */
 
-
-query::query(boost::rational<int> rInterval, string id) :
-    rInterval(rInterval),  id(id)
+query::query(boost::rational<int> rInterval, std::string id) : rInterval(rInterval), id(id)
 {}
 
 query::query()
 {}
 
-list< string > query::getFieldNamesList()
+std::list<std::string> query::getFieldNamesList()
 {
-    list < string > schema ;
+    std::list<std::string> schema;
     for (auto &f : lSchema)
         schema.push_back(f.getFirstFieldName());
     return schema ;
@@ -368,10 +364,10 @@ bool query::isReductionRequired()
     return streamOperatorCount > 1 ;
 }
 
-list < string > query::getDepStreamNameList(int reqDep)
+std::list<std::string> query::getDepStreamNameList(int reqDep)
 {
     int iDep(0);
-    list < string > lRetVal ;
+    std::list<std::string> lRetVal;
     for (auto &t : lProgram) {
         if (reqDep == 0) {
             //defult behaviour

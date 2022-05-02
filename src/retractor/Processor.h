@@ -23,37 +23,36 @@ class Processor : private boost::noncopyable
     );
 
     /** Variable that contains sources of data */
-    map<string, inputDF> gFileMap;
+    std::map<std::string, inputDF> gFileMap;
 
     /** Length of data streams processed by processor */
-    map<string, int> gStreamSize;
+    std::map<std::string, int> gStreamSize;
 
     /** Context variables */
-    map<string, vector<number>> gContextValMap;  // schema name/record values
+    std::map<std::string, std::vector<number>> gContextValMap; // schema name/record values
 
     /** Context variables
      *  NOTE: There shoulnd not appear two different stream lengths
      *  Existence of this should be revisited. Probably need to remove.
      */
-    map<string, int> gContextLenMap;
-
+    std::map<std::string, int> gContextLenMap;
 
     /** Context functions */
-    number getValueProc(string streamName,
+    number getValueProc(std::string streamName,
         int timeOffset,
         int schemaOffset,
-        bool reverse = false) ;
+        bool reverse = false);
 
     /** Context functions */
-    vector<number> getRow(string streamName,
+    std::vector<number> getRow(std::string streamName,
         int timeOffset,
-        bool reverse = false) ;
+        bool reverse = false);
 
     /** Function will return offsets according to stack operations
      *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
      */
-    int getArgumentOffset(const string &streamName,
-        const string &streamArgument) ;
+    int getArgumentOffset(const std::string &streamName,
+        const std::string &streamArgument);
 
 public:
 
@@ -61,18 +60,18 @@ public:
     Processor();
 
     /** String representation of stream */
-    string printRowValue(const string query_name);
+    std::string printRowValue(const std::string query_name);
 
     /** This function take in proper moment data to process */
-    void processRows(set<string> inSet);
+    void processRows(std::set<std::string> inSet);
 
     /** Main purpose of this function is fullfill all stream fields values
      *  on given moment by  realization all 1v2v3 elements stream programs
      */
-    void updateContext(set<string> inSet) ;
+    void updateContext(std::set<std::string> inSet);
 
     /** This function return lenght of data stream */
-    int getStreamCount(const string query_name);
+    int getStreamCount(const std::string query_name);
 
     /** This function try to roll up argument and reads data from schema
      * This is not finished - need to be fixed */

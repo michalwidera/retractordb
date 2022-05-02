@@ -10,6 +10,9 @@
 
 #include "config.h" // Add an automatically generated configuration file
 
+using namespace std;
+using namespace boost;
+
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance ;
 

@@ -39,10 +39,6 @@ namespace boost
 } // namespace boost
 
 
-
-using namespace std ;
-using namespace boost ;
-
 boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,  int ttl = 11) ;
 
 enum command_id {
@@ -68,17 +64,17 @@ class token
     command_id command ;
     boost::rational<int> crValue ;
     boost::rational<int> rcValue ;
-    string sValue_ ;
+    std::string sValue_ ;
 
 public:
-    string getValue();
+    std::string getValue();
     boost::rational<int> getCRValue() ;
 
-    token(command_id id = VOID_COMMAND, string sValue = "") ;
-    token(command_id id, boost::rational<int> crValue, string sValue = "") ;
+    token(command_id id = VOID_COMMAND, std::string sValue = "");
+    token(command_id id, boost::rational<int> crValue, std::string sValue = "");
     token(command_id id, double dValue);
 
-    string getStrTokenName() ;
+    std::string getStrTokenName() ;
     command_id getTokenCommand();
 } ;
 
@@ -98,22 +94,22 @@ private:
         ar &sFieldText ;
     }
 
-    string sFieldText ;
+    std::string sFieldText;
 
 public:
 
     enum eType { BAD, BYTE, INTEGER, UNSIGNED, RATIONAL, FLOAT, STRING} ;
 
-    set< string > setFieldName ;
+    std::set<std::string> setFieldName;
     eType dFieldType ;
-    list < token > lProgram ;
+    std::list<token> lProgram;
 
     field() ;
-    field(string sFieldName, list < token > &lProgram, eType fieldType, string sFieldText) ;
+    field(std::string sFieldName, std::list<token> &lProgram, eType fieldType, std::string sFieldText);
 
-    string getFirstFieldName() ;
-    string getFieldNameSet() ;
-    string getFieldText() ;
+    std::string getFirstFieldName();
+    std::string getFieldNameSet();
+    std::string getFieldText();
     token  getFirstFieldToken() ;
 } ;
 
@@ -136,24 +132,24 @@ private:
 
 public:
 
-    query(boost::rational<int> rInterval, string id) ;
+    query(boost::rational<int> rInterval, std::string id) ;
     query() ;
 
-    list< string > getFieldNamesList() ;
+    std::list<std::string> getFieldNamesList();
 
-    string id ;
-    string filename ;
+    std::string id ;
+    std::string filename;
     boost::rational<int> rInterval ;
-    list < field > lSchema ;
-    list < token > lProgram ;
+    std::list<field> lSchema;
+    std::list < token > lProgram ;
 
     bool isDeclaration();
     bool isReductionRequired();
     bool isGenerated();
 
-    field &getField(string sField);
+    field &getField(std::string sField);
 
-    list < string > getDepStreamNameList(int reqDep = 0) ;
+    std::list<std::string> getDepStreamNameList(int reqDep = 0);
 
     int getFieldIndex(field f);
 
@@ -162,13 +158,13 @@ public:
 
 bool operator< (const query &lhs, const query &rhs) ;
 
-query &getQuery(string query_name) ;
-int getSeqNr(string query_name) ;
-bool isDeclared(string query_name) ;
-bool isExist(string query_name);
+query &getQuery(std::string query_name) ;
+int getSeqNr(std::string query_name) ;
+bool isDeclared(std::string query_name) ;
+bool isExist(std::string query_name);
 
 class qTree :
-    public vector < query >
+    public std::vector < query >
 {
 
 private:
@@ -181,19 +177,18 @@ private:
     }
 
 public:
-
-    query &operator[](string query_name)
+    query &operator[](std::string query_name)
     {
         return getQuery(query_name) ;
     } ;
 
     void sort()
     {
-        std::sort(begin(), end()) ;
+        std::sort(begin(), end());
     };
 
     /** Topological sort*/
     void tsort() ;
 
-    boost::rational<int> getDelta(string query_name) ;
+    boost::rational<int> getDelta(std::string query_name);
 };
