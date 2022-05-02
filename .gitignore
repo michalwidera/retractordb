@@ -1,5 +1,6 @@
 CMakeCache.txt
 CMakeFiles/*
+src/include/config.h
 .idea/*
 cmake-build-debug/*
 CMakeLists.txt.user
@@ -23,4 +24,10 @@ scripts/CMakeFiles/*
 astyle/
 compile_commands.json
 install_manifest.txt
-gen
+*.dmp
+*.lkn
+*.qry*
+*.dot
+*.jpg
+*.png
+*.swp
