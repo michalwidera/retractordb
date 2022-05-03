@@ -231,8 +231,7 @@ std::string simplifyLProgram()
         for (
             std::list<token>::iterator it2 = (*it).lProgram.begin();
             it2 != (*it).lProgram.end();
-            ++it2)
-        {
+            ++it2) {
             t0 = t1 ;
             t1 = t2 ;
             t2 = (*it2);
@@ -254,8 +253,7 @@ std::string simplifyLProgram()
             for (
                 std::list<token>::iterator it2 = (*it).lProgram.begin();
                 it2 != (*it).lProgram.end();
-                ++it2)
-            {
+                ++it2) {
                 if (
                     (*it2).getStrTokenName() == "STREAM_TIMEMOVE" ||
                     (*it2).getStrTokenName() == "STREAM_SUBSTRACT"
@@ -296,8 +294,8 @@ std::string simplifyLProgram()
                 ) {
                     query newQuery ;
                     std::string
-                        arg1, //< Name of first opeartion arguemnt
-                        arg2; //< Name of second opeartion arguemnt
+                    arg1, //< Name of first opeartion arguemnt
+                    arg2; //< Name of second opeartion arguemnt
                     command_id cmd ;
                     {
                         token newVal(*it2);

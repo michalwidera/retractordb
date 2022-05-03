@@ -100,8 +100,8 @@ public:
     void exitExpMult(RQLParser::ExpMultContext* ctx) { recpToken(MULTIPLY); }
     void exitExpDiv(RQLParser::ExpDivContext* ctx) { recpToken(DIVIDE); }
 
-    void exitExpFloat(RQLParser::ExpFloatContext *ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
-    void exitExpDec(RQLParser::ExpDecContext *ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
+    void exitExpFloat(RQLParser::ExpFloatContext* ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
+    void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
 
     void exitSExpHash(RQLParser::SExpHashContext* ctx) { recpToken(STREAM_HASH); }
 

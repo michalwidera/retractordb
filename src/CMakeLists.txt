@@ -74,9 +74,11 @@ add_custom_target(
   WORKING_DIRECTORY ../../src/compiler
   SOURCES ../../src/compiler/RQL.g4)
 
+# pip install cmake-format sudo apt install astyle
 add_custom_target(
   astyle
-  COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h --exclude compiler/Parser
+  COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
+          --exclude=compiler/Parser
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
   WORKING_DIRECTORY ../../src)
 
