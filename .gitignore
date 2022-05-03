@@ -4,6 +4,7 @@ CTestTestfile.cmake
 CMakeLists.txt.user
 cmake_install.cmake
 src/include/config.h
+src/compiler/.antlr
 .idea/*
 cmake-build-debug/*
 Makefile
