@@ -5,6 +5,12 @@
 #include <memory>
 #include <map>
 
+enum mode {
+    XML,
+    JSON,
+    INFO
+};
+
 /** Query processor */
 class Processor : private boost::noncopyable
 {
@@ -54,6 +60,9 @@ class Processor : private boost::noncopyable
     int getArgumentOffset(const std::string &streamName,
         const std::string &streamArgument);
 
+
+    mode outMode ;
+
 public:
 
     /** Query processor works on core varialbe */
@@ -78,5 +87,8 @@ public:
     number getValueOfRollup(const query &q,
         int offset,
         int timeOffset);
+
+    void setMode(mode value);
+    mode getMode();
 
 };

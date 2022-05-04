@@ -24,12 +24,6 @@ extern "C" qTree coreInstance ;
 
 Processor* pProc = nullptr ;
 
-extern enum mode {
-    XML,
-    JSON,
-    INFO
-} outMode ;
-
 
 /** This function will give info how long is stream argument if argument will be * instead of argument list */
 int getSizeOfRollup(const query &q)
@@ -73,6 +67,13 @@ int getSizeOfRollup(const query &q)
     return 0; //pro forma
 }
 
+mode Processor::getMode() {
+    return outMode;
+}
+
+void Processor::setMode(mode val) {
+    outMode = val;
+}
 
 number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
 {
@@ -214,7 +215,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
     return number(0) ;    /* pro forma */
 }
 
-Processor::Processor()
+Processor::Processor() : outMode(JSON)
 {
     //This function initialize map creating archive streams in cbuff
     for (auto q : coreInstance) {

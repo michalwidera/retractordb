@@ -81,13 +81,6 @@ extern Processor* pProc ;
 // when it will be set thread will exit by given time (testing purposes)
 int iTimeLimitCnt(0) ;
 
-// Default communication mode - xml, by program option can change to json
-enum mode {
-    XML,
-    JSON,
-    INFO
-} outMode(INFO) ;
-
 typedef boost::property_tree::ptree ptree ;
 
 extern int iTest();
@@ -177,11 +170,11 @@ std::string Processor::printRowValue(const std::string query_name)
         pt.put(boost::lexical_cast<std::string> (i++), retVal.str());
     }
     std::stringstream strstream;
-    if (outMode == JSON)
+    if (pProc->getMode() == JSON)
         write_json(strstream, pt);
-    if (outMode == XML)
+    if (pProc->getMode() == XML)
         write_xml(strstream, pt);
-    if (outMode == INFO)
+    if (pProc->getMode() == INFO)
         write_info(strstream, pt);
     return strstream.str();
 }
@@ -273,11 +266,11 @@ ptree commandProcessor(ptree ptInval)
             std::cerr << "reply:";
             using boost::property_tree::ptree;
             std::stringstream strstream;
-            if (outMode == JSON)
+            if (pProc->getMode() == JSON)
                 write_json(strstream, ptRetval) ;
-            if (outMode == XML)
+            if (pProc->getMode() == XML)
                 write_xml(strstream, ptRetval);
-            if (outMode == INFO)
+            if (pProc->getMode() == INFO)
                 write_info(strstream, ptRetval);
             std::cerr << strstream.str();
         }
@@ -320,21 +313,21 @@ void commmandProcessorLoop()
                 strstream << message ;
                 memset(message, 0, 1000);
                 ptree pt ;
-                if (outMode == JSON)
+                if (pProc->getMode() == JSON)
                     read_json(strstream, pt) ;
-                if (outMode == XML)
+                if (pProc->getMode() == XML)
                     read_xml(strstream, pt);
-                if (outMode == INFO)
+                if (pProc->getMode() == INFO)
                     read_info(strstream, pt);
                 ptree pt_retval = commandProcessor(pt);
                 int clientProcessId = boost::lexical_cast<int> (pt.get("db.id", "")) ;
                 // Sending answer
                 std::stringstream response_stream ;
-                if (outMode == JSON)
+                if (pProc->getMode() == JSON)
                     write_json(response_stream, pt_retval) ;
-                if (outMode == XML)
+                if (pProc->getMode() == XML)
                     write_xml(response_stream, pt_retval);
-                if (outMode == INFO)
+                if (pProc->getMode() == INFO)
                     write_info(response_stream, pt_retval);
                 IPCString response(allocatorShmemMapInstance);
                 response = response_stream.str().c_str();
@@ -405,11 +398,11 @@ int main(int argc, char* argv[])
             return EPERM ; //ERROR defined in errno-base.h
         }
         if (vm.count("json"))
-            outMode = JSON;
+            pProc->setMode(JSON);
         if (vm.count("xml"))
-            outMode = XML;
+            pProc->setMode(XML);
         if (vm.count("info"))
-            outMode = INFO;
+            pProc->setMode(INFO);
         if (vm.count("verbose"))
             std::cerr << "Input :" << sInputFile << std::endl;
         std::ifstream ifs(sInputFile.c_str(), std::ios::binary);
