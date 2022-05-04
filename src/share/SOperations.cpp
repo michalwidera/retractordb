@@ -165,34 +165,3 @@ int agse(int offset, int step)
 {
     return floor(boost::rational<int> (offset) / boost::rational<int> (step));
 }
-
-void SOperations_regtest()
-{
-    boost::rational<int> a(1, 2) ;
-    boost::rational<int> b(1, 3) ;
-    boost::rational<int> c(2, 3) ;
-    boost::rational<int> d(5, 4) ;
-    boost::rational<int> e(1) ;
-    boost::rational<int> f(0) ;
-    boost::rational<int> g(-2, 3);
-    boost::rational<int> h(-1);
-    boost::rational<int> j(-5, 4);
-    assert(floor(a) == 0);
-    assert(floor(b) == 0);
-    assert(floor(c) == 0);
-    assert(floor(d) == 1);
-    assert(floor(e) == 1);
-    assert(floor(f) == 0);
-    assert(floor(g) == 0);
-    assert(floor(h) == -1);
-    assert(floor(j) == -1);
-    assert(ceil(a) == 1);
-    assert(ceil(b) == 1);
-    assert(ceil(c) == 1);
-    assert(ceil(d) == 2);
-    assert(ceil(e) == 1);
-    assert(ceil(f) == 0);
-    assert(ceil(g) == -1);
-    assert(ceil(h) == -1);
-    assert(ceil(j) == -2);
-}

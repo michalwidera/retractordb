@@ -13,5 +13,3 @@ int Div(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, 
 int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) ;
 int Substract(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) ;
 int agse(int offset, int step);
-
-void SOperations_regtest();
