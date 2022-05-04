@@ -29,6 +29,7 @@ jobs:
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
       - run: cd build && conan source ..
       - run: cd build && conan install ..
+      - run: cd build && conan build ..
       - run: cd build && make grammar
       - run: cd build && conan build ..
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
