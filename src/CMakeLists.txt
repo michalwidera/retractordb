@@ -79,7 +79,8 @@ add_custom_target(
   astyle
   COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
           --exclude=compiler/Parser
-  COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
+  COMMAND find ${PROJECT_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format
+          -i
   WORKING_DIRECTORY ../../src)
 
 add_custom_target(
