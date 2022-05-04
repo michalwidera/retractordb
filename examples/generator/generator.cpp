@@ -7,7 +7,7 @@
 #include <boost/crc.hpp>
 #include <boost/program_options.hpp>
 #include <boost/system/error_code.hpp>
-using namespace std;
+
 using namespace boost ;
 
 const int CRC16_CCITT_R=0x8408;  //https://en.wikipedia.org/wiki/Cyclic_redundancy_check
@@ -17,11 +17,11 @@ const int DEFAULT_PACK_COUNT=10;
 unsigned int packSize = DEFAULT_SIZE_OF_PACK;
 unsigned int packCount = DEFAULT_PACK_COUNT;
 
-vector<unsigned int> data;
-vector<unsigned int> remote;
+std::vector<unsigned int> data;
+std::vector<unsigned int> remote;
 
-string sOutputFile = "file.binary";
-string sInpuFile = "";
+std::string sOutputFile = "file.binary";
+std::string sInpuFile = "";
 
 unsigned int sawSize = std::numeric_limits<int>::max();
 unsigned int rndSize = 0;
@@ -38,8 +38,8 @@ int main(int argc, char* argv[])
     ("addcrc,c", po::value<unsigned int> (&packSize), "count crc after this")
     ("addsum,u", po::value<unsigned int> (&packSize), "count simple sum after this")
     ("datacount,d", po::value<unsigned int> (&packCount), "count of genrated packs")
-    ("outfile,f", po::value<string> (&sOutputFile), "outputfilename, default:file.binary")
-    ("inputfile,k", po::value<string> (&sInpuFile), "get data from inputfile instead of algo" )
+    ("outfile,f", po::value<std::string> (&sOutputFile), "outputfilename, default:file.binary")
+    ("inputfile,k", po::value<std::string> (&sInpuFile), "get data from inputfile instead of algo" )
     ("saw,s", po::value<unsigned int> (&sawSize), "algorithm: saw modulo (default:maxint)")
     ("rnd,r", po::value<unsigned int> (&rndSize), "algorithm: random modulo (default:0)")
     ("mul,m", po::value<unsigned int> (&mulSize), "algorithm: multiplication (default:1)")
@@ -53,21 +53,21 @@ int main(int argc, char* argv[])
 
     if (vm.count("help"))
     {
-        cerr << argv[0] << " - data generator" << std::endl;
-        cerr << "The idea of this program is to generate data with or without crc."<< std::endl;
-        cerr << "For testing purposes."<< std::endl;
-        cerr << "Algorithm: ((rnd + (j*CRC_packSize + i)) * mul) % saw" << std::endl;
-        cerr << "Examples:"<< std::endl;
-        cerr << "\t./xgenerator -d 8 -s 30 -p -m 10:"<< std::endl;
-        cerr << "\t\t>0 10 20 0 10 20 0 10"<< std::endl;
-        cerr << "\t./xgenerator -d 8 -p"<< std::endl;
-        cerr << "\t\t>0 1 2 3 4 5 6 7"<< std::endl;
-        cerr << "\t./xgenerator -d 8 -p -r 20"<< std::endl;
-        cerr << "\t\t>3 7 19 18 17 20 12 19"<< std::endl;
-        cerr << "\t./xgenerator -d 2 -p -c 4"<< std::endl;
-        cerr << "\t\t0 1 2 3 37368"<< std::endl;
-        cerr << "\t\t4 5 6 7 24536"<< std::endl;
-        cerr << desc << endl ;
+        std::cerr << argv[0] << " - data generator" << std::endl;
+        std::cerr << "The idea of this program is to generate data with or without crc."<< std::endl;
+        std::cerr << "For testing purposes."<< std::endl;
+        std::cerr << "Algorithm: ((rnd + (j*CRC_packSize + i)) * mul) % saw" << std::endl;
+        std::cerr << "Examples:"<< std::endl;
+        std::cerr << "\t./xgenerator -d 8 -s 30 -p -m 10:"<< std::endl;
+        std::cerr << "\t\t>0 10 20 0 10 20 0 10"<< std::endl;
+        std::cerr << "\t./xgenerator -d 8 -p"<< std::endl;
+        std::cerr << "\t\t>0 1 2 3 4 5 6 7"<< std::endl;
+        std::cerr << "\t./xgenerator -d 8 -p -r 20"<< std::endl;
+        std::cerr << "\t\t>3 7 19 18 17 20 12 19"<< std::endl;
+        std::cerr << "\t./xgenerator -d 2 -p -c 4"<< std::endl;
+        std::cerr << "\t\t0 1 2 3 37368"<< std::endl;
+        std::cerr << "\t\t4 5 6 7 24536"<< std::endl;
+        std::cerr << desc << std::endl ;
         return system::errc::success;
     }
 
@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
     for(auto j = 0; j < packCount; j++)
     {
 
-        vector<unsigned int> crcq;
+        std::vector<unsigned int> crcq;
         unsigned int sumq = 0;
 
         for(auto i = 0; i < packSize; ++i)
@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
             }
             if (vm.count("print"))
             {
-                cout << val << " ";
+                std::cout << val << " ";
             }
 
             if (vm.count("addsum"))
@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
             crcfn.process_bytes(crcq.data(), sizeof(unsigned int) * crcq.size());
             if (vm.count("print"))
             {
-                cout << crcfn.checksum() << endl ;
+                std::cout << crcfn.checksum() << std::endl ;
             }
             data.push_back(crcfn.checksum());
             crcqCnt++;
@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
         {
             if (vm.count("print"))
             {
-                cout << sumq << endl ;
+                std::cout << sumq << std::endl ;
             }
             data.push_back(sumq);
             sumqCnt++;
@@ -155,22 +155,22 @@ int main(int argc, char* argv[])
 
     if (vm.count("print"))
     {
-        cout << endl ;
+        std::cout << std::endl ;
     }
 
     myfile.write((char*)data.data(), data.size()*sizeof(unsigned int));
     myfile.close();
 
-    cout << "count:"<< packCount * packSize << endl;
+    std::cout << "count:"<< packCount * packSize << std::endl;
     if (vm.count("addcrc"))
     {
-        cout << "crc cnt:"<< crcqCnt << endl;
+        std::cout << "crc cnt:"<< crcqCnt << std::endl;
     }
     if (vm.count("addsum"))
     {
-        cout << "sum cnt:"<< sumqCnt << endl;
+        std::cout << "sum cnt:"<< sumqCnt << std::endl;
     }
-    cout << "output:" << sOutputFile << endl;
-    cout << "done." << endl;
+    std::cout << "output:" << sOutputFile << std::endl;
+    std::cout << "done." << std::endl;
     return system::errc::success;
 }

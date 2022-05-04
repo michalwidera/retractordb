@@ -12,14 +12,13 @@
 
 #include <iostream>
 
-using namespace std ;
 using namespace boost ;
 
 void inputFileInstance::goBegin()
 {
     if (extension == ".dat") {
         psFile->clear();
-        psFile->seekg(0, ios::beg);
+        psFile->seekg(0, std::ios::beg);
     }
     curPos = 0 ;
 }
@@ -31,9 +30,9 @@ inputFileInstance::inputFileInstance(std::string inputFileName)
     std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     // Parser feeds space at the end of string
     boost::trim_right(inputFileName);
-    ifstream* pstream = new ifstream(
+    std::ifstream* pstream = new std::ifstream(
         inputFileName,
-        (extension == ".txt") ? ios::in : ios::in | ios::binary
+        (extension == ".txt") ? std::ios::in : std::ios::in | std::ios::binary
     );
     psFile.reset(pstream);
     assert(psFile);
@@ -41,7 +40,7 @@ inputFileInstance::inputFileInstance(std::string inputFileName)
         len = -1 ;
     else {
         if (extension == ".dat") {
-            psFile->seekg(0, ios::end);
+            psFile->seekg(0, std::ios::end);
             len = psFile->tellg();
         }
         goBegin();

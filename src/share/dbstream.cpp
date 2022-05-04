@@ -12,10 +12,9 @@
 
 rdb::dataSet database;
 
-using namespace std ;
 using namespace boost ;
 
-long streamStoredSize(string filename)
+long streamStoredSize(std::string filename)
 {
     return database.streamStoredSize(filename);
 }
@@ -25,7 +24,7 @@ void setStorageLocation(std::string location)
     database.setStoragePath(location);
 }
 
-dbStream::dbStream(std::string streamName, list < std::string > schema) :
+dbStream::dbStream(std::string streamName, std::list < std::string > schema) :
     streamName(streamName),
     schema(schema),
     mpReadNr(-1),

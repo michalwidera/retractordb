@@ -10,7 +10,6 @@
 
 #include "config.h" // Add an automatically generated configuration file
 
-using namespace std ;
 using namespace boost ;
 using boost::property_tree::ptree;
 
@@ -34,8 +33,8 @@ int main(int argc, char* argv[])
         namespace po = boost::program_options;
         po::options_description desc("Allowed options");
         desc.add_options()
-        ("select,s", po::value<string> (&sInputStream), "show this stream")
-        ("detail,t", po::value<string> (&sInputStream), "show details of this stream")
+        ("select,s", po::value<std::string> (&sInputStream), "show this stream")
+        ("detail,t", po::value<std::string> (&sInputStream), "show details of this stream")
         ("tlimitqry,m", po::value<int> (&iTimeLimitCnt)->default_value(0), "limit of elements, 0 - no limit")
         ("hello,l", "diagnostic - hello db world")
         ("json,j", "json communication protocol")
@@ -69,9 +68,9 @@ int main(int argc, char* argv[])
         if (vm.count("influxdb"))
             setmode("INFLUXDB") ;
         if (vm.count("help")) {
-            cerr << argv[0] << " - data processing tool." << std::endl;
-            cout << desc;
-            cout << CONFIG_LINE;
+            std::cout << argv[0] << " - data processing tool." << std::endl;
+            std::cout << desc;
+            std::cout << CONFIG_LINE;
             return system::errc::success;
         } else if (vm.count("hello"))
             return hello();
@@ -87,17 +86,17 @@ int main(int argc, char* argv[])
             if (select(vm.count("needctrlc")) == false)
                 return system::errc::no_such_file_or_directory;
         } else {
-            cout << argv[0] << ": fatal error: no argument" << endl ;
-            cout << "query receiver terminated." << endl ;
+            std::cout << argv[0] << ": fatal error: no argument" << std::endl ;
+            std::cout << "query receiver terminated." << std::endl ;
             return EPERM ; //ERROR defined in errno-base.h
         }
     } catch (IPC::interprocess_exception &ex) {
-        cerr << ex.what() << endl << "catch client" << endl;
+        std::cerr << ex.what() << std::endl << "catch client" << std::endl;
         return system::errc::no_child_process;
     } catch (std::exception &e) {
-        cerr << e.what() << endl;
+        std::cerr << e.what() << std::endl;
         return system::errc::interrupted;
     }
-    cout << "ok." << endl ;
+    std::cout << "ok." << std::endl ;
     return system::errc::success;
 }

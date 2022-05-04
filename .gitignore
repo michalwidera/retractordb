@@ -5,6 +5,8 @@ CMakeLists.txt.user
 cmake_install.cmake
 src/include/config.h
 src/compiler/.antlr
+examples/generator/CMakeFiles
+examples/generator/xgenerator
 .idea/*
 cmake-build-debug/*
 Makefile

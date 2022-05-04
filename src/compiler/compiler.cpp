@@ -19,35 +19,6 @@ extern int fieldCount;
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance ;
 
-/*
-std::vector<std::string> load_file(std::string sInputFile)
-{
-    vector<string> retVal;
-    std::ifstream input(sInputFile.c_str(), ifstream::in);
-
-    if (! input.is_open())
-    {
-        throw std::out_of_range("File not found.");
-    }
-
-    string str;
-
-    while (getline(input, str))
-    {
-        boost::algorithm::trim(str);    //trailing and leading spaces need to be cut off
-
-        if (str == "stop")              //stop command is not covered by grammar
-        {
-            break ;
-        }
-
-        retVal.push_back(str);
-    }
-
-    return retVal ;
-}
-*/
-
 /** This procedure computes time delays (delata) for generated streams */
 std::string intervalCounter()
 {

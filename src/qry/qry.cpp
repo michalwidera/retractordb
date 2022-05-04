@@ -65,7 +65,6 @@ How xqry terminal works
 
 #include <ctime>
 
-using namespace std ;
 using namespace boost ;
 using namespace boost::assign;
 using namespace boost::placeholders;
@@ -96,7 +95,7 @@ int producer_count = 0 ;
 
 boost::atomic<bool> done(false);
 
-std::map <string, ptree> streamTable ;
+std::map <std::string, ptree> streamTable ;
 
 int iTimeLimitCnt ; // testing purposes - time limit query (-m)
 
@@ -115,7 +114,7 @@ enum outputFormatMode {
 
 //Graphite nbeed scheamt in format "path.to.data value timestamp"
 ptree schema ;
-string sInputStream ;
+std::string sInputStream ;
 
 
 void setmode(std::string const &mode)
@@ -170,14 +169,14 @@ void consumer()
     ptree e_value ;
     while (!done) {
         while (spsc_queue.pop(e_value)) {
-            string stream = e_value.get("stream", "")  ;
+            std::string stream = e_value.get("stream", "")  ;
             using namespace boost::adaptors;
-            BOOST_FOREACH(string w, streamTable | map_keys)
+            BOOST_FOREACH(std::string w, streamTable | map_keys)
             if (w == stream) {
                 int count = boost::lexical_cast<int> (e_value.get("count", ""));
                 if (outputFormatMode == RAW) {
                     for (int i = 0 ; i < count ; i ++)
-                        printf("%s ", e_value.get(boost::lexical_cast<string> (i), "").c_str());
+                        printf("%s ", e_value.get(boost::lexical_cast<std::string> (i), "").c_str());
                     printf("\r\n");
                 }
                 if (outputFormatMode == GRAPHITE) {
@@ -186,7 +185,7 @@ void consumer()
                         printf("%s.%s %s %llu\n",
                             sInputStream.c_str(),
                             v.second.get<std::string> ("").c_str(),
-                            e_value.get(boost::lexical_cast<string> (i++), "").c_str(),
+                            e_value.get(boost::lexical_cast<std::string> (i++), "").c_str(),
                             (unsigned long long) time(nullptr)
                         );
                     }
@@ -204,7 +203,7 @@ void consumer()
                             printf(",");
                         printf("%s=%s",
                             v.second.get<std::string> ("").c_str(),
-                            e_value.get(boost::lexical_cast<string> (i++), "").c_str()
+                            e_value.get(boost::lexical_cast<std::string> (i++), "").c_str()
                         );
                     }
                     printf(" %ld\n", duration_cast<nanoseconds> (system_clock::now().time_since_epoch()).count());
@@ -224,7 +223,7 @@ void consumer()
 void producer()
 {
     try {
-        string queueName = "brcdbr" + boost::lexical_cast<string> (boost::this_process::get_id()) ;
+        std::string queueName = "brcdbr" + boost::lexical_cast<std::string> (boost::this_process::get_id()) ;
         IPC::message_queue mq(IPC::open_only, queueName.c_str());
         char message[1024];
         unsigned int priority;
@@ -252,14 +251,14 @@ void producer()
                 boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
         }
     } catch (IPC::interprocess_exception &ex) {
-        cerr << ex.what() << endl << "catch on producer queue" << endl;
-        cerr << "queue:" << "brcdbr" + boost::lexical_cast<string> (boost::this_process::get_id()) << endl ;
+        std::cerr << ex.what() << std::endl << "catch on producer queue" << std::endl;
+        std::cerr << "queue:" << "brcdbr" + boost::lexical_cast<std::string> (boost::this_process::get_id()) << std::endl ;
         done = true ;
         return ;
     }
 }
 
-ptree netClient(string netCommand, string netArgument)
+ptree netClient(std::string netCommand, std::string netArgument)
 {
     ptree pt_response ;
     ptree pt_request ;
@@ -320,13 +319,13 @@ ptree netClient(string netCommand, string netArgument)
         if (outMode == INFO)
             read_info(strstream, pt_response);
     } catch (IPC::interprocess_exception &ex) {
-        cerr << ex.what() << endl << "catch IPC server" << endl;
+        std::cerr << ex.what() << std::endl << "catch IPC server" << std::endl;
         done = true ;
     } catch (boost::system::system_error &e) {
-        cerr << e.what() << endl << "boost system_error" << endl ;
+        std::cerr << e.what() << std::endl << "boost system_error" << std::endl ;
         done = true ;
     } catch (std::exception &e) {
-        cerr << e.what() << endl ;
+        std::cerr << e.what() << std::endl ;
         pt_response.put("error.response", e.what());
         done = true ;
     }
@@ -345,7 +344,7 @@ bool select(bool noneedctrlc)
         }
     }
     if (!found) {
-        cerr << "not found" << endl ;
+        std::cerr << "not found" << std::endl ;
         return found;
     }
     schema = netClient("detail", sInputStream) ;
@@ -384,7 +383,7 @@ int hello()
 {
     ptree pt = netClient("hello", "") ;
     printf("snd: hello\n");
-    string rcv("fail.") ;
+    std::string rcv("fail.") ;
     BOOST_FOREACH(ptree::value_type & v,
         pt) {
         rcv = v.second.get<std::string> ("") ;
@@ -403,8 +402,8 @@ int hello()
 void dir()
 {
     ptree pt = netClient("get", "") ;
-    std::vector<string> vcols = {"", "duration", "size", "count" };
-    stringstream ss ;
+    std::vector<std::string> vcols = {"", "duration", "size", "count" };
+    std::stringstream ss ;
     for (auto nName : vcols) {
         int maxSize = 0 ;
         for (const auto &v : pt.get_child("db.stream")) {
@@ -429,7 +428,7 @@ bool detailShow()
 {
     bool found(false);
     ptree pt = netClient("get", "") ;
-    cerr << "got answer" << endl ;
+    std::cerr << "got answer" << std::endl ;
     for (const auto &v : pt.get_child("db.stream")) {
         if (sInputStream == v.second.get<std::string> (""))
             found = true ;
@@ -439,6 +438,6 @@ bool detailShow()
         for (const auto &v : pt.get_child("db.field"))
             printf("%s.%s\n", sInputStream.c_str(), v.second.get<std::string> ("").c_str());
     } else
-        cerr << "not found" << endl ;
+        std::cerr << "not found" << std::endl ;
     return found ;
 }
