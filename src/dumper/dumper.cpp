@@ -393,7 +393,11 @@ int main(int argc, char* argv[])
                     vm.count("showtypes") != 0
                 );
             }
-            std::system(std::string("dot -Tpng " + sTempDotFile + " -o " + sTempPngFile).c_str());
+            auto ret = std::system(std::string("dot -Tpng " + sTempDotFile + " -o " + sTempPngFile).c_str());
+            if (ret < 0)
+                std::cout << "Dot Error: " << strerror(errno) << '\n';
+            else if (!WIFEXITED(ret))
+                std::cout << "Program Dot exited abnormaly\n";
             if (! vm.count("leavedot"))
                 std::remove(sTempDotFile.c_str());
             std::cerr << "type: start " << sTempPngFile << std::endl ;
