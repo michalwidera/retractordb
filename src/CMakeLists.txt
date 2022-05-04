@@ -70,18 +70,17 @@ install(TARGETS xretractor xcompiler xdumper xqry xtrdb
 
 add_custom_target(
   grammar
-  COMMAND ../../scripts/antlr4call.sh RQL.g4
-  WORKING_DIRECTORY ../../src/compiler
-  SOURCES ../../src/compiler/RQL.g4)
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/antlr4call.sh RQL.g4
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/compiler
+  SOURCES ${PROJECT_SOURCE_DIR}/compiler/RQL.g4)
 
 # pip install cmake-format sudo apt install astyle
 add_custom_target(
   astyle
   COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
           --exclude=compiler/Parser
-  COMMAND find ${PROJECT_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format
-          -i
-  WORKING_DIRECTORY ../../src)
+  COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_custom_target(
   vim
