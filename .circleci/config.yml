@@ -24,7 +24,7 @@ jobs:
     steps:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
-      - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip default-jre
+      - run: sudo apt-get update && sudo apt-get -y install gcc-10 cmake make build-essential python3 python3-pip default-jre
       - run: pip install conan
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
       - run: cd build && conan source ..
@@ -95,9 +95,7 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-stable
-      - build-edge:
-          requires:
-           - build-stable
+      - build-edge
       - build-edge-2204:
           requires:
             - build-edge
