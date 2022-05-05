@@ -170,12 +170,9 @@ std::string Processor::printRowValue(const std::string query_name)
         pt.put(boost::lexical_cast<std::string> (i++), retVal.str());
     }
     std::stringstream strstream;
-    if (pProc->getMode() == JSON)
-        write_json(strstream, pt);
-    if (pProc->getMode() == XML)
-        write_xml(strstream, pt);
-    if (pProc->getMode() == INFO)
-        write_info(strstream, pt);
+    // write_json(strstream, pt);
+    // write_xml(strstream, pt);
+    write_info(strstream, pt);
     return strstream.str();
 }
 
@@ -266,12 +263,9 @@ ptree commandProcessor(ptree ptInval)
             std::cerr << "reply:";
             using boost::property_tree::ptree;
             std::stringstream strstream;
-            if (pProc->getMode() == JSON)
-                write_json(strstream, ptRetval) ;
-            if (pProc->getMode() == XML)
-                write_xml(strstream, ptRetval);
-            if (pProc->getMode() == INFO)
-                write_info(strstream, ptRetval);
+            // write_json(strstream, ptRetval) ;
+            // write_xml(strstream, ptRetval);
+            write_info(strstream, ptRetval);
             std::cerr << strstream.str();
         }
     } catch (const boost::property_tree::ptree_error &e) {
@@ -313,22 +307,16 @@ void commmandProcessorLoop()
                 strstream << message ;
                 memset(message, 0, 1000);
                 ptree pt ;
-                if (pProc->getMode() == JSON)
-                    read_json(strstream, pt) ;
-                if (pProc->getMode() == XML)
-                    read_xml(strstream, pt);
-                if (pProc->getMode() == INFO)
-                    read_info(strstream, pt);
+                // read_json(strstream, pt) ;
+                // read_xml(strstream, pt);
+                read_info(strstream, pt);
                 ptree pt_retval = commandProcessor(pt);
                 int clientProcessId = boost::lexical_cast<int> (pt.get("db.id", "")) ;
                 // Sending answer
                 std::stringstream response_stream ;
-                if (pProc->getMode() == JSON)
-                    write_json(response_stream, pt_retval) ;
-                if (pProc->getMode() == XML)
-                    write_xml(response_stream, pt_retval);
-                if (pProc->getMode() == INFO)
-                    write_info(response_stream, pt_retval);
+                // write_json(response_stream, pt_retval) ;
+                // write_xml(response_stream, pt_retval);
+                write_info(response_stream, pt_retval);
                 IPCString response(allocatorShmemMapInstance);
                 response = response_stream.str().c_str();
                 mymap->insert(std::pair<KeyType, IPCString> (clientProcessId, response));
@@ -371,9 +359,6 @@ int main(int argc, char* argv[])
         ("display,s", po::value<std::string> (&sQuery), "process single query")
         ("dump,d", po::value<std::string> (&sDumpFile)->default_value("query.dmp"), "dump file name")
         ("tlimitqry,m", po::value<int> (&iTimeLimitCnt)->default_value(0), "query limit, 0 - no limit")
-        ("json,j", "communication mode json")
-        ("xml,x", "communication mode xml")
-        ("info,o", "communication mode info (default)")
         ("onscreen,e", "dump data on screen only")
         ("waterfall,f", "show waterfall mode")
         ("verbose,v", "Dump diagnostic info on screen while work")
@@ -397,12 +382,6 @@ int main(int argc, char* argv[])
             std::cout << "query processing terminated." << std::endl;
             return EPERM ; //ERROR defined in errno-base.h
         }
-        if (vm.count("json"))
-            pProc->setMode(JSON);
-        if (vm.count("xml"))
-            pProc->setMode(XML);
-        if (vm.count("info"))
-            pProc->setMode(INFO);
         if (vm.count("verbose"))
             std::cerr << "Input :" << sInputFile << std::endl;
         std::ifstream ifs(sInputFile.c_str(), std::ios::binary);

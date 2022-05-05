@@ -99,13 +99,6 @@ std::map <std::string, ptree> streamTable ;
 
 int iTimeLimitCnt ; // testing purposes - time limit query (-m)
 
-//Default comunication mode INFO
-enum mode {
-    XML,
-    JSON,
-    INFO
-} outMode(INFO) ;
-
 enum outputFormatMode {
     RAW,
     GRAPHITE,
@@ -119,13 +112,7 @@ std::string sInputStream ;
 
 void setmode(std::string const &mode)
 {
-    if (mode == "XML")
-        outMode = XML ;
-    else if (mode == "JSON")
-        outMode = JSON ;
-    else if (mode == "INFO")
-        outMode = INFO ;
-    else if (mode == "RAW")
+    if (mode == "RAW")
         outputFormatMode = RAW ;
     else if (mode == "GRAPHITE")
         outputFormatMode = GRAPHITE;
@@ -241,12 +228,9 @@ void producer()
             strstream << message ;
             memset(message, 0, 1000);
             ptree pt ;
-            if (outMode == JSON)
-                read_json(strstream, pt) ;
-            if (outMode == XML)
-                read_xml(strstream, pt);
-            if (outMode == INFO)
-                read_info(strstream, pt);
+            //read_json(strstream, pt) ;
+            //read_xml(strstream, pt);
+            read_info(strstream, pt);
             while (!spsc_queue.push(pt))
                 boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
         }
@@ -277,12 +261,9 @@ ptree netClient(std::string netCommand, std::string netArgument)
             , "RetractorQueryQueue"
         );
         std::stringstream request_stream ;
-        if (outMode == JSON)
-            write_json(request_stream, pt_request) ;
-        if (outMode == XML)
-            write_xml(request_stream, pt_request);
-        if (outMode == INFO)
-            write_info(request_stream, pt_request);
+        // write_json(request_stream, pt_request) ;
+        // write_xml(request_stream, pt_request);
+        write_info(request_stream, pt_request);
         mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
         // Send the request.
         //
@@ -312,12 +293,9 @@ ptree netClient(std::string netCommand, std::string netArgument)
         std::stringstream strstream;
         strstream << it->second;
         mymap->erase(processId);
-        if (outMode == JSON)
-            read_json(strstream, pt_response) ;
-        if (outMode == XML)
-            read_xml(strstream, pt_response);
-        if (outMode == INFO)
-            read_info(strstream, pt_response);
+        // read_json(strstream, pt_response) ;
+        // read_xml(strstream, pt_response);
+        read_info(strstream, pt_response);
     } catch (IPC::interprocess_exception &ex) {
         std::cerr << ex.what() << std::endl << "catch IPC server" << std::endl;
         done = true ;

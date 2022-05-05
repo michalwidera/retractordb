@@ -69,16 +69,6 @@ int getSizeOfRollup(const query &q)
     return 0; //pro forma
 }
 
-mode Processor::getMode()
-{
-    return outMode;
-}
-
-void Processor::setMode(mode val)
-{
-    outMode = val;
-}
-
 number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
 {
     token arg[3];
@@ -219,7 +209,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
     return number(0) ;    /* pro forma */
 }
 
-Processor::Processor() : outMode(INFO)
+Processor::Processor()
 {
     //This function initialize map creating archive streams in cbuff
     for (auto q : coreInstance) {

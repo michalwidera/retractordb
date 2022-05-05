@@ -37,9 +37,6 @@ int main(int argc, char* argv[])
         ("detail,t", po::value<std::string> (&sInputStream), "show details of this stream")
         ("tlimitqry,m", po::value<int> (&iTimeLimitCnt)->default_value(0), "limit of elements, 0 - no limit")
         ("hello,l", "diagnostic - hello db world")
-        ("json,j", "json communication protocol")
-        ("xml,x", "xml communication protocol")
-        ("info,o", "info communication protocol (default)")
         ("kill,k", "kill xretractor server")
         ("dir,d", "list of queries")
         ("graphite,g", "graphite output mode")
@@ -55,12 +52,6 @@ int main(int argc, char* argv[])
             options(desc).positional(p).run(), vm);
         po::notify(vm);
         setbuf(stdout, nullptr);
-        if (vm.count("json"))
-            setmode("JSON") ;
-        if (vm.count("xml"))
-            setmode("XML");
-        if (vm.count("info"))
-            setmode("INFO");
         if (vm.count("graphite"))
             setmode("GRAPHITE") ;
         if (vm.count("raw"))
