@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include <cstdint>
+#include <algorithm>
 
 #include <boost/stacktrace.hpp>
 
@@ -254,9 +255,15 @@ void Processor::processRows(std::set<std::string> inSet)
         }
         std::vector<number> ctxRowValue;
         if (q.isDeclaration()) {
-            for (auto f : q.lSchema)
-                ctxRowValue.push_back(gFileMap[ q.id ].getCR(f));
-        } else {
+            //for (auto f : q.lSchema)
+            //    ctxRowValue.push_back(gFileMap[ q.id ].getCR(f));
+            // same as below ...
+            std::ranges::for_each(
+                q.lSchema, [ctxRowValue, this, q](field f) mutable
+                { ctxRowValue.push_back(gFileMap[q.id].getCR(f)); });
+        }
+        else
+        {
             for (auto i = 0; i < getSizeOfRollup(q); i ++)
                 ctxRowValue.push_back(getValueOfRollup(q, i, 0));
         }
@@ -409,8 +416,12 @@ void Processor::updateContext(std::set<std::string> inSet)
                     assert(streamNameArg == "");
                     assert(argument1.getValue() != "");
                     assert(argument2.getValue() != "");
-                    for (auto f : q.lSchema)
-                        rowValues.push_back(computeValue(f, q));
+                    //for (auto f : q.lSchema)
+                    //    rowValues.push_back(computeValue(f, q));
+                    // same as below ...
+                    std::ranges::for_each(
+                        q.lSchema, [rowValues, this, q](field f) mutable
+                        { rowValues.push_back(computeValue(f, q)); });
                     break;
                 case STREAM_AVG:
                     argument1 = * (it++);
