@@ -215,7 +215,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset)
     return number(0) ;    /* pro forma */
 }
 
-Processor::Processor() : outMode(JSON)
+Processor::Processor() : outMode(INFO)
 {
     //This function initialize map creating archive streams in cbuff
     for (auto q : coreInstance) {

@@ -104,7 +104,7 @@ enum mode {
     XML,
     JSON,
     INFO
-} outMode(JSON) ;
+} outMode(INFO) ;
 
 enum outputFormatMode {
     RAW,
