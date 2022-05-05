@@ -18,6 +18,7 @@
 #include <iostream>
 #include <cstdint>
 #include <algorithm>
+#include <ranges>
 
 #include <boost/stacktrace.hpp>
 
