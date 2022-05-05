@@ -35,10 +35,10 @@ namespace rdb
         data[path + filename]->Put(reinterpret_cast<std::byte*>(pRawData));
     }
 
-    int dataSet::GetBlock(std::string filename, int offset, char* pRawData)
+    bool dataSet::GetBlock(std::string filename, int offset, char* pRawData)
     {
         bool success = data[path + filename]->Get(reinterpret_cast<std::byte*>(pRawData), offset);
-        return success ? 1 : 0 ;
+        return success ;
     }
 
     void dataSet::reverse(std::string filename, bool val)

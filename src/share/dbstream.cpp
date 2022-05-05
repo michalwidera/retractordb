@@ -86,15 +86,15 @@ void dbStream::get(int offset, bool reverse)
         return;
     }
     assert(len != 0);
-    long ret;
+    bool success;
     if (reverse)
-        ret = database.GetBlock(streamName, offset, pRawData.get()) ;
+        success = database.GetBlock(streamName, offset, pRawData.get()) ;
     else {
         database.reverse(streamName, true);
-        database.GetBlock(streamName, offset, pRawData.get());
+        success = database.GetBlock(streamName, offset, pRawData.get());
         database.reverse(streamName, false);
     }
-    assert(ret != 0);
+    assert(success);
     mpRead.clear();
     char* p(pRawData.get());
     for (int i = 0 ; i < schema.size() ; i++) {
