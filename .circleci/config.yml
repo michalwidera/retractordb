@@ -81,8 +81,11 @@ workflows:
                  - master
                  - /issue_.*/
       - build-edge:
-          requires:
-            - build-stable
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
   nightly:
     triggers:
       - schedule:
