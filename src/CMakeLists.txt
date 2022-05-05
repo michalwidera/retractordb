@@ -65,6 +65,12 @@ target_link_libraries(xdumper ${CONAN_LIBS})
 target_link_libraries(xqry ${CONAN_LIBS})
 target_link_libraries(xtrdb ${CONAN_LIBS})
 
+set_property( TARGET xretractor PROPERTY CXX_STANDARD 20)
+set_property( TARGET xcompiler PROPERTY CXX_STANDARD 20)
+set_property( TARGET xdumper PROPERTY CXX_STANDARD 20)
+set_property( TARGET xqry PROPERTY CXX_STANDARD 20)
+set_property( TARGET xtrdb PROPERTY CXX_STANDARD 20)
+
 install(TARGETS xretractor xcompiler xdumper xqry xtrdb
         DESTINATION ~/.local/bin)
 
