@@ -1,14 +1,11 @@
 #include "dbstream.h"
-#include <cassert>            // for assert
+#include <cassert>             // for assert
 #include <ext/alloc_traits.h>  // for __alloc_traits<>::value_type
-#include <cstring>            // for memcpy, NULL
+#include <cstring>             // for memcpy, NULL
 #include <algorithm>           // for max
 #include <iostream>            // for basic_ostream::operator<<, operator<<
 
 #include "rdb/dataset.h"
-
-// stacktrace -> -ldl in CMakeList.txt
-#include <boost/stacktrace.hpp>
 
 rdb::dataSet database;
 
@@ -67,7 +64,6 @@ number dbStream::readCache(const int &_Keyval)
 void dbStream::get(int offset, bool reverse)
 {
     if (offset < 0) {
-        std::cerr << boost::stacktrace::stacktrace();
         assert(false);
         return;
     }
@@ -79,10 +75,6 @@ void dbStream::get(int offset, bool reverse)
         const number fake = boost::rational<int> (999, 1);
         for (auto i = 0 ; i < schema.size() ; i++)
             mpRead[i] = fake ;
-//      cerr << "fake data @ streamName:" << streamName << " offset:" << offset << " len:" << len << endl;
-//        TODO: There is problem. Need to investigate.
-//        cerr << boost::stacktrace::stacktrace() ;
-//        assert(false);
         return;
     }
     assert(len != 0);
