@@ -57,11 +57,11 @@ void dbStream::store()
 number dbStream::readCache(const int &_Keyval)
 {
     if (mpReadNr == -1)
-        get(0);
+        readData(0);
     return mpRead[ _Keyval ] ;
 }
 
-void dbStream::get(int offset, bool reverse)
+void dbStream::readData(int offset, bool reverse)
 {
     if (offset < 0) {
         assert(false);

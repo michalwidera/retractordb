@@ -323,7 +323,7 @@ number Processor::getValueProc(std::string streamName, int timeOffset, int schem
         retval = gContextValMap[streamName][schemaOffset];
     else {
         dbStream &archive = *(storage[streamName]);
-        archive.get(timeOffset - 1, reverse);
+        archive.readData(timeOffset - 1, reverse);
         retval = archive.readCache(schemaOffset);
     }
     return retval;
