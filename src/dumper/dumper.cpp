@@ -298,7 +298,7 @@ void dumpQSet()
     }
 }
 
-void dumpQHierarchy()
+void dumpRawTextFile(bool bShowFieldTypes)
 {
     for (auto q : coreInstance) {
         std::cout << q.id << "(" << q.rInterval << ")" ;
@@ -309,8 +309,11 @@ void dumpQHierarchy()
             std::cout << "\t:- " << t.getStrTokenName() << "(" << t.getValue() << ")" << std::endl ;
         for (auto f : q.lSchema) {
             std::cout << "\t" ;
-            for (auto s : f.setFieldName)
+            for (auto s : f.setFieldName) {
                 std::cout << s << ":" ;
+                if (bShowFieldTypes)
+                    std::cout << "(" << f.dFieldType << ")";
+            }
             std::cout << std::endl ;
             for (auto tf : f.lProgram)
                 if (tf.getStrTokenName() == "PUSH_ID") {
@@ -416,7 +419,7 @@ int main(int argc, char* argv[])
             dumpQFieldsProgram() ;
         } else {
             // Default
-            dumpQHierarchy() ;
+            dumpRawTextFile(vm.count("showtypes")) ;
         }
     } catch (std::exception &e) {
         std::cerr << e.what() << std::endl;

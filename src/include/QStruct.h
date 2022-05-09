@@ -98,7 +98,7 @@ private:
 
 public:
 
-    enum eType { BAD, BYTE, INTEGER, UNSIGNED, RATIONAL, FLOAT, STRING} ;
+    enum eType {BAD, BYTE, INTEGER, UNSIGNED, RATIONAL, FLOAT, STRING} ;
 
     std::set<std::string> setFieldName;
     eType dFieldType ;
@@ -111,6 +111,8 @@ public:
     std::string getFieldNameSet();
     std::string getFieldText();
     token  getFirstFieldToken() ;
+
+    friend std::ostream &operator<<(std::ostream &os, const field::eType s);
 } ;
 
 class query

@@ -383,3 +383,25 @@ std::list<std::string> query::getDepStreamNameList(int reqDep)
     }
     return lRetVal ;
 }
+
+std::ostream &operator<<(std::ostream &os, field::eType s)
+{
+    switch (s) {
+        case field::eType::BAD:
+            return os << "BAD";
+        case field::eType::BYTE:
+            return os << "BYTE";
+        case field::eType::INTEGER:
+            return os << "INTEGER";
+        case field::eType::UNSIGNED:
+            return os << "UNSIGNED";
+        case field::eType::RATIONAL:
+            return os << "RATIONAL";
+        case field::eType::FLOAT:
+            return os << "FLOAT";
+        case field::eType::STRING:
+            return os << "STRING";
+        default:
+            return os << "?";
+    }
+}
