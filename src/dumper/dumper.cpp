@@ -81,24 +81,7 @@ void dumpGraphiz(std::ostream &xout,
                 std::string sFieldString(f.getFieldText()) ;
                 xout << sFieldString ;
                 if (bShowFieldTypes)
-                    switch (f.dFieldType) {
-                        case field::BAD :
-                            xout << "";
-                            break ;
-                        case field::BYTE :
-                            xout << "(Byte)";
-                            break ;
-                        case field::INTEGER:
-                            xout << "(Integer)";
-                            break ;
-                        case field::RATIONAL:
-                            xout << "(Rational)";
-                            break ;
-                        default:
-                            xout << "(Integer)";
-                            //std::cerr << "?? " << f.dFieldType << std::endl ;
-                            //throw std::invalid_argument("niezdefiniowany typ w polu");
-                    }
+                    std::cout << "(" << f.dFieldType << ")";
             }
             xout << "}" ;
         } //if ( bShowFileds ) - end of fields in stream
