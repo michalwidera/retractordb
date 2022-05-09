@@ -289,7 +289,17 @@ void dumpRawTextFile(bool bShowFieldTypes)
             std::cout << "\t" << q.filename ;
         std::cout << std::endl ;
         for (auto t : q.lProgram)
-            std::cout << "\t:- " << t.getStrTokenName() << "(" << t.getValue() << ")" << std::endl ;
+            if ( t.getStrTokenName() == "PUSH_ID"
+            || t.getStrTokenName() == "PUSH_STREAM"
+            || t.getStrTokenName() == "PUSH_VAL"
+            || t.getStrTokenName() == "STREAM_AGSE"
+            || t.getStrTokenName() == "STREAM_SUBSTRACT" ) {
+                 std::cout << "\t:- " << t.getStrTokenName() << "(" << t.getValue() << ")" << std::endl ;
+            }
+            else {
+                std::cout << "\t:- " << t.getStrTokenName() << std::endl ;
+            }
+
         for (auto f : q.lSchema) {
             std::cout << "\t" ;
             for (auto s : f.setFieldName) {
@@ -305,14 +315,18 @@ void dumpRawTextFile(bool bShowFieldTypes)
                         << "("
                         << tf.getValue()
                         << "["
-                        <<        tf.getCRValue()
+                        << tf.getCRValue()
                         << "])" << std::endl ;
-                } else {
+                } else if ((tf.getStrTokenName() == "CALL") || (tf.getStrTokenName() == "PUSH_VAL")) {
                     std::cout << "\t\t"
                         << tf.getStrTokenName()
                         << "("
                         << tf.getValue()
                         << ")"
+                        << std::endl ;
+                } else {
+                    std::cout << "\t\t"
+                        << tf.getStrTokenName()
                         << std::endl ;
                 }
         }
