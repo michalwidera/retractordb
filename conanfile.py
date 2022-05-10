@@ -21,7 +21,7 @@ fi
 
 class Retractor(ConanFile):
     settings = "os", "compiler", "build_type", "arch", "cppstd"
-    requires = ["cmake/3.21.3"]
+    requires = ["cmake"]
     license = "MIT"
     author = "Michal Widera"
     description = "RetractorDB time series database"
