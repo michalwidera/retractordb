@@ -7,7 +7,9 @@ extraction:
         - libboost-all-dev
         - cmake
       script:
-        - python3 -m pip install conan --user --upgrade pip setuptools
+        - pip3 install conan --user --upgrade pip setuptools
+        - export PATH=$PATH:~/.local/bin
+        - ls ~/.local/bin
         - conan profile new default --detect
         - conan profile update settings.compiler.libcxx=libstdc++11 default
     configure:
