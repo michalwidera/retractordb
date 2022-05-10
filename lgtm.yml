@@ -4,10 +4,12 @@ extraction:
     prepare:
       packages:
         - gcc-10
+        - cmake
+        - build-essential
+        - python3
+        - python3-pip
       script:
-        - pip3 install conan --user --upgrade pip setuptools cmake
-        - export PATH=$PATH:~/.local/bin
-        - ls ~/.local/bin
+        - pip3 install conan
         - conan profile new default --detect
         - conan profile update settings.compiler.libcxx=libstdc++11 default
         - cd build && conan install .. -o boost="1.77.0" --build missing
