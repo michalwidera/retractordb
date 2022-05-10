@@ -10,7 +10,7 @@ extraction:
         - ls ~/.local/bin
         - conan profile new default --detect
         - conan profile update settings.compiler.libcxx=libstdc++11 default
-        - cd build && conan install .. -o boost="1.77.0"
+        - cd build && conan install .. -o boost="1.77.0" --build missing
     index:
       build_command: 
         - cd build && conan build ..
