@@ -4,10 +4,8 @@ extraction:
     prepare:
       packages:
         - gcc-10
-        - libboost-all-dev
-        - cmake
       script:
-        - pip3 install conan --user --upgrade pip setuptools
+        - pip3 install conan --user --upgrade pip setuptools cmake
         - export PATH=$PATH:~/.local/bin
         - ls ~/.local/bin
         - conan profile new default --detect
