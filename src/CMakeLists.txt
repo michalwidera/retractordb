@@ -89,6 +89,7 @@ add_custom_target(
 
 find_package(Git QUIET)
 
+string(TIMESTAMP GIT_CURRENT_BUILDTIME "%y%m%d%H%M")
 if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
   execute_process(
     COMMAND ${GIT_EXECUTABLE} branch --show-current
