@@ -465,15 +465,15 @@ std::string prepareFields()
                         std::list<token>::iterator eIt = q.lProgram.begin();
                         std::string sName1 = (*eIt++).getValue();
                         std::string sName2 = (*eIt++).getValue();
-                        token cmd = (* eIt ++) ;
-                        q.lSchema = combine(sName1, sName2, cmd) ;
+                        token cmd = (* eIt ++);
+                        q.lSchema = combine(sName1, sName2, cmd);
                         break ;
                     }
                     if (q.lProgram.size() == 2) {
                         std::list<token>::iterator eIt = q.lProgram.begin();
                         std::string sName1 = (*eIt++).getValue();
-                        token cmd = (* eIt ++) ;
-                        q.lSchema = combine(sName1, "", cmd) ;
+                        token cmd = (* eIt ++);
+                        q.lSchema = combine(sName1, "", cmd);
                         break ;
                     }
                 }

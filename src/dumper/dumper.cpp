@@ -289,17 +289,14 @@ void dumpRawTextFile(bool bShowFieldTypes)
             std::cout << "\t" << q.filename ;
         std::cout << std::endl ;
         for (auto t : q.lProgram)
-            if ( t.getStrTokenName() == "PUSH_ID"
-            || t.getStrTokenName() == "PUSH_STREAM"
-            || t.getStrTokenName() == "PUSH_VAL"
-            || t.getStrTokenName() == "STREAM_AGSE"
-            || t.getStrTokenName() == "STREAM_SUBSTRACT" ) {
-                 std::cout << "\t:- " << t.getStrTokenName() << "(" << t.getValue() << ")" << std::endl ;
-            }
-            else {
+            if (t.getStrTokenName() == "PUSH_ID"
+                || t.getStrTokenName() == "PUSH_STREAM"
+                || t.getStrTokenName() == "PUSH_VAL"
+                || t.getStrTokenName() == "STREAM_AGSE"
+                || t.getStrTokenName() == "STREAM_SUBSTRACT")
+                std::cout << "\t:- " << t.getStrTokenName() << "(" << t.getValue() << ")" << std::endl ;
+            else
                 std::cout << "\t:- " << t.getStrTokenName() << std::endl ;
-            }
-
         for (auto f : q.lSchema) {
             std::cout << "\t" ;
             for (auto s : f.setFieldName) {
