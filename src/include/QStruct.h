@@ -17,6 +17,8 @@
 
 #include <boost/rational.hpp>
 
+#include "tokenDef.h"
+
 namespace boost
 {
     namespace serialization
@@ -41,11 +43,6 @@ namespace boost
 
 boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,  int ttl = 11) ;
 
-enum command_id {
-#define DEF_CASE( _A_ ) _A_ ,
-#include "tokendefset.h"
-#undef DEF_CASE
-} ;
 
 class token
 {

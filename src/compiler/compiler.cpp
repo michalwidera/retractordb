@@ -12,6 +12,8 @@
 
 #include "compiler.hpp"
 
+#include "tokenDef.h"
+
 using boost::lexical_cast;
 
 extern int fieldCount;
@@ -174,12 +176,7 @@ std::string intervalCounter()
 
 std::string generateStreamName(std::string sName1, std::string sName2, command_id cmd)
 {
-    std::string sOperation("undefinied");
-    switch (cmd) {
-#define DEF_CASE( _A_ ) case _A_ : sOperation = #_A_ ; break ;
-#include "tokendefset.h"
-#undef DEF_CASE
-    }
+    std::string sOperation = GetStringcommand_id(cmd);
     if (sName2 == "")
         return sOperation + std::string("_") + sName1;
     else

@@ -15,7 +15,18 @@
 using namespace boost;
 using namespace boost::lambda;
 
-#define UNDEFINIED_TOKEN "UNDEFINIED TOKEN"
+#define DECL(element)     \
+    {                     \
+        element, #element \
+    }
+#define BEGIN(ENUM_NAME) \
+    std::map<ENUM_NAME, std::string> tg_##ENUM_NAME =
+#define END(ENUM_NAME) \
+    ;                  \
+    std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
+
+#undef ENUM_DEFINED
+#include "tokenDef.h"
 
 extern "C" {
     qTree coreInstance ;
@@ -69,12 +80,7 @@ command_id token::getTokenCommand()
 
 std::string token::getStrTokenName()
 {
-    switch (getTokenCommand()) {
-#define DEF_CASE( _A_ ) case _A_ : return #_A_ ;
-#include "tokendefset.h"
-#undef DEF_CASE
-    }
-    return UNDEFINIED_TOKEN ;
+    return GetStringcommand_id(command);
 }
 
 boost::rational<int> Rationalize(double inValue, double DIFF/*=1E-6*/,  int ttl/*=11*/)
