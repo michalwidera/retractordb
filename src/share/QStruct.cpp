@@ -280,7 +280,7 @@ int query::getFieldIndex(field f_arg) {
 bool query::isReductionRequired() {
   int streamOperatorCount(0);
   for (auto &t : lProgram) {
-    switch(t.getTokenCommand()) {
+    switch (t.getTokenCommand()) {
       case STREAM_HASH:
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
@@ -289,8 +289,7 @@ bool query::isReductionRequired() {
       case STREAM_TIMEMOVE:
       case STREAM_AGSE:
         ++streamOperatorCount;
-      default:
-        ;
+      default:;
     }
   }
   return streamOperatorCount > 1;
