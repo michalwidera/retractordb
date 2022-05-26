@@ -17,7 +17,7 @@
 
 #include <boost/rational.hpp>
 
-#include "tokenDef.h"
+#include "enumDecl.h"
 
 namespace boost
 {
@@ -95,8 +95,6 @@ private:
 
 public:
 
-    enum eType {BAD, BYTE, INTEGER, UNSIGNED, RATIONAL, FLOAT, STRING} ;
-
     std::set<std::string> setFieldName;
     eType dFieldType ;
     std::list<token> lProgram;
@@ -109,7 +107,7 @@ public:
     std::string getFieldText();
     token  getFirstFieldToken() ;
 
-    friend std::ostream &operator<<(std::ostream &os, const field::eType s);
+    friend std::ostream &operator<<(std::ostream &os, const eType s);
 } ;
 
 class query

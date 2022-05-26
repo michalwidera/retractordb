@@ -2,31 +2,56 @@
 
 // Based on https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
+// Checking redefinded namespace sanity
+#ifdef DECL
+    #error DECL conficts with inner tokenDef.h declaration.
+#endif
+#ifdef BEGIN_E_GEN
+    #error BEGIN_E_GEN conficts with inner tokenDef.h declaration.
+#endif
+#ifdef END_E_GEN
+    #error END_E_GEN conficts with inner tokenDef.h declaration.
+#endif
+
 #ifdef ENUM_CREATE_DEFINITION
+
+// Part responsible for Definition & Initialization of map structure
+#include <map>
 #define DECL(element)     \
     {                     \
         element, #element \
     }
-#define BEGIN(ENUM_NAME) \
+#define BEGIN_E_GEN(ENUM_NAME) \
     std::map<ENUM_NAME, std::string> tg_##ENUM_NAME =
-#define END(ENUM_NAME) \
+#define END_E_GEN(ENUM_NAME) \
     ;                  \
     std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
-//This will force to BEGIN(...) - END(...) will appear once again with new set of BEGIN/END definitions
+// This undef will force to BEGIN_E_GEN(...) - END_E_GEN(...) will appear once again with new set of
+// BEGIN_E_GEN/END_E_GEN definitions and will goto to BEGIN_E_GEN sections
 #undef ENUM_DECLARATION_DONE
 #endif
 
 #ifndef ENUM_DECLARATION_DONE
 
-#ifndef BEGIN
-#define BEGIN(ENUM_NAME) enum ENUM_NAME
+// Part resposible for declaration
+#ifndef BEGIN_E_GEN
+#define BEGIN_E_GEN(ENUM_NAME) enum ENUM_NAME
 #define DECL(element) element
-#define END(ENUM_NAME) \
+#define END_E_GEN(ENUM_NAME) \
     ;                  \
     std::string GetString##ENUM_NAME(enum ENUM_NAME index);
 #endif
 
-BEGIN(command_id)
+//
+// Clarification: This structure in default mode will create: enum XXX { void_command, void_value, ... }
+// and GetStringXXX function will be decared as existing somewhere.
+// When, before including this header macro ENUM_CREATE_DEFINITION will be defined this structure
+// will create&initialize following map: std::map<XXX, std::string> = { { VOID_COMMAND, "VOID_COMMAND "} , ...}
+// and function GetStingXXX with body.
+// AT LEAST ONE PLACE WHEN #define ENUM_CREATE_DEFINITION with #include this file must appear to generate defs
+// Benefit of this solution: One place in code that materialize ENUM in scope of Runtime.
+//
+BEGIN_E_GEN(command_id)
 {
     DECL(VOID_COMMAND),
          DECL(VOID_VALUE),
@@ -71,10 +96,22 @@ BEGIN(command_id)
          DECL(COUNT),
          DECL(COUNT_RANGE)
 }
-END(command_id)
+END_E_GEN(command_id)
 
-#undef BEGIN
-#undef END
+BEGIN_E_GEN(eType)
+{
+    DECL(BAD),
+         DECL(BYTE),
+         DECL(INTEGER),
+         DECL(UNSIGNED),
+         DECL(RATIONAL),
+         DECL(FLOAT),
+         DECL(STRING)
+}
+END_E_GEN(eType)
+
+#undef BEGIN_E_GEN
+#undef END_E_GEN
 #undef DECL
 #define ENUM_DECLARATION_DONE
 #endif

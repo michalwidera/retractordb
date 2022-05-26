@@ -12,7 +12,7 @@
 
 #include "compiler.hpp"
 
-#include "tokenDef.h"
+#include "enumDecl.h"
 
 using boost::lexical_cast;
 
@@ -250,7 +250,7 @@ std::string simplifyLProgram()
                     ++it2 ;
                     std::list<token> lSchema;
                     lSchema.push_back(token(PUSH_TSCAN));
-                    newQuery.lSchema.push_back(field("*", lSchema, field::BAD, "*")) ;
+                    newQuery.lSchema.push_back(field("*", lSchema, BAD, "*")) ;
                     newQuery.id = generateStreamName(arg1, "", cmd);
                     (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
                     coreInstance.push_back(newQuery);    //After this instruction it loses context
@@ -293,7 +293,7 @@ std::string simplifyLProgram()
                     ++it2 ;
                     std::list<token> lSchema;
                     lSchema.push_back(token(PUSH_TSCAN));
-                    newQuery.lSchema.push_back(field("*", lSchema, field::BAD, "*")) ;
+                    newQuery.lSchema.push_back(field("*", lSchema, BAD, "*")) ;
                     newQuery.id = generateStreamName(arg1, arg2, cmd);
                     (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
                     coreInstance.push_back(newQuery);
@@ -354,28 +354,28 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
     else if (cmd == STREAM_AVG) {
         field intf ;
         intf.setFieldName.insert("avg");
-        intf.dFieldType = field::RATIONAL ;
+        intf.dFieldType = RATIONAL ;
         intf.lProgram.push_front(token(PUSH_ID, sName1));
         lRetVal.push_back(intf);
         return lRetVal ;
     } else if (cmd == STREAM_MIN) {
         field intf ;
         intf.setFieldName.insert("min");
-        intf.dFieldType = field::RATIONAL ;
+        intf.dFieldType = RATIONAL ;
         intf.lProgram.push_front(token(PUSH_ID, sName1));
         lRetVal.push_back(intf);
         return lRetVal ;
     } else if (cmd == STREAM_MAX) {
         field intf ;
         intf.setFieldName.insert("max");
-        intf.dFieldType = field::RATIONAL ;
+        intf.dFieldType = RATIONAL ;
         intf.lProgram.push_front(token(PUSH_ID, sName1));
         lRetVal.push_back(intf);
         return lRetVal ;
     } else if (cmd == STREAM_SUM) {
         field intf ;
         intf.setFieldName.insert("sum");
-        intf.dFieldType = field::RATIONAL ;
+        intf.dFieldType = RATIONAL ;
         intf.lProgram.push_front(token(PUSH_ID, sName1));
         lRetVal.push_back(intf);
         return lRetVal ;
@@ -388,14 +388,14 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
             for (int i = 0 ; i < windowSize ; i++) {
                 field intf ;
                 intf.setFieldName.insert(sName1 + "_" + lexical_cast<std::string>(i));
-                intf.dFieldType = field::BAD ;
+                intf.dFieldType = BAD ;
                 schema.push_back(intf);
             }
         } else {
             for (int i = windowSize - 1 ; i >= 0  ; i--) {
                 field intf ;
                 intf.setFieldName.insert(sName1 + "_" + lexical_cast<std::string>(i));
-                intf.dFieldType = field::BAD ;
+                intf.dFieldType = BAD ;
                 schema.push_back(intf);
             }
         }
@@ -457,7 +457,7 @@ std::string prepareFields()
                             std::list<token> newLProgram;
                             newLProgram.push_back(token(PUSH_ID, boost::rational<int> (filedPosition++), nameOfscanningTable));
                             std::string name = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-                            q.lSchema.push_back(field(name, newLProgram, field::INTEGER, ""));
+                            q.lSchema.push_back(field(name, newLProgram, INTEGER, ""));
                         }
                         break ;
                     }

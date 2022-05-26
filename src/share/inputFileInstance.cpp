@@ -8,7 +8,7 @@
 #include <boost/type_index.hpp>                    // for type_info
 #include <boost/type_index/type_index_facade.hpp>  // for operator==
 #include <stdexcept>                               // for out_of_range
-#include "QStruct.h"                               // for field, field::BAD
+#include "QStruct.h"                               // for field, BAD
 
 #include <iostream>
 
@@ -96,16 +96,16 @@ void inputDF::processRow()
     lResult.clear();
     for (auto &f : lSchema) {
         switch (f.dFieldType) {
-            case field::BYTE:
+            case BYTE:
                 lResult.push_back(get<unsigned char>());
                 break ;
-            case field::INTEGER:
+            case INTEGER:
                 lResult.push_back(get<int>()) ;
                 break ;
-            case field::RATIONAL:
+            case RATIONAL:
                 lResult.push_back(get<boost::rational<int>>());
                 break ;
-            case field::BAD:
+            case BAD:
             default:
                 std::cerr << "field:" << f.getFirstFieldName() << std::endl ;
                 throw std::out_of_range("processRow/undefined type");

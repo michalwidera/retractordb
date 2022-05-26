@@ -68,7 +68,7 @@ class ParserListener : public RQLBaseListener
     std::list < token > program;
 
     /* Type of field */
-    field::eType fType = field::BAD;
+    eType fType = BAD;
 
     /* Type of field - eq.1-atomic, >1 - array */
     int fTypeSize = 1;
@@ -213,13 +213,13 @@ public:
     void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx)
     {
         recpToken(PUSH_TSCAN, ctx->getText());
-        qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 3"));
+        qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, INTEGER, "todo 3"));
         program.clear();
     }
 
     void exitExpression(RQLParser::ExpressionContext* ctx)
     {
-        qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, field::INTEGER, "todo 2"));
+        qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string> (fieldCount ++), program, INTEGER, "todo 2"));
         program.clear();
     }
 
@@ -228,20 +228,20 @@ public:
         std::string name = ctx->children[0]->getText();
         boost::to_upper(name);
         if (name == "STRING")
-            fType = field::BYTE;
+            fType = BYTE;
         else if (name == "BYTEARRAY")
-            fType = field::BYTE;
+            fType = BYTE;
         else if (name == "INTARRAY")
-            fType = field::INTEGER;
+            fType = INTEGER;
         else
             abort();
         fTypeSize = std::stoi(ctx->type_size->getText());
     }
 
-    void exitTypeByte(RQLParser::TypeByteContext* ctx) { fType = field::BYTE; }
-    void exitTypeInt(RQLParser::TypeIntContext* ctx) { fType = field::INTEGER; }
-    void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx) { fType = field::UNSIGNED; }
-    void exitTypeFloat(RQLParser::TypeFloatContext* ctx) { fType = field::FLOAT; }
+    void exitTypeByte(RQLParser::TypeByteContext* ctx) { fType = BYTE; }
+    void exitTypeInt(RQLParser::TypeIntContext* ctx) { fType = INTEGER; }
+    void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx) { fType = UNSIGNED; }
+    void exitTypeFloat(RQLParser::TypeFloatContext* ctx) { fType = FLOAT; }
 
     void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx)
     {
@@ -254,7 +254,7 @@ public:
                 qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
             }
         }
-        fType = field::BAD;
+        fType = BAD;
         fTypeSize = 1;
     }
 
