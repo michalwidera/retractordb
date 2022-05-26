@@ -11,7 +11,8 @@ void dir();
 int hello();
 void setmode(std::string const &mode);
 bool detailShow();
-boost::property_tree::ptree netClient(std::string netCommand, std::string netArgument);
+boost::property_tree::ptree netClient(std::string netCommand,
+                                      std::string netArgument);
 
 extern std::string sInputStream;
 extern int iTimeLimitCnt;

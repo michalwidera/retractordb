@@ -1,72 +1,70 @@
 #ifndef STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 #define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 
-#include <cstddef> // std::byte
+#include <cstddef>  // std::byte
 
 #include "desc.h"
 
-namespace rdb
-{
-    /**
-     * @brief This class define accessing method to payload (memory area)
-     *
-     * @tparam T Type of stored data - std::byte or char
-     */
-    template <typename T>
-    class payLoadAccessor
-    {
+namespace rdb {
+/**
+ * @brief This class define accessing method to payload (memory area)
+ *
+ * @tparam T Type of stored data - std::byte or char
+ */
+template <typename T>
+class payLoadAccessor {
+  /**
+   * Descriptor of managed payload area
+   */
+  Descriptor descriptor;
 
-        /**
-         * Descriptor of managed payload area
-         */
-        Descriptor descriptor ;
+  /**
+   * Pointer to payload
+   */
+  T *ptr;
 
-        /**
-         * Pointer to payload
-         */
-        T* ptr ;
+  /**
+   * Type of dumped or read numeric formats
+   */
+  bool hexFormat;
 
-        /**
-         * Type of dumped or read numeric formats
-         */
-        bool hexFormat;
+ public:
+  /**
+   * @brief Accessor to descriptor object
+   *
+   * @return Descriptor
+   */
+  Descriptor getDescriptor() const;
 
-    public:
+  /**
+   * @brief Accessor to pointer to payload
+   *
+   * @return T* pointer to payload
+   */
+  T *getPayloadPtr() const;
 
-        /**
-         * @brief Accessor to descriptor object
-         *
-         * @return Descriptor
-         */
-        Descriptor getDescriptor() const;
+  /**
+   * Constructor of payLoadAccessor object
+   *
+   * @param descriptor descriptor of payload area
+   * @param ptr pointer to payload
+   * @param hexFormat type of default stored data
+   */
+  payLoadAccessor(Descriptor descriptor, T *ptr, bool hexFormat = false);
 
-        /**
-         * @brief Accessor to pointer to payload
-         *
-         * @return T* pointer to payload
-         */
-        T* getPayloadPtr() const;
+  /**
+   * Default constructor is dissalowed
+   */
+  payLoadAccessor() = delete;
 
-        /**
-         * Constructor of payLoadAccessor object
-         *
-         * @param descriptor descriptor of payload area
-         * @param ptr pointer to payload
-         * @param hexFormat type of default stored data
-         */
-        payLoadAccessor(Descriptor descriptor, T* ptr, bool hexFormat = false);
+  template <typename K>
+  friend std::istream &operator>>(std::istream &is,
+                                  const payLoadAccessor<K> &rhs);
 
-        /**
-         * Default constructor is dissalowed
-         */
-        payLoadAccessor() = delete;
+  template <typename K>
+  friend std::ostream &operator<<(std::ostream &os,
+                                  const payLoadAccessor<K> &rhs);
+};
+}  // namespace rdb
 
-        template <typename K>
-        friend std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs);
-
-        template <typename K>
-        friend std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs);
-    };
-}
-
-#endif // STORAGE_RDB_INCLUDE_PAYLOADACC_H_
+#endif  // STORAGE_RDB_INCLUDE_PAYLOADACC_H_

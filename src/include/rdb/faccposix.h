@@ -3,27 +3,27 @@
 
 #include "fainterface.h"
 
-namespace rdb
-{
-    /**
-     * @brief Object that implements storage interface via posix calls
-     */
-    template<typename T>
-    class posixBinaryFileAccessor : public FileAccessorInterface<T>
-    {
-        std::string fileNameStr;
+namespace rdb {
+/**
+ * @brief Object that implements storage interface via posix calls
+ */
+template <typename T>
+class posixBinaryFileAccessor : public FileAccessorInterface<T> {
+  std::string fileNameStr;
 
-    public:
-        posixBinaryFileAccessor(std::string fileName);
+ public:
+  posixBinaryFileAccessor(std::string fileName);
 
-        int Read(T* ptrData, const size_t size, const size_t position) override;
-        int Write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
-        std::string FileName() override;
+  int Read(T *ptrData, const size_t size, const size_t position) override;
+  int Write(
+      const T *ptrData, const size_t size,
+      const size_t position = std::numeric_limits<size_t>::max()) override;
+  std::string FileName() override;
 
-        posixBinaryFileAccessor() = delete;
-        posixBinaryFileAccessor(const posixBinaryFileAccessor &) = delete;
-        posixBinaryFileAccessor &operator=(const posixBinaryFileAccessor &) = delete;
-    };
-} // namespace rdb
+  posixBinaryFileAccessor() = delete;
+  posixBinaryFileAccessor(const posixBinaryFileAccessor &) = delete;
+  posixBinaryFileAccessor &operator=(const posixBinaryFileAccessor &) = delete;
+};
+}  // namespace rdb
 
-#endif //STORAGE_RDB_INCLUDE_FACCPOSIX_H_
+#endif  // STORAGE_RDB_INCLUDE_FACCPOSIX_H_

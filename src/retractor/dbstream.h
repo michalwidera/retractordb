@@ -10,7 +10,7 @@
 #include <vector>                            // for vector
 
 /** Data of this type are stored in streams */
-typedef boost::variant< boost::rational<int>, int, double > number ;
+typedef boost::variant<boost::rational<int>, int, double> number;
 
 /**
  * Class covers CBuffer with own abstraction
@@ -19,25 +19,24 @@ typedef boost::variant< boost::rational<int>, int, double > number ;
  * after store() opeartion data are no longer avaiable by
  * stream[1] or stream["field_name"] but new place is ready for tuple
  */
-class dbStream : private boost::noncopyable
-{
+class dbStream : private boost::noncopyable {
+  int frameSize;                      /**< Size of frame in bytes */
+  boost::shared_array<char> pRawData; /**< Pointer for binary data */
+  std::string streamName;             /**< Stream name */
+  std::list<std::string>
+      schema; /**< Schema - otherwize, list of field in stream */
+  std::vector<number> mpShadow;
+  std::vector<number> mpRead;
+  int mpReadNr, mpLenNr;
 
-    int frameSize ; /**< Size of frame in bytes */
-    boost::shared_array< char >  pRawData ; /**< Pointer for binary data */
-    std::string streamName ; /**< Stream name */
-    std::list < std::string > schema ; /**< Schema - otherwize, list of field in stream */
-    std::vector < number >  mpShadow ;
-    std::vector < number >  mpRead ;
-    int mpReadNr, mpLenNr ;
+ public:
+  dbStream(std::string streamName, std::list<std::string> schema);
 
-public:
-
-    dbStream(std::string streamName, std::list < std::string > schema);
-
-    number &operator[](const int &_Keyval);
-    number readCache(const int &_Keyval);
-    void store();
-    void readData(int offset = 0, bool reverse = false); /**< Get data from archive */
+  number &operator[](const int &_Keyval);
+  number readCache(const int &_Keyval);
+  void store();
+  void readData(int offset = 0,
+                bool reverse = false); /**< Get data from archive */
 };
 
 long streamStoredSize(std::string filename);

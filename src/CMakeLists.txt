@@ -82,6 +82,13 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_custom_target(
+  cformat
+  COMMAND find . -name *.h -o -iname *.cpp -o -iname *.hpp -o -iname *.cc | grep
+          --invert-match 'Parser/' | xargs clang-format -i -style=Google
+  COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+add_custom_target(
   vim
   COMMAND [ ! -f ~/.vim ] && mkdir -p ~/.vim
   COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)

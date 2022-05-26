@@ -1,191 +1,161 @@
 #pragma once
 
-//Standard template library
-#include <string>
+// Standard template library
+#include <algorithm>
 #include <list>
 #include <set>
-#include <algorithm>
-#include <stack>
 #include <sstream>
+#include <stack>
+#include <string>
 
-//Boost libraries
-#include <boost/archive/text_oarchive.hpp>
+// Boost libraries
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/rational.hpp>
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
 
-#include <boost/rational.hpp>
-
 #include "enumDecl.h"
 
-namespace boost
-{
-    namespace serialization
-    {
+namespace boost {
+namespace serialization {
 
-        template<class Archive, class T>
-        inline void serialize(
-            Archive &ar,
-            boost::rational<T> &p,
-            unsigned int /* file_version */
-        )
-        {
-            T _num(p.numerator()) ;
-            T _den(p.denominator());
-            ar &_num ;
-            ar &_den ;
-            p.assign(_num, _den);
-        }
-    } // namespace serialization
-} // namespace boost
+template <class Archive, class T>
+inline void serialize(Archive &ar, boost::rational<T> &p,
+                      unsigned int /* file_version */
+) {
+  T _num(p.numerator());
+  T _den(p.denominator());
+  ar &_num;
+  ar &_den;
+  p.assign(_num, _den);
+}
+}  // namespace serialization
+}  // namespace boost
 
+boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,
+                                 int ttl = 11);
 
-boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,  int ttl = 11) ;
+class token {
+  friend class boost::serialization::access;
 
+  template <class Archive>
+  void serialize(Archive &ar, unsigned int version) {
+    ar &command;
+    ar &crValue;
+    ar &rcValue;
+    ar &sValue_;
+  }
 
-class token
-{
+  command_id command;
+  boost::rational<int> crValue;
+  boost::rational<int> rcValue;
+  std::string sValue_;
 
-    friend class boost::serialization::access;
+ public:
+  std::string getValue();
+  boost::rational<int> getCRValue();
 
-    template<class Archive>
-    void serialize(Archive &ar, unsigned int version)
-    {
-        ar &command ;
-        ar &crValue ;
-        ar &rcValue ;
-        ar &sValue_ ;
-    }
+  token(command_id id = VOID_COMMAND, std::string sValue = "");
+  token(command_id id, boost::rational<int> crValue, std::string sValue = "");
+  token(command_id id, double dValue);
 
-    command_id command ;
-    boost::rational<int> crValue ;
-    boost::rational<int> rcValue ;
-    std::string sValue_ ;
+  std::string getStrTokenName();
+  command_id getTokenCommand();
+};
 
-public:
-    std::string getValue();
-    boost::rational<int> getCRValue() ;
+class field {
+ private:
+  friend class boost::serialization::access;
 
-    token(command_id id = VOID_COMMAND, std::string sValue = "");
-    token(command_id id, boost::rational<int> crValue, std::string sValue = "");
-    token(command_id id, double dValue);
+  template <class Archive>
+  void serialize(Archive &ar, unsigned int version) {
+    ar &setFieldName;
+    ar &dFieldType;
+    ar &lProgram;
+    ar &sFieldText;
+  }
 
-    std::string getStrTokenName() ;
-    command_id getTokenCommand();
-} ;
+  std::string sFieldText;
 
-class field
-{
+ public:
+  std::set<std::string> setFieldName;
+  eType dFieldType;
+  std::list<token> lProgram;
 
-private:
+  field();
+  field(std::string sFieldName, std::list<token> &lProgram, eType fieldType,
+        std::string sFieldText);
 
-    friend class boost::serialization::access;
+  std::string getFirstFieldName();
+  std::string getFieldNameSet();
+  std::string getFieldText();
+  token getFirstFieldToken();
 
-    template<class Archive>
-    void serialize(Archive &ar, unsigned int version)
-    {
-        ar &setFieldName ;
-        ar &dFieldType ;
-        ar &lProgram ;
-        ar &sFieldText ;
-    }
+  friend std::ostream &operator<<(std::ostream &os, const eType s);
+};
 
-    std::string sFieldText;
+class query {
+ private:
+  friend class boost::serialization::access;
 
-public:
+  template <class Archive>
+  void serialize(Archive &ar, unsigned int version) {
+    ar &id;
+    ar &filename;
+    ar &rInterval;
+    ar &lSchema;
+    ar &lProgram;
+  }
 
-    std::set<std::string> setFieldName;
-    eType dFieldType ;
-    std::list<token> lProgram;
+ public:
+  query(boost::rational<int> rInterval, std::string id);
+  query();
 
-    field() ;
-    field(std::string sFieldName, std::list<token> &lProgram, eType fieldType, std::string sFieldText);
+  std::list<std::string> getFieldNamesList();
 
-    std::string getFirstFieldName();
-    std::string getFieldNameSet();
-    std::string getFieldText();
-    token getFirstFieldToken() ;
+  std::string id;
+  std::string filename;
+  boost::rational<int> rInterval;
+  std::list<field> lSchema;
+  std::list<token> lProgram;
 
-    friend std::ostream &operator<<(std::ostream &os, const eType s);
-} ;
+  bool isDeclaration();
+  bool isReductionRequired();
+  bool isGenerated();
 
-class query
-{
+  field &getField(std::string sField);
 
-private:
+  std::list<std::string> getDepStreamNameList(int reqDep = 0);
 
-    friend class boost::serialization::access ;
+  int getFieldIndex(field f);
 
-    template<class Archive>
-    void serialize(Archive &ar, unsigned int version)
-    {
-        ar &id ;
-        ar &filename ;
-        ar &rInterval ;
-        ar &lSchema ;
-        ar &lProgram ;
-    }
+  void reset();
+};
 
-public:
+bool operator<(const query &lhs, const query &rhs);
 
-    query(boost::rational<int> rInterval, std::string id) ;
-    query() ;
-
-    std::list<std::string> getFieldNamesList();
-
-    std::string id ;
-    std::string filename;
-    boost::rational<int> rInterval ;
-    std::list<field> lSchema;
-    std::list < token > lProgram ;
-
-    bool isDeclaration();
-    bool isReductionRequired();
-    bool isGenerated();
-
-    field &getField(std::string sField);
-
-    std::list<std::string> getDepStreamNameList(int reqDep = 0);
-
-    int getFieldIndex(field f);
-
-    void reset();
-} ;
-
-bool operator< (const query &lhs, const query &rhs) ;
-
-query &getQuery(std::string query_name) ;
-int getSeqNr(std::string query_name) ;
-bool isDeclared(std::string query_name) ;
+query &getQuery(std::string query_name);
+int getSeqNr(std::string query_name);
+bool isDeclared(std::string query_name);
 bool isExist(std::string query_name);
 
-class qTree :
-    public std::vector<query>
-{
+class qTree : public std::vector<query> {
+ private:
+  friend class boost::serialization::access;
+  template <class Archive>
+  void serialize(Archive &ar, unsigned int version) {
+    ar &boost::serialization::base_object<vector<query>>(*this);
+  }
 
-private:
+ public:
+  query &operator[](std::string query_name) { return getQuery(query_name); };
 
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, unsigned int version)
-    {
-        ar &boost::serialization::base_object<vector<query>> (*this) ;
-    }
+  void sort() { std::sort(begin(), end()); };
 
-public:
-    query &operator[](std::string query_name)
-    {
-        return getQuery(query_name) ;
-    } ;
+  /** Topological sort*/
+  void tsort();
 
-    void sort()
-    {
-        std::sort(begin(), end());
-    };
-
-    /** Topological sort*/
-    void tsort() ;
-
-    boost::rational<int> getDelta(std::string query_name);
+  boost::rational<int> getDelta(std::string query_name);
 };
