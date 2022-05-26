@@ -8,9 +8,9 @@
 
 // Common flags defined for all posix open operations
 #if defined(HAVE_O_CLOEXEC)
-constexpr const int kOpenBaseFlags = O_CLOEXEC;
+    constexpr const int kOpenBaseFlags = O_CLOEXEC;
 #else
-constexpr const int kOpenBaseFlags = 0;
+    constexpr const int kOpenBaseFlags = 0;
 #endif // defined(HAVE_O_CLOEXEC)
 
 namespace rdb

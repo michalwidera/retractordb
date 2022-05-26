@@ -15,17 +15,7 @@
 using namespace boost;
 using namespace boost::lambda;
 
-#define DECL(element)     \
-    {                     \
-        element, #element \
-    }
-#define BEGIN(ENUM_NAME) \
-    std::map<ENUM_NAME, std::string> tg_##ENUM_NAME =
-#define END(ENUM_NAME) \
-    ;                  \
-    std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
-
-#undef ENUM_DEFINED
+#define ENUM_CREATE_DEFINITION
 #include "tokenDef.h"
 
 extern "C" {

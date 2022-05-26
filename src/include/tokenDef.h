@@ -2,7 +2,21 @@
 
 // Based on https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
-#ifndef ENUM_DEFINED
+#ifdef ENUM_CREATE_DEFINITION
+#define DECL(element)     \
+    {                     \
+        element, #element \
+    }
+#define BEGIN(ENUM_NAME) \
+    std::map<ENUM_NAME, std::string> tg_##ENUM_NAME =
+#define END(ENUM_NAME) \
+    ;                  \
+    std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
+//This will force to BEGIN(...) - END(...) will appear once again with new set of BEGIN/END definitions
+#undef ENUM_DECLARATION_DONE
+#endif
+
+#ifndef ENUM_DECLARATION_DONE
 
 #ifndef BEGIN
 #define BEGIN(ENUM_NAME) enum ENUM_NAME
@@ -62,5 +76,5 @@ END(command_id)
 #undef BEGIN
 #undef END
 #undef DECL
-#define ENUM_DEFINED
+#define ENUM_DECLARATION_DONE
 #endif
