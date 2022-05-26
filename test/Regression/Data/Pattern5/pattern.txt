@@ -32,7 +32,7 @@
 	INTARRAY data[3]
 	BYTEARRAY bt[3]
 	BYTE Control
-	Float m1
+	FLOAT m1
 	STRING m2[0]
 }[0m
 .

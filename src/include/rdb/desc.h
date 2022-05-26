@@ -17,7 +17,7 @@ namespace rdb {
 /**
  * @brief Supported field types.
  */
-enum FieldType { STRING, BYTEARRAY, INTARRAY, BYTE, UINT, INT, Float, Double };
+enum FieldType { STRING, BYTEARRAY, INTARRAY, BYTE, UINT, INT, FLOAT, DOUBLE };
 
 typedef int fieldLen;
 typedef std::string fieldName;

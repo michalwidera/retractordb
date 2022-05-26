@@ -18,8 +18,8 @@ Storage supports data of following types:
 |STRING|[declared]|Array of Bytes|Array of bytes dedicated for strings|
 |BYTEARRAY|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
 |INTARRAY|[declared]|Array of Integers|Array of integers dedicated for integer array payloads|
-|Float| 4 | ... | Floating point value|
-|Double| 8 | ... | Floating point value (double size)|
+|FLOAT| 4 | ... | Floating point value|
+|DOUBLE| 8 | ... | Floating point value (double size)|
 
 Table 1. Supported types by :Rdb
 
@@ -51,14 +51,14 @@ ok
 
 ```
 $ xtrdb
-.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INT intdata Float measurment }
+.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INT intdata FLOAT measurment }
 ok
 .desc
 {       STRING name[5]
         BYTEARRAY data[3]
         BYTE control
         INT intdata
-        Float measurment
+        FLOAT measurment
 }
 ```
 
@@ -75,7 +75,7 @@ ok
         BYTEARRAY data[3]
         BYTE control
         INT intdata
-        Float measurment
+        FLOAT measurment
 }
 .set name test1
 .set data 5 7 8

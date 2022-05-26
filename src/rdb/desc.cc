@@ -25,8 +25,8 @@ static inline void rtrim(std::string &s) {
     {
         std::map<FieldType, std::string> typeDictionary = {
             {STRING, "STRING"}, {BYTEARRAY, "BYTEARRAY"},  {INTARRAY,
-   "INTARRAY"}, {UINT, "UINT"}, {BYTE, "BYTE"}, {INT, "INT"}, {Float, "Float"},
-   {Double, "Double"}}; return typeDictionary[e];
+   "INTARRAY"}, {UINT, "UINT"}, {BYTE, "BYTE"}, {INT, "INT"}, {FLOAT, "FLOAT"},
+   {DOUBLE, "DOUBLE"}}; return typeDictionary[e];
     }
 */
 FieldType GetFieldType(std::string name) {
@@ -35,7 +35,7 @@ FieldType GetFieldType(std::string name) {
   std::map<std::string, FieldType> typeDictionary = {
       {"STRING", STRING}, {"BYTEARRAY", BYTEARRAY}, {"INTARRAY", INTARRAY},
       {"UINT", UINT},     {"BYTE", BYTE},           {"INT", INT},
-      {"Float", Float},   {"Double", Double}};
+      {"FLOAT", FLOAT},   {"DOUBLE", DOUBLE}};
   return typeDictionary[name];
 }
 
@@ -53,10 +53,10 @@ constexpr const char *GetFieldType(FieldType e) noexcept {
       return "BYTE";
     case INT:
       return "INT";
-    case Float:
-      return "Float";
-    case Double:
-      return "Double";
+    case FLOAT:
+      return "FLOAT";
+    case DOUBLE:
+      return "DOUBLE";
     default:
       assert("Undefined type");
       return "error";
@@ -69,9 +69,9 @@ constexpr uint GetFieldLenFromType(FieldType ft) {
       return sizeof(UINT);
     case INT:
       return sizeof(INT);
-    case Float:
+    case FLOAT:
       return sizeof(float);
-    case Double:
+    case DOUBLE:
       return sizeof(double);
     case BYTE:
       return 1;

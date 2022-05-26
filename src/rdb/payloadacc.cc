@@ -73,9 +73,9 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
     copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
   else if (desc.Type(fieldName) == "INT")
     copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "Float")
+  else if (desc.Type(fieldName) == "FLOAT")
     copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "Double")
+  else if (desc.Type(fieldName) == "DOUBLE")
     copyToMemory<double, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
   else
     std::cerr << "field not found\n";
@@ -145,11 +145,11 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << std::setw(8);
       }
       os << data;
-    } else if (std::get<rtype>(r) == Float) {
+    } else if (std::get<rtype>(r) == FLOAT) {
       float data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(float));
       os << data;
-    } else if (std::get<rtype>(r) == Double) {
+    } else if (std::get<rtype>(r) == DOUBLE) {
       double data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(double));
       os << data;
