@@ -85,8 +85,8 @@ class field {
   std::list<token> lProgram;
 
   field();
-  field(std::string sFieldName, std::list<token> &lProgram, rdb::eType fieldType,
-        std::string sFieldText);
+  field(std::string sFieldName, std::list<token> &lProgram,
+        rdb::eType fieldType, std::string sFieldText);
 
   std::string getFirstFieldName();
   std::string getFieldNameSet();

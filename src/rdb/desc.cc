@@ -33,9 +33,10 @@ rdb::eType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
   std::map<std::string, rdb::eType> typeDictionary = {
-      {"STRING", rdb::STRING}, {"BYTEARRAY", rdb::BYTEARRAY}, {"INTARRAY", rdb::INTARRAY},
-      {"UINT", rdb::UINT},     {"BYTE", rdb::BYTE},           {"INTEGER", rdb::INTEGER},
-      {"FLOAT", rdb::FLOAT},   {"DOUBLE", rdb::DOUBLE}};
+      {"STRING", rdb::STRING},     {"BYTEARRAY", rdb::BYTEARRAY},
+      {"INTARRAY", rdb::INTARRAY}, {"UINT", rdb::UINT},
+      {"BYTE", rdb::BYTE},         {"INTEGER", rdb::INTEGER},
+      {"FLOAT", rdb::FLOAT},       {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
 
@@ -185,7 +186,8 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     os << "\t" << GetFieldType(std::get<rtype>(r)) << " " << std::get<rname>(r);
-    if (std::get<rtype>(r) == rdb::STRING || std::get<rtype>(r) == rdb::BYTEARRAY)
+    if (std::get<rtype>(r) == rdb::STRING ||
+        std::get<rtype>(r) == rdb::BYTEARRAY)
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
     else if (std::get<rtype>(r) == rdb::INTARRAY)
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";

@@ -96,12 +96,11 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
                         DECL(STREAM_TIMEMOVE),
                         DECL(STREAM_AGSE),
                         DECL(COUNT),
-                        DECL(COUNT_RANGE)} END_E_GEN(command_id)
-namespace rdb {
-    BEGIN_E_GEN(eType){DECL(BAD),      DECL(BYTE),      DECL(INTEGER),
-                       DECL(UINT),     DECL(RATIONAL),  DECL(FLOAT),
-                       DECL(STRING),   DECL(BYTEARRAY), DECL(INTARRAY),
-                       DECL(DOUBLE)} END_E_GEN(eType)
+                        DECL(COUNT_RANGE)} END_E_GEN(command_id) namespace rdb {
+  BEGIN_E_GEN(eType){DECL(BAD),    DECL(BYTE),      DECL(INTEGER),
+                     DECL(UINT),   DECL(RATIONAL),  DECL(FLOAT),
+                     DECL(STRING), DECL(BYTEARRAY), DECL(INTARRAY),
+                     DECL(DOUBLE)} END_E_GEN(eType)
 }
 
 #undef BEGIN_E_GEN

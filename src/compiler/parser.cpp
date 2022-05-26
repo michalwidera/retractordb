@@ -237,7 +237,9 @@ class ParserListener : public RQLBaseListener {
 
   void exitTypeByte(RQLParser::TypeByteContext *ctx) { fType = rdb::BYTE; }
   void exitTypeInt(RQLParser::TypeIntContext *ctx) { fType = rdb::INTEGER; }
-  void exitTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) { fType = rdb::UINT; }
+  void exitTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) {
+    fType = rdb::UINT;
+  }
   void exitTypeFloat(RQLParser::TypeFloatContext *ctx) { fType = rdb::FLOAT; }
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) {
