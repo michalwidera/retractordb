@@ -133,8 +133,8 @@ STRING_T:           'STRING'|'String';
 BYTEARRAY_T:        'BYTEARRAY'|'Bytearray';
 INTARRAY_T:         'INTARRAY'|'Intarray';
 BYTE_T:             'BYTE'|'Byte';
-UNSIGNED_T:         'UNSIGNED'|'Uint';
-INTEGER_T:          'INT'|'Int'|'INTEGER';
+UNSIGNED_T:         'UINT'|'Uint';
+INTEGER_T:          'INTEGER'|'Integer';
 FLOAT_T:            'FLOAT'|'Float';
 
 SELECT:             'SELECT'|'select';

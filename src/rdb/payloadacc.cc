@@ -71,7 +71,7 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
            sizeof(unsigned char));
   } else if (desc.Type(fieldName) == "UINT")
     copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "INT")
+  else if (desc.Type(fieldName) == "INTEGER")
     copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
   else if (desc.Type(fieldName) == "FLOAT")
     copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
@@ -97,7 +97,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
       auto len_ = desc.Len(std::get<rname>(r));
       os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_),
                         len_);
-    } else if (std::get<rtype>(r) == BYTEARRAY) {
+    } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
         unsigned char data;
         memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(unsigned char),
@@ -109,7 +109,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << (int)data;
         if (i != std::get<rlen>(r)) os << " ";
       }
-    } else if (std::get<rtype>(r) == INTARRAY) {
+    } else if (std::get<rtype>(r) == rdb::INTARRAY) {
       for (auto i = 0; i < std::get<rlen>(r) / sizeof(int); i++) {
         int data;
         memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(int),
@@ -121,7 +121,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << (int)data;
         if (i != std::get<rlen>(r)) os << " ";
       }
-    } else if (std::get<rtype>(r) == BYTE) {
+    } else if (std::get<rtype>(r) == rdb::BYTE) {
       unsigned char data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(unsigned char));
       if (rhs.hexFormat) {
@@ -129,7 +129,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << std::setw(2);
       }
       os << (int)data;
-    } else if (std::get<rtype>(r) == INT) {
+    } else if (std::get<rtype>(r) == rdb::INTEGER) {
       int data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(int));
       if (rhs.hexFormat) {
@@ -137,7 +137,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << std::setw(8);
       }
       os << data;
-    } else if (std::get<rtype>(r) == UINT) {
+    } else if (std::get<rtype>(r) == rdb::UINT) {
       unsigned int data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(unsigned int));
       if (rhs.hexFormat) {
@@ -145,11 +145,11 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << std::setw(8);
       }
       os << data;
-    } else if (std::get<rtype>(r) == FLOAT) {
+    } else if (std::get<rtype>(r) == rdb::FLOAT) {
       float data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(float));
       os << data;
-    } else if (std::get<rtype>(r) == DOUBLE) {
+    } else if (std::get<rtype>(r) == rdb::DOUBLE) {
       double data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(double));
       os << data;

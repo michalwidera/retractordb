@@ -13,7 +13,7 @@ Storage supports data of following types:
 | type | size(bytes) | range | meaning |
 | ---  | ---: | --- | --- |
 |BYTE  | 1 | 0..255|8-bit byte|
-|INT   | 4 |-2147483648 to 2147483647|C++ Integer|
+|INTEGER   | 4 |-2147483648 to 2147483647|C++ Integer|
 |Unit  | 4 |0 to 4294967295|Unsigned int|
 |STRING|[declared]|Array of Bytes|Array of bytes dedicated for strings|
 |BYTEARRAY|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
@@ -51,13 +51,13 @@ ok
 
 ```
 $ xtrdb
-.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INT intdata FLOAT measurment }
+.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INTEGER intdata FLOAT measurment }
 ok
 .desc
 {       STRING name[5]
         BYTEARRAY data[3]
         BYTE control
-        INT intdata
+        INTEGER intdata
         FLOAT measurment
 }
 ```
@@ -74,7 +74,7 @@ ok
 {       STRING name[5]
         BYTEARRAY data[3]
         BYTE control
-        INT intdata
+        INTEGER intdata
         FLOAT measurment
 }
 .set name test1

@@ -84,16 +84,16 @@ void inputDF::processRow() {
   lResult.clear();
   for (auto &f : lSchema) {
     switch (f.dFieldType) {
-      case BYTE:
+      case rdb::BYTE:
         lResult.push_back(get<unsigned char>());
         break;
-      case INTEGER:
+      case rdb::INTEGER:
         lResult.push_back(get<int>());
         break;
-      case RATIONAL:
+      case rdb::RATIONAL:
         lResult.push_back(get<boost::rational<int>>());
         break;
-      case BAD:
+      case rdb::BAD:
       default:
         std::cerr << "field:" << f.getFirstFieldName() << std::endl;
         throw std::out_of_range("processRow/undefined type");

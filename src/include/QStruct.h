@@ -81,11 +81,11 @@ class field {
 
  public:
   std::set<std::string> setFieldName;
-  eType dFieldType;
+  rdb::eType dFieldType;
   std::list<token> lProgram;
 
   field();
-  field(std::string sFieldName, std::list<token> &lProgram, eType fieldType,
+  field(std::string sFieldName, std::list<token> &lProgram, rdb::eType fieldType,
         std::string sFieldText);
 
   std::string getFirstFieldName();
@@ -93,7 +93,7 @@ class field {
   std::string getFieldText();
   token getFirstFieldToken();
 
-  friend std::ostream &operator<<(std::ostream &os, const eType s);
+  friend std::ostream &operator<<(std::ostream &os, const rdb::eType s);
 };
 
 class query {

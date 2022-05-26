@@ -222,7 +222,7 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 field::field() {}
 
 field::field(std::string sFieldName, std::list<token> &lProgram,
-             eType dFieldType, std::string sFieldText)
+             rdb::eType dFieldType, std::string sFieldText)
     : lProgram(lProgram), dFieldType(dFieldType), sFieldText(sFieldText) {
   setFieldName.insert(sFieldName);
 }
@@ -312,6 +312,6 @@ std::list<std::string> query::getDepStreamNameList(int reqDep) {
   return lRetVal;
 }
 
-std::ostream &operator<<(std::ostream &os, eType s) {
-  return os << GetStringeType(s);
+std::ostream &operator<<(std::ostream &os, rdb::eType s) {
+  return os << rdb::GetStringeType(s);
 }

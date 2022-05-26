@@ -104,7 +104,7 @@ bool test_3()
 
 bool test_descriptor()
 {
-    rdb::Descriptor data1{rdb::field("Name3", 10, rdb::STRING), rdb::field("Name4", 10, rdb::STRING)};
+   rdb::Descriptor data1{rdb::field("Name3", 10, rdb::STRING), rdb::field("Name4", 10, rdb::STRING)};
 
     data1.Append({rdb::field("Name5z", 10, rdb::STRING)});
     data1.Append({rdb::field("Name6z", 10, rdb::STRING)});
@@ -113,7 +113,7 @@ bool test_descriptor()
     data1.push_back(rdb::field("TLen", sizeof(uint), rdb::UINT));
 
     data1 | rdb::Descriptor("Name2", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Len3", rdb::UINT);
-    {
+     {
         std::stringstream coutstring;
         coutstring << data1;
         char test[] = "{\tSTRING Name3[10]\n\tSTRING Name4[10]\n\tSTRING Name5z[10]\n\tSTRING Name6z[10]\n\tSTRING Name[10]\n\tUINT TLen\n\tSTRING Name2[10]\n\tBYTE Control\n\tUINT Len3\n}";
@@ -194,7 +194,7 @@ bool test_storage()
 
     static_assert(sizeof(dataPayload) == 15);
 
-    auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("TLen", rdb::INT)};
+    auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("TLen", rdb::INTEGER)};
 
     // This assert will fail is structure is not packed.
     if (dataDescriptor.GetSize() != sizeof(dataPayload))

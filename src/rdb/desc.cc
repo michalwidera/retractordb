@@ -21,41 +21,41 @@ static inline void rtrim(std::string &s) {
           s.end());
 }
 /*
-    std::string GetFieldType(FieldType e)
+    std::string GetFieldType(rdb::eType e)
     {
-        std::map<FieldType, std::string> typeDictionary = {
+        std::map<eType, std::string> typeDictionary = {
             {STRING, "STRING"}, {BYTEARRAY, "BYTEARRAY"},  {INTARRAY,
    "INTARRAY"}, {UINT, "UINT"}, {BYTE, "BYTE"}, {INT, "INT"}, {FLOAT, "FLOAT"},
    {DOUBLE, "DOUBLE"}}; return typeDictionary[e];
     }
 */
-FieldType GetFieldType(std::string name) {
+rdb::eType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
-  std::map<std::string, FieldType> typeDictionary = {
-      {"STRING", STRING}, {"BYTEARRAY", BYTEARRAY}, {"INTARRAY", INTARRAY},
-      {"UINT", UINT},     {"BYTE", BYTE},           {"INT", INT},
-      {"FLOAT", FLOAT},   {"DOUBLE", DOUBLE}};
+  std::map<std::string, rdb::eType> typeDictionary = {
+      {"STRING", rdb::STRING}, {"BYTEARRAY", rdb::BYTEARRAY}, {"INTARRAY", rdb::INTARRAY},
+      {"UINT", rdb::UINT},     {"BYTE", rdb::BYTE},           {"INTEGER", rdb::INTEGER},
+      {"FLOAT", rdb::FLOAT},   {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
 
-constexpr const char *GetFieldType(FieldType e) noexcept {
+constexpr const char *GetFieldType(rdb::eType e) noexcept {
   switch (e) {
-    case STRING:
+    case rdb::STRING:
       return "STRING";
-    case BYTEARRAY:
+    case rdb::BYTEARRAY:
       return "BYTEARRAY";
-    case INTARRAY:
+    case rdb::INTARRAY:
       return "INTARRAY";
-    case UINT:
+    case rdb::UINT:
       return "UINT";
-    case BYTE:
+    case rdb::BYTE:
       return "BYTE";
-    case INT:
-      return "INT";
-    case FLOAT:
+    case rdb::INTEGER:
+      return "INTEGER";
+    case rdb::FLOAT:
       return "FLOAT";
-    case DOUBLE:
+    case rdb::DOUBLE:
       return "DOUBLE";
     default:
       assert("Undefined type");
@@ -63,21 +63,21 @@ constexpr const char *GetFieldType(FieldType e) noexcept {
   }
 }
 
-constexpr uint GetFieldLenFromType(FieldType ft) {
+constexpr uint GetFieldLenFromType(rdb::eType ft) {
   switch (ft) {
-    case UINT:
-      return sizeof(UINT);
-    case INT:
-      return sizeof(INT);
-    case FLOAT:
+    case rdb::UINT:
+      return sizeof(unsigned);
+    case rdb::INTEGER:
+      return sizeof(int);
+    case rdb::FLOAT:
       return sizeof(float);
-    case DOUBLE:
+    case rdb::DOUBLE:
       return sizeof(double);
-    case BYTE:
+    case rdb::BYTE:
       return 1;
-    case STRING:
-    case BYTEARRAY:
-    case INTARRAY:
+    case rdb::STRING:
+    case rdb::BYTEARRAY:
+    case rdb::INTARRAY:
       assert("This type has other method of len-type id");
       break;
     default:
@@ -89,13 +89,13 @@ constexpr uint GetFieldLenFromType(FieldType ft) {
 Descriptor::Descriptor(std::initializer_list<field> l)
     : std::vector<field>(l) {}
 
-Descriptor::Descriptor(fieldName n, fieldLen l, FieldType t) {
+Descriptor::Descriptor(fieldName n, fieldLen l, rdb::eType t) {
   push_back(field(n, l, t));
   UpdateNames();
 }
 
-Descriptor::Descriptor(fieldName n, FieldType t) {
-  assert((t != STRING || t != BYTEARRAY || t != INTARRAY) &&
+Descriptor::Descriptor(fieldName n, rdb::eType t) {
+  assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
   push_back(field(n, GetFieldLenFromType(t), t));
   UpdateNames();
@@ -185,9 +185,9 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     os << "\t" << GetFieldType(std::get<rtype>(r)) << " " << std::get<rname>(r);
-    if (std::get<rtype>(r) == STRING || std::get<rtype>(r) == BYTEARRAY)
+    if (std::get<rtype>(r) == rdb::STRING || std::get<rtype>(r) == rdb::BYTEARRAY)
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
-    else if (std::get<rtype>(r) == INTARRAY)
+    else if (std::get<rtype>(r) == rdb::INTARRAY)
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
     os << std::endl;
   }
@@ -223,9 +223,9 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     ltrim(name);
     rtrim(name);
     auto ft = GetFieldType(type);
-    if (ft == STRING || ft == BYTEARRAY)
+    if (ft == rdb::STRING || ft == rdb::BYTEARRAY)
       is >> len;
-    else if (ft == INTARRAY) {
+    else if (ft == rdb::INTARRAY) {
       is >> len;
       len *= sizeof(int);
     } else

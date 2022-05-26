@@ -69,12 +69,12 @@ class DataStorageAccessor {
     {method} Put
 }
 
-enum FieldType {
+enum rdb::eType {
     STRING
     BYTEARRAY
     UINT
     BYTE
-    INT
+    INTEGER
     FLOAT
     DOUBLE
 }
@@ -89,7 +89,7 @@ posixPrmBinaryFileAccessor --* DataStorageAccessor
 
 Descriptor --* DataStorageAccessor
 
-Descriptor --- FieldType
+Descriptor --- rdb::eType
 
 payLoadAccessor --* Descriptor
 

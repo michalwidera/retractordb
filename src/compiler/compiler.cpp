@@ -233,7 +233,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lSchema;
           lSchema.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lSchema, BAD, "*"));
+          newQuery.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
           newQuery.id = generateStreamName(arg1, "", cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(
@@ -274,7 +274,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lSchema;
           lSchema.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lSchema, BAD, "*"));
+          newQuery.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
           newQuery.id = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
@@ -337,28 +337,28 @@ std::list<field> combine(std::string sName1, std::string sName2,
   else if (cmd == STREAM_AVG) {
     field intf;
     intf.setFieldName.insert("avg");
-    intf.dFieldType = RATIONAL;
+    intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
     field intf;
     intf.setFieldName.insert("min");
-    intf.dFieldType = RATIONAL;
+    intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
     field intf;
     intf.setFieldName.insert("max");
-    intf.dFieldType = RATIONAL;
+    intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
     field intf;
     intf.setFieldName.insert("sum");
-    intf.dFieldType = RATIONAL;
+    intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
@@ -371,14 +371,14 @@ std::list<field> combine(std::string sName1, std::string sName2,
       for (int i = 0; i < windowSize; i++) {
         field intf;
         intf.setFieldName.insert(sName1 + "_" + lexical_cast<std::string>(i));
-        intf.dFieldType = BAD;
+        intf.dFieldType = rdb::BAD;
         schema.push_back(intf);
       }
     } else {
       for (int i = windowSize - 1; i >= 0; i--) {
         field intf;
         intf.setFieldName.insert(sName1 + "_" + lexical_cast<std::string>(i));
-        intf.dFieldType = BAD;
+        intf.dFieldType = rdb::BAD;
         schema.push_back(intf);
       }
     }
@@ -441,7 +441,7 @@ std::string prepareFields() {
                                           nameOfscanningTable));
               std::string name =
                   "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-              q.lSchema.push_back(field(name, newLProgram, INTEGER, ""));
+              q.lSchema.push_back(field(name, newLProgram, rdb::INTEGER, ""));
             }
             break;
           }

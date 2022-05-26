@@ -61,7 +61,7 @@ class ParserListener : public RQLBaseListener {
   std::list<token> program;
 
   /* Type of field */
-  eType fType = BAD;
+  rdb::eType fType = rdb::BAD;
 
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSize = 1;
@@ -210,14 +210,14 @@ class ParserListener : public RQLBaseListener {
     recpToken(PUSH_TSCAN, ctx->getText());
     qry.lSchema.push_back(
         field("Field_" + boost::lexical_cast<std::string>(fieldCount++),
-              program, INTEGER, "todo 3"));
+              program, rdb::INTEGER, "todo 3"));
     program.clear();
   }
 
   void exitExpression(RQLParser::ExpressionContext *ctx) {
     qry.lSchema.push_back(
         field("Field_" + boost::lexical_cast<std::string>(fieldCount++),
-              program, INTEGER, "todo 2"));
+              program, rdb::INTEGER, "todo 2"));
     program.clear();
   }
 
@@ -225,20 +225,20 @@ class ParserListener : public RQLBaseListener {
     std::string name = ctx->children[0]->getText();
     boost::to_upper(name);
     if (name == "STRING")
-      fType = BYTE;
+      fType = rdb::BYTE;
     else if (name == "BYTEARRAY")
-      fType = BYTE;
+      fType = rdb::BYTE;
     else if (name == "INTARRAY")
-      fType = INTEGER;
+      fType = rdb::INTEGER;
     else
       abort();
     fTypeSize = std::stoi(ctx->type_size->getText());
   }
 
-  void exitTypeByte(RQLParser::TypeByteContext *ctx) { fType = BYTE; }
-  void exitTypeInt(RQLParser::TypeIntContext *ctx) { fType = INTEGER; }
-  void exitTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) { fType = UNSIGNED; }
-  void exitTypeFloat(RQLParser::TypeFloatContext *ctx) { fType = FLOAT; }
+  void exitTypeByte(RQLParser::TypeByteContext *ctx) { fType = rdb::BYTE; }
+  void exitTypeInt(RQLParser::TypeIntContext *ctx) { fType = rdb::INTEGER; }
+  void exitTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) { fType = rdb::UINT; }
+  void exitTypeFloat(RQLParser::TypeFloatContext *ctx) { fType = rdb::FLOAT; }
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) {
     std::list<token> emptyProgram;
@@ -251,7 +251,7 @@ class ParserListener : public RQLBaseListener {
         qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
       }
     }
-    fType = BAD;
+    fType = rdb::BAD;
     fTypeSize = 1;
   }
 };

@@ -14,18 +14,13 @@ namespace rdb {
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
-/**
- * @brief Supported field types.
- */
-enum FieldType { STRING, BYTEARRAY, INTARRAY, BYTE, UINT, INT, FLOAT, DOUBLE };
-
 typedef int fieldLen;
 typedef std::string fieldName;
 
 /**
  * @brief Tuple type - that defines field - Name, Len and Type.
  */
-typedef std::tuple<fieldName, fieldLen, FieldType> field;
+typedef std::tuple<fieldName, fieldLen, rdb::eType> field;
 
 /**
  * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
@@ -59,7 +54,7 @@ class Descriptor : public std::vector<field> {
    * @brief Construct a new Descriptor object
    *
    * @param l initializer list - this enables create Descriptor as Descriptor
-   * obj{field("A",10,STRING), field("B",10,rdb::STRING)};
+   * obj{field("A",10,STRING), field("B",10,STRING)};
    */
   Descriptor(std::initializer_list<field> l);
 
@@ -71,7 +66,7 @@ class Descriptor : public std::vector<field> {
    * @param l Field len
    * @param t Field type - STRING (Maybe tables in future)
    */
-  Descriptor(fieldName n, fieldLen l, FieldType t);
+  Descriptor(fieldName n, fieldLen l, rdb::eType t);
 
   /**
    * @brief Construct a new Descriptor object - only for no objects with len
@@ -79,7 +74,7 @@ class Descriptor : public std::vector<field> {
    * @param n Field name
    * @param t Field type - Int, Byte ...
    */
-  Descriptor(fieldName n, FieldType t);
+  Descriptor(fieldName n, rdb::eType t);
 
   /**
    * @brief Construct a new Descriptor object - Default constructor
