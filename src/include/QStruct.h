@@ -105,7 +105,7 @@ public:
     std::string getFirstFieldName();
     std::string getFieldNameSet();
     std::string getFieldText();
-    token  getFirstFieldToken() ;
+    token getFirstFieldToken() ;
 
     friend std::ostream &operator<<(std::ostream &os, const eType s);
 } ;
@@ -161,7 +161,7 @@ bool isDeclared(std::string query_name) ;
 bool isExist(std::string query_name);
 
 class qTree :
-    public std::vector < query >
+    public std::vector<query>
 {
 
 private:
@@ -170,7 +170,7 @@ private:
     template<class Archive>
     void serialize(Archive &ar, unsigned int version)
     {
-        ar &boost::serialization::base_object< vector < query >> (*this) ;
+        ar &boost::serialization::base_object<vector<query>> (*this) ;
     }
 
 public:
