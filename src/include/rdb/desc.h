@@ -17,7 +17,7 @@ namespace rdb {
 /**
  * @brief Supported field types.
  */
-enum FieldType { STRING, Bytearray, Intarray, Byte, Uint, Int, Float, Double };
+enum FieldType { STRING, BYTEARRAY, INTARRAY, BYTE, UINT, INT, Float, Double };
 
 typedef int fieldLen;
 typedef std::string fieldName;
@@ -96,7 +96,7 @@ class Descriptor : public std::vector<field> {
   /**
    * @brief This constructor helps chaining operators with descriptor.
    *
-   * DescriptorObject | Descriptor("A",10,STRING) | Descriptor("B",Byte)
+   * DescriptorObject | Descriptor("A",10,STRING) | Descriptor("B",BYTE)
    *
    * @param rhs Right Hand Side - it is reference to Right arguemnt of operator
    * @return Descriptor& This return reference to result

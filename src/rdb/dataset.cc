@@ -18,7 +18,7 @@ long dataSet::GetLen(std::string filename) {
 
 void dataSet::DefBlock(std::string filename, int frameSize) {
   recordSize = frameSize;
-  auto desc{rdb::Descriptor("payload", frameSize, rdb::Bytearray)};
+  auto desc{rdb::Descriptor("payload", frameSize, rdb::BYTEARRAY)};
   data[path + filename] = std::unique_ptr<rdb::DataStorageAccessor<std::byte>>(
       new rdb::DataStorageAccessor(desc, path + filename, false));
   recordSize = desc.GetSize();

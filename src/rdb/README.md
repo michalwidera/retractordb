@@ -11,13 +11,13 @@ Retractor DB is using inner database format. This format supports read,update, a
 Storage supports data of following types:
 
 | type | size(bytes) | range | meaning |
-| --- | ---: | --- | --- |
-| Byte | 1 | 0..255|8-bit byte|
-|Int   | 4 |-2147483648 to 2147483647|C++ Integer|
+| ---  | ---: | --- | --- |
+|BYTE  | 1 | 0..255|8-bit byte|
+|INT   | 4 |-2147483648 to 2147483647|C++ Integer|
 |Unit  | 4 |0 to 4294967295|Unsigned int|
 |STRING|[declared]|Array of Bytes|Array of bytes dedicated for strings|
-|Bytearray|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
-|Intarray|[declared]|Array of Integers|Array of integers dedicated for integer array payloads|
+|BYTEARRAY|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
+|INTARRAY|[declared]|Array of Integers|Array of integers dedicated for integer array payloads|
 |Float| 4 | ... | Floating point value|
 |Double| 8 | ... | Floating point value (double size)|
 
@@ -51,13 +51,13 @@ ok
 
 ```
 $ xtrdb
-.create testfile { STRING name[5] Bytearray data[3] Byte control Int intdata Float measurment }
+.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INT intdata Float measurment }
 ok
 .desc
 {       STRING name[5]
-        Bytearray data[3]
-        Byte control
-        Int intdata
+        BYTEARRAY data[3]
+        BYTE control
+        INT intdata
         Float measurment
 }
 ```
@@ -72,9 +72,9 @@ File testfile will contain only binary data - testfile.desc will contain data de
 ok
 .desc
 {       STRING name[5]
-        Bytearray data[3]
-        Byte control
-        Int intdata
+        BYTEARRAY data[3]
+        BYTE control
+        INT intdata
         Float measurment
 }
 .set name test1

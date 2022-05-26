@@ -29,9 +29,9 @@
 .2 Record(s)
 25 Byte(s) per record.
 .[93m{	STRING name[5]
-	Intarray data[3]
-	Bytearray bt[3]
-	Byte Control
+	INTARRAY data[3]
+	BYTEARRAY bt[3]
+	BYTE Control
 	Float m1
 	STRING m2[0]
 }[0m

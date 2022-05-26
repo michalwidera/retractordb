@@ -71,10 +71,10 @@ class DataStorageAccessor {
 
 enum FieldType {
     STRING
-    Bytearray
-    Uint
-    Byte
-    Int
+    BYTEARRAY
+    UINT
+    BYTE
+    INT
     Float
     Double
 }

@@ -47,7 +47,7 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
            desc.Len(fieldName));
     memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), record.c_str(),
            std::min((size_t)desc.Len(fieldName), record.size()));
-  } else if (desc.Type(fieldName) == "Bytearray") {
+  } else if (desc.Type(fieldName) == "BYTEARRAY") {
     for (auto i = 0; i < desc.Len(fieldName); i++) {
       int data;
       is >> data;
@@ -56,22 +56,22 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
                  i * sizeof(unsigned char),
              &data8, sizeof(unsigned char));
     }
-  } else if (desc.Type(fieldName) == "Intarray") {
+  } else if (desc.Type(fieldName) == "INTARRAY") {
     for (auto i = 0; i < desc.Len(fieldName) / sizeof(int); i++) {
       int data;
       is >> data;
       memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i * sizeof(int),
              &data, sizeof(int));
     }
-  } else if (desc.Type(fieldName) == "Byte") {
+  } else if (desc.Type(fieldName) == "BYTE") {
     int data;
     is >> data;
     unsigned char data8 = static_cast<unsigned char>(data);
     memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), &data8,
            sizeof(unsigned char));
-  } else if (desc.Type(fieldName) == "Uint")
+  } else if (desc.Type(fieldName) == "UINT")
     copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "Int")
+  else if (desc.Type(fieldName) == "INT")
     copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
   else if (desc.Type(fieldName) == "Float")
     copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
@@ -97,7 +97,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
       auto len_ = desc.Len(std::get<rname>(r));
       os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_),
                         len_);
-    } else if (std::get<rtype>(r) == Bytearray) {
+    } else if (std::get<rtype>(r) == BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
         unsigned char data;
         memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(unsigned char),
@@ -109,7 +109,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << (int)data;
         if (i != std::get<rlen>(r)) os << " ";
       }
-    } else if (std::get<rtype>(r) == Intarray) {
+    } else if (std::get<rtype>(r) == INTARRAY) {
       for (auto i = 0; i < std::get<rlen>(r) / sizeof(int); i++) {
         int data;
         memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(int),
@@ -121,7 +121,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << (int)data;
         if (i != std::get<rlen>(r)) os << " ";
       }
-    } else if (std::get<rtype>(r) == Byte) {
+    } else if (std::get<rtype>(r) == BYTE) {
       unsigned char data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(unsigned char));
       if (rhs.hexFormat) {
@@ -129,7 +129,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << std::setw(2);
       }
       os << (int)data;
-    } else if (std::get<rtype>(r) == Int) {
+    } else if (std::get<rtype>(r) == INT) {
       int data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(int));
       if (rhs.hexFormat) {
@@ -137,7 +137,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
         os << std::setw(8);
       }
       os << data;
-    } else if (std::get<rtype>(r) == Uint) {
+    } else if (std::get<rtype>(r) == UINT) {
       unsigned int data;
       memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(unsigned int));
       if (rhs.hexFormat) {

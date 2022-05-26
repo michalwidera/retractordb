@@ -24,8 +24,8 @@ static inline void rtrim(std::string &s) {
     std::string GetFieldType(FieldType e)
     {
         std::map<FieldType, std::string> typeDictionary = {
-            {STRING, "STRING"}, {Bytearray, "Bytearray"},  {Intarray,
-   "Intarray"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"},
+            {STRING, "STRING"}, {BYTEARRAY, "BYTEARRAY"},  {INTARRAY,
+   "INTARRAY"}, {UINT, "UINT"}, {BYTE, "BYTE"}, {INT, "INT"}, {Float, "Float"},
    {Double, "Double"}}; return typeDictionary[e];
     }
 */
@@ -33,8 +33,8 @@ FieldType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
   std::map<std::string, FieldType> typeDictionary = {
-      {"STRING", STRING}, {"Bytearray", Bytearray}, {"Intarray", Intarray},
-      {"Uint", Uint},     {"Byte", Byte},           {"Int", Int},
+      {"STRING", STRING}, {"BYTEARRAY", BYTEARRAY}, {"INTARRAY", INTARRAY},
+      {"UINT", UINT},     {"BYTE", BYTE},           {"INT", INT},
       {"Float", Float},   {"Double", Double}};
   return typeDictionary[name];
 }
@@ -43,16 +43,16 @@ constexpr const char *GetFieldType(FieldType e) noexcept {
   switch (e) {
     case STRING:
       return "STRING";
-    case Bytearray:
-      return "Bytearray";
-    case Intarray:
-      return "Intarray";
-    case Uint:
-      return "Uint";
-    case Byte:
-      return "Byte";
-    case Int:
-      return "Int";
+    case BYTEARRAY:
+      return "BYTEARRAY";
+    case INTARRAY:
+      return "INTARRAY";
+    case UINT:
+      return "UINT";
+    case BYTE:
+      return "BYTE";
+    case INT:
+      return "INT";
     case Float:
       return "Float";
     case Double:
@@ -65,19 +65,19 @@ constexpr const char *GetFieldType(FieldType e) noexcept {
 
 constexpr uint GetFieldLenFromType(FieldType ft) {
   switch (ft) {
-    case Uint:
-      return sizeof(uint);
-    case Int:
-      return sizeof(int);
+    case UINT:
+      return sizeof(UINT);
+    case INT:
+      return sizeof(INT);
     case Float:
       return sizeof(float);
     case Double:
       return sizeof(double);
-    case Byte:
+    case BYTE:
       return 1;
     case STRING:
-    case Bytearray:
-    case Intarray:
+    case BYTEARRAY:
+    case INTARRAY:
       assert("This type has other method of len-type id");
       break;
     default:
@@ -95,7 +95,7 @@ Descriptor::Descriptor(fieldName n, fieldLen l, FieldType t) {
 }
 
 Descriptor::Descriptor(fieldName n, FieldType t) {
-  assert((t != STRING || t != Bytearray || t != Intarray) &&
+  assert((t != STRING || t != BYTEARRAY || t != INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
   push_back(field(n, GetFieldLenFromType(t), t));
   UpdateNames();
@@ -185,9 +185,9 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     os << "\t" << GetFieldType(std::get<rtype>(r)) << " " << std::get<rname>(r);
-    if (std::get<rtype>(r) == STRING || std::get<rtype>(r) == Bytearray)
+    if (std::get<rtype>(r) == STRING || std::get<rtype>(r) == BYTEARRAY)
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
-    else if (std::get<rtype>(r) == Intarray)
+    else if (std::get<rtype>(r) == INTARRAY)
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
     os << std::endl;
   }
@@ -223,9 +223,9 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     ltrim(name);
     rtrim(name);
     auto ft = GetFieldType(type);
-    if (ft == STRING || ft == Bytearray)
+    if (ft == STRING || ft == BYTEARRAY)
       is >> len;
-    else if (ft == Intarray) {
+    else if (ft == INTARRAY) {
       is >> len;
       len *= sizeof(int);
     } else
