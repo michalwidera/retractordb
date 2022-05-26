@@ -14,7 +14,7 @@
 #error END_E_GEN conficts with inner tokenDef.h declaration.
 #endif
 
-#ifdef ENUM_CREATE_DEFINITION
+#ifdef ENUMDECL_H_CREATE_DEFINITION
 
 // Part responsible for Definition & Initialization of map structure
 #include <map>
@@ -29,10 +29,10 @@
 // This undef will force to BEGIN_E_GEN(...) - END_E_GEN(...) will appear once
 // again with new set of BEGIN_E_GEN/END_E_GEN definitions and will goto to
 // BEGIN_E_GEN sections
-#undef ENUM_DECLARATION_DONE
+#undef ENUMDECL_H_DECLARATION_DONE
 #endif
 
-#ifndef ENUM_DECLARATION_DONE
+#ifndef ENUMDECL_H_DECLARATION_DONE
 
 // Part resposible for declaration
 #ifndef BEGIN_E_GEN
@@ -47,10 +47,10 @@
 // Clarification: This structure in default mode will create: enum XXX {
 // void_command, void_value, ... } and GetStringXXX function will be decared as
 // existing somewhere. When, before including this header macro
-// ENUM_CREATE_DEFINITION will be defined this structure will create&initialize
+// ENUMDECL_H_CREATE_DEFINITION will be defined this structure will create&initialize
 // following map: std::map<XXX, std::string> = { { VOID_COMMAND, "VOID_COMMAND
 // "} , ...} and function GetStingXXX with body. AT LEAST ONE PLACE WHEN #define
-// ENUM_CREATE_DEFINITION with #include this file must appear to generate defs
+// ENUMDECL_H_CREATE_DEFINITION with #include this file must appear to generate defs
 // Benefit of this solution: One place in code that materialize ENUM in scope of
 // Runtime.
 //
@@ -104,5 +104,5 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
 #undef BEGIN_E_GEN
 #undef END_E_GEN
 #undef DECL
-#define ENUM_DECLARATION_DONE
+#define ENUMDECL_H_DECLARATION_DONE
 #endif

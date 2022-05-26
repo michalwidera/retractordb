@@ -14,7 +14,7 @@
 using namespace boost;
 using namespace boost::lambda;
 
-#define ENUM_CREATE_DEFINITION
+#define ENUMDECL_H_CREATE_DEFINITION
 #include "enumDecl.h"
 
 extern "C" {
