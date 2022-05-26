@@ -20,15 +20,7 @@ static inline void rtrim(std::string &s) {
               .base(),
           s.end());
 }
-/*
-    std::string GetFieldType(rdb::eType e)
-    {
-        std::map<eType, std::string> typeDictionary = {
-            {STRING, "STRING"}, {BYTEARRAY, "BYTEARRAY"},  {INTARRAY,
-   "INTARRAY"}, {UINT, "UINT"}, {BYTE, "BYTE"}, {INT, "INT"}, {FLOAT, "FLOAT"},
-   {DOUBLE, "DOUBLE"}}; return typeDictionary[e];
-    }
-*/
+
 rdb::eType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
@@ -40,28 +32,13 @@ rdb::eType GetFieldType(std::string name) {
   return typeDictionary[name];
 }
 
-constexpr const char *GetFieldType(rdb::eType e) noexcept {
-  switch (e) {
-    case rdb::STRING:
-      return "STRING";
-    case rdb::BYTEARRAY:
-      return "BYTEARRAY";
-    case rdb::INTARRAY:
-      return "INTARRAY";
-    case rdb::UINT:
-      return "UINT";
-    case rdb::BYTE:
-      return "BYTE";
-    case rdb::INTEGER:
-      return "INTEGER";
-    case rdb::FLOAT:
-      return "FLOAT";
-    case rdb::DOUBLE:
-      return "DOUBLE";
-    default:
-      assert("Undefined type");
-      return "error";
-  }
+std::string GetFieldType(rdb::eType e) {
+  std::map<rdb::eType, std::string> typeDictionary = {
+      {rdb::STRING, "STRING"},     {rdb::BYTEARRAY, "BYTEARRAY"},
+      {rdb::INTARRAY, "INTARRAY"}, {rdb::UINT, "UINT"},
+      {rdb::BYTE, "BYTE"},         {rdb::INTEGER, "INTEGER"},
+      {rdb::FLOAT, "FLOAT"},       {rdb::DOUBLE, "DOUBLE"}};
+  return typeDictionary[e];
 }
 
 constexpr uint GetFieldLenFromType(rdb::eType ft) {
