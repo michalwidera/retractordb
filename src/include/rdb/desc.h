@@ -7,6 +7,8 @@
 #include <tuple>
 #include <vector>
 
+#include "enumDecl.h"
+
 namespace rdb {
 
 // https://developers.google.com/protocol-buffers/docs/overview#scalar

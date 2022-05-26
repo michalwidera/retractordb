@@ -47,12 +47,13 @@
 // Clarification: This structure in default mode will create: enum XXX {
 // void_command, void_value, ... } and GetStringXXX function will be decared as
 // existing somewhere. When, before including this header macro
-// ENUMDECL_H_CREATE_DEFINITION will be defined this structure will create&initialize
-// following map: std::map<XXX, std::string> = { { VOID_COMMAND, "VOID_COMMAND
+// ENUMDECL_H_CREATE_DEFINITION will be defined this structure will
+// create&initialize following map: std::map<XXX, std::string> = { {
+// VOID_COMMAND, "VOID_COMMAND
 // "} , ...} and function GetStingXXX with body. AT LEAST ONE PLACE WHEN #define
-// ENUMDECL_H_CREATE_DEFINITION with #include this file must appear to generate defs
-// Benefit of this solution: One place in code that materialize ENUM in scope of
-// Runtime.
+// ENUMDECL_H_CREATE_DEFINITION with #include this file must appear to generate
+// defs Benefit of this solution: One place in code that materialize ENUM in
+// scope of Runtime.
 //
 BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
                         DECL(VOID_VALUE),
@@ -97,9 +98,10 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
                         DECL(COUNT),
                         DECL(COUNT_RANGE)} END_E_GEN(command_id)
 
-    BEGIN_E_GEN(eType){DECL(BAD),      DECL(BYTE),     DECL(INTEGER),
-                       DECL(UNSIGNED), DECL(RATIONAL), DECL(FLOAT),
-                       DECL(STRING)} END_E_GEN(eType)
+    BEGIN_E_GEN(eType){DECL(BAD),      DECL(BYTE),      DECL(INTEGER),
+                       DECL(UNSIGNED), DECL(RATIONAL),  DECL(FLOAT),
+                       DECL(STRING),   DECL(BYTEARRAY), DECL(INTARRAY),
+                       DECL(DOUBLE)} END_E_GEN(eType)
 
 #undef BEGIN_E_GEN
 #undef END_E_GEN
