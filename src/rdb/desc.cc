@@ -24,7 +24,7 @@ static inline void rtrim(std::string &s) {
     std::string GetFieldType(FieldType e)
     {
         std::map<FieldType, std::string> typeDictionary = {
-            {String, "String"}, {Bytearray, "Bytearray"},  {Intarray,
+            {STRING, "STRING"}, {Bytearray, "Bytearray"},  {Intarray,
    "Intarray"}, {Uint, "Uint"}, {Byte, "Byte"}, {Int, "Int"}, {Float, "Float"},
    {Double, "Double"}}; return typeDictionary[e];
     }
@@ -33,7 +33,7 @@ FieldType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
   std::map<std::string, FieldType> typeDictionary = {
-      {"String", String}, {"Bytearray", Bytearray}, {"Intarray", Intarray},
+      {"STRING", STRING}, {"Bytearray", Bytearray}, {"Intarray", Intarray},
       {"Uint", Uint},     {"Byte", Byte},           {"Int", Int},
       {"Float", Float},   {"Double", Double}};
   return typeDictionary[name];
@@ -41,8 +41,8 @@ FieldType GetFieldType(std::string name) {
 
 constexpr const char *GetFieldType(FieldType e) noexcept {
   switch (e) {
-    case String:
-      return "String";
+    case STRING:
+      return "STRING";
     case Bytearray:
       return "Bytearray";
     case Intarray:
@@ -75,7 +75,7 @@ constexpr uint GetFieldLenFromType(FieldType ft) {
       return sizeof(double);
     case Byte:
       return 1;
-    case String:
+    case STRING:
     case Bytearray:
     case Intarray:
       assert("This type has other method of len-type id");
@@ -95,7 +95,7 @@ Descriptor::Descriptor(fieldName n, fieldLen l, FieldType t) {
 }
 
 Descriptor::Descriptor(fieldName n, FieldType t) {
-  assert((t != String || t != Bytearray || t != Intarray) &&
+  assert((t != STRING || t != Bytearray || t != Intarray) &&
          "This method does not work for Stings and Bytearrays.");
   push_back(field(n, GetFieldLenFromType(t), t));
   UpdateNames();
@@ -185,7 +185,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     os << "\t" << GetFieldType(std::get<rtype>(r)) << " " << std::get<rname>(r);
-    if (std::get<rtype>(r) == String || std::get<rtype>(r) == Bytearray)
+    if (std::get<rtype>(r) == STRING || std::get<rtype>(r) == Bytearray)
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
     else if (std::get<rtype>(r) == Intarray)
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
@@ -223,7 +223,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     ltrim(name);
     rtrim(name);
     auto ft = GetFieldType(type);
-    if (ft == String || ft == Bytearray)
+    if (ft == STRING || ft == Bytearray)
       is >> len;
     else if (ft == Intarray) {
       is >> len;

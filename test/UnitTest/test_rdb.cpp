@@ -104,27 +104,27 @@ bool test_3()
 
 bool test_descriptor()
 {
-    rdb::Descriptor data1{rdb::field("Name3", 10, rdb::String), rdb::field("Name4", 10, rdb::String)};
+    rdb::Descriptor data1{rdb::field("Name3", 10, rdb::STRING), rdb::field("Name4", 10, rdb::STRING)};
 
-    data1.Append({rdb::field("Name5z", 10, rdb::String)});
-    data1.Append({rdb::field("Name6z", 10, rdb::String)});
+    data1.Append({rdb::field("Name5z", 10, rdb::STRING)});
+    data1.Append({rdb::field("Name6z", 10, rdb::STRING)});
 
-    data1.push_back(rdb::field("Name", 10, rdb::String));
+    data1.push_back(rdb::field("Name", 10, rdb::STRING));
     data1.push_back(rdb::field("TLen", sizeof(uint), rdb::Uint));
 
-    data1 | rdb::Descriptor("Name2", 10, rdb::String) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("Len3", rdb::Uint);
+    data1 | rdb::Descriptor("Name2", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("Len3", rdb::Uint);
     {
         std::stringstream coutstring;
         coutstring << data1;
-        char test[] = "{\tString Name3[10]\n\tString Name4[10]\n\tString Name5z[10]\n\tString Name6z[10]\n\tString Name[10]\n\tUint TLen\n\tString Name2[10]\n\tByte Control\n\tUint Len3\n}";
+        char test[] = "{\tSTRING Name3[10]\n\tSTRING Name4[10]\n\tSTRING Name5z[10]\n\tSTRING Name6z[10]\n\tSTRING Name[10]\n\tUint TLen\n\tSTRING Name2[10]\n\tByte Control\n\tUint Len3\n}";
         if (strcmp(coutstring.str().c_str(), test) != 0)
             return false;
     }
 
-    rdb::Descriptor data2 = rdb::Descriptor("Name", 10, rdb::String) | rdb::Descriptor("Len3", rdb::Uint) | rdb::Descriptor("Control", rdb::Byte);
+    rdb::Descriptor data2 = rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Len3", rdb::Uint) | rdb::Descriptor("Control", rdb::Byte);
     {
         std::stringstream coutstring;
-        char test[] = "{\tString Name[10]\n\tUint Len3\n\tByte Control\n}";
+        char test[] = "{\tSTRING Name[10]\n\tUint Len3\n\tByte Control\n}";
         coutstring << data2;
         if (strcmp(coutstring.str().c_str(), test) != 0)
             return false;
@@ -149,7 +149,7 @@ bool test_descriptor_read()
     std::streambuf *orig = std::cin.rdbuf();
     //Note: This mess is intended here in test
 
-    const char *test_string = "{ String Name3[10]\nString Name[10]\nUint Len String Name2 10 Byte Control Uint Len3 }";
+    const char *test_string = "{ STRING Name3[10]\nSTRING Name[10]\nUint Len STRING Name2 10 Byte Control Uint Len3 }";
 
     // Test goes here
 
@@ -163,7 +163,7 @@ bool test_descriptor_read()
 
     {
         std::stringstream coutstring;
-        const char *test = "{\tString Name3[10]\n\tString Name[10]\n\tUint Len\n\tString Name2[10]\n\tByte Control\n\tUint Len3\n}";
+        const char *test = "{\tSTRING Name3[10]\n\tSTRING Name[10]\n\tUint Len\n\tSTRING Name2[10]\n\tByte Control\n\tUint Len3\n}";
         coutstring << data3;
         if(strcmp(coutstring.str().c_str(), test) != 0)
             return false;
@@ -194,7 +194,7 @@ bool test_storage()
 
     static_assert(sizeof(dataPayload) == 15);
 
-    auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::String) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("TLen", rdb::Int)};
+    auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::Byte) | rdb::Descriptor("TLen", rdb::Int)};
 
     // This assert will fail is structure is not packed.
     if (dataDescriptor.GetSize() != sizeof(dataPayload))

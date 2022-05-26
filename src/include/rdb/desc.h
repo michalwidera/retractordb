@@ -17,7 +17,7 @@ namespace rdb {
 /**
  * @brief Supported field types.
  */
-enum FieldType { String, Bytearray, Intarray, Byte, Uint, Int, Float, Double };
+enum FieldType { STRING, Bytearray, Intarray, Byte, Uint, Int, Float, Double };
 
 typedef int fieldLen;
 typedef std::string fieldName;
@@ -59,17 +59,17 @@ class Descriptor : public std::vector<field> {
    * @brief Construct a new Descriptor object
    *
    * @param l initializer list - this enables create Descriptor as Descriptor
-   * obj{field("A",10,String), field("B",10,rdb::String)};
+   * obj{field("A",10,STRING), field("B",10,rdb::STRING)};
    */
   Descriptor(std::initializer_list<field> l);
 
   /**
-   * @brief Construct a new Descriptor object - only for String (object with
+   * @brief Construct a new Descriptor object - only for STRING (object with
    * len)
    *
    * @param n Field name
    * @param l Field len
-   * @param t Field type - String (Maybe tables in future)
+   * @param t Field type - STRING (Maybe tables in future)
    */
   Descriptor(fieldName n, fieldLen l, FieldType t);
 
@@ -87,7 +87,7 @@ class Descriptor : public std::vector<field> {
   Descriptor() = default;
 
   /**
-   * @brief This function will object.Append({field("A",10,String)});
+   * @brief This function will object.Append({field("A",10,STRING)});
    *
    * @param l Initializer list of fields in {}
    */
@@ -96,7 +96,7 @@ class Descriptor : public std::vector<field> {
   /**
    * @brief This constructor helps chaining operators with descriptor.
    *
-   * DescriptorObject | Descriptor("A",10,String) | Descriptor("B",Byte)
+   * DescriptorObject | Descriptor("A",10,STRING) | Descriptor("B",Byte)
    *
    * @param rhs Right Hand Side - it is reference to Right arguemnt of operator
    * @return Descriptor& This return reference to result

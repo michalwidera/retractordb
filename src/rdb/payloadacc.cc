@@ -40,7 +40,7 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
   else
     is >> std::dec;
   Descriptor desc(rhs.getDescriptor());
-  if (desc.Type(fieldName) == "String") {
+  if (desc.Type(fieldName) == "STRING") {
     std::string record;
     std::getline(is >> std::ws, record);
     memset(rhs.getPayloadPtr() + desc.Offset(fieldName), 0,
@@ -93,7 +93,7 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
     os << "\t" << std::get<rname>(r) << ":";
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.Offset(std::get<rname>(r));
-    if (std::get<rtype>(r) == String) {
+    if (std::get<rtype>(r) == STRING) {
       auto len_ = desc.Len(std::get<rname>(r));
       os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_),
                         len_);
