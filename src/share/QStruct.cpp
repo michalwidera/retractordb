@@ -280,13 +280,18 @@ int query::getFieldIndex(field f_arg) {
 bool query::isReductionRequired() {
   int streamOperatorCount(0);
   for (auto &t : lProgram) {
-    if (t.getTokenCommand() == STREAM_HASH) ++streamOperatorCount;
-    if (t.getTokenCommand() == STREAM_DEHASH_DIV) ++streamOperatorCount;
-    if (t.getTokenCommand() == STREAM_DEHASH_MOD) ++streamOperatorCount;
-    if (t.getTokenCommand() == STREAM_ADD) ++streamOperatorCount;
-    if (t.getTokenCommand() == STREAM_SUBSTRACT) ++streamOperatorCount;
-    if (t.getTokenCommand() == STREAM_TIMEMOVE) ++streamOperatorCount;
-    if (t.getTokenCommand() == STREAM_AGSE) ++streamOperatorCount;
+    switch(t.getTokenCommand()) {
+      case STREAM_HASH:
+      case STREAM_DEHASH_DIV:
+      case STREAM_DEHASH_MOD:
+      case STREAM_ADD:
+      case STREAM_SUBSTRACT:
+      case STREAM_TIMEMOVE:
+      case STREAM_AGSE:
+        ++streamOperatorCount;
+      default:
+        ;
+    }
   }
   return streamOperatorCount > 1;
 }
