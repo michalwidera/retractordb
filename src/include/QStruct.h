@@ -84,13 +84,11 @@ class field {
     ar &lProgram;
     ar &sFieldText;
     ar &fieldDesc;
-    ar &fieldName;
   }
 
   std::string sFieldText;
 
  public:
-  std::string fieldName;
   rdb::eType dFieldType;
   std::list<token> lProgram;
 

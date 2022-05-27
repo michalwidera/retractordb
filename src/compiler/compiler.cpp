@@ -306,7 +306,7 @@ std::list<field> combine(std::string sName1, std::string sName2,
     int i = 0;
     for (auto f : getQuery(sName1).lSchema) {
       field intf;
-      intf.fieldName =
+      std::get<rdb::rname>(intf.fieldDesc) =
           "Field_" + boost::lexical_cast<std::string>(fieldCount++);
       intf.lProgram.push_front(
           token(PUSH_ID, boost::rational<int>(i++), sName1));
@@ -315,7 +315,7 @@ std::list<field> combine(std::string sName1, std::string sName2,
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
       field intf;
-      intf.fieldName =
+      std::get<rdb::rname>(intf.fieldDesc) =
           "Field_" + boost::lexical_cast<std::string>(fieldCount++);
       intf.lProgram.push_front(
           token(PUSH_ID, boost::rational<int>(i++), sName2));
@@ -328,28 +328,28 @@ std::list<field> combine(std::string sName1, std::string sName2,
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_AVG) {
     field intf;
-    intf.fieldName = "avg";
+    std::get<rdb::rname>(intf.fieldDesc) = "avg";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
     field intf;
-    intf.fieldName = "min";
+    std::get<rdb::rname>(intf.fieldDesc) = "min";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
     field intf;
-    intf.fieldName = "max";
+    std::get<rdb::rname>(intf.fieldDesc) = "max";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
     field intf;
-    intf.fieldName = "sum";
+    std::get<rdb::rname>(intf.fieldDesc) = "sum";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
@@ -362,14 +362,16 @@ std::list<field> combine(std::string sName1, std::string sName2,
     if (rational_cast<int>(cmd_token.getCRValue()) > 0) {
       for (int i = 0; i < windowSize; i++) {
         field intf;
-        intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
+        std::get<rdb::rname>(intf.fieldDesc) =
+            sName1 + "_" + lexical_cast<std::string>(i);
         intf.dFieldType = rdb::BAD;
         schema.push_back(intf);
       }
     } else {
       for (int i = windowSize - 1; i >= 0; i--) {
         field intf;
-        intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
+        std::get<rdb::rname>(intf.fieldDesc) =
+            sName1 + "_" + lexical_cast<std::string>(i);
         intf.dFieldType = rdb::BAD;
         schema.push_back(intf);
       }
@@ -556,7 +558,7 @@ std::string convertReferences() {
                 if (q1.id == schema) {
                   int offset1(0);
                   for (auto &f1 : q1.lSchema) {
-                    if (f1.fieldName == field) {
+                    if (std::get<rdb::rname>(f1.fieldDesc) == field) {
                       t = token(PUSH_ID, boost::rational<int>(offset1), schema);
                       break;
                     } else
@@ -625,7 +627,7 @@ std::string convertReferences() {
               if (pQ1 != nullptr) {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
-                  if (f1.fieldName == field) {
+                  if (std::get<rdb::rname>(f1.fieldDesc) == field) {
                     t = token(PUSH_ID, boost::rational<int>(offset1), schema1);
                     bFieldFound = true;
                   }
@@ -635,7 +637,7 @@ std::string convertReferences() {
               if (pQ2 != nullptr && bFieldFound == false) {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
-                  if (f2.fieldName == field) {
+                  if (std::get<rdb::rname>(f2.fieldDesc) == field) {
                     t = token(PUSH_ID, boost::rational<int>(offset1), schema2);
                     bFieldFound = true;
                   }

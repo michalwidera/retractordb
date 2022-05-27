@@ -66,7 +66,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
         // Patch on gramma problem -
         // dot program is using { as important sign - we need to convert { to <
         //
-        std::string sFieldName(f.fieldName);
+        std::string sFieldName(std::get<rdb::rname>(f.fieldDesc));
         std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
         std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
         std::string sFieldString(f.getFieldText());
@@ -135,7 +135,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
                   "label=\"";
         else
           xout << "[shape=record,label=\"";
-        std::string sFieldName(f.fieldName);
+        std::string sFieldName(std::get<rdb::rname>(f.fieldDesc));
         std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
         std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
         xout << sFieldName;
@@ -209,7 +209,7 @@ void dumpQFieldsProgram() {
     for (auto f : q.lSchema) {
       for (auto t : f.lProgram) {
         std::cout << q.id << "\t";
-        std::cout << f.fieldName << "\t";
+        std::cout << std::get<rdb::rname>(f.fieldDesc) << "\t";
         std::cout << t.getStrTokenName() << "\t";
         std::cout << t.getValue();
         if (t.getStrTokenName() == "PUSH_ID")
@@ -228,7 +228,7 @@ void dumpQFields() {
     for (auto f : q.lSchema) {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
-      std::cout << f.fieldName << "\t";
+      std::cout << std::get<rdb::rname>(f.fieldDesc) << "\t";
       std::cout << std::endl;
     }
   }
@@ -279,7 +279,7 @@ void dumpRawTextFile(bool bShowFieldTypes) {
         std::cout << "\t:- " << t.getStrTokenName() << std::endl;
     for (auto f : q.lSchema) {
       std::cout << "\t";
-      std::cout << f.fieldName << ":";
+      std::cout << std::get<rdb::rname>(f.fieldDesc) << ":";
       if (bShowFieldTypes)
         std::cout << "(" << GetStringeType(f.dFieldType) << ")";
       std::cout << std::endl;
