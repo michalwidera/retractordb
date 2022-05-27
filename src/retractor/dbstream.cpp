@@ -20,13 +20,20 @@ void setStorageLocation(std::string location) {
   database.setStoragePath(location);
 }
 
-dbStream::dbStream(std::string streamName, std::list<std::string> schema)
+dbStream::dbStream(std::string streamName, std::list<field> schema)
     : streamName(streamName),
       schema(schema),
       mpReadNr(-1),
       mpLenNr(-1),
       frameSize(schema.size() * sizeof(number)),
       pRawData(new char[frameSize]) {
+  /*
+  rdb::Descriptor desc;
+  for (auto i = 0; i < schema.size(); i ++ )
+  {
+    desc | rdb::Descriptor();
+  }
+  */
   database.DefBlock(streamName, frameSize);
   mpShadow.resize(schema.size());
   mpRead.resize(schema.size());

@@ -24,6 +24,12 @@ void dataSet::DefBlock(std::string filename, int frameSize) {
   recordSize = desc.GetSize();
 }
 
+void dataSet::DefBlock(std::string filename, rdb::Descriptor desc) {
+  data[path + filename] = std::unique_ptr<rdb::DataStorageAccessor<std::byte>>(
+      new rdb::DataStorageAccessor(desc, path + filename, false));
+  recordSize = desc.GetSize();
+}
+
 void dataSet::PutBlock(std::string filename, char* pRawData) {
   data[path + filename]->Put(reinterpret_cast<std::byte*>(pRawData));
 }

@@ -17,6 +17,7 @@
 #include <boost/serialization/vector.hpp>
 
 #include "enumDecl.h"
+#include "rdb/desc.h"
 
 namespace boost {
 namespace serialization {
@@ -31,6 +32,14 @@ inline void serialize(Archive &ar, boost::rational<T> &p,
   ar &_den;
   p.assign(_num, _den);
 }
+
+// https://stackoverflow.com/questions/14744303/does-boost-support-serialization-of-c11s-stdtuple/14928368#14928368
+template <typename Archive, typename... Types>
+inline void serialize(Archive &ar, std::tuple<Types...> &t,
+                      const unsigned int) {
+  std::apply([&](auto &...element) { ((ar & element), ...); }, t);
+}
+
 }  // namespace serialization
 }  // namespace boost
 
@@ -75,6 +84,7 @@ class field {
     ar &dFieldType;
     ar &lProgram;
     ar &sFieldText;
+    ar &fieldDesc;
   }
 
   std::string sFieldText;
@@ -83,6 +93,8 @@ class field {
   std::set<std::string> setFieldName;
   rdb::eType dFieldType;
   std::list<token> lProgram;
+
+  rdb::field fieldDesc;
 
   field();
   field(std::string sFieldName, std::list<token> &lProgram,

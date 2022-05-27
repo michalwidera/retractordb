@@ -9,6 +9,8 @@
 #include <string>                            // for string
 #include <vector>                            // for vector
 
+#include "QStruct.h"
+
 /** Data of this type are stored in streams */
 typedef boost::variant<boost::rational<int>, int, double> number;
 
@@ -23,14 +25,14 @@ class dbStream : private boost::noncopyable {
   int frameSize;                      /**< Size of frame in bytes */
   boost::shared_array<char> pRawData; /**< Pointer for binary data */
   std::string streamName;             /**< Stream name */
-  std::list<std::string>
-      schema; /**< Schema - otherwize, list of field in stream */
   std::vector<number> mpShadow;
   std::vector<number> mpRead;
   int mpReadNr, mpLenNr;
 
+  std::list<field> schema;
+
  public:
-  dbStream(std::string streamName, std::list<std::string> schema);
+  dbStream(std::string streamName, std::list<field> schema);
 
   number &operator[](const int &_Keyval);
   number readCache(const int &_Keyval);

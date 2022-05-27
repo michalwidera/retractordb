@@ -207,8 +207,7 @@ Processor::Processor() {
   // This function initialize map creating archive streams in cbuff
   for (auto q : coreInstance) {
     if (storage.find(q.id) == storage.end())
-      storage[q.id] =
-          std::shared_ptr<dbStream>(new dbStream(q.id, q.getFieldNamesList()));
+      storage[q.id] = std::shared_ptr<dbStream>(new dbStream(q.id, q.lSchema));
     else
       ;  // Stream with this name already exist in stystem
     // Container initialization for file type data sources

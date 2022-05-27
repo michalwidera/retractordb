@@ -28,6 +28,7 @@ class dataSet {
   long streamStoredSize(std::string filename);
   long GetLen(std::string filename);
   void DefBlock(std::string filename, int frameSize);
+  void DefBlock(std::string filename, Descriptor desc);
   void PutBlock(std::string filename, char *pRawData);
   bool GetBlock(std::string filename, int offset, char *pRawData);
   void reverse(std::string filename, bool val);
