@@ -298,14 +298,6 @@ std::list<field> combine(std::string sName1, std::string sName2,
       throw std::invalid_argument(
           "Hash operation needs same schemas on arguments stream");
     lRetVal = getQuery(sName1).lSchema;
-    // check this!!!
-    //        list < field >::iterator it = lRetVal.begin() ;
-    //        BOOST_FOREACH ( field f1 , getQuery( sName1 ).lSchema )
-    //        {
-    //            BOOST_FOREACH( const string & s , f1.setFieldName )
-    //                    (*it).setFieldName.insert( s ) ;
-    //            it ++ ;
-    //        }
   } else if (cmd == STREAM_DEHASH_DIV)
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_DEHASH_MOD)
@@ -314,8 +306,8 @@ std::list<field> combine(std::string sName1, std::string sName2,
     int i = 0;
     for (auto f : getQuery(sName1).lSchema) {
       field intf;
-      intf.setFieldName.insert("Field_" +
-                               boost::lexical_cast<std::string>(fieldCount++));
+      intf.fieldName =
+          "Field_" + boost::lexical_cast<std::string>(fieldCount++);
       intf.lProgram.push_front(
           token(PUSH_ID, boost::rational<int>(i++), sName1));
       lRetVal.push_back(intf);
@@ -323,8 +315,8 @@ std::list<field> combine(std::string sName1, std::string sName2,
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
       field intf;
-      intf.setFieldName.insert("Field_" +
-                               boost::lexical_cast<std::string>(fieldCount++));
+      intf.fieldName =
+          "Field_" + boost::lexical_cast<std::string>(fieldCount++);
       intf.lProgram.push_front(
           token(PUSH_ID, boost::rational<int>(i++), sName2));
       lRetVal.push_back(intf);
@@ -336,28 +328,28 @@ std::list<field> combine(std::string sName1, std::string sName2,
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_AVG) {
     field intf;
-    intf.setFieldName.insert("avg");
+    intf.fieldName = "avg";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
     field intf;
-    intf.setFieldName.insert("min");
+    intf.fieldName = "min";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
     field intf;
-    intf.setFieldName.insert("max");
+    intf.fieldName = "max";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
     field intf;
-    intf.setFieldName.insert("sum");
+    intf.fieldName = "sum";
     intf.dFieldType = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
@@ -370,14 +362,14 @@ std::list<field> combine(std::string sName1, std::string sName2,
     if (rational_cast<int>(cmd_token.getCRValue()) > 0) {
       for (int i = 0; i < windowSize; i++) {
         field intf;
-        intf.setFieldName.insert(sName1 + "_" + lexical_cast<std::string>(i));
+        intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
         intf.dFieldType = rdb::BAD;
         schema.push_back(intf);
       }
     } else {
       for (int i = windowSize - 1; i >= 0; i--) {
         field intf;
-        intf.setFieldName.insert(sName1 + "_" + lexical_cast<std::string>(i));
+        intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
         intf.dFieldType = rdb::BAD;
         schema.push_back(intf);
       }
@@ -564,7 +556,7 @@ std::string convertReferences() {
                 if (q1.id == schema) {
                   int offset1(0);
                   for (auto &f1 : q1.lSchema) {
-                    if (f1.setFieldName.find(field) != f1.setFieldName.end()) {
+                    if (f1.fieldName == field) {
                       t = token(PUSH_ID, boost::rational<int>(offset1), schema);
                       break;
                     } else
@@ -633,7 +625,7 @@ std::string convertReferences() {
               if (pQ1 != nullptr) {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
-                  if (f1.setFieldName.find(field) != f1.setFieldName.end()) {
+                  if (f1.fieldName == field) {
                     t = token(PUSH_ID, boost::rational<int>(offset1), schema1);
                     bFieldFound = true;
                   }
@@ -643,7 +635,7 @@ std::string convertReferences() {
               if (pQ2 != nullptr && bFieldFound == false) {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
-                  if (f2.setFieldName.find(field) != f2.setFieldName.end()) {
+                  if (f2.fieldName == field) {
                     t = token(PUSH_ID, boost::rational<int>(offset1), schema2);
                     bFieldFound = true;
                   }

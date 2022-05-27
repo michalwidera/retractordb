@@ -80,17 +80,17 @@ class field {
 
   template <class Archive>
   void serialize(Archive &ar, unsigned int version) {
-    ar &setFieldName;
     ar &dFieldType;
     ar &lProgram;
     ar &sFieldText;
     ar &fieldDesc;
+    ar &fieldName;
   }
 
   std::string sFieldText;
 
  public:
-  std::set<std::string> setFieldName;
+  std::string fieldName;
   rdb::eType dFieldType;
   std::list<token> lProgram;
 
@@ -101,7 +101,6 @@ class field {
         rdb::eType fieldType, std::string sFieldText);
 
   std::string getFirstFieldName();
-  std::string getFieldNameSet();
   std::string getFieldText();
   token getFirstFieldToken();
 

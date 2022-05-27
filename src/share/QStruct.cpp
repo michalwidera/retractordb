@@ -98,7 +98,7 @@ boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
 
 field &query::getField(std::string sField) {
   for (auto &f : lSchema) {
-    if (f.setFieldName.find(sField) != f.setFieldName.end()) return f;
+    if (f.fieldName == sField) return f;
   }
   throw std::logic_error("No such field in schema");
   return *new field();
@@ -223,24 +223,19 @@ field::field() {}
 
 field::field(std::string sFieldName, std::list<token> &lProgram,
              rdb::eType dFieldType, std::string sFieldText)
-    : lProgram(lProgram), dFieldType(dFieldType), sFieldText(sFieldText) {
-  setFieldName.insert(sFieldName);
-}
+    : lProgram(lProgram),
+      dFieldType(dFieldType),
+      sFieldText(sFieldText),
+      fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
 
-std::string field::getFirstFieldName() { return *setFieldName.begin(); }
+std::string field::getFirstFieldName() { return fieldName; }
 
 token field::getFirstFieldToken() {
   assert(lProgram.size() >
          0);  // If this fails that means in field no program (decl!)
   return *lProgram.begin();
-}
-
-std::string field::getFieldNameSet() {
-  std::stringstream retVal;
-  for (const auto &s : setFieldName) retVal << s << " ";
-  return retVal.str();
 }
 
 /** Construktor set */
