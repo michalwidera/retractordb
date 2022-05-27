@@ -83,7 +83,7 @@ inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
 void inputDF::processRow() {
   lResult.clear();
   for (auto &f : lSchema) {
-    switch (f.dFieldType) {
+    switch (std::get<rdb::rtype>(f.fieldDesc)) {
       case rdb::BYTE:
         lResult.push_back(get<unsigned char>());
         break;

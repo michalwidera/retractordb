@@ -329,28 +329,28 @@ std::list<field> combine(std::string sName1, std::string sName2,
   else if (cmd == STREAM_AVG) {
     field intf;
     std::get<rdb::rname>(intf.fieldDesc) = "avg";
-    intf.dFieldType = rdb::RATIONAL;
+    std::get<rdb::rtype>(intf.fieldDesc) = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
     field intf;
     std::get<rdb::rname>(intf.fieldDesc) = "min";
-    intf.dFieldType = rdb::RATIONAL;
+    std::get<rdb::rtype>(intf.fieldDesc) = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
     field intf;
     std::get<rdb::rname>(intf.fieldDesc) = "max";
-    intf.dFieldType = rdb::RATIONAL;
+    std::get<rdb::rtype>(intf.fieldDesc) = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
     field intf;
     std::get<rdb::rname>(intf.fieldDesc) = "sum";
-    intf.dFieldType = rdb::RATIONAL;
+    std::get<rdb::rtype>(intf.fieldDesc) = rdb::RATIONAL;
     intf.lProgram.push_front(token(PUSH_ID, sName1));
     lRetVal.push_back(intf);
     return lRetVal;
@@ -364,7 +364,7 @@ std::list<field> combine(std::string sName1, std::string sName2,
         field intf;
         std::get<rdb::rname>(intf.fieldDesc) =
             sName1 + "_" + lexical_cast<std::string>(i);
-        intf.dFieldType = rdb::BAD;
+        std::get<rdb::rtype>(intf.fieldDesc) = rdb::BAD;
         schema.push_back(intf);
       }
     } else {
@@ -372,7 +372,7 @@ std::list<field> combine(std::string sName1, std::string sName2,
         field intf;
         std::get<rdb::rname>(intf.fieldDesc) =
             sName1 + "_" + lexical_cast<std::string>(i);
-        intf.dFieldType = rdb::BAD;
+        std::get<rdb::rtype>(intf.fieldDesc) = rdb::BAD;
         schema.push_back(intf);
       }
     }
@@ -512,8 +512,9 @@ std::string replicateIDX() {
           }
           std::string toRepalce = oldField.getFieldText();
           replaceAll(toRepalce, "_", lexical_cast<std::string>(i));
+          auto newFieldType = std::get<rdb::rtype>(oldField.fieldDesc);
           field newField(schemaName + "_" + lexical_cast<std::string>(i),
-                         newLProgram, oldField.dFieldType, toRepalce);
+                         newLProgram, newFieldType, toRepalce);
           q.lSchema.push_back(newField);
         }
         assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());

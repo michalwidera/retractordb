@@ -223,7 +223,8 @@ field::field() {}
 
 field::field(std::string sFieldName, std::list<token> &lProgram,
              rdb::eType dFieldType, std::string sFieldText)
-    : lProgram(lProgram), dFieldType(dFieldType), sFieldText(sFieldText) {
+    : lProgram(lProgram), sFieldText(sFieldText) {
+  std::get<rdb::rtype>(fieldDesc) = dFieldType;
   std::get<rdb::rname>(fieldDesc) = sFieldName;
 }
 

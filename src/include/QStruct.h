@@ -80,7 +80,6 @@ class field {
 
   template <class Archive>
   void serialize(Archive &ar, unsigned int version) {
-    ar &dFieldType;
     ar &lProgram;
     ar &sFieldText;
     ar &fieldDesc;
@@ -89,7 +88,6 @@ class field {
   std::string sFieldText;
 
  public:
-  rdb::eType dFieldType;
   std::list<token> lProgram;
 
   rdb::field fieldDesc;
