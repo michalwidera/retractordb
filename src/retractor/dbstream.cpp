@@ -29,8 +29,7 @@ dbStream::dbStream(std::string streamName, std::list<field> schema)
       pRawData(new char[frameSize]) {
   rdb::Descriptor data;
   for (auto const &i : schema) data.push_back(i.fieldDesc);
-
-  database.DefBlock(streamName, frameSize);
+  database.DefBlock(streamName, data);
   mpShadow.resize(schema.size());
   mpRead.resize(schema.size());
 }
