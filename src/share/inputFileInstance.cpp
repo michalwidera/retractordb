@@ -95,7 +95,7 @@ void inputDF::processRow() {
         break;
       case rdb::BAD:
       default:
-        std::cerr << "field:" << f.getFirstFieldName() << std::endl;
+        std::cerr << "field:" << std::get<rdb::rtype>(f.fieldDesc) << std::endl;
         throw std::out_of_range("processRow/undefined type");
         break;  // proforma
     }
@@ -106,7 +106,8 @@ boost::rational<int> inputDF::getCR(field f) {
   boost::rational<int> retValue(0);
   int cnt(0);
   for (auto &v : lSchema) {
-    if (v.getFirstFieldName() == f.getFirstFieldName()) break;
+    if (std::get<rdb::rname>(v.fieldDesc) == std::get<rdb::rname>(f.fieldDesc))
+      break;
     cnt++;
   }
   if (lResult.size() == 0) processRow();

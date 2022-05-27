@@ -260,14 +260,15 @@ query::query() {}
 
 std::list<std::string> query::getFieldNamesList() {
   std::list<std::string> schema;
-  for (auto &f : lSchema) schema.push_back(f.getFirstFieldName());
+  for (auto &f : lSchema) schema.push_back(std::get<rdb::rname>(f.fieldDesc));
   return schema;
 }
 
 int query::getFieldIndex(field f_arg) {
   int idx(0);
   for (auto f : lSchema) {
-    if (f.getFirstFieldName() == f_arg.getFirstFieldName())  // Todo
+    if (std::get<rdb::rname>(f.fieldDesc) ==
+        std::get<rdb::rname>(f_arg.fieldDesc))  // Todo
       return idx;
     idx++;
   }
