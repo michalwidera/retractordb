@@ -230,10 +230,6 @@ field::field(std::string sFieldName, std::list<token> &lProgram,
 
 std::string field::getFieldText() { return sFieldText; }
 
-std::string field::getFirstFieldName() {
-  return std::get<rdb::rname>(fieldDesc);
-}
-
 token field::getFirstFieldToken() {
   assert(lProgram.size() >
          0);  // If this fails that means in field no program (decl!)

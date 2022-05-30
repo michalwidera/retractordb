@@ -96,7 +96,6 @@ class field {
   field(std::string sFieldName, std::list<token> &lProgram,
         rdb::eType fieldType, std::string sFieldText);
 
-  std::string getFirstFieldName();
   std::string getFieldText();
   token getFirstFieldToken();
 
