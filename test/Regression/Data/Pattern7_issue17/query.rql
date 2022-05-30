@@ -1,0 +1,19 @@
+# Check if fields are identified correctly - Covering #issue_17
+
+STORAGE '/home/michal/test'
+
+# DECLARE a BYTE, b BYTE STREAM coreAB, 1 FILE '/dev/urandom'
+# DECLARE c BYTE, d BYTE STREAM coreCD, 0.5 FILE '/dev/urandom'
+
+# SELECT coreAB[0]+1,coreAB[1]+1,coreCD[0],coreCD[1] STREAM out1 FROM coreAB+coreCD
+# SELECT out[1] STREAM out2 FROM out1
+# SELECT out3[0],out3[1],out3[2],out3[3] STREAM out3 FROM coreAB+coreCD
+
+DECLARE a BYTE, b BYTE STREAM coreAB, 1 FILE '/dev/urandom'
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile2.dat'
+DECLARE b INTEGER STREAM core1, 0.2 FILE 'datafile3.dat'
+
+SELECT str1[0]*10,str1[0]*10 STREAM str1 FROM core0+core1
+
+SELECT str2[0]+10,str2[1]+1 STREAM str2 FROM coreAB
