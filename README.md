@@ -21,20 +21,21 @@ Commands
 How to install
 -----------------------------------------------------------------------
 
+NOTE: If you are using conan fist time plese create default conan profile
+```
+conan profile new default --detect
+```
+
 ```
 sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
 pip install conan
 git clone https://github.com/michalwidera/retractordb.git
 cd build
-conan source ..
 conan install ..
 conan build ..
 make test
 ```
-If you are using conan fist time plese create default conan profile
-```
-conan profile new default --detect
-```
+
 
 After installation _xretractor_, _xqry_ ... etc will be installed in ~/.local/bin on path.
 Please check proper installation by typing in command prompt - for instance: _xqry -h_

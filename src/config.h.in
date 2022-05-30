@@ -1,0 +1,13 @@
+#ifndef CONFIG_H_IN
+#define CONFIG_H_IN
+
+// This file will be regenerated during build process in include directory
+// as config.h file with filled @---@ values.
+// Check: https://evileg.com/en/post/536/
+// and: https://cliutils.gitlab.io/modern-cmake/chapters/basics/programs.html
+
+#define CONFIG_LINE "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "                           \
+                    "Code compiler: @CMAKE_CXX_COMPILER_ID@ Ver. @CMAKE_CXX_COMPILER_VERSION@, " \
+                    "Build time: @GIT_CURRENT_BUILDTIME@\n"
+
+#endif // CONFIG_H_IN
