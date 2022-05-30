@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.3 FATAL_ERROR )
+cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
-project (retractordb-test)
+project(retractordb-test)
 
 enable_testing()
 

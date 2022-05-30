@@ -1,8 +1,10 @@
---style=bsd
+--style=linux
 --suffix=none
 --indent=spaces
 --indent-switches
 --indent-cases
+--indent-preproc-block
+--indent-preproc-define
 
 # Paddings around operators, parentheses, and a header
 # (header means `if`, `while`, etc. Example: `if (true)`, instead of `if(true)`)
@@ -11,6 +13,8 @@
 --pad-comma
 --unpad-paren
 
+--keep-one-line-blocks
+
 --delete-empty-lines
 --align-pointer=type
 --align-reference=name
@@ -18,16 +22,11 @@
 --indent-cases
 --indent-after-parens
 --indent-namespaces
---add-braces
+--remove-braces
 --close-templates
 --break-after-logical
 --break-one-line-headers
---break-blocks
-
-# Make sure to always add brackets to if,for,while etc statements
-# we do not want to repeat goto fail;
---keep-one-line-blocks
---keep-one-line-statements
+--attach-return-type
 
 # Obvious 132 col length maximum
 --max-code-length=132
