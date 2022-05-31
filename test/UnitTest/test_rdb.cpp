@@ -29,6 +29,7 @@ bool test_1() {
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
   auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
+  if (statusRemove1 != 0) return false;
 
   return true;
 }
@@ -51,6 +52,7 @@ bool test_2() {
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
   auto statusRemove1 = remove(dataStore.FileName().c_str());
+  if (statusRemove1 != 0) return false;
 
   return true;
 }
@@ -87,6 +89,7 @@ bool test_3() {
     if (strcmp(reinterpret_cast<char *>(yData), "test xxxx") != 0) return false;
   }
   auto statusRemove1 = remove(dataStore.FileName().c_str());
+  if (statusRemove1 != 0) return false;
 
   return true;
 }
@@ -239,7 +242,10 @@ bool test_storage() {
   }
 
   auto statusRemove1 = remove("datafile-fstream2");
+  if (statusRemove1 != 0) return false;
+
   auto statusRemove2 = remove("datafile-fstream2.desc");
+  if (statusRemove2 != 0) return false;
 
   return true;
 }

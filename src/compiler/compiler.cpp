@@ -25,7 +25,7 @@ std::string intervalCounter() {
     bool bOnceAgain(false);
     coreInstance.sort();
     for (auto &q : coreInstance) {
-      if (q.lProgram.size() == 0) {
+      if (q.lProgram.empty()) {
         continue; /* Declaration */
       }
       if (q.lProgram.size() == 1) {
@@ -182,11 +182,11 @@ TODO: Stream_MAX,MIN,AVG...
 */
 std::string simplifyLProgram() {
   coreInstance.sort();
-  for (qTree::iterator it = coreInstance.begin(); it != coreInstance.end();
+  for (auto it = coreInstance.begin(); it != coreInstance.end();
        ++it) {
     // Agse pahse optization
     token t0, t1, t2;
-    for (std::list<token>::iterator it2 = (*it).lProgram.begin();
+    for (auto it2 = (*it).lProgram.begin();
          it2 != (*it).lProgram.end(); ++it2) {
       t0 = t1;
       t1 = t2;
@@ -205,7 +205,7 @@ std::string simplifyLProgram() {
     }
     // Otimization phase 2
     if ((*it).isReductionRequired()) {
-      for (std::list<token>::iterator it2 = (*it).lProgram.begin();
+      for (auto it2 = (*it).lProgram.begin();
            it2 != (*it).lProgram.end(); ++it2) {
         if ((*it2).getStrTokenName() == "STREAM_TIMEMOVE" ||
             (*it2).getStrTokenName() == "STREAM_SUBSTRACT") {
@@ -415,7 +415,7 @@ std::string prepareFields() {
       // fail of this asseration means that all streams are
       // after otimization alerady
       std::vector<std::list<field>::iterator> eraseList;
-      std::list<field>::iterator it = q.lSchema.begin();
+      auto it = q.lSchema.begin();
       for (auto &f : q.lSchema) {
         if (f.getFirstFieldToken().getTokenCommand() == PUSH_TSCAN) {
           // found! - and now unroll
@@ -440,7 +440,7 @@ std::string prepareFields() {
             break;
           }
           if (q.lProgram.size() == 3) {
-            std::list<token>::iterator eIt = q.lProgram.begin();
+            auto eIt = q.lProgram.begin();
             std::string sName1 = (*eIt++).getValue();
             std::string sName2 = (*eIt++).getValue();
             token cmd = (*eIt++);
@@ -448,7 +448,7 @@ std::string prepareFields() {
             break;
           }
           if (q.lProgram.size() == 2) {
-            std::list<token>::iterator eIt = q.lProgram.begin();
+            auto eIt = q.lProgram.begin();
             std::string sName1 = (*eIt++).getValue();
             token cmd = (*eIt++);
             q.lSchema = combine(sName1, "", cmd);
@@ -601,7 +601,7 @@ std::string convertReferences() {
             if (regex_search(text.c_str(), what, xprFieldId3)) {
               assert(what.size() == 2);
               const std::string field(what[1]);
-              std::list<token>::iterator eIt = q.lProgram.begin();
+              auto eIt = q.lProgram.begin();
               std::string schema1, schema2;
               command_id cmd;
               query *pQ1(nullptr), *pQ2(nullptr);
@@ -635,7 +635,7 @@ std::string convertReferences() {
                   ++offset1;
                 }
               }
-              if (pQ2 != nullptr && bFieldFound == false) {
+              if (pQ2 != nullptr && !bFieldFound) {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
                   if (std::get<rdb::rname>(f2.fieldDesc) == field) {
@@ -645,7 +645,7 @@ std::string convertReferences() {
                   ++offset1;
                 }
               }
-              if (bFieldFound == false)
+              if (!bFieldFound)
                 throw std::logic_error(
                     "No field of given name in stream schema ID3");
             } else

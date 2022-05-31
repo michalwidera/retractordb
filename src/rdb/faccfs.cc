@@ -17,7 +17,7 @@ namespace rdb {
 
 template <class T>
 genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName)
-    : fileNameStr(fileName){};
+    : fileNameStr(fileName) {}
 
 template <class T>
 std::string genericBinaryFileAccessor<T>::FileName() {
@@ -49,7 +49,7 @@ int genericBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;
-};
+}
 
 template <class T>
 int genericBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
@@ -73,7 +73,7 @@ int genericBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;
-};
+}
 
 template class genericBinaryFileAccessor<std::byte>;
 template class genericBinaryFileAccessor<char>;

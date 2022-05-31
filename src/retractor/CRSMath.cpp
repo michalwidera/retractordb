@@ -24,7 +24,7 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot(0) {
           isDivided = true;
       }
     }
-    if (isDivided == false) {
+    if (!isDivided) {
       // If number is not divided we add sr set
       // ONLY HERE IS SR.INSERT
       // Here we insert only theses deltas to se set which are not delta = delta

@@ -366,7 +366,7 @@ void dir() {
     ss << "|%";
     ss << maxSize;
     ss << "s";
-  };
+  }
   ss << "|\n";
   for (const auto &v : pt.get_child("db.stream")) {
     printf(ss.str().c_str(), v.second.get<std::string>("").c_str(),

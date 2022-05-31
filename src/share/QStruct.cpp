@@ -290,18 +290,13 @@ bool query::isReductionRequired() {
 }
 
 std::list<std::string> query::getDepStreamNameList(int reqDep) {
-  int iDep(0);
   std::list<std::string> lRetVal;
   for (auto &t : lProgram) {
     if (reqDep == 0) {
       // defult behaviour
       if (t.getTokenCommand() == PUSH_STREAM) lRetVal.push_back(t.getValue());
-    } else {
-      if (reqDep == iDep) {
-        if (t.getTokenCommand() == PUSH_STREAM) lRetVal.push_back(t.getValue());
-      }
+    } else
       ++reqDep;
-    }
   }
   return lRetVal;
 }

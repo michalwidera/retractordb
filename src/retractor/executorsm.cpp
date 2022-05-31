@@ -185,11 +185,8 @@ ptree commandProcessor(ptree ptInval) {
         ptRetval.put(
             std::string("db.stream.") + q.id + std::string(".duration"),
             boost::lexical_cast<std::string>(q.rInterval));
-        long recordsCount = 0;
-        if (!q.isDeclaration())
-          recordsCount = streamStoredSize(q.id);
-        else
-          recordsCount = -1;
+        long recordsCount = -1;
+        if (!q.isDeclaration()) recordsCount = streamStoredSize(q.id);
         int processCount = (pProc == nullptr) ? 0 : pProc->getStreamCount(q.id);
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"),
                      boost::lexical_cast<std::string>(recordsCount));
@@ -417,7 +414,6 @@ int main(int argc, char *argv[]) {
         if (vm.count("verbose"))
           std::cerr << "Press any key to stop." << std::endl;
       }
-      boost::rational<int> prev_interval(0);
       boost::rational<int> timeSlot(coreInstance.getDelta(sQuery));
       boost::rational<int> interval(timeSlot * 1000);  // miliseconds
       while (!_kbhit()) {

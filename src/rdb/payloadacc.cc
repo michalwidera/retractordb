@@ -94,9 +94,8 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.Offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
-      auto len_ = desc.Len(std::get<rname>(r));
       os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_),
-                        len_);
+                        desc.Len(std::get<rname>(r)));
     } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
         unsigned char data;
