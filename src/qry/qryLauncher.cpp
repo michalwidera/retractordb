@@ -65,9 +65,9 @@ int main(int argc, char *argv[]) {
     } else if (vm.count("dir"))
       dir();
     else if (vm.count("detail")) {
-      if (detailShow() == false) return system::errc::no_such_file_or_directory;
+      if (!detailShow()) return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
-      if (select(vm.count("needctrlc")) == false)
+      if (!select(vm.count("needctrlc")))
         return system::errc::no_such_file_or_directory;
     } else {
       std::cout << argv[0] << ": fatal error: no argument" << std::endl;

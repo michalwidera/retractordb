@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
         std::cout << static_cast<unsigned>(*(ptr + i));
         std::cout << std::dec;
         std::cout << " ";
-      };
+      }
       std::cout << "\n";
     } else {
       std::cout << RED "?\n" RESET;

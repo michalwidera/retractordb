@@ -17,7 +17,7 @@ DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName,
   std::string fileDesc(pAccessor->FileName());
   fileDesc.append(".desc");
   myFile.open(fileDesc, std::ios::in);
-  if (myFile.good() == true) myFile >> descriptor;
+  if (myFile.good()) myFile >> descriptor;
   myFile.close();
   recordsCount = 0;
   if (descriptor.GetSize() > 0) {
@@ -25,7 +25,7 @@ DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName,
                      std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
   }
-};
+}
 
 template <class T, class K>
 DataStorageAccessor<T, K>::DataStorageAccessor(const Descriptor descriptor,
@@ -52,16 +52,20 @@ DataStorageAccessor<T, K>::DataStorageAccessor(const Descriptor descriptor,
                      std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
   }
-};
+}
 
 template <class T, class K>
 DataStorageAccessor<T, K>::~DataStorageAccessor() {
   if (removeOnExit) {
+    // Constructor & Destructor does not fail - need to reconsider remove this
+    // asserts or make this in another way.
     auto statusRemove1 = remove(filename.c_str());
+    assert(statusRemove1 == 0);
     auto descFilename(filename + ".desc");
     auto statusRemove2 = remove(descFilename.c_str());
+    assert(statusRemove2 == 0);
   }
-};
+}
 
 template <class T, class K>
 bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
@@ -73,7 +77,7 @@ bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
     assert(result == 0);
   }
   return result == 0;
-};
+}
 
 template <class T, class K>
 Descriptor& DataStorageAccessor<T, K>::getDescriptor() {

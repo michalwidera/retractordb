@@ -16,7 +16,7 @@ constexpr const int kOpenBaseFlags = 0;
 namespace rdb {
 template <class T>
 posixBinaryFileAccessor<T>::posixBinaryFileAccessor(std::string fileName)
-    : fileNameStr(fileName){};
+    : fileNameStr(fileName) {}
 
 template <class T>
 std::string posixBinaryFileAccessor<T>::FileName() {
@@ -63,7 +63,7 @@ int posixBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
   }
   ::close(fd);
   return EXIT_SUCCESS;
-};
+}
 
 template <class T>
 int posixBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
@@ -77,7 +77,7 @@ int posixBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
   ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
   ::close(fd);
   return EXIT_SUCCESS;
-};
+}
 
 template class posixBinaryFileAccessor<std::byte>;
 template class posixBinaryFileAccessor<char>;

@@ -44,9 +44,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
     xout << q.id;
     xout << "\\ninterval=" << q.rInterval;
     if (q.isDeclaration()) xout << "\\nDeclaration";
-    ;
     if (q.isGenerated()) xout << "\\nAutogen";
-    ;
     // end stream specific
     //
     // fields in stream

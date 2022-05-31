@@ -13,7 +13,7 @@ template <class T>
 posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName)
     : fileNameStr(fileName) {
   fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
-};
+}
 
 template <class T>
 posixPrmBinaryFileAccessor<T>::~posixPrmBinaryFileAccessor() {
@@ -56,7 +56,7 @@ int posixPrmBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
     sizesh -= write_result;
   }
   return EXIT_SUCCESS;
-};
+}
 
 template <class T>
 int posixPrmBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
@@ -67,7 +67,7 @@ int posixPrmBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
   }
   ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
   return EXIT_SUCCESS;
-};
+}
 
 template class posixPrmBinaryFileAccessor<std::byte>;
 template class posixPrmBinaryFileAccessor<char>;

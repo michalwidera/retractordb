@@ -66,16 +66,6 @@ int main(int argc, char *argv[]) {
     }
     std::string sQueryFile = vm["queryfile"].as<std::string>();
     std::string sOutFile = vm["outfile"].as<std::string>();
-    std::string sSubsetFile = "query.sub";
-    // override defaults if filename is matching regexp
-    {
-      boost::regex filenameRe("(\\w*).(\\w*)");  // filename.extension
-      boost::cmatch what;
-      if (regex_match(sQueryFile.c_str(), what, filenameRe)) {
-        std::string filenameNoExt = std::string(what[1]);
-        sSubsetFile = filenameNoExt + ".sub";
-      }
-    }
     std::cout << "Input file:" << sQueryFile << std::endl;
     std::cout << "Compile result:" << parser(sQueryFile) << std::endl;
     //
@@ -84,15 +74,15 @@ int main(int argc, char *argv[]) {
     std::istringstream iss(dumpInstance(""), std::ios::binary);
     boost::archive::text_iarchive ia(iss);
     ia >> coreInstance;
-    if (coreInstance.size() == 0)
+    if (coreInstance.empty())
       throw std::out_of_range("No queries to process found");
     if (vm.count("dumpcross")) {
       std::string sOutFileLog1 = vm["outfile"].as<std::string>() + ".lg1";
       dumpInstance(sOutFileLog1);
     }
-    int dAfterParserSize((int)coreInstance.size());
     std::string response;
     response = simplifyLProgram();
+    assert(response == "OK");
     if (vm.count("dumpcross")) {
       std::string sOutFileLog2 = vm["outfile"].as<std::string>() + ".lg2";
       dumpInstance(sOutFileLog2);
@@ -109,7 +99,6 @@ int main(int argc, char *argv[]) {
     assert(response == "OK");
     response = replicateIDX();
     assert(response == "OK");
-    int dAfterCompilingSize((int)coreInstance.size());
     dumpInstance(sOutFile);
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
