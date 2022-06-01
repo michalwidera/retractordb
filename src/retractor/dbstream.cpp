@@ -29,8 +29,7 @@ dbStream::dbStream(std::string streamName, std::list<field> schema)
       pRawData(new char[frameSize]) {
   rdb::Descriptor data;
   for (auto const &i : schema) data.push_back(i.fieldDesc);
-  if (streamName == "signalRow")
-    std::cerr << data << std::endl;
+  if (streamName == "signalRow") std::cerr << data << std::endl;
   database.DefBlock(streamName, data);
   mpShadow.resize(schema.size());
   mpRead.resize(schema.size());
@@ -69,10 +68,9 @@ void dbStream::readData(int offset, bool reverse) {
   if (mpReadNr == offset && mpLenNr == len) return;
   if (offset > len || len == 0) {
     const number fake = boost::rational<int>(999, 1);
-    //if (streamName == "signalRow")
+    // if (streamName == "signalRow")
     //  std::cerr << offset << "," << len << std::endl;
-    for (auto i = 0; i < schema.size(); i++)
-      mpRead[i] = fake;
+    for (auto i = 0; i < schema.size(); i++) mpRead[i] = fake;
     return;
   }
   assert(len != 0);
