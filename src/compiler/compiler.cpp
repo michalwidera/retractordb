@@ -363,7 +363,8 @@ std::list<field> combine(std::string sName1, std::string sName2,
         field intf;
         std::get<rdb::rname>(intf.fieldDesc) =
             sName1 + "_" + lexical_cast<std::string>(i);
-        std::get<rdb::rtype>(intf.fieldDesc) = rdb::BAD;
+        std::get<rdb::rtype>(intf.fieldDesc) = rdb::INTEGER; // TODO - need to inherit BYTE or INTEGER from BYTEARRAY or INTARRAY
+        std::get<rdb::rlen>(intf.fieldDesc) = 2;
         schema.push_back(intf);
       }
     } else {
@@ -371,7 +372,8 @@ std::list<field> combine(std::string sName1, std::string sName2,
         field intf;
         std::get<rdb::rname>(intf.fieldDesc) =
             sName1 + "_" + lexical_cast<std::string>(i);
-        std::get<rdb::rtype>(intf.fieldDesc) = rdb::BAD;
+        std::get<rdb::rtype>(intf.fieldDesc) = rdb::INTEGER; // TODO - need to inherit BYTE or INTEGER from BYTEARRAY or INTARRAY
+        std::get<rdb::rlen>(intf.fieldDesc) = 2;
         schema.push_back(intf);
       }
     }

@@ -20,7 +20,7 @@ typedef std::string fieldName;
 /**
  * @brief Tuple type - that defines field - Name, Len and Type.
  */
-typedef std::tuple<fieldName, fieldLen, rdb::eType> field;
+typedef std::tuple<fieldName, fieldLen, rdb::eType> rfield;
 
 /**
  * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
@@ -30,7 +30,7 @@ enum FieldColumn { rname = 0, rlen = 1, rtype = 2 };
 /**
  * @brief Structure resposible for mapping types into binary struct
  */
-class Descriptor : public std::vector<field> {
+class Descriptor : public std::vector<rfield> {
   /**
    * @brief This is map of field names. Each field name should be unique for
    * each descriptor If two or more tuples have same name this fieldNames object
@@ -56,7 +56,7 @@ class Descriptor : public std::vector<field> {
    * @param l initializer list - this enables create Descriptor as Descriptor
    * obj{field("A",10,STRING), field("B",10,STRING)};
    */
-  Descriptor(std::initializer_list<field> l);
+  Descriptor(std::initializer_list<rfield> l);
 
   /**
    * @brief Construct a new Descriptor object - only for STRING (object with
@@ -86,7 +86,7 @@ class Descriptor : public std::vector<field> {
    *
    * @param l Initializer list of fields in {}
    */
-  void Append(std::initializer_list<field> l);
+  void Append(std::initializer_list<rfield> l);
 
   /**
    * @brief This constructor helps chaining operators with descriptor.

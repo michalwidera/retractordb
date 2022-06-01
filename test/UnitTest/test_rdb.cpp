@@ -95,14 +95,14 @@ bool test_3() {
 }
 
 bool test_descriptor() {
-  rdb::Descriptor data1{rdb::field("Name3", 10, rdb::STRING),
-                        rdb::field("Name4", 10, rdb::STRING)};
+  rdb::Descriptor data1{rdb::rfield("Name3", 10, rdb::STRING),
+                        rdb::rfield("Name4", 10, rdb::STRING)};
 
-  data1.Append({rdb::field("Name5z", 10, rdb::STRING)});
-  data1.Append({rdb::field("Name6z", 10, rdb::STRING)});
+  data1.Append({rdb::rfield("Name5z", 10, rdb::STRING)});
+  data1.Append({rdb::rfield("Name6z", 10, rdb::STRING)});
 
-  data1.push_back(rdb::field("Name", 10, rdb::STRING));
-  data1.push_back(rdb::field("TLen", sizeof(uint), rdb::UINT));
+  data1.push_back(rdb::rfield("Name", 10, rdb::STRING));
+  data1.push_back(rdb::rfield("TLen", sizeof(uint), rdb::UINT));
 
   data1 | rdb::Descriptor("Name2", 10, rdb::STRING) |
       rdb::Descriptor("Control", rdb::BYTE) |

@@ -64,24 +64,24 @@ constexpr uint GetFieldLenFromType(rdb::eType ft) {
   return 0;
 }
 
-Descriptor::Descriptor(std::initializer_list<field> l)
-    : std::vector<field>(l) {}
+Descriptor::Descriptor(std::initializer_list<rfield> l)
+    : std::vector<rfield>(l) {}
 
 Descriptor::Descriptor(fieldName n, fieldLen l, rdb::eType t) {
-  push_back(field(n, l, t));
+  push_back(rfield(n, l, t));
   UpdateNames();
 }
 
 Descriptor::Descriptor(fieldName n, rdb::eType t) {
   assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
-  push_back(field(n, GetFieldLenFromType(t), t));
+  push_back(rfield(n, GetFieldLenFromType(t), t));
   UpdateNames();
 }
 
 bool Descriptor::isDirty() const { return fieldNames.size() == 0; }
 
-void Descriptor::Append(std::initializer_list<field> l) {
+void Descriptor::Append(std::initializer_list<rfield> l) {
   insert(end(), l.begin(), l.end());
 }
 
