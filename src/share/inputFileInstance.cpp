@@ -16,10 +16,10 @@
 using namespace boost;
 
 void inputFileInstance::goBegin() {
-  if (extension == ".dat") {
+  //if (extension == ".dat") {
     psFile->clear();
     psFile->seekg(0, std::ios::beg);
-  }
+  //}
   curPos = 0;
 }
 
@@ -64,6 +64,9 @@ T inputFileInstance::get() {
     psFile->read(reinterpret_cast<char *>(&retVal), sizeof retVal);
     curPos += sizeof(T);
   }
+  if (extension == ".txt")
+    std::cerr << retVal << std::endl ;
+
   return retVal;
 }
 
