@@ -192,6 +192,8 @@ ptree commandProcessor(ptree ptInval) {
                      boost::lexical_cast<std::string>(recordsCount));
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
                      boost::lexical_cast<std::string>(processCount));
+        ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"),
+                     q.filename);
       }
     }
     //
