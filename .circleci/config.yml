@@ -17,6 +17,22 @@ jobs:
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build && make test
 
+  build-stable-debug:
+    working_directory: ~
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run: uname -a && cat /proc/version && cat /etc/issue
+      - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+      - run: pip install conan
+      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
+      - run: cd build && conan source ..
+      - run: cd build && conan install .. -s build_type=Debug
+      - run: cd build && conan build ..
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
+      - run: cd build && make test
+
   build-edge:
     working_directory: ~
     docker:
@@ -81,6 +97,12 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-stable-debug:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
       - build-edge:
           filters:
             branches:
@@ -99,6 +121,7 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-stable
+      - build-stable-debug
       - build-edge
       - build-edge-2204:
           requires:
