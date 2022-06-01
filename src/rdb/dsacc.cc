@@ -60,15 +60,16 @@ DataStorageAccessor<T, K>::~DataStorageAccessor() {
     // Constructor & Destructor does not fail - need to reconsider remove this
     // asserts or make this in another way.
     auto statusRemove1 = remove(filename.c_str());
-    assert(statusRemove1 == 0);
+    //assert(statusRemove1 == 0);
     auto descFilename(filename + ".desc");
     auto statusRemove2 = remove(descFilename.c_str());
-    assert(statusRemove2 == 0);
+    //assert(statusRemove2 == 0);
   }
 }
 
 template <class T, class K>
 bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
+  assert(!descriptor.isDirty());
   auto size = descriptor.GetSize();
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   int result = 0;
@@ -102,6 +103,7 @@ const size_t DataStorageAccessor<T, K>::getRecordsCount() {
 template <class T, class K>
 bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
                                     const size_t recordIndex) {
+  assert(!descriptor.isDirty());
   auto size = descriptor.GetSize();
   int result = 0;
   if (recordIndex == std::numeric_limits<size_t>::max()) {
