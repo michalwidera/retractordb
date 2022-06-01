@@ -28,8 +28,15 @@ dbStream::dbStream(std::string streamName, std::list<field> schema)
       frameSize(schema.size() * sizeof(number)),
       pRawData(new char[frameSize]) {
   rdb::Descriptor data;
-  for (auto const &i : schema) data.push_back(i.fieldDesc);
-  if (streamName == "signalRow") std::cerr << data << std::endl;
+  for (auto const &i : schema) {
+    data.push_back(i.fieldDesc);
+    if (streamName == "signalRow") {
+    std::cerr << std::get<rdb::rname>(i.fieldDesc) << std::endl; // source_x
+    std::cerr << std::get<rdb::rtype>(i.fieldDesc) << std::endl; // 0
+    std::cerr << std::get<rdb::rlen>(i.fieldDesc) << std::endl;  // 0
+    }
+  };
+  if (streamName == "signalRow") std::cerr << data << std::endl; // BUG - data is dirty
   database.DefBlock(streamName, data);
   mpShadow.resize(schema.size());
   mpRead.resize(schema.size());

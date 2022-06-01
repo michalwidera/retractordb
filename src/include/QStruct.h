@@ -90,7 +90,7 @@ class field {
  public:
   std::list<token> lProgram;
 
-  rdb::field fieldDesc;
+  rdb::rfield fieldDesc;
 
   field();
   field(std::string sFieldName, std::list<token> &lProgram,
