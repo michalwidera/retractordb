@@ -515,6 +515,7 @@ void Processor::updateContext(std::set<std::string> inSet) {
             rowValues = getRow(streamNameArg, TimeOffset, true);
           }
           break;
+
         case STREAM_AGSE:
           // PUSH_STREAM core -> delta_source (argument1)
           // PUSH_VAL 2 -> window_length (argument2)
