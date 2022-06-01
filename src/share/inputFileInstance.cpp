@@ -16,10 +16,8 @@
 using namespace boost;
 
 void inputFileInstance::goBegin() {
-  //if (extension == ".dat") {
-    psFile->clear();
-    psFile->seekg(0, std::ios::beg);
-  //}
+  psFile->clear();
+  psFile->seekg(0, std::ios::beg);
   curPos = 0;
 }
 

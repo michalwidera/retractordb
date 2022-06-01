@@ -355,7 +355,8 @@ int hello() {
 
 void dir() {
   ptree pt = netClient("get", "");
-  std::vector<std::string> vcols = {"", "duration", "size", "count","location"};
+  std::vector<std::string> vcols = {"", "duration", "size", "count",
+                                    "location"};
   std::stringstream ss;
   for (auto nName : vcols) {
     int maxSize = 0;

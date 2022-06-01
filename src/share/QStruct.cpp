@@ -226,7 +226,7 @@ field::field(std::string sFieldName, std::list<token> &lProgram,
     : lProgram(lProgram), sFieldText(sFieldText) {
   std::get<rdb::rtype>(fieldDesc) = dFieldType;
   std::get<rdb::rname>(fieldDesc) = sFieldName;
-  std::get<rdb::rlen>(fieldDesc) = 2; //HERE IS BUG
+  std::get<rdb::rlen>(fieldDesc) = 2;  // HERE IS BUG
 }
 
 std::string field::getFieldText() { return sFieldText; }

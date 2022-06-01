@@ -60,10 +60,10 @@ DataStorageAccessor<T, K>::~DataStorageAccessor() {
     // Constructor & Destructor does not fail - need to reconsider remove this
     // asserts or make this in another way.
     auto statusRemove1 = remove(filename.c_str());
-    //assert(statusRemove1 == 0);
+    // assert(statusRemove1 == 0);
     auto descFilename(filename + ".desc");
     auto statusRemove2 = remove(descFilename.c_str());
-    //assert(statusRemove2 == 0);
+    // assert(statusRemove2 == 0);
   }
 }
 

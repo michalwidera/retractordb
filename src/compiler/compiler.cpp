@@ -182,12 +182,11 @@ TODO: Stream_MAX,MIN,AVG...
 */
 std::string simplifyLProgram() {
   coreInstance.sort();
-  for (auto it = coreInstance.begin(); it != coreInstance.end();
-       ++it) {
+  for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
     // Agse pahse optization
     token t0, t1, t2;
-    for (auto it2 = (*it).lProgram.begin();
-         it2 != (*it).lProgram.end(); ++it2) {
+    for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end();
+         ++it2) {
       t0 = t1;
       t1 = t2;
       t2 = (*it2);
@@ -205,8 +204,8 @@ std::string simplifyLProgram() {
     }
     // Otimization phase 2
     if ((*it).isReductionRequired()) {
-      for (auto it2 = (*it).lProgram.begin();
-           it2 != (*it).lProgram.end(); ++it2) {
+      for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end();
+           ++it2) {
         if ((*it2).getStrTokenName() == "STREAM_TIMEMOVE" ||
             (*it2).getStrTokenName() == "STREAM_SUBSTRACT") {
           query newQuery;
