@@ -64,9 +64,6 @@ T inputFileInstance::get() {
     psFile->read(reinterpret_cast<char *>(&retVal), sizeof retVal);
     curPos += sizeof(T);
   }
-  if (extension == ".txt")
-    std::cerr << retVal << std::endl ;
-
   return retVal;
 }
 
