@@ -1,7 +1,7 @@
 #include "rdb/dataset.h"
 
 #include <cstddef>
-#include <iostream> // }{
+#include <iostream>  // }{
 
 #include "rdb/desc.h"
 #include "rdb/dsacc.h"
@@ -33,6 +33,8 @@ void dataSet::PutBlock(std::string filename, char* pRawData) {
 bool dataSet::GetBlock(std::string filename, int offset, char* pRawData) {
   bool success = data[path + filename]->Get(
       reinterpret_cast<std::byte*>(pRawData), offset);
+  if (filename == "source")
+    std::cerr << "3. " << (int)*pRawData << " " << offset << std::endl;
   return success;
 }
 

@@ -30,17 +30,14 @@ dbStream::dbStream(std::string streamName, std::list<field> schema)
   rdb::Descriptor data;
   for (auto const &i : schema) data | rdb::Descriptor(i.fieldName, i.fieldType);
   database.DefBlock(streamName, data);
-  mpShadow.resize(schema.size());
   mpRead.resize(schema.size());
 }
-
-number &dbStream::operator[](const int &_Keyval) { return mpShadow[_Keyval]; }
 
 void dbStream::store() {
   char *p(pRawData.get());
   int cnt(0);
   for (auto &str : schema) {
-    number fieldData(mpShadow[cnt]);
+    number fieldData;
     memcpy(p, &fieldData, sizeof(number));
     p += sizeof(number);
     cnt++;
@@ -50,22 +47,17 @@ void dbStream::store() {
   mpReadNr = -1;
 }
 
-number dbStream::readCache(const int &_Keyval) {
-  if (mpReadNr == -1) readData(0);
-  return mpRead[_Keyval];
-}
-
-void dbStream::readData(int offset, bool reverse) {
+number dbStream::readData(int offset, int keyval, bool reverse) {
   if (offset < 0) {
     abort();
   }
   assert(offset >= 0);
   int len = database.GetLen(streamName);
-  if (mpReadNr == offset && mpLenNr == len) return;
+  // if (mpReadNr == offset && mpLenNr == len) return mpRead[keyval];
   if (offset > len || len == 0) {
     const number fake = boost::rational<int>(999, 1);
     for (auto i = 0; i < schema.size(); i++) mpRead[i] = fake;
-    return;
+    return fake;
   }
   assert(len != 0);
   bool success;
@@ -82,13 +74,12 @@ void dbStream::readData(int offset, bool reverse) {
   mpRead.clear();
   char *p(pRawData.get());
   for (int i = 0; i < schema.size(); i++) {
-    number fieldData;
-    memcpy(&fieldData, p, sizeof(number));
-    mpRead[i] = fieldData;
+    number fieldDataDest;
+    memcpy(&fieldDataDest, p, sizeof(number));
+    mpRead[i] = fieldDataDest;
     p += sizeof(number);
   }
-  assert(mpShadow.size() != 0);
   mpReadNr = offset; /* position */
   mpLenNr = len;
-  return;
+  return mpRead[keyval];
 }

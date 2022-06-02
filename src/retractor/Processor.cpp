@@ -254,7 +254,6 @@ void Processor::processRows(std::set<std::string> inSet) {
     int cnt(0);
     for (auto &f : q.lSchema) {
       boost::rational<int> value(computeValue(f, q));
-      (*storage[q.id])[cnt] = value;
       gContextValMap[q.id][cnt] = value;
       cnt++;
     }
@@ -313,11 +312,10 @@ number Processor::getValueProc(std::string streamName, int timeOffset,
     retval = gContextValMap[streamName][schemaOffset];
   else {
     dbStream &archive = *(storage[streamName]);
-    archive.readData(timeOffset - 1, reverse);
-    retval = archive.readCache(schemaOffset);
-    if (streamName == "source") {  // BUG LOGGING
-      std::cerr << retval << "," << timeOffset << "," << schemaOffset
-                << std::endl;
+    retval = archive.readData(timeOffset - 1, schemaOffset, reverse);
+    if (streamName == "source") {  // BUG LOGGING }{
+      std::cerr << "2. (" << timeOffset << "," << schemaOffset << ") -> "
+                << retval << std::endl;
     }
   }
   return retval;
@@ -560,7 +558,7 @@ void Processor::updateContext(std::set<std::string> inSet) {
               std::cerr << "}{";
               for (int i = 0; i < windowSize; i++) {
                 number ret = getValueProc(nameSrc, 0, i + d);
-                std::cerr << " " << ret;
+                std::cerr << "1. " << i + d << " -> " << ret << std::endl;
                 rowValues.push_back(ret);
               }
               std::cerr << std::endl;
