@@ -81,7 +81,7 @@ inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
 void inputDF::processRow() {
   lResult.clear();
   for (auto &f : lSchema) {
-    switch (std::get<rdb::rtype>(f.fieldDesc)) {
+    switch (f.fieldType) {
       case rdb::BYTE:
         lResult.push_back(get<unsigned char>());
         break;
@@ -93,7 +93,7 @@ void inputDF::processRow() {
         break;
       case rdb::BAD:
       default:
-        std::cerr << "field:" << std::get<rdb::rtype>(f.fieldDesc) << std::endl;
+        std::cerr << "field:" << f.fieldType << std::endl;
         throw std::out_of_range("processRow/undefined type");
         break;  // proforma
     }
@@ -104,8 +104,7 @@ boost::rational<int> inputDF::getCR(field f) {
   boost::rational<int> retValue(0);
   int cnt(0);
   for (auto &v : lSchema) {
-    if (std::get<rdb::rname>(v.fieldDesc) == std::get<rdb::rname>(f.fieldDesc))
-      break;
+    if (v.fieldName == f.fieldName) break;
     cnt++;
   }
   if (lResult.size() == 0) processRow();

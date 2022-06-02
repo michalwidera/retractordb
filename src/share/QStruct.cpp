@@ -98,7 +98,7 @@ boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
 
 field &query::getField(std::string sField) {
   for (auto &f : lSchema) {
-    if (std::get<rdb::rname>(f.fieldDesc) == sField) return f;
+    if (f.fieldName == sField) return f;
   }
   throw std::logic_error("No such field in schema");
   return *new field();
@@ -223,11 +223,10 @@ field::field() {}
 
 field::field(std::string sFieldName, std::list<token> &lProgram,
              rdb::eType dFieldType, std::string sFieldText)
-    : lProgram(lProgram), sFieldText(sFieldText) {
-  std::get<rdb::rtype>(fieldDesc) = dFieldType;
-  std::get<rdb::rname>(fieldDesc) = sFieldName;
-  std::get<rdb::rlen>(fieldDesc) = 2;  // HERE IS BUG
-}
+    : lProgram(lProgram),
+      sFieldText(sFieldText),
+      fieldType(dFieldType),
+      fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
 
@@ -257,15 +256,14 @@ query::query() {}
 
 std::list<std::string> query::getFieldNamesList() {
   std::list<std::string> schema;
-  for (auto &f : lSchema) schema.push_back(std::get<rdb::rname>(f.fieldDesc));
+  for (auto &f : lSchema) schema.push_back(f.fieldName);
   return schema;
 }
 
 int query::getFieldIndex(field f_arg) {
   int idx(0);
   for (auto f : lSchema) {
-    if (std::get<rdb::rname>(f.fieldDesc) ==
-        std::get<rdb::rname>(f_arg.fieldDesc))  // Todo
+    if (f.fieldName == f_arg.fieldName)  // Todo
       return idx;
     idx++;
   }

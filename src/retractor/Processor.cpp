@@ -315,6 +315,10 @@ number Processor::getValueProc(std::string streamName, int timeOffset,
     dbStream &archive = *(storage[streamName]);
     archive.readData(timeOffset - 1, reverse);
     retval = archive.readCache(schemaOffset);
+    if (streamName == "source") {  // BUG LOGGING
+      std::cerr << retval << "," << timeOffset << "," << schemaOffset
+                << std::endl;
+    }
   }
   return retval;
 }
@@ -553,10 +557,13 @@ void Processor::updateContext(std::set<std::string> inSet) {
             } else {
               int d = abs(
                   (streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
+              std::cerr << "}{";
               for (int i = 0; i < windowSize; i++) {
                 number ret = getValueProc(nameSrc, 0, i + d);
+                std::cerr << " " << ret;
                 rowValues.push_back(ret);
               }
+              std::cerr << std::endl;
             }
             assert(rowValues.size() == q.lSchema.size());
             assert(gContextValMap[q.id].size() == rowValues.size());
