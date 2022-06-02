@@ -1,6 +1,7 @@
 #include "rdb/dataset.h"
 
 #include <cstddef>
+#include <iostream> // }{
 
 #include "rdb/desc.h"
 #include "rdb/dsacc.h"
@@ -20,6 +21,9 @@ void dataSet::DefBlock(std::string filename, rdb::Descriptor desc) {
   data[path + filename] = std::unique_ptr<rdb::DataStorageAccessor<std::byte>>(
       new rdb::DataStorageAccessor(desc, path + filename, false));
   recordSize = desc.GetSize();
+  if (filename == "source") {  // BUG LOGGING
+    std::cerr << "}{" << filename << std::endl << desc << std::endl;
+  }
 }
 
 void dataSet::PutBlock(std::string filename, char* pRawData) {

@@ -70,7 +70,7 @@ DataStorageAccessor<T, K>::~DataStorageAccessor() {
 template <class T, class K>
 bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
   if (descriptor.isDirty()) {
-    return false;
+    abort();
   }
   auto size = descriptor.GetSize();
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
@@ -105,8 +105,8 @@ const size_t DataStorageAccessor<T, K>::getRecordsCount() {
 template <class T, class K>
 bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
                                     const size_t recordIndex) {
-  if(descriptor.isDirty()){
-    return false;
+  if (descriptor.isDirty()) {
+    abort();
   }
   auto size = descriptor.GetSize();
   int result = 0;

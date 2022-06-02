@@ -28,15 +28,7 @@ dbStream::dbStream(std::string streamName, std::list<field> schema)
       frameSize(schema.size() * sizeof(number)),
       pRawData(new char[frameSize]) {
   rdb::Descriptor data;
-  for (auto const &i : schema) {
-    data.push_back(i.fieldDesc);
-    if (streamName == "signalRow") {
-    std::cerr << std::get<rdb::rname>(i.fieldDesc) << std::endl; // source_x
-    std::cerr << std::get<rdb::rtype>(i.fieldDesc) << std::endl; // 0
-    std::cerr << std::get<rdb::rlen>(i.fieldDesc) << std::endl;  // 0
-    }
-  };
-  if (streamName == "signalRow") std::cerr << data << std::endl; // BUG - data is dirty
+  for (auto const &i : schema) data | rdb::Descriptor(i.fieldName, i.fieldType);
   database.DefBlock(streamName, data);
   mpShadow.resize(schema.size());
   mpRead.resize(schema.size());
@@ -54,8 +46,6 @@ void dbStream::store() {
     cnt++;
   }
   database.PutBlock(streamName, pRawData.get());
-  if (streamName == "signalRow")
-    std::cerr << database.streamStoredSize(streamName) << " ";
   mpLenNr = -1;
   mpReadNr = -1;
 }
@@ -67,16 +57,13 @@ number dbStream::readCache(const int &_Keyval) {
 
 void dbStream::readData(int offset, bool reverse) {
   if (offset < 0) {
-    assert(false);
-    return;
+    abort();
   }
   assert(offset >= 0);
   int len = database.GetLen(streamName);
   if (mpReadNr == offset && mpLenNr == len) return;
   if (offset > len || len == 0) {
     const number fake = boost::rational<int>(999, 1);
-    // if (streamName == "signalRow")
-    //  std::cerr << offset << "," << len << std::endl;
     for (auto i = 0; i < schema.size(); i++) mpRead[i] = fake;
     return;
   }
@@ -89,7 +76,9 @@ void dbStream::readData(int offset, bool reverse) {
     success = database.GetBlock(streamName, offset, pRawData.get());
     database.reverse(streamName, false);
   }
-  assert(success);
+  if (!success) {
+    abort();
+  }
   mpRead.clear();
   char *p(pRawData.get());
   for (int i = 0; i < schema.size(); i++) {

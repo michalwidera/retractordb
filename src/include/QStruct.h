@@ -82,7 +82,8 @@ class field {
   void serialize(Archive &ar, unsigned int version) {
     ar &lProgram;
     ar &sFieldText;
-    ar &fieldDesc;
+    ar &fieldName;
+    ar &fieldType;
   }
 
   std::string sFieldText;
@@ -90,7 +91,8 @@ class field {
  public:
   std::list<token> lProgram;
 
-  rdb::rfield fieldDesc;
+  std::string fieldName;
+  rdb::eType fieldType;
 
   field();
   field(std::string sFieldName, std::list<token> &lProgram,
