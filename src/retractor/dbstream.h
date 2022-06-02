@@ -25,7 +25,6 @@ class dbStream : private boost::noncopyable {
   int frameSize;                      /**< Size of frame in bytes */
   boost::shared_array<char> pRawData; /**< Pointer for binary data */
   std::string streamName;             /**< Stream name */
-  std::vector<number> mpShadow;
   std::vector<number> mpRead;
   int mpReadNr, mpLenNr;
 
@@ -34,11 +33,11 @@ class dbStream : private boost::noncopyable {
  public:
   dbStream(std::string streamName, std::list<field> schema);
 
-  number &operator[](const int &_Keyval);
-  number readCache(const int &_Keyval);
+  // number &operator[](const int &_Keyval);
+
   void store();
-  void readData(int offset = 0,
-                bool reverse = false); /**< Get data from archive */
+  number readData(int offset = 0, int keyval = 0,
+                  bool reverse = false); /**< Get data from archive */
 };
 
 long streamStoredSize(std::string filename);
