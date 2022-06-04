@@ -206,10 +206,12 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
 Processor::Processor() {
   // This function initialize map creating archive streams in cbuff
   for (auto q : coreInstance) {
+    /*
     if (storage.find(q.id) == storage.end())
       storage[q.id] = std::shared_ptr<dbStream>(new dbStream(q.id, q.lSchema));
     else
       ;  // Stream with this name already exist in stystem
+    */
     // Container initialization for file type data sources
     if (!q.filename.empty())
       gFileMap[q.id] = inputDF(q.filename.c_str(), q.lSchema);
@@ -258,7 +260,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       cnt++;
     }
     // Store computed values to cbuffer - on disk
-    storage[q.id]->store();
+    // storage[q.id]->store();
   }
 }
 
@@ -311,8 +313,11 @@ number Processor::getValueProc(std::string streamName, int timeOffset,
       (gContextLenMap[streamName] > gStreamSize[streamName]))
     retval = gContextValMap[streamName][schemaOffset];
   else {
+    /*
     dbStream &archive = *(storage[streamName]);
     retval = archive.readData(timeOffset - 1, schemaOffset, reverse);
+    */
+    retval = boost::rational<int>(123, 1);
     if (streamName == "source") {  // BUG LOGGING }{
       std::cerr << "2. (" << timeOffset << "," << schemaOffset << ") -> "
                 << retval << std::endl;
@@ -812,3 +817,5 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
 int Processor::getStreamCount(const std::string query_name) {
   return gStreamSize[query_name];
 }
+
+long streamStoredSize(std::string filename) { return 0; }

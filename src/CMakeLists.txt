@@ -8,7 +8,6 @@ set(SOURCES_RETRACTOR
     retractor/Processor.cpp
     retractor/executorsm.cpp
     retractor/CRSMath.cpp
-    retractor/dbstream.cpp
     share/QStruct.cpp
     share/inputFileInstance.cpp
     share/SOperations.cpp

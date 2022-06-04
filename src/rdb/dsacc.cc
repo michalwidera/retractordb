@@ -68,21 +68,6 @@ DataStorageAccessor<T, K>::~DataStorageAccessor() {
 }
 
 template <class T, class K>
-bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
-  if (descriptor.isDirty()) {
-    abort();
-  }
-  auto size = descriptor.GetSize();
-  auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-  int result = 0;
-  if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
-    assert(result == 0);
-  }
-  return result == 0;
-}
-
-template <class T, class K>
 Descriptor& DataStorageAccessor<T, K>::getDescriptor() {
   return descriptor;
 }
@@ -100,6 +85,21 @@ void DataStorageAccessor<T, K>::setRemoveOnExit(bool value) {
 template <class T, class K>
 const size_t DataStorageAccessor<T, K>::getRecordsCount() {
   return recordsCount;
+}
+
+template <class T, class K>
+bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
+  if (descriptor.isDirty()) {
+    abort();
+  }
+  auto size = descriptor.GetSize();
+  int result = 0;
+  auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
+  if (recordsCount > 0 && recordIndex < recordsCount) {
+    result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
+    assert(result == 0);
+  }
+  return result == 0;
 }
 
 template <class T, class K>
