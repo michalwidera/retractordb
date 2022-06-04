@@ -1,17 +1,5 @@
 @startuml
 
-class dataSet {
-    {field} data
-    {field} recordSize
-    {field} count
-
-    {method} streamStoredSize
-    {method} GetLen
-    {method} DefBlock
-    {method} PutBlock
-    {method} GetBlock
-}
-
 class Descriptor {
     {field} fieldNames
 

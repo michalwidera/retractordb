@@ -27,7 +27,6 @@ set(SOURCES_RDB_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/payloadacc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/dataset.cc
     test_rdb.cpp
     main.cpp)
 
