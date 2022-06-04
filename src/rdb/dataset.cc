@@ -22,19 +22,22 @@ void dataSet::DefBlock(std::string filename, rdb::Descriptor desc) {
       new rdb::DataStorageAccessor(desc, path + filename, false));
   recordSize = desc.GetSize();
   if (filename == "source") {  // BUG LOGGING
-    std::cerr << "}{" << filename << std::endl << desc << std::endl;
+    std::cerr << "}{ path:" << path << " filename:" << filename << std::endl
+              << desc << std::endl;
   }
 }
 
 void dataSet::PutBlock(std::string filename, char* pRawData) {
   data[path + filename]->Put(reinterpret_cast<std::byte*>(pRawData));
+  if (filename == "source")
+    std::cerr << "4. put val=" << (int)*pRawData << std::endl;
 }
 
 bool dataSet::GetBlock(std::string filename, int offset, char* pRawData) {
   bool success = data[path + filename]->Get(
       reinterpret_cast<std::byte*>(pRawData), offset);
   if (filename == "source")
-    std::cerr << "3. " << (int)*pRawData << " " << offset << std::endl;
+    std::cerr << "3. get val=" << (int)*pRawData << " " << offset << std::endl;
   return success;
 }
 

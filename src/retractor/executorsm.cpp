@@ -403,7 +403,7 @@ int main(int argc, char *argv[]) {
         std::remove_if(coreInstance.begin(), coreInstance.end(),
                        [](const query &qry) { return qry.id[0] == ':'; });
     coreInstance.erase(new_end, coreInstance.end());
-    setStorageLocation(storagePath);
+    // setStorageLocation(storagePath);
     //
     // End of special parameters support
     //

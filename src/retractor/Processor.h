@@ -1,15 +1,21 @@
 #pragma once
 
+#include <boost/variant/variant.hpp>  // for variant
 #include <map>
 #include <memory>
 
-#include "dbstream.h"
+//#include "dbstream.h"
 #include "inputFileInstance.h"
+
+/** Data of this type are stored in streams */
+typedef boost::variant<boost::rational<int>, int, double> number;
+
+long streamStoredSize(std::string filename);
 
 /** Query processor */
 class Processor : private boost::noncopyable {
   /** Archive of data streams - initStorage */
-  std::map<std::string, std::shared_ptr<dbStream>> storage;
+  // std::map<std::string, std::shared_ptr<dbStream>> storage;
 
   /** This function assue data access
    *  Due each field is computed in form schema/query
