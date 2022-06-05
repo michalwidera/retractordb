@@ -61,9 +61,9 @@ bool operator<(const query &lhs, const query &rhs) {
 //  }
 //}
 
-command_id token::getTokenCommand() { return command; }
+command_id token::getCommandID() { return command; }
 
-std::string token::getStrTokenName() { return GetStringcommand_id(command); }
+std::string token::getStrCommandID() { return GetStringcommand_id(command); }
 
 boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
                                  int ttl /*=11*/) {
@@ -198,9 +198,9 @@ bool isExist(std::string query_name) {
   return false;
 }
 
-boost::rational<int> token::getCRValue() { return crValue; }
+boost::rational<int> token::get() { return numericValue; }
 
-std::string token::getValue() { return sValue_; }
+std::string token::getStr() { return textValue; }
 
 bool query::isDeclaration() { return lProgram.empty(); }
 
@@ -229,31 +229,31 @@ token field::getFirstFieldToken() {
 
 token::token(command_id id, std::string sValue,
              std::variant<double, int, boost::rational<int>> value)
-    : command(id), sValue_(sValue) {
+    : command(id), textValue(sValue) {
   boost::rational<int> *pVal1 = std::get_if<boost::rational<int>>(&value);
   if (pVal1)
-    crValue = *pVal1;
+    numericValue = *pVal1;
   else {
     int *pVal2 = std::get_if<int>(&value);
     if (pVal2)
-      crValue = boost::rational<int>(*pVal2, 1);
+      numericValue = boost::rational<int>(*pVal2, 1);
     else {
       double *pVal3 = std::get_if<double>(&value);
       if (pVal3)
-        crValue = Rationalize(*pVal3);
+        numericValue = Rationalize(*pVal3);
       else
-        crValue = boost::rational<int>(-999, 1);
+        numericValue = boost::rational<int>(-999, 1);  // Unidentified value
     }
   }
 
   if (sValue == "") {
     std::stringstream ss;
-    ss << crValue.numerator();
-    if (crValue.denominator() != 1) {
+    ss << numericValue.numerator();
+    if (numericValue.denominator() != 1) {
       ss << "_";
-      ss << crValue.denominator();
+      ss << numericValue.denominator();
     }
-    sValue_ = std::string(ss.str());
+    textValue = std::string(ss.str());
   }
 }
 
@@ -283,7 +283,7 @@ int query::getFieldIndex(field f_arg) {
 bool query::isReductionRequired() {
   int streamOperatorCount(0);
   for (auto &t : lProgram) {
-    switch (t.getTokenCommand()) {
+    switch (t.getCommandID()) {
       case STREAM_HASH:
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
@@ -303,7 +303,7 @@ std::list<std::string> query::getDepStreamNameList(int reqDep) {
   for (auto &t : lProgram) {
     if (reqDep == 0) {
       // defult behaviour
-      if (t.getTokenCommand() == PUSH_STREAM) lRetVal.push_back(t.getValue());
+      if (t.getCommandID() == PUSH_STREAM) lRetVal.push_back(t.getStr());
     } else
       ++reqDep;
   }

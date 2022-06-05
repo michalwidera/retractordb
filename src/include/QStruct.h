@@ -53,23 +53,23 @@ class token {
   template <class Archive>
   void serialize(Archive &ar, unsigned int version) {
     ar &command;
-    ar &crValue;
-    ar &sValue_;
+    ar &numericValue;
+    ar &textValue;
   }
 
   command_id command;
-  boost::rational<int> crValue;
-  std::string sValue_;
+  boost::rational<int> numericValue;
+  std::string textValue;
 
  public:
-  std::string getValue();
-  boost::rational<int> getCRValue();
+  std::string getStr();
+  boost::rational<int> get();
 
   token(command_id id = VOID_COMMAND, std::string sValue = "",
         std::variant<double, int, boost::rational<int>> value = 0);
 
-  std::string getStrTokenName();
-  command_id getTokenCommand();
+  std::string getStrCommandID();
+  command_id getCommandID();
 };
 
 class field {
