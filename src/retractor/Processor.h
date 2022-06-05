@@ -7,9 +7,6 @@
 //#include "dbstream.h"
 #include "inputFileInstance.h"
 
-/** Data of this type are stored in streams */
-typedef std::variant<boost::rational<int>, int, double> number;
-
 long streamStoredSize(std::string filename);
 
 /** Query processor */
