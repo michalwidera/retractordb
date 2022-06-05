@@ -73,8 +73,7 @@ class ParserListener : public RQLBaseListener {
     program.push_back(token(id, arg1));
   };
 
-  void recpToken(command_id id, std::string arg1,
-                 number arg2) {
+  void recpToken(command_id id, std::string arg1, number arg2) {
     program.push_back(token(id, arg1, arg2));
   };
 

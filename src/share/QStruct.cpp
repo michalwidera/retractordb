@@ -227,8 +227,7 @@ token field::getFirstFieldToken() {
 
 /** Construktor set */
 
-token::token(command_id id, std::string sValue,
-             number value)
+token::token(command_id id, std::string sValue, number value)
     : command(id), textValue(sValue) {
   boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
   if (pValRI)
