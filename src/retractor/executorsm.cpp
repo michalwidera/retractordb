@@ -21,7 +21,6 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/thread.hpp>
 
-
 // boost::this_process::get_id()
 #include <boost/process/environment.hpp>
 

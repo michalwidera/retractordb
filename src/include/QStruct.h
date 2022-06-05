@@ -15,6 +15,7 @@
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
+#include <variant>
 
 #include "enumDecl.h"
 #include "rdb/desc.h"
@@ -64,9 +65,8 @@ class token {
   std::string getValue();
   boost::rational<int> getCRValue();
 
-  token(command_id id = VOID_COMMAND, std::string sValue = "");
-  token(command_id id, boost::rational<int> crValue, std::string sValue = "");
-  token(command_id id, double dValue);
+  token(command_id id = VOID_COMMAND, std::string sValue = "",
+        std::variant<double, int, boost::rational<int>> value = 0);
 
   std::string getStrTokenName();
   command_id getTokenCommand();
