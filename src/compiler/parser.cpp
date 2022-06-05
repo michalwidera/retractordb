@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <string>
+#include <variant>
 
 #include "Parser/RQLBaseListener.h"
 #include "Parser/RQLLexer.h"
@@ -68,9 +70,13 @@ class ParserListener : public RQLBaseListener {
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
-  template <typename T>
-  void recpToken(command_id id, T arg) {
-    program.push_back(token(id, arg));
+  void recpToken(command_id id, std::string arg1) {
+    program.push_back(token(id, arg1));
+  };
+
+  void recpToken(command_id id, std::string arg1,
+                 std::variant<double, int, boost::rational<int>> arg2) {
+    program.push_back(token(id, arg1, arg2));
   };
 
  public:
@@ -95,21 +101,21 @@ class ParserListener : public RQLBaseListener {
   void exitExpDiv(RQLParser::ExpDivContext *ctx) { recpToken(DIVIDE); }
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) {
-    recpToken(PUSH_VAL, std::stof(ctx->getText()));
+    recpToken(PUSH_VAL, "", std::stof(ctx->getText()));
   }
   void exitExpDec(RQLParser::ExpDecContext *ctx) {
-    recpToken(PUSH_VAL, std::stoi(ctx->getText()));
+    recpToken(PUSH_VAL, "", std::stoi(ctx->getText()));
   }
 
   void exitSExpHash(RQLParser::SExpHashContext *ctx) { recpToken(STREAM_HASH); }
 
   void exitSExpAnd(RQLParser::SExpAndContext *ctx) {
-    recpToken(PUSH_VAL, rationalResult);
+    recpToken(PUSH_VAL, "", rationalResult);
     recpToken(STREAM_DEHASH_DIV);
   }
 
   void exitSExpMod(RQLParser::SExpModContext *ctx) {
-    recpToken(PUSH_VAL, rationalResult);
+    recpToken(PUSH_VAL, "", rationalResult);
     recpToken(STREAM_DEHASH_MOD);
   }
 
@@ -127,15 +133,16 @@ class ParserListener : public RQLBaseListener {
   }
   void exitSExpPlus(RQLParser::SExpPlusContext *ctx) { recpToken(STREAM_ADD); }
   void exitSExpMinus(RQLParser::SExpMinusContext *ctx) {
-    recpToken(STREAM_SUBSTRACT, rationalResult);
+    recpToken(STREAM_SUBSTRACT, "", rationalResult);
   }
 
   void exitSExpAgse(RQLParser::SExpAgseContext *ctx) {
     if (ctx->children[3]->getText() == "-")
-      program.push_back(token(PUSH_VAL, -std::stoi(ctx->window->getText())));
+      program.push_back(
+          token(PUSH_VAL, "", -std::stoi(ctx->window->getText())));
     else
-      program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
-    program.push_back(token(PUSH_VAL, std::stoi(ctx->step->getText())));
+      program.push_back(token(PUSH_VAL, "", std::stoi(ctx->window->getText())));
+    program.push_back(token(PUSH_VAL, "", std::stoi(ctx->step->getText())));
     program.push_back(token(STREAM_AGSE));
   }
 
@@ -198,7 +205,7 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) {
-    recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
+    recpToken(STREAM_TIMEMOVE, "", std::stoi(ctx->DECIMAL()->getText()));
   }
 
   void exitStream_factor(RQLParser::Stream_factorContext *ctx) {

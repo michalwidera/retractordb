@@ -200,18 +200,7 @@ bool isExist(std::string query_name) {
 
 boost::rational<int> token::getCRValue() { return crValue; }
 
-std::string token::getValue() {
-  if (sValue_.empty()) {
-    std::stringstream ss;
-    ss << crValue.numerator();
-    if (crValue.denominator() != 1) {
-      ss << "_";
-      ss << crValue.denominator();
-    }
-    return std::string(ss.str());
-  } else
-    return sValue_;
-}
+std::string token::getValue() { return sValue_; }
 
 bool query::isDeclaration() { return lProgram.empty(); }
 
@@ -238,14 +227,35 @@ token field::getFirstFieldToken() {
 
 /** Construktor set */
 
-token::token(command_id id, std::string sValue)
-    : command(id), crValue(0), sValue_(sValue) {}
+token::token(command_id id, std::string sValue,
+             std::variant<double, int, boost::rational<int>> value)
+    : command(id), sValue_(sValue) {
+  boost::rational<int> *pVal1 = std::get_if<boost::rational<int>>(&value);
+  if (pVal1)
+    crValue = *pVal1;
+  else {
+    int *pVal2 = std::get_if<int>(&value);
+    if (pVal2)
+      crValue = boost::rational<int>(*pVal2, 1);
+    else {
+      double *pVal3 = std::get_if<double>(&value);
+      if (pVal3)
+        crValue = Rationalize(*pVal3);
+      else
+        crValue = boost::rational<int>(-999, 1);
+    }
+  }
 
-token::token(command_id id, boost::rational<int> crValue, std::string sValue)
-    : command(id), crValue(crValue), sValue_(sValue) {}
-
-token::token(command_id id, double dValue)
-    : command(id), crValue(Rationalize(dValue)), sValue_("") {}
+  if (sValue == "") {
+    std::stringstream ss;
+    ss << crValue.numerator();
+    if (crValue.denominator() != 1) {
+      ss << "_";
+      ss << crValue.denominator();
+    }
+    sValue_ = std::string(ss.str());
+  }
+}
 
 /** Construktor set */
 

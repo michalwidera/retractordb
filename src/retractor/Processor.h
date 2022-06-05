@@ -1,8 +1,8 @@
 #pragma once
 
+#include <boost/variant.hpp>
 #include <map>
 #include <memory>
-#include <boost/variant.hpp>
 
 //#include "dbstream.h"
 #include "inputFileInstance.h"
