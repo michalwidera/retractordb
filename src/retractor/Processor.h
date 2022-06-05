@@ -3,7 +3,6 @@
 #include <map>
 #include <memory>
 
-//#include "dbstream.h"
 #include "inputFileInstance.h"
 
 long streamStoredSize(std::string filename);
