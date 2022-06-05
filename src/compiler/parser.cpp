@@ -6,7 +6,6 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
-#include <variant>
 
 #include "Parser/RQLBaseListener.h"
 #include "Parser/RQLLexer.h"

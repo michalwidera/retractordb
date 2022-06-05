@@ -2,7 +2,6 @@
 
 #include <map>
 #include <memory>
-#include <variant>
 
 //#include "dbstream.h"
 #include "inputFileInstance.h"
