@@ -20,6 +20,8 @@
 #include "enumDecl.h"
 #include "rdb/desc.h"
 
+typedef std::variant<boost::rational<int>, int, double> number;
+
 namespace boost {
 namespace serialization {
 
@@ -66,7 +68,7 @@ class token {
   boost::rational<int> get();
 
   token(command_id id = VOID_COMMAND, std::string sValue = "",
-        std::variant<boost::rational<int>, int, double> value = 0);
+        number value = 0);
 
   std::string getStrCommandID();
   command_id getCommandID();

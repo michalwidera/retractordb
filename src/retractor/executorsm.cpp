@@ -139,6 +139,10 @@ std::string Processor::printRowValue(const std::string query_name) {
          boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
   int i = 0;
   for (auto value : getRow(query_name, 0)) {
+    //
+    // There is part of communication format - here data are formated for
+    // transmission via internal queue.
+    //
     std::stringstream retVal;
     boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
     if (pValRI)
@@ -351,15 +355,13 @@ int main(int argc, char *argv[]) {
     desc.add_options()("help,h", "show help")(
         "infile,i",
         po::value<std::string>(&sInputFile)->default_value("query.qry"),
-        "input query plan")("query,q", po::value<std::string>(&sQuery),
-                            "query file")(
-        "display,s", po::value<std::string>(&sQuery), "process single query")(
+        "input query plan")("display,s", po::value<std::string>(&sQuery),
+                            "process single query")(
         "dump,d",
         po::value<std::string>(&sDumpFile)->default_value("query.dmp"),
         "dump file name")(
         "tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0),
-        "query limit, 0 - no limit")("onscreen,e", "dump data on screen only")(
-        "waterfall,f", "show waterfall mode")(
+        "query limit, 0 - no limit")("waterfall,f", "show waterfall mode")(
         "verbose,v", "Dump diagnostic info on screen while work");
     // Assume that infile is the first option
     po::positional_options_description p;
@@ -409,28 +411,6 @@ int main(int argc, char *argv[]) {
     // End of special parameters support
     //
     Processor proc;
-    //
-    // option query was created for single query testing
-    //
-    if (vm.count("query")) {
-      if (vm.count("verbose")) std::cerr << "Query :" << sQuery << std::flush;
-      if (iTimeLimitCnt == 0) {
-        if (vm.count("verbose"))
-          std::cerr << "Press any key to stop." << std::endl;
-      }
-      boost::rational<int> timeSlot(coreInstance.getDelta(sQuery));
-      boost::rational<int> interval(timeSlot * 1000);  // miliseconds
-      while (!_kbhit()) {
-        std::cout << timeSlot << std::endl;
-        std::cout << proc.printRowValue(sQuery) << std::endl;
-        for (auto s : getQuery(sQuery).getDepStreamNameList())
-          std::cout << s << std::endl << std::flush;
-        int ms(rational_cast<int>(interval));  // miliseconds
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(ms));
-      }
-      _getch();  // no wait ... feed key from kbhit
-      return system::errc::success;
-    }
     if (vm.count("verbose")) {
       std::cerr << "Objects:" << std::endl;
       dumpCore(std::cerr);
@@ -482,39 +462,35 @@ int main(int argc, char *argv[]) {
       // Data broadcast - main loop
       //
       for (auto queryName : getAwaitedStreamsSet(tl)) {
-        if (vm.count("onscreen"))
-          std::cout << proc.printRowValue(queryName) << std::endl;
-        else {
-          std::string row = proc.printRowValue(queryName);
-          std::list<int> eraseList;
-          for (const auto &element : id2StreamName_Relation) {
-            if (element.second == queryName) {
-              using namespace boost::interprocess;
-              //
-              // Query discovery. queues are created by show command
-              //
-              std::string queueName =
-                  "brcdbr" + boost::lexical_cast<std::string>(element.first);
-              IPC::message_queue mq(IPC::open_only, queueName.c_str());
-              //
-              // If send queue is full - means no one is listening and queue is
-              // going to remove
-              //
-              if (!mq.try_send(row.c_str(), row.length(), 0)) {
-                message_queue::remove(queueName.c_str());
-                eraseList.push_back(element.first);
-              }
+        std::string row = proc.printRowValue(queryName);
+        std::list<int> eraseList;
+        for (const auto &element : id2StreamName_Relation) {
+          if (element.second == queryName) {
+            using namespace boost::interprocess;
+            //
+            // Query discovery. queues are created by show command
+            //
+            std::string queueName =
+                "brcdbr" + boost::lexical_cast<std::string>(element.first);
+            IPC::message_queue mq(IPC::open_only, queueName.c_str());
+            //
+            // If send queue is full - means no one is listening and queue is
+            // going to remove
+            //
+            if (!mq.try_send(row.c_str(), row.length(), 0)) {
+              message_queue::remove(queueName.c_str());
+              eraseList.push_back(element.first);
             }
           }
-          //
-          // cleaning form clients map that are not receiving data from queue
-          //
-          for (const auto &element : eraseList) {
-            id2StreamName_Relation.erase(element);
-            if (vm.count("verbose"))
-              std::cout << "queue erased on timeout, procId=" << element
-                        << std::endl;
-          }
+        }
+        //
+        // cleaning form clients map that are not receiving data from queue
+        //
+        for (const auto &element : eraseList) {
+          id2StreamName_Relation.erase(element);
+          if (vm.count("verbose"))
+            std::cout << "queue erased on timeout, procId=" << element
+                      << std::endl;
         }
       }
       //
