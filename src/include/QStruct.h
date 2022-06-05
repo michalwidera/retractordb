@@ -66,7 +66,7 @@ class token {
   boost::rational<int> get();
 
   token(command_id id = VOID_COMMAND, std::string sValue = "",
-        std::variant<double, int, boost::rational<int>> value = 0);
+        std::variant<boost::rational<int>, int, double> value = 0);
 
   std::string getStrCommandID();
   command_id getCommandID();

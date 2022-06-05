@@ -1,14 +1,14 @@
 #pragma once
 
-#include <boost/variant.hpp>
 #include <map>
 #include <memory>
+#include <variant>
 
 //#include "dbstream.h"
 #include "inputFileInstance.h"
 
 /** Data of this type are stored in streams */
-typedef boost::variant<boost::rational<int>, int, double> number;
+typedef std::variant<boost::rational<int>, int, double> number;
 
 long streamStoredSize(std::string filename);
 

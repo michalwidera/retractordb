@@ -138,23 +138,25 @@ std::string Processor::printRowValue(const std::string query_name) {
   pt.put("count",
          boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
   int i = 0;
-  for (auto n : getRow(query_name, 0)) {
+  for (auto value : getRow(query_name, 0)) {
     std::stringstream retVal;
-    if (n.type() == typeid(int))
-      retVal << boost::rational_cast<int>(boost::get<boost::rational<int>>(n));
-    if (n.type() == typeid(double))
-      retVal << boost::rational_cast<double>(
-          boost::get<boost::rational<int>>(n));
-    if (n.type() == typeid(boost::rational<int>)) {
-      if ((boost::get<boost::rational<int>>(n)).denominator() == 1)
-        retVal << boost::rational_cast<int>(
-            boost::get<boost::rational<int>>(n));
-      else
-        retVal << boost::rational_cast<double>(
-            boost::get<boost::rational<int>>(n));
+    boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
+    if (pValRI)
+      retVal << boost::rational_cast<double>(*pValRI);
+    else {
+      int *pValI = std::get_if<int>(&value);
+      if (pValI)
+        retVal << *pValI;
+      else {
+        double *pValD = std::get_if<double>(&value);
+        if (pValD)
+          retVal << *pValD;
+        else
+          retVal << "Undifentified";
+      }
     }
     if (retVal.str().empty())
-      retVal << boost::rational_cast<int>(boost::get<boost::rational<int>>(n))
+      retVal << boost::rational_cast<int>(std::get<boost::rational<int>>(value))
              << "?";
     pt.put(boost::lexical_cast<std::string>(i++), retVal.str());
   }
