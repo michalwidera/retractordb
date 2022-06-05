@@ -30,7 +30,7 @@ std::string intervalCounter() {
       }
       if (q.lProgram.size() == 1) {
         token tInstance(*(q.lProgram.begin()));
-        q.rInterval = coreInstance.getDelta(tInstance.getValue());
+        q.rInterval = coreInstance.getDelta(tInstance.getStr());
         continue;  // Just one stream
       }
       assert(q.lProgram.size() == 3 || q.lProgram.size() == 2);
@@ -44,10 +44,10 @@ std::string intervalCounter() {
       token op(*loc.begin());
       loc.pop_front();
       boost::rational<int> delta(-1);
-      switch (op.getTokenCommand()) {
+      switch (op.getCommandID()) {
         case STREAM_HASH: {
-          boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue());
-          boost::rational<int> delta2 = coreInstance.getDelta(t2.getValue());
+          boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
+          boost::rational<int> delta2 = coreInstance.getDelta(t2.getStr());
           if (delta1 == 0 || delta2 == 0) {
             bOnceAgain = true;
             continue;
@@ -55,10 +55,9 @@ std::string intervalCounter() {
             delta = deltaHash(delta1, delta2);
         } break;
         case STREAM_DEHASH_DIV: {
-          boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue());
-          boost::rational<int> delta2 =
-              t2.getCRValue();  // There is no second stream - just fraction
-                                // argument
+          boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
+          boost::rational<int> delta2 = t2.get();  // There is no second stream
+                                                   // - just fraction argument
           assert(delta2 != 0);
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -78,8 +77,8 @@ std::string intervalCounter() {
           }
         } break;
         case STREAM_DEHASH_MOD: {
-          boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue());
-          boost::rational<int> delta2 = t2.getCRValue();
+          boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
+          boost::rational<int> delta2 = t2.get();
           assert(delta2 != 0);
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -99,7 +98,7 @@ std::string intervalCounter() {
           }
         } break;
         case STREAM_SUBSTRACT: {
-          boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue());
+          boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
           if (delta1 == 0) {
             bOnceAgain = true;
             continue;
@@ -107,8 +106,8 @@ std::string intervalCounter() {
             delta = deltaSubstract(delta1);
         } break;
         case STREAM_ADD: {
-          boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue());
-          boost::rational<int> delta2 = coreInstance.getDelta(t2.getValue());
+          boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
+          boost::rational<int> delta2 = coreInstance.getDelta(t2.getStr());
           if (delta1 == 0 || delta2 == 0) {
             bOnceAgain = true;
             continue;
@@ -121,7 +120,7 @@ std::string intervalCounter() {
         case STREAM_SUM:
         // Delta UNCHANGED ! (like time move)
         case STREAM_TIMEMOVE: {
-          boost::rational<int> delta1 = coreInstance.getDelta(t1.getValue());
+          boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
           if (delta1 == 0) {
             bOnceAgain = true;
             continue;
@@ -134,14 +133,14 @@ std::string intervalCounter() {
           // push_stream core0 -> deltaSrc
           // push_val 5 -> size_of_window
           // stream agse 3 -> step_of_window
-          boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getValue());
+          boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr());
           boost::rational<int> schemaSizeSrc =
-              getQuery(t1.getValue()).getFieldNamesList().size();
-          boost::rational<int> step = abs(t2.getCRValue());
-          boost::rational<int> windowSize = abs(op.getCRValue());
+              getQuery(t1.getStr()).getFieldNamesList().size();
+          boost::rational<int> step = abs(t2.get());
+          boost::rational<int> windowSize = abs(op.get());
           assert(windowSize > 0);
           assert(step > 0);
-          if (t2.getCRValue() < 0) {  // windowSize < 0
+          if (t2.get() < 0) {  // windowSize < 0
             delta = deltaSrc;
             delta /= schemaSizeSrc;
             delta *= windowSize;
@@ -150,12 +149,12 @@ std::string intervalCounter() {
             delta = (deltaSrc / schemaSizeSrc) * step;
         } break;
         default:
-          std::cerr << op.getStrTokenName() << " ";
-          std::cerr << op.getCRValue() << " ";
-          std::cerr << op.getValue() << " ";
+          std::cerr << op.getStrCommandID() << " ";
+          std::cerr << op.get() << " ";
+          std::cerr << op.getStr() << " ";
           std::cerr << std::endl;
           throw std::out_of_range("Undefined token/command on list");
-      }  // switch ( op.getTokenCommand() )
+      }  // switch ( op.getCommandID() )
       assert(delta != -1);
       q.rInterval = delta;  // There is estabilished delta value - return value
     }                       // BOOST_FOREACH ( query & q , coreInstance )
@@ -190,10 +189,10 @@ std::string simplifyLProgram() {
       t0 = t1;
       t1 = t2;
       t2 = (*it2);
-      if (t2.getStrTokenName() == "STREAM_AGSE" &&
-          t1.getStrTokenName() == "PUSH_VAL" &&
-          t0.getStrTokenName() == "PUSH_VAL") {
-        token newVal(t2.getTokenCommand(), t1.getValue(), t1.getCRValue());
+      if (t2.getStrCommandID() == "STREAM_AGSE" &&
+          t1.getStrCommandID() == "PUSH_VAL" &&
+          t0.getStrCommandID() == "PUSH_VAL") {
+        token newVal(t2.getCommandID(), t1.getStr(), t1.get());
         it2 = (*it).lProgram.erase(it2);
         --it2;
         it2 = (*it).lProgram.erase(it2);
@@ -206,8 +205,8 @@ std::string simplifyLProgram() {
     if ((*it).isReductionRequired()) {
       for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end();
            ++it2) {
-        if ((*it2).getStrTokenName() == "STREAM_TIMEMOVE" ||
-            (*it2).getStrTokenName() == "STREAM_SUBSTRACT") {
+        if ((*it2).getStrCommandID() == "STREAM_TIMEMOVE" ||
+            (*it2).getStrCommandID() == "STREAM_SUBSTRACT") {
           query newQuery;
           std::string arg1;  //< Name of argument operation
           command_id cmd;
@@ -215,7 +214,7 @@ std::string simplifyLProgram() {
           {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
-            cmd = (*it2).getTokenCommand();
+            cmd = (*it2).getCommandID();
             it2 = (*it).lProgram.erase(it2);
             --it2;
           }
@@ -223,9 +222,9 @@ std::string simplifyLProgram() {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
             std::stringstream s;
-            s << (*it2).getValue();
+            s << (*it2).getStr();
             arg1 = std::string(s.str());
-            affectedField = (*it2).getValue();
+            affectedField = (*it2).getStr();
             it2 = (*it).lProgram.erase(it2);
             --it2;
           }
@@ -239,8 +238,8 @@ std::string simplifyLProgram() {
               newQuery);  // After this instruction it loses context
           it = coreInstance.begin();
           break;
-        } else if ((*it2).getStrTokenName() != "PUSH_STREAM" &&
-                   (*it2).getStrTokenName() != "PUSH_VAL") {
+        } else if ((*it2).getStrCommandID() != "PUSH_STREAM" &&
+                   (*it2).getStrCommandID() != "PUSH_VAL") {
           query newQuery;
           std::string arg1,  //< Name of first opeartion arguemnt
               arg2;          //< Name of second opeartion arguemnt
@@ -248,7 +247,7 @@ std::string simplifyLProgram() {
           {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
-            cmd = (*it2).getTokenCommand();
+            cmd = (*it2).getCommandID();
             it2 = (*it).lProgram.erase(it2);
             --it2;
           }
@@ -256,7 +255,7 @@ std::string simplifyLProgram() {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
             std::stringstream s;
-            s << (*it2).getValue();
+            s << (*it2).getStr();
             arg1 = std::string(s.str());
             it2 = (*it).lProgram.erase(it2);
             --it2;
@@ -265,7 +264,7 @@ std::string simplifyLProgram() {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
             std::stringstream s;
-            s << (*it2).getValue();
+            s << (*it2).getStr();
             arg2 = std::string(s.str());
             it2 = (*it).lProgram.erase(it2);
             --it2;
@@ -290,7 +289,7 @@ std::string simplifyLProgram() {
 std::list<field> combine(std::string sName1, std::string sName2,
                          token cmd_token) {
   std::list<field> lRetVal;
-  command_id cmd = cmd_token.getTokenCommand();
+  command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
     if (getQuery(sName1).lSchema.size() != getQuery(sName2).lSchema.size())
@@ -356,9 +355,9 @@ std::list<field> combine(std::string sName1, std::string sName2,
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
     std::list<field> schema;
-    int windowSize = abs(rational_cast<int>(cmd_token.getCRValue()));
+    int windowSize = abs(rational_cast<int>(cmd_token.get()));
     // If winows is negative - reverted schema
-    if (rational_cast<int>(cmd_token.getCRValue()) > 0) {
+    if (rational_cast<int>(cmd_token.get()) > 0) {
       for (int i = 0; i < windowSize; i++) {
         field intf;
         intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
@@ -416,18 +415,18 @@ std::string prepareFields() {
       std::vector<std::list<field>::iterator> eraseList;
       auto it = q.lSchema.begin();
       for (auto &f : q.lSchema) {
-        if (f.getFirstFieldToken().getTokenCommand() == PUSH_TSCAN) {
+        if (f.getFirstFieldToken().getCommandID() == PUSH_TSCAN) {
           // found! - and now unroll
           if (q.lProgram.size() == 1) {
             // we assure that on and only token is push_stream
-            assert((*q.lProgram.begin()).getTokenCommand() == PUSH_STREAM);
-            auto nameOfscanningTable = (*q.lProgram.begin()).getValue();
+            assert((*q.lProgram.begin()).getCommandID() == PUSH_STREAM);
+            auto nameOfscanningTable = (*q.lProgram.begin()).getStr();
             // Remove of TSCAN
             eraseList.push_back(it);
-            // q.lSchema =  getQuery(t.getValue()).lSchema;
+            // q.lSchema =  getQuery(t.getStr()).lSchema;
             // copy list of fields from one to another
             int filedPosition = 0;
-            for (auto s : getQuery(t.getValue()).lSchema) {
+            for (auto s : getQuery(t.getStr()).lSchema) {
               std::list<token> newLProgram;
               newLProgram.push_back(
                   token(PUSH_ID, nameOfscanningTable,
@@ -440,15 +439,15 @@ std::string prepareFields() {
           }
           if (q.lProgram.size() == 3) {
             auto eIt = q.lProgram.begin();
-            std::string sName1 = (*eIt++).getValue();
-            std::string sName2 = (*eIt++).getValue();
+            std::string sName1 = (*eIt++).getStr();
+            std::string sName2 = (*eIt++).getStr();
             token cmd = (*eIt++);
             q.lSchema = combine(sName1, sName2, cmd);
             break;
           }
           if (q.lProgram.size() == 2) {
             auto eIt = q.lProgram.begin();
-            std::string sName1 = (*eIt++).getValue();
+            std::string sName1 = (*eIt++).getStr();
             token cmd = (*eIt++);
             q.lSchema = combine(sName1, "", cmd);
             break;
@@ -481,7 +480,7 @@ std::string replicateIDX() {
       std::string schemaName = "";
       bool found(false);
       for (auto &t : f.lProgram) {  // for each token in query field
-        if (t.getTokenCommand() == PUSH_IDX) {
+        if (t.getCommandID() == PUSH_IDX) {
           if (found) {
             if (q.lSchema.size() != 1) {
               // if _ exist then only one filed can be in query
@@ -489,7 +488,7 @@ std::string replicateIDX() {
             }
           }
           found = true;
-          schemaName = t.getValue();
+          schemaName = t.getStr();
         }
       }
       if (found) {
@@ -502,12 +501,12 @@ std::string replicateIDX() {
         for (int i = 0; i < fieldSize; i++) {
           std::list<token> newLProgram;
           for (auto &t : oldField.lProgram) {
-            if (t.getTokenCommand() == PUSH_IDX)
+            if (t.getCommandID() == PUSH_IDX)
               newLProgram.push_back(
-                  token(PUSH_ID, t.getValue(), boost::rational<int>(i)));
+                  token(PUSH_ID, t.getStr(), boost::rational<int>(i)));
             else
               newLProgram.push_back(
-                  token(t.getTokenCommand(), t.getValue(), t.getCRValue()));
+                  token(t.getCommandID(), t.getStr(), t.get()));
           }
           std::string toRepalce = oldField.getFieldText();
           replaceAll(toRepalce, "_", lexical_cast<std::string>(i));
@@ -543,8 +542,8 @@ std::string convertReferences() {
     assert(!q.isReductionRequired());
     for (auto &f : q.lSchema) {     // for each field in query
       for (auto &t : f.lProgram) {  // for each token in query field
-        const command_id cmd(t.getTokenCommand());
-        const std::string text(t.getValue());
+        const command_id cmd(t.getCommandID());
+        const std::string text(t.getStr());
         boost::cmatch what;
         switch (cmd) {
           case PUSH_ID1:
@@ -605,20 +604,20 @@ std::string convertReferences() {
               command_id cmd;
               query *pQ1(nullptr), *pQ2(nullptr);
               if (q.lProgram.size() == 1) {
-                schema1 = (*eIt).getValue();  // push stream - stream
-                cmd = (*eIt).getTokenCommand();
+                schema1 = (*eIt).getStr();  // push stream - stream
+                cmd = (*eIt).getCommandID();
                 assert(cmd == PUSH_STREAM);
                 pQ1 = &getQuery(schema1);
               }
               if (q.lProgram.size() == 2) {
-                schema1 = (*eIt++).getValue();   // push stream - stream
-                cmd = (*eIt).getTokenCommand();  // comand
+                schema1 = (*eIt++).getStr();  // push stream - stream
+                cmd = (*eIt).getCommandID();  // comand
                 pQ1 = &getQuery(schema1);
               }
               if (q.lProgram.size() == 3) {
-                schema1 = (*eIt++).getValue();   // push stream - stream
-                schema2 = (*eIt++).getValue();   // push stream - stream
-                cmd = (*eIt).getTokenCommand();  // comand
+                schema1 = (*eIt++).getStr();  // push stream - stream
+                schema2 = (*eIt++).getStr();  // push stream - stream
+                cmd = (*eIt).getCommandID();  // comand
                 pQ1 = &getQuery(schema1);
                 pQ2 = &getQuery(schema2);
               }
