@@ -120,7 +120,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
           int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
           std::string schema = f.getFirstFieldToken().getStr();
           boost::rational<int> val =
-              boost::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+              std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
           ret += val;
         }
         return ret;
@@ -314,10 +314,10 @@ number Processor::getValueProc(std::string streamName, int timeOffset,
     retval = archive.readData(timeOffset - 1, schemaOffset, reverse);
     */
     retval = boost::rational<int>(123, 1);
-    if (streamName == "source") {  // BUG LOGGING }{
-      std::cerr << "2. (" << timeOffset << "," << schemaOffset << ") -> "
-                << retval << std::endl;
-    }
+    // if (streamName == "source") {  // BUG LOGGING }{
+    //  std::cerr << "2. (" << timeOffset << "," << schemaOffset << ") -> "
+    //            << retval << std::endl;
+    //}
   }
   return retval;
 }
@@ -416,7 +416,7 @@ void Processor::updateContext(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              ret = ret + boost::get<boost::rational<int>>(
+              ret = ret + std::get<boost::rational<int>>(
                               getValueProc(schema, 0, pos));
             }
             ret = ret / static_cast<int>(q.lSchema.size());
@@ -433,8 +433,8 @@ void Processor::updateContext(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              boost::rational<int> val = boost::get<boost::rational<int>>(
-                  getValueProc(schema, 0, pos));
+              boost::rational<int> val =
+                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
               if (val > ret) ret = val;
             }
             rowValues.push_back(ret);
@@ -450,8 +450,8 @@ void Processor::updateContext(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              boost::rational<int> val = boost::get<boost::rational<int>>(
-                  getValueProc(schema, 0, pos));
+              boost::rational<int> val =
+                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
               if (val < ret) ret = val;
             }
             rowValues.push_back(ret);
@@ -467,8 +467,8 @@ void Processor::updateContext(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              boost::rational<int> val = boost::get<boost::rational<int>>(
-                  getValueProc(schema, 0, pos));
+              boost::rational<int> val =
+                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
               ret += val;
             }
             rowValues.push_back(ret);
@@ -555,7 +555,7 @@ void Processor::updateContext(std::set<std::string> inSet) {
               std::cerr << "}{";
               for (int i = 0; i < windowSize; i++) {
                 number ret = getValueProc(nameSrc, 0, i + d);
-                std::cerr << "1. " << i + d << " -> " << ret << std::endl;
+                // std::cerr << "1. " << i + d << " -> " << ret << std::endl;
                 rowValues.push_back(ret);
               }
               std::cerr << std::endl;
@@ -665,7 +665,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           int data_sum(0);
           for (int i = 0; i < getSizeOfRollup(q); i++) {
             boost::rational<int> val =
-                boost::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
+                std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
             data_sum += rational_cast<int>(val);
           }
           boost::rational<int> val(data_sum);
@@ -691,7 +691,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
             std::vector<unsigned char> data_v;
             for (int i = 0; i < getSizeOfRollup(q); i++) {
               boost::rational<int> val =
-                  boost::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
+                  std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
               byteConverter.int_type = rational_cast<int>(val);
               data_v.push_back(byteConverter.u8[0]);
             }
@@ -704,7 +704,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
             std::vector<unsigned short> data_v;
             for (int i = 0; i < getSizeOfRollup(q); i++) {
               boost::rational<int> val =
-                  boost::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
+                  std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
               byteConverter.int_type = rational_cast<int>(val);
               data_v.push_back(byteConverter.u16[0]);
             }
@@ -717,7 +717,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
             std::vector<unsigned long> data_v;
             for (int i = 0; i < getSizeOfRollup(q); i++) {
               boost::rational<int> val =
-                  boost::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
+                  std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
               byteConverter.int_type = rational_cast<int>(val);
               data_v.push_back(byteConverter.u32);
             }
@@ -760,7 +760,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           for (int j = 0; j < len; j++)
             for (int i = 0; i < getSizeOfRollup(q); i++) {
               boost::rational<int> val =
-                  boost::get<boost::rational<int>>(getValueOfRollup(q, i, j));
+                  std::get<boost::rational<int>>(getValueOfRollup(q, i, j));
               if (val >= from && val <= to) ret++;
             }
           rStack.push(ret);
@@ -785,7 +785,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
         // first argument
         int offsetFromArg = getArgumentOffset(q.id, argument);
         number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
-        rStack.push(boost::get<boost::rational<int>>(a));
+        rStack.push(std::get<boost::rational<int>>(a));
       } break;
       default:
         throw std::out_of_range(
@@ -797,7 +797,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
     int fieldPosition = q.getFieldIndex(f);
     assert(fieldPosition != -1);
     number retVal = gContextValMap[q.id][fieldPosition];
-    return boost::get<boost::rational<int>>(retVal);
+    return std::get<boost::rational<int>>(retVal);
   } else if (rStack.size() == 1)
     return rStack.top();
   else

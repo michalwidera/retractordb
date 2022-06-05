@@ -228,19 +228,19 @@ token field::getFirstFieldToken() {
 /** Construktor set */
 
 token::token(command_id id, std::string sValue,
-             std::variant<double, int, boost::rational<int>> value)
+             std::variant<boost::rational<int>, int, double> value)
     : command(id), textValue(sValue) {
-  boost::rational<int> *pVal1 = std::get_if<boost::rational<int>>(&value);
-  if (pVal1)
-    numericValue = *pVal1;
+  boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
+  if (pValRI)
+    numericValue = *pValRI;
   else {
-    int *pVal2 = std::get_if<int>(&value);
-    if (pVal2)
-      numericValue = boost::rational<int>(*pVal2, 1);
+    int *pValI = std::get_if<int>(&value);
+    if (pValI)
+      numericValue = boost::rational<int>(*pValI, 1);
     else {
-      double *pVal3 = std::get_if<double>(&value);
-      if (pVal3)
-        numericValue = Rationalize(*pVal3);
+      double *pValD = std::get_if<double>(&value);
+      if (pValD)
+        numericValue = Rationalize(*pValD);
       else
         numericValue = boost::rational<int>(-999, 1);  // Unidentified value
     }
