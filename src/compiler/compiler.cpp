@@ -57,7 +57,7 @@ std::string intervalCounter() {
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr());
           boost::rational<int> delta2 = t2.get();  // There is no second stream
-                                                   // - just fraction argument
+          // - just fraction argument
           assert(delta2 != 0);
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -362,7 +362,7 @@ std::list<field> combine(std::string sName1, std::string sName2,
         field intf;
         intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
         intf.fieldType = rdb::INTEGER;  // TODO - need to inherit BYTE or
-                                        // INTEGER from BYTEARRAY or INTARRAY
+        // INTEGER from BYTEARRAY or INTARRAY
         schema.push_back(intf);
       }
     } else {
@@ -370,7 +370,7 @@ std::list<field> combine(std::string sName1, std::string sName2,
         field intf;
         intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
         intf.fieldName = rdb::INTEGER;  // TODO - need to inherit BYTE or
-                                        // INTEGER from BYTEARRAY or INTARRAY
+        // INTEGER from BYTEARRAY or INTARRAY
         schema.push_back(intf);
       }
     }

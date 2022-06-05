@@ -244,7 +244,6 @@ token::token(command_id id, std::string sValue, number value)
         numericValue = boost::rational<int>(-999, 1);  // Unidentified value
     }
   }
-
   if (sValue == "") {
     std::stringstream ss;
     ss << numericValue.numerator();

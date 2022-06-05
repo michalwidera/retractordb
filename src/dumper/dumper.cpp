@@ -289,9 +289,8 @@ void dumpRawTextFile(bool bShowFieldTypes) {
                    (tf.getStrCommandID() == "PUSH_VAL")) {
           std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr()
                     << ")" << std::endl;
-        } else {
+        } else
           std::cout << "\t\t" << tf.getStrCommandID() << std::endl;
-        }
     }
   }
 }
