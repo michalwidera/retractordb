@@ -16,7 +16,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/stacktrace.hpp>
-#include <boost/variant.hpp>
 #include <cstdint>
 #include <iostream>
 #include <ranges>

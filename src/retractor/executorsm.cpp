@@ -20,7 +20,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/thread.hpp>
-#include <boost/variant.hpp>
+
 
 // boost::this_process::get_id()
 #include <boost/process/environment.hpp>
