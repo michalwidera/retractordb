@@ -53,13 +53,11 @@ class token {
   void serialize(Archive &ar, unsigned int version) {
     ar &command;
     ar &crValue;
-    ar &rcValue;
     ar &sValue_;
   }
 
   command_id command;
   boost::rational<int> crValue;
-  boost::rational<int> rcValue;
   std::string sValue_;
 
  public:
