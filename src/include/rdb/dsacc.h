@@ -39,7 +39,7 @@ class DataStorageAccessor {
    *
    * @return Descriptor& reference to descriptor inner object
    */
-  Descriptor &getDescriptor();
+  Descriptor& getDescriptor();
 
   /**
    * @brief Set the Reverse value
@@ -86,7 +86,7 @@ class DataStorageAccessor {
    * @param recordIndex location from beginging of the storage [unit: Records]
    * @return success status - true eq. success
    */
-  bool Get(T *inBuffer, const size_t recordIndex);
+  bool Get(T* inBuffer, const size_t recordIndex);
 
   /**
    * @brief Sends record to the storage
@@ -95,7 +95,7 @@ class DataStorageAccessor {
    * @param recordIndex location from begining of the storage [unit: Records]
    * @return success status- true eq. success
    */
-  bool Put(const T *outBuffer,
+  bool Put(const T* outBuffer,
            const size_t recordIndex = std::numeric_limits<size_t>::max());
 };
 }  // namespace rdb

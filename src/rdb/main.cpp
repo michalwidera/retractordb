@@ -22,7 +22,7 @@ enum payloadStatusType { fetched, clean, stored, changed };
 
 payloadStatusType payloadStatus(clean);
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_dacc;
   std::unique_ptr<std::byte[]> uPtr_payload;
   std::string file;
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
     else if (cmd == "dec")
       hexFormat = false;
     else if (cmd == "dump") {
-      auto *ptr = reinterpret_cast<unsigned char *>(uPtr_payload.get());
+      auto* ptr = reinterpret_cast<unsigned char*>(uPtr_payload.get());
       for (auto i = 0; i < uPtr_dacc->getDescriptor().GetSize(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');

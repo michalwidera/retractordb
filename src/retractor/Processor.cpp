@@ -339,7 +339,7 @@ void Processor::updateContext(std::set<std::string> inSet) {
     } else {
       // execution of stream program and store data
       assert(q.lProgram.size() < 4);  // we assume that all stream programs are
-                                      // optimized and 1v2v3 size
+      // optimized and 1v2v3 size
       assert(q.lProgram.size() >
              0);  // we assume that optimized streams are ready and filled
       std::list<token>::iterator it = q.lProgram.begin();
@@ -514,7 +514,6 @@ void Processor::updateContext(std::set<std::string> inSet) {
             rowValues = getRow(streamNameArg, TimeOffset, true);
           }
           break;
-
         case STREAM_AGSE:
           // PUSH_STREAM core -> delta_source (argument1)
           // PUSH_VAL 2 -> window_length (argument2)
