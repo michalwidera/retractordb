@@ -40,12 +40,16 @@ int main(int argc, char* argv[]) {
     std::string sOutputFile;
     std::string sInputFile;
     po::options_description desc("Avaiable options");
-    desc.add_options()("help,h", "Show program options")(
-        "queryfile,q", po::value<std::string>(&sInputFile), "query set file")(
-        "outfile,o",
-        po::value<std::string>(&sOutputFile)->default_value("query.qry"),
-        "output file")("dumpcross,d",
-                       "dump diagnostic cross compilation forms");
+    desc.add_options()                      // formating
+        ("help,h", "Show program options")  //
+        ("queryfile,q", po::value<std::string>(&sInputFile),
+         "query set file")  //
+        ("outfile,o",
+         po::value<std::string>(&sOutputFile)->default_value("query.qry"),
+         "output file")  //
+        ("dumpcross,d",
+         "dump diagnostic cross "
+         "compilation forms");
     po::positional_options_description
         p;  // Assume that infile is the first option
     p.add("queryfile", -1);

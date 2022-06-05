@@ -352,17 +352,19 @@ int main(int argc, char *argv[]) {
     std::string sQuery;
     std::string sDumpFile;
     po::options_description desc("Supported program options");
-    desc.add_options()("help,h", "show help")(
-        "infile,i",
-        po::value<std::string>(&sInputFile)->default_value("query.qry"),
-        "input query plan")("display,s", po::value<std::string>(&sQuery),
-                            "process single query")(
-        "dump,d",
-        po::value<std::string>(&sDumpFile)->default_value("query.dmp"),
-        "dump file name")(
-        "tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0),
-        "query limit, 0 - no limit")("waterfall,f", "show waterfall mode")(
-        "verbose,v", "Dump diagnostic info on screen while work");
+    desc.add_options()("help,h", "show help")  //
+        ("infile,i",
+         po::value<std::string>(&sInputFile)->default_value("query.qry"),
+         "input query plan")  //
+        ("display,s", po::value<std::string>(&sQuery),
+         "process single query")  //
+        ("dump,d",
+         po::value<std::string>(&sDumpFile)->default_value("query.dmp"),
+         "dump file name")  //
+        ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0),
+         "query limit, 0 - no limit")           //
+        ("waterfall,f", "show waterfall mode")  //
+        ("verbose,v", "Dump diagnostic info on screen while work");
     // Assume that infile is the first option
     po::positional_options_description p;
     p.add("infile", -1);

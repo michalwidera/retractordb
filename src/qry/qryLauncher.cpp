@@ -28,18 +28,22 @@ int main(int argc, char *argv[]) {
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
-    desc.add_options()("select,s", po::value<std::string>(&sInputStream),
-                       "show this stream")(
-        "detail,t", po::value<std::string>(&sInputStream),
-        "show details of this stream")(
-        "tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0),
-        "limit of elements, 0 - no limit")("hello,l",
-                                           "diagnostic - hello db world")(
-        "kill,k", "kill xretractor server")("dir,d", "list of queries")(
-        "graphite,g", "graphite output mode")(
-        "influxdb,f", "influxDB output mode")("raw,r", "raw mode (default)")(
-        "help,h", "show options")("needctrlc,c",
-                                  "force ctl+c for stop this tool");
+    desc.add_options()  //
+        ("select,s", po::value<std::string>(&sInputStream),
+         "show this stream")  //
+        ("detail,t", po::value<std::string>(&sInputStream),
+         "show details of this stream")  //
+        ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0),
+         "limit of elements, 0 - no limit")  //
+        ("hello,l",
+         "diagnostic - hello db world")         //
+        ("kill,k", "kill xretractor server")    //
+        ("dir,d", "list of queries")            //
+        ("graphite,g", "graphite output mode")  //
+        ("influxdb,f", "influxDB output mode")  //
+        ("raw,r", "raw mode (default)")         //
+        ("help,h", "show options")              //
+        ("needctrlc,c", "force ctl+c for stop this tool");
     po::positional_options_description
         p;  // Assume that select is the first option
     p.add("select", -1);
