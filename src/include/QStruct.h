@@ -132,6 +132,7 @@ class query {
   bool isDeclaration();
   bool isReductionRequired();
   bool isGenerated();
+  bool is(command_id command);
 
   field &getField(std::string sField);
 

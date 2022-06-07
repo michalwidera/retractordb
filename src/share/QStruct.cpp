@@ -296,6 +296,13 @@ bool query::isReductionRequired() {
   return streamOperatorCount > 1;
 }
 
+bool query::is(command_id command) {
+  for (auto &t : lProgram) {
+    if (t.getCommandID() == command) return true;
+  }
+  return false;
+}
+
 std::list<std::string> query::getDepStreamNameList(int reqDep) {
   std::list<std::string> lRetVal;
   for (auto &t : lProgram) {
