@@ -669,62 +669,6 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           }
           boost::rational<int> val(data_sum);
           rStack.push(val);
-        } else if (tk.getStr() == "crc") {
-          union Converter {
-            int32_t i32;
-            int int_type;
-            int16_t i16[2];
-            int8_t i8[4];
-            uint32_t u32;
-            uint16_t u16[2];
-            unsigned short us16[2];
-            uint8_t u8[4];
-          } byteConverter;
-          b = rStack.top();
-          rStack.pop();
-          a = rStack.top();
-          rStack.pop();
-          if (a == 8) {
-            boost::crc_basic<8> crcfn(rational_cast<unsigned char>(b), 0x0, 0x0,
-                                      false, false);
-            std::vector<unsigned char> data_v;
-            for (int i = 0; i < getSizeOfRollup(q); i++) {
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
-              byteConverter.int_type = rational_cast<int>(val);
-              data_v.push_back(byteConverter.u8[0]);
-            }
-            crcfn.process_bytes(data_v.data(), data_v.size());
-            boost::rational<int> val(crcfn.checksum());
-            rStack.push(val);
-          } else if (a == 16) {
-            boost::crc_basic<16> crcfn(rational_cast<unsigned short>(b), 0x0,
-                                       0x0, false, false);
-            std::vector<unsigned short> data_v;
-            for (int i = 0; i < getSizeOfRollup(q); i++) {
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
-              byteConverter.int_type = rational_cast<int>(val);
-              data_v.push_back(byteConverter.u16[0]);
-            }
-            crcfn.process_bytes(data_v.data(), 2 * data_v.size());
-            boost::rational<int> val(crcfn.checksum());
-            rStack.push(val);
-          } else if (a == 32) {
-            boost::crc_basic<32> crcfn(rational_cast<unsigned long>(b), 0x0,
-                                       0x0, false, false);
-            std::vector<unsigned long> data_v;
-            for (int i = 0; i < getSizeOfRollup(q); i++) {
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
-              byteConverter.int_type = rational_cast<int>(val);
-              data_v.push_back(byteConverter.u32);
-            }
-            crcfn.process_bytes(data_v.data(), 4 * data_v.size());
-            boost::rational<int> val(crcfn.checksum());
-            rStack.push(val);
-          } else
-            throw std::out_of_range("No support for this CRC size");
         } else if (tk.getStr() == "count") {
           assert(rStack.size() < 4);
           assert(rStack.size() > 0);
