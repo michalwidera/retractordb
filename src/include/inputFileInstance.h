@@ -6,7 +6,6 @@
 #include <boost/rational.hpp>  // for rational
 #include <fstream>             // for ifstream
 #include <list>                // for list
-#include <memory>              // for shared_ptr
 #include <string>              // for string
 #include <vector>              // for vector
 

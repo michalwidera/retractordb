@@ -229,32 +229,31 @@ void Processor::processRows(std::set<std::string> inSet) {
     // Drop rows that not come with this to compute
     if (inSet.find(q.id) == inSet.end()) continue;
     gStreamSize[q.id]++;
-    // Declarations need to be supported otherwise
+
     if (q.isDeclaration()) {
+      int cnt(0);
       assert(!q.filename.empty());
       gFileMap[q.id]
-          .readRowFromFile();  // Fetch next row form file that have schema
-    }
-    std::vector<number> ctxRowValue;
-    if (q.isDeclaration()) {
-      for (auto f : q.lSchema) ctxRowValue.push_back(gFileMap[q.id].getCR(f));
+          .readRowFromFile(); // Fetch next row form file that have schema
+      for (auto f : q.lSchema)
+        gContextValMap[q.id][cnt++] = gFileMap[q.id].getCR(f);
       // same as below ... wait for C++20
       // std::ranges::for_each(
       //    q.lSchema, [ctxRowValue, this, q](field f) mutable
       //    { ctxRowValue.push_back(gFileMap[q.id].getCR(f)); });
     } else {
       for (auto i = 0; i < getSizeOfRollup(q); i++)
-        ctxRowValue.push_back(getValueOfRollup(q, i, 0));
+        gContextValMap[q.id][i] = getValueOfRollup(q, i, 0);
     }
-    gContextValMap[q.id] = ctxRowValue;
+
     // here should be computer values of stream tuples
     // computed value shoud be stored in file
-    std::vector<number> rowValue;
+
     int cnt(0);
-    for (auto &f : q.lSchema) {
+    for (auto &f : q.lSchema)
+    {
       boost::rational<int> value(computeValue(f, q));
-      gContextValMap[q.id][cnt] = value;
-      cnt++;
+      gContextValMap[q.id][cnt++] = value;
     }
     // Store computed values to cbuffer - on disk
     // storage[q.id]->store();
