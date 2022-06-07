@@ -9,20 +9,41 @@
 #include <boost/type_index/type_index_facade.hpp>  // for operator==
 #include <cassert>                                 // for assert
 #include <iostream>
+#include <map>
 #include <stdexcept>  // for out_of_range
 
 #include "QStruct.h"  // for field, BAD
 
 using namespace boost;
 
-void inputFileInstance::goBegin() {
+void inputDF::goBegin() {
   psFile->clear();
   psFile->seekg(0, std::ios::beg);
   curPos = 0;
 }
 
-inputFileInstance::inputFileInstance(std::string inputFileName)
-    : len(0), curPos(0) {
+template <typename T>
+T inputDF::readFromFile() {
+  T retVal;
+  if (len == -1) throw std::out_of_range("no file connected to object");
+  if (extension == ".txt") {
+    *psFile >> retVal;
+    if (psFile->eof()) {
+      goBegin();
+      *psFile >> retVal;
+    }
+  } else {
+    if (curPos > (len - sizeof(T))) goBegin();
+    psFile->read(reinterpret_cast<char *>(&retVal), sizeof retVal);
+    curPos += sizeof(T);
+  }
+  return retVal;
+}
+
+inputDF::inputDF() {}
+
+inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
+    : filename(inputFileName), lSchema(lSchema), len(0), curPos(0) {
   extension = boost::filesystem::extension(inputFileName);
   std::transform(extension.begin(), extension.end(), extension.begin(),
                  ::tolower);
@@ -45,51 +66,21 @@ inputFileInstance::inputFileInstance(std::string inputFileName)
   // Don't throw exception from constructor - Rule!
 }
 
-inputFileInstance::inputFileInstance() : len(0), curPos(0) {}
-
-template <typename T>
-T inputFileInstance::get() {
-  T retVal;
-  if (len == -1) throw std::out_of_range("no file connected to object");
-  if (extension == ".txt") {
-    *psFile >> retVal;
-    if (psFile->eof()) {
-      goBegin();
-      *psFile >> retVal;
-    }
-  } else {
-    if (curPos > (len - sizeof(T))) goBegin();
-    psFile->read(reinterpret_cast<char *>(&retVal), sizeof retVal);
-    curPos += sizeof(T);
-  }
-  return retVal;
-}
-
-template unsigned char inputFileInstance::get<unsigned char>();
-template int inputFileInstance::get<int>();
-template boost::rational<int> inputFileInstance::get<boost::rational<int>>();
-
-//-------------------------------------------------------------
-// input DISK FILE - part
-//-------------------------------------------------------------
-
-inputDF::inputDF() : inputFileInstance() {}
-
-inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
-    : inputFileInstance(inputFileName), lSchema(lSchema) {}
-
-void inputDF::processRow() {
+void inputDF::readRowFromFile() {
   lResult.clear();
   for (auto &f : lSchema) {
     switch (f.fieldType) {
       case rdb::BYTE:
-        lResult.push_back(get<unsigned char>());
+        lResult.push_back(readFromFile<unsigned char>());
         break;
       case rdb::INTEGER:
-        lResult.push_back(get<int>());
+        lResult.push_back(readFromFile<int>());
+        break;
+      case rdb::FLOAT:
+        lResult.push_back(readFromFile<double>());
         break;
       case rdb::RATIONAL:
-        lResult.push_back(get<boost::rational<int>>());
+        lResult.push_back(readFromFile<boost::rational<int>>());
         break;
       case rdb::BAD:
       default:
@@ -107,12 +98,14 @@ boost::rational<int> inputDF::getCR(field f) {
     if (v.fieldName == f.fieldName) break;
     cnt++;
   }
-  if (lResult.size() == 0) processRow();
+  if (lResult.size() == 0) readRowFromFile();
   assert(lResult.size() != 0);
   if (lResult[cnt].type() == typeid(unsigned char))
     retValue = any_cast<unsigned char>(lResult[cnt]);
   else if (lResult[cnt].type() == typeid(int))
     retValue = any_cast<int>(lResult[cnt]);
+  else if (lResult[cnt].type() == typeid(double))
+    retValue = Rationalize(any_cast<double>(lResult[cnt]));
   else if (lResult[cnt].type() == typeid(boost::rational<int>))
     retValue = any_cast<boost::rational<int>>(lResult[cnt]);
   else
