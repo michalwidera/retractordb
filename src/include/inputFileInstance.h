@@ -10,24 +10,18 @@
 #include <string>              // for string
 #include <vector>              // for vector
 
-class inputFileInstance {
+class inputDF {
+  std::vector<boost::any> lResult;
+  std::list<field> lSchema;
+  std::string filename;
   std::shared_ptr<std::ifstream> psFile;
   int len;    /**< Length of file in bytes */
   int curPos; /**< Actual position in file */
   void goBegin();
   std::string extension;
 
- public:
-  inputFileInstance(std::string inputFileName);
-  inputFileInstance();
-
   template <typename T>
-  T get();
-};
-
-class inputDF : public inputFileInstance {
-  std::vector<boost::any> lResult;
-  std::list<field> lSchema;
+  T readFromFile();
 
  public:
   inputDF();
@@ -36,7 +30,7 @@ class inputDF : public inputFileInstance {
   /** The purpose of this function is to retrieve a row
    * from the file is created based on the schema saved in the query.
    */
-  void processRow();
+  void readRowFromFile();
 
   /** A function that returns the retrieved value from the file
    *  associated with the stream. It iss taken from the lResult buffer

@@ -232,7 +232,8 @@ void Processor::processRows(std::set<std::string> inSet) {
     // Declarations need to be supported otherwise
     if (q.isDeclaration()) {
       assert(!q.filename.empty());
-      gFileMap[q.id].processRow();  // Fetch next row form file that have schema
+      gFileMap[q.id]
+          .readRowFromFile();  // Fetch next row form file that have schema
     }
     std::vector<number> ctxRowValue;
     if (q.isDeclaration()) {
