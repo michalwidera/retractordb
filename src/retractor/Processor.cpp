@@ -234,7 +234,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       int cnt(0);
       assert(!q.filename.empty());
       gFileMap[q.id]
-          .readRowFromFile(); // Fetch next row form file that have schema
+          .readRowFromFile();  // Fetch next row form file that have schema
       for (auto f : q.lSchema)
         gContextValMap[q.id][cnt++] = gFileMap[q.id].getCR(f);
       // same as below ... wait for C++20
@@ -250,8 +250,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     // computed value shoud be stored in file
 
     int cnt(0);
-    for (auto &f : q.lSchema)
-    {
+    for (auto &f : q.lSchema) {
       boost::rational<int> value(computeValue(f, q));
       gContextValMap[q.id][cnt++] = value;
     }
@@ -273,24 +272,22 @@ int Processor::getArgumentOffset(const std::string &streamName,
                                  const std::string &streamArgument) {
   int retVal = 0;
   query &q(getQuery(streamName));
-  for (auto t : q.lProgram) {
-    if (t.getCommandID() == STREAM_ADD) {
-      auto it = q.lProgram.begin();
-      token A = *it;
-      it++;
-      token B = *it;
-      if (A.getStr() == streamArgument)
-        retVal = 0;
-      else if (B.getStr() == streamArgument)
-        retVal = getQuery(A.getStr()).lSchema.size();
-      else {
-        std::cerr << "currnet stream:" << streamName << std::endl;
-        std::cerr << "argument:" << streamArgument << std::endl;
-        std::cerr << "1st: " << A.getStr() << std::endl;
-        std::cerr << "2nd: " << B.getStr() << std::endl;
-        std::cerr << "@:" << boost::stacktrace::stacktrace() << std::endl;
-        throw std::out_of_range("Call to schema that not exist");
-      }
+  if (q.is(STREAM_ADD)) {
+    auto it = q.lProgram.begin();
+    token A = *it;
+    it++;
+    token B = *it;
+    if (A.getStr() == streamArgument)
+      retVal = 0;
+    else if (B.getStr() == streamArgument)
+      retVal = getQuery(A.getStr()).lSchema.size();
+    else {
+      std::cerr << "currnet stream:" << streamName << std::endl;
+      std::cerr << "argument:" << streamArgument << std::endl;
+      std::cerr << "1st: " << A.getStr() << std::endl;
+      std::cerr << "2nd: " << B.getStr() << std::endl;
+      std::cerr << "@:" << boost::stacktrace::stacktrace() << std::endl;
+      throw std::out_of_range("Call to schema that not exist");
     }
   }
   return retVal;

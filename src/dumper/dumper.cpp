@@ -187,13 +187,11 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
   // Stream realtions
   //
   for (auto q : coreInstance) {
-    for (auto t : q.lProgram) {
-      if (t.getStrCommandID() == "PUSH_STREAM") {
-        if (q.isDeclaration()) continue;
-        std::string relation(q.id + " -> " + t.getStr());
-        if (bShowStreamProgs) relation = "prg_" + relation;
-        streamRelationsSet.insert(relation);
-      }
+    if (q.is(PUSH_STREAM)) {
+      if (q.isDeclaration()) continue;
+      std::string relation(q.id + " -> " + t.getStr());
+      if (bShowStreamProgs) relation = "prg_" + relation;
+      streamRelationsSet.insert(relation);
     }
   }
   for (auto s : streamRelationsSet) xout << s << std::endl;
