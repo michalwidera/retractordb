@@ -1,17 +1,21 @@
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <sstream>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 #include <boost/stacktrace.hpp>
 #include <boost/system/error_code.hpp>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
 
 #include "QStruct.h"
 #include "compiler.hpp"
 #include "config.h"  // Add an automatically generated configuration file
+
+#include <spdlog/spdlog.h>
+#include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
 
 using namespace boost;
 
@@ -34,6 +38,10 @@ int main(int argc, char* argv[]) {
     if (len > 0)
       if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
   }
+  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
+  spdlog::set_default_logger(filelog);
+  spdlog::set_pattern(COMMON_LOG_PATTERN);
+  SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     std::unique_ptr<std::ostream> p_ofs;
     namespace po = boost::program_options;
