@@ -10,6 +10,8 @@
 // remove this is boost will clean up on own side.
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
+#include <spdlog/spdlog.h>
+
 #include <boost/crc.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
@@ -17,8 +19,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/stacktrace.hpp>
-
-#include <spdlog/spdlog.h>
 
 #include "QStruct.h"
 #include "SOperations.h"
@@ -196,7 +196,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
       }
       assert(false);  // TODO
   }
-  SPDLOG_ERROR("Unknown operator catched cmd={} progsize={}",cmd,progSize);
+  SPDLOG_ERROR("Unknown operator catched cmd={} progsize={}", cmd, progSize);
   assert(false);    // Unknown operator catched here
   return number(0); /* pro forma */
 }
@@ -284,7 +284,9 @@ int Processor::getArgumentOffset(const std::string &streamName,
     else if (B.getStr() == streamArgument)
       retVal = getQuery(A.getStr()).lSchema.size();
     else {
-      SPDLOG_ERROR("Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}", streamName, streamArgument, A.getStr(), B.getStr());
+      SPDLOG_ERROR(
+          "Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}",
+          streamName, streamArgument, A.getStr(), B.getStr());
       throw std::out_of_range("Call to schema that not exist");
     }
   }

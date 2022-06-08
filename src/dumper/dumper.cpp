@@ -187,15 +187,11 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
   // Stream realtions
   //
   for (auto q : coreInstance) {
-    for (auto t : q.lProgram)
-    {
-      if (t.getStrCommandID() == "PUSH_STREAM")
-      {
-        if (q.isDeclaration())
-          continue;
+    for (auto t : q.lProgram) {
+      if (t.getStrCommandID() == "PUSH_STREAM") {
+        if (q.isDeclaration()) continue;
         std::string relation(q.id + " -> " + t.getStr());
-        if (bShowStreamProgs)
-          relation = "prg_" + relation;
+        if (bShowStreamProgs) relation = "prg_" + relation;
         streamRelationsSet.insert(relation);
       }
     }
@@ -328,7 +324,7 @@ int main(int argc, char *argv[]) {
       std::cerr << argv[0] << " - qry file decoder.\n";
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << CONFIG_LINE;
+      std::cout << config_line;
       return system::errc::success;
     }
     std::string sPlikDanych = vm["infile"].as<std::string>();

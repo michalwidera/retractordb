@@ -1,41 +1,42 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
+
 #include <iostream>
 #include <memory>
 
 #include "CRSMath.h"
 #include "Processor.h"
 #include "QStruct.h"
-
-#include "config.h" // Add an automatically generated configuration file
+#include "config.h"  // Add an automatically generated configuration file
 
 // This defines is required to remove deprecation of boost/bind.hpp
 // some boost libraries still didn't remove dependency to boost bin
 // remove this is boost will clean up on own side.
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
+#include <spdlog/spdlog.h>
+
 #include <boost/chrono.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/process/environment.hpp>  // boost::this_process::get_id()
 #include <boost/program_options.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
-#include <boost/thread.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
-#include <boost/process/environment.hpp> // boost::this_process::get_id()
+#include <boost/thread.hpp>
 
-#include <spdlog/spdlog.h>
-#include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
+#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
 namespace IPC = boost::interprocess;
 
@@ -343,7 +344,7 @@ int main(int argc, char *argv[]) {
   }
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
-  spdlog::set_pattern(COMMON_LOG_PATTERN);
+  spdlog::set_pattern(common_log_pattern);
   SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   thread bt(commmandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
@@ -379,7 +380,7 @@ int main(int argc, char *argv[]) {
       std::cerr << argv[0] << " - query plan executor." << std::endl;
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << CONFIG_LINE;
+      std::cout << config_line;
       return system::errc::success;
     }
     if (!boost::filesystem::exists(sInputFile)) {

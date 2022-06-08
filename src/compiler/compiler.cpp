@@ -1,15 +1,14 @@
 #include "compiler.hpp"
 
-#include <fstream>
-#include <iostream>
+#include <spdlog/spdlog.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 #include <boost/system/error_code.hpp>
-
-#include <spdlog/spdlog.h>
+#include <fstream>
+#include <iostream>
 
 #include "QStruct.h"
 #include "SOperations.h"
@@ -72,7 +71,8 @@ std::string intervalCounter() {
             delta = deltaDivMod(delta1, delta2);
           }
           if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
+            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}",
+                         q.id, delta1, delta2);
             throw std::out_of_range(
                 "You cannot make faster div from slower source");
           }
@@ -91,7 +91,8 @@ std::string intervalCounter() {
             delta = deltaDivMod(delta2, delta1);
           }
           if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
+            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}",
+                         q.id, delta1, delta2);
             throw std::out_of_range(
                 "You cannot make faster mod from slower source");
           }
@@ -148,7 +149,8 @@ std::string intervalCounter() {
             delta = (deltaSrc / schemaSizeSrc) * step;
         } break;
         default:
-          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.get(), op.getStr());
+          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}",
+                       op.getStrCommandID(), op.get(), op.getStr());
           throw std::out_of_range("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
       assert(delta != -1);
@@ -586,7 +588,8 @@ std::string convertReferences() {
               const int offset1(atoi(sOffset1.c_str()));
               t = token(PUSH_ID, schema, boost::rational<int>(offset1));
             } else {
-              SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
+              SPDLOG_ERROR("No mach on type conversion ID2 text:{}",
+                           text.c_str());
               throw std::out_of_range("No mach on type conversion");
             }
             break;
