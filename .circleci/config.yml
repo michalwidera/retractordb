@@ -31,7 +31,7 @@ jobs:
       - run: cd build && conan install .. -s build_type=Debug
       - run: cd build && conan build ..
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test && cat *.log
+      - run: cd build && make test
 
   build-edge:
     working_directory: ~
@@ -49,7 +49,7 @@ jobs:
       - run: cd build && cmake .. && make grammar
       - run: cd build && conan build ..
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test && cat *.log
+      - run: cd build && make test
 
   build-edge-2204-clang:
     working_directory: ~
@@ -68,7 +68,7 @@ jobs:
       - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test && cat *.log
+      - run: cd build && make test
 
   build-edge-2204:
     working_directory: ~
@@ -85,7 +85,7 @@ jobs:
       - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test && cat *.log
+      - run: cd build && make test
 
 workflows:
   version: 2
