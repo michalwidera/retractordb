@@ -587,26 +587,11 @@ std::string convertReferences() {
             if (regex_search(text.c_str(), what, xprFieldId3)) {
               assert(what.size() == 2);
               const std::string field(what[1]);
-              auto eIt = q.lProgram.begin();
-              std::string schema1, schema2;
-              command_id cmd;
+
               query *pQ1(nullptr), *pQ2(nullptr);
-              if (q.lProgram.size() == 1) {
-                schema1 = (*eIt).getStr();  // push stream - stream
-                cmd = (*eIt).getCommandID();
-                assert(cmd == PUSH_STREAM);
-                pQ1 = &getQuery(schema1);
-              }
-              if (q.lProgram.size() == 2) {
-                schema1 = (*eIt++).getStr();  // push stream - stream
-                cmd = (*eIt).getCommandID();  // comand
-                pQ1 = &getQuery(schema1);
-              }
+              auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
+              pQ1 = &getQuery(schema1);
               if (q.lProgram.size() == 3) {
-                schema1 = (*eIt++).getStr();  // push stream - stream
-                schema2 = (*eIt++).getStr();  // push stream - stream
-                cmd = (*eIt).getCommandID();  // comand
-                pQ1 = &getQuery(schema1);
                 pQ2 = &getQuery(schema2);
               }
               bool bFieldFound(false);
