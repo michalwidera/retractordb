@@ -272,25 +272,18 @@ std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
 
 int Processor::getArgumentOffset(const std::string &streamName,
                                  const std::string &streamArgument) {
-  int retVal = 0;
   query &q(getQuery(streamName));
   if (q.is(STREAM_ADD)) {
-    auto it = q.lProgram.begin();
-    token A = *it;
-    it++;
-    token B = *it;
-    if (A.getStr() == streamArgument)
-      retVal = 0;
-    else if (B.getStr() == streamArgument)
-      retVal = getQuery(A.getStr()).lSchema.size();
-    else {
-      SPDLOG_ERROR(
-          "Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}",
-          streamName, streamArgument, A.getStr(), B.getStr());
-      throw std::out_of_range("Call to schema that not exist");
-    }
+    auto [sArg1, sArg2, cmd]{GetArgs(q.lProgram)};
+    if (sArg1 == streamArgument) return 0;
+    if (sArg2 == streamArgument) return getQuery(sArg1).lSchema.size();
+
+    SPDLOG_ERROR(
+        "Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}",
+        streamName, streamArgument, sArg1, sArg2);
+    throw std::out_of_range("Call to schema that not exist");
   }
-  return retVal;
+  return 0;
 }
 
 number Processor::getValueProc(std::string streamName, int timeOffset,
