@@ -31,7 +31,8 @@ class Retractor(ConanFile):
     options = {
         "boost": ["1.77.0","1.78.0","1.79.0"],
         "gtest": ["1.11.0"],
-        "antlr4" : ["4.9.3","4.10","4.10.1"]
+        "antlr4" : ["4.9.3","4.10","4.10.1"],
+        "spdlog" : ["1.10.0"]
     }
 
     default_options = {"boost:shared": False,
@@ -44,12 +45,13 @@ class Retractor(ConanFile):
                        "boost:without_filesystem": False,
                        "boost": "1.79.0",
                        "gtest": "1.11.0",
-                       "antlr4": "4.10.1"
+                       "antlr4": "4.10.1",
+                       "spdlog": "1.10.0"
                        }
 
     def validate(self):
         if not tools.valid_min_cppstd(self, "17"):
-            self.output.error("C++17 is required.")
+            self.output.error("at least C++17 is required.")
 
     def configure(self):
         self.settings.compiler.cppstd = 20
@@ -63,6 +65,7 @@ class Retractor(ConanFile):
         self.requires("boost/"+str(self.options.boost))
         self.requires("gtest/"+str(self.options.gtest))
         self.requires("antlr4-cppruntime/"+str(self.options.antlr4))
+        self.requires("spdlog/"+str(self.options.spdlog))
 
         # Auto-generation of antlr4call.sh script
 

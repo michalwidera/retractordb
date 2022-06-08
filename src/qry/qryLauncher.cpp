@@ -1,9 +1,13 @@
+#include <iostream>
+#include <sstream>
+
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
-#include <iostream>
-#include <sstream>
+
+#include <spdlog/spdlog.h>
+#include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "qry.hpp"
@@ -25,6 +29,10 @@ int main(int argc, char *argv[]) {
     if (len > 0)
       if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
   }
+  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
+  spdlog::set_default_logger(filelog);
+  spdlog::set_pattern(COMMON_LOG_PATTERN);
+  SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
@@ -75,16 +83,17 @@ int main(int argc, char *argv[]) {
         return system::errc::no_such_file_or_directory;
     } else {
       std::cout << argv[0] << ": fatal error: no argument" << std::endl;
-      std::cout << "query receiver terminated." << std::endl;
+      SPDLOG_ERROR("stop - error, no argument.");
       return EPERM;  // ERROR defined in errno-base.h
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cerr << ex.what() << std::endl << "catch client" << std::endl;
+    SPDLOG_ERROR("stop - IPC qry catch client:{}", ex.what());
     return system::errc::no_child_process;
   } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    SPDLOG_ERROR("stop - Exception catch client:{}", e.what());
     return system::errc::interrupted;
   }
   std::cout << "ok." << std::endl;
+  SPDLOG_INFO("stop");
   return system::errc::success;
 }

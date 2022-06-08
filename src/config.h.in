@@ -11,4 +11,6 @@
                     "Build time: @GIT_CURRENT_BUILDTIME@, " \
                     "Type: @CMAKE_BUILD_TYPE@\n"
 
+#define COMMON_LOG_PATTERN "%C%m%d %T.%e %^%s:%# [%L] %v%$"
+
 #endif // CONFIG_H_IN

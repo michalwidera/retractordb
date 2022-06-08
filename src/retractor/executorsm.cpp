@@ -1,6 +1,14 @@
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+#include <iostream>
+#include <memory>
+
 #include "CRSMath.h"
 #include "Processor.h"
 #include "QStruct.h"
+
+#include "config.h" // Add an automatically generated configuration file
 
 // This defines is required to remove deprecation of boost/bind.hpp
 // some boost libraries still didn't remove dependency to boost bin
@@ -20,23 +28,14 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/thread.hpp>
-
-// boost::this_process::get_id()
-#include <boost/process/environment.hpp>
-
-// for BOOST_FOREACH( cmd_e i, commands | map_keys )
-#include <fcntl.h>
-#include <termios.h>
-#include <unistd.h>
-
 #include <boost/filesystem.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
-#include <iostream>
-#include <memory>
+#include <boost/process/environment.hpp> // boost::this_process::get_id()
 
-#include "config.h"  // Add an automatically generated configuration file
+#include <spdlog/spdlog.h>
+#include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
 
 namespace IPC = boost::interprocess;
 
@@ -184,7 +183,7 @@ ptree commandProcessor(ptree ptInval) {
     // This command return stream idenifiers
     //
     if (command == "get" && pProc != nullptr) {
-      std::cerr << "get cmd rcv." << std::endl;
+      SPDLOG_DEBUG("get cmd rcv.");
       for (auto &q : coreInstance) {
         ptRetval.put(std::string("db.stream.") + q.id, q.id);
         ptRetval.put(
@@ -208,7 +207,7 @@ ptree commandProcessor(ptree ptInval) {
     if (command == "detail" && pProc != nullptr) {
       std::string streamName = ptInval.get("db.argument", "");
       assert(streamName != "");
-      std::cerr << "got detail " << streamName << " rcv." << std::endl;
+      SPDLOG_DEBUG("got detail {} rcv.", streamName);
       for (const auto &s : coreInstance[streamName].getFieldNamesList())
         ptRetval.put(std::string("db.field.") + s, s);
     }
@@ -224,7 +223,7 @@ ptree commandProcessor(ptree ptInval) {
       // check if command present id of process
       assert(ptInval.get("db.id", "") != "");
       // Testing purposes only - get it off after testing
-      std::cerr << "got show " << streamName << " rcv." << std::endl;
+      SPDLOG_DEBUG("got show {} rcv.", streamName);
       // Here we set that for porcess of given id we send apropriate data stream
       int streamId = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       id2StreamName_Relation[streamId] = streamName;
@@ -250,27 +249,26 @@ ptree commandProcessor(ptree ptInval) {
     // This command stop (kills) server process
     //
     if (command == "kill") {
-      std::cerr << "got kill rcv." << std::endl;
+      SPDLOG_DEBUG("got kill rcv.");
       iTimeLimitCnt = 1;
     }
     //
     // Diagnostic method
     //
     if (command == "hello") {
-      std::cerr << "got hello." << std::endl;
+      SPDLOG_DEBUG("got hello.");
       ptRetval.put(std::string("db"), std::string("world"));
-      std::cerr << "reply:";
       using boost::property_tree::ptree;
       std::stringstream strstream;
       // write_json(strstream, ptRetval) ;
       // write_xml(strstream, ptRetval);
       write_info(strstream, ptRetval);
-      std::cerr << strstream.str();
+      SPDLOG_DEBUG("reply: {}", strstream.str());
     }
   } catch (const boost::property_tree::ptree_error &e) {
-    std::cerr << "ptree fail:" << e.what() << std::endl;
+    SPDLOG_ERROR("ptree fail: {}", e.what());
   } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    SPDLOG_ERROR("Command processor failure: {}", e.what());
   }
   return ptRetval;  // sub for a while
 }
@@ -343,6 +341,10 @@ int main(int argc, char *argv[]) {
     if (len > 0)
       if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
   }
+  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
+  spdlog::set_default_logger(filelog);
+  spdlog::set_pattern(COMMON_LOG_PATTERN);
+  SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   thread bt(commmandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
@@ -513,11 +515,13 @@ int main(int argc, char *argv[]) {
         std::cout << "Query limit (-m) waiting for fullfil" << std::endl;
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cout << ex.what() << std::endl
-              << "interprocess exception" << std::endl;
+    std::cerr << ex.what() << std::endl
+              << "IPC::interprocess exception" << std::endl;
     retVal = system::errc::no_child_process;
   } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    std::cerr << "Fail";
+    std::cerr << "." << std::endl;
+    SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
   }
   bt.interrupt();

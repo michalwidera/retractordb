@@ -1,14 +1,15 @@
 #include "Processor.h"
 
-#include "QStruct.h"
-#include "SOperations.h"
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
+#include <ranges>
 
 // This define is required to remove deprecation of boost/bind.hpp
 // some boost libraries still didn't remove dependency to boost bin
 // remove this is boost will clean up on own side.
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
-#include <algorithm>
 #include <boost/crc.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
@@ -16,9 +17,11 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/stacktrace.hpp>
-#include <cstdint>
-#include <iostream>
-#include <ranges>
+
+#include <spdlog/spdlog.h>
+
+#include "QStruct.h"
+#include "SOperations.h"
 
 extern "C" qTree coreInstance;
 
@@ -193,8 +196,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
       }
       assert(false);  // TODO
   }
-  std::cerr << "cmd=" << cmd << std::endl;
-  std::cerr << "progsize=" << progSize << std::endl;
+  SPDLOG_ERROR("Unknown operator catched cmd={} progsize={}",cmd,progSize);
   assert(false);    // Unknown operator catched here
   return number(0); /* pro forma */
 }
@@ -282,11 +284,7 @@ int Processor::getArgumentOffset(const std::string &streamName,
     else if (B.getStr() == streamArgument)
       retVal = getQuery(A.getStr()).lSchema.size();
     else {
-      std::cerr << "currnet stream:" << streamName << std::endl;
-      std::cerr << "argument:" << streamArgument << std::endl;
-      std::cerr << "1st: " << A.getStr() << std::endl;
-      std::cerr << "2nd: " << B.getStr() << std::endl;
-      std::cerr << "@:" << boost::stacktrace::stacktrace() << std::endl;
+      SPDLOG_ERROR("Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}", streamName, streamArgument, A.getStr(), B.getStr());
       throw std::out_of_range("Call to schema that not exist");
     }
   }
@@ -548,13 +546,12 @@ void Processor::updateContext(std::set<std::string> inSet) {
             } else {
               int d = abs(
                   (streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
-              std::cerr << "}{";
+              // "}{";
               for (int i = 0; i < windowSize; i++) {
                 number ret = getValueProc(nameSrc, 0, i + d);
                 // std::cerr << "1. " << i + d << " -> " << ret << std::endl;
                 rowValues.push_back(ret);
               }
-              std::cerr << std::endl;
             }
             assert(rowValues.size() == q.lSchema.size());
             assert(gContextValMap[q.id].size() == rowValues.size());
