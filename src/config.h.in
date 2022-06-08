@@ -6,11 +6,11 @@
 // Check: https://evileg.com/en/post/536/
 // and: https://cliutils.gitlab.io/modern-cmake/chapters/basics/programs.html
 
-#define CONFIG_LINE "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "                           \
-                    "Code compiler: @CMAKE_CXX_COMPILER_ID@ Ver. @CMAKE_CXX_COMPILER_VERSION@, " \
-                    "Build time: @GIT_CURRENT_BUILDTIME@, " \
-                    "Type: @CMAKE_BUILD_TYPE@\n"
+constexpr auto config_line = "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "
+                             "Code compiler: @CMAKE_CXX_COMPILER_ID@ Ver. @CMAKE_CXX_COMPILER_VERSION@, "
+                             "Build time: @GIT_CURRENT_BUILDTIME@, "
+                             "Type: @CMAKE_BUILD_TYPE@\n";
 
-#define COMMON_LOG_PATTERN "%C%m%d %T.%e %^%s:%# [%L] %v%$"
+constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
 
 #endif // CONFIG_H_IN

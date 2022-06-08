@@ -1,16 +1,15 @@
-#include <iostream>
-#include <sstream>
+#include <spdlog/spdlog.h>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
-
-#include <spdlog/spdlog.h>
-#include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
+#include <iostream>
+#include <sstream>
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "qry.hpp"
+#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
 using namespace boost;
 using boost::property_tree::ptree;
@@ -31,7 +30,7 @@ int main(int argc, char *argv[]) {
   }
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
-  spdlog::set_pattern(COMMON_LOG_PATTERN);
+  spdlog::set_pattern(common_log_pattern);
   SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     namespace po = boost::program_options;
@@ -67,7 +66,7 @@ int main(int argc, char *argv[]) {
     if (vm.count("help")) {
       std::cout << argv[0] << " - data processing tool." << std::endl;
       std::cout << desc;
-      std::cout << CONFIG_LINE;
+      std::cout << config_line;
       return system::errc::success;
     } else if (vm.count("hello"))
       return hello();

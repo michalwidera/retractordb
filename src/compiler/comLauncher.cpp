@@ -1,7 +1,4 @@
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
+#include <spdlog/spdlog.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
@@ -9,13 +6,15 @@
 #include <boost/regex.hpp>
 #include <boost/stacktrace.hpp>
 #include <boost/system/error_code.hpp>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <sstream>
 
 #include "QStruct.h"
 #include "compiler.hpp"
 #include "config.h"  // Add an automatically generated configuration file
-
-#include <spdlog/spdlog.h>
-#include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
+#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
 using namespace boost;
 
@@ -40,7 +39,7 @@ int main(int argc, char* argv[]) {
   }
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
-  spdlog::set_pattern(COMMON_LOG_PATTERN);
+  spdlog::set_pattern(common_log_pattern);
   SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     std::unique_ptr<std::ostream> p_ofs;
@@ -68,7 +67,7 @@ int main(int argc, char* argv[]) {
     po::notify(vm);
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << CONFIG_LINE;
+      std::cout << config_line;
       return system::errc::success;
     }
     if (vm.count("queryfile") == 0) {
