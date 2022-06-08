@@ -315,6 +315,20 @@ std::list<std::string> query::getDepStreamNameList(int reqDep) {
   return lRetVal;
 }
 
+std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
+  auto eIt = prog.begin();
+  std::string sArg1;
+  std::string sArg2;
+
+  assert(prog.size() < 4);
+
+  if (prog.size() > 1) sArg1 = (*eIt++).getStr();  // 2,3
+  if (prog.size() > 2) sArg2 = (*eIt++).getStr();  // 3
+
+  token cmd = (*eIt++);
+  return std::make_tuple(sArg1, sArg2, cmd);
+}
+
 std::ostream &operator<<(std::ostream &os, rdb::eType s) {
   return os << rdb::GetStringeType(s);
 }

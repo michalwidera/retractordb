@@ -435,19 +435,9 @@ std::string prepareFields() {
             }
             break;
           }
-          if (q.lProgram.size() == 3) {
-            auto eIt = q.lProgram.begin();
-            std::string sName1 = (*eIt++).getStr();
-            std::string sName2 = (*eIt++).getStr();
-            token cmd = (*eIt++);
+          if (q.lProgram.size() == 3 || q.lProgram.size() == 2) {
+            auto [sName1, sName2, cmd]{GetArgs(q.lProgram)};
             q.lSchema = combine(sName1, sName2, cmd);
-            break;
-          }
-          if (q.lProgram.size() == 2) {
-            auto eIt = q.lProgram.begin();
-            std::string sName1 = (*eIt++).getStr();
-            token cmd = (*eIt++);
-            q.lSchema = combine(sName1, "", cmd);
             break;
           }
         }

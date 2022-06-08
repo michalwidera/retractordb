@@ -150,6 +150,8 @@ int getSeqNr(std::string query_name);
 bool isDeclared(std::string query_name);
 bool isExist(std::string query_name);
 
+std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
+
 class qTree : public std::vector<query> {
  private:
   friend class boost::serialization::access;
