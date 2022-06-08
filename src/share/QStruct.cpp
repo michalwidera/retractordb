@@ -322,6 +322,7 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
 
   assert(prog.size() < 4);
 
+  if (prog.size() == 1 ) sArg1 = (*eIt).getStr() ; // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr();  // 3
 
