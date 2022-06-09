@@ -40,22 +40,19 @@ class Processor : private boost::noncopyable {
   number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
                       bool reverse = false);
 
-  /** Context functions */
-  std::vector<number> getRow(std::string streamName, int timeOffset,
-                             bool reverse = false);
-
   /** Function will return offsets according to stack operations
    *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
    */
   int getArgumentOffset(const std::string &streamName,
                         const std::string &streamArgument);
 
+  /** This function try to roll up argument and reads data from schema
+   * This is not finished - need to be fixed */
+  number getValueOfRollup(const query &q, int offset, int timeOffset);
+
  public:
   /** Query processor works on core varialbe */
   Processor();
-
-  /** String representation of stream */
-  std::string printRowValue(const std::string query_name);
 
   /** This function take in proper moment data to process */
   void processRows(std::set<std::string> inSet);
@@ -68,7 +65,7 @@ class Processor : private boost::noncopyable {
   /** This function return lenght of data stream */
   int getStreamCount(const std::string query_name);
 
-  /** This function try to roll up argument and reads data from schema
-   * This is not finished - need to be fixed */
-  number getValueOfRollup(const query &q, int offset, int timeOffset);
+  /** Context functions */
+  std::vector<number> getRow(std::string streamName, int timeOffset,
+                             bool reverse = false);
 };
