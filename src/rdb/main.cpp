@@ -34,6 +34,10 @@ int main(int argc, char* argv[]) {
     std::cout << ".";
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
+    if (cmd == "quitdrop" || cmd == "qd") {
+      if (uPtr_dacc) uPtr_dacc->setRemoveOnExit(true);
+      break;
+    }
     if (cmd == "open" || cmd == "ropen") {
       std::cin >> file;
       if (!std::filesystem::exists(file)) {
@@ -70,6 +74,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
       std::cout << "exit|quit|q \t\t\t exit\n";
+      std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
       std::cout << "open|ropen [file] \t\t open database - create connection "
                    "(r-reverse iterator)\n";
       std::cout << "create|rcreate [file][schema] \t create database with "

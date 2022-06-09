@@ -35,7 +35,7 @@ std::map<std::string, int> gStreamSize;
 
 /** Context variables */
 std::map<std::string, std::vector<number>>
-    gContextValMap; // schema name/record values
+    gContextValMap;  // schema name/record values
 
 /** Context variables
  *  NOTE: There shoulnd not appear two different stream lengths
@@ -81,22 +81,19 @@ int getSizeOfRollup(const query &q) {
   return 0;  // pro forma
 }
 
-number getValueProc(std::string streamName, int timeOffset,
-                    int schemaOffset, bool reverse = false)
-{
+number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
+                    bool reverse = false) {
   number retval;
   query &q(getQuery(streamName));
   assert(timeOffset >= 0);
-  if (schemaOffset >= getSizeOfRollup(q))
-  {
+  if (schemaOffset >= getSizeOfRollup(q)) {
     timeOffset += schemaOffset / getSizeOfRollup(q);
     schemaOffset %= q.lSchema.size();
   }
   if ((timeOffset == 0) &&
       (gContextLenMap[streamName] > gStreamSize[streamName]))
     retval = gContextValMap[streamName][schemaOffset];
-  else
-  {
+  else {
     /*
     dbStream &archive = *(storage[streamName]);
     retval = archive.readData(timeOffset - 1, schemaOffset, reverse);
