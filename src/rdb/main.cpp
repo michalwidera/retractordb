@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
       uPtr_payload.reset(new std::byte[uPtr_dacc->getDescriptor().GetSize()]);
       memset(uPtr_payload.get(), 0, uPtr_dacc->getDescriptor().GetSize());
       payloadStatus = clean;
+      uPtr_dacc->setRemoveOnExit(false);
     } else if (cmd == "create" || cmd == "rcreate") {
       std::cin >> file;
       std::string sschema;
@@ -65,6 +66,7 @@ int main(int argc, char* argv[]) {
       uPtr_payload.reset(new std::byte[uPtr_dacc->getDescriptor().GetSize()]);
       memset(uPtr_payload.get(), 0, uPtr_dacc->getDescriptor().GetSize());
       payloadStatus = clean;
+      uPtr_dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
       std::cout << "exit|quit|q \t\t\t exit\n";
@@ -79,7 +81,7 @@ int main(int argc, char* argv[]) {
       std::cout << "set [field][value] \t\t set payload field value\n";
       std::cout << "status \t\t\t\t show status of payload\n";
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
-      std::cout << "rox \t\t\t\t remove on exit filt\n";
+      std::cout << "rox \t\t\t\t remove on exit flip\n";
       std::cout << "print \t\t\t\t show payload\n";
       std::cout
           << "hex|dec \t\t\t type of input/output of byte/number fields\n";
