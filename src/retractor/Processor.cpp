@@ -65,6 +65,50 @@ int getSizeOfRollup(const query &q) {
   return 0;  // pro forma
 }
 
+std::string Processor::printRowValue(const std::string query_name)
+{
+  using boost::property_tree::ptree;
+  ptree pt;
+  pt.put("stream", query_name);
+  pt.put("count",
+         boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
+  int i = 0;
+  for (auto value : getRow(query_name, 0))
+  {
+    //
+    // There is part of communication format - here data are formated for
+    // transmission via internal queue.
+    //
+    std::stringstream retVal;
+    boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
+    if (pValRI)
+      retVal << boost::rational_cast<double>(*pValRI);
+    else
+    {
+      int *pValI = std::get_if<int>(&value);
+      if (pValI)
+        retVal << *pValI;
+      else
+      {
+        double *pValD = std::get_if<double>(&value);
+        if (pValD)
+          retVal << *pValD;
+        else
+          retVal << "Undifentified";
+      }
+    }
+    if (retVal.str().empty())
+      retVal << boost::rational_cast<int>(std::get<boost::rational<int>>(value))
+             << "?";
+    pt.put(boost::lexical_cast<std::string>(i++), retVal.str());
+  }
+  std::stringstream strstream;
+  // write_json(strstream, pt);
+  // write_xml(strstream, pt);
+  write_info(strstream, pt);
+  return strstream.str();
+}
+
 number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
   token arg[3];
   const int progSize = q.lProgram.size();
