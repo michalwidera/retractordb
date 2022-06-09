@@ -20,26 +20,6 @@ class Processor : private boost::noncopyable {
    */
   boost::rational<int> computeValue(field &f, query &q);
 
-  /** Variable that contains sources of data */
-  std::map<std::string, inputDF> gFileMap;
-
-  /** Length of data streams processed by processor */
-  std::map<std::string, int> gStreamSize;
-
-  /** Context variables */
-  std::map<std::string, std::vector<number>>
-      gContextValMap;  // schema name/record values
-
-  /** Context variables
-   *  NOTE: There shoulnd not appear two different stream lengths
-   *  Existence of this should be revisited. Probably need to remove.
-   */
-  std::map<std::string, int> gContextLenMap;
-
-  /** Context functions */
-  number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
-                      bool reverse = false);
-
   /** Function will return offsets according to stack operations
    *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
    */

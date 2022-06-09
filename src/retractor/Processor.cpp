@@ -27,6 +27,22 @@ extern "C" qTree coreInstance;
 
 Processor *pProc = nullptr;
 
+/** Variable that contains sources of data */
+std::map<std::string, inputDF> gFileMap;
+
+/** Length of data streams processed by processor */
+std::map<std::string, int> gStreamSize;
+
+/** Context variables */
+std::map<std::string, std::vector<number>>
+    gContextValMap; // schema name/record values
+
+/** Context variables
+ *  NOTE: There shoulnd not appear two different stream lengths
+ *  Existence of this should be revisited. Probably need to remove.
+ */
+std::map<std::string, int> gContextLenMap;
+
 /** This function will give info how long is stream argument if argument will be
  * * instead of argument list */
 int getSizeOfRollup(const query &q) {
@@ -63,6 +79,35 @@ int getSizeOfRollup(const query &q) {
   }
   assert(false);
   return 0;  // pro forma
+}
+
+number getValueProc(std::string streamName, int timeOffset,
+                    int schemaOffset, bool reverse = false)
+{
+  number retval;
+  query &q(getQuery(streamName));
+  assert(timeOffset >= 0);
+  if (schemaOffset >= getSizeOfRollup(q))
+  {
+    timeOffset += schemaOffset / getSizeOfRollup(q);
+    schemaOffset %= q.lSchema.size();
+  }
+  if ((timeOffset == 0) &&
+      (gContextLenMap[streamName] > gStreamSize[streamName]))
+    retval = gContextValMap[streamName][schemaOffset];
+  else
+  {
+    /*
+    dbStream &archive = *(storage[streamName]);
+    retval = archive.readData(timeOffset - 1, schemaOffset, reverse);
+    */
+    retval = boost::rational<int>(123, 1);
+    // if (streamName == "source") {  // BUG LOGGING }{
+    //  std::cerr << "2. (" << timeOffset << "," << schemaOffset << ") -> "
+    //            << retval << std::endl;
+    //}
+  }
+  return retval;
 }
 
 number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
@@ -284,32 +329,6 @@ int Processor::getArgumentOffset(const std::string &streamName,
     throw std::out_of_range("Call to schema that not exist");
   }
   return 0;
-}
-
-number Processor::getValueProc(std::string streamName, int timeOffset,
-                               int schemaOffset, bool reverse) {
-  number retval;
-  query &q(getQuery(streamName));
-  assert(timeOffset >= 0);
-  if (schemaOffset >= getSizeOfRollup(q)) {
-    timeOffset += schemaOffset / getSizeOfRollup(q);
-    schemaOffset %= q.lSchema.size();
-  }
-  if ((timeOffset == 0) &&
-      (gContextLenMap[streamName] > gStreamSize[streamName]))
-    retval = gContextValMap[streamName][schemaOffset];
-  else {
-    /*
-    dbStream &archive = *(storage[streamName]);
-    retval = archive.readData(timeOffset - 1, schemaOffset, reverse);
-    */
-    retval = boost::rational<int>(123, 1);
-    // if (streamName == "source") {  // BUG LOGGING }{
-    //  std::cerr << "2. (" << timeOffset << "," << schemaOffset << ") -> "
-    //            << retval << std::endl;
-    //}
-  }
-  return retval;
 }
 
 void Processor::updateContext(std::set<std::string> inSet) {
