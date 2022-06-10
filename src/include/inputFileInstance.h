@@ -26,17 +26,5 @@ class inputDF {
   inputDF();
   inputDF(std::string inputFileName, std::list<field> &lSchema);
 
-  /** The purpose of this function is to retrieve a row
-   * from the file is created based on the schema saved in the query.
-   */
-  void readRowFromFile();
-
-  /** A function that returns the retrieved value from the file
-   *  associated with the stream. It iss taken from the lResult buffer
-   *  downloaded by processRow. This value is returned in the
-   *  order indicated by field parameter does not go by
-   *  reference because there is a mess with const
-   *  Here, the conversion to CR type also takes place
-   */
-  boost::rational<int> getCR(field f);
+  std::vector<number> getFileRow();
 };

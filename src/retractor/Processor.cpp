@@ -277,14 +277,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     if (q.isDeclaration()) {
       int cnt(0);
       assert(!q.filename.empty());
-      gFileMap[q.id]
-          .readRowFromFile();  // Fetch next row form file that have schema
-      for (auto f : q.lSchema)
-        gContextValMap[q.id][cnt++] = gFileMap[q.id].getCR(f);
-      // same as below ... wait for C++20
-      // std::ranges::for_each(
-      //    q.lSchema, [ctxRowValue, this, q](field f) mutable
-      //    { ctxRowValue.push_back(gFileMap[q.id].getCR(f)); });
+      gContextValMap[q.id] = gFileMap[q.id].getFileRow();
     } else {
       for (auto i = 0; i < getSizeOfRollup(q); i++)
         gContextValMap[q.id][i] = getValueOfRollup(q, i, 0);
@@ -341,7 +334,7 @@ void Processor::updateContext(std::set<std::string> inSet) {
       // If argument is declared -
       // we read source and store in context
       assert(q.filename != "");
-      for (auto f : q.lSchema) rowValues.push_back(gFileMap[q.id].getCR(f));
+      rowValues = gFileMap[q.id].getFileRow();
     } else {
       // execution of stream program and store data
       assert(q.lProgram.size() < 4);  // we assume that all stream programs are
@@ -642,29 +635,29 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
         if (tk.getStr() == "floor") {
           a = rStack.top();
           rStack.pop();
-          rStack.push(boost::rational<int>(Rationalize(floor(real))));
+          rStack.push(Rationalize(floor(real)));
         } else if (tk.getStr() == "getRowValueceil") {
           a = rStack.top();
           rStack.pop();
-          rStack.push(boost::rational<int>(Rationalize(ceil(real))));
+          rStack.push(Rationalize(ceil(real)));
         } else if (tk.getStr() == "iszero") {
           a = rStack.top();
           rStack.pop();
           if (a.numerator() == 0)
-            rStack.push(boost::rational<int>(Rationalize(1)));
+            rStack.push(Rationalize(1));
           else
-            rStack.push(boost::rational<int>(Rationalize(0)));
+            rStack.push(Rationalize(0));
         } else if (tk.getStr() == "isnonzero") {
           a = rStack.top();
           rStack.pop();
           if (a.numerator() == 0)
-            rStack.push(boost::rational<int>(Rationalize(0)));
+            rStack.push(Rationalize(0));
           else
-            rStack.push(boost::rational<int>(Rationalize(1)));
+            rStack.push(Rationalize(1));
         } else if (tk.getStr() == "sqrt") {
           a = rStack.top();
           rStack.pop();
-          rStack.push(boost::rational<int>(Rationalize(sqrt(real))));
+          rStack.push(Rationalize(sqrt(real)));
         } else if (tk.getStr() == "sum") {
           int data_sum(0);
           for (int i = 0; i < getSizeOfRollup(q); i++) {
