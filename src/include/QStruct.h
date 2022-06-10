@@ -20,7 +20,7 @@
 #include "enumDecl.h"
 #include "rdb/desc.h"
 
-typedef std::variant<boost::rational<int>, int, double> number;
+typedef std::variant<boost::rational<int>, int, double, unsigned char> number;
 
 namespace boost {
 namespace serialization {

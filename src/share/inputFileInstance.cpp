@@ -66,21 +66,30 @@ inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
   // Don't throw exception from constructor - Rule!
 }
 
-void inputDF::readRowFromFile() {
-  lResult.clear();
+//
+// This should _REALLY_ return number
+// but now there is a mess with types and
+// std::get: wrong index for variant
+// us reported if we return someting other
+// than rational<int> from this file
+//
+std::vector<number> inputDF::getFileRow() {
+  std::vector<number> result;
+
   for (auto &f : lSchema) {
+    boost::rational<int> val;
     switch (f.fieldType) {
       case rdb::BYTE:
-        lResult.push_back(readFromFile<unsigned char>());
+        val = readFromFile<unsigned char>();
         break;
       case rdb::INTEGER:
-        lResult.push_back(readFromFile<int>());
+        val = readFromFile<int>();
         break;
       case rdb::FLOAT:
-        lResult.push_back(readFromFile<double>());
+        val = Rationalize(readFromFile<double>());
         break;
       case rdb::RATIONAL:
-        lResult.push_back(readFromFile<boost::rational<int>>());
+        val = readFromFile<boost::rational<int>>();
         break;
       case rdb::BAD:
       default:
@@ -88,27 +97,8 @@ void inputDF::readRowFromFile() {
         throw std::out_of_range("processRow/undefined type");
         break;  // proforma
     }
+    result.push_back(val);
   }
-}
 
-boost::rational<int> inputDF::getCR(field f) {
-  boost::rational<int> retValue(0);
-  int cnt(0);
-  for (auto &v : lSchema) {
-    if (v.fieldName == f.fieldName) break;
-    cnt++;
-  }
-  if (lResult.size() == 0) readRowFromFile();
-  assert(lResult.size() != 0);
-  if (lResult[cnt].type() == typeid(unsigned char))
-    retValue = any_cast<unsigned char>(lResult[cnt]);
-  else if (lResult[cnt].type() == typeid(int))
-    retValue = any_cast<int>(lResult[cnt]);
-  else if (lResult[cnt].type() == typeid(double))
-    retValue = Rationalize(any_cast<double>(lResult[cnt]));
-  else if (lResult[cnt].type() == typeid(boost::rational<int>))
-    retValue = any_cast<boost::rational<int>>(lResult[cnt]);
-  else
-    throw std::out_of_range("getCR/undefined type");
-  return retValue;
+  return result;
 }
