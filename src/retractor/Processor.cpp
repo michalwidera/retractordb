@@ -30,7 +30,6 @@ Processor *pProc = nullptr;
 class dataAgregator {
  public:
   /** Length of data streams processed by processor */
-  int size;
   int len;
   std::vector<number> row;
 };
@@ -87,8 +86,7 @@ number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
     timeOffset += schemaOffset / getSizeOfRollup(q);
     schemaOffset %= q.lSchema.size();
   }
-  if ((timeOffset == 0) &&
-      (gDataMap[streamName].len > gDataMap[streamName].size))
+  if (timeOffset == 0)
     retval = gDataMap[streamName].row[schemaOffset];
   else {
     /*
@@ -256,7 +254,6 @@ Processor::Processor() {
       rowValues.push_back(boost::rational<int>(0));
     gDataMap[q.id].row = rowValues;
     gDataMap[q.id].len = 0;
-    gDataMap[q.id].size = -1;
   }
   pProc = this;
 }
@@ -268,7 +265,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     if (inSet.find(q.id) == inSet.end()) continue;
     // If given stream is aledy synchronized with context
     // there is no sens to make computed twice
-    if (gDataMap[q.id].len == gDataMap[q.id].size) continue;
+    // if (gDataMap[q.id].len == gDataMap[q.id].size) continue;
     std::vector<number> rowValues;
     if (q.isDeclaration()) {
       // If argument is declared -
@@ -318,7 +315,7 @@ void Processor::processRows(std::set<std::string> inSet) {
             streamNameArg = argument2.getStr();
           else
             streamNameArg = argument1.getStr();
-          TimeOffset = TimeOffset - gDataMap[streamNameArg].size;
+          TimeOffset = TimeOffset - gDataMap[streamNameArg].len;
           assert(TimeOffset >= 0);
           // If this assert fails - you are probably trying to hash a#b when a
           // and b has different schema sizes. This should be identified on
@@ -443,7 +440,7 @@ void Processor::processRows(std::set<std::string> inSet) {
             // q.rInterval - delta of output stream (rational) - contains
             // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
             // (2/3) argument of operation (rational)
-            int position = gDataMap[q.id].size + 1;
+            int position = gDataMap[q.id].len + 1;
             // size[q.id] == -1 for zero elements (therefore + 1)
             if (operation.getCommandID() == STREAM_DEHASH_DIV)
               TimeOffset = Div(q.rInterval, rationalArgument, position);
@@ -508,7 +505,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           if (operation.get() > q.rInterval) {
             // Check if parameters are in oposite order
             TimeOffset =
-                Substract(q.rInterval, operation.get(), gDataMap[q.id].size);
+                Substract(q.rInterval, operation.get(), gDataMap[q.id].len);
             TimeOffset = gDataMap[q.id].len - TimeOffset;
             rowValues = getRow(streamNameArg, TimeOffset);
           } else
@@ -528,7 +525,6 @@ void Processor::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
     // Drop rows that not come with this to compute
     if (inSet.find(q.id) == inSet.end()) continue;
-    gDataMap[q.id].size++;
 
     if (q.isDeclaration()) {
       int cnt(0);
@@ -735,7 +731,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
 }
 
 int Processor::getStreamCount(const std::string query_name) {
-  return gDataMap[query_name].size;
+  return gDataMap[query_name].len;
 }
 
 long streamStoredSize(std::string filename) { return 0; }
