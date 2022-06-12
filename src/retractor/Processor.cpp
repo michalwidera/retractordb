@@ -539,10 +539,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     // computed value shoud be stored in file
 
     int cnt(0);
-    for (auto &f : q.lSchema) {
-      boost::rational<int> value(computeValue(f, q));
-      gDataMap[q.id].row[cnt++] = value;
-    }
+    for (auto &f : q.lSchema) gDataMap[q.id].row[cnt++] = computeValue(f, q);
     // Store computed values to cbuffer - on disk
     // storage[q.id]->store();
   }
@@ -718,9 +715,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
   }  // for(auto tk : f.lProgram)
   if (rStack.size() == 0) {
     assert(q.isDeclaration());
-    int fieldPosition = q.getFieldIndex(f);
-    assert(fieldPosition != -1);
-    number retVal = gDataMap[q.id].row[fieldPosition];
+    number retVal = gDataMap[q.id].row[q.getFieldIndex(f)];
     return std::get<boost::rational<int>>(retVal);
   } else if (rStack.size() == 1)
     return rStack.top();
