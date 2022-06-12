@@ -269,59 +269,6 @@ Processor::Processor() {
 }
 
 void Processor::processRows(std::set<std::string> inSet) {
-  for (auto q : coreInstance) {
-    // Drop rows that not come with this to compute
-    if (inSet.find(q.id) == inSet.end()) continue;
-    gStreamSize[q.id]++;
-
-    if (q.isDeclaration()) {
-      int cnt(0);
-      assert(!q.filename.empty());
-      gContextValMap[q.id] = gFileMap[q.id].getFileRow();
-    } else {
-      for (auto i = 0; i < getSizeOfRollup(q); i++)
-        gContextValMap[q.id][i] = getValueOfRollup(q, i, 0);
-    }
-
-    // here should be computer values of stream tuples
-    // computed value shoud be stored in file
-
-    int cnt(0);
-    for (auto &f : q.lSchema) {
-      boost::rational<int> value(computeValue(f, q));
-      gContextValMap[q.id][cnt++] = value;
-    }
-    // Store computed values to cbuffer - on disk
-    // storage[q.id]->store();
-  }
-}
-
-std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
-                                      bool reverse) {
-  std::vector<number> retVal;
-  int column = 0;
-  for (auto f : getQuery(streamName).lSchema)
-    retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
-  return retVal;
-}
-
-int Processor::getArgumentOffset(const std::string &streamName,
-                                 const std::string &streamArgument) {
-  query &q(getQuery(streamName));
-  if (q.is(STREAM_ADD)) {
-    auto [sArg1, sArg2, cmd]{GetArgs(q.lProgram)};
-    if (sArg1 == streamArgument) return 0;
-    if (sArg2 == streamArgument) return getQuery(sArg1).lSchema.size();
-
-    SPDLOG_ERROR(
-        "Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}",
-        streamName, streamArgument, sArg1, sArg2);
-    throw std::out_of_range("Call to schema that not exist");
-  }
-  return 0;
-}
-
-void Processor::updateContext(std::set<std::string> inSet) {
   // Update of context variable
   for (auto q : coreInstance) {  // For all queries in system
     // Drop off rows that not computed now
@@ -588,6 +535,57 @@ void Processor::updateContext(std::set<std::string> inSet) {
     gContextValMap[q.id] = rowValues;
     gContextLenMap[q.id]++;
   }
+  // Oryginal processRows is start here
+  for (auto q : coreInstance) {
+    // Drop rows that not come with this to compute
+    if (inSet.find(q.id) == inSet.end()) continue;
+    gStreamSize[q.id]++;
+
+    if (q.isDeclaration()) {
+      int cnt(0);
+      assert(!q.filename.empty());
+      gContextValMap[q.id] = gFileMap[q.id].getFileRow();
+    } else {
+      for (auto i = 0; i < getSizeOfRollup(q); i++)
+        gContextValMap[q.id][i] = getValueOfRollup(q, i, 0);
+    }
+
+    // here should be computer values of stream tuples
+    // computed value shoud be stored in file
+
+    int cnt(0);
+    for (auto &f : q.lSchema) {
+      boost::rational<int> value(computeValue(f, q));
+      gContextValMap[q.id][cnt++] = value;
+    }
+    // Store computed values to cbuffer - on disk
+    // storage[q.id]->store();
+  }
+}
+
+std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
+                                      bool reverse) {
+  std::vector<number> retVal;
+  int column = 0;
+  for (auto f : getQuery(streamName).lSchema)
+    retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
+  return retVal;
+}
+
+int Processor::getArgumentOffset(const std::string &streamName,
+                                 const std::string &streamArgument) {
+  query &q(getQuery(streamName));
+  if (q.is(STREAM_ADD)) {
+    auto [sArg1, sArg2, cmd]{GetArgs(q.lProgram)};
+    if (sArg1 == streamArgument) return 0;
+    if (sArg2 == streamArgument) return getQuery(sArg1).lSchema.size();
+
+    SPDLOG_ERROR(
+        "Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}",
+        streamName, streamArgument, sArg1, sArg2);
+    throw std::out_of_range("Call to schema that not exist");
+  }
+  return 0;
 }
 
 boost::rational<int> Processor::computeValue(field &f, query &q) {
