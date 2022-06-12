@@ -461,7 +461,6 @@ int main(int argc, char *argv[]) {
         std::cout << std::endl;
       }
       std::set<std::string> inSet = getAwaitedStreamsSet(tl);
-      proc.updateContext(inSet);
       proc.processRows(inSet);
       //
       // Data broadcast - main loop

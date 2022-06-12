@@ -34,13 +34,11 @@ class Processor : private boost::noncopyable {
   /** Query processor works on core varialbe */
   Processor();
 
-  /** This function take in proper moment data to process */
-  void processRows(std::set<std::string> inSet);
-
-  /** Main purpose of this function is fullfill all stream fields values
+  /** This function take in proper moment data to process
+   *  Main purpose of this function is fullfill all stream fields values
    *  on given moment by  realization all 1v2v3 elements stream programs
    */
-  void updateContext(std::set<std::string> inSet);
+  void processRows(std::set<std::string> inSet);
 
   /** This function return lenght of data stream */
   int getStreamCount(const std::string query_name);
