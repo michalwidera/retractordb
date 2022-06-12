@@ -207,10 +207,6 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         int schemaSizeOut = getQuery(nameOut).lSchema.size();
         int streamSizeSrc = gDataMap[nameSrc].len;
         int streamSizeOut = gDataMap[nameOut].len;
-        int streamSizeSrc_ = gDataMap[nameSrc].size;
-        int streamSizeOut_ = gDataMap[nameOut].size;
-        if (streamSizeOut_ < 0) streamSizeOut_ = 0;
-        if (streamSizeSrc_ < 0) streamSizeSrc_ = 0;
         assert(nameSrc != "");
         assert(windowSize == schemaSizeOut);
         if (mirror)
@@ -480,10 +476,6 @@ void Processor::processRows(std::set<std::string> inSet) {
             int schemaSizeOut = getQuery(nameOut).lSchema.size();
             int streamSizeSrc = gDataMap[nameSrc].len;
             int streamSizeOut = gDataMap[nameOut].len;
-            int streamSizeSrc_ = gDataMap[nameSrc].size;
-            int streamSizeOut_ = gDataMap[nameOut].size;
-            if (streamSizeOut_ < 0) streamSizeOut_ = 0;
-            if (streamSizeSrc_ < 0) streamSizeSrc_ = 0;
             assert(nameSrc != "");
             assert(windowSize == schemaSizeOut);
             if (mirror) {
