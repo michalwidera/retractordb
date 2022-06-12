@@ -28,19 +28,16 @@ extern "C" qTree coreInstance;
 Processor *pProc = nullptr;
 
 class dataAgregator {
-  public:
-    /** Length of data streams processed by processor */
-    int gStreamSize;
+ public:
+  /** Length of data streams processed by processor */
+  int size;
+  std::vector<number> row;
 };
 
 std::map<std::string, dataAgregator> gDataMap;
 
 /** Variable that contains sources of data */
 std::map<std::string, inputDF> gFileMap;
-
-/** Context variables */
-std::map<std::string, std::vector<number>>
-    gContextValMap;  // schema name/record values
 
 /** Context variables
  *  NOTE: There shoulnd not appear two different stream lengths
@@ -96,8 +93,8 @@ number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
     schemaOffset %= q.lSchema.size();
   }
   if ((timeOffset == 0) &&
-      (gContextLenMap[streamName] > gDataMap[streamName].gStreamSize))
-    retval = gContextValMap[streamName][schemaOffset];
+      (gContextLenMap[streamName] > gDataMap[streamName].size))
+    retval = gDataMap[streamName].row[schemaOffset];
   else {
     /*
     dbStream &archive = *(storage[streamName]);
@@ -141,7 +138,7 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         auto rationalArgument = arg[1].get();
         assert(rationalArgument > 0);
         // q.id - name of output stream
-        // gStreamSize[q.id] - count of record in output stream
+        // size[q.id] - count of record in output stream
         // q.rInterval - delta of output stream (rational) - contains
         // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
         // (2/3) argument of operation (rational)
@@ -215,8 +212,8 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         int schemaSizeOut = getQuery(nameOut).lSchema.size();
         int streamSizeSrc = gContextLenMap[nameSrc];
         int streamSizeOut = gContextLenMap[nameOut];
-        int streamSizeSrc_ = gDataMap[nameSrc].gStreamSize;
-        int streamSizeOut_ = gDataMap[nameOut].gStreamSize;
+        int streamSizeSrc_ = gDataMap[nameSrc].size;
+        int streamSizeOut_ = gDataMap[nameOut].size;
         if (streamSizeOut_ < 0) streamSizeOut_ = 0;
         if (streamSizeSrc_ < 0) streamSizeSrc_ = 0;
         assert(nameSrc != "");
@@ -266,9 +263,9 @@ Processor::Processor() {
     std::vector<number> rowValues;
     for (auto i = 0; i < getSizeOfRollup(q); i++)
       rowValues.push_back(boost::rational<int>(0));
-    gContextValMap[q.id] = rowValues;
+    gDataMap[q.id].row = rowValues;
     gContextLenMap[q.id] = 0;
-    gDataMap[q.id].gStreamSize = -1;
+    gDataMap[q.id].size = -1;
   }
   pProc = this;
 }
@@ -280,7 +277,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     if (inSet.find(q.id) == inSet.end()) continue;
     // If given stream is aledy synchronized with context
     // there is no sens to make computed twice
-    if (gContextLenMap[q.id] == gDataMap[q.id].gStreamSize) continue;
+    if (gContextLenMap[q.id] == gDataMap[q.id].size) continue;
     std::vector<number> rowValues;
     if (q.isDeclaration()) {
       // If argument is declared -
@@ -309,7 +306,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           {
             auto pos = 0;
             for (auto f : getQuery(streamNameArg).lSchema) {
-              // rowValues.push_back(gContextValMap[streamNameArg][pos++]);
+              // rowValues.push_back(row[streamNameArg][pos++]);
               std::string schema = f.getFirstFieldToken().getStr();
               rowValues.push_back(getValueProc(schema, 0, pos++));
             }
@@ -330,14 +327,14 @@ void Processor::processRows(std::set<std::string> inSet) {
             streamNameArg = argument2.getStr();
           else
             streamNameArg = argument1.getStr();
-          TimeOffset = TimeOffset - gDataMap[streamNameArg].gStreamSize;
+          TimeOffset = TimeOffset - gDataMap[streamNameArg].size;
           assert(TimeOffset >= 0);
           // If this assert fails - you are probably trying to hash a#b when a
           // and b has different schema sizes. This should be identified on
           // compilation phase in future.
-          assert(gContextValMap[streamNameArg].size() ==
+          assert(gDataMap[streamNameArg].row.size() ==
                  getQuery(argument1.getStr()).lSchema.size());
-          assert(gContextValMap[streamNameArg].size() ==
+          assert(gDataMap[streamNameArg].row.size() ==
                  getQuery(argument2.getStr()).lSchema.size());
           rowValues = getRow(streamNameArg, TimeOffset);
           break;
@@ -451,12 +448,12 @@ void Processor::processRows(std::set<std::string> inSet) {
             rationalArgument = argument2.get();
             assert(rationalArgument > 0);
             // q.id - name of output stream
-            // gStreamSize[q.id] - count of record in output stream
+            // size[q.id] - count of record in output stream
             // q.rInterval - delta of output stream (rational) - contains
             // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
             // (2/3) argument of operation (rational)
-            int position = gDataMap[q.id].gStreamSize + 1;
-            // gStreamSize[q.id] == -1 for zero elements (therefore + 1)
+            int position = gDataMap[q.id].size + 1;
+            // size[q.id] == -1 for zero elements (therefore + 1)
             if (operation.getCommandID() == STREAM_DEHASH_DIV)
               TimeOffset = Div(q.rInterval, rationalArgument, position);
             if (operation.getCommandID() == STREAM_DEHASH_MOD)
@@ -488,8 +485,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             int schemaSizeOut = getQuery(nameOut).lSchema.size();
             int streamSizeSrc = gContextLenMap[nameSrc];
             int streamSizeOut = gContextLenMap[nameOut];
-            int streamSizeSrc_ = gDataMap[nameSrc].gStreamSize;
-            int streamSizeOut_ = gDataMap[nameOut].gStreamSize;
+            int streamSizeSrc_ = gDataMap[nameSrc].size;
+            int streamSizeOut_ = gDataMap[nameOut].size;
             if (streamSizeOut_ < 0) streamSizeOut_ = 0;
             if (streamSizeSrc_ < 0) streamSizeSrc_ = 0;
             assert(nameSrc != "");
@@ -510,7 +507,7 @@ void Processor::processRows(std::set<std::string> inSet) {
               }
             }
             assert(rowValues.size() == q.lSchema.size());
-            assert(gContextValMap[q.id].size() == rowValues.size());
+            assert(gDataMap[q.id].row.size() == rowValues.size());
           }
           break;
         case STREAM_SUBSTRACT:
@@ -523,12 +520,12 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           if (operation.get() > q.rInterval) {
             // Check if parameters are in oposite order
-            TimeOffset =
-                Substract(q.rInterval, operation.get(), gDataMap[q.id].gStreamSize);
+            TimeOffset = Substract(q.rInterval, operation.get(),
+                                   gDataMap[q.id].size);
             TimeOffset = gContextLenMap[q.id] - TimeOffset;
             rowValues = getRow(streamNameArg, TimeOffset);
           } else
-            rowValues = gContextValMap[streamNameArg];
+            rowValues = gDataMap[streamNameArg].row;
           break;
         default:
           // Stack hits non supported opertation
@@ -537,22 +534,22 @@ void Processor::processRows(std::set<std::string> inSet) {
     }
     // Store to conext computed values
     assert(!rowValues.empty());
-    gContextValMap[q.id] = rowValues;
+    gDataMap[q.id].row = rowValues;
     gContextLenMap[q.id]++;
   }
   // Oryginal processRows is start here
   for (auto q : coreInstance) {
     // Drop rows that not come with this to compute
     if (inSet.find(q.id) == inSet.end()) continue;
-    gDataMap[q.id].gStreamSize++;
+    gDataMap[q.id].size++;
 
     if (q.isDeclaration()) {
       int cnt(0);
       assert(!q.filename.empty());
-      gContextValMap[q.id] = gFileMap[q.id].getFileRow();
+      gDataMap[q.id].row = gFileMap[q.id].getFileRow();
     } else {
       for (auto i = 0; i < getSizeOfRollup(q); i++)
-        gContextValMap[q.id][i] = getValueOfRollup(q, i, 0);
+        gDataMap[q.id].row[i] = getValueOfRollup(q, i, 0);
     }
 
     // here should be computer values of stream tuples
@@ -561,7 +558,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     int cnt(0);
     for (auto &f : q.lSchema) {
       boost::rational<int> value(computeValue(f, q));
-      gContextValMap[q.id][cnt++] = value;
+      gDataMap[q.id].row[cnt++] = value;
     }
     // Store computed values to cbuffer - on disk
     // storage[q.id]->store();
@@ -740,7 +737,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
     assert(q.isDeclaration());
     int fieldPosition = q.getFieldIndex(f);
     assert(fieldPosition != -1);
-    number retVal = gContextValMap[q.id][fieldPosition];
+    number retVal = gDataMap[q.id].row[fieldPosition];
     return std::get<boost::rational<int>>(retVal);
   } else if (rStack.size() == 1)
     return rStack.top();
@@ -751,7 +748,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
 }
 
 int Processor::getStreamCount(const std::string query_name) {
-  return gDataMap[query_name].gStreamSize;
+  return gDataMap[query_name].size;
 }
 
 long streamStoredSize(std::string filename) { return 0; }
