@@ -1,5 +1,7 @@
 #include "QStruct.h"
 
+#include <spdlog/spdlog.h>
+
 #include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
 #include <boost/function.hpp>        // IWYU pragma: keep
 #include <boost/lambda/bind.hpp>     // IWYU pragma: keep
@@ -163,10 +165,7 @@ query &getQuery(std::string query_name) {
   for (auto &q : coreInstance) {
     if (q.id == query_name) return q;
   }
-  std::cerr << "Missing:" << std::endl;
-  std::cerr << " " << query_name << std::endl;
-  std::cerr << "Avaiable:" << std::endl;
-  for (auto &q : coreInstance) std::cerr << " " << q.id << std::endl;
+  SPDLOG_ERROR("Missing - {}", query_name);
   throw std::logic_error("No such stream in set - getQuery");
   static query void_query;
   return (void_query);  // proforma
@@ -180,6 +179,7 @@ int getSeqNr(std::string query_name) {
     else
       cnt++;
   }
+  SPDLOG_ERROR("No such stream in set - {}", query_name);
   throw std::logic_error("No such stream in set - getSeqNr");
   return -1;  // INVALID QUERY_NR
 }
@@ -275,6 +275,8 @@ int query::getFieldIndex(field f_arg) {
       return idx;
     idx++;
   }
+  SPDLOG_ERROR("Field not found in query - {}", f_arg.fieldName);
+  throw std::logic_error("Field not found in query");
   return -1;  // not found
 }
 
