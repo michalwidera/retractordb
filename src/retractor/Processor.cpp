@@ -76,7 +76,7 @@ number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
   return retval;
 }
 
-number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
+number Processor::getValueOfRollup(const query &q, int offset) {
   token arg[3];
   const int progSize = q.lProgram.size();
   assert(progSize < 4);
@@ -86,11 +86,11 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
   int TimeOffset(-1);  // This -1 is intentionally wrong - Hash return value
   switch (cmd) {
     case PUSH_STREAM:
-      return getValueProc(arg[0].getStr(), timeOffset, offset);
+      return getValueProc(arg[0].getStr(), 0, offset);
     case STREAM_TIMEMOVE:
       /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
       return getValueProc(arg[0].getStr(),
-                          timeOffset + rational_cast<int>(arg[1].get()),
+                          rational_cast<int>(arg[1].get()),
                           offset);
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
@@ -109,22 +109,22 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         // q.rInterval - delta of output stream (rational) - contains
         // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
         // (2/3) argument of operation (rational)
-        int newTimeOffset = -1;
+        int newTimeOffset = -1; // catch on assert(false);
         if (cmd == STREAM_DEHASH_DIV)
-          newTimeOffset = Div(q.rInterval, rationalArgument, timeOffset);
+          newTimeOffset = Div(q.rInterval, rationalArgument, 0);
         if (cmd == STREAM_DEHASH_MOD)
-          newTimeOffset = Mod(rationalArgument, q.rInterval, timeOffset);
+          newTimeOffset = Mod(rationalArgument, q.rInterval, 0);
         if (newTimeOffset < 0) assert(false);
         return getValueProc(streamNameArg, newTimeOffset, offset);
       }
     case STREAM_SUBSTRACT:
       // TODO: Check
-      return getValueProc(arg[0].getStr(), timeOffset, offset);
+      return getValueProc(arg[0].getStr(), 0, offset);
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
       assert(offset == 1);
-      return getValueProc(arg[0].getStr(), timeOffset, offset);
+      return getValueProc(arg[0].getStr(), 0, offset);
     case STREAM_SUM:
       assert(arg[0].getStr() != "");
       {
@@ -148,9 +148,9 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
       {
         const auto sizeOfFirstSchema = getQuery(arg[0].getStr()).lSchema.size();
         if (offset < sizeOfFirstSchema)
-          return getValueProc(arg[0].getStr(), timeOffset, offset);
+          return getValueProc(arg[0].getStr(), 0, offset);
         else
-          return getValueProc(arg[1].getStr(), timeOffset,
+          return getValueProc(arg[1].getStr(), 0,
                               offset - sizeOfFirstSchema);
       }
     case STREAM_AGSE:
@@ -182,24 +182,25 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         assert(nameSrc != "");
         assert(windowSize == schemaSizeOut);
         if (mirror)
-          return getValueProc(nameSrc, timeOffset, windowSize - 1 + offset);
+          return getValueProc(nameSrc, 0, windowSize - 1 + offset);
         else {
           int d =
               abs((streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
-          return getValueProc(nameSrc, timeOffset, windowSize - offset + d);
+          return getValueProc(nameSrc, 0, windowSize - offset + d);
         }
       }
     case STREAM_HASH:
       // TODO: Check if right hash part is returned here
       {
-        const auto timeSeqence = (gDataMap[q.id].len - timeOffset) > 1
-                                     ? gDataMap[q.id].len - timeOffset
+        const auto timeSeqence = (gDataMap[q.id].len) > 1
+                                     ? gDataMap[q.id].len
                                      : 1;
+        int timeOffset = 0;
         if (Hash(getQuery(arg[0].getStr()).rInterval,
-                 getQuery(arg[1].getStr()).rInterval, timeSeqence, TimeOffset))
-          return getValueProc(arg[1].getStr(), TimeOffset, offset);
+                 getQuery(arg[1].getStr()).rInterval, timeSeqence, timeOffset))
+          return getValueProc(arg[1].getStr(), timeOffset, offset);
         else
-          return getValueProc(arg[0].getStr(), TimeOffset, offset);
+          return getValueProc(arg[0].getStr(), timeOffset, offset);
       }
       assert(false);  // TODO
   }
@@ -507,7 +508,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       gDataMap[q.id].row = gFileMap[q.id].getFileRow();
     } else {
       for (auto i = 0; i < getSizeOfRollup(q); i++)
-        gDataMap[q.id].row[i] = getValueOfRollup(q, i, 0);
+        gDataMap[q.id].row[i] = getValueOfRollup(q, i);
     }
 
     // here should be computer values of stream tuples
@@ -626,49 +627,11 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           int data_sum(0);
           for (int i = 0; i < getSizeOfRollup(q); i++) {
             boost::rational<int> val =
-                std::get<boost::rational<int>>(getValueOfRollup(q, i, 0));
+                std::get<boost::rational<int>>(getValueOfRollup(q, i));
             data_sum += rational_cast<int>(val);
           }
           boost::rational<int> val(data_sum);
           rStack.push(val);
-        } else if (tk.getStr() == "count") {
-          assert(rStack.size() < 4);
-          assert(rStack.size() > 0);
-          /**
-           * Overhere you should see 1,2 or 3 arguments
-           * (x) means count X in schema
-           * (x,y) means count from X to Y in schema
-           * (x,y,t) means count X to Y in schemat and t probes back
-           */
-          std::vector<int> args;
-          while (!rStack.empty()) {
-            args.push_back(rational_cast<int>(rStack.top()));
-            rStack.pop();
-          }
-          int from, to, len = 1;
-          if (args.size() == 1) from = to = args[0];
-          if (args.size() == 2) {
-            from = args[1];
-            to = args[0];
-          }
-          if (args.size() == 3) {
-            from = args[2];
-            to = args[1];
-            len = args[0];
-          }
-          if (to < from) {
-            int tempval = from;
-            to = from;
-            from = tempval;
-          }
-          boost::rational<int> ret = 0; /* limits.h */
-          for (int j = 0; j < len; j++)
-            for (int i = 0; i < getSizeOfRollup(q); i++) {
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueOfRollup(q, i, j));
-              if (val >= from && val <= to) ret++;
-            }
-          rStack.push(ret);
         } else
           throw std::out_of_range(
               "No support for this math function - write it SVP");
