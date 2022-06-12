@@ -31,6 +31,7 @@ class dataAgregator {
  public:
   /** Length of data streams processed by processor */
   int size;
+  int len;
   std::vector<number> row;
 };
 
@@ -38,12 +39,6 @@ std::map<std::string, dataAgregator> gDataMap;
 
 /** Variable that contains sources of data */
 std::map<std::string, inputDF> gFileMap;
-
-/** Context variables
- *  NOTE: There shoulnd not appear two different stream lengths
- *  Existence of this should be revisited. Probably need to remove.
- */
-std::map<std::string, int> gContextLenMap;
 
 /** This function will give info how long is stream argument if argument will be
  * * instead of argument list */
@@ -93,7 +88,7 @@ number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
     schemaOffset %= q.lSchema.size();
   }
   if ((timeOffset == 0) &&
-      (gContextLenMap[streamName] > gDataMap[streamName].size))
+      (gDataMap[streamName].len > gDataMap[streamName].size))
     retval = gDataMap[streamName].row[schemaOffset];
   else {
     /*
@@ -210,8 +205,8 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
         boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
         int schemaSizeSrc = getQuery(nameSrc).lSchema.size();
         int schemaSizeOut = getQuery(nameOut).lSchema.size();
-        int streamSizeSrc = gContextLenMap[nameSrc];
-        int streamSizeOut = gContextLenMap[nameOut];
+        int streamSizeSrc = gDataMap[nameSrc].len;
+        int streamSizeOut = gDataMap[nameOut].len;
         int streamSizeSrc_ = gDataMap[nameSrc].size;
         int streamSizeOut_ = gDataMap[nameOut].size;
         if (streamSizeOut_ < 0) streamSizeOut_ = 0;
@@ -229,8 +224,8 @@ number Processor::getValueOfRollup(const query &q, int offset, int timeOffset) {
     case STREAM_HASH:
       // TODO: Check if right hash part is returned here
       {
-        const auto timeSeqence = (gContextLenMap[q.id] - timeOffset) > 1
-                                     ? gContextLenMap[q.id] - timeOffset
+        const auto timeSeqence = (gDataMap[q.id].len - timeOffset) > 1
+                                     ? gDataMap[q.id].len - timeOffset
                                      : 1;
         if (Hash(getQuery(arg[0].getStr()).rInterval,
                  getQuery(arg[1].getStr()).rInterval, timeSeqence, TimeOffset))
@@ -264,7 +259,7 @@ Processor::Processor() {
     for (auto i = 0; i < getSizeOfRollup(q); i++)
       rowValues.push_back(boost::rational<int>(0));
     gDataMap[q.id].row = rowValues;
-    gContextLenMap[q.id] = 0;
+    gDataMap[q.id].len = 0;
     gDataMap[q.id].size = -1;
   }
   pProc = this;
@@ -277,7 +272,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     if (inSet.find(q.id) == inSet.end()) continue;
     // If given stream is aledy synchronized with context
     // there is no sens to make computed twice
-    if (gContextLenMap[q.id] == gDataMap[q.id].size) continue;
+    if (gDataMap[q.id].len == gDataMap[q.id].size) continue;
     std::vector<number> rowValues;
     if (q.isDeclaration()) {
       // If argument is declared -
@@ -322,7 +317,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           argument1 = *(it++);
           argument2 = *(it++);
           if (Hash(getQuery(argument1.getStr()).rInterval,
-                   getQuery(argument2.getStr()).rInterval, gContextLenMap[q.id],
+                   getQuery(argument2.getStr()).rInterval, gDataMap[q.id].len,
                    TimeOffset))
             streamNameArg = argument2.getStr();
           else
@@ -483,8 +478,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
             int schemaSizeSrc = getQuery(nameSrc).lSchema.size();
             int schemaSizeOut = getQuery(nameOut).lSchema.size();
-            int streamSizeSrc = gContextLenMap[nameSrc];
-            int streamSizeOut = gContextLenMap[nameOut];
+            int streamSizeSrc = gDataMap[nameSrc].len;
+            int streamSizeOut = gDataMap[nameOut].len;
             int streamSizeSrc_ = gDataMap[nameSrc].size;
             int streamSizeOut_ = gDataMap[nameOut].size;
             if (streamSizeOut_ < 0) streamSizeOut_ = 0;
@@ -520,9 +515,9 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           if (operation.get() > q.rInterval) {
             // Check if parameters are in oposite order
-            TimeOffset = Substract(q.rInterval, operation.get(),
-                                   gDataMap[q.id].size);
-            TimeOffset = gContextLenMap[q.id] - TimeOffset;
+            TimeOffset =
+                Substract(q.rInterval, operation.get(), gDataMap[q.id].size);
+            TimeOffset = gDataMap[q.id].len - TimeOffset;
             rowValues = getRow(streamNameArg, TimeOffset);
           } else
             rowValues = gDataMap[streamNameArg].row;
@@ -535,7 +530,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     // Store to conext computed values
     assert(!rowValues.empty());
     gDataMap[q.id].row = rowValues;
-    gContextLenMap[q.id]++;
+    gDataMap[q.id].len++;
   }
   // Oryginal processRows is start here
   for (auto q : coreInstance) {
