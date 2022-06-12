@@ -32,6 +32,8 @@ class dataAgregator {
   /** Length of data streams processed by processor */
   int len;
   std::vector<number> row;
+  dataAgregator(){};
+  dataAgregator(std::vector<number> row, int len) : len(len), row(row) {}
 };
 
 std::map<std::string, dataAgregator> gDataMap;
@@ -41,49 +43,21 @@ std::map<std::string, inputDF> gFileMap;
 
 /** This function will give info how long is stream argument if argument will be
  * * instead of argument list */
-int getSizeOfRollup(const query &q) {
-  token arg[3];
-  auto progSize = q.lProgram.size();
-  assert(progSize < 4);
-  auto i = 0;
-  for (auto tk : q.lProgram) arg[i++] = tk;
-  if (progSize == 0) return q.lSchema.size();
-  if (progSize == 1) return getQuery(arg[0].getStr()).lSchema.size();
-  if (progSize == 2) return getQuery(arg[0].getStr()).lSchema.size();
-  const command_id cmd = arg[progSize - 1].getCommandID();
-  if (progSize == 3) {
-    switch (cmd) {
-      case STREAM_HASH:
-      case STREAM_DEHASH_MOD:
-      case STREAM_DEHASH_DIV:
-      case STREAM_SUBSTRACT:
-      case STREAM_TIMEMOVE:
-        return getQuery(arg[0].getStr()).lSchema.size();
-      case STREAM_AGSE:
-        return abs(rational_cast<int>(arg[2].get()));
-      case STREAM_ADD:
-        return getQuery(arg[0].getStr()).lSchema.size() +
-               getQuery(arg[1].getStr()).lSchema.size();
-      case STREAM_AVG:
-      case STREAM_MIN:
-      case STREAM_MAX:
-      case STREAM_SUM:
-        return 1;
-      default:
-        assert(false);
-    }
-  }
-  assert(false);
-  return 0;  // pro forma
-}
+int getSizeOfRollup(const query &q) { return gDataMap[q.id].row.size(); }
 
 number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
                     bool reverse = false) {
   number retval;
   query &q(getQuery(streamName));
   assert(timeOffset >= 0);
-  if (schemaOffset >= getSizeOfRollup(q)) {
-    timeOffset += schemaOffset / getSizeOfRollup(q);
+  int sizeOfRollup = getSizeOfRollup(q);
+  if (sizeOfRollup == 0) {
+    SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName,
+                 sizeOfRollup);
+    return retval;
+  }
+  if (schemaOffset >= sizeOfRollup) {
+    timeOffset += schemaOffset / sizeOfRollup;
     schemaOffset %= q.lSchema.size();
   }
   if (timeOffset == 0)
@@ -252,8 +226,9 @@ Processor::Processor() {
     std::vector<number> rowValues;
     for (auto i = 0; i < getSizeOfRollup(q); i++)
       rowValues.push_back(boost::rational<int>(0));
-    gDataMap[q.id].row = rowValues;
-    gDataMap[q.id].len = 0;
+    gDataMap[q.id] = dataAgregator(rowValues, 0);
+    SPDLOG_INFO("Build gDataMap {} len:{} rp:{}", q.id,
+                gDataMap[q.id].row.size(), getSizeOfRollup(q));
   }
   pProc = this;
 }
@@ -266,6 +241,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     // If given stream is aledy synchronized with context
     // there is no sens to make computed twice
     // if (gDataMap[q.id].len == gDataMap[q.id].size) continue;
+    if (gDataMap[q.id].row.size() == 0) continue;
     std::vector<number> rowValues;
     if (q.isDeclaration()) {
       // If argument is declared -
@@ -276,8 +252,8 @@ void Processor::processRows(std::set<std::string> inSet) {
       // execution of stream program and store data
       assert(q.lProgram.size() < 4);  // we assume that all stream programs are
       // optimized and 1v2v3 size
-      assert(q.lProgram.size() >
-             0);  // we assume that optimized streams are ready and filled
+      // we assume that optimized streams are ready and filled
+      assert(q.lProgram.size() > 0);
       std::list<token>::iterator it = q.lProgram.begin();
       token operation =
           q.lProgram.back();       // Operation is always last element on stack
@@ -507,9 +483,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             TimeOffset =
                 Substract(q.rInterval, operation.get(), gDataMap[q.id].len);
             TimeOffset = gDataMap[q.id].len - TimeOffset;
-            rowValues = getRow(streamNameArg, TimeOffset);
-          } else
-            rowValues = gDataMap[streamNameArg].row;
+          }
+          rowValues = getRow(streamNameArg, TimeOffset);
           break;
         default:
           // Stack hits non supported opertation
@@ -538,8 +513,10 @@ void Processor::processRows(std::set<std::string> inSet) {
     // here should be computer values of stream tuples
     // computed value shoud be stored in file
 
+    std::vector<number> rowValues;
     int cnt(0);
-    for (auto &f : q.lSchema) gDataMap[q.id].row[cnt++] = computeValue(f, q);
+    for (auto &f : q.lSchema) rowValues.push_back(computeValue(f, q));
+    gDataMap[q.id].row = rowValues;
     // Store computed values to cbuffer - on disk
     // storage[q.id]->store();
   }
@@ -548,6 +525,13 @@ void Processor::processRows(std::set<std::string> inSet) {
 std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
                                       bool reverse) {
   std::vector<number> retVal;
+  if (timeOffset < 0) {
+    // This need more investigation - this is kind of workaround.
+    // Because from different queations sometimes -1 a timeOffset could appear.
+    for (auto f : getQuery(streamName).lSchema)
+      retVal.push_back(boost::rational<int>(0));
+    return retVal;
+  }
   int column = 0;
   for (auto f : getQuery(streamName).lSchema)
     retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
