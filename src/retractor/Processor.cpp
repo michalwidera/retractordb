@@ -32,8 +32,10 @@ class dataAgregator {
   /** Length of data streams processed by processor */
   int len;
   std::vector<number> row;
-  dataAgregator(){};
-  dataAgregator(std::vector<number> row, int len) : len(len), row(row) {}
+  dataAgregator() {}
+  dataAgregator(int len) : len(len) {
+    std::fill_n(row.begin(), len, boost::rational<int>(0));
+  }
 };
 
 std::map<std::string, dataAgregator> gDataMap;
@@ -89,8 +91,7 @@ number Processor::getValueOfRollup(const query &q, int offset) {
       return getValueProc(arg[0].getStr(), 0, offset);
     case STREAM_TIMEMOVE:
       /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-      return getValueProc(arg[0].getStr(),
-                          rational_cast<int>(arg[1].get()),
+      return getValueProc(arg[0].getStr(), rational_cast<int>(arg[1].get()),
                           offset);
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
@@ -109,7 +110,7 @@ number Processor::getValueOfRollup(const query &q, int offset) {
         // q.rInterval - delta of output stream (rational) - contains
         // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
         // (2/3) argument of operation (rational)
-        int newTimeOffset = -1; // catch on assert(false);
+        int newTimeOffset = -1;  // catch on assert(false);
         if (cmd == STREAM_DEHASH_DIV)
           newTimeOffset = Div(q.rInterval, rationalArgument, 0);
         if (cmd == STREAM_DEHASH_MOD)
@@ -150,8 +151,7 @@ number Processor::getValueOfRollup(const query &q, int offset) {
         if (offset < sizeOfFirstSchema)
           return getValueProc(arg[0].getStr(), 0, offset);
         else
-          return getValueProc(arg[1].getStr(), 0,
-                              offset - sizeOfFirstSchema);
+          return getValueProc(arg[1].getStr(), 0, offset - sizeOfFirstSchema);
       }
     case STREAM_AGSE:
       // PUSH_STREAM core -> delta_source (argument1) arg[0]
@@ -192,9 +192,8 @@ number Processor::getValueOfRollup(const query &q, int offset) {
     case STREAM_HASH:
       // TODO: Check if right hash part is returned here
       {
-        const auto timeSeqence = (gDataMap[q.id].len) > 1
-                                     ? gDataMap[q.id].len
-                                     : 1;
+        const auto timeSeqence =
+            (gDataMap[q.id].len) > 1 ? gDataMap[q.id].len : 1;
         int timeOffset = 0;
         if (Hash(getQuery(arg[0].getStr()).rInterval,
                  getQuery(arg[1].getStr()).rInterval, timeSeqence, timeOffset))
@@ -221,14 +220,11 @@ Processor::Processor() {
     // Container initialization for file type data sources
     if (!q.filename.empty())
       gFileMap[q.id] = inputDF(q.filename.c_str(), q.lSchema);
-  }
-  // Initializing fill of context and lenght of data stream
-  for (auto q : coreInstance) {  // For all queries in systes
-    std::vector<number> rowValues;
-    std::fill_n(rowValues.begin(), getSizeOfRollup(q), boost::rational<int>(0));
-    gDataMap[q.id] = dataAgregator(rowValues, 0);
-    SPDLOG_INFO("Build gDataMap {} len:{} rp:{}", q.id,
-                gDataMap[q.id].row.size(), getSizeOfRollup(q));
+    else {
+      gDataMap[q.id] = dataAgregator(getSizeOfRollup(q));
+      SPDLOG_INFO("Build gDataMap {} len:{} rp:{}", q.id,
+                  gDataMap[q.id].row.size(), getSizeOfRollup(q));
+    }
   }
   pProc = this;
 }
