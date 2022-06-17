@@ -225,8 +225,7 @@ Processor::Processor() {
   // Initializing fill of context and lenght of data stream
   for (auto q : coreInstance) {  // For all queries in systes
     std::vector<number> rowValues;
-    for (auto i = 0; i < getSizeOfRollup(q); i++)
-      rowValues.push_back(boost::rational<int>(0));
+    std::fill_n(rowValues.begin(), getSizeOfRollup(q), boost::rational<int>(0));
     gDataMap[q.id] = dataAgregator(rowValues, 0);
     SPDLOG_INFO("Build gDataMap {} len:{} rp:{}", q.id,
                 gDataMap[q.id].row.size(), getSizeOfRollup(q));
