@@ -78,7 +78,9 @@ number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
   return retval;
 }
 
-number Processor::getValueOfRollup(const query &q, int offset) {
+/** This function try to roll up argument and reads data from schema
+ *  This is not finished - need to be fixed */
+number getValueOfRollup(const query &q, int offset) {
   token arg[3];
   const int progSize = q.lProgram.size();
   assert(progSize < 4);
