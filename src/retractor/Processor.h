@@ -26,10 +26,6 @@ class Processor : private boost::noncopyable {
   int getArgumentOffset(const std::string &streamName,
                         const std::string &streamArgument);
 
-  /** This function try to roll up argument and reads data from schema
-   * This is not finished - need to be fixed */
-  number getValueOfRollup(const query &q, int offset);
-
  public:
   /** Query processor works on core varialbe */
   Processor();
