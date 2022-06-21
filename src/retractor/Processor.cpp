@@ -135,8 +135,8 @@ number getValueOfRollup(const query &q, int offset) {
         boost::rational<int> ret = 0; /* limits.h */
         for (auto f : getQuery(arg[0].getStr()).lSchema) {
           int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
-          std::string schema = f.getFirstFieldToken().getStr();
-          boost::rational<int> val =
+          auto schema = f.getFirstFieldToken().getStr();
+          auto val =
               std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
           ret += val;
         }
