@@ -3,4 +3,4 @@ STORAGE 'temp'
 DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile2.dat'
 DECLARE b INTEGER STREAM core1, 0.2 FILE 'datafile3.dat'
 
-SELECT core0[0]*10,core1[0]*10 STREAM str1 FROM core0+core1
+SELECT core0[0]*10,core1[0]*10,core0[0]*core1[0]+20 STREAM str1 FROM core0+core1
