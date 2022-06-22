@@ -251,7 +251,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       // optimized and 1v2v3 size
       // we assume that optimized streams are ready and filled
       assert(q.lProgram.size() > 0);
-      std::list<token>::iterator it = q.lProgram.begin();
+      auto it = q.lProgram.begin();
       token operation =
           q.lProgram.back();       // Operation is always last element on stack
       token argument1, argument2;  // This arugments are optionally fullfiled
