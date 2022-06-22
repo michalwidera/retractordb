@@ -259,7 +259,7 @@ ptree netClient(std::string netCommand, std::string netArgument) {
     IPCMap *mymap = ret.first;
     assert(mymap);
     int processId = boost::this_process::get_id();
-    IPCMap::iterator it = mymap->find(processId);
+    auto it = mymap->find(processId);
     int cntr(maxAcceptableFails);
     while (it == mymap->end() && cntr) {
       boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
