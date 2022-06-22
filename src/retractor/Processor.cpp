@@ -136,9 +136,8 @@ number getValueOfRollup(const query &q, int offset) {
         for (auto f : getQuery(arg[0].getStr()).lSchema) {
           int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
           auto schema = f.getFirstFieldToken().getStr();
-          auto val =
-              std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
-          ret += val;
+          auto val = getValueProc(schema, 0, pos);
+          ret += std::get<boost::rational<int>>(val);
         }
         return ret;
       }
@@ -439,10 +438,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             assert(step >= 0);
             int windowSize = abs(rational_cast<int>(operation.get()));
             assert(windowSize > 0);
-            boost::rational<int> deltaSrc = getQuery(nameSrc).rInterval;
-            boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
-            int schemaSizeSrc = getQuery(nameSrc).lSchema.size();
-            int schemaSizeOut = getQuery(nameOut).lSchema.size();
+            int schemaSizeSrc = gDataMap[nameSrc].row.size();
+            int schemaSizeOut = gDataMap[nameOut].row.size();
             int streamSizeSrc = gDataMap[nameSrc].len;
             int streamSizeOut = gDataMap[nameOut].len;
             assert(nameSrc != "");
@@ -458,7 +455,6 @@ void Processor::processRows(std::set<std::string> inSet) {
               // "}{";
               for (int i = 0; i < windowSize; i++) {
                 number ret = getValueProc(nameSrc, 0, i + d);
-                // std::cerr << "1. " << i + d << " -> " << ret << std::endl;
                 rowValues.push_back(ret);
               }
             }
