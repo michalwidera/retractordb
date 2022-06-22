@@ -87,7 +87,6 @@ number getValueOfRollup(const query &q, int offset) {
   int i = 0;
   for (auto tk : q.lProgram) arg[i++] = tk;
   const command_id cmd = arg[progSize - 1].getCommandID();
-  int TimeOffset(-1);  // This -1 is intentionally wrong - Hash return value
   switch (cmd) {
     case PUSH_STREAM:
       return getValueProc(arg[0].getStr(), 0, offset);

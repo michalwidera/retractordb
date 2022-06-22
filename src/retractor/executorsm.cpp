@@ -169,8 +169,8 @@ ptree commandProcessor(ptree ptInval) {
       std::string streamName = ptInval.get("db.argument", "");
       assert(streamName != "");
       SPDLOG_DEBUG("got detail {} rcv.", streamName);
-      for (const auto &s : coreInstance[streamName].getFieldNamesList())
-        ptRetval.put(std::string("db.field.") + s, s);
+      for (const auto &s : coreInstance[streamName].lSchema)
+        ptRetval.put(std::string("db.field.") + s.fieldName, s.fieldName);
     }
     //
     // This command will add stream to list of transmited streams
