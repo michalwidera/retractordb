@@ -141,7 +141,7 @@ void qTree::tsort() {
         abort();
       }
       if (v.empty()) break;
-      std::list<std::string> ls = (*it).getDepStreamNameList();
+      std::vector<std::string> ls = (*it).getDepStreamName();
       bool fullDependent(true);
       for (auto s : ls) {
         if (!isThere(des, s)) fullDependent = false;
@@ -262,12 +262,6 @@ query::query(boost::rational<int> rInterval, std::string id)
 
 query::query() {}
 
-std::list<std::string> query::getFieldNamesList() {
-  std::list<std::string> schema;
-  for (auto &f : lSchema) schema.push_back(f.fieldName);
-  return schema;
-}
-
 int query::getFieldIndex(field f_arg) {
   int idx(0);
   for (auto f : lSchema) {
@@ -305,8 +299,8 @@ bool query::is(command_id command) {
   return false;
 }
 
-std::list<std::string> query::getDepStreamNameList(int reqDep) {
-  std::list<std::string> lRetVal;
+std::vector<std::string> query::getDepStreamName(int reqDep) {
+  std::vector<std::string> lRetVal;
   for (auto &t : lProgram) {
     if (reqDep == 0) {
       // defult behaviour

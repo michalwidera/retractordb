@@ -135,7 +135,7 @@ std::string intervalCounter() {
           // stream agse 3 -> step_of_window
           boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr());
           boost::rational<int> schemaSizeSrc =
-              getQuery(t1.getStr()).getFieldNamesList().size();
+              getQuery(t1.getStr()).lSchema.size();
           boost::rational<int> step = abs(t2.get());
           boost::rational<int> windowSize = abs(op.get());
           assert(windowSize > 0);

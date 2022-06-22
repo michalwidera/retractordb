@@ -136,7 +136,7 @@ class query {
 
   field &getField(std::string sField);
 
-  std::list<std::string> getDepStreamNameList(int reqDep = 0);
+  std::vector<std::string> getDepStreamName(int reqDep = 0);
 
   int getFieldIndex(field f);
 
