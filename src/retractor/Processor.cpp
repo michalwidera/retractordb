@@ -32,6 +32,7 @@ class dataAgregator {
   /** Length of data streams processed by processor */
   int len;
   std::vector<number> row;
+  std::vector<number> raw;
   dataAgregator() {}
   dataAgregator(int len) : len(len) {
     std::fill_n(row.begin(), len, boost::rational<int>(0));
@@ -174,10 +175,8 @@ number getValueOfRollup(const query &q, int offset) {
         assert(step >= 0);
         int windowSize = abs(rational_cast<int>(arg[2].get()));
         assert(windowSize > 0);
-        boost::rational<int> deltaSrc = getQuery(nameSrc).rInterval;
-        boost::rational<int> deltaOut = getQuery(nameOut).rInterval;
-        int schemaSizeSrc = getQuery(nameSrc).lSchema.size();
-        int schemaSizeOut = getQuery(nameOut).lSchema.size();
+        int schemaSizeSrc = gDataMap[nameSrc].row.size();
+        int schemaSizeOut = gDataMap[nameOut].row.size();
         int streamSizeSrc = gDataMap[nameSrc].len;
         int streamSizeOut = gDataMap[nameOut].len;
         assert(nameSrc != "");
@@ -620,14 +619,11 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           rStack.pop();
           rStack.push(Rationalize(sqrt(real)));
         } else if (tk.getStr() == "sum") {
-          int data_sum(0);
+          boost::rational<int> data_sum(0);
           for (int i = 0; i < getSizeOfRollup(q); i++) {
-            boost::rational<int> val =
-                std::get<boost::rational<int>>(getValueOfRollup(q, i));
-            data_sum += rational_cast<int>(val);
+            data_sum += std::get<boost::rational<int>>(getValueOfRollup(q, i));
           }
-          boost::rational<int> val(data_sum);
-          rStack.push(val);
+          rStack.push(data_sum);
         } else
           throw std::out_of_range(
               "No support for this math function - write it SVP");
