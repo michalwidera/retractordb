@@ -48,8 +48,27 @@ std::map<std::string, inputDF> gFileMap;
  * * instead of argument list */
 int getSizeOfRollup(const query &q) { return gDataMap[q.id].row.size(); }
 
-number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
+number getValueProc(std::string streamName, int schemaOffset,
                     bool reverse = false) {
+  int timeOffset = 0;
+  number retval;
+  query &q(getQuery(streamName));
+  assert(timeOffset >= 0);
+  int sizeOfRollup = getSizeOfRollup(q);
+  if (sizeOfRollup == 0) {
+    SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName,
+                 sizeOfRollup);
+    return retval;
+  }
+  if (schemaOffset >= sizeOfRollup) {
+    timeOffset += schemaOffset / sizeOfRollup;
+    schemaOffset %= q.lSchema.size();
+  }
+  return gDataMap[streamName].row[schemaOffset];
+}
+
+number getValueProcT(std::string streamName, int timeOffset, int schemaOffset,
+                     bool reverse = false) {
   number retval;
   query &q(getQuery(streamName));
   assert(timeOffset >= 0);
@@ -90,11 +109,11 @@ number getValueOfRollup(const query &q, int offset) {
   const command_id cmd = arg[progSize - 1].getCommandID();
   switch (cmd) {
     case PUSH_STREAM:
-      return getValueProc(arg[0].getStr(), 0, offset);
+      return getValueProc(arg[0].getStr(), offset);
     case STREAM_TIMEMOVE:
       /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-      return getValueProc(arg[0].getStr(), rational_cast<int>(arg[1].get()),
-                          offset);
+      return getValueProcT(arg[0].getStr(), rational_cast<int>(arg[1].get()),
+                           offset);
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
       /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2),
@@ -118,16 +137,16 @@ number getValueOfRollup(const query &q, int offset) {
         if (cmd == STREAM_DEHASH_MOD)
           newTimeOffset = Mod(rationalArgument, q.rInterval, 0);
         if (newTimeOffset < 0) assert(false);
-        return getValueProc(streamNameArg, newTimeOffset, offset);
+        return getValueProcT(streamNameArg, newTimeOffset, offset);
       }
     case STREAM_SUBSTRACT:
       // TODO: Check
-      return getValueProc(arg[0].getStr(), 0, offset);
+      return getValueProc(arg[0].getStr(), offset);
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
       assert(offset == 1);
-      return getValueProc(arg[0].getStr(), 0, offset);
+      return getValueProc(arg[0].getStr(), offset);
     case STREAM_SUM:
       assert(arg[0].getStr() != "");
       {
@@ -136,7 +155,7 @@ number getValueOfRollup(const query &q, int offset) {
         for (auto f : getQuery(arg[0].getStr()).lSchema) {
           int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
           auto schema = f.getFirstFieldToken().getStr();
-          auto val = getValueProc(schema, 0, pos);
+          auto val = getValueProc(schema, pos);
           ret += std::get<boost::rational<int>>(val);
         }
         return ret;
@@ -150,9 +169,9 @@ number getValueOfRollup(const query &q, int offset) {
       {
         const auto sizeOfFirstSchema = getQuery(arg[0].getStr()).lSchema.size();
         if (offset < sizeOfFirstSchema)
-          return getValueProc(arg[0].getStr(), 0, offset);
+          return getValueProc(arg[0].getStr(), offset);
         else
-          return getValueProc(arg[1].getStr(), 0, offset - sizeOfFirstSchema);
+          return getValueProc(arg[1].getStr(), offset - sizeOfFirstSchema);
       }
     case STREAM_AGSE:
       // PUSH_STREAM core -> delta_source (argument1) arg[0]
@@ -181,11 +200,11 @@ number getValueOfRollup(const query &q, int offset) {
         assert(nameSrc != "");
         assert(windowSize == schemaSizeOut);
         if (mirror)
-          return getValueProc(nameSrc, 0, windowSize - 1 + offset);
+          return getValueProc(nameSrc, windowSize - 1 + offset);
         else {
           int d =
               abs((streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
-          return getValueProc(nameSrc, 0, windowSize - offset + d);
+          return getValueProc(nameSrc, windowSize - offset + d);
         }
       }
     case STREAM_HASH:
@@ -196,9 +215,9 @@ number getValueOfRollup(const query &q, int offset) {
         int timeOffset = 0;
         if (Hash(getQuery(arg[0].getStr()).rInterval,
                  getQuery(arg[1].getStr()).rInterval, timeSeqence, timeOffset))
-          return getValueProc(arg[1].getStr(), timeOffset, offset);
+          return getValueProcT(arg[1].getStr(), timeOffset, offset);
         else
-          return getValueProc(arg[0].getStr(), timeOffset, offset);
+          return getValueProcT(arg[0].getStr(), timeOffset, offset);
       }
       assert(false);  // TODO
   }
@@ -267,7 +286,7 @@ void Processor::processRows(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               // rowValues.push_back(row[streamNameArg][pos++]);
               std::string schema = f.getFirstFieldToken().getStr();
-              rowValues.push_back(getValueProc(schema, 0, pos++));
+              rowValues.push_back(getValueProc(schema, pos++));
             }
           }
           break;
@@ -323,8 +342,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              ret = ret + std::get<boost::rational<int>>(
-                              getValueProc(schema, 0, pos));
+              ret = ret +
+                    std::get<boost::rational<int>>(getValueProc(schema, pos));
             }
             ret = ret / static_cast<int>(q.lSchema.size());
             rowValues.push_back(ret);
@@ -341,7 +360,7 @@ void Processor::processRows(std::set<std::string> inSet) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
               boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+                  std::get<boost::rational<int>>(getValueProc(schema, pos));
               if (val > ret) ret = val;
             }
             rowValues.push_back(ret);
@@ -358,7 +377,7 @@ void Processor::processRows(std::set<std::string> inSet) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
               boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+                  std::get<boost::rational<int>>(getValueProc(schema, pos));
               if (val < ret) ret = val;
             }
             rowValues.push_back(ret);
@@ -375,7 +394,7 @@ void Processor::processRows(std::set<std::string> inSet) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
               boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+                  std::get<boost::rational<int>>(getValueProc(schema, pos));
               ret += val;
             }
             rowValues.push_back(ret);
@@ -446,7 +465,7 @@ void Processor::processRows(std::set<std::string> inSet) {
             assert(windowSize == schemaSizeOut);
             if (mirror) {
               for (int i = windowSize - 1; i >= 0; i--) {
-                number ret = getValueProc(nameSrc, 0, i);
+                number ret = getValueProc(nameSrc, i);
                 rowValues.push_back(ret);
               }
             } else {
@@ -454,7 +473,7 @@ void Processor::processRows(std::set<std::string> inSet) {
                   (streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
               // "}{";
               for (int i = 0; i < windowSize; i++) {
-                number ret = getValueProc(nameSrc, 0, i + d);
+                number ret = getValueProc(nameSrc, i + d);
                 rowValues.push_back(ret);
               }
             }
@@ -526,7 +545,7 @@ std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
   }
   int column = 0;
   for (auto f : getQuery(streamName).lSchema)
-    retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
+    retVal.push_back(getValueProcT(streamName, timeOffset, column++, reverse));
   return retVal;
 }
 
@@ -640,7 +659,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
         // If operation ADD exist - then position schema will be moved
         // first argument
         int offsetFromArg = getArgumentOffset(q.id, argument);
-        number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
+        number a = getValueProc(q.id, offsetInSchema + offsetFromArg);
         rStack.push(std::get<boost::rational<int>>(a));
       } break;
       default:
