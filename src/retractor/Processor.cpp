@@ -35,7 +35,11 @@ class dataAgregator {
   std::vector<number> raw;
   dataAgregator() {}
   dataAgregator(int len) : len(len) {
-    std::fill_n(row.begin(), len, boost::rational<int>(0));
+    SPDLOG_DEBUG("Create dataAgregator {}", len);
+    //std::fill_n(row.begin(), len, boost::rational<int>(0));
+    assert(row.size() == 0);
+    for (auto i = 0; i < len; i++)
+      row.emplace_back(boost::rational<int>(0));
   }
 };
 
@@ -46,7 +50,7 @@ std::map<std::string, inputDF> gFileMap;
 
 /** This function will give info how long is stream argument if argument will be
  * * instead of argument list */
-int getSizeOfRollup(const query &q) { return gDataMap[q.id].row.size(); }
+int getRowSize(const query &q) { return gDataMap[q.id].row.size(); }
 
 number getValueProc(std::string streamName, int schemaOffset,
                     bool reverse = false) {
@@ -54,7 +58,7 @@ number getValueProc(std::string streamName, int schemaOffset,
   number retval;
   query &q(getQuery(streamName));
   assert(timeOffset >= 0);
-  int sizeOfRollup = getSizeOfRollup(q);
+  int sizeOfRollup = getRowSize(q);
   if (sizeOfRollup == 0) {
     SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName,
                  sizeOfRollup);
@@ -74,7 +78,7 @@ number getValueProcT(std::string streamName, int timeOffset, int schemaOffset,
   number retval;
   query &q(getQuery(streamName));
   assert(timeOffset >= 0);
-  int sizeOfRollup = getSizeOfRollup(q);
+  int sizeOfRollup = getRowSize(q);
   if (sizeOfRollup == 0) {
     SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName,
                  sizeOfRollup);
@@ -240,11 +244,12 @@ Processor::Processor() {
     // Container initialization for file type data sources
     if (!q.filename.empty())
       gFileMap[q.id] = inputDF(q.filename.c_str(), q.lSchema);
-    else {
-      gDataMap[q.id] = dataAgregator(getSizeOfRollup(q));
-      SPDLOG_INFO("Build gDataMap {} len:{} rp:{}", q.id,
-                  gDataMap[q.id].row.size(), getSizeOfRollup(q));
-    }
+
+    SPDLOG_INFO("Req: gDataMap {} len:{} rp:{}", q.id,
+                gDataMap[q.id].row.size(), q.lSchema.size());
+    gDataMap[q.id] = dataAgregator(q.lSchema.size());
+    SPDLOG_INFO("Bld: gDataMap {} len:{} rp:{}", q.id,
+                gDataMap[q.id].row.size(), getRowSize(q));
   }
   pProc = this;
 }
@@ -275,7 +280,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           q.lProgram.back();       // Operation is always last element on stack
       token argument1, argument2;  // This arugments are optionally fullfiled
       std::string streamNameArg;   // Same as argument
-      int TimeOffset(-1);  // This -1 is intentionally wrong to catch errors
+      int TimeOffset(0);
       assert(rowValues.empty());
       // all stream operations cover
       switch (operation.getCommandID()) {
@@ -299,6 +304,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(q.lProgram.size() == 3);
           // hash operations have two additional arguments of stack
           // these argument are stream names to HASH operation
+          TimeOffset = 0;
           argument1 = *(it++);
           argument2 = *(it++);
           if (Hash(getQuery(argument1.getStr()).rInterval,
@@ -307,7 +313,13 @@ void Processor::processRows(std::set<std::string> inSet) {
             streamNameArg = argument2.getStr();
           else
             streamNameArg = argument1.getStr();
-          TimeOffset = TimeOffset - gDataMap[streamNameArg].len;
+          if (TimeOffset <= 0) {
+            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}", TimeOffset, argument1.getStr(), argument2.getStr(), q.id);
+          }
+          //TimeOffset = TimeOffset - gDataMap[streamNameArg].len;  - need to investigate here.
+          if (TimeOffset < 0) {
+            SPDLOG_ERROR("Timeoffset is negative = {}, len = {}, gLen={}", TimeOffset, gDataMap[q.id].len, gDataMap[streamNameArg].len);
+          }
           assert(TimeOffset >= 0);
           // If this assert fails - you are probably trying to hash a#b when a
           // and b has different schema sizes. This should be identified on
@@ -519,7 +531,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       assert(!q.filename.empty());
       gDataMap[q.id].row = gFileMap[q.id].getFileRow();
     } else {
-      for (auto i = 0; i < getSizeOfRollup(q); i++)
+      for (auto i = 0; i < getRowSize(q); i++)
         gDataMap[q.id].row[i] = getValueOfRollup(q, i);
     }
 
@@ -637,7 +649,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           rStack.push(Rationalize(sqrt(real)));
         } else if (tk.getStr() == "sum") {
           boost::rational<int> data_sum(0);
-          for (int i = 0; i < getSizeOfRollup(q); i++) {
+          for (int i = 0; i < getRowSize(q); i++) {
             data_sum += std::get<boost::rational<int>>(getValueOfRollup(q, i));
           }
           rStack.push(data_sum);

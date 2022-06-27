@@ -40,6 +40,7 @@ int main(int argc, char* argv[]) {
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
   spdlog::set_pattern(common_log_pattern);
+  spdlog::flush_on(spdlog::level::trace);
   SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     std::unique_ptr<std::ostream> p_ofs;
