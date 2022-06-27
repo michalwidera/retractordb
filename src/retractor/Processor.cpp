@@ -61,9 +61,11 @@ number getValueProc(std::string streamName, int schemaOffset,
     return retval;
   }
   if (schemaOffset >= sizeOfRollup) {
+    SPDLOG_DEBUG("Art offset on measure {} {}", streamName, schemaOffset);
     timeOffset += schemaOffset / sizeOfRollup;
-    schemaOffset %= q.lSchema.size();
+    schemaOffset %= sizeOfRollup;
   }
+  // assert(timeOffset == 0);
   return gDataMap[streamName].row[schemaOffset];
 }
 
