@@ -34,7 +34,7 @@ T inputDF::readFromFile() {
     }
   } else {
     if (curPos > (len - sizeof(T))) goBegin();
-    psFile->read(reinterpret_cast<char *>(&retVal), sizeof retVal);
+    psFile->read(reinterpret_cast<char *>(&retVal), sizeof(retVal));
     curPos += sizeof(T);
   }
   return retVal;
