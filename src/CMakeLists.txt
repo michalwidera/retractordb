@@ -64,6 +64,16 @@ install(TARGETS xretractor xcompiler xdumper xqry xtrdb
         DESTINATION ~/.local/bin)
 
 add_custom_target(
+  simple
+  COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-simple.sh
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)
+
+add_custom_target(
+  dsp
+  COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-dsp.sh
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)
+
+add_custom_target(
   grammar
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/antlr4call.sh RQL.g4
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/compiler
