@@ -356,7 +356,9 @@ int main(int argc, char *argv[]) {
     std::string sQuery;
     std::string sDumpFile;
     po::options_description desc("Supported program options");
-    desc.add_options()("help,h", "show help")  //
+    desc.add_options()                        //
+        ("help,h", "show help")               //
+        ("compiler", "show compiler config")  //
         ("infile,i",
          po::value<std::string>(&sInputFile)->default_value("query.qry"),
          "input query plan")  //
@@ -381,6 +383,10 @@ int main(int argc, char *argv[]) {
       std::cerr << argv[0] << " - query plan executor." << std::endl;
     if (vm.count("help")) {
       std::cout << desc;
+      std::cout << config_line;
+      return system::errc::success;
+    }
+    if (vm.count("compiler")) {
       std::cout << config_line;
       return system::errc::success;
     }

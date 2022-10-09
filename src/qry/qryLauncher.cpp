@@ -36,7 +36,8 @@ int main(int argc, char *argv[]) {
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
-    desc.add_options()  //
+    desc.add_options()                        //
+        ("compiler", "show compiler config")  //
         ("select,s", po::value<std::string>(&sInputStream),
          "show this stream")  //
         ("detail,t", po::value<std::string>(&sInputStream),
@@ -69,7 +70,12 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line;
       return system::errc::success;
-    } else if (vm.count("hello"))
+    }
+    if (vm.count("compiler")) {
+      std::cout << config_line;
+      return system::errc::success;
+    }
+    if (vm.count("hello"))
       return hello();
     else if (vm.count("kill")) {
       ptree pt = netClient("kill", "");

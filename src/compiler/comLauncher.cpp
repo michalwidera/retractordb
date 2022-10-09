@@ -48,8 +48,9 @@ int main(int argc, char* argv[]) {
     std::string sOutputFile;
     std::string sInputFile;
     po::options_description desc("Avaiable options");
-    desc.add_options()                      // formating
-        ("help,h", "Show program options")  //
+    desc.add_options()                        // formating
+        ("help,h", "Show program options")    //
+        ("compiler", "show compiler config")  //
         ("queryfile,q", po::value<std::string>(&sInputFile),
          "query set file")  //
         ("outfile,o",
@@ -68,6 +69,10 @@ int main(int argc, char* argv[]) {
     po::notify(vm);
     if (vm.count("help")) {
       std::cout << desc;
+      std::cout << config_line;
+      return system::errc::success;
+    }
+    if (vm.count("compiler")) {
       std::cout << config_line;
       return system::errc::success;
     }

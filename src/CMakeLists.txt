@@ -64,6 +64,13 @@ install(TARGETS xretractor xcompiler xdumper xqry xtrdb
         DESTINATION ~/.local/bin)
 
 add_custom_target(
+  lst
+  COMMAND xretractor --compiler
+  COMMAND xcompiler --compiler
+  COMMAND xdumper --compiler
+  COMMAND xqry --compiler)
+
+add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-simple.sh
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)

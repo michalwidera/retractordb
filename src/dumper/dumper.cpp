@@ -300,19 +300,22 @@ int main(int argc, char *argv[]) {
     namespace po = boost::program_options;
     std::string sInputFile;
     po::options_description desc("Avaiable options");
-    desc.add_options()("help,h", "show help options")(
-        "verbose,r", "verbose mode")("dot,d", "create dot file")(
-        "csv,c", "create csv file")(
-        "view,v", "create dot file and then call dot process")(
-        "fields,f", "show fields in dot file")(
-        "tags,t", "show tags in dot file")("streamprogs,s",
-                                           "show stream programs in dot file")(
-        "sdump,p", "take as input file executor dump")(
-        "leavedot,e", "dont delete temporary dot file")(
-        "showtypes,w", "show field types in dot file")(
-        "infile,i",
-        po::value<std::string>(&sInputFile)->default_value("query.qry"),
-        "name of input data file");
+    desc.add_options()                                           //
+        ("help,h", "show help options")                          //
+        ("compiler", "show compiler config")                     //
+        ("verbose,r", "verbose mode")                            //
+        ("dot,d", "create dot file")                             //
+        ("csv,c", "create csv file")                             //
+        ("view,v", "create dot file and then call dot process")  //
+        ("fields,f", "show fields in dot file")                  //
+        ("tags,t", "show tags in dot file")                      //
+        ("streamprogs,s", "show stream programs in dot file")    //
+        ("sdump,p", "take as input file executor dump")          //
+        ("leavedot,e", "dont delete temporary dot file")         //
+        ("showtypes,w", "show field types in dot file")          //
+        ("infile,i",
+         po::value<std::string>(&sInputFile)->default_value("query.qry"),
+         "name of input data file");
     po::positional_options_description p;
     p.add("infile", -1);
     po::variables_map vm;
@@ -324,6 +327,10 @@ int main(int argc, char *argv[]) {
       std::cerr << argv[0] << " - qry file decoder.\n";
     if (vm.count("help")) {
       std::cout << desc;
+      std::cout << config_line;
+      return system::errc::success;
+    }
+    if (vm.count("compiler")) {
       std::cout << config_line;
       return system::errc::success;
     }
