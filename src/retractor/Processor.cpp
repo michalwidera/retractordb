@@ -703,7 +703,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
   return boost::rational<int>(0); /* pro forma */
 }
 
-int Processor::getStreamCount(const std::string query_name) {
+int getStreamCount(const std::string query_name) {
   return gDataMap[query_name].len;
 }
 
