@@ -152,11 +152,10 @@ ptree commandProcessor(ptree ptInval) {
             boost::lexical_cast<std::string>(q.rInterval));
         long recordsCount = -1;
         if (!q.isDeclaration()) recordsCount = streamStoredSize(q.id);
-        int processCount = (pProc == nullptr) ? 0 : pProc->getStreamCount(q.id);
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"),
                      boost::lexical_cast<std::string>(recordsCount));
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
-                     boost::lexical_cast<std::string>(processCount));
+                     boost::lexical_cast<std::string>(getStreamCount(q.id)));
         ptRetval.put(
             std::string("db.stream.") + q.id + std::string(".location"),
             q.filename);

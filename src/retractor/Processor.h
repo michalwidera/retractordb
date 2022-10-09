@@ -7,6 +7,9 @@
 
 long streamStoredSize(std::string filename);
 
+/** This function return lenght of data stream */
+int getStreamCount(const std::string query_name);
+
 /** Query processor */
 class Processor : private boost::noncopyable {
   /** Archive of data streams - initStorage */
@@ -29,9 +32,6 @@ class Processor : private boost::noncopyable {
    *  on given moment by  realization all 1v2v3 elements stream programs
    */
   void processRows(std::set<std::string> inSet);
-
-  /** This function return lenght of data stream */
-  int getStreamCount(const std::string query_name);
 
   /** Context functions */
   std::vector<number> getRow(std::string streamName, int timeOffset,
