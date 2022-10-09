@@ -36,10 +36,9 @@ class dataAgregator {
   dataAgregator() {}
   dataAgregator(int len) : len(len) {
     SPDLOG_DEBUG("Create dataAgregator {}", len);
-    //std::fill_n(row.begin(), len, boost::rational<int>(0));
+    // std::fill_n(row.begin(), len, boost::rational<int>(0));
     assert(row.size() == 0);
-    for (auto i = 0; i < len; i++)
-      row.emplace_back(boost::rational<int>(0));
+    for (auto i = 0; i < len; i++) row.emplace_back(boost::rational<int>(0));
   }
 };
 
@@ -314,11 +313,16 @@ void Processor::processRows(std::set<std::string> inSet) {
           else
             streamNameArg = argument1.getStr();
           if (TimeOffset <= 0) {
-            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}", TimeOffset, argument1.getStr(), argument2.getStr(), q.id);
+            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}",
+                         TimeOffset, argument1.getStr(), argument2.getStr(),
+                         q.id);
           }
-          //TimeOffset = TimeOffset - gDataMap[streamNameArg].len;  - need to investigate here.
+          // TimeOffset = TimeOffset - gDataMap[streamNameArg].len;  - need to
+          // investigate here.
           if (TimeOffset < 0) {
-            SPDLOG_ERROR("Timeoffset is negative = {}, len = {}, gLen={}", TimeOffset, gDataMap[q.id].len, gDataMap[streamNameArg].len);
+            SPDLOG_ERROR("Timeoffset is negative = {}, len = {}, gLen={}",
+                         TimeOffset, gDataMap[q.id].len,
+                         gDataMap[streamNameArg].len);
           }
           assert(TimeOffset >= 0);
           // If this assert fails - you are probably trying to hash a#b when a
@@ -563,22 +567,6 @@ std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
   return retVal;
 }
 
-int Processor::getArgumentOffset(const std::string &streamName,
-                                 const std::string &streamArgument) {
-  query &q(getQuery(streamName));
-  if (q.is(STREAM_ADD)) {
-    auto [sArg1, sArg2, cmd]{GetArgs(q.lProgram)};
-    if (sArg1 == streamArgument) return 0;
-    if (sArg2 == streamArgument) return getQuery(sArg1).lSchema.size();
-
-    SPDLOG_ERROR(
-        "Call to schema that not exist from:{}, argument:{}, 1st:{}, 2nd:{}",
-        streamName, streamArgument, sArg1, sArg2);
-    throw std::out_of_range("Call to schema that not exist");
-  }
-  return 0;
-}
-
 boost::rational<int> Processor::computeValue(field &f, query &q) {
   std::stack<boost::rational<int>> rStack;
   boost::rational<int> a, b;
@@ -672,7 +660,29 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
         std::string argument(tk.getStr());
         // If operation ADD exist - then position schema will be moved
         // first argument
-        int offsetFromArg = getArgumentOffset(q.id, argument);
+        int offsetFromArg = 0;
+        {
+          const std::string streamName(q.id);
+          const std::string streamArgument(argument);
+          // Function will return offsets according to stack operations
+          // when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
+          query &qq(getQuery(streamName));
+          if (qq.is(STREAM_ADD)) {
+            auto [sArg1, sArg2, cmd]{GetArgs(qq.lProgram)};
+            if (sArg1 == argument)
+              offsetFromArg = 0;
+            else if (sArg2 == argument)
+              offsetFromArg = getQuery(sArg1).lSchema.size();
+            else {
+              SPDLOG_ERROR(
+                  "Call to schema that not exist from:{}, argument:{}, 1st:{}, "
+                  "2nd:{}",
+                  streamName, streamArgument, sArg1, sArg2);
+              throw std::out_of_range("Call to schema that not exist");
+            }
+          }
+        }
+
         number a = getValueProc(q.id, offsetInSchema + offsetFromArg);
         rStack.push(std::get<boost::rational<int>>(a));
       } break;

@@ -20,12 +20,6 @@ class Processor : private boost::noncopyable {
    */
   boost::rational<int> computeValue(field &f, query &q);
 
-  /** Function will return offsets according to stack operations
-   *  when A#B offsets A i B are equal , when A+B then A=0, B=0+Size(A)
-   */
-  int getArgumentOffset(const std::string &streamName,
-                        const std::string &streamArgument);
-
  public:
   /** Query processor works on core varialbe */
   Processor();
