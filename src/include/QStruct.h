@@ -40,7 +40,7 @@ inline void serialize(Archive &ar, boost::rational<T> &p,
 template <typename Archive, typename... Types>
 inline void serialize(Archive &ar, std::tuple<Types...> &t,
                       const unsigned int) {
-  std::apply([&](auto &... element) { ((ar & element), ...); }, t);
+  std::apply([&](auto &...element) { ((ar & element), ...); }, t);
 }
 
 }  // namespace serialization
