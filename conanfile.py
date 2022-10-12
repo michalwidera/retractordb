@@ -45,7 +45,7 @@ class Retractor(ConanFile):
                        "boost:without_filesystem": False,
                        "boost": "1.80.0",
                        "gtest": "1.12.1",
-                       "antlr4": "4.10.1",
+                       "antlr4": "4.11.1",
                        "spdlog": "1.10.0"
                        }
 
