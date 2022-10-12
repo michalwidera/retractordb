@@ -1,5 +1,5 @@
 
-// Generated from RQL.g4 by ANTLR 4.10.1
+// Generated from RQL.g4 by ANTLR 4.11.1
 
 
 #include "RQLLexer.h"
@@ -41,7 +41,7 @@ struct RQLLexerStaticData final {
   std::unique_ptr<antlr4::atn::ATN> atn;
 };
 
-std::once_flag rqllexerLexerOnceFlag;
+::antlr4::internal::OnceFlag rqllexerLexerOnceFlag;
 RQLLexerStaticData *rqllexerLexerStaticData = nullptr;
 
 void rqllexerLexerInitialize() {
@@ -353,5 +353,5 @@ const atn::ATN& RQLLexer::getATN() const {
 
 
 void RQLLexer::initialize() {
-  std::call_once(rqllexerLexerOnceFlag, rqllexerLexerInitialize);
+  ::antlr4::internal::call_once(rqllexerLexerOnceFlag, rqllexerLexerInitialize);
 }
