@@ -52,7 +52,7 @@ std::map<std::string, inputDF> gFileMap;
 int getRowSize(const query &q) { return gDataMap[q.id].row.size(); }
 
 number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
-                     bool reverse = false) {
+                    bool reverse = false) {
   number retval;
   query &q(getQuery(streamName));
   assert(timeOffset >= 0);
@@ -97,7 +97,7 @@ number getValueOfRollup(const query &q, int offset) {
     case STREAM_TIMEMOVE:
       /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
       return getValueProc(arg[0].getStr(), rational_cast<int>(arg[1].get()),
-                           offset);
+                          offset);
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
       /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2),
@@ -339,8 +339,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              ret = ret +
-                    std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+              ret = ret + std::get<boost::rational<int>>(
+                              getValueProc(schema, 0, pos));
             }
             ret = ret / static_cast<int>(q.lSchema.size());
             rowValues.push_back(ret);
