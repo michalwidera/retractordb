@@ -90,7 +90,7 @@ jobs:
   build-arm-edge-2204:
     working_directory: ~
     docker:
-      - image: cimg/base:edge-22.04
+      - image: ubuntu-2004:current
     resource_class: arm.medium
     steps:
       - checkout
