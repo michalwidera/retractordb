@@ -99,7 +99,7 @@ boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
   return err1 > err2 ? result2 : result1;
 }
 
-field &query::getField(std::string sField) {
+field &query::getField(const std::string &sField) {
   for (auto &f : lSchema) {
     if (f.fieldName == sField) return f;
   }
@@ -116,7 +116,7 @@ void query::reset() {
   return;
 }
 
-bool isThere(std::vector<query> v, std::string query_name) {
+bool isThere(std::vector<query> v, const std::string &query_name) {
   for (auto &q : v) {
     if (q.id == query_name) return true;
   }
@@ -157,11 +157,11 @@ void qTree::tsort() {
   for (auto &q : des) push_back(q);
 }
 
-boost::rational<int> qTree::getDelta(std::string query_name) {
+boost::rational<int> qTree::getDelta(const std::string &query_name) {
   return getQuery(query_name).rInterval;
 }
 
-query &getQuery(std::string query_name) {
+query &getQuery(const std::string &query_name) {
   assert(query_name != "");
   for (auto &q : coreInstance) {
     if (q.id == query_name) return q;
@@ -172,7 +172,7 @@ query &getQuery(std::string query_name) {
   return (void_query);  // proforma
 }
 
-int getSeqNr(std::string query_name) {
+int getSeqNr(const std::string &query_name) {
   int cnt(0);
   for (auto &q : coreInstance) {
     if (query_name == q.id)
@@ -185,14 +185,14 @@ int getSeqNr(std::string query_name) {
   return -1;  // INVALID QUERY_NR
 }
 
-bool isDeclared(std::string query_name) {
+bool isDeclared(const std::string &query_name) {
   for (auto &q : coreInstance) {
     if (query_name == q.id) return q.isDeclaration();
   }
   return false;
 }
 
-bool isExist(std::string query_name) {
+bool isExist(const std::string &query_name) {
   for (auto &q : coreInstance) {
     if (query_name == q.id) return true;
   }
@@ -228,7 +228,7 @@ token field::getFirstFieldToken() {
 
 /** Construktor set */
 template <typename T>
-token::token(command_id id, std::string sValue, T value)
+token::token(command_id id, const std::string &sValue, T value)
     : command(id), textValue(sValue) {
   if constexpr (std::is_same_v<T, number>)
     numericValue = value;
@@ -252,14 +252,14 @@ token::token(command_id id, std::string sValue, T value)
   }
 }
 
-template token::token<number>(command_id, std::string, number);
-template token::token<int>(command_id, std::string, int);
-template token::token<double>(command_id, std::string, double);
-template token::token<float>(command_id, std::string, float);
+template token::token<number>(command_id, const std::string &, number);
+template token::token<int>(command_id, const std::string &, int);
+template token::token<double>(command_id, const std::string &, double);
+template token::token<float>(command_id, const std::string &, float);
 
 /** Construktor set */
 
-query::query(boost::rational<int> rInterval, std::string id)
+query::query(boost::rational<int> rInterval, const std::string &id)
     : rInterval(rInterval), id(id) {}
 
 query::query() {}

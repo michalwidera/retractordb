@@ -54,9 +54,9 @@ int getRowSize(const query &q) { return gDataMap[q.id].row.size(); }
 number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
                     bool reverse = false) {
   number retval;
-  query &q(getQuery(streamName));
+  const query &q(getQuery(streamName));
   assert(timeOffset >= 0);
-  int sizeOfRollup = getRowSize(q);
+  const int sizeOfRollup = getRowSize(q);
   if (sizeOfRollup == 0) {
     SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName,
                  sizeOfRollup);
@@ -678,8 +678,8 @@ number Processor::computeValue(field &f, query &q) {
   return 0; /* pro forma */
 }
 
-int getStreamCount(const std::string query_name) {
+int getStreamCount(const std::string &query_name) {
   return gDataMap[query_name].len;
 }
 
-long streamStoredSize(std::string filename) { return 0; }
+long streamStoredSize(std::string &filename) { return 0; }
