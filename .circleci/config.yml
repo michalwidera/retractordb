@@ -89,8 +89,8 @@ jobs:
 
   build-arm-edge-2204:
     working_directory: ~
-    docker:
-      - image: ubuntu-2004:current
+    machine:
+      image: ubuntu-2004:202101-01
     resource_class: arm.medium
     steps:
       - checkout
