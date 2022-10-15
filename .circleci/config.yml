@@ -101,7 +101,7 @@ jobs:
       - run: cd build && conan source ..
       - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
-      - run: .local/bin/xretractor -h && .local/bin/xqry -h && .local/bin/xdumper -h && .local/bin/xcompiler -h
+      - run: ~/.local/bin/xretractor -h && ~/.local/bin/xqry -h && ~/.local/bin/xdumper -h && ~/.local/bin/xcompiler -h
       - run: cd build && make test || true
 # There is a problem on test on ARM - I postopne this failure - build is more important that this for now.
 
