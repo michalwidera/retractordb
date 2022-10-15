@@ -21,15 +21,10 @@ Commands
 How to install
 -----------------------------------------------------------------------
 
-NOTE: If you are using conan fist time plese create default conan profile
-```
-conan profile new default --detect
-```
-
 ```
 sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
 pip install conan
-conan profile update settings.compiler.libcxx=libstdc++11 default
+conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
 git clone https://github.com/michalwidera/retractordb.git
 cd build
 conan install ..
@@ -37,6 +32,15 @@ conan build ..
 make test
 ```
 
+Work with antl4 and .g4 files requires java - install it with:
+```
+sudo apt install default-jre
+```
+
+If you want see graphic response, use gnuplot - install it with:
+```
+sudo apt install gnuplot
+```
 
 After installation _xretractor_, _xqry_ ... etc will be installed in ~/.local/bin on path.
 Please check proper installation by typing in command prompt - for instance: _xqry -h_
