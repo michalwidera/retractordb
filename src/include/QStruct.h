@@ -68,10 +68,10 @@ class token {
   boost::rational<int> get();
 
   token(command_id id = VOID_COMMAND) : command(id){};
-  token(command_id id, std::string sValue) : command(id), textValue(sValue){};
+  token(command_id id, const std::string &sValue) : command(id), textValue(sValue){};
 
   template <typename T>
-  token(command_id id, std::string sValue, T value);
+  token(command_id id, const std::string &sValue, T value);
 
   std::string getStrCommandID();
   command_id getCommandID();
@@ -121,7 +121,7 @@ class query {
   }
 
  public:
-  query(boost::rational<int> rInterval, std::string id);
+  query(boost::rational<int> rInterval, const std::string &id);
   query();
 
   std::list<std::string> getFieldNamesList();
@@ -137,7 +137,7 @@ class query {
   bool isGenerated();
   bool is(command_id command);
 
-  field &getField(std::string sField);
+  field &getField(const std::string &sField);
 
   std::vector<std::string> getDepStreamName(int reqDep = 0);
 
@@ -148,10 +148,10 @@ class query {
 
 bool operator<(const query &lhs, const query &rhs);
 
-query &getQuery(std::string query_name);
-int getSeqNr(std::string query_name);
-bool isDeclared(std::string query_name);
-bool isExist(std::string query_name);
+query &getQuery(const std::string &query_name);
+int getSeqNr(const std::string &query_name);
+bool isDeclared(const std::string &query_name);
+bool isExist(const std::string &query_name);
 
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
@@ -164,12 +164,12 @@ class qTree : public std::vector<query> {
   }
 
  public:
-  query &operator[](std::string query_name) { return getQuery(query_name); };
+  query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   void sort() { std::sort(begin(), end()); };
 
   /** Topological sort*/
   void tsort();
 
-  boost::rational<int> getDelta(std::string query_name);
+  boost::rational<int> getDelta(const std::string &query_name);
 };

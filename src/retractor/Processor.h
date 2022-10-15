@@ -5,10 +5,10 @@
 
 #include "inputFileInstance.h"
 
-long streamStoredSize(std::string filename);
+long streamStoredSize(std::string &filename);
 
 /** This function return lenght of data stream */
-int getStreamCount(const std::string query_name);
+int getStreamCount(const std::string &query_name);
 
 /** Query processor */
 class Processor : private boost::noncopyable {
