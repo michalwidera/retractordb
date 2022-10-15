@@ -21,7 +21,7 @@ class Processor : private boost::noncopyable {
    *  therefore argument is reference to this query
    *  main solution (we need it make it better)
    */
-  boost::rational<int> computeValue(field &f, query &q);
+  number computeValue(field &f, query &q);
 
  public:
   /** Query processor works on core varialbe */

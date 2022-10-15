@@ -12,6 +12,7 @@
 #include <sstream>                   // for operator<<, basic_ostream, endl
 #include <stack>                     // for stack
 #include <stdexcept>                 // for logic_error
+#include <type_traits>
 
 using namespace boost;
 using namespace boost::lambda;
@@ -226,24 +227,20 @@ token field::getFirstFieldToken() {
 }
 
 /** Construktor set */
-
-token::token(command_id id, std::string sValue, number value)
+template <typename T>
+token::token(command_id id, std::string sValue, T value)
     : command(id), textValue(sValue) {
-  boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
-  if (pValRI)
-    numericValue = *pValRI;
-  else {
-    int *pValI = std::get_if<int>(&value);
-    if (pValI)
-      numericValue = boost::rational<int>(*pValI, 1);
-    else {
-      double *pValD = std::get_if<double>(&value);
-      if (pValD)
-        numericValue = Rationalize(*pValD);
-      else
-        numericValue = boost::rational<int>(-999, 1);  // Unidentified value
-    }
-  }
+  if constexpr (std::is_same_v<T, number>)
+    numericValue = value;
+  else if constexpr (std::is_same_v<T, int>)
+    numericValue = boost::rational<int>(value, 1);
+  else if constexpr (std::is_same_v<T, double>)
+    numericValue = Rationalize(value);
+  else if constexpr (std::is_same_v<T, float>)
+    numericValue = Rationalize(value);
+  else
+    numericValue = boost::rational<int>(-999, 1);  // Unidentified value
+
   if (sValue == "") {
     std::stringstream ss;
     ss << numericValue.numerator();
@@ -254,6 +251,11 @@ token::token(command_id id, std::string sValue, number value)
     textValue = std::string(ss.str());
   }
 }
+
+template token::token<number>(command_id, std::string, number);
+template token::token<int>(command_id, std::string, int);
+template token::token<double>(command_id, std::string, double);
+template token::token<float>(command_id, std::string, float);
 
 /** Construktor set */
 

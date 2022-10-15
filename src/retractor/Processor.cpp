@@ -140,7 +140,7 @@ number getValueOfRollup(const query &q, int offset) {
           int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
           auto schema = f.getFirstFieldToken().getStr();
           auto val = getValueProc(schema, 0, pos);
-          ret += std::get<boost::rational<int>>(val);
+          ret += boost::rational<int>(val);
         }
         return ret;
       }
@@ -335,12 +335,11 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
-            boost::rational<int> ret = 0;
+            number ret = 0;
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              ret = ret + std::get<boost::rational<int>>(
-                              getValueProc(schema, 0, pos));
+              ret = ret + getValueProc(schema, 0, pos);
             }
             ret = ret / static_cast<int>(q.lSchema.size());
             rowValues.push_back(ret);
@@ -352,12 +351,11 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
-            boost::rational<int> ret = INT_MIN; /* limits.h */
+            number ret = INT_MIN; /* limits.h */
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+              number val = getValueProc(schema, 0, pos);
               if (val > ret) ret = val;
             }
             rowValues.push_back(ret);
@@ -369,12 +367,11 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
-            boost::rational<int> ret = INT_MAX; /* limits.h */
+            number ret = INT_MAX; /* limits.h */
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+              number val = getValueProc(schema, 0, pos);
               if (val < ret) ret = val;
             }
             rowValues.push_back(ret);
@@ -386,12 +383,11 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
-            boost::rational<int> ret = 0; /* limits.h */
+            number ret = 0; /* limits.h */
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
               std::string schema = f.getFirstFieldToken().getStr();
-              boost::rational<int> val =
-                  std::get<boost::rational<int>>(getValueProc(schema, 0, pos));
+              number val = getValueProc(schema, 0, pos);
               ret += val;
             }
             rowValues.push_back(ret);
@@ -415,7 +411,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           // STREAM_DEHASH_DIV
           {
             assert(q.lProgram.size() == 3);
-            boost::rational<int> rationalArgument;
+            number rationalArgument;
             argument1 = *(it++);
             argument2 = *(it++);
             streamNameArg = argument1.getStr();
@@ -546,9 +542,9 @@ std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
   return retVal;
 }
 
-boost::rational<int> Processor::computeValue(field &f, query &q) {
-  std::stack<boost::rational<int>> rStack;
-  boost::rational<int> a, b;
+number Processor::computeValue(field &f, query &q) {
+  std::stack<number> rStack;
+  number a, b;
   for (auto tk : f.lProgram) {
     switch (tk.getCommandID()) {
       case ADD:
@@ -615,9 +611,9 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
           rStack.pop();
           rStack.push(Rationalize(sqrt(real)));
         } else if (tk.getStr() == "sum") {
-          boost::rational<int> data_sum(0);
+          number data_sum(0);
           for (int i = 0; i < getRowSize(q); i++) {
-            data_sum += std::get<boost::rational<int>>(getValueOfRollup(q, i));
+            data_sum += getValueOfRollup(q, i);
           }
           rStack.push(data_sum);
         } else
@@ -663,7 +659,7 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
         }
 
         number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
-        rStack.push(std::get<boost::rational<int>>(a));
+        rStack.push(a);
       } break;
       default:
         throw std::out_of_range(
@@ -673,13 +669,13 @@ boost::rational<int> Processor::computeValue(field &f, query &q) {
   if (rStack.size() == 0) {
     assert(q.isDeclaration());
     number retVal = gDataMap[q.id].row[q.getFieldIndex(f)];
-    return std::get<boost::rational<int>>(retVal);
+    return retVal;
   } else if (rStack.size() == 1)
     return rStack.top();
   else
     throw std::out_of_range(
         "Thrown/Processor.cpp/getCRValue too much token left on stack");
-  return boost::rational<int>(0); /* pro forma */
+  return 0; /* pro forma */
 }
 
 int getStreamCount(const std::string query_name) {

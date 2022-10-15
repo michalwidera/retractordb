@@ -301,24 +301,7 @@ std::string printRowValue(const std::string query_name) {
     // transmission via internal queue.
     //
     std::stringstream retVal;
-    boost::rational<int> *pValRI = std::get_if<boost::rational<int>>(&value);
-    if (pValRI)
-      retVal << boost::rational_cast<double>(*pValRI);
-    else {
-      int *pValI = std::get_if<int>(&value);
-      if (pValI)
-        retVal << *pValI;
-      else {
-        double *pValD = std::get_if<double>(&value);
-        if (pValD)
-          retVal << *pValD;
-        else
-          retVal << "Undifentified";
-      }
-    }
-    if (retVal.str().empty())
-      retVal << boost::rational_cast<int>(std::get<boost::rational<int>>(value))
-             << "?";
+    retVal << boost::rational_cast<double>(value);
     pt.put(boost::lexical_cast<std::string>(i++), retVal.str());
   }
   std::stringstream strstream;
