@@ -98,12 +98,13 @@ jobs:
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
       - run: pip3 install conan
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
+      - run: export PATH=$PATH:~/.local/bin
       - run: cd build && conan source ..
       - run: cd build && conan install .. --build missing
       - run: cd build && conan build ..
-      - run: ~/.local/bin/xretractor -h && ~/.local/bin/xqry -h && ~/.local/bin/xdumper -h && ~/.local/bin/xcompiler -h
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build && make test || true
-# There is a problem on test on ARM - I postopne this failure - build is more important that this for now.
+# There is a problem on test on ARM - I will postopne this failure for now - build is more important that this for now.
 
 workflows:
   version: 2
