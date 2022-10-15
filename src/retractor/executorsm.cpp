@@ -48,11 +48,10 @@ typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator>
     IPCString;
 typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
 
-typedef int KeyType;
 typedef std::pair<const int, IPCString> ValueType;
 
 typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
+typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
 
@@ -277,9 +276,9 @@ void commmandProcessorLoop() {
         // write_json(response_stream, pt_retval) ;
         // write_xml(response_stream, pt_retval);
         write_info(response_stream, pt_retval);
-        IPCString response(allocatorShmemMapInstance);
-        response = response_stream.str().c_str();
-        mymap->insert(std::pair<KeyType, IPCString>(clientProcessId, response));
+        IPCString ipcResponse(allocatorShmemMapInstance);
+        ipcResponse = response_stream.str().c_str();
+        mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
       }
       boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
     }
