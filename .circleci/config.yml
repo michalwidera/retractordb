@@ -147,7 +147,7 @@ workflows:
       - build-stable
       - build-stable-debug
       - build-edge
-      - build-arm-edge-2204
+      - build-arm-edge-2204:
           requires:
             - build-edge
       - build-edge-2204:
