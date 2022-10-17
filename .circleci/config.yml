@@ -126,13 +126,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-arm-edge-2204:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-
 
   nightly:
     triggers:
