@@ -94,8 +94,8 @@ boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
     st.pop();
     result1 = result2;
   }
-  err1 = abs(rational_cast<double>(result1) - inValue);
-  err2 = abs(rational_cast<double>(result2) - inValue);
+  err1 = std::abs(rational_cast<double>(result1) - inValue);
+  err2 = std::abs(rational_cast<double>(result2) - inValue);
   return err1 > err2 ? result2 : result1;
 }
 
@@ -252,10 +252,10 @@ token::token(command_id id, const std::string &sValue, T value)
   }
 }
 
-template token::token<number>(command_id, const std::string &, number);
-template token::token<int>(command_id, const std::string &, int);
-template token::token<double>(command_id, const std::string &, double);
-template token::token<float>(command_id, const std::string &, float);
+template token::token(command_id id, const std::string &sValue, number);
+template token::token(command_id id, const std::string &sValue, int);
+template token::token(command_id id, const std::string &sValue, double);
+template token::token(command_id id, const std::string &sValue, float);
 
 /** Construktor set */
 
