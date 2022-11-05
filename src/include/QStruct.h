@@ -68,7 +68,8 @@ class token {
   boost::rational<int> get();
 
   token(command_id id = VOID_COMMAND) : command(id){};
-  token(command_id id, const std::string &sValue) : command(id), textValue(sValue){};
+  token(command_id id, const std::string &sValue)
+      : command(id), textValue(sValue){};
 
   template <typename T>
   token(command_id id, const std::string &sValue, T value);
@@ -164,7 +165,9 @@ class qTree : public std::vector<query> {
   }
 
  public:
-  query &operator[](const std::string &query_name) { return getQuery(query_name); };
+  query &operator[](const std::string &query_name) {
+    return getQuery(query_name);
+  };
 
   void sort() { std::sort(begin(), end()); };
 

@@ -75,7 +75,6 @@ inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
 //
 std::vector<number> inputDF::getFileRow() {
   std::vector<number> result;
-
   for (auto &f : lSchema) {
     boost::rational<int> val;
     switch (f.fieldType) {
@@ -99,6 +98,5 @@ std::vector<number> inputDF::getFileRow() {
     }
     result.push_back(val);
   }
-
   return result;
 }
