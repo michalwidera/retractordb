@@ -52,8 +52,10 @@ struct dataModel {
    * zapis danych do strumienia powinnien się udać tylko jeśli
    * wszystkie elementy publicznego deskryptora zostały zatwierdzone
    * tzn. są w stanie Ready To Check In
+   * uwaga: Istnieje opcja że ta funkcja zostanie zredukowana (usunięta)
+   * automatycznie po wszystkich setPublic - nastąpi flushDataToStorage
    */
-  bool flushDataToStream(std::string streamName);
+  bool flushDataToStorage(std::string streamName);
 
   void registerStream(std::string streamName,
                       const rdb::Descriptor internalDescriptor,
