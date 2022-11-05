@@ -1,9 +1,12 @@
 #pragma once
 
+#include <boost/core/noncopyable.hpp>
 #include <map>
 #include <memory>
+#include <string>
+#include <vector>
 
-#include "inputFileInstance.h"
+#include "QStruct.h"  // number type
 
 long streamStoredSize(std::string &filename);
 

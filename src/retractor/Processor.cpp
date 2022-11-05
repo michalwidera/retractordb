@@ -22,6 +22,7 @@
 
 #include "QStruct.h"
 #include "SOperations.h"
+#include "inputFileInstance.h"
 
 extern "C" qTree coreInstance;
 
@@ -222,7 +223,6 @@ Processor::Processor() {
     // Container initialization for file type data sources
     if (!q.filename.empty())
       gFileMap[q.id] = inputDF(q.filename.c_str(), q.lSchema);
-
     SPDLOG_INFO("Req: gDataMap {} len:{} rp:{}", q.id,
                 gDataMap[q.id].row.size(), q.lSchema.size());
     gDataMap[q.id] = dataAgregator(q.lSchema.size());
@@ -504,7 +504,6 @@ void Processor::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
     // Drop rows that not come with this to compute
     if (inSet.find(q.id) == inSet.end()) continue;
-
     if (q.isDeclaration()) {
       int cnt(0);
       assert(!q.filename.empty());
@@ -513,10 +512,8 @@ void Processor::processRows(std::set<std::string> inSet) {
       for (auto i = 0; i < getRowSize(q); i++)
         gDataMap[q.id].row[i] = getValueOfRollup(q, i);
     }
-
     // here should be computer values of stream tuples
     // computed value shoud be stored in file
-
     std::vector<number> rowValues;
     int cnt(0);
     for (auto &f : q.lSchema) rowValues.push_back(computeValue(f, q));
@@ -612,9 +609,8 @@ number Processor::computeValue(field &f, query &q) {
           rStack.push(Rationalize(sqrt(real)));
         } else if (tk.getStr() == "sum") {
           number data_sum(0);
-          for (int i = 0; i < getRowSize(q); i++) {
+          for (int i = 0; i < getRowSize(q); i++)
             data_sum += getValueOfRollup(q, i);
-          }
           rStack.push(data_sum);
         } else
           throw std::out_of_range(
@@ -657,7 +653,6 @@ number Processor::computeValue(field &f, query &q) {
             }
           }
         }
-
         number a = getValueProc(q.id, 0, offsetInSchema + offsetFromArg);
         rStack.push(a);
       } break;

@@ -240,7 +240,6 @@ token::token(command_id id, const std::string &sValue, T value)
     numericValue = Rationalize(value);
   else
     numericValue = boost::rational<int>(-999, 1);  // Unidentified value
-
   if (sValue == "") {
     std::stringstream ss;
     ss << numericValue.numerator();
@@ -317,13 +316,10 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   auto eIt = prog.begin();
   std::string sArg1;
   std::string sArg2;
-
   assert(prog.size() < 4);
-
   if (prog.size() == 1) sArg1 = (*eIt).getStr();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr();  // 3
-
   token cmd = (*eIt++);
   return std::make_tuple(sArg1, sArg2, cmd);
 }

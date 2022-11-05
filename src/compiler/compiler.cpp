@@ -587,13 +587,10 @@ std::string convertReferences() {
             if (regex_search(text.c_str(), what, xprFieldId3)) {
               assert(what.size() == 2);
               const std::string field(what[1]);
-
               query *pQ1(nullptr), *pQ2(nullptr);
               auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
               pQ1 = &getQuery(schema1);
-              if (q.lProgram.size() == 3) {
-                pQ2 = &getQuery(schema2);
-              }
+              if (q.lProgram.size() == 3) pQ2 = &getQuery(schema2);
               bool bFieldFound(false);
               int offset1(0);
               if (pQ1 != nullptr) {
