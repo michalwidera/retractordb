@@ -139,6 +139,10 @@ uint Descriptor::Position(std::string name) {
   return -1;
 }
 
+std::string Descriptor::FieldName(uint fieldPosition) {
+  return std::get<fieldName>((*this)[fieldPosition]);
+}
+
 uint Descriptor::Len(const std::string name) {
   auto pos = Position(name);
   return std::get<rlen>((*this)[pos]);
@@ -146,11 +150,23 @@ uint Descriptor::Len(const std::string name) {
 
 uint Descriptor::Offset(const std::string name) {
   auto offset = 0;
-  for (auto const i : *this) {
-    if (name == std::get<fieldName>(i)) return offset;
-    offset += std::get<rlen>(i);
+  for (auto const field : *this) {
+    if (name == std::get<fieldName>(field)) return offset;
+    offset += std::get<rlen>(field);
   }
-  assert(false && "record not found with that name");
+  assert(false && "field not found with that name");
+  return -1;
+}
+
+uint Descriptor::Offset(const int position) {
+  auto offset = 0;
+  int i = 0;
+  for (auto const field : *this) {
+    if (position == i) return offset;
+    i++;
+    offset += std::get<rlen>(field);
+  }
+  assert(false && "field not found with that postion");
   return -1;
 }
 

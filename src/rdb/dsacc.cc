@@ -121,6 +121,11 @@ bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
   return result == 0;
 };
 
+template <class T, class K>
+const std::string DataStorageAccessor<T, K>::getStorageFilename() {
+  return filename;
+}
+
 template class DataStorageAccessor<std::byte,
                                    rdb::genericBinaryFileAccessor<std::byte>>;
 template class DataStorageAccessor<char, rdb::genericBinaryFileAccessor<char>>;

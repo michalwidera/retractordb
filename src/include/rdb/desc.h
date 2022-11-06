@@ -134,6 +134,14 @@ class Descriptor : public std::vector<rfield> {
   uint Position(std::string name);
 
   /**
+   * @brief Return fieldname in vector of tuples on given fieldPosition
+   *
+   * @param fieldPosition Field postion
+   * @return string Position
+   */
+  std::string FieldName(uint fieldPosition);
+
+  /**
    * @brief Finds in inner container given tuple by name and return this tuple
    * len
    *
@@ -150,6 +158,15 @@ class Descriptor : public std::vector<rfield> {
    * @return uint Filed offset [unit: Bytes]
    */
   uint Offset(const std::string name);
+
+  /**
+   * @brief Counts over inner container and finds offset of given field position
+   * from package begining
+   *
+   * @param position Field position
+   * @return uint Filed offset [unit: Bytes]
+   */
+  uint Offset(int position);
 
   /**
    * @brief Return type of given field
