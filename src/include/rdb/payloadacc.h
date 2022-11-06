@@ -57,6 +57,24 @@ class payLoadAccessor {
    */
   payLoadAccessor() = delete;
 
+  /**
+   * Dirrect setter
+   *
+   * @param position position according to descriptor
+   * @param value value of given type according to desciptor that will be set in
+   * payload
+   */
+  void setPayloadField(int position, T *value);
+
+  /**
+   * Dirrect getter
+   *
+   * @param position position according to descriptor
+   * @return address of begining memory that contains data descibed by
+   * descriptor
+   */
+  T *getPayloadField(int position);
+
   template <typename K>
   friend std::istream &operator>>(std::istream &is,
                                   const payLoadAccessor<K> &rhs);

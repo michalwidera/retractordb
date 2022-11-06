@@ -30,6 +30,26 @@ T *payLoadAccessor<T>::getPayloadPtr() const {
   return ptr;
 }
 
+template <typename T>
+void payLoadAccessor<T>::setPayloadField(int position, T *value_ptr) {
+  std::string fieldName = descriptor.FieldName(position);
+  if (descriptor.Type(fieldName) == "STRING") {
+  } else if (descriptor.Type(fieldName) == "BYTEARRAY") {
+  } else if (descriptor.Type(fieldName) == "INTARRAY") {
+  } else if (descriptor.Type(fieldName) == "BYTE") {
+  } else if (descriptor.Type(fieldName) == "UINT") {
+  } else if (descriptor.Type(fieldName) == "INTEGER") {
+  } else if (descriptor.Type(fieldName) == "FLOAT") {
+  } else if (descriptor.Type(fieldName) == "DOUBLE") {
+  } else
+    std::cerr << "field not found\n";
+}
+
+template <typename T>
+T *payLoadAccessor<T>::getPayloadField(int position) {
+  return ptr + descriptor.Offset(position);
+}
+
 template <typename K>
 std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
   std::string fieldName;

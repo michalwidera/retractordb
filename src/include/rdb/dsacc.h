@@ -35,33 +35,6 @@ class DataStorageAccessor {
   ~DataStorageAccessor();
 
   /**
-   * @brief Accessor method - get ref to descriptor
-   *
-   * @return Descriptor& reference to descriptor inner object
-   */
-  Descriptor& getDescriptor();
-
-  /**
-   * @brief Set the Reverse value
-   *
-   * @param value reverse iterator status
-   */
-  void setReverse(bool value);
-
-  /**
-   * @brief Set if files should remain after program exits
-   * @param value remove on exit mode
-   */
-  void setRemoveOnExit(bool value);
-
-  /**
-   * @brief Get the Records Count object - how many payloads are in file
-   *
-   * @return const size_t count of records/payloads
-   */
-  const size_t getRecordsCount();
-
-  /**
    * @brief Construct a new Data Accessor object and create descriptor file
    *
    * @param descriptor Definition of binary schema
@@ -97,6 +70,40 @@ class DataStorageAccessor {
    */
   bool Put(const T* outBuffer,
            const size_t recordIndex = std::numeric_limits<size_t>::max());
+
+  /**
+   * @brief Accessor method - get ref to descriptor
+   *
+   * @return Descriptor& reference to descriptor inner object
+   */
+  Descriptor& getDescriptor();
+
+  /**
+   * @brief Set the Reverse value
+   *
+   * @param value reverse iterator status
+   */
+  void setReverse(bool value);
+
+  /**
+   * @brief Set if files should remain after program exits
+   * @param value remove on exit mode
+   */
+  void setRemoveOnExit(bool value);
+
+  /**
+   * @brief Get the Records Count object - how many payloads are in file
+   *
+   * @return const size_t count of records/payloads
+   */
+  const size_t getRecordsCount();
+
+  /**
+   * @brief Get storage filename
+   *
+   * @return const string filename
+   */
+  const std::string getStorageFilename();
 };
 }  // namespace rdb
 

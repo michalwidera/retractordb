@@ -2,12 +2,15 @@
 
 #include <rdb/desc.h>   // rdb::Descriptor
 #include <rdb/dsacc.h>  // rdb::DataStorageAccessor
+#include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <map>
+#include <memory>  // unique_ptr
 #include <string>
+#include <vector>
 
-#include "QStruct.h"  // number type
-
+#include "QStruct.h"  // number
 /**
  * Ta klasa ma za zadnie przedstawić warstwę abstrakcji danych.
  * Problem polegał na tym że poszególne strumienie i zapytania muszą inaczej
@@ -20,7 +23,7 @@
  *
  * TODO: Translate to english afterall - before merge to Master
  */
-struct dataModel {
+struct dataModel_ {
   std::map<std::string, rdb::DataStorageAccessor<std::byte>> dataStreamSet;
   std::map<std::string, rdb::Descriptor> internalDescriptorSet;
 
@@ -61,3 +64,25 @@ struct dataModel {
                       const rdb::Descriptor internalDescriptor,
                       const rdb::Descriptor publicDescriptor);
 };
+
+struct streamInstance {
+  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_storage;
+  std::unique_ptr<std::byte[]> uPtr_payload;
+
+  streamInstance(const std::string file,
+                 const rdb::Descriptor publicDescriptor) {
+    // Ta sekwencja utworzy plik danych i deskrypor
+    uPtr_storage.reset(new rdb::DataStorageAccessor(publicDescriptor, file));
+    uPtr_payload.reset(new std::byte[uPtr_storage->getDescriptor().GetSize()]);
+  };
+
+  rdb::Descriptor internalDescriptor;
+  std::vector<bool> publicDescriptorStatus;
+  bool flushDataToStorage();
+
+  number getPublic(int position);
+  void setPublic(int position, number value);
+  number getInternal(int position);
+  void setInternalDescriptor(const rdb::Descriptor internalDescriptor);
+};
+struct dataModel : public std::map<std::string, streamInstance> {};
