@@ -84,6 +84,10 @@ int main(int argc, char* argv[]) {
       std::cout << "write [n] \t\t\t send record to database from payload\n";
       std::cout << "append \t\t\t\t append payload to database\n";
       std::cout << "set [field][value] \t\t set payload field value\n";
+      std::cout << "setnum [position][number value] \t\t set payload field "
+                   "number value\n";
+      std::cout << "setchar [position][char value] \t\t set payload field char "
+                   "value\n";
       std::cout << "status \t\t\t\t show status of payload\n";
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";
@@ -112,6 +116,27 @@ int main(int argc, char* argv[]) {
       rdb::payLoadAccessor payload(uPtr_dacc->getDescriptor(),
                                    uPtr_payload.get(), hexFormat);
       std::cin >> payload;
+      payloadStatus = changed;
+      continue;
+    } else if (cmd == "setnum") {
+      rdb::payLoadAccessor payload(uPtr_dacc->getDescriptor(),
+                                   uPtr_payload.get(), hexFormat);
+      int position;
+      std::cin >> position;
+      int value;
+      std::cin >> value;
+      payload.setPayloadField(position, reinterpret_cast<std::byte*>(&value));
+      payloadStatus = changed;
+      continue;
+    } else if (cmd == "setchar") {
+      rdb::payLoadAccessor payload(uPtr_dacc->getDescriptor(),
+                                   uPtr_payload.get(), hexFormat);
+      int position;
+      std::cin >> position;
+      std::string value;
+      std::cin >> value;
+      payload.setPayloadField(
+          position, reinterpret_cast<std::byte*>((char*)value.c_str()));
       payloadStatus = changed;
       continue;
     } else if (cmd == "flip") {

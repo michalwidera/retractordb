@@ -34,7 +34,7 @@ template <typename T>
 void payLoadAccessor<T>::setPayloadField(int position, T *value_ptr) {
   auto fieldName = descriptor.FieldName(position);
   auto len = descriptor.Len(fieldName);
-  memcpy(ptr+descriptor.Offset(position),value_ptr,len);
+  memcpy(ptr + descriptor.Offset(position), value_ptr, len);
 }
 
 template <typename T>
