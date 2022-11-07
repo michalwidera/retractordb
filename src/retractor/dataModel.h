@@ -80,7 +80,7 @@ struct streamInstance {
   std::vector<bool> publicDescriptorStatus;
   bool flushDataToStorage();
 
-  number getPublic(int position) {}
+  number getPublic(int position);
   void setPublic(int position, number value);
   number getInternal(int position);
   void setInternalDescriptor(const rdb::Descriptor internalDescriptor);
