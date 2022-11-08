@@ -43,6 +43,10 @@ class payLoadAccessor {
     {field} ptr
     {field} hexFormat
 
+    {method} getDescriptor
+    {method} getPayloadPtr
+    {method} set_item
+    {method} get_item
     {method} operator>>
     {method} operator<<
 }

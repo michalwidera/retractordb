@@ -127,15 +127,15 @@ int main(int argc, char* argv[]) {
       if (uPtr_dacc->getDescriptor().Type(fieldname) == "INTEGER") {
         int value;
         std::cin >> value;
-        payload.setPayloadField(position, value);
+        payload.set_item(position, value);
       } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "DOUBLE") {
         double value;
         std::cin >> value;
-        payload.setPayloadField(position, value);
+        payload.set_item(position, value);
       } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "STRING") {
         std::string record;
         std::cin >> record;
-        payload.setPayloadField(position, record);
+        payload.set_item(position, record);
       } else
         std::cerr << "field not found\n";
       payloadStatus = changed;
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
       int position;
       std::cin >> position;
       auto fieldname = uPtr_dacc->getDescriptor().FieldName(position);
-      std::any value = payload.getPayloadField(position);
+      std::any value = payload.get_item(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
       }

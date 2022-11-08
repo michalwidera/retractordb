@@ -71,7 +71,7 @@ struct streamInstance {
    *  setPublic powinno ustawić w publicDescriptorFuses wartość true - tzn.
    * Ready To Check In
    */
-  std::any getPublic(int position) {}
+  std::any getPublic(int position) { return 0; }
   void setPublic(int position, std::any value) {
     uPtr_fuseset->blown(position);
     if (!uPtr_fuseset->has_any_good()) {
