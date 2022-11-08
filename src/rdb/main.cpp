@@ -127,23 +127,41 @@ int main(int argc, char* argv[]) {
       if (uPtr_dacc->getDescriptor().Type(fieldname) == "INTEGER") {
         int value;
         std::cin >> value;
-        payload.setPayloadField(position, reinterpret_cast<std::byte*>(&value));
-
-        // payload[position] = value;
-
+        payload.setPayloadField(position, value);
       } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "DOUBLE") {
         double value;
         std::cin >> value;
-        payload.setPayloadField(position, reinterpret_cast<std::byte*>(&value));
+        payload.setPayloadField(position, value);
       } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "STRING") {
         std::string record;
         std::cin >> record;
-        payload.setPayloadField(
-            position, reinterpret_cast<std::byte*>((char*)record.c_str()));
+        payload.setPayloadField(position, record);
       } else
         std::cerr << "field not found\n";
       payloadStatus = changed;
       continue;
+    } else if (cmd == "getpos") {
+      rdb::payLoadAccessor payload(uPtr_dacc->getDescriptor(),
+                                   uPtr_payload.get(), hexFormat);
+      int position;
+      std::cin >> position;
+      auto fieldname = uPtr_dacc->getDescriptor().FieldName(position);
+      std::any value = payload.getPayloadField(position);
+      if (value.type() == typeid(std::string)) {
+        std::cout << std::any_cast<std::string>(value) << std::endl;
+      }
+      if (value.type() == typeid(int)) {
+        std::cout << std::any_cast<int>(value) << std::endl;
+      }
+      if (value.type() == typeid(unsigned char)) {
+        std::cout << std::any_cast<unsigned char>(value) << std::endl;
+      }
+      if (value.type() == typeid(float)) {
+        std::cout << std::any_cast<float>(value) << std::endl;
+      }
+      if (value.type() == typeid(double)) {
+        std::cout << std::any_cast<double>(value) << std::endl;
+      }
     } else if (cmd == "flip") {
       reverse = !reverse;
       uPtr_dacc->setReverse(reverse);
