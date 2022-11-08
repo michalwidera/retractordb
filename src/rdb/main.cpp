@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
                    "(r-reverse iterator)\n";
       std::cout << "create|rcreate [file][schema] \t create database with "
                    "schema (r-reverse iterator)\n";
-      std::Cout << "  example: .create test_db { INTEGER dane STRING name[3] } "
+      std::cout << "\t\t\t\t example: .create test_db { INTEGER dane STRING name[3] } \n";
       std::cout << "desc \t\t\t\t show schema\n";
       std::cout << "read [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t send record to database from payload\n";
