@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "QStruct.h"  // number
+
 /**
  * Ta klasa ma za zadnie przedstawić warstwę abstrakcji danych.
  * Problem polegał na tym że poszególne strumienie i zapytania muszą inaczej
@@ -23,9 +24,18 @@
  *
  * TODO: Translate to english afterall - before merge to Master
  */
-struct dataModel_ {
-  std::map<std::string, rdb::DataStorageAccessor<std::byte>> dataStreamSet;
-  std::map<std::string, rdb::Descriptor> internalDescriptorSet;
+struct streamInstance {
+  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_storage;
+  std::unique_ptr<std::byte[]> uPtr_payload;
+  rdb::Descriptor internalDescriptor;
+
+  streamInstance(const std::string file, const rdb::Descriptor publicDescriptor,
+                 const rdb::Descriptor internalDescriptor)
+      : internalDescriptor(internalDescriptor) {
+    // Ta sekwencja utworzy plik danych i deskrypor
+    uPtr_storage.reset(new rdb::DataStorageAccessor(publicDescriptor, file));
+    uPtr_payload.reset(new std::byte[uPtr_storage->getDescriptor().GetSize()]);
+  };
 
   /**
    * Mapa zawierająca informacje powiązane z wewnętrznym deskryptorem
@@ -33,23 +43,7 @@ struct dataModel_ {
    * Check In jeśli jest wyliczony i gotowy do zapisu to == true - Ready To
    * Check In
    */
-  std::map<std::string, std::map<std::string, bool>> publicDescriptorStatusSet;
-
-  /**
-   * Dane z wewnętrznego schematu służą do wyznaczenia publicznego obrazu
-   * strumienia dlatego tylko występue getInternal - bez setInternal
-   */
-  number getInternal(std::string streamName, int position);
-
-  /**
-   *  Dane występujące w publicznym schemacie są pobierane przez zewnętrzne
-   * zapytania i zapisywane jednokrotnie przez wewnętrzne. czyli wiele getPublic
-   * z zewnątrz i tylko jedno wywołanie setPublic z wewnętrznego wyliczenia
-   *  setPublic powinno ustawić w publicDescriptorStatusSet wartość true - tzn.
-   * Ready To Check In
-   */
-  number getPublic(std::string streamName, int position);
-  void setPublic(std::string streamName, int position, number value);
+  std::vector<bool> publicDescriptorStatus;
 
   /**
    * zapis danych do strumienia powinnien się udać tylko jeśli
@@ -58,31 +52,22 @@ struct dataModel_ {
    * uwaga: Istnieje opcja że ta funkcja zostanie zredukowana (usunięta)
    * automatycznie po wszystkich setPublic - nastąpi flushDataToStorage
    */
-  bool flushDataToStorage(std::string streamName);
-
-  void registerStream(std::string streamName,
-                      const rdb::Descriptor internalDescriptor,
-                      const rdb::Descriptor publicDescriptor);
-};
-
-struct streamInstance {
-  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_storage;
-  std::unique_ptr<std::byte[]> uPtr_payload;
-
-  streamInstance(const std::string file,
-                 const rdb::Descriptor publicDescriptor) {
-    // Ta sekwencja utworzy plik danych i deskrypor
-    uPtr_storage.reset(new rdb::DataStorageAccessor(publicDescriptor, file));
-    uPtr_payload.reset(new std::byte[uPtr_storage->getDescriptor().GetSize()]);
-  };
-
-  rdb::Descriptor internalDescriptor;
-  std::vector<bool> publicDescriptorStatus;
   bool flushDataToStorage();
 
+  /**
+   *  Dane występujące w publicznym schemacie są pobierane przez zewnętrzne
+   * zapytania i zapisywane jednokrotnie przez wewnętrzne. czyli wiele getPublic
+   * z zewnątrz i tylko jedno wywołanie setPublic z wewnętrznego wyliczenia
+   *  setPublic powinno ustawić w publicDescriptorStatusSet wartość true - tzn.
+   * Ready To Check In
+   */
   number getPublic(int position);
   void setPublic(int position, number value);
+
+  /**
+   * Dane z wewnętrznego schematu służą do wyznaczenia publicznego obrazu
+   * strumienia dlatego tylko występue getInternal - bez setInternal
+   */
   number getInternal(int position);
-  void setInternalDescriptor(const rdb::Descriptor internalDescriptor);
 };
 struct dataModel : public std::map<std::string, streamInstance> {};
