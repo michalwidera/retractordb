@@ -1,11 +1,11 @@
 #include "rdb/payloadacc.h"
 
+#include <algorithm>  // std::min
 #include <cassert>
 #include <cstddef>  // std::byte
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
-
 namespace rdb {
 template <typename T>
 payLoadAccessor<T>::payLoadAccessor(Descriptor descriptor, T *ptr,
@@ -31,15 +31,68 @@ T *payLoadAccessor<T>::getPayloadPtr() const {
 }
 
 template <typename T>
-void payLoadAccessor<T>::setPayloadField(int position, T *value_ptr) {
+void payLoadAccessor<T>::setPayloadField(int position, std::any value) {
   auto fieldName = descriptor.FieldName(position);
   auto len = descriptor.Len(fieldName);
-  memcpy(ptr + descriptor.Offset(position), value_ptr, len);
+  if (descriptor.Type(fieldName) == "STRING") {
+    std::string data(std::any_cast<std::string>(value));
+    memcpy(ptr + descriptor.Offset(position), data.c_str(),
+           std::min(len, static_cast<uint>(data.length())));
+    return;
+  } else if (descriptor.Type(fieldName) == "BYTE") {
+    unsigned char data(std::any_cast<unsigned char>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);
+    return;
+  } else if (descriptor.Type(fieldName) == "INTEGER") {
+    int data(std::any_cast<int>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);
+    return;
+  } else if (descriptor.Type(fieldName) == "DOUBLE") {
+    double data(std::any_cast<double>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);
+    return;
+  } else if (descriptor.Type(fieldName) == "FLOAT") {
+    float data(std::any_cast<float>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);
+    return;
+  }
+  assert(false && "type not supported on setter");
 }
 
 template <typename T>
-T *payLoadAccessor<T>::getPayloadField(int position) {
-  return ptr + descriptor.Offset(position);
+std::any payLoadAccessor<T>::getPayloadField(int position) {
+  // return ptr + descriptor.Offset(position);
+  auto fieldName = descriptor.FieldName(position);
+  auto len = descriptor.Len(fieldName);
+  std::cerr << "set:" << fieldName << std::endl;
+  if (descriptor.Type(fieldName) == "STRING") {
+    std::string retval;
+    retval.assign(reinterpret_cast<char *>(ptr) + descriptor.Offset(position),
+                  len);
+    return retval;
+  } else if (descriptor.Type(fieldName) == "BYTE") {
+    unsigned char data;
+    data = *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(ptr) +
+                                              descriptor.Offset(position));
+    return data;
+  } else if (descriptor.Type(fieldName) == "INTEGER") {
+    int data;
+    data = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) +
+                                    descriptor.Offset(position));
+    return data;
+  } else if (descriptor.Type(fieldName) == "DOUBLE") {
+    double data;
+    data = *reinterpret_cast<double *>(reinterpret_cast<double *>(ptr) +
+                                       descriptor.Offset(position));
+    return data;
+  } else if (descriptor.Type(fieldName) == "FLOAT") {
+    float data;
+    data = *reinterpret_cast<double *>(reinterpret_cast<float *>(ptr) +
+                                       descriptor.Offset(position));
+    return data;
+  }
+  assert(false && "type not supporte on getter.");
+  return 0xdead;
 }
 
 template <typename K>

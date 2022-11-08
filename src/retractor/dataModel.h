@@ -4,6 +4,7 @@
 #include <rdb/dsacc.h>  // rdb::DataStorageAccessor
 #include <spdlog/spdlog.h>
 
+#include <any>
 #include <cassert>
 #include <map>
 #include <memory>  // unique_ptr
@@ -61,8 +62,8 @@ struct streamInstance {
    *  setPublic powinno ustawić w publicDescriptorStatusSet wartość true - tzn.
    * Ready To Check In
    */
-  number getPublic(int position);
-  void setPublic(int position, number value);
+  std::any getPublic(int position);
+  void setPublic(int position, std::any value);
 
   /**
    * Dane z wewnętrznego schematu służą do wyznaczenia publicznego obrazu

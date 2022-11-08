@@ -1,6 +1,7 @@
 #ifndef STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 #define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 
+#include <any>
 #include <cstddef>  // std::byte
 
 #include "desc.h"
@@ -64,7 +65,7 @@ class payLoadAccessor {
    * @param value value of given type according to desciptor that will be set in
    * payload
    */
-  void setPayloadField(int position, T *value);
+  void setPayloadField(int position, std::any value);
 
   /**
    * Dirrect getter
@@ -73,7 +74,7 @@ class payLoadAccessor {
    * @return address of begining memory that contains data descibed by
    * descriptor
    */
-  T *getPayloadField(int position);
+  std::any getPayloadField(int position);
 
   template <typename K>
   friend std::istream &operator>>(std::istream &is,
