@@ -53,15 +53,22 @@ struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_storage;
   std::unique_ptr<std::byte[]> uPtr_payload;
   std::unique_ptr<fuseCabinet> uPtr_fuseset;
-  rdb::Descriptor internalDescriptor;
+  rdb::Descriptor internalDataDescriptor;
 
-  streamInstance(const std::string file, const rdb::Descriptor publicDescriptor,
-                 const rdb::Descriptor internalDescriptor)
-      : internalDescriptor(internalDescriptor) {
+  std::vector<std::any> publicData;
+  std::vector<std::any> internalData;
+
+  streamInstance(const std::string file,
+                 const rdb::Descriptor publicDataDescriptor,
+                 const rdb::Descriptor internalDataDescriptor)
+      : internalDataDescriptor(internalDataDescriptor) {
     // Ta sekwencja utworzy plik danych i deskrypor
-    uPtr_storage.reset(new rdb::DataStorageAccessor(publicDescriptor, file));
+    uPtr_storage.reset(
+        new rdb::DataStorageAccessor(publicDataDescriptor, file));
     uPtr_payload.reset(new std::byte[uPtr_storage->getDescriptor().GetSize()]);
-    uPtr_fuseset.reset(new fuseCabinet(publicDescriptor.size()));
+    uPtr_fuseset.reset(new fuseCabinet(publicDataDescriptor.size()));
+    internalData.resize(internalDataDescriptor.size());
+    publicData.resize(publicDataDescriptor.size());
   };
 
   /**
@@ -88,6 +95,10 @@ struct streamInstance {
 
   /**
    * Dane z wewnętrznego schematu służą do wyznaczenia publicznego obrazu
+   * Dane z wewnętrznego schematu to nie jest kopia publicznego schematu
+   * Te dane są płaskim rozwinięciem tego co wychodzi z klauzuli FROM
+   * (bez obliczeń) - te dane służą do obliczeń wystawianych przez publiczny
+   * obraz
    */
   std::any getInternal(int position);
   void setInternal(int position, std::any value);  // czy potrzebne ?
