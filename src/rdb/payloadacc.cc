@@ -43,8 +43,21 @@ void payLoadAccessor<T>::set_item(int position, std::any value) {
     unsigned char data(std::any_cast<unsigned char>(value));
     memcpy(ptr + descriptor.Offset(position), &data, len);
     return;
+  } else if (descriptor.Type(fieldName) == "BYTEARRAY") {
+    std::vector<unsigned char> data(
+        std::any_cast<std::vector<unsigned char>>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);  //- check & todo
+    return;
   } else if (descriptor.Type(fieldName) == "INTEGER") {
     int data(std::any_cast<int>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);
+    return;
+  } else if (descriptor.Type(fieldName) == "INTARRAY") {
+    std::vector<int> data(std::any_cast<std::vector<int>>(value));
+    memcpy(ptr + descriptor.Offset(position), &data, len);  //- check & todo
+    return;
+  } else if (descriptor.Type(fieldName) == "UINT") {
+    uint data(std::any_cast<uint>(value));
     memcpy(ptr + descriptor.Offset(position), &data, len);
     return;
   } else if (descriptor.Type(fieldName) == "DOUBLE") {
@@ -61,7 +74,6 @@ void payLoadAccessor<T>::set_item(int position, std::any value) {
 
 template <typename T>
 std::any payLoadAccessor<T>::get_item(int position) {
-  // return ptr + descriptor.Offset(position);
   auto fieldName = descriptor.FieldName(position);
   auto len = descriptor.Len(fieldName);
   std::cerr << "set:" << fieldName << std::endl;
@@ -70,15 +82,36 @@ std::any payLoadAccessor<T>::get_item(int position) {
     retval.assign(reinterpret_cast<char *>(ptr) + descriptor.Offset(position),
                   len);
     return retval;
+  } else if (descriptor.Type(fieldName) == "BYTEARRAY") {
+    std::vector<unsigned char> data;
+    for (auto i = 0; i < descriptor.Len(fieldName); i++) {
+      unsigned char data8 = *reinterpret_cast<unsigned char *>(
+          reinterpret_cast<char *>(ptr) + descriptor.Offset(position) + i);
+      data.push_back(data8);
+    }
+    return data;
   } else if (descriptor.Type(fieldName) == "BYTE") {
     unsigned char data;
     data = *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(ptr) +
                                               descriptor.Offset(position));
     return data;
+  } else if (descriptor.Type(fieldName) == "INTARRAY") {
+    std::vector<int> data;
+    for (auto i = 0; i < descriptor.Len(fieldName); i++) {
+      int dataInt = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) +
+                                             descriptor.Offset(position) + i);
+      data.push_back(dataInt);
+    }
+    return data;
   } else if (descriptor.Type(fieldName) == "INTEGER") {
     int data;
     data = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) +
                                     descriptor.Offset(position));
+    return data;
+  } else if (descriptor.Type(fieldName) == "UINT") {
+    uint data;
+    data = *reinterpret_cast<uint *>(reinterpret_cast<uint *>(ptr) +
+                                     descriptor.Offset(position));
     return data;
   } else if (descriptor.Type(fieldName) == "DOUBLE") {
     double data;

@@ -18,6 +18,10 @@
 #define YELLOW "\x1B[93m"
 #define RESET "\033[0m"
 
+/*
+ * This code creates xtrdb executable file.
+ */
+
 enum payloadStatusType { fetched, clean, stored, changed };
 
 payloadStatusType payloadStatus(clean);
@@ -130,6 +134,10 @@ int main(int argc, char* argv[]) {
         payload.set_item(position, value);
       } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "DOUBLE") {
         double value;
+        std::cin >> value;
+        payload.set_item(position, value);
+      } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "BYTE") {
+        unsigned char value;
         std::cin >> value;
         payload.set_item(position, value);
       } else if (uPtr_dacc->getDescriptor().Type(fieldname) == "STRING") {
