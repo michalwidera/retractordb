@@ -26,50 +26,15 @@
  * TODO: Translate to english afterall - before merge to Master
  */
 struct streamInstance {
-  struct fuseCabinet {
-    /**
-     * Mapa zawierająca informacje powiązane z wewnętrznym deskryptorem
-     * domyślinie - każdy rekord jest świeży i niegotowy == false - Not Ready To
-     * Check In jeśli jest wyliczony i gotowy do zapisu to == true - Ready To
-     * Check In
-     */
-    std::vector<bool> publicDescriptorFuses;
-
-    fuseCabinet(int capacity) {
-      publicDescriptorFuses.resize(capacity);
-      reset();
-    };
-    void reset() {
-      for (auto i : publicDescriptorFuses) i = true;
-    };
-    void blown(int position) { publicDescriptorFuses[position] = false; };
-    bool is_good(int position) { return publicDescriptorFuses[position]; };
-    bool has_any_good() {
-      for (auto i : publicDescriptorFuses)
-        if (i) return true;
-      return false;
-    };
-  };
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_storage;
   std::unique_ptr<std::byte[]> uPtr_payload;
-  std::unique_ptr<fuseCabinet> uPtr_fuseset;
   rdb::Descriptor internalDataDescriptor;
+  rdb::Descriptor externalDataDescriptor;
 
-  std::vector<std::any> publicData;
+  std::vector<std::any> externalData;
   std::vector<std::any> internalData;
 
-  streamInstance(const std::string file,
-                 const rdb::Descriptor publicDataDescriptor,
-                 const rdb::Descriptor internalDataDescriptor)
-      : internalDataDescriptor(internalDataDescriptor) {
-    // Ta sekwencja utworzy plik danych i deskrypor
-    uPtr_storage.reset(
-        new rdb::DataStorageAccessor(publicDataDescriptor, file));
-    uPtr_payload.reset(new std::byte[uPtr_storage->getDescriptor().GetSize()]);
-    uPtr_fuseset.reset(new fuseCabinet(publicDataDescriptor.size()));
-    internalData.resize(internalDataDescriptor.size());
-    publicData.resize(publicDataDescriptor.size());
-  };
+  streamInstance(const std::string file);
 
   /**
    *  Dane występujące w publicznym schemacie są pobierane przez zewnętrzne
@@ -78,20 +43,8 @@ struct streamInstance {
    *  setPublic powinno ustawić w publicDescriptorFuses wartość true - tzn.
    * Ready To Check In
    */
-  std::any getPublic(int position) { return 0; }
-  void setPublic(int position, std::any value) {
-    uPtr_fuseset->blown(position);
-    if (!uPtr_fuseset->has_any_good()) {
-      /**
-       * zapis danych do strumienia powinnien się udać tylko jeśli
-       * wszystkie elementy publicznego deskryptora zostały zatwierdzone
-       * tzn. są w stanie Ready To Check In
-       * uwaga: Istnieje opcja że ta funkcja zostanie zredukowana (usunięta)
-       * automatycznie po wszystkich setPublic - nastąpi flushDataToStorage
-       */
-      uPtr_fuseset->reset();
-    }
-  }
+  std::any getPublic(int position);
+  void setPublic(int position, std::any value);
 
   /**
    * Dane z wewnętrznego schematu służą do wyznaczenia publicznego obrazu
@@ -103,4 +56,5 @@ struct streamInstance {
   std::any getInternal(int position);
   void setInternal(int position, std::any value);  // czy potrzebne ?
 };
+
 struct dataModel : public std::map<std::string, streamInstance> {};

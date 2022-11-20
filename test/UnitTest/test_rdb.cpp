@@ -195,7 +195,8 @@ bool test_storage() {
 
   dataPayload payload1;
 
-  rdb::DataStorageAccessor dAcc2(dataDescriptor, "datafile-fstream2");
+  rdb::DataStorageAccessor dAcc2("datafile-fstream2");
+  dAcc2.createDescriptor(dataDescriptor);
 
   std::memcpy(payload1.Name, "test data", AREA_SIZE);
   payload1.TLen = 0x66;

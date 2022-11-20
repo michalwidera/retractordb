@@ -21,7 +21,7 @@ class DataStorageAccessor {
 
   Descriptor descriptor;
 
-  bool reverse;
+  bool reverse = false;
 
   bool removeOnExit;
 
@@ -35,22 +35,16 @@ class DataStorageAccessor {
   ~DataStorageAccessor();
 
   /**
-   * @brief Construct a new Data Accessor object and create descriptor file
-   *
-   * @param descriptor Definition of binary schema
-   * @param fileName Storage file
-   * @param reverse type of Get/Set operations index - from head or from tail
-   */
-  DataStorageAccessor(const Descriptor descriptor, std::string fileName,
-                      bool reverse = false);
-
-  /**
    * @brief Open existing Data Accessor object and check descriptor file
    *
    * @param fileName Storage file
    * @param reverse type of Get/Set operations index - from head or from tail
    */
-  DataStorageAccessor(std::string fileName, bool reverse = false);
+  DataStorageAccessor(std::string fileName);
+
+  void createDescriptor(const Descriptor descriptor);
+
+  enum dataForm { noData, noDescriptor, open } dataFileStatus;
 
   /**
    * @brief Reads data package from storage
