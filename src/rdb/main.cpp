@@ -48,7 +48,8 @@ int main(int argc, char* argv[]) {
         std::cout << RED "File does not exist\n" RESET;
         continue;
       }
-      uPtr_dacc.reset(new rdb::DataStorageAccessor(file, cmd == "ropen"));
+      uPtr_dacc.reset(new rdb::DataStorageAccessor(file));
+      uPtr_dacc->setReverse(cmd == "ropen");
       if (uPtr_dacc->getDescriptor().GetSize() == 0) {
         std::cout << RED "File exist, description file missing (.desc)\n" RESET;
         continue;
@@ -69,8 +70,9 @@ int main(int argc, char* argv[]) {
       std::stringstream scheamStringStream(sschema);
       rdb::Descriptor desc;
       scheamStringStream >> desc;
-      uPtr_dacc.reset(
-          new rdb::DataStorageAccessor(desc, file, cmd == "rcreate"));
+      uPtr_dacc.reset(new rdb::DataStorageAccessor(file));
+      uPtr_dacc->createDescriptor(desc);
+      uPtr_dacc->setReverse(cmd == "rcreate");
       uPtr_payload.reset(new std::byte[uPtr_dacc->getDescriptor().GetSize()]);
       memset(uPtr_payload.get(), 0, uPtr_dacc->getDescriptor().GetSize());
       payloadStatus = clean;

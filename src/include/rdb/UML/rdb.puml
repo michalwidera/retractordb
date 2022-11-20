@@ -56,9 +56,17 @@ class DataStorageAccessor {
     {field} descriptor
     {field} reverse
     {field} recordsCount
+    {field} dataFileStatus
+    {field} filename
 
+    {method} createDescriptor
     {method} Get
     {method} Put
+    {method} getDescriptor
+    {method} setReverse
+    {method} setRemoveOnExit
+    {method} getRecordsCount
+    {method} getStorageFilename
 }
 
 enum rdb::eType {

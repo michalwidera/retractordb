@@ -1,54 +1,56 @@
 #include "rdb/dsacc.h"
 
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
 namespace rdb {
 template <class T, class K>
-DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName,
-                                               bool reverse)
+DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
     : pAccessor(new K(fileName)),
-      reverse(reverse),
       filename(fileName),
-      removeOnExit(true) {
+      removeOnExit(true),
+      recordsCount(0),
+      dataFileStatus(noData) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   std::string fileDesc(pAccessor->FileName());
   fileDesc.append(".desc");
-  myFile.open(fileDesc, std::ios::in);
-  if (myFile.good()) myFile >> descriptor;
-  myFile.close();
-  recordsCount = 0;
-  if (descriptor.GetSize() > 0) {
-    std::ifstream in(fileName.c_str(),
-                     std::ifstream::ate | std::ifstream::binary);
-    if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
+  dataFileStatus = noDescriptor;
+  // --
+  if (std::filesystem::exists(fileDesc)) {
+    myFile.open(fileDesc, std::ios::in);
+    if (myFile.good()) myFile >> descriptor;
+    myFile.close();
+    if (descriptor.GetSize() > 0) {
+      std::ifstream in(fileName.c_str(),
+                       std::ifstream::ate | std::ifstream::binary);
+      if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
+    }
+    dataFileStatus = open;
   }
 }
 
 template <class T, class K>
-DataStorageAccessor<T, K>::DataStorageAccessor(const Descriptor descriptor,
-                                               std::string fileName,
-                                               bool reverse)
-    : pAccessor(new K(fileName)),
-      descriptor(descriptor),
-      reverse(reverse),
-      filename(fileName),
-      removeOnExit(true) {
-  std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(0, 0);
+void DataStorageAccessor<T, K>::createDescriptor(
+    const Descriptor descriptorParam) {
+  if (dataFileStatus == open) {
+    return;  // data file already opend and have attached descriptor
+  }
+  descriptor = descriptorParam;
+  std::fstream descFile;
+  descFile.rdbuf()->pubsetbuf(0, 0);
   std::string fileDesc(pAccessor->FileName());
   fileDesc.append(".desc");
   // Creating .desc file
-  myFile.open(fileDesc, std::ios::out);
-  assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-  myFile << descriptor;
-  assert((myFile.rdstate() & std::ofstream::failbit) == 0);
-  myFile.close();
-  recordsCount = 0;
+  descFile.open(fileDesc, std::ios::out);
+  assert((descFile.rdstate() & std::ofstream::failbit) == 0);
+  descFile << descriptor;
+  assert((descFile.rdstate() & std::ofstream::failbit) == 0);
+  descFile.close();
   if (descriptor.GetSize() > 0) {
-    std::ifstream in(fileName.c_str(),
+    std::ifstream in(filename.c_str(),
                      std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
   }
