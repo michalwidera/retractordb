@@ -29,22 +29,27 @@ Terminal is called xtrdb.
 After call, you will see . (dot prompt)
 type h for help
 ```
-.h
+.help
 exit|quit|q                      exit
+quitdrop|qd                      exit & drop artifacts
 open|ropen [file]                open database - create connection (r-reverse iterator)
 create|rcreate [file][schema]    create database with schema (r-reverse iterator)
+                                 example: .create test_db { INTEGER dane STRING name[3] }
 desc                             show schema
 read [n]                         read record from database into payload
 write [n]                        send record to database from payload
 append                           append payload to database
 set [field][value]               set payload field value
+setpos [position][number value]                  set payload field number value
 status                           show status of payload
 flip                             flip reverse iterator
+rox                              remove on exit flip
 print                            show payload
 hex|dec                          type of input/output of byte/number fields
 size                             show database size in records
 dump                             show payload memory
 ok
+.
 ```
 
 ## Create file with data

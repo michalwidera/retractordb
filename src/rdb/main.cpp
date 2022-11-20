@@ -70,6 +70,10 @@ int main(int argc, char* argv[]) {
       std::stringstream scheamStringStream(sschema);
       rdb::Descriptor desc;
       scheamStringStream >> desc;
+      if (std::filesystem::exists(file)) {
+        std::cout << RED "File already exist\n" RESET;
+        continue;
+      }
       uPtr_dacc.reset(new rdb::DataStorageAccessor(file));
       uPtr_dacc->createDescriptor(desc);
       uPtr_dacc->setReverse(cmd == "rcreate");
