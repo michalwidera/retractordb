@@ -35,9 +35,8 @@ DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
 template <class T, class K>
 void DataStorageAccessor<T, K>::createDescriptor(
     const Descriptor descriptorParam) {
-  if (dataFileStatus == open) {
-    return;  // data file already opend and have attached descriptor
-  }
+  if (dataFileStatus == open)
+    abort();  // data file already opend and have attached descriptor
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
