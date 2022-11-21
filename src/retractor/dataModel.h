@@ -2,6 +2,7 @@
 
 #include <rdb/desc.h>   // rdb::Descriptor
 #include <rdb/dsacc.h>  // rdb::DataStorageAccessor
+#include <rdb/payloadacc.h>
 #include <spdlog/spdlog.h>
 
 #include <any>
@@ -30,9 +31,7 @@ struct streamInstance {
   std::unique_ptr<std::byte[]> uPtr_payload;
   rdb::Descriptor internalDataDescriptor;
   rdb::Descriptor externalDataDescriptor;
-
-  std::vector<std::any> externalData;
-  std::vector<std::any> internalData;
+  std::unique_ptr<rdb::payLoadAccessor<std::byte>> uPtr_plAcces;
 
   streamInstance(const std::string file);
 
