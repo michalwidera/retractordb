@@ -53,6 +53,7 @@ void DataStorageAccessor<T, K>::createDescriptor(
                      std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
   }
+  dataFileStatus = open;
 }
 
 template <class T, class K>
@@ -91,6 +92,7 @@ const size_t DataStorageAccessor<T, K>::getRecordsCount() {
 template <class T, class K>
 bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
+  if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.GetSize();
   int result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
@@ -105,6 +107,7 @@ template <class T, class K>
 bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
                                     const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
+  if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.GetSize();
   int result = 0;
   if (recordIndex == std::numeric_limits<size_t>::max()) {
