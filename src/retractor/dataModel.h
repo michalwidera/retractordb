@@ -27,11 +27,11 @@
  * TODO: Translate to english afterall - before merge to Master
  */
 struct streamInstance {
-  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> uPtr_storage;
-  std::unique_ptr<std::byte[]> uPtr_payload;
+  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
+  std::unique_ptr<std::byte[]> payload;
   rdb::Descriptor internalDataDescriptor;
   rdb::Descriptor externalDataDescriptor;
-  std::unique_ptr<rdb::payLoadAccessor<std::byte>> uPtr_plAcces;
+  std::unique_ptr<rdb::payLoadAccessor<std::byte>> plAcces;
 
   streamInstance(const std::string file);
 
