@@ -52,7 +52,7 @@ class payLoadAccessor {
 }
 
 class DataStorageAccessor {
-    {field} pAccessor
+    {field} accessor
     {field} descriptor
     {field} reverse
     {field} recordsCount

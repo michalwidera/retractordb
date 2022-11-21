@@ -17,7 +17,7 @@ namespace rdb {
  */
 template <class T = std::byte, class K = rdb::posixPrmBinaryFileAccessor<T>>
 class DataStorageAccessor {
-  std::unique_ptr<K> pAccessor;
+  std::unique_ptr<K> accessor;
 
   Descriptor descriptor;
 

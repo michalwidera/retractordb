@@ -29,9 +29,7 @@
 struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
   std::unique_ptr<std::byte[]> payload;
-  rdb::Descriptor internalDataDescriptor;
-  rdb::Descriptor externalDataDescriptor;
-  std::unique_ptr<rdb::payLoadAccessor<std::byte>> plAcces;
+  std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
 
   streamInstance(const std::string file);
 

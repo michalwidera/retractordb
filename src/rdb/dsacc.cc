@@ -8,14 +8,14 @@
 namespace rdb {
 template <class T, class K>
 DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
-    : pAccessor(new K(fileName)),
+    : accessor(new K(fileName)),
       filename(fileName),
       removeOnExit(true),
       recordsCount(0),
       dataFileStatus(noData) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  std::string fileDesc(pAccessor->FileName());
+  std::string fileDesc(accessor->FileName());
   fileDesc.append(".desc");
   dataFileStatus = noDescriptor;
   // --
@@ -40,7 +40,7 @@ void DataStorageAccessor<T, K>::createDescriptor(
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
-  std::string fileDesc(pAccessor->FileName());
+  std::string fileDesc(accessor->FileName());
   fileDesc.append(".desc");
   // Creating .desc file
   descFile.open(fileDesc, std::ios::out);
@@ -97,7 +97,7 @@ bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
   int result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = pAccessor->Read(inBuffer, size, recordIndexRv * size);
+    result = accessor->Read(inBuffer, size, recordIndexRv * size);
     assert(result == 0);
   }
   return result == 0;
@@ -111,14 +111,14 @@ bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
   auto size = descriptor.GetSize();
   int result = 0;
   if (recordIndex == std::numeric_limits<size_t>::max()) {
-    result = pAccessor->Write(outBuffer, size);  // <- Call to Append Function
+    result = accessor->Write(outBuffer, size);  // <- Call to Append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
       auto recordIndexRv =
           reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-      result = pAccessor->Write(outBuffer, size, recordIndexRv * size);
+      result = accessor->Write(outBuffer, size, recordIndexRv * size);
       assert(result == 0);
     }
   }
