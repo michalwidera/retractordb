@@ -2,6 +2,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <filesystem>
 #include <iostream>
 #include <memory>
 
@@ -18,7 +19,6 @@
 #include <spdlog/spdlog.h>
 
 #include <boost/chrono.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -371,7 +371,7 @@ int main(int argc, char *argv[]) {
       std::cout << config_line;
       return system::errc::success;
     }
-    if (!boost::filesystem::exists(sInputFile)) {
+    if (!std::filesystem::exists(sInputFile)) {
       std::cout << argv[0] << ": fatal error: no input file" << std::endl;
       std::cout << "query processing terminated." << std::endl;
       return EPERM;  // ERROR defined in errno-base.h
