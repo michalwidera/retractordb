@@ -42,7 +42,7 @@ class Retractor(ConanFile):
                        "boost:without_test": False,
                        "boost:multithreading": True,
                        "boost:without_system": False,
-                       "boost:without_filesystem": False,
+                       "boost:without_filesystem": False, # this could go true - but conan does not have such default
                        "boost": "1.80.0",
                        "gtest": "1.12.1",
                        "antlr4": "4.11.1",

@@ -3,11 +3,11 @@
 
 #include <algorithm>                               // for transform
 #include <boost/algorithm/string/trim.hpp>         // for trim_right
-#include <boost/filesystem/convenience.hpp>        // for extension
 #include <boost/rational.hpp>                      // for rational, operator>>
 #include <boost/type_index.hpp>                    // for type_info
 #include <boost/type_index/type_index_facade.hpp>  // for operator==
 #include <cassert>                                 // for assert
+#include <filesystem>
 #include <iostream>
 #include <map>
 #include <stdexcept>  // for out_of_range
@@ -44,7 +44,7 @@ inputDF::inputDF() {}
 
 inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
     : filename(inputFileName), lSchema(lSchema), len(0), curPos(0) {
-  extension = boost::filesystem::extension(inputFileName);
+  extension = std::filesystem::path(inputFileName).extension();
   std::transform(extension.begin(), extension.end(), extension.begin(),
                  ::tolower);
   // Parser feeds space at the end of string
