@@ -29,3 +29,11 @@ std::any streamInstance::getPublic(int position) {
 void streamInstance::setPublic(int position, std::any value) {
   accessor->set_item(position, value);
 }
+
+std::any streamInstance::getInternal(int position) {
+  return internalAccessor->get_item(position);
+}
+
+void streamInstance::setInternal(int position, std::any value) {
+  internalAccessor->set_item(position, value);
+}
