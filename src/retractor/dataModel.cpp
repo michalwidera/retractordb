@@ -15,8 +15,11 @@ streamInstance::streamInstance(const std::string file) {
   payload.reset(new std::byte[storage->getDescriptor().GetSize()]);
   accessor.reset(new rdb::payLoadAccessor(storage->getDescriptor(),
                                           payload.get(), noHexFormat));
-  for (auto q : coreInstance) {
-  };
+  internalView.reset(
+      new std::byte[coreInstance[file].getInternalDescriptor().GetSize()]);
+  internalAccessor.reset(
+      new rdb::payLoadAccessor(coreInstance[file].getInternalDescriptor(),
+                               internalView.get(), noHexFormat));
 };
 
 std::any streamInstance::getPublic(int position) {
