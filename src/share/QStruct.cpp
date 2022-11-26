@@ -313,9 +313,45 @@ std::vector<std::string> query::getDepStreamName(int reqDep) {
 }
 
 rdb::Descriptor query::getDescriptor() {
-  rdb::Descriptor retVal {};
+  rdb::Descriptor retVal{};
   for (auto &f : lSchema) {
-    retVal|rdb::Descriptor(f.fieldName,f.fieldType);
+    retVal | rdb::Descriptor(f.fieldName, f.fieldType);
+  }
+  return retVal;
+}
+
+rdb::Descriptor query::getInternalDescriptor() {
+  rdb::Descriptor retVal{};
+  auto [arg1, arg2, cmd]{GetArgs(lProgram)};
+  auto i{0};
+  switch (cmd.getCommandID()) {
+    case STREAM_HASH:
+    case STREAM_DEHASH_DIV:
+    case STREAM_DEHASH_MOD:
+    case STREAM_SUBSTRACT:
+    case STREAM_TIMEMOVE: {
+      for (auto &f : getQuery(arg1).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+    } break;
+    case STREAM_ADD: {
+      for (auto &f : getQuery(arg1).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+      for (auto &f : getQuery(arg2).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+    } break;
+    case STREAM_AGSE: {
+      int windowSize = abs(rational_cast<int>(cmd.get()));
+      auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
+      for (int i = 0; i < windowSize; i++) {
+        retVal |
+            rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);
+      }
+    } break;
+    default:
+      assert(false);
   }
   return retVal;
 }
