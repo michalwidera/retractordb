@@ -145,6 +145,8 @@ class query {
   int getFieldIndex(field f);
 
   void reset();
+
+  rdb::Descriptor getDescriptor();
 };
 
 bool operator<(const query &lhs, const query &rhs);
@@ -176,3 +178,4 @@ class qTree : public std::vector<query> {
 
   boost::rational<int> getDelta(const std::string &query_name);
 };
+

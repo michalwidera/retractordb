@@ -31,6 +31,9 @@ struct streamInstance {
   std::unique_ptr<std::byte[]> payload;
   std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
 
+  std::unique_ptr<std::byte[]> internalView;
+  std::unique_ptr<rdb::payLoadAccessor<std::byte>> internalAccessor;
+
   streamInstance(const std::string file);
 
   /**

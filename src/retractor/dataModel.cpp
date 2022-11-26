@@ -1,6 +1,11 @@
 #include "dataModel.h"
 
+#include <assert.h>
 #include <rdb/payloadacc.h>  // rdb::payLoadAccessor
+
+#include "QStruct.h"
+
+extern "C" qTree coreInstance;
 
 enum { noHexFormat = false, HexFormat = true };
 
@@ -10,4 +15,14 @@ streamInstance::streamInstance(const std::string file) {
   payload.reset(new std::byte[storage->getDescriptor().GetSize()]);
   accessor.reset(new rdb::payLoadAccessor(storage->getDescriptor(),
                                           payload.get(), noHexFormat));
+  for (auto q : coreInstance) {
+  };
 };
+
+std::any streamInstance::getPublic(int position) {
+  return accessor->get_item(position);
+}
+
+void streamInstance::setPublic(int position, std::any value) {
+  accessor->set_item(position, value);
+}

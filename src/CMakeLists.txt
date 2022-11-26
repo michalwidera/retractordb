@@ -26,7 +26,8 @@ set(SOURCES_COMPILER
     share/QStruct.cpp
     share/SOperations.cpp
     compiler/Parser/RQLLexer.cpp
-    compiler/Parser/RQLParser.cpp)
+    compiler/Parser/RQLParser.cpp
+    rdb/desc.cc)
 
 set(SOURCES_DUMPER
     dumper/dumper.cpp
