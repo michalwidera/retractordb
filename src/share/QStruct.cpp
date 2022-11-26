@@ -312,6 +312,14 @@ std::vector<std::string> query::getDepStreamName(int reqDep) {
   return lRetVal;
 }
 
+rdb::Descriptor query::getDescriptor() {
+  rdb::Descriptor retVal {};
+  for (auto &f : lSchema) {
+    retVal|rdb::Descriptor(f.fieldName,f.fieldType);
+  }
+  return retVal;
+}
+
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   auto eIt = prog.begin();
   std::string sArg1;
