@@ -135,4 +135,4 @@ ok
 
 ## UML Sequence Diagram of :Rdb communication process
 
-![Class Diagram](http://www.plantuml.com/plantuml/proxy?src=https://raw.githubusercontent.com/michalwidera/retractordb/issue_17/src/rdb/UML/rdb-comunication.puml)
+![Class Diagram](http://www.plantuml.com/plantuml/proxy?cache=no?src=https://raw.githubusercontent.com/michalwidera/retractordb/issue_17/src/rdb/UML/rdb-comunication.puml)
