@@ -6,7 +6,7 @@ participant  Rdb #Lime
 Entity       Description #Lime
 database     Storage #Tomato
 
-== Create connection ==
+== Create connection. ==
 
 Client -> Rdb : DataStorageAccessor() 
 Activate Rdb #Lime
