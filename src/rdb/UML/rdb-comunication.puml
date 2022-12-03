@@ -1,28 +1,27 @@
 @startuml
 
-
-participant  Client
-Entity       Payload
-participant  Rdb
-Entity       Description
-database     Storage
+participant  Client #Application
+Entity       Payload #Lime
+participant  Rdb #Lime
+Entity       Description #Lime
+database     Storage #Tomato
 
 == Create connection ==
 
-Client -> Rdb : DataStorageAccessor()
-Activate Rdb
+Client -> Rdb : DataStorageAccessor() 
+Activate Rdb #Lime
 Rdb -> Rdb: Open data file
-Activate Description
+Activate Description #Lime
 Rdb -> Description : Fetch .desc file
 Rdb -> Rdb : create FileAccessor()
 Client -> Payload: Create payload area
 deactivate Rdb
-Activate Payload
+Activate Payload #Lime
 
 == Read data ==
 
 Client -> Rdb : Get()
-Activate Rdb
+Activate Rdb #Lime
 Description -> Rdb : Get Size of Payload
 Rdb -> Storage : FileAccessor.Read()
 Storage --> Payload : Read data from disk
@@ -35,7 +34,7 @@ Payload --> Client : Read payload area
 
 Client --> Payload: Fill Payload area
 Client -> Rdb: Put()
-Activate Rdb
+Activate Rdb #Lime
 Description -> Rdb : Get Size of Payload
 Rdb -> Storage : FileAccessor.Write()
 Payload --> Storage: Write data to disk
