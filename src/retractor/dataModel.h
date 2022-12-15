@@ -14,6 +14,15 @@
 
 #include "QStruct.h"  // number
 
+enum class hexFormat { no = false, yes = true };
+
+struct schemaAccessor {
+  std::unique_ptr<std::byte[]> payload;
+  std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
+  std::any get(int position) {return accessor->get_item(position);};
+  void set(int position, std::any value) {accessor->set_item(position, value);};
+};
+
 /**
  * Ta klasa ma za zadnie przedstawić warstwę abstrakcji danych.
  * Problem polegał na tym że poszególne strumienie i zapytania muszą inaczej
@@ -28,33 +37,11 @@
  */
 struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
-  std::unique_ptr<std::byte[]> payload;
-  std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
-
-  std::unique_ptr<std::byte[]> internalView;
-  std::unique_ptr<rdb::payLoadAccessor<std::byte>> internalAccessor;
+  
+  schemaAccessor publicSchema;
+  schemaAccessor internalSchema;
 
   streamInstance(const std::string file);
-
-  /**
-   *  Dane występujące w publicznym schemacie są pobierane przez zewnętrzne
-   * zapytania i zapisywane jednokrotnie przez wewnętrzne. czyli wiele getPublic
-   * z zewnątrz i tylko jedno wywołanie setPublic z wewnętrznego wyliczenia
-   *  setPublic powinno ustawić w publicDescriptorFuses wartość true - tzn.
-   * Ready To Check In
-   */
-  std::any getPublic(int position);
-  void setPublic(int position, std::any value);
-
-  /**
-   * Dane z wewnętrznego schematu służą do wyznaczenia publicznego obrazu
-   * Dane z wewnętrznego schematu to nie jest kopia publicznego schematu
-   * Te dane są płaskim rozwinięciem tego co wychodzi z klauzuli FROM
-   * (bez obliczeń) - te dane służą do obliczeń wystawianych przez publiczny
-   * obraz
-   */
-  std::any getInternal(int position);
-  void setInternal(int position, std::any value);  // czy potrzebne ?
 };
 
 struct dataModel : public std::map<std::string, streamInstance> {};
