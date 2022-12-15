@@ -7,8 +7,6 @@
 
 extern "C" qTree coreInstance;
 
-enum { noHexFormat = false, HexFormat = true };
-
 streamInstance::streamInstance(const std::string file) {
   // Ta sekwencja otworzy plik danych i deskrypor
   storage.reset(new rdb::DataStorageAccessor(file));

@@ -14,9 +14,8 @@
 
 #include "QStruct.h"  // number
 
-enum class hexFormat { no = false, yes = true };
-
 struct schemaAccessor {
+  enum { noHexFormat = false, HexFormat = true };
   std::unique_ptr<std::byte[]> payload;
   std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
   std::any get(int position) { return accessor->get_item(position); };
@@ -25,7 +24,7 @@ struct schemaAccessor {
   };
   schemaAccessor(rdb::Descriptor descriptor) {
     payload.reset(new std::byte[descriptor.GetSize()]);
-    accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), false));
+    accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
   };
 };
 
