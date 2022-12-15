@@ -19,8 +19,14 @@ enum class hexFormat { no = false, yes = true };
 struct schemaAccessor {
   std::unique_ptr<std::byte[]> payload;
   std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
-  std::any get(int position) {return accessor->get_item(position);};
-  void set(int position, std::any value) {accessor->set_item(position, value);};
+  std::any get(int position) { return accessor->get_item(position); };
+  void set(int position, std::any value) {
+    accessor->set_item(position, value);
+  };
+  schemaAccessor(rdb::Descriptor descriptor) {
+    payload.reset(new std::byte[descriptor.GetSize()]);
+    accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), false));
+  };
 };
 
 /**
@@ -37,9 +43,9 @@ struct schemaAccessor {
  */
 struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
-  
-  schemaAccessor publicSchema;
-  schemaAccessor internalSchema;
+
+  std::unique_ptr<schemaAccessor> publicSchema;
+  std::unique_ptr<schemaAccessor> internalSchema;
 
   streamInstance(const std::string file);
 };
