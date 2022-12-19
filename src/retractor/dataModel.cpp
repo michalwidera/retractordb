@@ -10,7 +10,7 @@ extern "C" qTree coreInstance;
 streamInstance::streamInstance(const std::string file) {
   // Ta sekwencja otworzy plik danych i deskrypor
   storage.reset(new rdb::DataStorageAccessor(file));
-  publicSchema.reset(new schemaAccessor(storage->getDescriptor()));
+  publicSchema.reset(new streamComposite(storage->getDescriptor()));
   internalSchema.reset(
-      new schemaAccessor(coreInstance[file].getInternalDescriptor()));
+      new streamComposite(coreInstance[file].getInternalDescriptor()));
 };

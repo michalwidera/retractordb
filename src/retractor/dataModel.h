@@ -14,7 +14,7 @@
 
 #include "QStruct.h"  // number
 
-struct schemaAccessor {
+struct streamComposite {
   enum { noHexFormat = false, HexFormat = true };
   std::unique_ptr<std::byte[]> payload;
   std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
@@ -22,7 +22,7 @@ struct schemaAccessor {
   void set(int position, std::any value) {
     accessor->set_item(position, value);
   };
-  schemaAccessor(rdb::Descriptor descriptor) {
+  streamComposite(rdb::Descriptor descriptor) {
     payload.reset(new std::byte[descriptor.GetSize()]);
     accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
   };
@@ -43,8 +43,8 @@ struct schemaAccessor {
 struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
 
-  std::unique_ptr<schemaAccessor> publicSchema;
-  std::unique_ptr<schemaAccessor> internalSchema;
+  std::unique_ptr<streamComposite> publicSchema;
+  std::unique_ptr<streamComposite> internalSchema;
 
   streamInstance(const std::string file);
 };
