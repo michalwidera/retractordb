@@ -32,7 +32,7 @@ class Retractor(ConanFile):
         "boost": ["1.77.0","1.78.0","1.79.0","1.80.0"],
         "gtest": ["1.11.0","1.12.1"],
         "antlr4" : ["4.9.3","4.10.1","4.11.1"],
-        "spdlog" : ["1.10.0"]
+        "spdlog" : ["1.10.0","1.11.0"]
     }
 
     default_options = {"boost:shared": False,
@@ -46,7 +46,7 @@ class Retractor(ConanFile):
                        "boost": "1.80.0",
                        "gtest": "1.12.1",
                        "antlr4": "4.11.1",
-                       "spdlog": "1.10.0"
+                       "spdlog": "1.11.0"
                        }
 
     def validate(self):
