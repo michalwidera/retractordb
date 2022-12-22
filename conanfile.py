@@ -46,7 +46,7 @@ class Retractor(ConanFile):
                        "boost": "1.80.0",
                        "gtest": "1.12.1",
                        "antlr4": "4.11.1",
-                       "spdlog": "1.11.0"
+                       "spdlog": "1.10.0"
                        }
 
     def validate(self):
