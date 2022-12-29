@@ -17,7 +17,7 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
   T data;
   is >> data;
   Descriptor desc(rhs.getDescriptor());
-  memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), &data, sizeof(T));
+  memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data, sizeof(T));
 }
 
 template <typename T>
@@ -31,97 +31,97 @@ T *payLoadAccessor<T>::getPayloadPtr() const {
 }
 
 template <typename T>
-void payLoadAccessor<T>::set_item(int position, std::any value) {
+void payLoadAccessor<T>::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
-  auto len = descriptor.Len(fieldName);
-  if (descriptor.Type(fieldName) == "STRING") {
+  auto len = descriptor.len(fieldName);
+  if (descriptor.type(fieldName) == "STRING") {
     std::string data(std::any_cast<std::string>(value));
-    memcpy(ptr + descriptor.Offset(position), data.c_str(),
+    memcpy(ptr + descriptor.offset(position), data.c_str(),
            std::min(len, static_cast<uint>(data.length())));
     return;
-  } else if (descriptor.Type(fieldName) == "BYTE") {
+  } else if (descriptor.type(fieldName) == "BYTE") {
     unsigned char data(std::any_cast<unsigned char>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);
+    memcpy(ptr + descriptor.offset(position), &data, len);
     return;
-  } else if (descriptor.Type(fieldName) == "BYTEARRAY") {
+  } else if (descriptor.type(fieldName) == "BYTEARRAY") {
     std::vector<unsigned char> data(
         std::any_cast<std::vector<unsigned char>>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);  //- check & todo
+    memcpy(ptr + descriptor.offset(position), &data, len);  //- check & todo
     return;
-  } else if (descriptor.Type(fieldName) == "INTEGER") {
+  } else if (descriptor.type(fieldName) == "INTEGER") {
     int data(std::any_cast<int>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);
+    memcpy(ptr + descriptor.offset(position), &data, len);
     return;
-  } else if (descriptor.Type(fieldName) == "INTARRAY") {
+  } else if (descriptor.type(fieldName) == "INTARRAY") {
     std::vector<int> data(std::any_cast<std::vector<int>>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);  //- check & todo
+    memcpy(ptr + descriptor.offset(position), &data, len);  //- check & todo
     return;
-  } else if (descriptor.Type(fieldName) == "UINT") {
+  } else if (descriptor.type(fieldName) == "UINT") {
     uint data(std::any_cast<uint>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);
+    memcpy(ptr + descriptor.offset(position), &data, len);
     return;
-  } else if (descriptor.Type(fieldName) == "DOUBLE") {
+  } else if (descriptor.type(fieldName) == "DOUBLE") {
     double data(std::any_cast<double>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);
+    memcpy(ptr + descriptor.offset(position), &data, len);
     return;
-  } else if (descriptor.Type(fieldName) == "FLOAT") {
+  } else if (descriptor.type(fieldName) == "FLOAT") {
     float data(std::any_cast<float>(value));
-    memcpy(ptr + descriptor.Offset(position), &data, len);
+    memcpy(ptr + descriptor.offset(position), &data, len);
     return;
   }
   assert(false && "type not supported on setter");
 }
 
 template <typename T>
-std::any payLoadAccessor<T>::get_item(int position) {
+std::any payLoadAccessor<T>::getItem(int position) {
   auto fieldName = descriptor.fieldName(position);
-  auto len = descriptor.Len(fieldName);
+  auto len = descriptor.len(fieldName);
   std::cerr << "set:" << fieldName << std::endl;
-  if (descriptor.Type(fieldName) == "STRING") {
+  if (descriptor.type(fieldName) == "STRING") {
     std::string retval;
-    retval.assign(reinterpret_cast<char *>(ptr) + descriptor.Offset(position),
+    retval.assign(reinterpret_cast<char *>(ptr) + descriptor.offset(position),
                   len);
     return retval;
-  } else if (descriptor.Type(fieldName) == "BYTEARRAY") {
+  } else if (descriptor.type(fieldName) == "BYTEARRAY") {
     std::vector<unsigned char> data;
-    for (auto i = 0; i < descriptor.Len(fieldName); i++) {
+    for (auto i = 0; i < descriptor.len(fieldName); i++) {
       unsigned char data8 = *reinterpret_cast<unsigned char *>(
-          reinterpret_cast<char *>(ptr) + descriptor.Offset(position) + i);
+          reinterpret_cast<char *>(ptr) + descriptor.offset(position) + i);
       data.push_back(data8);
     }
     return data;
-  } else if (descriptor.Type(fieldName) == "BYTE") {
+  } else if (descriptor.type(fieldName) == "BYTE") {
     unsigned char data;
     data = *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(ptr) +
-                                              descriptor.Offset(position));
+                                              descriptor.offset(position));
     return data;
-  } else if (descriptor.Type(fieldName) == "INTARRAY") {
+  } else if (descriptor.type(fieldName) == "INTARRAY") {
     std::vector<int> data;
-    for (auto i = 0; i < descriptor.Len(fieldName); i++) {
+    for (auto i = 0; i < descriptor.len(fieldName); i++) {
       int dataInt = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) +
-                                             descriptor.Offset(position) + i);
+                                             descriptor.offset(position) + i);
       data.push_back(dataInt);
     }
     return data;
-  } else if (descriptor.Type(fieldName) == "INTEGER") {
+  } else if (descriptor.type(fieldName) == "INTEGER") {
     int data;
     data = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) +
-                                    descriptor.Offset(position));
+                                    descriptor.offset(position));
     return data;
-  } else if (descriptor.Type(fieldName) == "UINT") {
+  } else if (descriptor.type(fieldName) == "UINT") {
     uint data;
     data = *reinterpret_cast<uint *>(reinterpret_cast<uint *>(ptr) +
-                                     descriptor.Offset(position));
+                                     descriptor.offset(position));
     return data;
-  } else if (descriptor.Type(fieldName) == "DOUBLE") {
+  } else if (descriptor.type(fieldName) == "DOUBLE") {
     double data;
     data = *reinterpret_cast<double *>(reinterpret_cast<double *>(ptr) +
-                                       descriptor.Offset(position));
+                                       descriptor.offset(position));
     return data;
-  } else if (descriptor.Type(fieldName) == "FLOAT") {
+  } else if (descriptor.type(fieldName) == "FLOAT") {
     float data;
     data = *reinterpret_cast<double *>(reinterpret_cast<float *>(ptr) +
-                                       descriptor.Offset(position));
+                                       descriptor.offset(position));
     return data;
   }
   assert(false && "type not supporte on getter.");
@@ -138,42 +138,42 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
   else
     is >> std::dec;
   Descriptor desc(rhs.getDescriptor());
-  if (desc.Type(fieldName) == "STRING") {
+  if (desc.type(fieldName) == "STRING") {
     std::string record;
     std::getline(is >> std::ws, record);
-    memset(rhs.getPayloadPtr() + desc.Offset(fieldName), 0,
-           desc.Len(fieldName));
-    memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), record.c_str(),
-           std::min((size_t)desc.Len(fieldName), record.size()));
-  } else if (desc.Type(fieldName) == "BYTEARRAY") {
-    for (auto i = 0; i < desc.Len(fieldName); i++) {
+    memset(rhs.getPayloadPtr() + desc.offset(fieldName), 0,
+           desc.len(fieldName));
+    memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), record.c_str(),
+           std::min((size_t)desc.len(fieldName), record.size()));
+  } else if (desc.type(fieldName) == "BYTEARRAY") {
+    for (auto i = 0; i < desc.len(fieldName); i++) {
       int data;
       is >> data;
       unsigned char data8 = static_cast<unsigned char>(data);
-      memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) +
+      memcpy(rhs.getPayloadPtr() + desc.offset(fieldName) +
                  i * sizeof(unsigned char),
              &data8, sizeof(unsigned char));
     }
-  } else if (desc.Type(fieldName) == "INTARRAY") {
-    for (auto i = 0; i < desc.Len(fieldName) / sizeof(int); i++) {
+  } else if (desc.type(fieldName) == "INTARRAY") {
+    for (auto i = 0; i < desc.len(fieldName) / sizeof(int); i++) {
       int data;
       is >> data;
-      memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName) + i * sizeof(int),
+      memcpy(rhs.getPayloadPtr() + desc.offset(fieldName) + i * sizeof(int),
              &data, sizeof(int));
     }
-  } else if (desc.Type(fieldName) == "BYTE") {
+  } else if (desc.type(fieldName) == "BYTE") {
     int data;
     is >> data;
     unsigned char data8 = static_cast<unsigned char>(data);
-    memcpy(rhs.getPayloadPtr() + desc.Offset(fieldName), &data8,
+    memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data8,
            sizeof(unsigned char));
-  } else if (desc.Type(fieldName) == "UINT")
+  } else if (desc.type(fieldName) == "UINT")
     copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "INTEGER")
+  else if (desc.type(fieldName) == "INTEGER")
     copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "FLOAT")
+  else if (desc.type(fieldName) == "FLOAT")
     copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
-  else if (desc.Type(fieldName) == "DOUBLE")
+  else if (desc.type(fieldName) == "DOUBLE")
     copyToMemory<double, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
   else
     std::cerr << "field not found\n";
@@ -190,10 +190,10 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
   for (auto const &r : rhs.getDescriptor()) {
     os << "\t" << std::get<rname>(r) << ":";
     auto desc = rhs.getDescriptor();
-    auto offset_ = desc.Offset(std::get<rname>(r));
+    auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
       os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_),
-                        desc.Len(std::get<rname>(r)));
+                        desc.len(std::get<rname>(r)));
     } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
         unsigned char data;

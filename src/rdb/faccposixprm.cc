@@ -21,12 +21,12 @@ posixPrmBinaryFileAccessor<T>::~posixPrmBinaryFileAccessor() {
 }
 
 template <class T>
-std::string posixPrmBinaryFileAccessor<T>::FileName() {
+std::string posixPrmBinaryFileAccessor<T>::fileName() {
   return fileNameStr;
 }
 
 template <class T>
-int posixPrmBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
+int posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
                                          const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
@@ -59,7 +59,7 @@ int posixPrmBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
 }
 
 template <class T>
-int posixPrmBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
+int posixPrmBinaryFileAccessor<T>::read(T* ptrData, const size_t size,
                                         const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {

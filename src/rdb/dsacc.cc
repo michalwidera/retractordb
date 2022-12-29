@@ -15,7 +15,7 @@ DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
       dataFileStatus(noData) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  std::string fileDesc(accessor->FileName());
+  std::string fileDesc(accessor->fileName());
   fileDesc.append(".desc");
   dataFileStatus = noDescriptor;
   // --
@@ -41,7 +41,7 @@ void DataStorageAccessor<T, K>::createDescriptor(
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
-  std::string fileDesc(accessor->FileName());
+  std::string fileDesc(accessor->fileName());
   fileDesc.append(".desc");
   // Creating .desc file
   descFile.open(fileDesc, std::ios::out);
@@ -91,35 +91,35 @@ const size_t DataStorageAccessor<T, K>::getRecordsCount() {
 }
 
 template <class T, class K>
-bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
+bool DataStorageAccessor<T, K>::get(T* inBuffer, const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
   int result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->Read(inBuffer, size, recordIndexRv * size);
+    result = accessor->read(inBuffer, size, recordIndexRv * size);
     assert(result == 0);
   }
   return result == 0;
 }
 
 template <class T, class K>
-bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
+bool DataStorageAccessor<T, K>::put(const T* outBuffer,
                                     const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
   int result = 0;
   if (recordIndex == std::numeric_limits<size_t>::max()) {
-    result = accessor->Write(outBuffer, size);  // <- Call to Append Function
+    result = accessor->write(outBuffer, size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
       auto recordIndexRv =
           reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-      result = accessor->Write(outBuffer, size, recordIndexRv * size);
+      result = accessor->write(outBuffer, size, recordIndexRv * size);
       assert(result == 0);
     }
   }

@@ -9,13 +9,13 @@ namespace rdb {
  * @brief This is interface for accessor interface.
  *
  * There is only 3 opeations over file/object/blob aka storage
- * Append data at the end of storage
+ * append data at the end of storage
  * Read data from the storage
  * Update data in the middle of storage
  * This three has been covered by following interface
- * Read ::= Read(data, position)
- * Append :== Write(data, position == max_possible_value )
- * Update :== Write(data, position)
+ * read ::= read(data, position)
+ * append :== write(data, position == max_possible_value )
+ * update :== write(data, position)
  *
  * @tparam T Type of stored data - std::byte or char
  */
@@ -31,7 +31,7 @@ struct FileAccessorInterface {
    * @param position position from the begining of file [unit: Bytes]
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual int Read(T* ptrData, const size_t size, const size_t position) = 0;
+  virtual int read(T* ptrData, const size_t size, const size_t position) = 0;
 
   /**
    * @brief Updates or appends data in the storage
@@ -43,7 +43,7 @@ struct FileAccessorInterface {
    * possible value - works as append.
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual int Write(
+  virtual int write(
       const T* ptrData, const size_t size,
       const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
@@ -52,7 +52,7 @@ struct FileAccessorInterface {
    *
    * @return std::string filename
    */
-  virtual std::string FileName() = 0;
+  virtual std::string fileName() = 0;
 
   virtual ~FileAccessorInterface(){};
 };

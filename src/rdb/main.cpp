@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
         std::cout << RED "record out of range\n" RESET;
         continue;
       }
-      dacc->Get(payload.get(), record);
+      dacc->get(payload.get(), record);
       payloadStatus = fetched;
     } else if (cmd == "set") {
       rdb::payLoadAccessor payloadAcc(dacc->getDescriptor(), payload.get(),
@@ -134,22 +134,22 @@ int main(int argc, char* argv[]) {
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
-      if (dacc->getDescriptor().Type(fieldname) == "INTEGER") {
+      if (dacc->getDescriptor().type(fieldname) == "INTEGER") {
         int value;
         std::cin >> value;
-        payloadAcc.set_item(position, value);
-      } else if (dacc->getDescriptor().Type(fieldname) == "DOUBLE") {
+        payloadAcc.setItem(position, value);
+      } else if (dacc->getDescriptor().type(fieldname) == "DOUBLE") {
         double value;
         std::cin >> value;
-        payloadAcc.set_item(position, value);
-      } else if (dacc->getDescriptor().Type(fieldname) == "BYTE") {
+        payloadAcc.setItem(position, value);
+      } else if (dacc->getDescriptor().type(fieldname) == "BYTE") {
         unsigned char value;
         std::cin >> value;
-        payloadAcc.set_item(position, value);
-      } else if (dacc->getDescriptor().Type(fieldname) == "STRING") {
+        payloadAcc.setItem(position, value);
+      } else if (dacc->getDescriptor().type(fieldname) == "STRING") {
         std::string record;
         std::cin >> record;
-        payloadAcc.set_item(position, record);
+        payloadAcc.setItem(position, record);
       } else
         std::cerr << "field not found\n";
       payloadStatus = changed;
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
-      std::any value = payloadAcc.get_item(position);
+      std::any value = payloadAcc.getItem(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
       }
@@ -194,10 +194,10 @@ int main(int argc, char* argv[]) {
         std::cout << RED "record out of range - Check append command.\n" RESET;
         continue;
       }
-      dacc->Put(payload.get(), record);
+      dacc->put(payload.get(), record);
       payloadStatus = stored;
     } else if (cmd == "append") {
-      dacc->Put(payload.get());
+      dacc->put(payload.get());
       payloadStatus = stored;
     } else if (cmd == "status") {
       switch (payloadStatus) {

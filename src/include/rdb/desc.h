@@ -45,7 +45,7 @@ class Descriptor : public std::vector<rfield> {
    * @return true - no double names found
    * @return false - found doubled names fields
    */
-  bool UpdateNames();
+  bool _updateNames();
 
  public:
   bool isDirty() const;
@@ -82,11 +82,11 @@ class Descriptor : public std::vector<rfield> {
   Descriptor() = default;
 
   /**
-   * @brief This function will object.Append({field("A",10,STRING)});
+   * @brief This function will object.append({field("A",10,STRING)});
    *
    * @param l Initializer list of fields in {}
    */
-  void Append(std::initializer_list<rfield> l);
+  void append(std::initializer_list<rfield> l);
 
   /**
    * @brief This constructor helps chaining operators with descriptor.
@@ -131,7 +131,7 @@ class Descriptor : public std::vector<rfield> {
    * @param name Field name
    * @return uint Position [unit: Index]
    */
-  uint Position(std::string name);
+  uint position(std::string name);
 
   /**
    * @brief Return fieldname in vector of tuples on given fieldPosition
@@ -148,7 +148,7 @@ class Descriptor : public std::vector<rfield> {
    * @param name Field name
    * @return uint Field name [unit: Bytes]
    */
-  uint Len(const std::string name);
+  uint len(const std::string name);
 
   /**
    * @brief Counts over inner container and finds offset of given field name
@@ -157,7 +157,7 @@ class Descriptor : public std::vector<rfield> {
    * @param name Field name
    * @return uint Filed offset [unit: Bytes]
    */
-  uint Offset(const std::string name);
+  uint offset(const std::string name);
 
   /**
    * @brief Counts over inner container and finds offset of given field position
@@ -166,7 +166,7 @@ class Descriptor : public std::vector<rfield> {
    * @param position Field position
    * @return uint Filed offset [unit: Bytes]
    */
-  uint Offset(int position);
+  uint offset(int position);
 
   /**
    * @brief Return type of given field
@@ -174,7 +174,7 @@ class Descriptor : public std::vector<rfield> {
    * @param name Field name
    * @return std::string Type as literal string
    */
-  std::string Type(const std::string name);
+  std::string type(const std::string name);
 
   /**
    * @brief In case of string types this funcion will get binary representation
@@ -185,8 +185,8 @@ class Descriptor : public std::vector<rfield> {
    * @return std::string Returned string from field.
    */
   template <typename T>
-  std::string ToString(const std::string name, T *ptr) {
-    return std::string(reinterpret_cast<char *>(ptr + Offset(name)), Len(name));
+  std::string toString(const std::string name, T *ptr) {
+    return std::string(reinterpret_cast<char *>(ptr + offset(name)), len(name));
   }
 
   /**
@@ -199,8 +199,8 @@ class Descriptor : public std::vector<rfield> {
    * container
    */
   template <typename T, typename K>
-  auto Cast(const std::string name, K *ptr) {
-    return *(reinterpret_cast<T *>(ptr + Offset(name)));
+  auto cast(const std::string name, K *ptr) {
+    return *(reinterpret_cast<T *>(ptr + offset(name)));
   };
 
   // Operators that enables read and write Descriptor to file/scereen i Human

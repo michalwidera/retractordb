@@ -20,23 +20,23 @@ genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName)
     : fileNameStr(fileName) {}
 
 template <class T>
-std::string genericBinaryFileAccessor<T>::FileName() {
+std::string genericBinaryFileAccessor<T>::fileName() {
   return fileNameStr;
 }
 
 template <class T>
-int genericBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
+int genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
                                         const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   if (position == std::numeric_limits<size_t>::max()) {
-    myFile.open(FileName(), std::ios::in | std::ios::out | std::ios::binary |
+    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary |
                                 std::ios::app | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     // Note: no seekp here!
   } else {
-    myFile.open(FileName(), std::ios::in | std::ios::out | std::ios::binary |
+    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary |
                                 std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
@@ -52,11 +52,11 @@ int genericBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
 }
 
 template <class T>
-int genericBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
+int genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size,
                                        const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  myFile.open(FileName(), std::ios::in | std::ios::binary);
+  myFile.open(fileName(), std::ios::in | std::ios::binary);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.seekg(position);

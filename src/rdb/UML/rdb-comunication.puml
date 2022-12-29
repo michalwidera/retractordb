@@ -20,10 +20,10 @@ Activate Payload #Lime
 
 == Read data ==
 
-Client -> Rdb : Get()
+Client -> Rdb : get()
 Activate Rdb #Lime
 Description --> Rdb : Get Size of Payload
-Rdb -> Storage : FileAccessor.Read()
+Rdb -> Storage : FileAccessor.read()
 Storage --> Payload : Read data from disk
 Rdb --> Client : Status
 deactivate Rdb
@@ -33,10 +33,10 @@ Payload --> Client : Read payload area
 == Write data ==
 
 Client -> Payload: Fill Payload area
-Client -> Rdb: Put()
+Client -> Rdb: put()
 Activate Rdb #Lime
 Description --> Rdb : Get Size of Payload
-Rdb -> Storage : FileAccessor.Write()
+Rdb -> Storage : FileAccessor.write()
 Payload -> Storage: Write data to disk
 Rdb --> Client : Status
 deactivate Rdb
