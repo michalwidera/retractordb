@@ -3,16 +3,16 @@
 class Descriptor {
     {field} fieldNames
 
-    {method} Append
+    {method} append
     {method} operator|
     {method} operator=
     {method} getSizeInBytes
-    {method} Position
-    {method} Len
-    {method} Offset
-    {method} Type
-    {method} ToString
-    {method} Cast
+    {method} position
+    {method} len
+    {method} offset
+    {method} type
+    {method} toString
+    {method} cast
     {method} operator<<
     {method} operator>>
 }
@@ -33,9 +33,9 @@ class posixPrmBinaryFileAccessor {
 
 
 interface FileAccessorInterface {
-    {method} Read
-    {method} Write
-    {method} FileName
+    {method} read
+    {method} write
+    {method} fileName
 }
 
 class payLoadAccessor {
@@ -45,8 +45,8 @@ class payLoadAccessor {
 
     {method} getDescriptor
     {method} getPayloadPtr
-    {method} set_item
-    {method} get_item
+    {method} setItem
+    {method} getItem
     {method} operator>>
     {method} operator<<
 }
@@ -60,8 +60,8 @@ class DataStorageAccessor {
     {field} filename
 
     {method} createDescriptor
-    {method} Get
-    {method} Put
+    {method} get
+    {method} put
     {method} getDescriptor
     {method} setReverse
     {method} setRemoveOnExit

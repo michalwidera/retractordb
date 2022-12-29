@@ -14,11 +14,11 @@ class posixBinaryFileAccessor : public FileAccessorInterface<T> {
  public:
   posixBinaryFileAccessor(std::string fileName);
 
-  int Read(T *ptrData, const size_t size, const size_t position) override;
-  int Write(
+  int read(T *ptrData, const size_t size, const size_t position) override;
+  int write(
       const T *ptrData, const size_t size,
       const size_t position = std::numeric_limits<size_t>::max()) override;
-  std::string FileName() override;
+  std::string fileName() override;
 };
 }  // namespace rdb
 

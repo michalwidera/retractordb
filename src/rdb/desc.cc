@@ -69,19 +69,19 @@ Descriptor::Descriptor(std::initializer_list<rfield> l)
 
 Descriptor::Descriptor(fieldNameType n, fieldLenType l, rdb::eType t) {
   push_back(rfield(n, l, t));
-  UpdateNames();
+  _updateNames();
 }
 
 Descriptor::Descriptor(fieldNameType n, rdb::eType t) {
   assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
   push_back(rfield(n, GetFieldLenFromType(t), t));
-  UpdateNames();
+  _updateNames();
 }
 
 bool Descriptor::isDirty() const { return fieldNames.size() == 0; }
 
-void Descriptor::Append(std::initializer_list<rfield> l) {
+void Descriptor::append(std::initializer_list<rfield> l) {
   insert(end(), l.begin(), l.end());
 }
 
@@ -95,20 +95,20 @@ Descriptor &Descriptor::operator|(const Descriptor &rhs) {
     // can't do safe: data | data
     // due one name policy
   }
-  UpdateNames();
+  _updateNames();
   return *this;
 }
 
 Descriptor &Descriptor::operator=(const Descriptor &rhs) {
   clear();
   insert(end(), rhs.begin(), rhs.end());
-  UpdateNames();
+  _updateNames();
   return *this;
 }
 
 Descriptor::Descriptor(const Descriptor &init) {
   *this | init;
-  UpdateNames();
+  _updateNames();
 }
 
 uint Descriptor::getSizeInBytes() const {
@@ -117,7 +117,7 @@ uint Descriptor::getSizeInBytes() const {
   return size;
 }
 
-bool Descriptor::UpdateNames() {
+bool Descriptor::_updateNames() {
   uint position = 0;
   fieldNames.clear();
   for (auto const i : *this) {
@@ -133,7 +133,7 @@ bool Descriptor::UpdateNames() {
   return true;
 }
 
-uint Descriptor::Position(std::string name) {
+uint Descriptor::position(std::string name) {
   if (fieldNames.find(name) != fieldNames.end()) return fieldNames[name];
   assert(false && "did not find that record id Descriptor:{}");
   return -1;
@@ -143,12 +143,11 @@ std::string Descriptor::fieldName(uint fieldPosition) {
   return std::get<fieldNameType>((*this)[fieldPosition]);
 }
 
-uint Descriptor::Len(const std::string name) {
-  auto pos = Position(name);
-  return std::get<rlen>((*this)[pos]);
+uint Descriptor::len(const std::string name) {
+  return std::get<rlen>((*this)[position(name)]);
 }
 
-uint Descriptor::Offset(const std::string name) {
+uint Descriptor::offset(const std::string name) {
   auto offset = 0;
   for (auto const field : *this) {
     if (name == std::get<fieldNameType>(field)) return offset;
@@ -158,7 +157,7 @@ uint Descriptor::Offset(const std::string name) {
   return -1;
 }
 
-uint Descriptor::Offset(const int position) {
+uint Descriptor::offset(const int position) {
   auto offset = 0;
   int i = 0;
   for (auto const field : *this) {
@@ -170,9 +169,8 @@ uint Descriptor::Offset(const int position) {
   return -1;
 }
 
-std::string Descriptor::Type(const std::string name) {
-  auto pos = Position(name);
-  return GetFieldType(std::get<rtype>((*this)[pos]));
+std::string Descriptor::type(const std::string name) {
+  return GetFieldType(std::get<rtype>((*this)[position(name)]));
 }
 
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {

@@ -18,9 +18,9 @@ struct streamComposite {
   enum { noHexFormat = false, HexFormat = true };
   std::unique_ptr<std::byte[]> payload;
   std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
-  std::any get(int position) { return accessor->get_item(position); };
+  std::any get(int position) { return accessor->getItem(position); };
   void set(int position, std::any value) {
-    accessor->set_item(position, value);
+    accessor->setItem(position, value);
   };
   streamComposite(rdb::Descriptor descriptor) {
     payload.reset(new std::byte[descriptor.getSizeInBytes()]);

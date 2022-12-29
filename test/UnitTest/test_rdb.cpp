@@ -19,16 +19,16 @@ bool test_1() {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    binaryAccessor1.Write(xData, AREA_SIZE);
+    binaryAccessor1.write(xData, AREA_SIZE);
 
     if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
 
     T yData[AREA_SIZE];
-    binaryAccessor1.Read(yData, AREA_SIZE, 0);
+    binaryAccessor1.read(yData, AREA_SIZE, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
-  auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
+  auto statusRemove1 = remove(binaryAccessor1.fileName().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;
@@ -41,17 +41,17 @@ bool test_2() {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    dataStore.Write(xData, AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);  // Add one extra record
+    dataStore.write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);  // Add one extra record
 
     if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
 
     T yData[AREA_SIZE];
-    dataStore.Read(yData, AREA_SIZE, 0);
+    dataStore.read(yData, AREA_SIZE, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
-  auto statusRemove1 = remove(dataStore.FileName().c_str());
+  auto statusRemove1 = remove(dataStore.fileName().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;
@@ -64,31 +64,31 @@ bool test_3() {
     T xData[AREA_SIZE];
 
     std::memcpy(xData, "test aaaa", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     std::memcpy(xData, "test bbbb", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     std::memcpy(xData, "test cccc", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     std::memcpy(xData, "test xxxx", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE, AREA_SIZE);  // <- Update
+    dataStore.write(xData, AREA_SIZE, AREA_SIZE);  // <- Update
 
     std::memcpy(xData, "test dddd", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     T yData[AREA_SIZE];
 
-    dataStore.Read(yData, AREA_SIZE, 0);
+    dataStore.read(yData, AREA_SIZE, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test aaaa") != 0) return false;
 
-    dataStore.Read(yData, AREA_SIZE, AREA_SIZE);
+    dataStore.read(yData, AREA_SIZE, AREA_SIZE);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test xxxx") != 0) return false;
   }
-  auto statusRemove1 = remove(dataStore.FileName().c_str());
+  auto statusRemove1 = remove(dataStore.fileName().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;
@@ -98,8 +98,8 @@ bool test_descriptor() {
   rdb::Descriptor data1{rdb::rfield("Name3", 10, rdb::STRING),
                         rdb::rfield("Name4", 10, rdb::STRING)};
 
-  data1.Append({rdb::rfield("Name5z", 10, rdb::STRING)});
-  data1.Append({rdb::rfield("Name6z", 10, rdb::STRING)});
+  data1.append({rdb::rfield("Name5z", 10, rdb::STRING)});
+  data1.append({rdb::rfield("Name6z", 10, rdb::STRING)});
 
   data1.push_back(rdb::rfield("Name", 10, rdb::STRING));
   data1.push_back(rdb::rfield("TLen", sizeof(uint), rdb::UINT));
@@ -127,10 +127,10 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  if (data2.Position("Control") != 2) return false;
-  if (data2.Len("Control") != 1) return false;
-  if (strcmp(data2.Type("Control").c_str(), "BYTE") != 0) return false;
-  if (data2.Offset("Control") != 14) return false;
+  if (data2.position("Control") != 2) return false;
+  if (data2.len("Control") != 1) return false;
+  if (strcmp(data2.type("Control").c_str(), "BYTE") != 0) return false;
+  if (data2.offset("Control") != 14) return false;
 
   return true;
 }
@@ -202,33 +202,33 @@ bool test_storage() {
   payload1.TLen = 0x66;
   payload1.Control = 0x22;
 
-  if (payload1.TLen != dAcc2.getDescriptor().Cast<int>("TLen", payload1.ptr))
+  if (payload1.TLen != dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr))
     return false;
 
-  dAcc2.Put(payload1.ptr);
-  dAcc2.Put(payload1.ptr);
-  dAcc2.Put(payload1.ptr);
+  dAcc2.put(payload1.ptr);
+  dAcc2.put(payload1.ptr);
+  dAcc2.put(payload1.ptr);
 
   dataPayload payload2;
   std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
   payload2.TLen = 0x67;
   payload2.Control = 0x33;
 
-  dAcc2.Put(payload2.ptr, 1);
+  dAcc2.put(payload2.ptr, 1);
 
   dataPayload payload3;
-  dAcc2.Get(payload3.ptr, 1);
+  dAcc2.get(payload3.ptr, 1);
 
   {
     std::stringstream coutstring;
-    coutstring << dAcc2.getDescriptor().ToString("Name", payload3.ptr);
+    coutstring << dAcc2.getDescriptor().toString("Name", payload3.ptr);
     if (strcmp(coutstring.str().c_str(), "xxxx xxxx") != 0) return false;
   }
 
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << dAcc2.getDescriptor().Cast<int>("TLen", payload3.ptr);
+    coutstring << dAcc2.getDescriptor().cast<int>("TLen", payload3.ptr);
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "67") != 0) return false;
   }
@@ -236,7 +236,7 @@ bool test_storage() {
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << (uint)dAcc2.getDescriptor().Cast<uint8_t>("Control",
+    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control",
                                                             payload3.ptr);
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "33") != 0) return false;

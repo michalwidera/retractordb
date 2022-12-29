@@ -42,13 +42,13 @@ class payLoadAccessor {
   /// @param position position according to descriptor
   /// @param value value of given type according to desciptor that will be set
   /// in payload
-  void set_item(int position, std::any value);
+  void setItem(int position, std::any value);
 
   /// @brief Dirrect getter
   /// @param position position according to descriptor
   /// @return address of begining memory that contains data descibed by
   /// descriptor
-  std::any get_item(int position);
+  std::any getItem(int position);
 
   template <typename K>
   friend std::istream &operator>>(std::istream &is,
