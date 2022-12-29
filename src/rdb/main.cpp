@@ -50,12 +50,12 @@ int main(int argc, char* argv[]) {
       }
       dacc.reset(new rdb::DataStorageAccessor(file));
       dacc->setReverse(cmd == "ropen");
-      if (dacc->getDescriptor().GetSize() == 0) {
+      if (dacc->getDescriptor().getSizeInBytes() == 0) {
         std::cout << RED "File exist, description file missing (.desc)\n" RESET;
         continue;
       }
-      payload.reset(new std::byte[dacc->getDescriptor().GetSize()]);
-      memset(payload.get(), 0, dacc->getDescriptor().GetSize());
+      payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
+      memset(payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "create" || cmd == "rcreate") {
@@ -77,8 +77,8 @@ int main(int argc, char* argv[]) {
       dacc.reset(new rdb::DataStorageAccessor(file));
       dacc->createDescriptor(desc);
       dacc->setReverse(cmd == "rcreate");
-      payload.reset(new std::byte[dacc->getDescriptor().GetSize()]);
-      memset(payload.get(), 0, dacc->getDescriptor().GetSize());
+      payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
+      memset(payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
                                       hexFormat);
       int position;
       std::cin >> position;
-      auto fieldname = dacc->getDescriptor().FieldName(position);
+      auto fieldname = dacc->getDescriptor().fieldName(position);
       if (dacc->getDescriptor().Type(fieldname) == "INTEGER") {
         int value;
         std::cin >> value;
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
                                       hexFormat);
       int position;
       std::cin >> position;
-      auto fieldname = dacc->getDescriptor().FieldName(position);
+      auto fieldname = dacc->getDescriptor().fieldName(position);
       std::any value = payloadAcc.get_item(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
@@ -216,7 +216,8 @@ int main(int argc, char* argv[]) {
       }
     } else if (cmd == "size") {
       std::cout << dacc->getRecordsCount() << " Record(s)\n";
-      std::cout << dacc->getDescriptor().GetSize() << " Byte(s) per record.\n";
+      std::cout << dacc->getDescriptor().getSizeInBytes()
+                << " Byte(s) per record.\n";
       continue;
     } else if (cmd == "hex")
       hexFormat = true;
@@ -224,7 +225,7 @@ int main(int argc, char* argv[]) {
       hexFormat = false;
     else if (cmd == "dump") {
       auto* ptr = reinterpret_cast<unsigned char*>(payload.get());
-      for (auto i = 0; i < dacc->getDescriptor().GetSize(); i++) {
+      for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');
         std::cout << std::setw(2);
