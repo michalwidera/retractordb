@@ -14,13 +14,13 @@ namespace rdb {
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
-typedef int fieldLen;
-typedef std::string fieldName;
+typedef int fieldLenType;
+typedef std::string fieldNameType;
 
 /**
  * @brief Tuple type - that defines field - Name, Len and Type.
  */
-typedef std::tuple<fieldName, fieldLen, rdb::eType> rfield;
+typedef std::tuple<fieldNameType, fieldLenType, rdb::eType> rfield;
 
 /**
  * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
@@ -66,7 +66,7 @@ class Descriptor : public std::vector<rfield> {
    * @param l Field len
    * @param t Field type - STRING (Maybe tables in future)
    */
-  Descriptor(fieldName n, fieldLen l, rdb::eType t);
+  Descriptor(fieldNameType n, fieldLenType l, rdb::eType t);
 
   /**
    * @brief Construct a new Descriptor object - only for no objects with len
@@ -74,7 +74,7 @@ class Descriptor : public std::vector<rfield> {
    * @param n Field name
    * @param t Field type - Int, Byte ...
    */
-  Descriptor(fieldName n, rdb::eType t);
+  Descriptor(fieldNameType n, rdb::eType t);
 
   /**
    * @brief Construct a new Descriptor object - Default constructor
@@ -123,7 +123,7 @@ class Descriptor : public std::vector<rfield> {
    *
    * @return uint size of package [unit: Bytes]
    */
-  uint GetSize() const;
+  uint getSizeInBytes() const;
 
   /**
    * @brief Return position as index in vector of tuples of given field name
@@ -139,7 +139,7 @@ class Descriptor : public std::vector<rfield> {
    * @param fieldPosition Field postion
    * @return string Position
    */
-  std::string FieldName(uint fieldPosition);
+  std::string fieldName(uint fieldPosition);
 
   /**
    * @brief Finds in inner container given tuple by name and return this tuple

@@ -23,10 +23,11 @@ DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
     myFile.open(fileDesc, std::ios::in);
     if (myFile.good()) myFile >> descriptor;
     myFile.close();
-    if (descriptor.GetSize() > 0) {
+    if (descriptor.getSizeInBytes() > 0) {
       std::ifstream in(fileName.c_str(),
                        std::ifstream::ate | std::ifstream::binary);
-      if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
+      if (in.good())
+        recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
     }
     dataFileStatus = open;
   }
@@ -48,10 +49,10 @@ void DataStorageAccessor<T, K>::createDescriptor(
   descFile << descriptor;
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile.close();
-  if (descriptor.GetSize() > 0) {
+  if (descriptor.getSizeInBytes() > 0) {
     std::ifstream in(filename.c_str(),
                      std::ifstream::ate | std::ifstream::binary);
-    if (in.good()) recordsCount = int(in.tellg() / descriptor.GetSize());
+    if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
   }
   dataFileStatus = open;
 }
@@ -93,7 +94,7 @@ template <class T, class K>
 bool DataStorageAccessor<T, K>::Get(T* inBuffer, const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
-  auto size = descriptor.GetSize();
+  auto size = descriptor.getSizeInBytes();
   int result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
@@ -108,7 +109,7 @@ bool DataStorageAccessor<T, K>::Put(const T* outBuffer,
                                     const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
-  auto size = descriptor.GetSize();
+  auto size = descriptor.getSizeInBytes();
   int result = 0;
   if (recordIndex == std::numeric_limits<size_t>::max()) {
     result = accessor->Write(outBuffer, size);  // <- Call to Append Function

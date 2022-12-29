@@ -64,11 +64,11 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
         // Patch on gramma problem -
         // dot program is using { as important sign - we need to convert { to <
         //
-        std::string sFieldName(f.fieldName);
-        std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
-        std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
-        std::string sFieldString(f.getFieldText());
-        xout << sFieldString;
+        std::string name(f.fieldName);
+        std::replace(name.begin(), name.end(), '{', '/');
+        std::replace(name.begin(), name.end(), '}', '/');
+        std::string fieldText(f.getFieldText());
+        xout << fieldText;
         if (bShowFieldTypes)
           std::cout << "(" << GetStringeType(f.fieldType) << ")";
       }

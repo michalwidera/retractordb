@@ -67,12 +67,12 @@ constexpr uint GetFieldLenFromType(rdb::eType ft) {
 Descriptor::Descriptor(std::initializer_list<rfield> l)
     : std::vector<rfield>(l) {}
 
-Descriptor::Descriptor(fieldName n, fieldLen l, rdb::eType t) {
+Descriptor::Descriptor(fieldNameType n, fieldLenType l, rdb::eType t) {
   push_back(rfield(n, l, t));
   UpdateNames();
 }
 
-Descriptor::Descriptor(fieldName n, rdb::eType t) {
+Descriptor::Descriptor(fieldNameType n, rdb::eType t) {
   assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
   push_back(rfield(n, GetFieldLenFromType(t), t));
@@ -111,7 +111,7 @@ Descriptor::Descriptor(const Descriptor &init) {
   UpdateNames();
 }
 
-uint Descriptor::GetSize() const {
+uint Descriptor::getSizeInBytes() const {
   uint size = 0;
   for (auto const i : *this) size += std::get<rlen>(i);
   return size;
@@ -121,8 +121,8 @@ bool Descriptor::UpdateNames() {
   uint position = 0;
   fieldNames.clear();
   for (auto const i : *this) {
-    if (fieldNames.find(std::get<fieldName>(i)) == fieldNames.end())
-      fieldNames[std::get<fieldName>(i)] = position;
+    if (fieldNames.find(std::get<fieldNameType>(i)) == fieldNames.end())
+      fieldNames[std::get<fieldNameType>(i)] = position;
     else {
       fieldNames.clear();
       assert(false && "that name aleardy exist so it will make dirty");
@@ -139,8 +139,8 @@ uint Descriptor::Position(std::string name) {
   return -1;
 }
 
-std::string Descriptor::FieldName(uint fieldPosition) {
-  return std::get<fieldName>((*this)[fieldPosition]);
+std::string Descriptor::fieldName(uint fieldPosition) {
+  return std::get<fieldNameType>((*this)[fieldPosition]);
 }
 
 uint Descriptor::Len(const std::string name) {
@@ -151,7 +151,7 @@ uint Descriptor::Len(const std::string name) {
 uint Descriptor::Offset(const std::string name) {
   auto offset = 0;
   for (auto const field : *this) {
-    if (name == std::get<fieldName>(field)) return offset;
+    if (name == std::get<fieldNameType>(field)) return offset;
     offset += std::get<rlen>(field);
   }
   assert(false && "field not found with that name");

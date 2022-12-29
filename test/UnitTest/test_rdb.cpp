@@ -191,7 +191,7 @@ bool test_storage() {
                       rdb::Descriptor("TLen", rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
-  if (dataDescriptor.GetSize() != sizeof(dataPayload)) return false;
+  if (dataDescriptor.getSizeInBytes() != sizeof(dataPayload)) return false;
 
   dataPayload payload1;
 

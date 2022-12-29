@@ -23,8 +23,9 @@ struct streamComposite {
     accessor->set_item(position, value);
   };
   streamComposite(rdb::Descriptor descriptor) {
-    payload.reset(new std::byte[descriptor.GetSize()]);
-    accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
+    payload.reset(new std::byte[descriptor.getSizeInBytes()]);
+    accessor.reset(
+        new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
   };
 };
 

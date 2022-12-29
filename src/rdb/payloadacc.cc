@@ -32,7 +32,7 @@ T *payLoadAccessor<T>::getPayloadPtr() const {
 
 template <typename T>
 void payLoadAccessor<T>::set_item(int position, std::any value) {
-  auto fieldName = descriptor.FieldName(position);
+  auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.Len(fieldName);
   if (descriptor.Type(fieldName) == "STRING") {
     std::string data(std::any_cast<std::string>(value));
@@ -74,7 +74,7 @@ void payLoadAccessor<T>::set_item(int position, std::any value) {
 
 template <typename T>
 std::any payLoadAccessor<T>::get_item(int position) {
-  auto fieldName = descriptor.FieldName(position);
+  auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.Len(fieldName);
   std::cerr << "set:" << fieldName << std::endl;
   if (descriptor.Type(fieldName) == "STRING") {

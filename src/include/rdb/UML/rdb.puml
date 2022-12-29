@@ -6,7 +6,7 @@ class Descriptor {
     {method} Append
     {method} operator|
     {method} operator=
-    {method} GetSize
+    {method} getSizeInBytes
     {method} Position
     {method} Len
     {method} Offset

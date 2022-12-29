@@ -97,10 +97,11 @@ add_custom_target(
 # sudo apt install clang-format ; sudo pip install cmakelang
 add_custom_target(
   cformat
-  COMMAND find ../src -name *.h -o -iname *.cpp -o -iname *.hpp -o -iname *.cc |
-          grep --invert-match 'Parser/' | xargs clang-format -i -style=Google
-  COMMAND find ../test -name *.h -o -iname *.cpp -o -iname *.hpp -o -iname *.cc
-          | xargs clang-format -i -style=Google
+  COMMAND
+    find ../src -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname
+    "*.cc" | grep --invert-match 'Parser/' | xargs clang-format -i -style=Google
+  COMMAND find ../test -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o
+          -iname "*.cc" | xargs clang-format -i -style=Google
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
