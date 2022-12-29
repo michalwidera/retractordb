@@ -18,7 +18,6 @@ Testing/
 nohup.out
 build/
 scripts/CMakeFiles/*
-.vscode/
 astyle/
 compile_commands.json
 install_manifest.txt
