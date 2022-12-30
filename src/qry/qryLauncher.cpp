@@ -53,13 +53,10 @@ int main(int argc, char *argv[]) {
         ("raw,r", "raw mode (default)")         //
         ("help,h", "show options")              //
         ("needctrlc,c", "force ctl+c for stop this tool");
-    po::positional_options_description
-        p;  // Assume that select is the first option
+    po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
     po::variables_map vm;
-    po::store(
-        po::command_line_parser(argc, argv).options(desc).positional(p).run(),
-        vm);
+    po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
     setbuf(stdout, nullptr);
     if (vm.count("graphite")) setmode("GRAPHITE");
@@ -85,8 +82,7 @@ int main(int argc, char *argv[]) {
     else if (vm.count("detail")) {
       if (!detailShow()) return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
-      if (!select(vm.count("needctrlc")))
-        return system::errc::no_such_file_or_directory;
+      if (!select(vm.count("needctrlc"))) return system::errc::no_such_file_or_directory;
     } else {
       std::cout << argv[0] << ": fatal error: no argument" << std::endl;
       SPDLOG_ERROR("stop - error, no argument.");

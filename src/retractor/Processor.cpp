@@ -52,15 +52,13 @@ std::map<std::string, inputDF> gFileMap;
  * * instead of argument list */
 int getRowSize(const query &q) { return gDataMap[q.id].row.size(); }
 
-number getValueProc(std::string streamName, int timeOffset, int schemaOffset,
-                    bool reverse = false) {
+number getValueProc(std::string streamName, int timeOffset, int schemaOffset, bool reverse = false) {
   number retval;
   const query &q(getQuery(streamName));
   assert(timeOffset >= 0);
   const int sizeOfRollup = getRowSize(q);
   if (sizeOfRollup == 0) {
-    SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName,
-                 sizeOfRollup);
+    SPDLOG_ERROR("schema size of {} is {} (uninitialized?)", streamName, sizeOfRollup);
     return retval;
   }
   if (schemaOffset >= sizeOfRollup) {
@@ -97,8 +95,7 @@ number getValueOfRollup(const query &q, int offset) {
       return getValueProc(arg[0].getStr(), 0, offset);
     case STREAM_TIMEMOVE:
       /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-      return getValueProc(arg[0].getStr(), rational_cast<int>(arg[1].get()),
-                          offset);
+      return getValueProc(arg[0].getStr(), rational_cast<int>(arg[1].get()), offset);
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
       /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2),
@@ -117,10 +114,8 @@ number getValueOfRollup(const query &q, int offset) {
         // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
         // (2/3) argument of operation (rational)
         int newTimeOffset = -1;  // catch on assert(false);
-        if (cmd == STREAM_DEHASH_DIV)
-          newTimeOffset = Div(q.rInterval, rationalArgument, 0);
-        if (cmd == STREAM_DEHASH_MOD)
-          newTimeOffset = Mod(rationalArgument, q.rInterval, 0);
+        if (cmd == STREAM_DEHASH_DIV) newTimeOffset = Div(q.rInterval, rationalArgument, 0);
+        if (cmd == STREAM_DEHASH_MOD) newTimeOffset = Mod(rationalArgument, q.rInterval, 0);
         if (newTimeOffset < 0) assert(false);
         return getValueProc(streamNameArg, newTimeOffset, offset);
       }
@@ -187,19 +182,16 @@ number getValueOfRollup(const query &q, int offset) {
         if (mirror)
           return getValueProc(nameSrc, 0, windowSize - 1 + offset);
         else {
-          int d =
-              abs((streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
+          int d = abs((streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
           return getValueProc(nameSrc, 0, windowSize - offset + d);
         }
       }
     case STREAM_HASH:
       // TODO: Check if right hash part is returned here
       {
-        const auto timeSeqence =
-            (gDataMap[q.id].len) > 1 ? gDataMap[q.id].len : 1;
+        const auto timeSeqence = (gDataMap[q.id].len) > 1 ? gDataMap[q.id].len : 1;
         int timeOffset = 0;
-        if (Hash(getQuery(arg[0].getStr()).rInterval,
-                 getQuery(arg[1].getStr()).rInterval, timeSeqence, timeOffset))
+        if (Hash(getQuery(arg[0].getStr()).rInterval, getQuery(arg[1].getStr()).rInterval, timeSeqence, timeOffset))
           return getValueProc(arg[1].getStr(), timeOffset, offset);
         else
           return getValueProc(arg[0].getStr(), timeOffset, offset);
@@ -221,13 +213,10 @@ Processor::Processor() {
       ;  // Stream with this name already exist in stystem
     */
     // Container initialization for file type data sources
-    if (!q.filename.empty())
-      gFileMap[q.id] = inputDF(q.filename.c_str(), q.lSchema);
-    SPDLOG_INFO("Req: gDataMap {} len:{} rp:{}", q.id,
-                gDataMap[q.id].row.size(), q.lSchema.size());
+    if (!q.filename.empty()) gFileMap[q.id] = inputDF(q.filename.c_str(), q.lSchema);
+    SPDLOG_INFO("Req: gDataMap {} len:{} rp:{}", q.id, gDataMap[q.id].row.size(), q.lSchema.size());
     gDataMap[q.id] = dataAgregator(q.lSchema.size());
-    SPDLOG_INFO("Bld: gDataMap {} len:{} rp:{}", q.id,
-                gDataMap[q.id].row.size(), getRowSize(q));
+    SPDLOG_INFO("Bld: gDataMap {} len:{} rp:{}", q.id, gDataMap[q.id].row.size(), getRowSize(q));
   }
   pProc = this;
 }
@@ -254,10 +243,9 @@ void Processor::processRows(std::set<std::string> inSet) {
       // we assume that optimized streams are ready and filled
       assert(q.lProgram.size() > 0);
       auto it = q.lProgram.begin();
-      token operation =
-          q.lProgram.back();       // Operation is always last element on stack
-      token argument1, argument2;  // This arugments are optionally fullfiled
-      std::string streamNameArg;   // Same as argument
+      token operation = q.lProgram.back();  // Operation is always last element on stack
+      token argument1, argument2;           // This arugments are optionally fullfiled
+      std::string streamNameArg;            // Same as argument
       int TimeOffset(0);
       assert(rowValues.empty());
       // all stream operations cover
@@ -285,32 +273,27 @@ void Processor::processRows(std::set<std::string> inSet) {
           TimeOffset = 0;
           argument1 = *(it++);
           argument2 = *(it++);
-          if (Hash(getQuery(argument1.getStr()).rInterval,
-                   getQuery(argument2.getStr()).rInterval, gDataMap[q.id].len,
+          if (Hash(getQuery(argument1.getStr()).rInterval, getQuery(argument2.getStr()).rInterval, gDataMap[q.id].len,
                    TimeOffset))
             streamNameArg = argument2.getStr();
           else
             streamNameArg = argument1.getStr();
           if (TimeOffset <= 0) {
-            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}",
-                         TimeOffset, argument1.getStr(), argument2.getStr(),
-                         q.id);
+            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}", TimeOffset, argument1.getStr(),
+                         argument2.getStr(), q.id);
           }
           // TimeOffset = TimeOffset - gDataMap[streamNameArg].len;  - need to
           // investigate here.
           if (TimeOffset < 0) {
-            SPDLOG_ERROR("Timeoffset is negative = {}, len = {}, gLen={}",
-                         TimeOffset, gDataMap[q.id].len,
+            SPDLOG_ERROR("Timeoffset is negative = {}, len = {}, gLen={}", TimeOffset, gDataMap[q.id].len,
                          gDataMap[streamNameArg].len);
           }
           assert(TimeOffset >= 0);
           // If this assert fails - you are probably trying to hash a#b when a
           // and b has different schema sizes. This should be identified on
           // compilation phase in future.
-          assert(gDataMap[streamNameArg].row.size() ==
-                 getQuery(argument1.getStr()).lSchema.size());
-          assert(gDataMap[streamNameArg].row.size() ==
-                 getQuery(argument2.getStr()).lSchema.size());
+          assert(gDataMap[streamNameArg].row.size() == getQuery(argument1.getStr()).lSchema.size());
+          assert(gDataMap[streamNameArg].row.size() == getQuery(argument2.getStr()).lSchema.size());
           rowValues = getRow(streamNameArg, TimeOffset);
           break;
         case STREAM_ADD:
@@ -425,10 +408,8 @@ void Processor::processRows(std::set<std::string> inSet) {
             // (2/3) argument of operation (rational)
             int position = gDataMap[q.id].len + 1;
             // size[q.id] == -1 for zero elements (therefore + 1)
-            if (operation.getCommandID() == STREAM_DEHASH_DIV)
-              TimeOffset = Div(q.rInterval, rationalArgument, position);
-            if (operation.getCommandID() == STREAM_DEHASH_MOD)
-              TimeOffset = Mod(rationalArgument, q.rInterval, position);
+            if (operation.getCommandID() == STREAM_DEHASH_DIV) TimeOffset = Div(q.rInterval, rationalArgument, position);
+            if (operation.getCommandID() == STREAM_DEHASH_MOD) TimeOffset = Mod(rationalArgument, q.rInterval, position);
             if (TimeOffset < 0) assert(false);
             rowValues = getRow(streamNameArg, TimeOffset, true);
           }
@@ -462,8 +443,7 @@ void Processor::processRows(std::set<std::string> inSet) {
                 rowValues.push_back(ret);
               }
             } else {
-              int d = abs(
-                  (streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
+              int d = abs((streamSizeOut)-agse(streamSizeSrc * schemaSizeSrc, step));
               // "}{";
               for (int i = 0; i < windowSize; i++) {
                 number ret = getValueProc(nameSrc, 0, i + d);
@@ -484,8 +464,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           if (operation.get() > q.rInterval) {
             // Check if parameters are in oposite order
-            TimeOffset =
-                Substract(q.rInterval, operation.get(), gDataMap[q.id].len);
+            TimeOffset = Substract(q.rInterval, operation.get(), gDataMap[q.id].len);
             TimeOffset = gDataMap[q.id].len - TimeOffset;
           }
           rowValues = getRow(streamNameArg, TimeOffset);
@@ -509,8 +488,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       assert(!q.filename.empty());
       gDataMap[q.id].row = gFileMap[q.id].getFileRow();
     } else {
-      for (auto i = 0; i < getRowSize(q); i++)
-        gDataMap[q.id].row[i] = getValueOfRollup(q, i);
+      for (auto i = 0; i < getRowSize(q); i++) gDataMap[q.id].row[i] = getValueOfRollup(q, i);
     }
     // here should be computer values of stream tuples
     // computed value shoud be stored in file
@@ -523,19 +501,16 @@ void Processor::processRows(std::set<std::string> inSet) {
   }
 }
 
-std::vector<number> Processor::getRow(std::string streamName, int timeOffset,
-                                      bool reverse) {
+std::vector<number> Processor::getRow(std::string streamName, int timeOffset, bool reverse) {
   std::vector<number> retVal;
   if (timeOffset < 0) {
     // This need more investigation - this is kind of workaround.
     // Because from different queations sometimes -1 a timeOffset could appear.
-    for (auto f : getQuery(streamName).lSchema)
-      retVal.push_back(boost::rational<int>(0));
+    for (auto f : getQuery(streamName).lSchema) retVal.push_back(boost::rational<int>(0));
     return retVal;
   }
   int column = 0;
-  for (auto f : getQuery(streamName).lSchema)
-    retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
+  for (auto f : getQuery(streamName).lSchema) retVal.push_back(getValueProc(streamName, timeOffset, column++, reverse));
   return retVal;
 }
 
@@ -609,12 +584,10 @@ number Processor::computeValue(field &f, query &q) {
           rStack.push(Rationalize(sqrt(real)));
         } else if (tk.getStr() == "sum") {
           number data_sum(0);
-          for (int i = 0; i < getRowSize(q); i++)
-            data_sum += getValueOfRollup(q, i);
+          for (int i = 0; i < getRowSize(q); i++) data_sum += getValueOfRollup(q, i);
           rStack.push(data_sum);
         } else
-          throw std::out_of_range(
-              "No support for this math function - write it SVP");
+          throw std::out_of_range("No support for this math function - write it SVP");
       } break;
       case PUSH_ID3:  // Field_name
       case PUSH_ID1:  // Schema_name.Field_name
@@ -657,8 +630,7 @@ number Processor::computeValue(field &f, query &q) {
         rStack.push(a);
       } break;
       default:
-        throw std::out_of_range(
-            "Thrown/Processor.cpp/getCRValue Unknown token");
+        throw std::out_of_range("Thrown/Processor.cpp/getCRValue Unknown token");
     }
   }  // for(auto tk : f.lProgram)
   if (rStack.size() == 0) {
@@ -668,13 +640,10 @@ number Processor::computeValue(field &f, query &q) {
   } else if (rStack.size() == 1)
     return rStack.top();
   else
-    throw std::out_of_range(
-        "Thrown/Processor.cpp/getCRValue too much token left on stack");
+    throw std::out_of_range("Thrown/Processor.cpp/getCRValue too much token left on stack");
   return 0; /* pro forma */
 }
 
-int getStreamCount(const std::string &query_name) {
-  return gDataMap[query_name].len;
-}
+int getStreamCount(const std::string &query_name) { return gDataMap[query_name].len; }
 
 long streamStoredSize(std::string &filename) { return 0; }

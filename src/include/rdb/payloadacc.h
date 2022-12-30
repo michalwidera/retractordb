@@ -51,12 +51,10 @@ class payLoadAccessor {
   std::any getItem(int position);
 
   template <typename K>
-  friend std::istream &operator>>(std::istream &is,
-                                  const payLoadAccessor<K> &rhs);
+  friend std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs);
 
   template <typename K>
-  friend std::ostream &operator<<(std::ostream &os,
-                                  const payLoadAccessor<K> &rhs);
+  friend std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs);
 };
 }  // namespace rdb
 

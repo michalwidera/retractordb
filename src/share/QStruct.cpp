@@ -30,9 +30,7 @@ qTree coreInstance;
 //        ) ;
 //}
 
-bool operator<(const query &lhs, const query &rhs) {
-  return lhs.rInterval < rhs.rInterval;
-}
+bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
 //{
 //  //
@@ -68,8 +66,7 @@ command_id token::getCommandID() { return command; }
 
 std::string token::getStrCommandID() { return GetStringcommand_id(command); }
 
-boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
-                                 int ttl /*=11*/) {
+boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/, int ttl /*=11*/) {
   std::stack<int> st;
   double startx(inValue), diff, err1, err2;
   unsigned int val;
@@ -157,9 +154,7 @@ void qTree::tsort() {
   for (auto &q : des) push_back(q);
 }
 
-boost::rational<int> qTree::getDelta(const std::string &query_name) {
-  return getQuery(query_name).rInterval;
-}
+boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }
 
 query &getQuery(const std::string &query_name) {
   assert(query_name != "");
@@ -211,25 +206,19 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 field::field() {}
 
-field::field(std::string sFieldName, std::list<token> &lProgram,
-             rdb::eType dFieldType, std::string sFieldText)
-    : lProgram(lProgram),
-      sFieldText(sFieldText),
-      fieldType(dFieldType),
-      fieldName(sFieldName) {}
+field::field(std::string sFieldName, std::list<token> &lProgram, rdb::eType dFieldType, std::string sFieldText)
+    : lProgram(lProgram), sFieldText(sFieldText), fieldType(dFieldType), fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
 
 token field::getFirstFieldToken() {
-  assert(lProgram.size() >
-         0);  // If this fails that means in field no program (decl!)
+  assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
   return *lProgram.begin();
 }
 
 /** Construktor set */
 template <typename T>
-token::token(command_id id, const std::string &sValue, T value)
-    : command(id), textValue(sValue) {
+token::token(command_id id, const std::string &sValue, T value) : command(id), textValue(sValue) {
   if constexpr (std::is_same_v<T, number>)
     numericValue = value;
   else if constexpr (std::is_same_v<T, int>)
@@ -258,8 +247,7 @@ template token::token(command_id id, const std::string &sValue, float);
 
 /** Construktor set */
 
-query::query(boost::rational<int> rInterval, const std::string &id)
-    : rInterval(rInterval), id(id) {}
+query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}
 
 query::query() {}
 
@@ -346,8 +334,7 @@ rdb::Descriptor query::getInternalDescriptor() {
       int windowSize = abs(rational_cast<int>(cmd.get()));
       auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
       for (int i = 0; i < windowSize; i++) {
-        retVal |
-            rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);
       }
     } break;
     default:
@@ -368,6 +355,4 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   return std::make_tuple(sArg1, sArg2, cmd);
 }
 
-std::ostream &operator<<(std::ostream &os, rdb::eType s) {
-  return os << rdb::GetStringeType(s);
-}
+std::ostream &operator<<(std::ostream &os, rdb::eType s) { return os << rdb::GetStringeType(s); }

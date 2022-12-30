@@ -44,8 +44,7 @@ namespace IPC = boost::interprocess;
 typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
 
 typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator>
-    IPCString;
+typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
 typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
 
 typedef std::pair<const int, IPCString> ValueType;
@@ -120,8 +119,7 @@ void dumpCore(std::ostream &xout) {
 
 std::set<std::string> getAwaitedStreamsSet(TimeLine &tl) {
   std::set<std::string> retVal;
-  while (pProc == nullptr)
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+  while (pProc == nullptr) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   for (const auto &it : coreInstance) {
     boost::rational<int> slot = it.rInterval;
     if (!tl.isThisDeltaAwaitCurrentTimeSlot(slot)) continue;
@@ -146,18 +144,13 @@ ptree commandProcessor(ptree ptInval) {
       SPDLOG_DEBUG("get cmd rcv.");
       for (auto &q : coreInstance) {
         ptRetval.put(std::string("db.stream.") + q.id, q.id);
-        ptRetval.put(
-            std::string("db.stream.") + q.id + std::string(".duration"),
-            boost::lexical_cast<std::string>(q.rInterval));
+        ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
         long recordsCount = -1;
         if (!q.isDeclaration()) recordsCount = streamStoredSize(q.id);
-        ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"),
-                     boost::lexical_cast<std::string>(recordsCount));
+        ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
                      boost::lexical_cast<std::string>(getStreamCount(q.id)));
-        ptRetval.put(
-            std::string("db.stream.") + q.id + std::string(".location"),
-            q.filename);
+        ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"), q.filename);
       }
     }
     //
@@ -167,8 +160,7 @@ ptree commandProcessor(ptree ptInval) {
       std::string streamName = ptInval.get("db.argument", "");
       assert(streamName != "");
       SPDLOG_DEBUG("got detail {} rcv.", streamName);
-      for (const auto &s : coreInstance[streamName].lSchema)
-        ptRetval.put(std::string("db.field.") + s.fieldName, s.fieldName);
+      for (const auto &s : coreInstance[streamName].lSchema) ptRetval.put(std::string("db.field.") + s.fieldName, s.fieldName);
     }
     //
     // This command will add stream to list of transmited streams
@@ -191,8 +183,7 @@ ptree commandProcessor(ptree ptInval) {
       // let's assuem that we have 1/10 duration
       // that menas 10 elements are going in second
       // so - we need 10 elements for one second buffer
-      int maxElements =
-          boost::rational_cast<int>(1 / coreInstance[streamName].rInterval);
+      int maxElements = boost::rational_cast<int>(1 / coreInstance[streamName].rInterval);
       maxElements = (maxElements < 2) ? 2 : maxElements;
       IPC::message_queue mq(IPC::open_or_create  // open or crate
                             ,
@@ -238,10 +229,8 @@ void commmandProcessorLoop() {
     IPC::message_queue::remove("RetractorQueryQueue");
     IPC::shared_memory_object::remove("RetractorShmemMap");
     // Segment and allogator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create,
-                                          "RetractorShmemMap", 65536);
-    const ShmemAllocator allocatorShmemMapInstance(
-        mapSegment.get_segment_manager());
+    IPC::managed_shared_memory mapSegment(IPC::open_or_create, "RetractorShmemMap", 65536);
+    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     // Create a message_queue.
     IPC::message_queue mq(IPC::open_or_create  // open or crate
                           ,
@@ -291,8 +280,7 @@ std::string printRowValue(const std::string query_name) {
   using boost::property_tree::ptree;
   ptree pt;
   pt.put("stream", query_name);
-  pt.put("count",
-         boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
+  pt.put("count", boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
   int i = 0;
   for (auto value : pProc->getRow(query_name, 0)) {
     //
@@ -340,13 +328,11 @@ int main(int argc, char *argv[]) {
     desc.add_options()                        //
         ("help,h", "show help")               //
         ("compiler", "show compiler config")  //
-        ("infile,i",
-         po::value<std::string>(&sInputFile)->default_value("query.qry"),
+        ("infile,i", po::value<std::string>(&sInputFile)->default_value("query.qry"),
          "input query plan")  //
         ("display,s", po::value<std::string>(&sQuery),
          "process single query")  //
-        ("dump,d",
-         po::value<std::string>(&sDumpFile)->default_value("query.dmp"),
+        ("dump,d", po::value<std::string>(&sDumpFile)->default_value("query.dmp"),
          "dump file name")  //
         ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0),
          "query limit, 0 - no limit")           //
@@ -356,12 +342,9 @@ int main(int argc, char *argv[]) {
     po::positional_options_description p;
     p.add("infile", -1);
     po::variables_map vm;
-    po::store(
-        po::command_line_parser(argc, argv).options(desc).positional(p).run(),
-        vm);
+    po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
-    if (vm.count("verbose"))
-      std::cerr << argv[0] << " - query plan executor." << std::endl;
+    if (vm.count("verbose")) std::cerr << argv[0] << " - query plan executor." << std::endl;
     if (vm.count("help")) {
       std::cout << desc;
       std::cout << config_line;
@@ -395,9 +378,7 @@ int main(int argc, char *argv[]) {
     for (auto qry : coreInstance) {
       if (qry.id == ":STORAGE") storagePath = qry.filename;
     }
-    auto new_end =
-        std::remove_if(coreInstance.begin(), coreInstance.end(),
-                       [](const query &qry) { return qry.id[0] == ':'; });
+    auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(), [](const query &qry) { return qry.id[0] == ':'; });
     coreInstance.erase(new_end, coreInstance.end());
     // setStorageLocation(storagePath);
     //
@@ -416,10 +397,7 @@ int main(int argc, char *argv[]) {
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
     if (vm.count("verbose")) {
-      std::cout << ((iTimeLimitCnt == 0)
-                        ? "Press any key to stop."
-                        : "Query limit (-m) waiting for fullfil")
-                << std::endl;
+      std::cout << ((iTimeLimitCnt == 0) ? "Press any key to stop." : "Query limit (-m) waiting for fullfil") << std::endl;
     }
     boost::rational<int> prev_interval(0);
     while (!_kbhit() && iTimeLimitCnt != 1) {
@@ -434,8 +412,7 @@ int main(int argc, char *argv[]) {
       // probably can be increased in faster machines
       //
       const int msInSec = 1000;
-      boost::rational<int> interval(tl.getNextTimeSlot() *
-                                    msInSec /* sec->ms */);
+      boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
       int period(rational_cast<int>(interval - prev_interval));  // miliseconds
       prev_interval = interval;
       //
@@ -462,8 +439,7 @@ int main(int argc, char *argv[]) {
             //
             // Query discovery. queues are created by show command
             //
-            std::string queueName =
-                "brcdbr" + boost::lexical_cast<std::string>(element.first);
+            std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
             IPC::message_queue mq(IPC::open_only, queueName.c_str());
             //
             // If send queue is full - means no one is listening and queue is
@@ -480,9 +456,7 @@ int main(int argc, char *argv[]) {
         //
         for (const auto &element : eraseList) {
           id2StreamName_Relation.erase(element);
-          if (vm.count("verbose"))
-            std::cout << "queue erased on timeout, procId=" << element
-                      << std::endl;
+          if (vm.count("verbose")) std::cout << "queue erased on timeout, procId=" << element << std::endl;
         }
       }
       //
@@ -499,12 +473,10 @@ int main(int argc, char *argv[]) {
     if (iTimeLimitCnt != 1) {
       _getch();  // no wait ... feed key from kbhit
     } else {
-      if (vm.count("verbose"))
-        std::cout << "Query limit (-m) waiting for fullfil" << std::endl;
+      if (vm.count("verbose")) std::cout << "Query limit (-m) waiting for fullfil" << std::endl;
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cerr << ex.what() << std::endl
-              << "IPC::interprocess exception" << std::endl;
+    std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;
     retVal = system::errc::no_child_process;
   } catch (std::exception &e) {
     std::cerr << "Fail";
@@ -517,8 +489,7 @@ int main(int argc, char *argv[]) {
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
   for (const auto &element : id2StreamName_Relation) {
-    std::string queueName =
-        "brcdbr" + boost::lexical_cast<std::string>(element.first);
+    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
     IPC::message_queue::remove(queueName.c_str());
   }
   return retVal;

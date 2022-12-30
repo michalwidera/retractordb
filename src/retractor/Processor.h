@@ -37,6 +37,5 @@ class Processor : private boost::noncopyable {
   void processRows(std::set<std::string> inSet);
 
   /** Context functions */
-  std::vector<number> getRow(std::string streamName, int timeOffset,
-                             bool reverse = false);
+  std::vector<number> getRow(std::string streamName, int timeOffset, bool reverse = false);
 };

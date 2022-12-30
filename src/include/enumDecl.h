@@ -21,11 +21,9 @@
 #define DECL(element) \
   { element, #element }
 #define BEGIN_E_GEN(ENUM_NAME) std::map<ENUM_NAME, std::string> tg_##ENUM_NAME =
-#define END_E_GEN(ENUM_NAME)                               \
-  ;                                                        \
-  std::string GetString##ENUM_NAME(enum ENUM_NAME index) { \
-    return tg_##ENUM_NAME[index];                          \
-  };
+#define END_E_GEN(ENUM_NAME) \
+  ;                          \
+  std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
 // This undef will force to BEGIN_E_GEN(...) - END_E_GEN(...) will appear once
 // again with new set of BEGIN_E_GEN/END_E_GEN definitions and will goto to
 // BEGIN_E_GEN sections
@@ -99,10 +97,8 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
 
     // This declaration goes into ::rdb namespace
     namespace rdb {
-  BEGIN_E_GEN(eType){DECL(BAD),    DECL(BYTE),      DECL(INTEGER),
-                     DECL(UINT),   DECL(RATIONAL),  DECL(FLOAT),
-                     DECL(STRING), DECL(BYTEARRAY), DECL(INTARRAY),
-                     DECL(DOUBLE)} END_E_GEN(eType)
+  BEGIN_E_GEN(eType){DECL(BAD),   DECL(BYTE),   DECL(INTEGER),   DECL(UINT),     DECL(RATIONAL),
+                     DECL(FLOAT), DECL(STRING), DECL(BYTEARRAY), DECL(INTARRAY), DECL(DOUBLE)} END_E_GEN(eType)
 }
 
 #undef BEGIN_E_GEN

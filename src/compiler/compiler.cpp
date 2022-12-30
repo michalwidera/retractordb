@@ -71,10 +71,8 @@ std::string intervalCounter() {
             delta = deltaDivMod(delta1, delta2);
           }
           if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}",
-                         q.id, delta1, delta2);
-            throw std::out_of_range(
-                "You cannot make faster div from slower source");
+            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
+            throw std::out_of_range("You cannot make faster div from slower source");
           }
         } break;
         case STREAM_DEHASH_MOD: {
@@ -91,10 +89,8 @@ std::string intervalCounter() {
             delta = deltaDivMod(delta2, delta1);
           }
           if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}",
-                         q.id, delta1, delta2);
-            throw std::out_of_range(
-                "You cannot make faster mod from slower source");
+            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
+            throw std::out_of_range("You cannot make faster mod from slower source");
           }
         } break;
         case STREAM_SUBSTRACT: {
@@ -134,8 +130,7 @@ std::string intervalCounter() {
           // push_val 5 -> size_of_window
           // stream agse 3 -> step_of_window
           boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr());
-          boost::rational<int> schemaSizeSrc =
-              getQuery(t1.getStr()).lSchema.size();
+          boost::rational<int> schemaSizeSrc = getQuery(t1.getStr()).lSchema.size();
           boost::rational<int> step = abs(t2.get());
           boost::rational<int> windowSize = abs(op.get());
           assert(windowSize > 0);
@@ -149,8 +144,7 @@ std::string intervalCounter() {
             delta = (deltaSrc / schemaSizeSrc) * step;
         } break;
         default:
-          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}",
-                       op.getStrCommandID(), op.get(), op.getStr());
+          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.get(), op.getStr());
           throw std::out_of_range("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
       assert(delta != -1);
@@ -165,8 +159,7 @@ std::string intervalCounter() {
   return std::string("OK");
 }
 
-std::string generateStreamName(std::string sName1, std::string sName2,
-                               command_id cmd) {
+std::string generateStreamName(std::string sName1, std::string sName2, command_id cmd) {
   std::string sOperation = GetStringcommand_id(cmd);
   if (sName2 == "")
     return sOperation + std::string("_") + sName1;
@@ -182,14 +175,11 @@ std::string simplifyLProgram() {
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
     // Agse pahse optization
     token t0, t1, t2;
-    for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end();
-         ++it2) {
+    for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
       t0 = t1;
       t1 = t2;
       t2 = (*it2);
-      if (t2.getStrCommandID() == "STREAM_AGSE" &&
-          t1.getStrCommandID() == "PUSH_VAL" &&
-          t0.getStrCommandID() == "PUSH_VAL") {
+      if (t2.getStrCommandID() == "STREAM_AGSE" && t1.getStrCommandID() == "PUSH_VAL" && t0.getStrCommandID() == "PUSH_VAL") {
         token newVal(t2.getCommandID(), t1.getStr(), t1.get());
         it2 = (*it).lProgram.erase(it2);
         --it2;
@@ -201,10 +191,8 @@ std::string simplifyLProgram() {
     }
     // Otimization phase 2
     if ((*it).isReductionRequired()) {
-      for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end();
-           ++it2) {
-        if ((*it2).getStrCommandID() == "STREAM_TIMEMOVE" ||
-            (*it2).getStrCommandID() == "STREAM_SUBSTRACT") {
+      for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
+        if ((*it2).getStrCommandID() == "STREAM_TIMEMOVE" || (*it2).getStrCommandID() == "STREAM_SUBSTRACT") {
           query newQuery;
           std::string arg1;  //< Name of argument operation
           command_id cmd;
@@ -232,12 +220,10 @@ std::string simplifyLProgram() {
           newQuery.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
           newQuery.id = generateStreamName(arg1, "", cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
-          coreInstance.push_back(
-              newQuery);  // After this instruction it loses context
+          coreInstance.push_back(newQuery);  // After this instruction it loses context
           it = coreInstance.begin();
           break;
-        } else if ((*it2).getStrCommandID() != "PUSH_STREAM" &&
-                   (*it2).getStrCommandID() != "PUSH_VAL") {
+        } else if ((*it2).getStrCommandID() != "PUSH_STREAM" && (*it2).getStrCommandID() != "PUSH_VAL") {
           query newQuery;
           std::string arg1,  //< Name of first opeartion arguemnt
               arg2;          //< Name of second opeartion arguemnt
@@ -284,15 +270,13 @@ std::string simplifyLProgram() {
 }
 
 // Goal of this procedure is to unroll schema bsased of given command
-std::list<field> combine(std::string sName1, std::string sName2,
-                         token cmd_token) {
+std::list<field> combine(std::string sName1, std::string sName2, token cmd_token) {
   std::list<field> lRetVal;
   command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
     if (getQuery(sName1).lSchema.size() != getQuery(sName2).lSchema.size())
-      throw std::invalid_argument(
-          "Hash operation needs same schemas on arguments stream");
+      throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
     lRetVal = getQuery(sName1).lSchema;
   } else if (cmd == STREAM_DEHASH_DIV)
     lRetVal = getQuery(sName1).lSchema;
@@ -302,19 +286,15 @@ std::list<field> combine(std::string sName1, std::string sName2,
     int i = 0;
     for (auto f : getQuery(sName1).lSchema) {
       field intf;
-      intf.fieldName =
-          "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-      intf.lProgram.push_front(
-          token(PUSH_ID, sName1, boost::rational<int>(i++)));
+      intf.fieldName = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
+      intf.lProgram.push_front(token(PUSH_ID, sName1, boost::rational<int>(i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
       field intf;
-      intf.fieldName =
-          "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-      intf.lProgram.push_front(
-          token(PUSH_ID, sName2, boost::rational<int>(i++)));
+      intf.fieldName = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
+      intf.lProgram.push_front(token(PUSH_ID, sName2, boost::rational<int>(i++)));
       lRetVal.push_back(intf);
     }
     return lRetVal;
@@ -426,11 +406,8 @@ std::string prepareFields() {
             int filedPosition = 0;
             for (auto s : getQuery(t.getStr()).lSchema) {
               std::list<token> newLProgram;
-              newLProgram.push_back(
-                  token(PUSH_ID, nameOfscanningTable,
-                        boost::rational<int>(filedPosition++)));
-              std::string name =
-                  "Field_" + boost::lexical_cast<std::string>(fieldCount++);
+              newLProgram.push_back(token(PUSH_ID, nameOfscanningTable, boost::rational<int>(filedPosition++)));
+              std::string name = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
               q.lSchema.push_back(field(name, newLProgram, rdb::INTEGER, ""));
             }
             break;
@@ -450,8 +427,7 @@ std::string prepareFields() {
   return std::string("OK");
 }
 
-void replaceAll(std::string &str, const std::string &from,
-                const std::string &to) {
+void replaceAll(std::string &str, const std::string &from, const std::string &to) {
   if (from.empty()) return;
   size_t start_pos = 0;
   while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
@@ -490,17 +466,14 @@ std::string replicateIDX() {
           std::list<token> newLProgram;
           for (auto &t : oldField.lProgram) {
             if (t.getCommandID() == PUSH_IDX)
-              newLProgram.push_back(
-                  token(PUSH_ID, t.getStr(), boost::rational<int>(i)));
+              newLProgram.push_back(token(PUSH_ID, t.getStr(), boost::rational<int>(i)));
             else
-              newLProgram.push_back(
-                  token(t.getCommandID(), t.getStr(), t.get()));
+              newLProgram.push_back(token(t.getCommandID(), t.getStr(), t.get()));
           }
           std::string toRepalce = oldField.getFieldText();
           replaceAll(toRepalce, "_", lexical_cast<std::string>(i));
           auto newFieldType = oldField.fieldType;
-          field newField(schemaName + "_" + lexical_cast<std::string>(i),
-                         newLProgram, newFieldType, toRepalce);
+          field newField(schemaName + "_" + lexical_cast<std::string>(i), newLProgram, newFieldType, toRepalce);
           q.lSchema.push_back(newField);
         }
         assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());
@@ -519,14 +492,13 @@ note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction
 */
 std::string convertReferences() {
-  boost::regex xprFieldId5(
-      "(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");                    // something[1][1]
-  boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");  // something[1,1]
-  boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");           // something[1]
-  boost::regex xprFieldIdX("(\\w*)\\[_]");                  // something[_]
-  boost::regex xprFieldId1("(\\w*).(\\w*)");  // something.in_schema
-  boost::regex xprFieldId3("(\\w*)");         // field_of_corn
-  for (auto &q : coreInstance) {              // for each query
+  boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
+  boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
+  boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");              // something[1]
+  boost::regex xprFieldIdX("(\\w*)\\[_]");                     // something[_]
+  boost::regex xprFieldId1("(\\w*).(\\w*)");                   // something.in_schema
+  boost::regex xprFieldId3("(\\w*)");                          // field_of_corn
+  for (auto &q : coreInstance) {                               // for each query
     assert(!q.isReductionRequired());
     for (auto &f : q.lSchema) {     // for each field in query
       for (auto &t : f.lProgram) {  // for each token in query field
@@ -578,8 +550,7 @@ std::string convertReferences() {
               const int offset1(atoi(sOffset1.c_str()));
               t = token(PUSH_ID, schema, boost::rational<int>(offset1));
             } else {
-              SPDLOG_ERROR("No mach on type conversion ID2 text:{}",
-                           text.c_str());
+              SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
               throw std::out_of_range("No mach on type conversion");
             }
             break;
@@ -613,16 +584,13 @@ std::string convertReferences() {
                   ++offset1;
                 }
               }
-              if (!bFieldFound)
-                throw std::logic_error(
-                    "No field of given name in stream schema ID3");
+              if (!bFieldFound) throw std::logic_error("No field of given name in stream schema ID3");
             } else
               throw std::out_of_range("No mach on type conversion ID3");
             break;
           case PUSH_ID4:
           case PUSH_ID5:
-            if (regex_search(text.c_str(), what, xprFieldId4) ||
-                regex_search(text.c_str(), what, xprFieldId5)) {
+            if (regex_search(text.c_str(), what, xprFieldId4) || regex_search(text.c_str(), what, xprFieldId5)) {
               assert(what.size() == 4);
               const std::string schema(what[1]);
               const std::string sOffset1(what[2]);
@@ -636,12 +604,8 @@ std::string convertReferences() {
                   break;
                 }
               }
-              if (!foundSchema)
-                throw std::logic_error(
-                    "Field calls nonexist schema - config.log (-g)");
-              t = token(
-                  PUSH_ID, schema,
-                  boost::rational<int>(offset1 + offset2 * q.lSchema.size()));
+              if (!foundSchema) throw std::logic_error("Field calls nonexist schema - config.log (-g)");
+              t = token(PUSH_ID, schema, boost::rational<int>(offset1 + offset2 * q.lSchema.size()));
             } else
               throw std::out_of_range("No mach on type conversion ID4");
             break;

@@ -1,14 +1,15 @@
 {
     "configurations": [
-    {
-        "name": "Linux",
+        {
+            "name": "Linux",
             "defines": [],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json"
-    }
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
     ],
     "version": 4
 }

@@ -8,11 +8,7 @@
 namespace rdb {
 template <class T, class K>
 DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
-    : accessor(new K(fileName)),
-      filename(fileName),
-      removeOnExit(true),
-      recordsCount(0),
-      dataFileStatus(noData) {
+    : accessor(new K(fileName)), filename(fileName), removeOnExit(true), recordsCount(0), dataFileStatus(noData) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   std::string fileDesc(accessor->fileName());
@@ -24,20 +20,16 @@ DataStorageAccessor<T, K>::DataStorageAccessor(std::string fileName)
     if (myFile.good()) myFile >> descriptor;
     myFile.close();
     if (descriptor.getSizeInBytes() > 0) {
-      std::ifstream in(fileName.c_str(),
-                       std::ifstream::ate | std::ifstream::binary);
-      if (in.good())
-        recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+      std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
+      if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
     }
     dataFileStatus = open;
   }
 }
 
 template <class T, class K>
-void DataStorageAccessor<T, K>::createDescriptor(
-    const Descriptor descriptorParam) {
-  if (dataFileStatus == open)
-    abort();  // data file already opend and have attached descriptor
+void DataStorageAccessor<T, K>::createDescriptor(const Descriptor descriptorParam) {
+  if (dataFileStatus == open) abort();  // data file already opend and have attached descriptor
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
@@ -50,8 +42,7 @@ void DataStorageAccessor<T, K>::createDescriptor(
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile.close();
   if (descriptor.getSizeInBytes() > 0) {
-    std::ifstream in(filename.c_str(),
-                     std::ifstream::ate | std::ifstream::binary);
+    std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
   }
   dataFileStatus = open;
@@ -105,8 +96,7 @@ bool DataStorageAccessor<T, K>::get(T* inBuffer, const size_t recordIndex) {
 }
 
 template <class T, class K>
-bool DataStorageAccessor<T, K>::put(const T* outBuffer,
-                                    const size_t recordIndex) {
+bool DataStorageAccessor<T, K>::put(const T* outBuffer, const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
@@ -117,8 +107,7 @@ bool DataStorageAccessor<T, K>::put(const T* outBuffer,
     if (result == 0) recordsCount++;
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
-      auto recordIndexRv =
-          reverse ? (recordsCount - 1) - recordIndex : recordIndex;
+      auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
       result = accessor->write(outBuffer, size, recordIndexRv * size);
       assert(result == 0);
     }
@@ -131,21 +120,15 @@ const std::string DataStorageAccessor<T, K>::getStorageFilename() {
   return filename;
 }
 
-template class DataStorageAccessor<std::byte,
-                                   rdb::genericBinaryFileAccessor<std::byte>>;
+template class DataStorageAccessor<std::byte, rdb::genericBinaryFileAccessor<std::byte>>;
 template class DataStorageAccessor<char, rdb::genericBinaryFileAccessor<char>>;
-template class DataStorageAccessor<
-    unsigned char, rdb::genericBinaryFileAccessor<unsigned char>>;
+template class DataStorageAccessor<unsigned char, rdb::genericBinaryFileAccessor<unsigned char>>;
 
-template class DataStorageAccessor<std::byte,
-                                   rdb::posixBinaryFileAccessor<std::byte>>;
+template class DataStorageAccessor<std::byte, rdb::posixBinaryFileAccessor<std::byte>>;
 template class DataStorageAccessor<char, rdb::posixBinaryFileAccessor<char>>;
-template class DataStorageAccessor<unsigned char,
-                                   rdb::posixBinaryFileAccessor<unsigned char>>;
+template class DataStorageAccessor<unsigned char, rdb::posixBinaryFileAccessor<unsigned char>>;
 
-template class DataStorageAccessor<std::byte,
-                                   rdb::posixPrmBinaryFileAccessor<std::byte>>;
+template class DataStorageAccessor<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>;
 template class DataStorageAccessor<char, rdb::posixPrmBinaryFileAccessor<char>>;
-template class DataStorageAccessor<
-    unsigned char, rdb::posixPrmBinaryFileAccessor<unsigned char>>;
+template class DataStorageAccessor<unsigned char, rdb::posixPrmBinaryFileAccessor<unsigned char>>;
 }  // namespace rdb

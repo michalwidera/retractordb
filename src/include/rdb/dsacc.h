@@ -62,8 +62,7 @@ class DataStorageAccessor {
    * @param recordIndex location from begining of the storage [unit: Records]
    * @return success status- true eq. success
    */
-  bool put(const T* outBuffer,
-           const size_t recordIndex = std::numeric_limits<size_t>::max());
+  bool put(const T* outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
 
   /**
    * @brief Accessor method - get ref to descriptor
