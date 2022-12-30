@@ -244,11 +244,6 @@ bool test_storage() {
   return true;
 }
 
-bool test_descriptor_compare() {
-  bool result{true};
-
-  return result;
-}
 TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
 
 TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
