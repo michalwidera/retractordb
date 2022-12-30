@@ -38,6 +38,8 @@ set(SOURCES_SCHEMA_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/payloadacc.cc
+    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     test_schema.cpp
     main.cpp)
 

@@ -72,6 +72,10 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeindex": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "csignal": "cpp",
+        "coroutine": "cpp",
+        "slist": "cpp",
+        "future": "cpp"
     }
 }
