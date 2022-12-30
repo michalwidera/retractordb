@@ -141,8 +141,8 @@ class query {
 
   void reset();
 
-  rdb::Descriptor getDescriptor();
-  rdb::Descriptor getInternalDescriptor();
+  rdb::Descriptor descriptorExpression();
+  rdb::Descriptor descriptorFrom();
 };
 
 bool operator<(const query &lhs, const query &rhs);

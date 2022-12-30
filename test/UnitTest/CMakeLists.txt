@@ -31,13 +31,25 @@ set(SOURCES_RDB_TEST
     test_rdb.cpp
     main.cpp)
 
+set(SOURCES_SCHEMA_TEST
+    ${CMAKE_SOURCE_DIR}/src/rdb/desc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/dsacc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/payloadacc.cc
+    test_schema.cpp
+    main.cpp)
+
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xcompiler ${SOURCES_COMPILER_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
+add_executable(test_schema ${SOURCES_RDB_TEST})
 
 target_link_libraries(test_xqry ${CONAN_LIBS})
 target_link_libraries(test_xcompiler ${CONAN_LIBS})
 target_link_libraries(test_xtrdb ${CONAN_LIBS})
+target_link_libraries(test_schema ${CONAN_LIBS})
 
 add_test(
   NAME unittest-test-xqry
@@ -54,5 +66,10 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/bin/test_xtrdb)
 
+add_test(
+  NAME unittest-test-schema
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  COMMAND ${CMAKE_BINARY_DIR}/bin/test_schema)
+
 set_tests_properties(unittest-test-xtrdb unittest-test-xcompiler
-                     unittest-test-xqry PROPERTIES RUN_SERIAL TRUE)
+                     unittest-test-xqry unittest-test-schema PROPERTIES RUN_SERIAL TRUE)

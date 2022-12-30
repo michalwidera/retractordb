@@ -1,5 +1,7 @@
 #include "dataModel.h"
 
+#include <cassert>
+
 #include "QStruct.h"  // coreInstance
 
 extern "C" qTree coreInstance;
@@ -16,5 +18,6 @@ streamComposite::streamComposite(rdb::Descriptor descriptor) {
 streamInstance::streamInstance(const std::string file) {
   storage.reset(new rdb::DataStorageAccessor(file));
   external.reset(new streamComposite(storage->getDescriptor()));
-  internal.reset(new streamComposite(coreInstance[file].getInternalDescriptor()));
+  assert(storage->getDescriptor() == coreInstance[file].descriptorExpression());
+  internal.reset(new streamComposite(coreInstance[file].descriptorFrom()));
 };
