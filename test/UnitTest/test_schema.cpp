@@ -9,3 +9,5 @@
 #include "rdb/dsacc.h"
 #include "rdb/fainterface.h"
 #include "rdb/payloadacc.h"
+
+TEST(xschema, check_test1) { ASSERT_TRUE(true); };
