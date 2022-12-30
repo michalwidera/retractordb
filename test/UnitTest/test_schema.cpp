@@ -22,7 +22,9 @@ TEST(xschema, check_test1) {
   lSchema.push_back(token(PUSH_TSCAN));
   qry.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
   coreInstance.push_back(qry);
-  streamInstance data{"file_1.dat"};
   */
+
+  //streamInstance data{"file_1.dat"};
+
   ASSERT_TRUE(true);
 };
