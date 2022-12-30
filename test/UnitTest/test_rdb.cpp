@@ -244,11 +244,30 @@ bool test_storage() {
   return true;
 }
 
+bool test_descriptor_compare() {
+  bool result{true};
+
+  return result;
+}
 TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
 
 TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
 
 TEST(xrdb, test_storage) { ASSERT_TRUE(test_storage()); }
+
+TEST(xrdb, test_descriptor_compare) {
+  auto dataDescriptor1{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+                       rdb::Descriptor("TLen", rdb::INTEGER)};
+  auto dataDescriptor2{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+                       rdb::Descriptor("TLen", rdb::INTEGER)};
+  auto dataDescriptorDiff1{rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Name", 10, rdb::STRING) |
+                          rdb::Descriptor("TLen", rdb::INTEGER)};
+  auto dataDescriptorDiff2{rdb::Descriptor("Name", 11, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+                           rdb::Descriptor("TLen", rdb::INTEGER)};
+  ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
+  ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
+  ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
+}
 
 TEST(crdb, genericBinaryFileAccessor_byte) {
   auto result1 = test_1<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
