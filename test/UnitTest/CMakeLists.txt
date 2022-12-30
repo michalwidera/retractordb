@@ -44,7 +44,7 @@ set(SOURCES_SCHEMA_TEST
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xcompiler ${SOURCES_COMPILER_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
-add_executable(test_schema ${SOURCES_RDB_TEST})
+add_executable(test_schema ${SOURCES_SCHEMA_TEST})
 
 target_link_libraries(test_xqry ${CONAN_LIBS})
 target_link_libraries(test_xcompiler ${CONAN_LIBS})
