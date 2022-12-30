@@ -16,8 +16,7 @@ namespace rdb {
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 template <class T>
-genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName)
-    : fileNameStr(fileName) {}
+genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {}
 
 template <class T>
 std::string genericBinaryFileAccessor<T>::fileName() {
@@ -25,19 +24,16 @@ std::string genericBinaryFileAccessor<T>::fileName() {
 }
 
 template <class T>
-int genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
-                                        const size_t position) {
+int genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   if (position == std::numeric_limits<size_t>::max()) {
-    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary |
-                                std::ios::app | std::ios::ate);
+    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     // Note: no seekp here!
   } else {
-    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary |
-                                std::ios::ate);
+    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.seekp(position);
@@ -52,8 +48,7 @@ int genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
 }
 
 template <class T>
-int genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size,
-                                       const size_t position) {
+int genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   myFile.open(fileName(), std::ios::in | std::ios::binary);

@@ -45,13 +45,11 @@ inputDF::inputDF() {}
 inputDF::inputDF(std::string inputFileName, std::list<field> &lSchema)
     : filename(inputFileName), lSchema(lSchema), len(0), curPos(0) {
   extension = std::filesystem::path(inputFileName).extension();
-  std::transform(extension.begin(), extension.end(), extension.begin(),
-                 ::tolower);
+  std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
   // Parser feeds space at the end of string
   boost::trim_right(inputFileName);
-  std::ifstream *pstream = new std::ifstream(
-      inputFileName,
-      (extension == ".txt") ? std::ios::in : std::ios::in | std::ios::binary);
+  std::ifstream *pstream =
+      new std::ifstream(inputFileName, (extension == ".txt") ? std::ios::in : std::ios::in | std::ios::binary);
   psFile.reset(pstream);
   assert(psFile);
   if (!psFile.get())

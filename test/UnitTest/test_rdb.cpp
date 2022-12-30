@@ -95,8 +95,7 @@ bool test_3() {
 }
 
 bool test_descriptor() {
-  rdb::Descriptor data1{rdb::rfield("Name3", 10, rdb::STRING),
-                        rdb::rfield("Name4", 10, rdb::STRING)};
+  rdb::Descriptor data1{rdb::rfield("Name3", 10, rdb::STRING), rdb::rfield("Name4", 10, rdb::STRING)};
 
   data1.append({rdb::rfield("Name5z", 10, rdb::STRING)});
   data1.append({rdb::rfield("Name6z", 10, rdb::STRING)});
@@ -104,9 +103,7 @@ bool test_descriptor() {
   data1.push_back(rdb::rfield("Name", 10, rdb::STRING));
   data1.push_back(rdb::rfield("TLen", sizeof(uint), rdb::UINT));
 
-  data1 | rdb::Descriptor("Name2", 10, rdb::STRING) |
-      rdb::Descriptor("Control", rdb::BYTE) |
-      rdb::Descriptor("Len3", rdb::UINT);
+  data1 | rdb::Descriptor("Name2", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Len3", rdb::UINT);
   {
     std::stringstream coutstring;
     coutstring << data1;
@@ -117,9 +114,8 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  rdb::Descriptor data2 = rdb::Descriptor("Name", 10, rdb::STRING) |
-                          rdb::Descriptor("Len3", rdb::UINT) |
-                          rdb::Descriptor("Control", rdb::BYTE);
+  rdb::Descriptor data2 =
+      rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Len3", rdb::UINT) | rdb::Descriptor("Control", rdb::BYTE);
   {
     std::stringstream coutstring;
     char test[] = "{\tSTRING Name[10]\n\tUINT Len3\n\tBYTE Control\n}";
@@ -186,8 +182,7 @@ bool test_storage() {
 
   static_assert(sizeof(dataPayload) == 15);
 
-  auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) |
-                      rdb::Descriptor("Control", rdb::BYTE) |
+  auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
                       rdb::Descriptor("TLen", rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
@@ -202,8 +197,7 @@ bool test_storage() {
   payload1.TLen = 0x66;
   payload1.Control = 0x22;
 
-  if (payload1.TLen != dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr))
-    return false;
+  if (payload1.TLen != dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr)) return false;
 
   dAcc2.put(payload1.ptr);
   dAcc2.put(payload1.ptr);
@@ -236,8 +230,7 @@ bool test_storage() {
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control",
-                                                            payload3.ptr);
+    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", payload3.ptr);
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "33") != 0) return false;
   }
@@ -294,14 +287,11 @@ TEST(crdb, posixBinaryFileAccessor_char) {
 }
 
 TEST(crdb, posixPrmBinaryFileAccessor_byte) {
-  auto result1 =
-      test_1<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result1 = test_1<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result1);
-  auto result2 =
-      test_2<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result2 = test_2<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result2);
-  auto result3 =
-      test_3<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result3 = test_3<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result3);
 }
 

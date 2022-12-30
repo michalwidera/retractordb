@@ -9,35 +9,26 @@ namespace rdb {
 // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
 
 static inline void ltrim(std::string &s) {
-  s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
-            return !std::isspace(ch);
-          }));
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
 }
 
 static inline void rtrim(std::string &s) {
-  s.erase(std::find_if(s.rbegin(), s.rend(),
-                       [](unsigned char ch) { return !std::isspace(ch); })
-              .base(),
-          s.end());
+  s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
 }
 
 rdb::eType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
   std::map<std::string, rdb::eType> typeDictionary = {
-      {"STRING", rdb::STRING},     {"BYTEARRAY", rdb::BYTEARRAY},
-      {"INTARRAY", rdb::INTARRAY}, {"UINT", rdb::UINT},
-      {"BYTE", rdb::BYTE},         {"INTEGER", rdb::INTEGER},
-      {"FLOAT", rdb::FLOAT},       {"DOUBLE", rdb::DOUBLE}};
+      {"STRING", rdb::STRING}, {"BYTEARRAY", rdb::BYTEARRAY}, {"INTARRAY", rdb::INTARRAY}, {"UINT", rdb::UINT},
+      {"BYTE", rdb::BYTE},     {"INTEGER", rdb::INTEGER},     {"FLOAT", rdb::FLOAT},       {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
 
 std::string GetFieldType(rdb::eType e) {
   std::map<rdb::eType, std::string> typeDictionary = {
-      {rdb::STRING, "STRING"},     {rdb::BYTEARRAY, "BYTEARRAY"},
-      {rdb::INTARRAY, "INTARRAY"}, {rdb::UINT, "UINT"},
-      {rdb::BYTE, "BYTE"},         {rdb::INTEGER, "INTEGER"},
-      {rdb::FLOAT, "FLOAT"},       {rdb::DOUBLE, "DOUBLE"}};
+      {rdb::STRING, "STRING"}, {rdb::BYTEARRAY, "BYTEARRAY"}, {rdb::INTARRAY, "INTARRAY"}, {rdb::UINT, "UINT"},
+      {rdb::BYTE, "BYTE"},     {rdb::INTEGER, "INTEGER"},     {rdb::FLOAT, "FLOAT"},       {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
 }
 
@@ -64,8 +55,7 @@ constexpr uint GetFieldLenFromType(rdb::eType ft) {
   return 0;
 }
 
-Descriptor::Descriptor(std::initializer_list<rfield> l)
-    : std::vector<rfield>(l) {}
+Descriptor::Descriptor(std::initializer_list<rfield> l) : std::vector<rfield>(l) {}
 
 Descriptor::Descriptor(fieldNameType n, fieldLenType l, rdb::eType t) {
   push_back(rfield(n, l, t));
@@ -81,9 +71,7 @@ Descriptor::Descriptor(fieldNameType n, rdb::eType t) {
 
 bool Descriptor::isDirty() const { return fieldNames.size() == 0; }
 
-void Descriptor::append(std::initializer_list<rfield> l) {
-  insert(end(), l.begin(), l.end());
-}
+void Descriptor::append(std::initializer_list<rfield> l) { insert(end(), l.begin(), l.end()); }
 
 Descriptor &Descriptor::operator|(const Descriptor &rhs) {
   if (this != &rhs)
@@ -139,13 +127,9 @@ uint Descriptor::position(std::string name) {
   return -1;
 }
 
-std::string Descriptor::fieldName(uint fieldPosition) {
-  return std::get<fieldNameType>((*this)[fieldPosition]);
-}
+std::string Descriptor::fieldName(uint fieldPosition) { return std::get<fieldNameType>((*this)[fieldPosition]); }
 
-uint Descriptor::len(const std::string name) {
-  return std::get<rlen>((*this)[position(name)]);
-}
+uint Descriptor::len(const std::string name) { return std::get<rlen>((*this)[position(name)]); }
 
 uint Descriptor::offset(const std::string name) {
   auto offset = 0;
@@ -169,16 +153,13 @@ uint Descriptor::offset(const int position) {
   return -1;
 }
 
-std::string Descriptor::type(const std::string name) {
-  return GetFieldType(std::get<rtype>((*this)[position(name)]));
-}
+std::string Descriptor::type(const std::string name) { return GetFieldType(std::get<rtype>((*this)[position(name)])); }
 
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     os << "\t" << GetFieldType(std::get<rtype>(r)) << " " << std::get<rname>(r);
-    if (std::get<rtype>(r) == rdb::STRING ||
-        std::get<rtype>(r) == rdb::BYTEARRAY)
+    if (std::get<rtype>(r) == rdb::STRING || std::get<rtype>(r) == rdb::BYTEARRAY)
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
     else if (std::get<rtype>(r) == rdb::INTARRAY)
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
@@ -195,17 +176,14 @@ struct synsugar_is_space : std::ctype<char> {
   synsugar_is_space() : ctype<char>(get_table()) {}
   static mask const *get_table() {
     static mask rc[table_size];
-    rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] =
-        std::ctype_base::space;
+    rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = std::ctype_base::space;
     return &rc[0];
   }
 };
 
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   auto origLocale = is.getloc();
-  is.imbue(std::locale(
-      origLocale,
-      std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
+  is.imbue(std::locale(origLocale, std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
   do {
     std::string type;
     std::string name;

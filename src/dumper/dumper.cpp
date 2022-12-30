@@ -18,8 +18,7 @@ extern "C" qTree coreInstance;
 // 2. dot -Tjpg out.dot -o file.jpg
 // 3. start file.jgp
 //
-void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
-                 bool bShowTags, bool bShowFieldTypes) {
+void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowFieldTypes) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
@@ -69,8 +68,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
         std::replace(name.begin(), name.end(), '}', '/');
         std::string fieldText(f.getFieldText());
         xout << fieldText;
-        if (bShowFieldTypes)
-          std::cout << "(" << GetStringeType(f.fieldType) << ")";
+        if (bShowFieldTypes) std::cout << "(" << GetStringeType(f.fieldType) << ")";
       }
       xout << "}";
     }  // if ( bShowFileds ) - end of fields in stream
@@ -97,10 +95,8 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
         }
         for (token t : q.lProgram) {
           xout << t.getStrCommandID() << " ";
-          if (t.getStrCommandID() != "STREAM_HASH" &&
-              t.getStrCommandID() != "STREAM_ADD" &&
-              t.getStrCommandID() != "STREAM_DEHASH_DIV" &&
-              t.getStrCommandID() != "STREAM_DEHASH_MOD")
+          if (t.getStrCommandID() != "STREAM_HASH" && t.getStrCommandID() != "STREAM_ADD" &&
+              t.getStrCommandID() != "STREAM_DEHASH_DIV" && t.getStrCommandID() != "STREAM_DEHASH_MOD")
             xout << t.getStr();
           xout << "\\n";
         }
@@ -174,10 +170,8 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs,
         xout << "]";
         xout << std::endl;
         // Relation1
-        std::string relation(q.id + ":" + "tag" +
-                             lexical_cast<std::string>(dTag) + " -> " + q.id +
-                             "_tag" + lexical_cast<std::string>(dTag) +
-                             " [style=dotted]");
+        std::string relation(q.id + ":" + "tag" + lexical_cast<std::string>(dTag) + " -> " + q.id + "_tag" +
+                             lexical_cast<std::string>(dTag) + " [style=dotted]");
         streamRelationsSet.insert(relation);
         ++dTag;
       }
@@ -210,8 +204,7 @@ void dumpQFieldsProgram() {
         std::cout << f.fieldName << "\t";
         std::cout << t.getStrCommandID() << "\t";
         std::cout << t.getStr();
-        if (t.getStrCommandID() == "PUSH_ID")
-          std::cout << "[" << t.get() << "]";
+        if (t.getStrCommandID() == "PUSH_ID") std::cout << "[" << t.get() << "]";
         std::cout << std::endl;
       }
     }
@@ -266,29 +259,21 @@ void dumpRawTextFile(bool bShowFieldTypes) {
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
-      if (t.getStrCommandID() == "PUSH_ID" ||
-          t.getStrCommandID() == "PUSH_STREAM" ||
-          t.getStrCommandID() == "PUSH_VAL" ||
-          t.getStrCommandID() == "STREAM_AGSE" ||
-          t.getStrCommandID() == "STREAM_SUBSTRACT")
-        std::cout << "\t:- " << t.getStrCommandID() << "(" << t.getStr() << ")"
-                  << std::endl;
+      if (t.getStrCommandID() == "PUSH_ID" || t.getStrCommandID() == "PUSH_STREAM" || t.getStrCommandID() == "PUSH_VAL" ||
+          t.getStrCommandID() == "STREAM_AGSE" || t.getStrCommandID() == "STREAM_SUBSTRACT")
+        std::cout << "\t:- " << t.getStrCommandID() << "(" << t.getStr() << ")" << std::endl;
       else
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
     for (auto f : q.lSchema) {
       std::cout << "\t";
       std::cout << f.fieldName << ":";
-      if (bShowFieldTypes)
-        std::cout << "(" << GetStringeType(f.fieldType) << ")";
+      if (bShowFieldTypes) std::cout << "(" << GetStringeType(f.fieldType) << ")";
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr()
-                    << "[" << tf.get() << "])" << std::endl;
-        } else if ((tf.getStrCommandID() == "CALL") ||
-                   (tf.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr()
-                    << ")" << std::endl;
+          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr() << "[" << tf.get() << "])" << std::endl;
+        } else if ((tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL")) {
+          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr() << ")" << std::endl;
         } else
           std::cout << "\t\t" << tf.getStrCommandID() << std::endl;
     }
@@ -313,18 +298,13 @@ int main(int argc, char *argv[]) {
         ("sdump,p", "take as input file executor dump")          //
         ("leavedot,e", "dont delete temporary dot file")         //
         ("showtypes,w", "show field types in dot file")          //
-        ("infile,i",
-         po::value<std::string>(&sInputFile)->default_value("query.qry"),
-         "name of input data file");
+        ("infile,i", po::value<std::string>(&sInputFile)->default_value("query.qry"), "name of input data file");
     po::positional_options_description p;
     p.add("infile", -1);
     po::variables_map vm;
-    po::store(
-        po::command_line_parser(argc, argv).options(desc).positional(p).run(),
-        vm);
+    po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
-    if (vm.count("verbose") || vm.count("help"))
-      std::cerr << argv[0] << " - qry file decoder.\n";
+    if (vm.count("verbose") || vm.count("help")) std::cerr << argv[0] << " - qry file decoder.\n";
     if (vm.count("help")) {
       std::cout << desc;
       std::cout << config_line;
@@ -356,12 +336,10 @@ int main(int argc, char *argv[]) {
       const std::string sTempPngFile("temp_$$$.png");
       {
         std::ofstream ofs(sTempDotFile.c_str());
-        dumpGraphiz(ofs, vm.count("fields") != 0, vm.count("streamprogs") != 0,
-                    vm.count("tags") != 0, vm.count("showtypes") != 0);
+        dumpGraphiz(ofs, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0,
+                    vm.count("showtypes") != 0);
       }
-      auto ret = std::system(
-          std::string("dot -Tpng " + sTempDotFile + " -o " + sTempPngFile)
-              .c_str());
+      auto ret = std::system(std::string("dot -Tpng " + sTempDotFile + " -o " + sTempPngFile).c_str());
       if (ret < 0)
         std::cout << "Dot Error: " << strerror(errno) << '\n';
       else if (!WIFEXITED(ret))
@@ -369,8 +347,7 @@ int main(int argc, char *argv[]) {
       if (!vm.count("leavedot")) std::remove(sTempDotFile.c_str());
       std::cerr << "type: start " << sTempPngFile << std::endl;
     } else if (vm.count("dot")) {
-      dumpGraphiz(std::cout, vm.count("fields") != 0,
-                  vm.count("streamprogs") != 0, vm.count("tags") != 0,
+      dumpGraphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0,
                   vm.count("showtypes") != 0);
     } else if (vm.count("csv")) {
       std::cerr << "Core count:" << (int)coreInstance.size() << std::endl;

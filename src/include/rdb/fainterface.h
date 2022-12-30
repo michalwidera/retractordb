@@ -43,9 +43,7 @@ struct FileAccessorInterface {
    * possible value - works as append.
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual int write(
-      const T* ptrData, const size_t size,
-      const size_t position = std::numeric_limits<size_t>::max()) = 0;
+  virtual int write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
   /**
    * @brief gets name of storage (file name)

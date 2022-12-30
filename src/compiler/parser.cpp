@@ -24,12 +24,10 @@ std::string status = "OK";
 
 class LexerErrorListener : public BaseErrorListener {
  public:
-  void syntaxError(Recognizer* recognizer, Token* offendingSymbol, size_t line,
-                   size_t charPositionInLine, const std::string& msg,
-                   std::exception_ptr e) override {
+  void syntaxError(Recognizer* recognizer, Token* offendingSymbol, size_t line, size_t charPositionInLine,
+                   const std::string& msg, std::exception_ptr e) override {
     std::cerr << "Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at "
-              << offendingSymbol << ": " << msg;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
     status = "Fail";
     exit(EPERM);
   }
@@ -37,12 +35,10 @@ class LexerErrorListener : public BaseErrorListener {
 
 class ParserErrorListener : public BaseErrorListener {
  public:
-  void syntaxError(Recognizer* recognizer, Token* offendingSymbol, size_t line,
-                   size_t charPositionInLine, const std::string& msg,
-                   std::exception_ptr e) override {
+  void syntaxError(Recognizer* recognizer, Token* offendingSymbol, size_t line, size_t charPositionInLine,
+                   const std::string& msg, std::exception_ptr e) override {
     std::cerr << "Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at "
-              << offendingSymbol << ": " << msg;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
     status = "Fail";
     exit(EPERM);
   }
@@ -69,9 +65,7 @@ class ParserListener : public RQLBaseListener {
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
-  void recpToken(command_id id, std::string arg1) {
-    program.push_back(token(id, arg1));
-  };
+  void recpToken(command_id id, std::string arg1) { program.push_back(token(id, arg1)); };
 
   template <typename T>
   void recpToken(command_id id, std::string arg1, T arg2) {
@@ -81,30 +75,18 @@ class ParserListener : public RQLBaseListener {
  public:
   void enterProg(RQLParser::ProgContext* ctx) {}
 
-  void exitFieldID(RQLParser::FieldIDContext* ctx) {
-    recpToken(PUSH_ID3, ctx->getText());
-  }
-  void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext* ctx) {
-    recpToken(PUSH_IDX, ctx->getText());
-  }
-  void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) {
-    recpToken(PUSH_ID1, ctx->getText());
-  }
-  void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) {
-    recpToken(PUSH_ID2, ctx->getText());
-  }
+  void exitFieldID(RQLParser::FieldIDContext* ctx) { recpToken(PUSH_ID3, ctx->getText()); }
+  void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext* ctx) { recpToken(PUSH_IDX, ctx->getText()); }
+  void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) { recpToken(PUSH_ID1, ctx->getText()); }
+  void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) { recpToken(PUSH_ID2, ctx->getText()); }
 
   void exitExpPlus(RQLParser::ExpPlusContext* ctx) { recpToken(ADD); }
   void exitExpMinus(RQLParser::ExpMinusContext* ctx) { recpToken(SUBTRACT); }
   void exitExpMult(RQLParser::ExpMultContext* ctx) { recpToken(MULTIPLY); }
   void exitExpDiv(RQLParser::ExpDivContext* ctx) { recpToken(DIVIDE); }
 
-  void exitExpFloat(RQLParser::ExpFloatContext* ctx) {
-    recpToken(PUSH_VAL, "", std::stof(ctx->getText()));
-  }
-  void exitExpDec(RQLParser::ExpDecContext* ctx) {
-    recpToken(PUSH_VAL, "", std::stoi(ctx->getText()));
-  }
+  void exitExpFloat(RQLParser::ExpFloatContext* ctx) { recpToken(PUSH_VAL, "", std::stof(ctx->getText())); }
+  void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, "", std::stoi(ctx->getText())); }
 
   void exitSExpHash(RQLParser::SExpHashContext* ctx) { recpToken(STREAM_HASH); }
 
@@ -118,36 +100,23 @@ class ParserListener : public RQLBaseListener {
     recpToken(STREAM_DEHASH_MOD);
   }
 
-  void exitStreamMin(RQLParser::StreamMinContext* ctx) {
-    recpToken(STREAM_MIN);
-  }
-  void exitStreamMax(RQLParser::StreamMaxContext* ctx) {
-    recpToken(STREAM_MAX);
-  }
-  void exitStreamAvg(RQLParser::StreamAvgContext* ctx) {
-    recpToken(STREAM_AVG);
-  }
-  void exitStreamSum(RQLParser::StreamSumContext* ctx) {
-    recpToken(STREAM_SUM);
-  }
+  void exitStreamMin(RQLParser::StreamMinContext* ctx) { recpToken(STREAM_MIN); }
+  void exitStreamMax(RQLParser::StreamMaxContext* ctx) { recpToken(STREAM_MAX); }
+  void exitStreamAvg(RQLParser::StreamAvgContext* ctx) { recpToken(STREAM_AVG); }
+  void exitStreamSum(RQLParser::StreamSumContext* ctx) { recpToken(STREAM_SUM); }
   void exitSExpPlus(RQLParser::SExpPlusContext* ctx) { recpToken(STREAM_ADD); }
-  void exitSExpMinus(RQLParser::SExpMinusContext* ctx) {
-    recpToken(STREAM_SUBSTRACT, "", rationalResult);
-  }
+  void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, "", rationalResult); }
 
   void exitSExpAgse(RQLParser::SExpAgseContext* ctx) {
     if (ctx->children[3]->getText() == "-")
-      program.push_back(
-          token(PUSH_VAL, "", -std::stoi(ctx->window->getText())));
+      program.push_back(token(PUSH_VAL, "", -std::stoi(ctx->window->getText())));
     else
       program.push_back(token(PUSH_VAL, "", std::stoi(ctx->window->getText())));
     program.push_back(token(PUSH_VAL, "", std::stoi(ctx->step->getText())));
     program.push_back(token(STREAM_AGSE));
   }
 
-  void exitFunction_call(RQLParser::Function_callContext* ctx) {
-    recpToken(CALL, ctx->children[0]->getText());
-  }
+  void exitFunction_call(RQLParser::Function_callContext* ctx) { recpToken(CALL, ctx->children[0]->getText()); }
 
   // page 119 - The Definitive ANTL4 Reference Guide
   void exitDeclare(RQLParser::DeclareContext* ctx) {
@@ -168,9 +137,7 @@ class ParserListener : public RQLBaseListener {
     rationalResult = Rationalize(std::stod(ctx->FLOAT()->getText()));
   }
 
-  void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext* ctx) {
-    rationalResult = std::stoi(ctx->DECIMAL()->getText());
-  }
+  void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext* ctx) { rationalResult = std::stoi(ctx->DECIMAL()->getText()); }
 
   void exitFraction(RQLParser::FractionContext* ctx) {
     const int nom = std::stoi(ctx->children[0]->getText());
@@ -193,8 +160,7 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
     // Add / at the end of path
-    if (qry.filename[qry.filename.size() - 1] != '/')
-      qry.filename.push_back('/');
+    if (qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
     // This should set paths correct on compiled system
     std::filesystem::path native_system_path{qry.filename};
     qry.filename = native_system_path.make_preferred().string();
@@ -208,22 +174,17 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitStream_factor(RQLParser::Stream_factorContext* ctx) {
-    if (ctx->children.size() == 1)
-      program.push_back(token(PUSH_STREAM, ctx->ID()->getText()));
+    if (ctx->children.size() == 1) program.push_back(token(PUSH_STREAM, ctx->ID()->getText()));
   }
 
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx) {
     recpToken(PUSH_TSCAN, ctx->getText());
-    qry.lSchema.push_back(
-        field("Field_" + boost::lexical_cast<std::string>(fieldCount++),
-              program, rdb::INTEGER, "todo 3"));
+    qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, "todo 3"));
     program.clear();
   }
 
   void exitExpression(RQLParser::ExpressionContext* ctx) {
-    qry.lSchema.push_back(
-        field("Field_" + boost::lexical_cast<std::string>(fieldCount++),
-              program, rdb::INTEGER, "todo 2"));
+    qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, "todo 2"));
     program.clear();
   }
 
@@ -243,16 +204,13 @@ class ParserListener : public RQLBaseListener {
 
   void exitTypeByte(RQLParser::TypeByteContext* ctx) { fType = rdb::BYTE; }
   void exitTypeInt(RQLParser::TypeIntContext* ctx) { fType = rdb::INTEGER; }
-  void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx) {
-    fType = rdb::UINT;
-  }
+  void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx) { fType = rdb::UINT; }
   void exitTypeFloat(RQLParser::TypeFloatContext* ctx) { fType = rdb::FLOAT; }
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx) {
     std::list<token> emptyProgram;
     if (fTypeSize == 1)
-      qry.lSchema.push_back(
-          field(ctx->ID()->getText(), emptyProgram, fType, ""));
+      qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, ""));
     else {
       for (auto i = 0; i < fTypeSize; i++) {
         std::string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);

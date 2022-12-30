@@ -13,7 +13,7 @@
 
 #include "QStruct.h"
 #include "compiler.hpp"
-#include "config.h"  // Add an automatically generated configuration file
+#include "config.h"                        // Add an automatically generated configuration file
 #include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
 using namespace boost;
@@ -53,19 +53,15 @@ int main(int argc, char* argv[]) {
         ("compiler", "show compiler config")  //
         ("queryfile,q", po::value<std::string>(&sInputFile),
          "query set file")  //
-        ("outfile,o",
-         po::value<std::string>(&sOutputFile)->default_value("query.qry"),
+        ("outfile,o", po::value<std::string>(&sOutputFile)->default_value("query.qry"),
          "output file")  //
         ("dumpcross,d",
          "dump diagnostic cross "
          "compilation forms");
-    po::positional_options_description
-        p;  // Assume that infile is the first option
+    po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
     po::variables_map vm;
-    po::store(
-        po::command_line_parser(argc, argv).options(desc).positional(p).run(),
-        vm);
+    po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
     if (vm.count("help")) {
       std::cout << desc;
@@ -91,8 +87,7 @@ int main(int argc, char* argv[]) {
     std::istringstream iss(dumpInstance(""), std::ios::binary);
     boost::archive::text_iarchive ia(iss);
     ia >> coreInstance;
-    if (coreInstance.empty())
-      throw std::out_of_range("No queries to process found");
+    if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
     if (vm.count("dumpcross")) {
       std::string sOutFileLog1 = vm["outfile"].as<std::string>() + ".lg1";
       dumpInstance(sOutFileLog1);

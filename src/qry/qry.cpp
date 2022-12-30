@@ -69,8 +69,7 @@ namespace IPC = boost::interprocess;
 typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
 
 typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator>
-    IPCString;
+typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
 typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
 
 typedef int KeyType;
@@ -145,20 +144,14 @@ void consumer() {
         if (w == stream) {
           int count = boost::lexical_cast<int>(e_value.get("count", ""));
           if (outputFormatMode == RAW) {
-            for (int i = 0; i < count; i++)
-              printf(
-                  "%s ",
-                  e_value.get(boost::lexical_cast<std::string>(i), "").c_str());
+            for (int i = 0; i < count; i++) printf("%s ", e_value.get(boost::lexical_cast<std::string>(i), "").c_str());
             printf("\r\n");
           }
           if (outputFormatMode == GRAPHITE) {
             int i = 0;
             for (const auto &v : schema.get_child("db.field")) {
-              printf("%s.%s %s %llu\n", sInputStream.c_str(),
-                     v.second.get<std::string>("").c_str(),
-                     e_value.get(boost::lexical_cast<std::string>(i++), "")
-                         .c_str(),
-                     (unsigned long long)time(nullptr));
+              printf("%s.%s %s %llu\n", sInputStream.c_str(), v.second.get<std::string>("").c_str(),
+                     e_value.get(boost::lexical_cast<std::string>(i++), "").c_str(), (unsigned long long)time(nullptr));
             }
           }
           // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
@@ -173,12 +166,9 @@ void consumer() {
               else
                 printf(",");
               printf("%s=%s", v.second.get<std::string>("").c_str(),
-                     e_value.get(boost::lexical_cast<std::string>(i++), "")
-                         .c_str());
+                     e_value.get(boost::lexical_cast<std::string>(i++), "").c_str());
             }
-            printf(" %ld\n", duration_cast<nanoseconds>(
-                                 system_clock::now().time_since_epoch())
-                                 .count());
+            printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
           }
           // This part is time limited (-m) resposbile
           if (iTimeLimitCnt > 1) --iTimeLimitCnt;
@@ -186,14 +176,12 @@ void consumer() {
     }
     boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
   }
-  while (spsc_queue.pop(e_value))
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+  while (spsc_queue.pop(e_value)) boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
 }
 
 void producer() {
   try {
-    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(
-                                           boost::this_process::get_id());
+    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(boost::this_process::get_id());
     IPC::message_queue mq(IPC::open_only, queueName.c_str());
     char message[1024];
     unsigned int priority;
@@ -213,16 +201,12 @@ void producer() {
       // read_json(strstream, pt) ;
       // read_xml(strstream, pt);
       read_info(strstream, pt);
-      while (!spsc_queue.push(pt))
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+      while (!spsc_queue.push(pt)) boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cerr << ex.what() << std::endl
-              << "catch on producer queue" << std::endl;
+    std::cerr << ex.what() << std::endl << "catch on producer queue" << std::endl;
     std::cerr << "queue:"
-              << "brcdbr" + boost::lexical_cast<std::string>(
-                                boost::this_process::get_id())
-              << std::endl;
+              << "brcdbr" + boost::lexical_cast<std::string>(boost::this_process::get_id()) << std::endl;
     done = true;
     return;
   }
@@ -233,8 +217,7 @@ ptree netClient(std::string netCommand, std::string netArgument) {
   ptree pt_request;
   try {
     IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
-    const ShmemAllocator allocatorShmemMapInstance(
-        mapSegment.get_segment_manager());
+    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", boost::this_process::get_id());
     if (netArgument != "") pt_request.put("db.argument", netArgument);
@@ -355,14 +338,12 @@ int hello() {
 
 void dir() {
   ptree pt = netClient("get", "");
-  std::vector<std::string> vcols = {"", "duration", "size", "count",
-                                    "location"};
+  std::vector<std::string> vcols = {"", "duration", "size", "count", "location"};
   std::stringstream ss;
   for (auto nName : vcols) {
     int maxSize = 0;
     for (const auto &v : pt.get_child("db.stream")) {
-      if (v.second.get<std::string>(nName).length() > maxSize)
-        maxSize = v.second.get<std::string>(nName).length();
+      if (v.second.get<std::string>(nName).length() > maxSize) maxSize = v.second.get<std::string>(nName).length();
     }
     ss << "|%";
     ss << maxSize;
@@ -370,10 +351,8 @@ void dir() {
   }
   ss << "|\n";
   for (const auto &v : pt.get_child("db.stream")) {
-    printf(ss.str().c_str(), v.second.get<std::string>("").c_str(),
-           v.second.get<std::string>("duration").c_str(),
-           v.second.get<std::string>("size").c_str(),
-           v.second.get<std::string>("count").c_str(),
+    printf(ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
+           v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
            v.second.get<std::string>("location").c_str());
   }
 }
@@ -388,8 +367,7 @@ bool detailShow() {
   if (found) {
     ptree pt = netClient("detail", sInputStream);
     for (const auto &v : pt.get_child("db.field"))
-      printf("%s.%s\n", sInputStream.c_str(),
-             v.second.get<std::string>("").c_str());
+      printf("%s.%s\n", sInputStream.c_str(), v.second.get<std::string>("").c_str());
   } else
     std::cerr << "not found" << std::endl;
   return found;

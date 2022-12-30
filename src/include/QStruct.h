@@ -26,8 +26,7 @@ namespace boost {
 namespace serialization {
 
 template <class Archive, class T>
-inline void serialize(Archive &ar, boost::rational<T> &p,
-                      unsigned int /* file_version */
+inline void serialize(Archive &ar, boost::rational<T> &p, unsigned int /* file_version */
 ) {
   T _num(p.numerator());
   T _den(p.denominator());
@@ -38,16 +37,14 @@ inline void serialize(Archive &ar, boost::rational<T> &p,
 
 // https://stackoverflow.com/questions/14744303/does-boost-support-serialization-of-c11s-stdtuple/14928368#14928368
 template <typename Archive, typename... Types>
-inline void serialize(Archive &ar, std::tuple<Types...> &t,
-                      const unsigned int) {
+inline void serialize(Archive &ar, std::tuple<Types...> &t, const unsigned int) {
   std::apply([&](auto &...element) { ((ar & element), ...); }, t);
 }
 
 }  // namespace serialization
 }  // namespace boost
 
-boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,
-                                 int ttl = 11);
+boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6, int ttl = 11);
 
 class token {
   friend class boost::serialization::access;
@@ -68,8 +65,7 @@ class token {
   boost::rational<int> get();
 
   token(command_id id = VOID_COMMAND) : command(id){};
-  token(command_id id, const std::string &sValue)
-      : command(id), textValue(sValue){};
+  token(command_id id, const std::string &sValue) : command(id), textValue(sValue){};
 
   template <typename T>
   token(command_id id, const std::string &sValue, T value);
@@ -99,8 +95,7 @@ class field {
   rdb::eType fieldType;
 
   field();
-  field(std::string sFieldName, std::list<token> &lProgram,
-        rdb::eType fieldType, std::string sFieldText);
+  field(std::string sFieldName, std::list<token> &lProgram, rdb::eType fieldType, std::string sFieldText);
 
   std::string getFieldText();
   token getFirstFieldToken();
@@ -168,9 +163,7 @@ class qTree : public std::vector<query> {
   }
 
  public:
-  query &operator[](const std::string &query_name) {
-    return getQuery(query_name);
-  };
+  query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   void sort() { std::sort(begin(), end()); };
 

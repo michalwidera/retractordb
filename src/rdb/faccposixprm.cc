@@ -10,8 +10,7 @@ namespace rdb {
 constexpr const int kOpenBaseFlags = O_CLOEXEC;
 
 template <class T>
-posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName)
-    : fileNameStr(fileName) {
+posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {
   fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
 }
 
@@ -26,8 +25,7 @@ std::string posixPrmBinaryFileAccessor<T>::fileName() {
 }
 
 template <class T>
-int posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
-                                         const size_t position) {
+int posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
     return errno;  // Error status
@@ -59,8 +57,7 @@ int posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
 }
 
 template <class T>
-int posixPrmBinaryFileAccessor<T>::read(T* ptrData, const size_t size,
-                                        const size_t position) {
+int posixPrmBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
     return fd;  // <- Error status

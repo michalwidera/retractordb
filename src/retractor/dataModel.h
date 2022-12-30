@@ -1,7 +1,7 @@
 #pragma once
 
-#include <rdb/desc.h>   // rdb::Descriptor
-#include <rdb/dsacc.h>  // rdb::DataStorageAccessor
+#include <rdb/desc.h>        // rdb::Descriptor
+#include <rdb/dsacc.h>       // rdb::DataStorageAccessor
 #include <rdb/payloadacc.h>  // rdb::payLoadAccessor
 
 #include <any>
@@ -24,8 +24,8 @@ struct streamComposite {
 struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
 
-  std::unique_ptr<streamComposite> publicSchema;
-  std::unique_ptr<streamComposite> internalSchema;
+  std::unique_ptr<streamComposite> external;
+  std::unique_ptr<streamComposite> internal;
 
   streamInstance(const std::string file);
 };
