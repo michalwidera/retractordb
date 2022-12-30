@@ -24,7 +24,7 @@ TEST(xschema, check_test1) {
   coreInstance.push_back(qry);
   */
 
-  //streamInstance data{"file_1.dat"};
+  streamInstance data{"file_1.dat"};
 
   ASSERT_TRUE(true);
 };
