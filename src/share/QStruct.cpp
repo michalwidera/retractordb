@@ -300,7 +300,8 @@ std::vector<std::string> query::getDepStreamName(int reqDep) {
   return lRetVal;
 }
 
-rdb::Descriptor query::getDescriptor() {
+rdb::Descriptor query::descriptorExpression()
+{
   rdb::Descriptor retVal{};
   for (auto &f : lSchema) {
     retVal | rdb::Descriptor(f.fieldName, f.fieldType);
@@ -308,7 +309,8 @@ rdb::Descriptor query::getDescriptor() {
   return retVal;
 }
 
-rdb::Descriptor query::getInternalDescriptor() {
+rdb::Descriptor query::descriptorFrom()
+{
   rdb::Descriptor retVal{};
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};
   auto i{0};
