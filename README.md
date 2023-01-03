@@ -84,7 +84,7 @@ from core1+core0
 Author
 -----------------------------------------------------------------------
 
-Project created in 2003-2022 by Michal Widera
+Project created in 2003-2023 by Michal Widera
 (michal@widera.com.pl)
 
 
