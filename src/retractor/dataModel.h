@@ -28,6 +28,9 @@ struct streamInstance {
   std::unique_ptr<streamComposite> internal;
 
   streamInstance(const std::string file);
+  streamInstance(const std::string file,              //
+                 const rdb::Descriptor descInternal,  //
+                 const rdb::Descriptor descExternal);
 };
 
 struct dataModel : public std::map<std::string, streamInstance> {};

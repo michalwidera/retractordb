@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
-
 #include <spdlog/spdlog.h>
+
+#include "spdlog/pattern_formatter.h"
 #include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
 constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
