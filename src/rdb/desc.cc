@@ -19,16 +19,26 @@ static inline void rtrim(std::string &s) {
 rdb::eType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
-  std::map<std::string, rdb::eType> typeDictionary = {
-      {"STRING", rdb::STRING}, {"BYTEARRAY", rdb::BYTEARRAY}, {"INTARRAY", rdb::INTARRAY}, {"UINT", rdb::UINT},
-      {"BYTE", rdb::BYTE},     {"INTEGER", rdb::INTEGER},     {"FLOAT", rdb::FLOAT},       {"DOUBLE", rdb::DOUBLE}};
+  std::map<std::string, rdb::eType> typeDictionary = {{"STRING", rdb::STRING},        //
+                                                      {"BYTEARRAY", rdb::BYTEARRAY},  //
+                                                      {"INTARRAY", rdb::INTARRAY},    //
+                                                      {"UINT", rdb::UINT},            //
+                                                      {"BYTE", rdb::BYTE},            //
+                                                      {"INTEGER", rdb::INTEGER},      //
+                                                      {"FLOAT", rdb::FLOAT},          //
+                                                      {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
 
 std::string GetFieldType(rdb::eType e) {
-  std::map<rdb::eType, std::string> typeDictionary = {
-      {rdb::STRING, "STRING"}, {rdb::BYTEARRAY, "BYTEARRAY"}, {rdb::INTARRAY, "INTARRAY"}, {rdb::UINT, "UINT"},
-      {rdb::BYTE, "BYTE"},     {rdb::INTEGER, "INTEGER"},     {rdb::FLOAT, "FLOAT"},       {rdb::DOUBLE, "DOUBLE"}};
+  std::map<rdb::eType, std::string> typeDictionary = {{rdb::STRING, "STRING"},        //
+                                                      {rdb::BYTEARRAY, "BYTEARRAY"},  //
+                                                      {rdb::INTARRAY, "INTARRAY"},    //
+                                                      {rdb::UINT, "UINT"},            //
+                                                      {rdb::BYTE, "BYTE"},            //
+                                                      {rdb::INTEGER, "INTEGER"},      //
+                                                      {rdb::FLOAT, "FLOAT"},          //
+                                                      {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
 }
 
