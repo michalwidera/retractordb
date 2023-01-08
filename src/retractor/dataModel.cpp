@@ -13,7 +13,6 @@ extern "C" qTree coreInstance;
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
 
 std::any streamComposite::get(int position) { return accessor->getItem(position); };
-
 void streamComposite::set(int position, std::any value) { accessor->setItem(position, value); };
 
 streamComposite::streamComposite(rdb::Descriptor descriptor) {
@@ -28,6 +27,7 @@ streamInstance::streamInstance(         //
 ) {
   storage.reset(new rdb::DataStorageAccessor(file));
   storage->createDescriptor(descStorage);
+  storageAccessor.reset(new rdb::payLoadAccessor(storage->getDescriptor(), storage->payload.get()));
   internal.reset(new streamComposite(descInternal));
 
   {
