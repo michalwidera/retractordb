@@ -182,7 +182,8 @@ bool test_storage() {
 
   static_assert(sizeof(dataPayload) == 15);
 
-  auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+  auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) |  //
+                      rdb::Descriptor("Control", rdb::BYTE) |     //
                       rdb::Descriptor("TLen", rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
@@ -199,30 +200,30 @@ bool test_storage() {
 
   if (payload1.TLen != dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr)) return false;
 
-  dAcc2.write(payload1.ptr);
-  dAcc2.write(payload1.ptr);
-  dAcc2.write(payload1.ptr);
+  dAcc2.write();
+  dAcc2.write();
+  dAcc2.write();
 
   dataPayload payload2;
   std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
   payload2.TLen = 0x67;
   payload2.Control = 0x33;
+  std::memcpy(dAcc2.payload.get(), &payload2, 15);
 
-  dAcc2.write(payload2.ptr, 1);
+  dAcc2.write(1);
 
-  dataPayload payload3;
-  dAcc2.read(payload3.ptr, 1);
+  dAcc2.read(1);
 
   {
     std::stringstream coutstring;
-    coutstring << dAcc2.getDescriptor().toString("Name", payload3.ptr);
+    coutstring << dAcc2.getDescriptor().toString("Name", dAcc2.payload.get());
     if (strcmp(coutstring.str().c_str(), "xxxx xxxx") != 0) return false;
   }
 
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << dAcc2.getDescriptor().cast<int>("TLen", payload3.ptr);
+    coutstring << dAcc2.getDescriptor().cast<int>("TLen", dAcc2.payload.get());
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "67") != 0) return false;
   }
@@ -230,7 +231,7 @@ bool test_storage() {
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", payload3.ptr);
+    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", dAcc2.payload.get());
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "33") != 0) return false;
   }
