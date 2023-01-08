@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
       std::cout << "write [n] \t\t\t send record to database from payload\n";
       std::cout << "append \t\t\t\t append payload to database\n";
       std::cout << "set [field][value] \t\t set payload field value\n";
-      std::cout << "setpos [position][number value] \t\t set payload field number value\n";
+      std::cout << "setpos [position][number value]\t set payload field number value\n";
       std::cout << "status \t\t\t\t show status of payload\n";
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";
