@@ -85,19 +85,15 @@ int main(int argc, char* argv[]) {
       std::cout << GREEN;
       std::cout << "exit|quit|q \t\t\t exit\n";
       std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
-      std::cout << "open|ropen [file] \t\t open database - create connection "
-                   "(r-reverse iterator)\n";
-      std::cout << "create|rcreate [file][schema] \t create database with "
-                   "schema (r-reverse iterator)\n";
-      std::cout << "\t\t\t\t example: .create test_db { INTEGER dane STRING "
-                   "name[3] } \n";
+      std::cout << "open|ropen [file] \t\t open database - create connection (r-reverse iterator)\n";
+      std::cout << "create|rcreate [file][schema] \t create database with schema (r-reverse iterator)\n";
+      std::cout << "\t\t\t\t example: .create test_db { INTEGER dane STRING name[3] } \n";
       std::cout << "desc \t\t\t\t show schema\n";
       std::cout << "read [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t send record to database from payload\n";
       std::cout << "append \t\t\t\t append payload to database\n";
       std::cout << "set [field][value] \t\t set payload field value\n";
-      std::cout << "setpos [position][number value] \t\t set payload field "
-                   "number value\n";
+      std::cout << "setpos [position][number value] \t\t set payload field number value\n";
       std::cout << "status \t\t\t\t show status of payload\n";
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";

@@ -125,8 +125,6 @@ const std::string DataStorageAccessor<K>::getStorageFilename() {
 }
 
 template class DataStorageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;
-
 template class DataStorageAccessor<rdb::posixBinaryFileAccessor<std::byte>>;
-
 template class DataStorageAccessor<rdb::posixPrmBinaryFileAccessor<std::byte>>;
 }  // namespace rdb
