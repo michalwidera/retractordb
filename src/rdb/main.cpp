@@ -27,7 +27,7 @@ enum payloadStatusType { fetched, clean, stored, changed };
 payloadStatusType payloadStatus(clean);
 
 int main(int argc, char* argv[]) {
-  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> dacc;
+  std::unique_ptr<rdb::DataStorageAccessor<>> dacc;
   std::unique_ptr<std::byte[]> payload;
   std::string file;
   bool reverse = false;
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
         std::cout << RED "record out of range\n" RESET;
         continue;
       }
-      dacc->get(payload.get(), record);
+      dacc->read(payload.get(), record);
       payloadStatus = fetched;
     } else if (cmd == "set") {
       rdb::payLoadAccessor payloadAcc(dacc->getDescriptor(), payload.get(), hexFormat);
@@ -189,10 +189,10 @@ int main(int argc, char* argv[]) {
         std::cout << RED "record out of range - Check append command.\n" RESET;
         continue;
       }
-      dacc->put(payload.get(), record);
+      dacc->write(payload.get(), record);
       payloadStatus = stored;
     } else if (cmd == "append") {
-      dacc->put(payload.get());
+      dacc->write(payload.get());
       payloadStatus = stored;
     } else if (cmd == "status") {
       switch (payloadStatus) {

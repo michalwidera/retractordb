@@ -15,7 +15,7 @@ namespace rdb {
 /**
  * @brief This object purpose is to access data via descriptor
  */
-template <class T = std::byte, class K = rdb::posixPrmBinaryFileAccessor<T>>
+template <class K = rdb::posixPrmBinaryFileAccessor<std::byte>>
 class DataStorageAccessor {
   std::unique_ptr<K> accessor;
 
@@ -53,7 +53,7 @@ class DataStorageAccessor {
    * @param recordIndex location from beginging of the storage [unit: Records]
    * @return success status - true eq. success
    */
-  bool get(T* inBuffer, const size_t recordIndex);
+  bool read(std::byte* inBuffer, const size_t recordIndex);
 
   /**
    * @brief Sends record to the storage
@@ -62,7 +62,7 @@ class DataStorageAccessor {
    * @param recordIndex location from begining of the storage [unit: Records]
    * @return success status- true eq. success
    */
-  bool put(const T* outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
+  bool write(const std::byte* outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
 
   /**
    * @brief Accessor method - get ref to descriptor
