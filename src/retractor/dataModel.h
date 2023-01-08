@@ -13,7 +13,7 @@
 struct streamComposite {
   enum { noHexFormat = false, HexFormat = true };
   std::unique_ptr<std::byte[]> payload;
-  std::unique_ptr<rdb::payLoadAccessor<std::byte>> accessor;
+  std::unique_ptr<rdb::payLoadAccessor> accessor;
 
   std::any get(int position);
   void set(int position, std::any value);

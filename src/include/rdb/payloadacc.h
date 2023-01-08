@@ -8,14 +8,12 @@
 
 namespace rdb {
 /// @brief This class define accessing method to payload (memory area)
-/// @tparam T Type of stored data - std::byte or char
-template <typename T>
 class payLoadAccessor {
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;
 
   /// @brief Pointer to payload
-  T *ptr;
+  std::byte *ptr;
 
   /// @brief Type of dumped or read numeric formats
   bool hexFormat;
@@ -27,13 +25,13 @@ class payLoadAccessor {
 
   /// @brief Accessor to pointer to payload
   /// @return  T* pointer to payload
-  T *getPayloadPtr() const;
+  std::byte *getPayloadPtr() const;
 
   /// @brief Constructor of payLoadAccessor object
   /// @param descriptor descriptor of payload area
   /// @param ptr pointer to payload
   /// @param hexFormat type of default stored data
-  payLoadAccessor(Descriptor descriptor, T *ptr, bool hexFormat = false);
+  payLoadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat = false);
 
   /// @brief Default constructor is dissalowed
   payLoadAccessor() = delete;
@@ -50,11 +48,8 @@ class payLoadAccessor {
   /// descriptor
   std::any getItem(int position);
 
-  template <typename K>
-  friend std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs);
-
-  template <typename K>
-  friend std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs);
+  friend std::istream &operator>>(std::istream &is, const payLoadAccessor &rhs);
+  friend std::ostream &operator<<(std::ostream &os, const payLoadAccessor &rhs);
 };
 }  // namespace rdb
 
