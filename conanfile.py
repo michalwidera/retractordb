@@ -50,8 +50,8 @@ class Retractor(ConanFile):
                        }
 
     def validate(self):
-        if not tools.valid_min_cppstd(self, "17"):
-            self.output.error("at least C++17 is required.")
+        if not tools.valid_min_cppstd(self, "20"):
+            self.output.error("at least C++20 is required.")
 
     def configure(self):
         self.settings.compiler.cppstd = 20
