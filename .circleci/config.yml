@@ -126,6 +126,6 @@ workflows:
       - build-2204-ARM:
           requires:
             - build-2204
-       - build-2204-clang:
+      - build-2204-clang:
           requires:
             - build-2204
