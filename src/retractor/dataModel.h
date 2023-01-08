@@ -22,7 +22,7 @@ struct streamComposite {
 };
 
 struct streamInstance {
-  std::unique_ptr<rdb::DataStorageAccessor<std::byte>> storage;
+  std::unique_ptr<rdb::DataStorageAccessor<>> storage;
 
   std::unique_ptr<streamComposite> external;
   std::unique_ptr<streamComposite> internal;

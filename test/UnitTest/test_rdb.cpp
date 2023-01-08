@@ -199,19 +199,19 @@ bool test_storage() {
 
   if (payload1.TLen != dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr)) return false;
 
-  dAcc2.put(payload1.ptr);
-  dAcc2.put(payload1.ptr);
-  dAcc2.put(payload1.ptr);
+  dAcc2.write(payload1.ptr);
+  dAcc2.write(payload1.ptr);
+  dAcc2.write(payload1.ptr);
 
   dataPayload payload2;
   std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
   payload2.TLen = 0x67;
   payload2.Control = 0x33;
 
-  dAcc2.put(payload2.ptr, 1);
+  dAcc2.write(payload2.ptr, 1);
 
   dataPayload payload3;
-  dAcc2.get(payload3.ptr, 1);
+  dAcc2.read(payload3.ptr, 1);
 
   {
     std::stringstream coutstring;
