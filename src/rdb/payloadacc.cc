@@ -18,13 +18,9 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
   memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data, sizeof(T));
 }
 
-Descriptor payLoadAccessor::getDescriptor() const {
-  return descriptor;
-}
+Descriptor payLoadAccessor::getDescriptor() const { return descriptor; }
 
-std::byte *payLoadAccessor::getPayloadPtr() const {
-  return ptr;
-}
+std::byte *payLoadAccessor::getPayloadPtr() const { return ptr; }
 
 void payLoadAccessor::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
