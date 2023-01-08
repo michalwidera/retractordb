@@ -21,29 +21,23 @@ streamComposite::streamComposite(rdb::Descriptor descriptor) {
   accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
 };
 
-streamInstance::streamInstance(          //
-    const std::string file,              //
-    const rdb::Descriptor descInternal,  //
-    const rdb::Descriptor descExternal   //
+streamInstance::streamInstance(         //
+    const std::string file,             //
+    const rdb::Descriptor descStorage,  //
+    const rdb::Descriptor descInternal  //
 ) {
   storage.reset(new rdb::DataStorageAccessor(file));
-  storage->createDescriptor(descExternal);
-  external.reset(new streamComposite(descExternal));
+  storage->createDescriptor(descStorage);
   internal.reset(new streamComposite(descInternal));
 
   {
     std::stringstream strStream;
     strStream << storage->getDescriptor();
-    SPDLOG_INFO("storage descriptor: {}", removeCRLF(strStream.str()));
-  }
-  {
-    std::stringstream strStream;
-    strStream << external->accessor->getDescriptor();
-    SPDLOG_INFO("external descriptor: {}", removeCRLF(strStream.str()));
+    SPDLOG_INFO("storage/external descriptor: {}", removeCRLF(strStream.str()));
   }
   {
     std::stringstream strStream;
     strStream << internal->accessor->getDescriptor();
-    SPDLOG_INFO("internal descriptor: {}", removeCRLF(strStream.str()));
+    SPDLOG_INFO("image/internal descriptor: {}", removeCRLF(strStream.str()));
   }
 };

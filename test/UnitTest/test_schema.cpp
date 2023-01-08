@@ -25,18 +25,18 @@ TEST(xschema, check_test1) {
   qry.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
   coreInstance.push_back(qry);
   */
-  auto dataDescriptorInternal{
+  auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
       rdb::Descriptor("A[3]", rdb::INTEGER)    //
   };
 
-  auto dataDescriptorExternal{
+  auto dataStorageDescriptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER)    //
   };
 
-  streamInstance data{"file_A.dat", dataDescriptorInternal, dataDescriptorExternal};
+  streamInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
 
   ASSERT_TRUE(true);
 };
