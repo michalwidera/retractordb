@@ -47,23 +47,3 @@ streamInstance::streamInstance(          //
     SPDLOG_INFO("internal descriptor: {}", removeCRLF(strStream.str()));
   }
 };
-
-streamInstance::streamInstance(const std::string file) {
-  storage.reset(new rdb::DataStorageAccessor(file));
-  external.reset(new streamComposite(storage->getDescriptor()));
-  // assert(storage->getDescriptor() == coreInstance[file].descriptorExpression());
-
-  std::stringstream strStream;
-  strStream << storage->getDescriptor();
-  SPDLOG_INFO("storage descriptor: {}", removeCRLF(strStream.str()));
-
-  // strStream.clear();
-  // strStream << coreInstance[file].descriptorFrom();
-  // SPDLOG_INFO("descriptorFrom descriptor: {}", strStream.str());
-
-  // strStream.clear();
-  // strStream << coreInstance[file].descriptorExpression();
-  // SPDLOG_INFO("descriptorExpression descriptor: {}", strStream.str());
-
-  // internal.reset(new streamComposite(coreInstance[file].descriptorFrom()));
-};
