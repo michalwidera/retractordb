@@ -7,8 +7,7 @@
 #include <iomanip>
 #include <iostream>
 namespace rdb {
-template <typename T>
-payLoadAccessor<T>::payLoadAccessor(Descriptor descriptor, T *ptr, bool hexFormat)
+payLoadAccessor::payLoadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat)
     : descriptor(descriptor), ptr(ptr), hexFormat(hexFormat) {}
 
 template <typename T, typename K>
@@ -19,18 +18,15 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
   memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data, sizeof(T));
 }
 
-template <typename T>
-Descriptor payLoadAccessor<T>::getDescriptor() const {
+Descriptor payLoadAccessor::getDescriptor() const {
   return descriptor;
 }
 
-template <typename T>
-T *payLoadAccessor<T>::getPayloadPtr() const {
+std::byte *payLoadAccessor::getPayloadPtr() const {
   return ptr;
 }
 
-template <typename T>
-void payLoadAccessor<T>::setItem(int position, std::any value) {
+void payLoadAccessor::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
   if (descriptor.type(fieldName) == "STRING") {
@@ -69,8 +65,7 @@ void payLoadAccessor<T>::setItem(int position, std::any value) {
   assert(false && "type not supported on setter");
 }
 
-template <typename T>
-std::any payLoadAccessor<T>::getItem(int position) {
+std::any payLoadAccessor::getItem(int position) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
   std::cerr << "set:" << fieldName << std::endl;
@@ -117,8 +112,7 @@ std::any payLoadAccessor<T>::getItem(int position) {
   return 0xdead;
 }
 
-template <typename K>
-std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
+std::istream &operator>>(std::istream &is, const payLoadAccessor &rhs) {
   std::string fieldName;
   is >> fieldName;
   if (is.eof()) return is;
@@ -151,20 +145,19 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor<K> &rhs) {
     unsigned char data8 = static_cast<unsigned char>(data);
     memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data8, sizeof(unsigned char));
   } else if (desc.type(fieldName) == "UINT")
-    copyToMemory<uint, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
+    copyToMemory<uint, payLoadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "INTEGER")
-    copyToMemory<int, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
+    copyToMemory<int, payLoadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "FLOAT")
-    copyToMemory<float, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
+    copyToMemory<float, payLoadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "DOUBLE")
-    copyToMemory<double, payLoadAccessor<K>>(is, rhs, fieldName.c_str());
+    copyToMemory<double, payLoadAccessor>(is, rhs, fieldName.c_str());
   else
     std::cerr << "field not found\n";
   return is;
 }
 
-template <class K>
-std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
+std::ostream &operator<<(std::ostream &os, const payLoadAccessor &rhs) {
   os << "{";
   if (rhs.hexFormat)
     os << std::hex;
@@ -239,15 +232,4 @@ std::ostream &operator<<(std::ostream &os, const payLoadAccessor<K> &rhs) {
   return os;
 }
 
-template class payLoadAccessor<std::byte>;
-template class payLoadAccessor<char>;
-template class payLoadAccessor<unsigned char>;
-
-template std::istream &operator>>(std::istream &is, const payLoadAccessor<std::byte> &rhs);
-template std::istream &operator>>(std::istream &is, const payLoadAccessor<char> &rhs);
-template std::istream &operator>>(std::istream &is, const payLoadAccessor<unsigned char> &rhs);
-
-template std::ostream &operator<<(std::ostream &os, const payLoadAccessor<std::byte> &rhs);
-template std::ostream &operator<<(std::ostream &os, const payLoadAccessor<char> &rhs);
-template std::ostream &operator<<(std::ostream &os, const payLoadAccessor<unsigned char> &rhs);
 }  // namespace rdb
