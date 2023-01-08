@@ -8,7 +8,11 @@
 namespace rdb {
 template <class K>
 DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
-    : accessor(new K(fileName)), filename(fileName), removeOnExit(true), recordsCount(0), dataFileStatus(noData) {
+    : accessor(new K(fileName)),  //
+      filename(fileName),         //
+      removeOnExit(true),         //
+      recordsCount(0),            //
+      dataFileStatus(noData) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   std::string fileDesc(accessor->fileName());
