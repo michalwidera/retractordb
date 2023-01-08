@@ -95,7 +95,7 @@ bool DataStorageAccessor<K>::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
-  int result = 0;
+  auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
     result = accessor->read(payload.get(), size, recordIndexRv * size);
@@ -109,8 +109,8 @@ bool DataStorageAccessor<K>::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
-  int result = 0;
-  if (recordIndex == std::numeric_limits<size_t>::max()) {
+  auto result = 0;
+  if (recordIndex >= recordsCount) {
     result = accessor->write(payload.get(), size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
