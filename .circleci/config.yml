@@ -2,7 +2,7 @@ version: 2.1
 jobs:
 
   build-2004:
-    working_directory: ~
+    working_directory: ~/retractordb
     docker:
       - image: cimg/base:stable
     steps:
@@ -18,7 +18,7 @@ jobs:
       - run: cd build && make test
 
   build-2004-debug:
-    working_directory: ~
+    working_directory: ~/retractordb
     docker:
       - image: cimg/base:stable
     steps:
@@ -34,7 +34,7 @@ jobs:
       - run: cd build && make test
 
   build-2204-clang:
-    working_directory: ~
+    working_directory: ~/retractordb
     docker:
       - image: cimg/base:edge-22.04
     resource_class: large
@@ -53,7 +53,7 @@ jobs:
       - run: cd build && make test
 
   build-2204:
-    working_directory: ~
+    working_directory: ~/retractordb
     docker:
       - image: cimg/base:edge-22.04
     resource_class: large
@@ -70,7 +70,7 @@ jobs:
       - run: cd build && make test
 
   build-2204-ARM:
-    working_directory: ~
+    working_directory: ~/retractordb
     machine:
       image: ubuntu-2004:202101-01
     resource_class: arm.large
