@@ -23,13 +23,11 @@ struct streamComposite {
 
 struct streamInstance {
   std::unique_ptr<rdb::DataStorageAccessor<>> storage;
-
-  std::unique_ptr<streamComposite> external;
   std::unique_ptr<streamComposite> internal;
 
-  streamInstance(const std::string file,              //
-                 const rdb::Descriptor descInternal,  //
-                 const rdb::Descriptor descExternal);
+  streamInstance(const std::string file,             //
+                 const rdb::Descriptor descStorage,  //
+                 const rdb::Descriptor descInternal);
 };
 
 struct dataModel : public std::map<std::string, streamInstance> {};
