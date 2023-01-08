@@ -1,6 +1,7 @@
 #include "rdb/dsacc.h"
 
 #include <cassert>
+#include <cstring>  //std::memset
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -26,6 +27,8 @@ DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
     if (descriptor.getSizeInBytes() > 0) {
       std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
       if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+      payload.reset(new std::byte[descriptor.getSizeInBytes()]);
+      memset(payload.get(), 0, descriptor.getSizeInBytes());
     }
     dataFileStatus = open;
   }
@@ -48,6 +51,8 @@ void DataStorageAccessor<K>::createDescriptor(const Descriptor descriptorParam) 
   if (descriptor.getSizeInBytes() > 0) {
     std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+    payload.reset(new std::byte[descriptor.getSizeInBytes()]);
+    memset(payload.get(), 0, descriptor.getSizeInBytes());
   }
   dataFileStatus = open;
 }
@@ -86,33 +91,33 @@ const size_t DataStorageAccessor<K>::getRecordsCount() {
 }
 
 template <class K>
-bool DataStorageAccessor<K>::read(std::byte* inBuffer, const size_t recordIndex) {
+bool DataStorageAccessor<K>::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
   int result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->read(inBuffer, size, recordIndexRv * size);
+    result = accessor->read(payload.get(), size, recordIndexRv * size);
     assert(result == 0);
   }
   return result == 0;
 }
 
 template <class K>
-bool DataStorageAccessor<K>::write(const std::byte* outBuffer, const size_t recordIndex) {
+bool DataStorageAccessor<K>::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
   int result = 0;
   if (recordIndex == std::numeric_limits<size_t>::max()) {
-    result = accessor->write(outBuffer, size);  // <- Call to append Function
+    result = accessor->write(payload.get(), size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
       auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-      result = accessor->write(outBuffer, size, recordIndexRv * size);
+      result = accessor->write(payload.get(), size, recordIndexRv * size);
       assert(result == 0);
     }
   }

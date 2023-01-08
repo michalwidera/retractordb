@@ -34,6 +34,8 @@ class DataStorageAccessor {
 
   ~DataStorageAccessor();
 
+  std::unique_ptr<std::byte[]> payload;
+
   /**
    * @brief Open existing Data Accessor object and check descriptor file
    *
@@ -49,20 +51,18 @@ class DataStorageAccessor {
   /**
    * @brief Reads data package from storage
    *
-   * @param inBuffer pointer to area where package will be fetched
    * @param recordIndex location from beginging of the storage [unit: Records]
    * @return success status - true eq. success
    */
-  bool read(std::byte* inBuffer, const size_t recordIndex);
+  bool read(const size_t recordIndex);
 
   /**
    * @brief Sends record to the storage
    *
-   * @param outBuffer pointer to area when record is stored
    * @param recordIndex location from begining of the storage [unit: Records]
    * @return success status- true eq. success
    */
-  bool write(const std::byte* outBuffer, const size_t recordIndex = std::numeric_limits<size_t>::max());
+  bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
 
   /**
    * @brief Accessor method - get ref to descriptor
