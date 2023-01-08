@@ -8,7 +8,9 @@
 #include <iostream>
 namespace rdb {
 payLoadAccessor::payLoadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat)
-    : descriptor(descriptor), ptr(ptr), hexFormat(hexFormat) {}
+    : descriptor(descriptor),  //
+      ptr(ptr),                //
+      hexFormat(hexFormat) {}
 
 template <typename T, typename K>
 void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
