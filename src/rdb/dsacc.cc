@@ -27,7 +27,8 @@ DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
     if (descriptor.getSizeInBytes() > 0) {
       std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
       if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-      payload.reset(new std::byte[descriptor.getSizeInBytes()]);
+      payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
+      // payload.reset(new std::byte[descriptor.getSizeInBytes()]);
       memset(payload.get(), 0, descriptor.getSizeInBytes());
     }
     dataFileStatus = open;
@@ -51,7 +52,8 @@ void DataStorageAccessor<K>::createDescriptor(const Descriptor descriptorParam) 
   if (descriptor.getSizeInBytes() > 0) {
     std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-    payload.reset(new std::byte[descriptor.getSizeInBytes()]);
+    // payload.reset(new std::byte[descriptor.getSizeInBytes()]);
+    payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
     memset(payload.get(), 0, descriptor.getSizeInBytes());
   }
   dataFileStatus = open;
