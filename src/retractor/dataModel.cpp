@@ -19,7 +19,7 @@ streamComposite::streamComposite(rdb::Descriptor descriptor) {
   //payload.reset(new std::byte[descriptor.getSizeInBytes()]);
   //accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
 
-  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes()]);
+  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
   accessor = std::make_unique<rdb::payLoadAccessor>(descriptor, payload.get(), noHexFormat);
 };
 
