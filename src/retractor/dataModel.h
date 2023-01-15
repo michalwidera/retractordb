@@ -26,9 +26,9 @@ struct streamInstance {
   std::unique_ptr<rdb::payLoadAccessor> storageAccessor;
   std::unique_ptr<streamComposite> internal;
 
-  streamInstance(const std::string file,             //
-                 const rdb::Descriptor descStorage,  //
-                 const rdb::Descriptor descInternal);
+  streamInstance(const std::string file,               // <- query %% filename
+                 const rdb::Descriptor descStorage,    // <- query %% descriptorExpression()
+                 const rdb::Descriptor descInternal);  // <- query %% descriptorFrom()
 };
 
 struct dataModel : public std::map<std::string, streamInstance> {};
