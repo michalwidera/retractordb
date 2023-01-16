@@ -11,6 +11,7 @@
 #include "rdb/fainterface.h"
 #include "rdb/payloadacc.h"
 #include "retractor/dataModel.h"
+#include "spdlog/spdlog.h"
 
 extern "C" qTree coreInstance;
 
@@ -37,6 +38,15 @@ TEST(xschema, check_test1) {
   };
 
   streamInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
+
+  data.accessorInternal->setItem(0, 123);
+  data.accessorInternal->setItem(1, 345);
+
+  auto v1 = data.accessorInternal->getItem(0);
+
+  data.accessorStorage->setItem(0, 123);
+  data.accessorStorage->setItem(1, 345);
+  data.storage->write();
 
   ASSERT_TRUE(true);
 };

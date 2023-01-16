@@ -10,6 +10,8 @@
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"
 #include "rdb/payloadacc.h"
+#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
+#include "spdlog/spdlog.h"
 
 #define GREEN "\x1B[32m"
 #define RED "\x1B[31m"
@@ -17,6 +19,8 @@
 #define BLUE "\x1B[34m"
 #define YELLOW "\x1B[93m"
 #define RESET "\033[0m"
+
+constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
 
 /*
  * This code creates xtrdb executable file.
@@ -27,6 +31,11 @@ enum payloadStatusType { fetched, clean, stored, changed };
 payloadStatusType payloadStatus(clean);
 
 int main(int argc, char* argv[]) {
+  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
+  spdlog::set_default_logger(filelog);
+  spdlog::set_pattern(common_log_pattern);
+  spdlog::flush_on(spdlog::level::trace);
+
   std::unique_ptr<rdb::DataStorageAccessor<>> dacc;
   std::unique_ptr<std::byte[]> payload;
   std::string file;
