@@ -6,6 +6,8 @@
 #include <fstream>
 #include <iostream>
 
+#include "spdlog/spdlog.h"
+
 namespace rdb {
 template <class K>
 DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
@@ -28,11 +30,12 @@ DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
       std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
       if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
       payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
-      // payload.reset(new std::byte[descriptor.getSizeInBytes()]);
       memset(payload.get(), 0, descriptor.getSizeInBytes());
+      SPDLOG_INFO("DataStorageAccessor: Payload create.");
     }
     dataFileStatus = open;
   }
+  SPDLOG_INFO("DataStorageAccessor: construict done.");
 }
 
 template <class K>
@@ -52,11 +55,12 @@ void DataStorageAccessor<K>::createDescriptor(const Descriptor descriptorParam) 
   if (descriptor.getSizeInBytes() > 0) {
     std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-    // payload.reset(new std::byte[descriptor.getSizeInBytes()]);
     payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
     memset(payload.get(), 0, descriptor.getSizeInBytes());
+    SPDLOG_INFO("DataStorageAccessor: createDescriptor, open data file.");
   }
   dataFileStatus = open;
+  SPDLOG_INFO("DataStorageAccessor: createDescriptor, done.");
 }
 
 template <class K>
@@ -102,6 +106,7 @@ bool DataStorageAccessor<K>::read(const size_t recordIndex) {
   if (recordsCount > 0 && recordIndex < recordsCount) {
     result = accessor->read(payload.get(), size, recordIndexRv * size);
     assert(result == 0);
+    SPDLOG_INFO("DataStorageAccessor: read {}", recordIndexRv);
   }
   return result == 0;
 }
@@ -116,11 +121,13 @@ bool DataStorageAccessor<K>::write(const size_t recordIndex) {
     result = accessor->write(payload.get(), size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
+    SPDLOG_INFO("DataStorageAccessor: append");
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
       auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
       result = accessor->write(payload.get(), size, recordIndexRv * size);
       assert(result == 0);
+      SPDLOG_INFO("DataStorageAccessor: write {}", recordIndexRv);
     }
   }
   return result == 0;

@@ -10,18 +10,9 @@
 
 extern "C" qTree coreInstance;
 
+enum { noHexFormat = false, HexFormat = true };
+
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
-
-std::any streamComposite::get(int position) { return accessor->getItem(position); };
-void streamComposite::set(int position, std::any value) { accessor->setItem(position, value); };
-
-streamComposite::streamComposite(rdb::Descriptor descriptor) {
-  // payload.reset(new std::byte[descriptor.getSizeInBytes()]);
-  // accessor.reset(new rdb::payLoadAccessor(descriptor, payload.get(), noHexFormat));
-
-  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
-  accessor = std::make_unique<rdb::payLoadAccessor>(descriptor, payload.get(), noHexFormat);
-};
 
 streamInstance::streamInstance(         //
     const std::string file,             //
@@ -30,12 +21,10 @@ streamInstance::streamInstance(         //
 ) {
   storage = std::make_unique<rdb::DataStorageAccessor<>>(file);
   storage->createDescriptor(descStorage);
-  storageAccessor = std::make_unique<rdb::payLoadAccessor>(storage->getDescriptor(), storage->payload.get());
-  internal = std::make_unique<streamComposite>(descInternal);
-  // storage.reset(new rdb::DataStorageAccessor(file));
-  // storage->createDescriptor(descStorage);
-  // storageAccessor.reset(new rdb::payLoadAccessor(storage->getDescriptor(), storage->payload.get()));
-  // internal.reset(new streamComposite(descInternal));
+  accessorStorage = std::make_unique<rdb::payLoadAccessor>(storage->getDescriptor(), storage->payload.get());
+
+  payloadInternal = std::make_unique<std::byte[]>(descInternal.getSizeInBytes());
+  accessorInternal = std::make_unique<rdb::payLoadAccessor>(descInternal, payloadInternal.get(), noHexFormat);
 
   {
     std::stringstream strStream;
@@ -44,7 +33,7 @@ streamInstance::streamInstance(         //
   }
   {
     std::stringstream strStream;
-    strStream << internal->accessor->getDescriptor();
+    strStream << accessorInternal->getDescriptor();
     SPDLOG_INFO("image/internal descriptor: {}", removeCRLF(strStream.str()));
   }
 };
