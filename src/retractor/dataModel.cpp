@@ -14,6 +14,8 @@ enum { noHexFormat = false, HexFormat = true };
 
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
 
+std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
+
 streamInstance::streamInstance(         //
     const std::string file,             //
     const rdb::Descriptor descStorage,  //
@@ -29,11 +31,11 @@ streamInstance::streamInstance(         //
   {
     std::stringstream strStream;
     strStream << storage->getDescriptor();
-    SPDLOG_INFO("storage/external descriptor: {}", removeCRLF(strStream.str()));
+    SPDLOG_INFO("storage/external descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
   {
     std::stringstream strStream;
     strStream << accessorInternal->getDescriptor();
-    SPDLOG_INFO("image/internal descriptor: {}", removeCRLF(strStream.str()));
+    SPDLOG_INFO("image/internal descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
 };
