@@ -15,27 +15,33 @@ DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
       filename(fileName),         //
       removeOnExit(true),         //
       recordsCount(0),            //
-      dataFileStatus(noData) {
+      dataFileStatus(noDescriptor) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  std::string fileDesc(accessor->fileName());
-  fileDesc.append(".desc");
-  dataFileStatus = noDescriptor;
+  auto fileDesc(accessor->fileName().append(".desc"));
   // --
-  if (std::filesystem::exists(fileDesc)) {
-    myFile.open(fileDesc, std::ios::in);
-    if (myFile.good()) myFile >> descriptor;
-    myFile.close();
-    if (descriptor.getSizeInBytes() > 0) {
-      std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
-      if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-      payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
-      memset(payload.get(), 0, descriptor.getSizeInBytes());
-      SPDLOG_INFO("DataStorageAccessor: Payload create.");
-    }
-    dataFileStatus = open;
+  if (!std::filesystem::exists(fileDesc)) {
+    SPDLOG_WARN("construct: no descriptor found, done.");
+    return;
   }
-  SPDLOG_INFO("DataStorageAccessor: construict done.");
+
+  myFile.open(fileDesc, std::ios::in);  // Open existing descriptor
+  if (myFile.good()) myFile >> descriptor;
+  myFile.close();
+
+  if (descriptor.getSizeInBytes() == 0) {
+    SPDLOG_ERROR("construct: descriptor found - but struct empty, done.");
+    return;
+  }
+
+  std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
+  if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
+  memset(payload.get(), 0, descriptor.getSizeInBytes());
+
+  dataFileStatus = open;
+
+  SPDLOG_INFO("construct: Success, Descriptor&Storage [open], Payload [create]");
 }
 
 template <class K>
@@ -44,23 +50,27 @@ void DataStorageAccessor<K>::createDescriptor(const Descriptor descriptorParam) 
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
-  std::string fileDesc(accessor->fileName());
-  fileDesc.append(".desc");
+  auto fileDesc(accessor->fileName().append(".desc"));
   // Creating .desc file
   descFile.open(fileDesc, std::ios::out);
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile << descriptor;
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile.close();
-  if (descriptor.getSizeInBytes() > 0) {
-    std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
-    if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-    payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
-    memset(payload.get(), 0, descriptor.getSizeInBytes());
-    SPDLOG_INFO("DataStorageAccessor: createDescriptor, open data file.");
+
+  if (descriptor.getSizeInBytes() == 0) {
+    SPDLOG_ERROR("construct: descriptor found - but struct empty, done.");
+    return;
   }
+
+  std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
+  if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
+  memset(payload.get(), 0, descriptor.getSizeInBytes());
+
   dataFileStatus = open;
-  SPDLOG_INFO("DataStorageAccessor: createDescriptor, done.");
+
+  SPDLOG_INFO("fn createDescriptor: Success, Descriptor&Storage [open], Payload [create]");
 }
 
 template <class K>
@@ -106,7 +116,7 @@ bool DataStorageAccessor<K>::read(const size_t recordIndex) {
   if (recordsCount > 0 && recordIndex < recordsCount) {
     result = accessor->read(payload.get(), size, recordIndexRv * size);
     assert(result == 0);
-    SPDLOG_INFO("DataStorageAccessor: read {}", recordIndexRv);
+    SPDLOG_INFO("read {}", recordIndexRv);
   }
   return result == 0;
 }
@@ -121,13 +131,13 @@ bool DataStorageAccessor<K>::write(const size_t recordIndex) {
     result = accessor->write(payload.get(), size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
-    SPDLOG_INFO("DataStorageAccessor: append");
+    SPDLOG_INFO("append");
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
       auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
       result = accessor->write(payload.get(), size, recordIndexRv * size);
       assert(result == 0);
-      SPDLOG_INFO("DataStorageAccessor: write {}", recordIndexRv);
+      SPDLOG_INFO("write {}", recordIndexRv);
     }
   }
   return result == 0;
