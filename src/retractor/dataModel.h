@@ -1,6 +1,6 @@
 #pragma once
 
-#include <rdb/desc.h>        // rdb::Descriptor
+#include <rdb/descriptor.h>        // rdb::Descriptor
 #include <rdb/storageacc.h>       // rdb::storageAccessor
 #include <rdb/payloadacc.h>  // rdb::payLoadAccessor
 

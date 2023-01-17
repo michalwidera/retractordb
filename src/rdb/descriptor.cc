@@ -1,4 +1,4 @@
-#include "rdb/desc.h"
+#include "rdb/descriptor.h"
 
 #include <cassert>
 #include <cctype>

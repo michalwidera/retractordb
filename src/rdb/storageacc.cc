@@ -83,6 +83,7 @@ storageAccessor<K>::~storageAccessor() {
     auto descFilename(filename + ".desc");
     auto statusRemove2 = remove(descFilename.c_str());
     // assert(statusRemove2 == 0);
+    SPDLOG_INFO("drop storage");
   }
 }
 

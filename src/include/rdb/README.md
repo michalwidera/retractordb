@@ -4,7 +4,7 @@ Following headers are in include/rdb directory are:
 
 file name|Type name|description|temporary
 :--|---|---|--:
-desc.h|Descriptor|Description - this object creates ability to create descritons of binary frames using types and arrays|no
+descriptor.h|Descriptor|Description - this object creates ability to create descritons of binary frames using types and arrays|no
 faccfs.h|genericBinaryFileAccessor|File Accessor as File system - type. This is underlaying type that supports access to binary fields. std::fstream is used as interface. :Rdb user does not need to use this object directly|?
 faccposix.h|posixBinaryFileAccessor|File Accessor as Posix - type. This is underlaying type that supports access to binary fields. Posix functions are used as interface. :Rdb user does not need to use this object directly|?
 faccposixprm.h|posixPrmBinaryFileAccessor|File Accessor as Posix Permamanet - type. This is underlaying type that supports access to binary fields. Posix functions are used as interface. Difference between faccposix is that file descriptor remains open duiring entire live of obcject :Rdb user does not need to use this object directly. This is development area.|no

@@ -18,7 +18,7 @@
 #include <variant>
 
 #include "enumDecl.h"
-#include "rdb/desc.h"
+#include "rdb/descriptor.h"
 
 typedef boost::rational<int> number;
 

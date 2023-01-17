@@ -5,7 +5,7 @@
 #include <memory>   // std::unique_ptr
 #include <string>
 
-#include "desc.h"
+#include "descriptor.h"
 #include "faccfs.h"
 #include "faccposix.h"
 #include "faccposixprm.h"

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-#include "rdb/desc.h"
+#include "rdb/descriptor.h"
 #include "rdb/storageacc.h"
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"

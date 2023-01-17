@@ -14,7 +14,7 @@ set(SOURCES_COMPILER_TEST
     ${CMAKE_SOURCE_DIR}/src/compiler/compiler.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/parser.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/rdb/desc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLLexer.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLParser.cpp
@@ -22,7 +22,7 @@ set(SOURCES_COMPILER_TEST
     main.cpp)
 
 set(SOURCES_RDB_TEST
-    ${CMAKE_SOURCE_DIR}/src/rdb/desc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
@@ -32,7 +32,7 @@ set(SOURCES_RDB_TEST
     main.cpp)
 
 set(SOURCES_SCHEMA_TEST
-    ${CMAKE_SOURCE_DIR}/src/rdb/desc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc

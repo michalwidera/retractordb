@@ -15,7 +15,7 @@ set(SOURCES_RETRACTOR
     rdb/faccfs.cc
     rdb/faccposix.cc
     rdb/faccposixprm.cc
-    rdb/desc.cc
+    rdb/descriptor.cc
     rdb/storageacc.cc
     rdb/payloadacc.cc)
 
@@ -27,7 +27,7 @@ set(SOURCES_COMPILER
     share/SOperations.cpp
     compiler/Parser/RQLLexer.cpp
     compiler/Parser/RQLParser.cpp
-    rdb/desc.cc)
+    rdb/descriptor.cc)
 
 set(SOURCES_DUMPER
     dumper/dumper.cpp
@@ -35,7 +35,7 @@ set(SOURCES_DUMPER
     rdb/faccfs.cc
     rdb/faccposix.cc
     rdb/faccposixprm.cc
-    rdb/desc.cc
+    rdb/descriptor.cc
     rdb/storageacc.cc
     rdb/payloadacc.cc)
 
@@ -46,7 +46,7 @@ set(SOURCES_RDB
     rdb/faccfs.cc
     rdb/faccposix.cc
     rdb/faccposixprm.cc
-    rdb/desc.cc
+    rdb/descriptor.cc
     rdb/storageacc.cc
     rdb/payloadacc.cc)
 
