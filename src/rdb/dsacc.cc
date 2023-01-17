@@ -21,7 +21,7 @@ DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
   auto fileDesc(accessor->fileName().append(".desc"));
   // --
   if (!std::filesystem::exists(fileDesc)) {
-    SPDLOG_WARN("construct: no descriptor found, done.");
+    SPDLOG_WARN("construct: no descriptor found - expect fn createDescriptor, done.");
     return;
   }
 
