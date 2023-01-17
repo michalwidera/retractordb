@@ -343,11 +343,11 @@ int main(int argc, char *argv[]) {
     if (vm.count("verbose")) std::cerr << argv[0] << " - query plan executor." << std::endl;
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("compiler")) {
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (!std::filesystem::exists(sInputFile)) {

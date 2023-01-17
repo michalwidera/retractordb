@@ -307,11 +307,11 @@ int main(int argc, char *argv[]) {
     if (vm.count("verbose") || vm.count("help")) std::cerr << argv[0] << " - qry file decoder.\n";
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("compiler")) {
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     std::string sPlikDanych = vm["infile"].as<std::string>();

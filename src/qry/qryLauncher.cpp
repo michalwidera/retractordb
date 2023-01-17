@@ -61,11 +61,11 @@ int main(int argc, char *argv[]) {
     if (vm.count("help")) {
       std::cout << argv[0] << " - data processing tool." << std::endl;
       std::cout << desc;
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("compiler")) {
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("hello"))

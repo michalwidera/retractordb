@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
   spdlog::set_default_logger(filelog);
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
-  SPDLOG_INFO("{} start  [-------------------]", argv[0]);
+  // SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     std::unique_ptr<std::ostream> p_ofs;
     namespace po = boost::program_options;
@@ -61,11 +61,11 @@ int main(int argc, char* argv[]) {
     po::notify(vm);
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("compiler")) {
-      std::cout << config_line;
+      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("queryfile") == 0) {
