@@ -62,8 +62,7 @@ target_link_libraries(xdumper ${CONAN_LIBS})
 target_link_libraries(xqry ${CONAN_LIBS})
 target_link_libraries(xtrdb ${CONAN_LIBS})
 
-install(TARGETS xretractor xcompiler xdumper xqry xtrdb
-        DESTINATION ~/.local/bin)
+install(TARGETS xretractor xcompiler xdumper xqry xtrdb DESTINATION ~/.local/bin)
 
 add_custom_target(
   lst
@@ -88,26 +87,18 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/compiler
   SOURCES ${PROJECT_SOURCE_DIR}/compiler/RQL.g4)
 
-# pip install cmake-format sudo apt install astyle add_custom_target( astyle
-# COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
-# --exclude=compiler/Parser COMMAND find ${CMAKE_SOURCE_DIR} -name
-# CMakeLists.txt | xargs cmake-format -i WORKING_DIRECTORY
-# ${PROJECT_SOURCE_DIR})
+# pip install cmake-format sudo apt install astyle add_custom_target( astyle COMMAND astyle --options=astyle.options --recursive
+# *.cpp *.hpp *.cc *.h --exclude=compiler/Parser COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
+# WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
-# sudo apt install clang-format ; sudo pip install cmakelang
-# https://zed0.co.uk/clang-format-configurator/
+# sudo apt install clang-format ; sudo pip install cmakelang https://zed0.co.uk/clang-format-configurator/
 add_custom_target(
   cformat
-  COMMAND
-    find ../src -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname
-    "*.cc" | grep --invert-match 'Parser/' | xargs clang-format -i
-    --style='{BasedOnStyle: Google, ColumnLimit: 129}'
-  COMMAND
-    find ../test -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname
-    "*.cc" | xargs clang-format -i --style='{BasedOnStyle: Google, ColumnLimit:
-    129}'
-  COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
-          --line-width=129
+  COMMAND find ../src -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname "*.cc" | grep --invert-match 'Parser/' | xargs
+          clang-format -i --style='{BasedOnStyle: Google, ColumnLimit: 129}'
+  COMMAND find ../test -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname "*.cc" | xargs clang-format -i
+          --style='{BasedOnStyle: Google, ColumnLimit: 129}'
+  COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i --line-width=129
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_custom_target(
@@ -115,10 +106,8 @@ add_custom_target(
   COMMAND [ ! -f ~/.vim ] && mkdir -p ~/.vim
   COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)
 
-# This target is required when VSCode will call nina and CMakeCache.txt is in
-# incompatible format - conan build .. complains : CMake Error: Error: generator
-# : Unix Makefiles Does not match the generator used previously: Ninja just use:
-# $make clear_cache
+# This target is required when VSCode will call nina and CMakeCache.txt is in incompatible format - conan build .. complains :
+# CMake Error: Error: generator : Unix Makefiles Does not match the generator used previously: Ninja just use: $make clear_cache
 add_custom_target(clear_cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
 
 find_package(Git QUIET)

@@ -46,7 +46,7 @@ class DataStorageAccessor {
 
   void createDescriptor(const Descriptor descriptor);
 
-  enum dataForm { noData, noDescriptor, open } dataFileStatus;
+  enum dataForm { noDescriptor, open } dataFileStatus;
 
   /**
    * @brief Reads data package from storage
