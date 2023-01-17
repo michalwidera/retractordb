@@ -51,7 +51,7 @@ class payLoadAccessor {
     {method} operator<<
 }
 
-class DataStorageAccessor {
+class storageAccessor {
     {field} accessor
     {field} descriptor
     {field} reverse
@@ -83,11 +83,11 @@ FileAccessorInterface --> genericBinaryFileAccessor
 FileAccessorInterface --> posixBinaryFileAccessor
 FileAccessorInterface --> posixPrmBinaryFileAccessor
 
-genericBinaryFileAccessor --* DataStorageAccessor
-posixBinaryFileAccessor --* DataStorageAccessor
-posixPrmBinaryFileAccessor --* DataStorageAccessor
+genericBinaryFileAccessor --* storageAccessor
+posixBinaryFileAccessor --* storageAccessor
+posixPrmBinaryFileAccessor --* storageAccessor
 
-Descriptor --* DataStorageAccessor
+Descriptor --* storageAccessor
 
 Descriptor --- rdb::eType
 

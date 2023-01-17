@@ -1,7 +1,7 @@
 #pragma once
 
 #include <rdb/desc.h>        // rdb::Descriptor
-#include <rdb/dsacc.h>       // rdb::DataStorageAccessor
+#include <rdb/storageacc.h>       // rdb::storageAccessor
 #include <rdb/payloadacc.h>  // rdb::payLoadAccessor
 
 #include <any>
@@ -11,7 +11,7 @@
 #include <vector>
 
 struct streamInstance {
-  std::unique_ptr<rdb::DataStorageAccessor<>> storage;  // have own payload and descriptor
+  std::unique_ptr<rdb::storageAccessor<>> storage;  // have own payload and descriptor
   std::unique_ptr<rdb::payLoadAccessor> accessorStorage;
 
   std::unique_ptr<std::byte[]> payloadInternal;

@@ -16,7 +16,7 @@ set(SOURCES_RETRACTOR
     rdb/faccposix.cc
     rdb/faccposixprm.cc
     rdb/desc.cc
-    rdb/dsacc.cc
+    rdb/storageacc.cc
     rdb/payloadacc.cc)
 
 set(SOURCES_COMPILER
@@ -36,7 +36,7 @@ set(SOURCES_DUMPER
     rdb/faccposix.cc
     rdb/faccposixprm.cc
     rdb/desc.cc
-    rdb/dsacc.cc
+    rdb/storageacc.cc
     rdb/payloadacc.cc)
 
 set(SOURCES_QRY qry/qryLauncher.cpp qry/qry.cpp)
@@ -47,7 +47,7 @@ set(SOURCES_RDB
     rdb/faccposix.cc
     rdb/faccposixprm.cc
     rdb/desc.cc
-    rdb/dsacc.cc
+    rdb/storageacc.cc
     rdb/payloadacc.cc)
 
 add_executable(xretractor ${SOURCES_RETRACTOR})

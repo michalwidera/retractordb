@@ -8,7 +8,7 @@ database     Storage #Tomato
 
 == Create connection ==
 
-Client -> Rdb : DataStorageAccessor() 
+Client -> Rdb : storageAccessor() 
 Activate Rdb #Lime
 Rdb -> Rdb: Open data file
 Activate Description #Lime

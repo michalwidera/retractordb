@@ -6,7 +6,7 @@
 #include <locale>
 #include <string>
 
-#include "rdb/dsacc.h"
+#include "rdb/storageacc.h"
 #include "rdb/fainterface.h"
 #include "rdb/payloadacc.h"
 
@@ -191,7 +191,7 @@ bool test_storage() {
 
   dataPayload payload1;
 
-  rdb::DataStorageAccessor dAcc2("datafile-fstream2");
+  rdb::storageAccessor dAcc2("datafile-fstream2");
   dAcc2.createDescriptor(dataDescriptor);
 
   std::memcpy(payload1.Name, "test data", AREA_SIZE);
