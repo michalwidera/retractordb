@@ -1,4 +1,4 @@
-#include "rdb/dsacc.h"
+#include "rdb/storageacc.h"
 
 #include <cassert>
 #include <cstring>  //std::memset
@@ -10,7 +10,7 @@
 
 namespace rdb {
 template <class K>
-DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
+storageAccessor<K>::storageAccessor(std::string fileName)
     : accessor(new K(fileName)),  //
       filename(fileName),         //
       removeOnExit(true),         //
@@ -45,7 +45,7 @@ DataStorageAccessor<K>::DataStorageAccessor(std::string fileName)
 }
 
 template <class K>
-void DataStorageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
+void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
   if (dataFileStatus == open) abort();  // data file already opend and have attached descriptor
   descriptor = descriptorParam;
   std::fstream descFile;
@@ -74,7 +74,7 @@ void DataStorageAccessor<K>::createDescriptor(const Descriptor descriptorParam) 
 }
 
 template <class K>
-DataStorageAccessor<K>::~DataStorageAccessor() {
+storageAccessor<K>::~storageAccessor() {
   if (removeOnExit) {
     // Constructor & Destructor does not fail - need to reconsider remove this
     // asserts or make this in another way.
@@ -87,27 +87,27 @@ DataStorageAccessor<K>::~DataStorageAccessor() {
 }
 
 template <class K>
-Descriptor& DataStorageAccessor<K>::getDescriptor() {
+Descriptor& storageAccessor<K>::getDescriptor() {
   return descriptor;
 }
 
 template <class K>
-void DataStorageAccessor<K>::setReverse(bool value) {
+void storageAccessor<K>::setReverse(bool value) {
   reverse = value;
 }
 
 template <class K>
-void DataStorageAccessor<K>::setRemoveOnExit(bool value) {
+void storageAccessor<K>::setRemoveOnExit(bool value) {
   removeOnExit = value;
 }
 
 template <class K>
-const size_t DataStorageAccessor<K>::getRecordsCount() {
+const size_t storageAccessor<K>::getRecordsCount() {
   return recordsCount;
 }
 
 template <class K>
-bool DataStorageAccessor<K>::read(const size_t recordIndex) {
+bool storageAccessor<K>::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
@@ -122,7 +122,7 @@ bool DataStorageAccessor<K>::read(const size_t recordIndex) {
 }
 
 template <class K>
-bool DataStorageAccessor<K>::write(const size_t recordIndex) {
+bool storageAccessor<K>::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
   auto size = descriptor.getSizeInBytes();
@@ -144,11 +144,11 @@ bool DataStorageAccessor<K>::write(const size_t recordIndex) {
 };
 
 template <class K>
-const std::string DataStorageAccessor<K>::getStorageFilename() {
+const std::string storageAccessor<K>::getStorageFilename() {
   return filename;
 }
 
-template class DataStorageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;
-template class DataStorageAccessor<rdb::posixBinaryFileAccessor<std::byte>>;
-template class DataStorageAccessor<rdb::posixPrmBinaryFileAccessor<std::byte>>;
+template class storageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;
+template class storageAccessor<rdb::posixBinaryFileAccessor<std::byte>>;
+template class storageAccessor<rdb::posixPrmBinaryFileAccessor<std::byte>>;
 }  // namespace rdb

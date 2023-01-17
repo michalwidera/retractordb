@@ -23,7 +23,7 @@ set(SOURCES_COMPILER_TEST
 
 set(SOURCES_RDB_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/desc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/dsacc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
@@ -33,7 +33,7 @@ set(SOURCES_RDB_TEST
 
 set(SOURCES_SCHEMA_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/desc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/dsacc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc

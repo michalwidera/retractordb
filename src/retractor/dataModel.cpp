@@ -21,7 +21,7 @@ streamInstance::streamInstance(         //
     const rdb::Descriptor descStorage,  //
     const rdb::Descriptor descInternal  //
 ) {
-  storage = std::make_unique<rdb::DataStorageAccessor<>>(file);
+  storage = std::make_unique<rdb::storageAccessor<>>(file);
   storage->createDescriptor(descStorage);
   accessorStorage = std::make_unique<rdb::payLoadAccessor>(storage->getDescriptor(), storage->payload.get());
 

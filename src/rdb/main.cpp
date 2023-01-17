@@ -6,7 +6,7 @@
 #include <string>
 
 #include "rdb/desc.h"
-#include "rdb/dsacc.h"
+#include "rdb/storageacc.h"
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"
 #include "rdb/payloadacc.h"
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
 
-  std::unique_ptr<rdb::DataStorageAccessor<>> dacc;
+  std::unique_ptr<rdb::storageAccessor<>> dacc;
   std::unique_ptr<std::byte[]> payload;
   std::string file;
   bool reverse = false;
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
         std::cout << RED "File does not exist\n" RESET;
         continue;
       }
-      dacc.reset(new rdb::DataStorageAccessor(file));
+      dacc.reset(new rdb::storageAccessor(file));
       dacc->setReverse(cmd == "ropen");
       if (dacc->getDescriptor().getSizeInBytes() == 0) {
         std::cout << RED "File exist, description file missing (.desc)\n" RESET;
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
         std::cout << RED "File already exist\n" RESET;
         continue;
       }
-      dacc.reset(new rdb::DataStorageAccessor(file));
+      dacc.reset(new rdb::storageAccessor(file));
       dacc->createDescriptor(desc);
       dacc->setReverse(cmd == "rcreate");
       // payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);

@@ -16,7 +16,7 @@ namespace rdb {
  * @brief This object purpose is to access data via descriptor
  */
 template <class K = rdb::posixPrmBinaryFileAccessor<std::byte>>
-class DataStorageAccessor {
+class storageAccessor {
   std::unique_ptr<K> accessor;
 
   Descriptor descriptor;
@@ -30,9 +30,9 @@ class DataStorageAccessor {
   std::string filename;
 
  public:
-  DataStorageAccessor() = delete;
+  storageAccessor() = delete;
 
-  ~DataStorageAccessor();
+  ~storageAccessor();
 
   std::unique_ptr<std::byte[]> payload;
 
@@ -42,7 +42,7 @@ class DataStorageAccessor {
    * @param fileName Storage file
    * @param reverse type of Get/Set operations index - from head or from tail
    */
-  DataStorageAccessor(std::string fileName);
+  storageAccessor(std::string fileName);
 
   void createDescriptor(const Descriptor descriptor);
 
