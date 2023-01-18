@@ -6,9 +6,9 @@
 #include <locale>
 #include <string>
 
-#include "rdb/storageacc.h"
 #include "rdb/fainterface.h"
 #include "rdb/payloadacc.h"
+#include "rdb/storageacc.h"
 
 const uint AREA_SIZE = 10;
 

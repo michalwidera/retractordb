@@ -6,6 +6,9 @@
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
+
+#include "spdlog/spdlog.h"
+
 namespace rdb {
 payLoadAccessor::payLoadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat)
     : descriptor(descriptor),  //
@@ -30,37 +33,39 @@ void payLoadAccessor::setItem(int position, std::any value) {
   if (descriptor.type(fieldName) == "STRING") {
     std::string data(std::any_cast<std::string>(value));
     memcpy(ptr + descriptor.offset(position), data.c_str(), std::min(len, static_cast<uint>(data.length())));
-    return;
+    SPDLOG_INFO("setItem {} string:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTE") {
     unsigned char data(std::any_cast<unsigned char>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);
-    return;
+    SPDLOG_INFO("setItem {} char:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTEARRAY") {
     std::vector<unsigned char> data(std::any_cast<std::vector<unsigned char>>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);  //- check & todo
-    return;
+    SPDLOG_INFO("setItem {} bytearray", position);
   } else if (descriptor.type(fieldName) == "INTEGER") {
     int data(std::any_cast<int>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);
-    return;
+    SPDLOG_INFO("setItem {} int:{}", position, data);
   } else if (descriptor.type(fieldName) == "INTARRAY") {
     std::vector<int> data(std::any_cast<std::vector<int>>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);  //- check & todo
-    return;
+    SPDLOG_INFO("setItem {} intarray", position);
   } else if (descriptor.type(fieldName) == "UINT") {
     uint data(std::any_cast<uint>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);
-    return;
+    SPDLOG_INFO("setItem {} uint:{}", position, data);
   } else if (descriptor.type(fieldName) == "DOUBLE") {
     double data(std::any_cast<double>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);
-    return;
+    SPDLOG_INFO("setItem {} double:{}", position, data);
   } else if (descriptor.type(fieldName) == "FLOAT") {
     float data(std::any_cast<float>(value));
     memcpy(ptr + descriptor.offset(position), &data, len);
-    return;
+    SPDLOG_INFO("setItem {} float:{}", position, data);
+  } else {
+    SPDLOG_ERROR("Type not supported.");
+    assert(false && "type not supported on setter");
   }
-  assert(false && "type not supported on setter");
 }
 
 std::any payLoadAccessor::getItem(int position) {
@@ -70,6 +75,7 @@ std::any payLoadAccessor::getItem(int position) {
   if (descriptor.type(fieldName) == "STRING") {
     std::string retval;
     retval.assign(reinterpret_cast<char *>(ptr) + descriptor.offset(position), len);
+    SPDLOG_INFO("getItem {} string:{}", position, retval);
     return retval;
   } else if (descriptor.type(fieldName) == "BYTEARRAY") {
     std::vector<unsigned char> data;
@@ -77,10 +83,12 @@ std::any payLoadAccessor::getItem(int position) {
       unsigned char data8 = *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(ptr) + descriptor.offset(position) + i);
       data.push_back(data8);
     }
+    SPDLOG_INFO("getItem {} bytearray", position);
     return data;
   } else if (descriptor.type(fieldName) == "BYTE") {
     unsigned char data;
     data = *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(ptr) + descriptor.offset(position));
+    SPDLOG_INFO("getItem {} byte:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "INTARRAY") {
     std::vector<int> data;
@@ -88,24 +96,30 @@ std::any payLoadAccessor::getItem(int position) {
       int dataInt = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) + descriptor.offset(position) + i);
       data.push_back(dataInt);
     }
+    SPDLOG_INFO("getItem {} intarray", position);
     return data;
   } else if (descriptor.type(fieldName) == "INTEGER") {
     int data;
     data = *reinterpret_cast<int *>(reinterpret_cast<int *>(ptr) + descriptor.offset(position));
+    SPDLOG_INFO("getItem {} int:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "UINT") {
     uint data;
     data = *reinterpret_cast<uint *>(reinterpret_cast<uint *>(ptr) + descriptor.offset(position));
+    SPDLOG_INFO("getItem {} uint:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "DOUBLE") {
     double data;
     data = *reinterpret_cast<double *>(reinterpret_cast<double *>(ptr) + descriptor.offset(position));
+    SPDLOG_INFO("getItem {} double:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "FLOAT") {
     float data;
+    SPDLOG_INFO("getItem {} float:{}", position, data);
     data = *reinterpret_cast<double *>(reinterpret_cast<float *>(ptr) + descriptor.offset(position));
     return data;
   }
+  SPDLOG_ERROR("Type not supported.");
   assert(false && "type not supporte on getter.");
   return 0xdead;
 }
