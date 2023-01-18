@@ -7,9 +7,9 @@
 #include <string>
 
 #include "QStruct.h"  // coreInstance
-#include "rdb/storageacc.h"
 #include "rdb/fainterface.h"
 #include "rdb/payloadacc.h"
+#include "rdb/storageacc.h"
 #include "retractor/dataModel.h"
 #include "spdlog/spdlog.h"
 
