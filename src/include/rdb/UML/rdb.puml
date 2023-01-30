@@ -40,13 +40,12 @@ interface FileAccessorInterface {
 
 class payloadAccessor {
     {field} descriptor
-    {field} ptr
-    {field} hexFormat
 
     {method} getDescriptor
     {method} getPayloadPtr
     {method} setItem
     {method} getItem
+    {method} setHex
     {method} operator>>
     {method} operator<<
 }

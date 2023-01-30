@@ -3,6 +3,7 @@
 
 #include <any>
 #include <cstddef>  // std::byte
+#include <memory>   // std::unique_ptr
 
 #include "descriptor.h"
 
@@ -12,8 +13,8 @@ class payloadAccessor {
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;
 
-  /// @brief Pointer to payload
-  std::byte *ptr;
+  /// @brief Payload memory area
+  std::unique_ptr<std::byte[]> payload;
 
   /// @brief Type of dumped or read numeric formats
   bool hexFormat;
@@ -29,9 +30,7 @@ class payloadAccessor {
 
   /// @brief Constructor of payloadAccessor object
   /// @param descriptor descriptor of payload area
-  /// @param ptr pointer to payload
-  /// @param hexFormat type of default stored data
-  payloadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat = false);
+  payloadAccessor(Descriptor descriptor);
 
   /// @brief Default constructor is dissalowed
   payloadAccessor() = delete;
@@ -47,6 +46,10 @@ class payloadAccessor {
   /// @return address of begining memory that contains data descibed by
   /// descriptor
   std::any getItem(int position);
+
+  /// @brief Set format input/output formater - default false
+  /// @param hexFormat true if out/in in hex
+  void setHex(bool hexFormat);
 
   friend std::istream &operator>>(std::istream &is, const payloadAccessor &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs);

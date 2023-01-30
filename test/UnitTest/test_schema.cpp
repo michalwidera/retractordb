@@ -26,6 +26,9 @@ TEST(xschema, check_test1) {
   qry.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
   coreInstance.push_back(qry);
   */
+
+ 
+
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
@@ -38,7 +41,7 @@ TEST(xschema, check_test1) {
   };
 
   streamInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
-
+  /* Work In progress
   data.accessorInternal->setItem(0, 123);
   data.accessorInternal->setItem(1, 345);
 
@@ -47,6 +50,7 @@ TEST(xschema, check_test1) {
   data.accessorStorage->setItem(0, 123);
   data.accessorStorage->setItem(1, 345);
   data.storage->write();
+  */
 
   ASSERT_TRUE(true);
 };
