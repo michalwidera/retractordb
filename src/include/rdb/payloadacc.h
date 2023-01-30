@@ -8,7 +8,7 @@
 
 namespace rdb {
 /// @brief This class define accessing method to payload (memory area)
-class payLoadAccessor {
+class payloadAccessor {
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;
 
@@ -27,14 +27,14 @@ class payLoadAccessor {
   /// @return  T* pointer to payload
   std::byte *getPayloadPtr() const;
 
-  /// @brief Constructor of payLoadAccessor object
+  /// @brief Constructor of payloadAccessor object
   /// @param descriptor descriptor of payload area
   /// @param ptr pointer to payload
   /// @param hexFormat type of default stored data
-  payLoadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat = false);
+  payloadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat = false);
 
   /// @brief Default constructor is dissalowed
-  payLoadAccessor() = delete;
+  payloadAccessor() = delete;
 
   /// @brief Dirrect setter
   /// @param position position according to descriptor
@@ -48,8 +48,8 @@ class payLoadAccessor {
   /// descriptor
   std::any getItem(int position);
 
-  friend std::istream &operator>>(std::istream &is, const payLoadAccessor &rhs);
-  friend std::ostream &operator<<(std::ostream &os, const payLoadAccessor &rhs);
+  friend std::istream &operator>>(std::istream &is, const payloadAccessor &rhs);
+  friend std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs);
 };
 }  // namespace rdb
 

@@ -127,12 +127,12 @@ int main(int argc, char* argv[]) {
       dacc->read(record);
       payloadStatus = fetched;
     } else if (cmd == "set") {
-      rdb::payLoadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
+      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
       std::cin >> payloadAcc;
       payloadStatus = changed;
       continue;
     } else if (cmd == "setpos") {
-      rdb::payLoadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
+      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
       payloadStatus = changed;
       continue;
     } else if (cmd == "getpos") {
-      rdb::payLoadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
+      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
     } else if (cmd == "print") {
-      rdb::payLoadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
+      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
       std::cout << payloadAcc << std::endl;
       continue;
     } else if (cmd == "write") {
