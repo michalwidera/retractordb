@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
       std::cout << argv[0] << " - data processing tool." << std::endl;
       std::cout << desc;
       std::cout << config_line << std::endl;
+      std::cout << warranty << std::endl;
       return system::errc::success;
     }
     if (vm.count("compiler")) {
