@@ -50,7 +50,6 @@ int main(int argc, char* argv[]) {
     po::options_description desc("Avaiable options");
     desc.add_options()                                                                                  //
         ("help,h", "Show program options")                                                              //
-        ("compiler", "show compiler config")                                                            //
         ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                          //
         ("outfile,o", po::value<std::string>(&sOutputFile)->default_value("query.qry"), "output file")  //
         ("dumpcross,d", "dump diagnostic cross compilation forms");
@@ -63,10 +62,6 @@ int main(int argc, char* argv[]) {
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << warranty << std::endl;
-      return system::errc::success;
-    }
-    if (vm.count("compiler")) {
-      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("queryfile") == 0) {
