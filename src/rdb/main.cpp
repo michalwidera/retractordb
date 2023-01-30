@@ -37,7 +37,6 @@ int main(int argc, char* argv[]) {
   spdlog::flush_on(spdlog::level::trace);
 
   std::unique_ptr<rdb::storageAccessor<>> dacc;
-  std::unique_ptr<std::byte[]> payload;
   std::string file;
   bool reverse = false;
   bool rox = true;
