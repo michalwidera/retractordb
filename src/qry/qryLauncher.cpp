@@ -37,7 +37,6 @@ int main(int argc, char *argv[]) {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     desc.add_options()                                                                                        //
-        ("compiler", "show compiler config")                                                                  //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                               //
         ("detail,t", po::value<std::string>(&sInputStream), "show details of this stream")                    //
         ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0), "limit of elements, 0 - no limit")  //
@@ -63,10 +62,6 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << warranty << std::endl;
-      return system::errc::success;
-    }
-    if (vm.count("compiler")) {
-      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (vm.count("hello"))

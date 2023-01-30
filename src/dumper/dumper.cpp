@@ -287,7 +287,6 @@ int main(int argc, char *argv[]) {
     po::options_description desc("Avaiable options");
     desc.add_options()                                           //
         ("help,h", "show help options")                          //
-        ("compiler", "show compiler config")                     //
         ("verbose,r", "verbose mode")                            //
         ("dot,d", "create dot file")                             //
         ("csv,c", "create csv file")                             //
@@ -309,10 +308,6 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << warranty << std::endl;
-      return system::errc::success;
-    }
-    if (vm.count("compiler")) {
-      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     std::string sPlikDanych = vm["infile"].as<std::string>();

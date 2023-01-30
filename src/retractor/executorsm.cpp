@@ -327,7 +327,6 @@ int main(int argc, char *argv[]) {
     po::options_description desc("Supported program options");
     desc.add_options()                                                                                     //
         ("help,h", "show help")                                                                            //
-        ("compiler", "show compiler config")                                                               //
         ("infile,i", po::value<std::string>(&sInputFile)->default_value("query.qry"), "input query plan")  //
         ("display,s", po::value<std::string>(&sQuery), "process single query")                             //
         ("dump,d", po::value<std::string>(&sDumpFile)->default_value("query.dmp"), "dump file name")       //
@@ -345,10 +344,6 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << warranty << std::endl;
-      return system::errc::success;
-    }
-    if (vm.count("compiler")) {
-      std::cout << config_line << std::endl;
       return system::errc::success;
     }
     if (!std::filesystem::exists(sInputFile)) {
