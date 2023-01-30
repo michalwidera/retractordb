@@ -37,10 +37,10 @@ int main(int argc, char* argv[]) {
   spdlog::flush_on(spdlog::level::trace);
 
   std::unique_ptr<rdb::storageAccessor<>> dacc;
+  std::unique_ptr<rdb::payloadAccessor> payloadAcc;
   std::string file;
   bool reverse = false;
   bool rox = true;
-  bool hexFormat = false;
   std::string cmd;
   do {
     std::cout << ".";
@@ -65,6 +65,10 @@ int main(int argc, char* argv[]) {
       // dacc->payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
       // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
       payloadStatus = clean;
+
+      payloadAcc = std::make_unique<rdb::payloadAccessor>(dacc->getDescriptor());
+      dacc->attachPayloadPtr(payloadAcc->getPayloadPtr());
+
       dacc->setRemoveOnExit(false);
     } else if (cmd == "create" || cmd == "rcreate") {
       std::cin >> file;
@@ -87,6 +91,10 @@ int main(int argc, char* argv[]) {
       dacc->setReverse(cmd == "rcreate");
       // payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
       // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
+
+      payloadAcc = std::make_unique<rdb::payloadAccessor>(dacc->getDescriptor());
+      dacc->attachPayloadPtr(payloadAcc->getPayloadPtr());
+
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
@@ -126,41 +134,38 @@ int main(int argc, char* argv[]) {
       dacc->read(record);
       payloadStatus = fetched;
     } else if (cmd == "set") {
-      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
-      std::cin >> payloadAcc;
+      std::cin >> *payloadAcc;
       payloadStatus = changed;
       continue;
     } else if (cmd == "setpos") {
-      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
       if (dacc->getDescriptor().type(fieldname) == "INTEGER") {
         int value;
         std::cin >> value;
-        payloadAcc.setItem(position, value);
+        payloadAcc->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldname) == "DOUBLE") {
         double value;
         std::cin >> value;
-        payloadAcc.setItem(position, value);
+        payloadAcc->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldname) == "BYTE") {
         unsigned char value;
         std::cin >> value;
-        payloadAcc.setItem(position, value);
+        payloadAcc->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldname) == "STRING") {
         std::string record;
         std::cin >> record;
-        payloadAcc.setItem(position, record);
+        payloadAcc->setItem(position, record);
       } else
         std::cerr << "field not found\n";
       payloadStatus = changed;
       continue;
     } else if (cmd == "getpos") {
-      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
-      std::any value = payloadAcc.getItem(position);
+      std::any value = payloadAcc->getItem(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
       }
@@ -183,8 +188,7 @@ int main(int argc, char* argv[]) {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
     } else if (cmd == "print") {
-      rdb::payloadAccessor payloadAcc(dacc->getDescriptor(), dacc->payload.get(), hexFormat);
-      std::cout << payloadAcc << std::endl;
+      std::cout << *payloadAcc << std::endl;
       continue;
     } else if (cmd == "write") {
       size_t record;
@@ -217,12 +221,12 @@ int main(int argc, char* argv[]) {
       std::cout << dacc->getRecordsCount() << " Record(s)\n";
       std::cout << dacc->getDescriptor().getSizeInBytes() << " Byte(s) per record.\n";
       continue;
-    } else if (cmd == "hex")
-      hexFormat = true;
-    else if (cmd == "dec")
-      hexFormat = false;
-    else if (cmd == "dump") {
-      auto* ptr = reinterpret_cast<unsigned char*>(dacc->payload.get());
+    } else if (cmd == "hex") {
+      payloadAcc->setHex(true);
+    } else if (cmd == "dec") {
+      payloadAcc->setHex(false);
+    } else if (cmd == "dump") {
+      auto* ptr = reinterpret_cast<unsigned char*>(payloadAcc->getPayloadPtr());
       for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');

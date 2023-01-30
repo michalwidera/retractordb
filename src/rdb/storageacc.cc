@@ -15,6 +15,7 @@ storageAccessor<K>::storageAccessor(std::string fileName)
       filename(fileName),         //
       removeOnExit(true),         //
       recordsCount(0),            //
+      payloadPtr(nullptr),        //
       dataFileStatus(noDescriptor) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
@@ -36,12 +37,15 @@ storageAccessor<K>::storageAccessor(std::string fileName)
 
   std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
-  memset(payload.get(), 0, descriptor.getSizeInBytes());
 
   dataFileStatus = open;
 
   SPDLOG_INFO("construct: Success, Descriptor&Storage [open], Payload [create]");
+}
+
+template <class K>
+void storageAccessor<K>::attachPayloadPtr(std::byte *payloadPtrVal) {
+  payloadPtr = payloadPtrVal;
 }
 
 template <class K>
@@ -65,8 +69,6 @@ void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
 
   std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-  payload = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
-  memset(payload.get(), 0, descriptor.getSizeInBytes());
 
   dataFileStatus = open;
 
@@ -111,11 +113,12 @@ template <class K>
 bool storageAccessor<K>::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
+  if (payloadPtr == nullptr) abort();  // no payload attached
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->read(payload.get(), size, recordIndexRv * size);
+    result = accessor->read(payloadPtr, size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("read {}", recordIndexRv);
   }
@@ -126,17 +129,18 @@ template <class K>
 bool storageAccessor<K>::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
+  if (payloadPtr == nullptr) abort();  // no payload attached
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
-    result = accessor->write(payload.get(), size);  // <- Call to append Function
+    result = accessor->write(payloadPtr, size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
     SPDLOG_INFO("append");
   } else {
     if (recordsCount > 0 && recordIndex < recordsCount) {
       auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-      result = accessor->write(payload.get(), size, recordIndexRv * size);
+      result = accessor->write(payloadPtr, size, recordIndexRv * size);
       assert(result == 0);
       SPDLOG_INFO("write {}", recordIndexRv);
     }

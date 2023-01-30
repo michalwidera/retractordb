@@ -193,6 +193,7 @@ bool test_storage() {
 
   rdb::storageAccessor dAcc2("datafile-fstream2");
   dAcc2.createDescriptor(dataDescriptor);
+  dAcc2.attachPayloadPtr(payload1.ptr);
 
   std::memcpy(payload1.Name, "test data", AREA_SIZE);
   payload1.TLen = 0x66;
@@ -205,10 +206,11 @@ bool test_storage() {
   dAcc2.write();
 
   dataPayload payload2;
+  dAcc2.attachPayloadPtr(payload2.ptr);
+
   std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
   payload2.TLen = 0x67;
   payload2.Control = 0x33;
-  std::memcpy(dAcc2.payload.get(), &payload2, 15);
 
   dAcc2.write(1);
 
@@ -216,14 +218,14 @@ bool test_storage() {
 
   {
     std::stringstream coutstring;
-    coutstring << dAcc2.getDescriptor().toString("Name", dAcc2.payload.get());
+    coutstring << dAcc2.getDescriptor().toString("Name", payload2.ptr);
     if (strcmp(coutstring.str().c_str(), "xxxx xxxx") != 0) return false;
   }
 
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << dAcc2.getDescriptor().cast<int>("TLen", dAcc2.payload.get());
+    coutstring << dAcc2.getDescriptor().cast<int>("TLen", payload2.ptr);
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "67") != 0) return false;
   }
@@ -231,7 +233,7 @@ bool test_storage() {
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", dAcc2.payload.get());
+    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", payload2.ptr);
     coutstring << std::dec;
     if (strcmp(coutstring.str().c_str(), "33") != 0) return false;
   }

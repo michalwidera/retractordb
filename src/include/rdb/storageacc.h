@@ -10,6 +10,7 @@
 #include "faccposix.h"
 #include "faccposixprm.h"
 #include "fainterface.h"
+#include "payloadacc.h"
 
 namespace rdb {
 /**
@@ -29,12 +30,12 @@ class storageAccessor {
 
   std::string filename;
 
+  std::byte *payloadPtr;
+
  public:
   storageAccessor() = delete;
 
   ~storageAccessor();
-
-  std::unique_ptr<std::byte[]> payload;
 
   /**
    * @brief Open existing Data Accessor object and check descriptor file
@@ -47,6 +48,8 @@ class storageAccessor {
   void createDescriptor(const Descriptor descriptor);
 
   enum dataForm { noDescriptor, open } dataFileStatus;
+
+  void attachPayloadPtr(std::byte *payloadPtrVal);
 
   /**
    * @brief Reads data package from storage
