@@ -23,10 +23,10 @@ streamInstance::streamInstance(         //
 ) {
   storage = std::make_unique<rdb::storageAccessor<>>(file);
   storage->createDescriptor(descStorage);
-  accessorStorage = std::make_unique<rdb::payLoadAccessor>(storage->getDescriptor(), storage->payload.get());
+  accessorStorage = std::make_unique<rdb::payloadAccessor>(storage->getDescriptor(), storage->payload.get());
 
   payloadInternal = std::make_unique<std::byte[]>(descInternal.getSizeInBytes());
-  accessorInternal = std::make_unique<rdb::payLoadAccessor>(descInternal, payloadInternal.get(), noHexFormat);
+  accessorInternal = std::make_unique<rdb::payloadAccessor>(descInternal, payloadInternal.get(), noHexFormat);
 
   {
     std::stringstream strStream;

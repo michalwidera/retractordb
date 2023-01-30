@@ -38,7 +38,7 @@ interface FileAccessorInterface {
     {method} fileName
 }
 
-class payLoadAccessor {
+class payloadAccessor {
     {field} descriptor
     {field} ptr
     {field} hexFormat
@@ -91,6 +91,6 @@ Descriptor --* storageAccessor
 
 Descriptor --- rdb::eType
 
-payLoadAccessor --* Descriptor
+payloadAccessor --* Descriptor
 
 @enduml

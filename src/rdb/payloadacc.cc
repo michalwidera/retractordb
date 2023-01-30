@@ -10,7 +10,7 @@
 #include "spdlog/spdlog.h"
 
 namespace rdb {
-payLoadAccessor::payLoadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat)
+payloadAccessor::payloadAccessor(Descriptor descriptor, std::byte *ptr, bool hexFormat)
     : descriptor(descriptor),  //
       ptr(ptr),                //
       hexFormat(hexFormat) {}
@@ -23,11 +23,11 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
   memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data, sizeof(T));
 }
 
-Descriptor payLoadAccessor::getDescriptor() const { return descriptor; }
+Descriptor payloadAccessor::getDescriptor() const { return descriptor; }
 
-std::byte *payLoadAccessor::getPayloadPtr() const { return ptr; }
+std::byte *payloadAccessor::getPayloadPtr() const { return ptr; }
 
-void payLoadAccessor::setItem(int position, std::any value) {
+void payloadAccessor::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
   if (descriptor.type(fieldName) == "STRING") {
@@ -68,7 +68,7 @@ void payLoadAccessor::setItem(int position, std::any value) {
   }
 }
 
-std::any payLoadAccessor::getItem(int position) {
+std::any payloadAccessor::getItem(int position) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
   std::cerr << "set:" << fieldName << std::endl;
@@ -124,7 +124,7 @@ std::any payLoadAccessor::getItem(int position) {
   return 0xdead;
 }
 
-std::istream &operator>>(std::istream &is, const payLoadAccessor &rhs) {
+std::istream &operator>>(std::istream &is, const payloadAccessor &rhs) {
   std::string fieldName;
   is >> fieldName;
   if (is.eof()) return is;
@@ -157,19 +157,19 @@ std::istream &operator>>(std::istream &is, const payLoadAccessor &rhs) {
     unsigned char data8 = static_cast<unsigned char>(data);
     memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data8, sizeof(unsigned char));
   } else if (desc.type(fieldName) == "UINT")
-    copyToMemory<uint, payLoadAccessor>(is, rhs, fieldName.c_str());
+    copyToMemory<uint, payloadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "INTEGER")
-    copyToMemory<int, payLoadAccessor>(is, rhs, fieldName.c_str());
+    copyToMemory<int, payloadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "FLOAT")
-    copyToMemory<float, payLoadAccessor>(is, rhs, fieldName.c_str());
+    copyToMemory<float, payloadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "DOUBLE")
-    copyToMemory<double, payLoadAccessor>(is, rhs, fieldName.c_str());
+    copyToMemory<double, payloadAccessor>(is, rhs, fieldName.c_str());
   else
     std::cerr << "field not found\n";
   return is;
 }
 
-std::ostream &operator<<(std::ostream &os, const payLoadAccessor &rhs) {
+std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
   os << "{";
   if (rhs.hexFormat)
     os << std::hex;
