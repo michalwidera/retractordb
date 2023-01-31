@@ -72,7 +72,7 @@ class storageAccessor {
    *
    * @return Descriptor& reference to descriptor inner object
    */
-  Descriptor& getDescriptor();
+  Descriptor &getDescriptor();
 
   /**
    * @brief Set the Reverse value
