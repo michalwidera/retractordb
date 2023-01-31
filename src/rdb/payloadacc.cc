@@ -22,7 +22,7 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
   T data;
   is >> data;
   Descriptor desc(rhs.getDescriptor());
-  memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data, sizeof(T));
+  memcpy(rhs.get() + desc.offset(fieldName), &data, sizeof(T));
 }
 
 void payloadAccessor::setHex(bool hexFormatVal) {
@@ -31,7 +31,7 @@ void payloadAccessor::setHex(bool hexFormatVal) {
 
 Descriptor payloadAccessor::getDescriptor() const { return descriptor; }
 
-std::byte *payloadAccessor::getPayloadPtr() const { return payload.get(); }
+std::byte *payloadAccessor::get() const { return payload.get(); }
 
 void payloadAccessor::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
@@ -143,26 +143,26 @@ std::istream &operator>>(std::istream &is, const payloadAccessor &rhs) {
   if (desc.type(fieldName) == "STRING") {
     std::string record;
     std::getline(is >> std::ws, record);
-    memset(rhs.getPayloadPtr() + desc.offset(fieldName), 0, desc.len(fieldName));
-    memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
+    memset(rhs.get() + desc.offset(fieldName), 0, desc.len(fieldName));
+    memcpy(rhs.get() + desc.offset(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
   } else if (desc.type(fieldName) == "BYTEARRAY") {
     for (auto i = 0; i < desc.len(fieldName); i++) {
       int data;
       is >> data;
       unsigned char data8 = static_cast<unsigned char>(data);
-      memcpy(rhs.getPayloadPtr() + desc.offset(fieldName) + i * sizeof(unsigned char), &data8, sizeof(unsigned char));
+      memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(unsigned char), &data8, sizeof(unsigned char));
     }
   } else if (desc.type(fieldName) == "INTARRAY") {
     for (auto i = 0; i < desc.len(fieldName) / sizeof(int); i++) {
       int data;
       is >> data;
-      memcpy(rhs.getPayloadPtr() + desc.offset(fieldName) + i * sizeof(int), &data, sizeof(int));
+      memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(int), &data, sizeof(int));
     }
   } else if (desc.type(fieldName) == "BYTE") {
     int data;
     is >> data;
     unsigned char data8 = static_cast<unsigned char>(data);
-    memcpy(rhs.getPayloadPtr() + desc.offset(fieldName), &data8, sizeof(unsigned char));
+    memcpy(rhs.get() + desc.offset(fieldName), &data8, sizeof(unsigned char));
   } else if (desc.type(fieldName) == "UINT")
     copyToMemory<uint, payloadAccessor>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "INTEGER")
@@ -187,11 +187,11 @@ std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
-      os << std::string(reinterpret_cast<char *>(rhs.getPayloadPtr() + offset_), desc.len(std::get<rname>(r)));
+      os << std::string(reinterpret_cast<char *>(rhs.get() + offset_), desc.len(std::get<rname>(r)));
     } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
         unsigned char data;
-        memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(unsigned char), sizeof(unsigned char));
+        memcpy(&data, rhs.get() + offset_ + i * sizeof(unsigned char), sizeof(unsigned char));
         if (rhs.hexFormat) {
           os << std::setfill('0');
           os << std::setw(2);
@@ -202,7 +202,7 @@ std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
     } else if (std::get<rtype>(r) == rdb::INTARRAY) {
       for (auto i = 0; i < std::get<rlen>(r) / sizeof(int); i++) {
         int data;
-        memcpy(&data, rhs.getPayloadPtr() + offset_ + i * sizeof(int), sizeof(int));
+        memcpy(&data, rhs.get() + offset_ + i * sizeof(int), sizeof(int));
         if (rhs.hexFormat) {
           os << std::setfill('0');
           os << std::setw(8);
@@ -212,7 +212,7 @@ std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
       }
     } else if (std::get<rtype>(r) == rdb::BYTE) {
       unsigned char data;
-      memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(unsigned char));
+      memcpy(&data, rhs.get() + offset_, sizeof(unsigned char));
       if (rhs.hexFormat) {
         os << std::setfill('0');
         os << std::setw(2);
@@ -220,7 +220,7 @@ std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
       os << (int)data;
     } else if (std::get<rtype>(r) == rdb::INTEGER) {
       int data;
-      memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(int));
+      memcpy(&data, rhs.get() + offset_, sizeof(int));
       if (rhs.hexFormat) {
         os << std::setfill('0');
         os << std::setw(8);
@@ -228,7 +228,7 @@ std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
       os << data;
     } else if (std::get<rtype>(r) == rdb::UINT) {
       unsigned int data;
-      memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(unsigned int));
+      memcpy(&data, rhs.get() + offset_, sizeof(unsigned int));
       if (rhs.hexFormat) {
         os << std::setfill('0');
         os << std::setw(8);
@@ -236,11 +236,11 @@ std::ostream &operator<<(std::ostream &os, const payloadAccessor &rhs) {
       os << data;
     } else if (std::get<rtype>(r) == rdb::FLOAT) {
       float data;
-      memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(float));
+      memcpy(&data, rhs.get() + offset_, sizeof(float));
       os << data;
     } else if (std::get<rtype>(r) == rdb::DOUBLE) {
       double data;
-      memcpy(&data, rhs.getPayloadPtr() + offset_, sizeof(double));
+      memcpy(&data, rhs.get() + offset_, sizeof(double));
       os << data;
     } else
       assert(false && "Unrecognized type");

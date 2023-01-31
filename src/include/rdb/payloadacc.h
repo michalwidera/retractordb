@@ -26,7 +26,7 @@ class payloadAccessor {
 
   /// @brief Accessor to pointer to payload
   /// @return  T* pointer to payload
-  std::byte *getPayloadPtr() const;
+  std::byte *get() const;
 
   /// @brief Constructor of payloadAccessor object
   /// @param descriptor descriptor of payload area
