@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
       payloadStatus = clean;
 
       payloadAcc = std::make_unique<rdb::payloadAccessor>(dacc->getDescriptor());
-      dacc->attachPayloadPtr(payloadAcc->getPayloadPtr());
+      dacc->attachPayloadPtr(payloadAcc->get());
 
       dacc->setRemoveOnExit(false);
     } else if (cmd == "create" || cmd == "rcreate") {
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
       // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
 
       payloadAcc = std::make_unique<rdb::payloadAccessor>(dacc->getDescriptor());
-      dacc->attachPayloadPtr(payloadAcc->getPayloadPtr());
+      dacc->attachPayloadPtr(payloadAcc->get());
 
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
@@ -226,7 +226,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "dec") {
       payloadAcc->setHex(false);
     } else if (cmd == "dump") {
-      auto* ptr = reinterpret_cast<unsigned char*>(payloadAcc->getPayloadPtr());
+      auto* ptr = reinterpret_cast<unsigned char*>(payloadAcc->get());
       for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');

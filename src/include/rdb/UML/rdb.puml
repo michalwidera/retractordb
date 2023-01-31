@@ -42,7 +42,7 @@ class payloadAccessor {
     {field} descriptor
 
     {method} getDescriptor
-    {method} getPayloadPtr
+    {method} get
     {method} setItem
     {method} getItem
     {method} setHex
