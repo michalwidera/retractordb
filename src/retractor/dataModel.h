@@ -13,7 +13,7 @@
 struct streamInstance {
   std::unique_ptr<rdb::storageAccessor<>> storage;
   std::unique_ptr<rdb::payload> storagePayload;
-  std::unique_ptr<rdb::payload> InternalPayload;
+  std::unique_ptr<rdb::payload> internalPayload;
 
   streamInstance(const std::string file,                     // <- query %% filename
                  const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()

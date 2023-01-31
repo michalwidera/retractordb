@@ -24,7 +24,7 @@ streamInstance::streamInstance(               //
   storage = std::make_unique<rdb::storageAccessor<>>(file);
   storage->createDescriptor(storageDescriptor);
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
-  InternalPayload = std::make_unique<rdb::payload>(internalDescriptor);
+  internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
   {
     std::stringstream strStream;
@@ -33,7 +33,7 @@ streamInstance::streamInstance(               //
   }
   {
     std::stringstream strStream;
-    strStream << InternalPayload->getDescriptor();
+    strStream << internalPayload->getDescriptor();
     SPDLOG_INFO("image/internal descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
 };
