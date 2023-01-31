@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QStruct.h>         // query
 #include <rdb/descriptor.h>  // rdb::Descriptor
 #include <rdb/payload.h>     // rdb::payload
 #include <rdb/storageacc.h>  // rdb::storageAccessor
@@ -18,6 +19,8 @@ struct dataInstance {
   dataInstance(const std::string file,                     // <- query %% filename
                const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
                const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+
+  // dataInstance(const query &qry);
 };
 
 struct dataModel : public std::map<std::string, dataInstance> {};

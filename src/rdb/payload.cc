@@ -34,6 +34,7 @@ std::byte *payload::get() const { return payloadData.get(); }
 void payload::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
+  if (position > descriptor.size()) abort();
   if (descriptor.type(fieldName) == "STRING") {
     std::string data(std::any_cast<std::string>(value));
     memcpy(payloadData.get() + descriptor.offset(position), data.c_str(), std::min(len, static_cast<uint>(data.length())));
@@ -75,6 +76,7 @@ void payload::setItem(int position, std::any value) {
 std::any payload::getItem(int position) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
+  if (position > descriptor.size()) abort();
   std::cerr << "set:" << fieldName << std::endl;
   if (descriptor.type(fieldName) == "STRING") {
     std::string retval;
