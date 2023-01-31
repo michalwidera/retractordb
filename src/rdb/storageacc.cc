@@ -40,11 +40,12 @@ storageAccessor<K>::storageAccessor(std::string fileName)
 
   dataFileStatus = open;
 
-  SPDLOG_INFO("construct: Success, Descriptor&Storage [open], Payload [create]");
+  SPDLOG_INFO("construct: Success, Descriptor&Storage [open]");
 }
 
 template <class K>
 void storageAccessor<K>::attachPayloadPtr(std::byte *payloadPtrVal) {
+  SPDLOG_INFO("construct: Payload [attached]");
   payloadPtr = payloadPtrVal;
 }
 
@@ -72,7 +73,7 @@ void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
 
   dataFileStatus = open;
 
-  SPDLOG_INFO("fn createDescriptor: Success, Descriptor&Storage [open], Payload [create]");
+  SPDLOG_INFO("fn createDescriptor: Success, Descriptor&Storage [open]");
 }
 
 template <class K>
