@@ -8,7 +8,7 @@
 
 #include "QStruct.h"  // coreInstance
 #include "rdb/fainterface.h"
-#include "rdb/payloadacc.h"
+#include "rdb/payload.h"
 #include "rdb/storageacc.h"
 #include "retractor/dataModel.h"
 #include "spdlog/spdlog.h"
@@ -27,7 +27,7 @@ TEST(xschema, check_test1) {
   coreInstance.push_back(qry);
   */
 
- 
+
 
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //

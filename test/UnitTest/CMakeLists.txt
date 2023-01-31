@@ -27,7 +27,7 @@ set(SOURCES_RDB_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/payloadacc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     test_rdb.cpp
     main.cpp)
 
@@ -37,7 +37,7 @@ set(SOURCES_SCHEMA_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/payloadacc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     test_schema.cpp

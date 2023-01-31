@@ -8,7 +8,7 @@
 #include "rdb/descriptor.h"
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"
-#include "rdb/payloadacc.h"
+#include "rdb/payload.h"
 #include "rdb/storageacc.h"
 #include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 #include "spdlog/spdlog.h"
@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
   spdlog::flush_on(spdlog::level::trace);
 
   std::unique_ptr<rdb::storageAccessor<>> dacc;
-  std::unique_ptr<rdb::payloadAccessor> payloadAcc;
+  std::unique_ptr<rdb::payload> payloadAcc;
   std::string file;
   bool reverse = false;
   bool rox = true;
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
       // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
       payloadStatus = clean;
 
-      payloadAcc = std::make_unique<rdb::payloadAccessor>(dacc->getDescriptor());
+      payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
       dacc->attachPayloadPtr(payloadAcc->get());
 
       dacc->setRemoveOnExit(false);
@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
       // payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
       // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
 
-      payloadAcc = std::make_unique<rdb::payloadAccessor>(dacc->getDescriptor());
+      payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
       dacc->attachPayloadPtr(payloadAcc->get());
 
       payloadStatus = clean;

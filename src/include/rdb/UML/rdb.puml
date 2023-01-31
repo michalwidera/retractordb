@@ -38,7 +38,7 @@ interface FileAccessorInterface {
     {method} fileName
 }
 
-class payloadAccessor {
+class payload {
     {field} descriptor
 
     {method} getDescriptor
@@ -90,6 +90,6 @@ Descriptor --* storageAccessor
 
 Descriptor --- rdb::eType
 
-payloadAccessor --* Descriptor
+payload --* Descriptor
 
 @enduml
