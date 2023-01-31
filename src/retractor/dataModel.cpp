@@ -38,3 +38,10 @@ dataInstance::dataInstance(                   //
     SPDLOG_INFO("image/internal descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
 };
+/*
+dataInstance::dataInstance(const query &qry)
+    : dataInstance(qry.filename,                //
+                   qry.descriptorFrom(),        //
+                   qry.descriptorExpression())  //
+      {};
+*/
