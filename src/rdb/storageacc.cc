@@ -44,7 +44,7 @@ storageAccessor<K>::storageAccessor(std::string fileName)
 }
 
 template <class K>
-void storageAccessor<K>::attachPayloadPtr(std::byte *payloadPtrVal) {
+void storageAccessor<K>::attachPayloadPtr(std::byte* payloadPtrVal) {
   SPDLOG_INFO("construct: Payload [attached]");
   payloadPtr = payloadPtrVal;
 }
@@ -114,7 +114,7 @@ template <class K>
 bool storageAccessor<K>::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
-  if (payloadPtr == nullptr) abort();  // no payload attached
+  if (payloadPtr == nullptr) abort();   // no payload attached
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
@@ -130,7 +130,7 @@ template <class K>
 bool storageAccessor<K>::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (dataFileStatus != open) abort();  // data file is not opened
-  if (payloadPtr == nullptr) abort();  // no payload attached
+  if (payloadPtr == nullptr) abort();   // no payload attached
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {

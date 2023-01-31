@@ -16,26 +16,24 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 
-streamInstance::streamInstance(         //
-    const std::string file,             //
-    const rdb::Descriptor descStorage,  //
-    const rdb::Descriptor descInternal  //
+streamInstance::streamInstance(               //
+    const std::string file,                   //
+    const rdb::Descriptor storageDescriptor,  //
+    const rdb::Descriptor internalDescriptor  //
 ) {
   storage = std::make_unique<rdb::storageAccessor<>>(file);
-  storage->createDescriptor(descStorage);
-  accessorStorage = std::make_unique<rdb::payload>(storage->getDescriptor());
-
-  payloadInternal = std::make_unique<std::byte[]>(descInternal.getSizeInBytes());
-  accessorInternal = std::make_unique<rdb::payload>(descInternal);
+  storage->createDescriptor(storageDescriptor);
+  storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
+  InternalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
   {
     std::stringstream strStream;
-    strStream << storage->getDescriptor();
+    strStream << storagePayload->getDescriptor();
     SPDLOG_INFO("storage/external descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
   {
     std::stringstream strStream;
-    strStream << accessorInternal->getDescriptor();
+    strStream << InternalPayload->getDescriptor();
     SPDLOG_INFO("image/internal descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
 };

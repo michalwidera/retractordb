@@ -25,9 +25,7 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
   memcpy(rhs.get() + desc.offset(fieldName), &data, sizeof(T));
 }
 
-void payload::setHex(bool hexFormatVal) {
-  hexFormat = hexFormatVal;
-}
+void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
 
 Descriptor payload::getDescriptor() const { return descriptor; }
 
@@ -46,7 +44,7 @@ void payload::setItem(int position, std::any value) {
     SPDLOG_INFO("setItem {} char:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTEARRAY") {
     std::vector<unsigned char> data(std::any_cast<std::vector<unsigned char>>(value));
-    memcpy(payloadData.get() + descriptor.offset(position), &data, len); //- check & todo
+    memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
     SPDLOG_INFO("setItem {} bytearray", position);
   } else if (descriptor.type(fieldName) == "INTEGER") {
     int data(std::any_cast<int>(value));
@@ -54,7 +52,7 @@ void payload::setItem(int position, std::any value) {
     SPDLOG_INFO("setItem {} int:{}", position, data);
   } else if (descriptor.type(fieldName) == "INTARRAY") {
     std::vector<int> data(std::any_cast<std::vector<int>>(value));
-    memcpy(payloadData.get() + descriptor.offset(position), &data, len); //- check & todo
+    memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
     SPDLOG_INFO("setItem {} intarray", position);
   } else if (descriptor.type(fieldName) == "UINT") {
     uint data(std::any_cast<uint>(value));

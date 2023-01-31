@@ -27,8 +27,6 @@ TEST(xschema, check_test1) {
   coreInstance.push_back(qry);
   */
 
-
-
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
