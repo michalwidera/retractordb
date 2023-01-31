@@ -45,8 +45,14 @@ storageAccessor<K>::storageAccessor(std::string fileName)
 
 template <class K>
 void storageAccessor<K>::attachPayloadPtr(std::byte* payloadPtrVal) {
-  SPDLOG_INFO("construct: Payload [attached]");
+  SPDLOG_INFO("required: PayloadPtr [attached]");
   payloadPtr = payloadPtrVal;
+}
+
+template <class K>
+void storageAccessor<K>::attachPayload(rdb::payload& payloadRef) {
+  SPDLOG_INFO("required: Payload [attached]");
+  payloadPtr = payloadRef.get();
 }
 
 template <class K>
@@ -64,7 +70,7 @@ void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
   descFile.close();
 
   if (descriptor.getSizeInBytes() == 0) {
-    SPDLOG_ERROR("construct: descriptor found - but struct empty, done.");
+    SPDLOG_ERROR("createDescriptor: descriptor found - but struct empty, done.");
     return;
   }
 
@@ -73,7 +79,7 @@ void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
 
   dataFileStatus = open;
 
-  SPDLOG_INFO("fn createDescriptor: Success, Descriptor&Storage [open]");
+  SPDLOG_INFO("createDescriptor: Success, Descriptor&Storage [open]");
 }
 
 template <class K>

@@ -50,6 +50,7 @@ class storageAccessor {
   enum dataForm { noDescriptor, open } dataFileStatus;
 
   void attachPayloadPtr(std::byte *payloadPtrVal);
+  void attachPayload(rdb::payload &payloadRef);
 
   /**
    * @brief Reads data package from storage

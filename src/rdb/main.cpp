@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
       payloadStatus = clean;
 
       payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
-      dacc->attachPayloadPtr(payloadAcc->get());
+      dacc->attachPayload(*payloadAcc);
 
       dacc->setRemoveOnExit(false);
     } else if (cmd == "create" || cmd == "rcreate") {
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
       // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
 
       payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
-      dacc->attachPayloadPtr(payloadAcc->get());
+      dacc->attachPayload(*payloadAcc);
 
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);

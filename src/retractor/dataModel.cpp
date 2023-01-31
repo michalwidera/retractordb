@@ -16,15 +16,16 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 
-streamInstance::streamInstance(               //
+dataInstance::dataInstance(                   //
     const std::string file,                   //
     const rdb::Descriptor storageDescriptor,  //
-    const rdb::Descriptor internalDescriptor  //
-) {
-  storage = std::make_unique<rdb::storageAccessor<>>(file);
-  storage->createDescriptor(storageDescriptor);
+    const rdb::Descriptor internalDescriptor) {
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
+
+  storage = std::make_unique<rdb::storageAccessor<>>(file);
+  storage->createDescriptor(storageDescriptor);
+  storage->attachPayload(*storagePayload);
 
   {
     std::stringstream strStream;

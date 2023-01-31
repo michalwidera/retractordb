@@ -10,14 +10,14 @@
 #include <string>
 #include <vector>
 
-struct streamInstance {
+struct dataInstance {
   std::unique_ptr<rdb::storageAccessor<>> storage;
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> internalPayload;
 
-  streamInstance(const std::string file,                     // <- query %% filename
-                 const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
-                 const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  dataInstance(const std::string file,                     // <- query %% filename
+               const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
+               const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 };
 
-struct dataModel : public std::map<std::string, streamInstance> {};
+struct dataModel : public std::map<std::string, dataInstance> {};

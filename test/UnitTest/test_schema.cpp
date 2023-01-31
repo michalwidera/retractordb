@@ -38,17 +38,16 @@ TEST(xschema, check_test1) {
       rdb::Descriptor("A[2]", rdb::INTEGER)    //
   };
 
-  streamInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
-  /* Work In progress
-  data.accessorInternal->setItem(0, 123);
-  data.accessorInternal->setItem(1, 345);
+  dataInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
 
-  auto v1 = data.accessorInternal->getItem(0);
+  data.internalPayload->setItem(0, 123);
+  data.internalPayload->setItem(1, 345);
 
-  data.accessorStorage->setItem(0, 123);
-  data.accessorStorage->setItem(1, 345);
+  auto v1 = data.internalPayload->getItem(0);
+
+  data.storagePayload->setItem(0, 234);
+  data.storagePayload->setItem(1, 456);
   data.storage->write();
-  */
 
   ASSERT_TRUE(true);
 };
