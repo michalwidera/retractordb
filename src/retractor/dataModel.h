@@ -20,7 +20,7 @@ struct dataInstance {
                const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
                const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
-  // dataInstance(const query &qry);
+  dataInstance(query &qry);
 };
 
 struct dataModel : public std::map<std::string, dataInstance> {};
