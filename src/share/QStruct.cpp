@@ -343,7 +343,7 @@ rdb::Descriptor query::descriptorFrom() {
   return retVal;
 }
 
-std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
+std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog)  {
   auto eIt = prog.begin();
   std::string sArg1;
   std::string sArg2;
