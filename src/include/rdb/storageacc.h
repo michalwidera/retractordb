@@ -32,6 +32,8 @@ class storageAccessor {
 
   std::byte *payloadPtr;
 
+  bool storageExistsBefore;  // true if storageAccessor have created file
+
  public:
   storageAccessor() = delete;
 
@@ -101,6 +103,8 @@ class storageAccessor {
    * @return const string filename
    */
   const std::string getStorageFilename();
+
+  bool storageCreated();
 };
 }  // namespace rdb
 

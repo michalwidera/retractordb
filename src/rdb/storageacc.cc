@@ -11,12 +11,13 @@
 namespace rdb {
 template <class K>
 storageAccessor<K>::storageAccessor(std::string fileName)
-    : accessor(std::make_unique<K>(fileName)),  //
-      filename(fileName),                       //
-      removeOnExit(true),                       //
-      recordsCount(0),                          //
-      payloadPtr(nullptr),                      //
+    : filename(fileName),   //
+      removeOnExit(true),   //
+      recordsCount(0),      //
+      payloadPtr(nullptr),  //
       dataFileStatus(noDescriptor) {
+  storageExistsBefore = std::filesystem::exists(fileName);
+  accessor = std::make_unique<K>(fileName);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   auto fileDesc(accessor->fileName().append(".desc"));
@@ -158,6 +159,12 @@ bool storageAccessor<K>::write(const size_t recordIndex) {
 template <class K>
 const std::string storageAccessor<K>::getStorageFilename() {
   return filename;
+}
+
+
+template <class K>
+bool storageAccessor<K>::storageCreated() {
+  return !storageExistsBefore;
 }
 
 template class storageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;

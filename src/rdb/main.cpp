@@ -53,7 +53,8 @@ int main(int argc, char* argv[]) {
     }
     if (cmd == "open" || cmd == "ropen") {
       std::cin >> file;
-      if (std::filesystem::exists(file)) {
+      dacc = std::make_unique<rdb::storageAccessor<>>(file);
+      if (!dacc->storageCreated()) {
         //
         // open existing file path
         //
@@ -61,7 +62,6 @@ int main(int argc, char* argv[]) {
           std::cout << RED "File exist, description file missing (.desc)\n" RESET;
           continue;
         }
-        dacc = std::make_unique<rdb::storageAccessor<>>(file);
         // additional check if file exist and descriptor is match - here ?
       } else {
         //
@@ -77,11 +77,6 @@ int main(int argc, char* argv[]) {
         std::stringstream scheamStringStream(sschema);
         rdb::Descriptor desc;
         scheamStringStream >> desc;
-        if (std::filesystem::exists(file)) {
-          std::cout << RED "File already exist\n" RESET;
-          continue;
-        }
-        dacc = std::make_unique<rdb::storageAccessor<>>(file);
         dacc->createDescriptor(desc);
       }
       dacc->setReverse(cmd == "ropen");
