@@ -57,12 +57,11 @@ int main(int argc, char* argv[]) {
         //
         // open existing file path
         //
-        std::cin >> file;
-        dacc = std::make_unique<rdb::storageAccessor<>>(file);
         if (dacc->getDescriptor().getSizeInBytes() == 0) {
           std::cout << RED "File exist, description file missing (.desc)\n" RESET;
           continue;
         }
+        dacc = std::make_unique<rdb::storageAccessor<>>(file);
         // additional check if file exist and descriptor is match - here ?
       } else {
         //
