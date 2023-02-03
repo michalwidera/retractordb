@@ -109,6 +109,14 @@ int main(int argc, char* argv[]) {
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << RESET;
+    } else if (cmd == "dropfile") {
+      std::string object;
+      do {
+        std::cin >> object;
+        if (std::filesystem::exists(object)) {
+          std::filesystem::remove(object);
+        }
+      } while (object.find("}") == std::string::npos);
     } else if (!dacc) {
       std::cout << RED "unconnected\n" RESET;
       continue;
