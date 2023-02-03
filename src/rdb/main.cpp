@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>  // make_unique
 #include <string>
 
 #include "rdb/descriptor.h"
@@ -52,58 +53,49 @@ int main(int argc, char* argv[]) {
     }
     if (cmd == "open" || cmd == "ropen") {
       std::cin >> file;
-      if (!std::filesystem::exists(file)) {
-        std::cout << RED "File does not exist\n" RESET;
-        continue;
-      }
-      dacc.reset(new rdb::storageAccessor(file));
-      dacc->setReverse(cmd == "ropen");
-      if (dacc->getDescriptor().getSizeInBytes() == 0) {
-        std::cout << RED "File exist, description file missing (.desc)\n" RESET;
-        continue;
-      }
-      // dacc->payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
-      // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
-      payloadStatus = clean;
-
-      payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
-      dacc->attachPayload(*payloadAcc);
-
-      dacc->setRemoveOnExit(false);
-    } else if (cmd == "create" || cmd == "rcreate") {
-      std::cin >> file;
-      std::string sschema;
-      std::string object;
-      do {
-        std::cin >> object;
-        sschema.append(object);
-        sschema.append(" ");
-      } while (object.find("}") == std::string::npos);
-      std::stringstream scheamStringStream(sschema);
-      rdb::Descriptor desc;
-      scheamStringStream >> desc;
       if (std::filesystem::exists(file)) {
-        std::cout << RED "File already exist\n" RESET;
-        continue;
+        //
+        // open existing file path
+        //
+        std::cin >> file;
+        dacc = std::make_unique<rdb::storageAccessor<>>(file);
+        if (dacc->getDescriptor().getSizeInBytes() == 0) {
+          std::cout << RED "File exist, description file missing (.desc)\n" RESET;
+          continue;
+        }
+        // additional check if file exist and descriptor is match - here ?
+      } else {
+        //
+        // create new file path
+        //
+        std::string sschema;
+        std::string object;
+        do {
+          std::cin >> object;
+          sschema.append(object);
+          sschema.append(" ");
+        } while (object.find("}") == std::string::npos);
+        std::stringstream scheamStringStream(sschema);
+        rdb::Descriptor desc;
+        scheamStringStream >> desc;
+        if (std::filesystem::exists(file)) {
+          std::cout << RED "File already exist\n" RESET;
+          continue;
+        }
+        dacc = std::make_unique<rdb::storageAccessor<>>(file);
+        dacc->createDescriptor(desc);
       }
-      dacc.reset(new rdb::storageAccessor(file));
-      dacc->createDescriptor(desc);
-      dacc->setReverse(cmd == "rcreate");
-      // payload.reset(new std::byte[dacc->getDescriptor().getSizeInBytes()]);
-      // memset(dacc->payload.get(), 0, dacc->getDescriptor().getSizeInBytes());
-
+      dacc->setReverse(cmd == "ropen");
       payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
       dacc->attachPayload(*payloadAcc);
-
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
       std::cout << "exit|quit|q \t\t\t exit\n";
       std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
-      std::cout << "open|ropen [file] \t\t open database - create connection (r-reverse iterator)\n";
-      std::cout << "create|rcreate [file][schema] \t create database with schema (r-reverse iterator)\n";
-      std::cout << "\t\t\t\t example: .create test_db { INTEGER dane STRING name[3] } \n";
+      std::cout << "open|ropen file [schema] \t open or create database with schema (r-reverse iterator)\n";
+      std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] } \n";
       std::cout << "desc \t\t\t\t show schema\n";
       std::cout << "read [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t send record to database from payload\n";

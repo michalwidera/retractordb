@@ -1,4 +1,4 @@
-create test2 { STRING name[5] INTARRAY data[3] BYTEARRAY bt[3] BYTE Control FLOAT m1 INTEGER m2 }
+open test2 { STRING name[5] INTARRAY data[3] BYTEARRAY bt[3] BYTE Control FLOAT m1 INTEGER m2 }
 size
 set name test1
 set data 1 2 3

@@ -11,11 +11,11 @@
 namespace rdb {
 template <class K>
 storageAccessor<K>::storageAccessor(std::string fileName)
-    : accessor(new K(fileName)),  //
-      filename(fileName),         //
-      removeOnExit(true),         //
-      recordsCount(0),            //
-      payloadPtr(nullptr),        //
+    : accessor(std::make_unique<K>(fileName)),  //
+      filename(fileName),                       //
+      removeOnExit(true),                       //
+      recordsCount(0),                          //
+      payloadPtr(nullptr),                      //
       dataFileStatus(noDescriptor) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
