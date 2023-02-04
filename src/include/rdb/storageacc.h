@@ -33,8 +33,6 @@ class storageAccessor {
 
   std::byte *payloadPtr;
 
-  bool storageExistsBefore;  // true if storageAccessor have created file
-
  public:
   storageAccessor() = delete;
 

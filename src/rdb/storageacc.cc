@@ -19,7 +19,7 @@ storageAccessor<K>::storageAccessor(std::string fileName)
       recordsCount(0),      //
       payloadPtr(nullptr),  //
       dataFileStatus(storageState::noDescriptor) {
-  storageExistsBefore = std::filesystem::exists(fileName);
+  auto storageExistsBefore = std::filesystem::exists(fileName);
   accessor = std::make_unique<K>(fileName);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
@@ -170,7 +170,7 @@ const std::string storageAccessor<K>::getStorageFilename() {
 
 template <class K>
 bool storageAccessor<K>::storageCreated() {
-  return !storageExistsBefore;
+  return !(dataFileStatus == storageState::openAndCreate);
 }
 
 template class storageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;
