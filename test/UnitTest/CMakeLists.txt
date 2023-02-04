@@ -40,6 +40,9 @@ set(SOURCES_SCHEMA_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLLexer.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLParser.cpp
     test_schema.cpp
     main.cpp)
 
