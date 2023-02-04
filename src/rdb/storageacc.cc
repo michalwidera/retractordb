@@ -9,13 +9,16 @@
 #include "spdlog/spdlog.h"
 
 namespace rdb {
+
+bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
+
 template <class K>
 storageAccessor<K>::storageAccessor(std::string fileName)
     : filename(fileName),   //
       removeOnExit(true),   //
       recordsCount(0),      //
       payloadPtr(nullptr),  //
-      dataFileStatus(noDescriptor) {
+      dataFileStatus(storageState::noDescriptor) {
   storageExistsBefore = std::filesystem::exists(fileName);
   accessor = std::make_unique<K>(fileName);
   std::fstream myFile;
@@ -39,9 +42,13 @@ storageAccessor<K>::storageAccessor(std::string fileName)
   std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
 
-  dataFileStatus = open;
-
-  SPDLOG_INFO("construct: Success, Descriptor&Storage [open]");
+  if (storageExistsBefore) {
+    dataFileStatus = storageState::openExisting;
+    SPDLOG_INFO("construct: Success, Descriptor&Storage [openExisting]");
+  } else {
+    dataFileStatus = storageState::openAndCreate;
+    SPDLOG_INFO("construct: Success, Descriptor&Storage [openAndCreate]");
+  }
 }
 
 template <class K>
@@ -58,7 +65,7 @@ void storageAccessor<K>::attachPayload(rdb::payload& payloadRef) {
 
 template <class K>
 void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
-  if (dataFileStatus == open) abort();  // data file already opend and have attached descriptor
+  if (isOpen(dataFileStatus)) abort();  // data file already opend and have attached descriptor
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
@@ -78,9 +85,9 @@ void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
   std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
 
-  dataFileStatus = open;
+  dataFileStatus = storageState::openAndCreate;
 
-  SPDLOG_INFO("createDescriptor: Success, Descriptor&Storage [open]");
+  SPDLOG_INFO("createDescriptor: Success, Descriptor&Storage [openAndCreate]");
 }
 
 template <class K>
@@ -120,8 +127,8 @@ const size_t storageAccessor<K>::getRecordsCount() {
 template <class K>
 bool storageAccessor<K>::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
-  if (dataFileStatus != open) abort();  // data file is not opened
-  if (payloadPtr == nullptr) abort();   // no payload attached
+  if (!isOpen(dataFileStatus)) abort();  // data file is not opened
+  if (payloadPtr == nullptr) abort();    // no payload attached
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
@@ -136,8 +143,8 @@ bool storageAccessor<K>::read(const size_t recordIndex) {
 template <class K>
 bool storageAccessor<K>::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
-  if (dataFileStatus != open) abort();  // data file is not opened
-  if (payloadPtr == nullptr) abort();   // no payload attached
+  if (!isOpen(dataFileStatus)) abort();  // data file is not opened
+  if (payloadPtr == nullptr) abort();    // no payload attached
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
@@ -160,7 +167,6 @@ template <class K>
 const std::string storageAccessor<K>::getStorageFilename() {
   return filename;
 }
-
 
 template <class K>
 bool storageAccessor<K>::storageCreated() {
