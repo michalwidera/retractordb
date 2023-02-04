@@ -103,7 +103,7 @@ class storageAccessor {
    */
   const std::string getStorageFilename();
 
-  bool storageCreated();
+  bool storageAlreadyExisting();
 };
 }  // namespace rdb
 

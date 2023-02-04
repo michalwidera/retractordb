@@ -45,10 +45,11 @@ storageAccessor<K>::storageAccessor(std::string fileName)
   if (storageExistsBefore) {
     dataFileStatus = storageState::openExisting;
     SPDLOG_INFO("construct: Success, Descriptor&Storage [openExisting]");
-  } else {
-    dataFileStatus = storageState::openAndCreate;
-    SPDLOG_INFO("construct: Success, Descriptor&Storage [openAndCreate]");
+    return;
   }
+
+  dataFileStatus = storageState::openAndCreate;
+  SPDLOG_INFO("construct: Success, Descriptor&Storage [openAndCreate]");
 }
 
 template <class K>
@@ -65,7 +66,13 @@ void storageAccessor<K>::attachPayload(rdb::payload& payloadRef) {
 
 template <class K>
 void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
-  if (isOpen(dataFileStatus)) abort();  // data file already opend and have attached descriptor
+  if (isOpen(dataFileStatus)) {
+    if (descriptorParam == descriptor) {
+      SPDLOG_INFO("createDescriptor: descriptor param match - ok, pass.");
+      return;
+    }
+    abort();  // data file already opend and have attached different descriptor
+  }
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
@@ -152,13 +159,14 @@ bool storageAccessor<K>::write(const size_t recordIndex) {
     assert(result == 0);
     if (result == 0) recordsCount++;
     SPDLOG_INFO("append");
-  } else {
-    if (recordsCount > 0 && recordIndex < recordsCount) {
-      auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-      result = accessor->write(payloadPtr, size, recordIndexRv * size);
-      assert(result == 0);
-      SPDLOG_INFO("write {}", recordIndexRv);
-    }
+    return result == 0;
+  }
+
+  if (recordsCount > 0 && recordIndex < recordsCount) {
+    auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
+    result = accessor->write(payloadPtr, size, recordIndexRv * size);
+    assert(result == 0);
+    SPDLOG_INFO("write {}", recordIndexRv);
   }
   return result == 0;
 };
@@ -169,8 +177,8 @@ const std::string storageAccessor<K>::getStorageFilename() {
 }
 
 template <class K>
-bool storageAccessor<K>::storageCreated() {
-  return !(dataFileStatus == storageState::openAndCreate);
+bool storageAccessor<K>::storageAlreadyExisting() {
+  return dataFileStatus == storageState::openExisting;
 }
 
 template class storageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;
