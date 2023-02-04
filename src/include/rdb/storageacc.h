@@ -13,6 +13,7 @@
 #include "payload.h"
 
 namespace rdb {
+enum class storageState { noDescriptor, openExisting, openAndCreate };
 /**
  * @brief This object purpose is to access data via descriptor
  */
@@ -49,7 +50,7 @@ class storageAccessor {
 
   void createDescriptor(const Descriptor descriptor);
 
-  enum dataForm { noDescriptor, open } dataFileStatus;
+  storageState dataFileStatus;
 
   void attachPayloadPtr(std::byte *payloadPtrVal);
   void attachPayload(rdb::payload &payloadRef);
