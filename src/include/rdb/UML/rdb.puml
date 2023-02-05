@@ -59,12 +59,23 @@ class storageAccessor {
     {field} filename
 
     {method} createDescriptor
-    {method} get
-    {method} put
+    {method} read
+    {method} write
     {method} getDescriptor
     {method} setReverse
     {method} setRemoveOnExit
     {method} getRecordsCount
+    {method} getStorageFilename
+}
+
+class externalAccessor {
+    {field} accessor
+    {field} descriptor
+    {field} filename
+
+    {method} createDescriptor
+    {method} read
+    {method} getDescriptor
     {method} getStorageFilename
 }
 
