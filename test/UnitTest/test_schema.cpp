@@ -81,7 +81,9 @@ TEST(xschema, check_test1) {
   //  SPDLOG_INFO("coreInstance[] {}, {}", q.id, q.filename);
   //}
 
-  dataInstance data(coreInstance["str1"]);
+  dataInstance data1(coreInstance["str1"]);
+
+  // dataInstance data2(coreInstance["core0"]);
 
   ASSERT_TRUE(true);
 };
