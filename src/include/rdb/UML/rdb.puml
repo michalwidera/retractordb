@@ -98,6 +98,7 @@ posixBinaryFileAccessor --* storageAccessor
 posixPrmBinaryFileAccessor --* storageAccessor
 
 Descriptor --* storageAccessor
+Descriptor --* externalAccessor
 
 Descriptor --- rdb::eType
 
