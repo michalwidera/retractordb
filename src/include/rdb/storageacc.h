@@ -45,7 +45,6 @@ class storageAccessor {
   void setReverse(bool value);
   void setRemoveOnExit(bool value);
   const size_t getRecordsCount();
-  const std::string getStorageFilename();
   bool storageAlreadyExisting();
 };
 }  // namespace rdb
