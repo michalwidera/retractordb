@@ -172,11 +172,6 @@ bool storageAccessor<K>::write(const size_t recordIndex) {
 };
 
 template <class K>
-const std::string storageAccessor<K>::getStorageFilename() {
-  return filename;
-}
-
-template <class K>
 bool storageAccessor<K>::storageAlreadyExisting() {
   return dataFileStatus == storageState::openExisting;
 }

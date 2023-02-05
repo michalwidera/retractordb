@@ -11,7 +11,8 @@
             "configurationProvider": "ms-vscode.cmake-tools",
             "includePath": [
                 "${default}",
-                "${workspaceFolder}/src/include"
+                "${workspaceFolder}/src/include",
+                "${workspaceFolder}/src/include/rdb"
             ]
         }
     ],
