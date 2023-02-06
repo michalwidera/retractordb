@@ -15,9 +15,8 @@
 namespace rdb {
 enum class storageState { noDescriptor, openExisting, openAndCreate };
 
-template <class K = rdb::posixPrmBinaryFileAccessor<std::byte>>
 class storageAccessor {
-  std::unique_ptr<K> accessor;
+  std::unique_ptr<FileAccessorInterface<std::byte>> accessor;
   Descriptor descriptor;
   bool reverse = false;
   bool removeOnExit;

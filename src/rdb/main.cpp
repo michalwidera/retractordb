@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
 
-  std::unique_ptr<rdb::storageAccessor<>> dacc;
+  std::unique_ptr<rdb::storageAccessor> dacc;
   std::unique_ptr<rdb::payload> payloadAcc;
   std::string file;
   bool reverse = false;
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
     }
     if (cmd == "open" || cmd == "ropen") {
       std::cin >> file;
-      dacc = std::make_unique<rdb::storageAccessor<>>(file);
+      dacc = std::make_unique<rdb::storageAccessor>(file);
       if (dacc->storageAlreadyExisting()) {
         //
         // open existing file path

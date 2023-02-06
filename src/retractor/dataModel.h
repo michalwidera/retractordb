@@ -12,7 +12,7 @@
 #include <vector>
 
 struct dataInstance {
-  std::unique_ptr<rdb::storageAccessor<>> storage;
+  std::unique_ptr<rdb::storageAccessor> storage;
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> internalPayload;
 

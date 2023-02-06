@@ -12,15 +12,14 @@ namespace rdb {
 
 bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
 
-template <class K>
-storageAccessor<K>::storageAccessor(std::string fileName)
+storageAccessor::storageAccessor(std::string fileName)
     : filename(fileName),   //
       removeOnExit(true),   //
       recordsCount(0),      //
       payloadPtr(nullptr),  //
       dataFileStatus(storageState::noDescriptor) {
   auto storageExistsBefore = std::filesystem::exists(fileName);
-  accessor = std::make_unique<K>(fileName);
+  accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(fileName);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   auto fileDesc(accessor->fileName().append(".desc"));
@@ -52,20 +51,17 @@ storageAccessor<K>::storageAccessor(std::string fileName)
   SPDLOG_INFO("construct: Success, Descriptor&Storage [openAndCreate]");
 }
 
-template <class K>
-void storageAccessor<K>::attachPayloadPtr(std::byte* payloadPtrVal) {
+void storageAccessor::attachPayloadPtr(std::byte* payloadPtrVal) {
   SPDLOG_INFO("required: PayloadPtr [attached]");
   payloadPtr = payloadPtrVal;
 }
 
-template <class K>
-void storageAccessor<K>::attachPayload(rdb::payload& payloadRef) {
+void storageAccessor::attachPayload(rdb::payload& payloadRef) {
   SPDLOG_INFO("required: Payload [attached]");
   payloadPtr = payloadRef.get();
 }
 
-template <class K>
-void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
+void storageAccessor::createDescriptor(const Descriptor descriptorParam) {
   if (isOpen(dataFileStatus)) {
     if (descriptorParam == descriptor) {
       SPDLOG_INFO("createDescriptor: descriptor param match - ok, pass.");
@@ -97,8 +93,7 @@ void storageAccessor<K>::createDescriptor(const Descriptor descriptorParam) {
   SPDLOG_INFO("createDescriptor: Success, Descriptor&Storage [openAndCreate]");
 }
 
-template <class K>
-storageAccessor<K>::~storageAccessor() {
+storageAccessor::~storageAccessor() {
   if (removeOnExit) {
     // Constructor & Destructor does not fail - need to reconsider remove this
     // asserts or make this in another way.
@@ -111,28 +106,15 @@ storageAccessor<K>::~storageAccessor() {
   }
 }
 
-template <class K>
-Descriptor& storageAccessor<K>::getDescriptor() {
-  return descriptor;
-}
+Descriptor& storageAccessor::getDescriptor() { return descriptor; }
 
-template <class K>
-void storageAccessor<K>::setReverse(bool value) {
-  reverse = value;
-}
+void storageAccessor::setReverse(bool value) { reverse = value; }
 
-template <class K>
-void storageAccessor<K>::setRemoveOnExit(bool value) {
-  removeOnExit = value;
-}
+void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
-template <class K>
-const size_t storageAccessor<K>::getRecordsCount() {
-  return recordsCount;
-}
+const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
-template <class K>
-bool storageAccessor<K>::read(const size_t recordIndex) {
+bool storageAccessor::read(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (!isOpen(dataFileStatus)) abort();  // data file is not opened
   if (payloadPtr == nullptr) abort();    // no payload attached
@@ -147,8 +129,7 @@ bool storageAccessor<K>::read(const size_t recordIndex) {
   return result == 0;
 }
 
-template <class K>
-bool storageAccessor<K>::write(const size_t recordIndex) {
+bool storageAccessor::write(const size_t recordIndex) {
   if (descriptor.isDirty()) abort();
   if (!isOpen(dataFileStatus)) abort();  // data file is not opened
   if (payloadPtr == nullptr) abort();    // no payload attached
@@ -171,12 +152,6 @@ bool storageAccessor<K>::write(const size_t recordIndex) {
   return result == 0;
 };
 
-template <class K>
-bool storageAccessor<K>::storageAlreadyExisting() {
-  return dataFileStatus == storageState::openExisting;
-}
+bool storageAccessor::storageAlreadyExisting() { return dataFileStatus == storageState::openExisting; }
 
-template class storageAccessor<rdb::genericBinaryFileAccessor<std::byte>>;
-template class storageAccessor<rdb::posixBinaryFileAccessor<std::byte>>;
-template class storageAccessor<rdb::posixPrmBinaryFileAccessor<std::byte>>;
 }  // namespace rdb
