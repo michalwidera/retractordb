@@ -27,26 +27,12 @@ typedef std::tuple<fieldNameType, fieldLenType, rdb::eType> rfield;
  */
 enum FieldColumn { rname = 0, rlen = 1, rtype = 2 };
 
+constexpr int error_desc_location = -1;
+
 /**
  * @brief Structure resposible for mapping types into binary struct
  */
 class Descriptor : public std::vector<rfield> {
-  /**
-   * @brief This is map of field names. Each field name should be unique for
-   * each descriptor If two or more tuples have same name this fieldNames object
-   * is empty.
-   *
-   */
-  std::map<std::string, int> fieldNames;
-
-  /**
-   * @brief Internal function that will check names consistency in object
-   *
-   * @return true - no double names found
-   * @return false - found doubled names fields
-   */
-  bool _updateNames();
-
  public:
   bool isDirty() const;
 
@@ -121,17 +107,17 @@ class Descriptor : public std::vector<rfield> {
    * @brief Get the Size object - it scans all tuples and sums size in bytes of
    * these objects.
    *
-   * @return uint size of package [unit: Bytes]
+   * @return int size of package [unit: Bytes]
    */
-  uint getSizeInBytes() const;
+  int getSizeInBytes() const;
 
   /**
    * @brief Return position as index in vector of tuples of given field name
    *
    * @param name Field name
-   * @return uint Position [unit: Index]
+   * @return int Position [unit: Index]
    */
-  uint position(std::string name);
+  int position(std::string name);
 
   /**
    * @brief Return fieldname in vector of tuples on given fieldPosition
@@ -139,34 +125,34 @@ class Descriptor : public std::vector<rfield> {
    * @param fieldPosition Field postion
    * @return string Position
    */
-  std::string fieldName(uint fieldPosition);
+  std::string fieldName(int fieldPosition);
 
   /**
    * @brief Finds in inner container given tuple by name and return this tuple
    * len
    *
    * @param name Field name
-   * @return uint Field name [unit: Bytes]
+   * @return int Field name [unit: Bytes]
    */
-  uint len(const std::string name);
+  int len(const std::string name);
 
   /**
    * @brief Counts over inner container and finds offset of given field name
    * from package begining
    *
    * @param name Field name
-   * @return uint Filed offset [unit: Bytes]
+   * @return int Filed offset [unit: Bytes]
    */
-  uint offset(const std::string name);
+  int offset(const std::string name);
 
   /**
    * @brief Counts over inner container and finds offset of given field position
    * from package begining
    *
    * @param position Field position
-   * @return uint Filed offset [unit: Bytes]
+   * @return int Filed offset [unit: Bytes]
    */
-  uint offset(int position);
+  int offset(int position);
 
   /**
    * @brief Return type of given field
