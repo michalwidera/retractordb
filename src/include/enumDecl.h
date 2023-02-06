@@ -107,7 +107,8 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
       DECL(STRING),     //
       DECL(BYTEARRAY),  //
       DECL(INTARRAY),   //
-      DECL(DOUBLE)      //
+      DECL(DOUBLE),     //
+      DECL(REF)         //
   } END_E_GEN(eType)
 }
 

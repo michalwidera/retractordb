@@ -41,6 +41,7 @@ rdb::eType GetFieldType(std::string name) {
                                                       {"BYTE", rdb::BYTE},            //
                                                       {"INTEGER", rdb::INTEGER},      //
                                                       {"FLOAT", rdb::FLOAT},          //
+                                                      {"REF", rdb::REF},              //
                                                       {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
@@ -53,12 +54,15 @@ std::string GetFieldType(rdb::eType e) {
                                                       {rdb::BYTE, "BYTE"},            //
                                                       {rdb::INTEGER, "INTEGER"},      //
                                                       {rdb::FLOAT, "FLOAT"},          //
+                                                      {rdb::REF, "REF"},              //
                                                       {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
 }
 
 constexpr int GetFieldLenFromType(rdb::eType ft) {
   switch (ft) {
+    case rdb::REF:
+      return 0;
     case rdb::UINT:
       return sizeof(unsigned);
     case rdb::INTEGER:
