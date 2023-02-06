@@ -37,7 +37,7 @@ void payload::setItem(int position, std::any value) {
   if (position > descriptor.size()) abort();
   if (descriptor.type(fieldName) == "STRING") {
     std::string data(std::any_cast<std::string>(value));
-    memcpy(payloadData.get() + descriptor.offset(position), data.c_str(), std::min(len, static_cast<uint>(data.length())));
+    memcpy(payloadData.get() + descriptor.offset(position), data.c_str(), std::min(len, static_cast<int>(data.length())));
     SPDLOG_INFO("setItem {} string:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTE") {
     unsigned char data(std::any_cast<unsigned char>(value));

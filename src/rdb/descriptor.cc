@@ -1,19 +1,34 @@
 #include "rdb/descriptor.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cctype>
 #include <iostream>
+#include <limits>
 #include <locale>
 
 namespace rdb {
 // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
 
 static inline void ltrim(std::string &s) {
-  s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+  s.erase(                                      //
+      s.begin(),                                //
+      std::find_if(s.begin(), s.end(),          //
+                   [](auto ch) {                //
+                     return !std::isspace(ch);  //
+                   }                            //
+                   ));
 }
 
 static inline void rtrim(std::string &s) {
-  s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
+  s.erase(                                //
+      std::find_if(s.rbegin(), s.rend(),  //
+                   [](auto ch) {          //
+                     return !std::isspace(ch);
+                   }  //
+                   )
+          .base(),
+      s.end());
 }
 
 rdb::eType GetFieldType(std::string name) {
@@ -42,7 +57,7 @@ std::string GetFieldType(rdb::eType e) {
   return typeDictionary[e];
 }
 
-constexpr uint GetFieldLenFromType(rdb::eType ft) {
+constexpr int GetFieldLenFromType(rdb::eType ft) {
   switch (ft) {
     case rdb::UINT:
       return sizeof(unsigned);
@@ -67,19 +82,17 @@ constexpr uint GetFieldLenFromType(rdb::eType ft) {
 
 Descriptor::Descriptor(std::initializer_list<rfield> l) : std::vector<rfield>(l) {}
 
-Descriptor::Descriptor(fieldNameType n, fieldLenType l, rdb::eType t) {
-  push_back(rfield(n, l, t));
-  _updateNames();
+Descriptor::Descriptor(fieldNameType n, fieldLenType l, rdb::eType t) {  //
+  push_back(rfield(n, l, t));                                            //
 }
 
 Descriptor::Descriptor(fieldNameType n, rdb::eType t) {
   assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
   push_back(rfield(n, GetFieldLenFromType(t), t));
-  _updateNames();
 }
 
-bool Descriptor::isDirty() const { return fieldNames.size() == 0; }
+bool Descriptor::isDirty() const { return this->size() == 0; }
 
 void Descriptor::append(std::initializer_list<rfield> l) { insert(end(), l.begin(), l.end()); }
 
@@ -93,65 +106,57 @@ Descriptor &Descriptor::operator|(const Descriptor &rhs) {
     // can't do safe: data | data
     // due one name policy
   }
-  _updateNames();
   return *this;
 }
 
 Descriptor &Descriptor::operator=(const Descriptor &rhs) {
   clear();
   insert(end(), rhs.begin(), rhs.end());
-  _updateNames();
   return *this;
 }
 
-Descriptor::Descriptor(const Descriptor &init) {
-  *this | init;
-  _updateNames();
-}
+Descriptor::Descriptor(const Descriptor &init) { *this | init; }
 
-uint Descriptor::getSizeInBytes() const {
-  uint size = 0;
+int Descriptor::getSizeInBytes() const {
+  int size = 0;
   for (auto const i : *this) size += std::get<rlen>(i);
   return size;
 }
 
-bool Descriptor::_updateNames() {
-  uint position = 0;
-  fieldNames.clear();
-  for (auto const i : *this) {
-    if (fieldNames.find(std::get<fieldNameType>(i)) == fieldNames.end())
-      fieldNames[std::get<fieldNameType>(i)] = position;
-    else {
-      fieldNames.clear();
-      assert(false && "that name aleardy exist so it will make dirty");
-      return false;
-    }
-    position++;
-  }
-  return true;
+int Descriptor::position(std::string name) {
+  auto it = std::find_if(begin(), end(),                          //
+                         [name](const auto &item) {               //
+                           return std::get<rname>(item) == name;  //
+                         }                                        //
+  );
+
+  if (it != end())
+    return std::distance(begin(), it);
+  else
+    assert(false && "did not find that record id Descriptor:{}");
+
+  return error_desc_location;
 }
 
-uint Descriptor::position(std::string name) {
-  if (fieldNames.find(name) != fieldNames.end()) return fieldNames[name];
-  assert(false && "did not find that record id Descriptor:{}");
-  return -1;
+std::string Descriptor::fieldName(int fieldPosition) {  //
+  return std::get<rname>((*this)[fieldPosition]);       //
 }
 
-std::string Descriptor::fieldName(uint fieldPosition) { return std::get<fieldNameType>((*this)[fieldPosition]); }
+int Descriptor::len(const std::string name) {      //
+  return std::get<rlen>((*this)[position(name)]);  //
+}
 
-uint Descriptor::len(const std::string name) { return std::get<rlen>((*this)[position(name)]); }
-
-uint Descriptor::offset(const std::string name) {
+int Descriptor::offset(const std::string name) {
   auto offset = 0;
   for (auto const field : *this) {
-    if (name == std::get<fieldNameType>(field)) return offset;
+    if (name == std::get<rname>(field)) return offset;
     offset += std::get<rlen>(field);
   }
   assert(false && "field not found with that name");
-  return -1;
+  return error_desc_location;
 }
 
-uint Descriptor::offset(const int position) {
+int Descriptor::offset(const int position) {
   auto offset = 0;
   int i = 0;
   for (auto const field : *this) {
@@ -160,7 +165,7 @@ uint Descriptor::offset(const int position) {
     offset += std::get<rlen>(field);
   }
   assert(false && "field not found with that postion");
-  return -1;
+  return error_desc_location;
 }
 
 std::string Descriptor::type(const std::string name) { return GetFieldType(std::get<rtype>((*this)[position(name)])); }
@@ -176,7 +181,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
     os << std::endl;
   }
   os << "}";
-  if (rhs.fieldNames.size() == 0) os << "[dirty]";
+  if (rhs.isDirty()) os << "[dirty]";
   return os;
 }
 
