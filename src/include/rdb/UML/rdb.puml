@@ -56,7 +56,7 @@ class storageAccessor {
     {field} dataFileStatus
     {field} filename
 
-    {method} createDescriptor
+    {method} attachDescriptor
     {method} read
     {method} write
     {method} getDescriptor
@@ -70,7 +70,7 @@ class externalAccessor {
     {field} descriptor
     {field} filename
 
-    {method} createDescriptor
+    {method} attachDescriptor
     {method} read
     {method} getDescriptor
 }

@@ -7,7 +7,7 @@ start
 
 partition "construct" {
 :storageAccessor(filename,[descriptorParam]) ;
-note right: Crete storageAccessor class instance
+note right: Crete storageAccessor class instance;
 
 :assume descriptor as filename.desc;
 }
@@ -15,23 +15,29 @@ note right: Crete storageAccessor class instance
 partition "attachDescriptor" {
 if (descriptor file exists?) then (yes)
   :read descriptor file;
-  if (descriptorParam.has_value() && descriptor == descriptorParam) then (yes)
-    if (descriptor has ref?) then (yes)
-      :storage location from ref;
-    else (no)
-      :default storage ref;
-    endif
+  if (descriptorParam.has_not_value() ||
+      descriptor == descriptorParam) then (yes)
+    :set storage location
+    [ref];
+    note right: CurrDir if no ref;
   else (no)
     :<color:red>ERROR - differnet descriptors;
     stop
   endif
 else (no)
-  :default storage ref;
-  :create and store
-  descriptor file;
+	if (descriptorParam.has_value()) then (yes)
+  :create descriptor file
+  [ref];
+  note right: CurrDir if no ref;
+  else(no)
+     :<color:red>ERROR - no descriptor;
+    stop
+  endif
 endif
 
 :<color:green>descriptor is ready;
+
+note left: Storage location estabilished
 }
 
 partition "attachStorage" {

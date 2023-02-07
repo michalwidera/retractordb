@@ -193,7 +193,7 @@ bool test_storage() {
 
   rdb::storageAccessor dAcc2("datafile-fstream2");
   dAcc2.attachStorage();
-  dAcc2.createDescriptor(dataDescriptor);
+  dAcc2.attachDescriptor(dataDescriptor);
   dAcc2.attachPayloadPtr(payload1.ptr);
 
   std::memcpy(payload1.Name, "test data", AREA_SIZE);

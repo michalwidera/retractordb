@@ -17,7 +17,7 @@ class externalAccessor {
   externalAccessor() = delete;
   externalAccessor(std::string fileName);
 
-  void createDescriptor(const Descriptor descriptor);
+  void attachDescriptor(const Descriptor descriptor);
 
   void attachPayloadPtr(std::byte *payloadPtrVal);
   void attachPayload(rdb::payload &payloadRef);
