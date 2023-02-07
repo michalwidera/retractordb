@@ -54,19 +54,11 @@ int main(int argc, char* argv[]) {
     if (cmd == "open" || cmd == "ropen") {
       std::cin >> file;
       dacc = std::make_unique<rdb::storageAccessor>(file);
-      dacc->attachStorage();
-      if (dacc->storageAlreadyExisting()) {
-        //
-        // open existing file path
-        //
-        if (dacc->getDescriptor().getSizeInBytes() == 0) {
-          std::cout << RED "File exist, description file missing (.desc)\n" RESET;
-          continue;
-        }
-        // additional check if file exist and descriptor is match - here ?
+      if (dacc->peekDescriptor()) {
+        dacc->attachDescriptor();  // we are sure here that decriptor file exist
       } else {
         //
-        // create new file path
+        // no descriptor found - need to create
         //
         std::string sschema;
         std::string object;
@@ -80,6 +72,7 @@ int main(int argc, char* argv[]) {
         scheamStringStream >> desc;
         dacc->attachDescriptor(&desc);
       }
+      dacc->attachStorage();
       dacc->setReverse(cmd == "ropen");
       payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
       dacc->attachPayload(*payloadAcc);

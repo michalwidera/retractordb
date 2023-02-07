@@ -45,7 +45,8 @@ class storageAccessor {
   void setReverse(bool value);
   void setRemoveOnExit(bool value);
   const size_t getRecordsCount();
-  bool storageAlreadyExisting();
+  bool peekStorage();
+  bool peekDescriptor();
 };
 }  // namespace rdb
 
