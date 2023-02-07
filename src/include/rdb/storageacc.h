@@ -23,10 +23,11 @@ class storageAccessor {
   size_t recordsCount;
   std::string filename;
   std::byte *payloadPtr;
+  Descriptor *descriptorParam;
 
  public:
   storageAccessor() = delete;
-  storageAccessor(std::string fileName);
+  storageAccessor(std::string fileName, Descriptor* descriptorParam = nullptr);
   ~storageAccessor();
 
   storageState dataFileStatus;
