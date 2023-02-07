@@ -1,5 +1,6 @@
 #include "rdb/storageacc.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>  //std::memset
 #include <filesystem>
@@ -12,51 +13,29 @@ namespace rdb {
 
 bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
 
-storageAccessor::storageAccessor(std::string fileName, Descriptor* descriptorParam)
-    : filename(fileName),                          //
-      removeOnExit(true),                          //
-      recordsCount(0),                             //
-      payloadPtr(nullptr),                         //
-      dataFileStatus(storageState::noDescriptor),  //
-      descriptorParam(descriptorParam)             //
+storageAccessor::storageAccessor(std::string fileName)
+    : filename(fileName),                         //
+      removeOnExit(true),                         //
+      recordsCount(0),                            //
+      payloadPtr(nullptr),                        //
+      dataFileStatus(storageState::noDescriptor)  //
 {}
 
 void storageAccessor::attachStorage() {
-  auto storageExistsBefore = std::filesystem::exists(filename);
+  auto alreadyExist = std::filesystem::exists(filename);
+
   accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
 
-  // --
-  auto fileDesc(filename + ".desc");
-
-  if (!std::filesystem::exists(fileDesc)) {
-    SPDLOG_WARN("construct: no descriptor found - expect fn attachDescriptor, done.");
-    return;
-  }
-
-  std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(0, 0);
-  myFile.open(fileDesc, std::ios::in);  // Open existing descriptor
-  if (myFile.good()) myFile >> descriptor;
-  myFile.close();
-
-  if (descriptor.getSizeInBytes() == 0) {
-    SPDLOG_ERROR("construct: descriptor found - but struct empty, done.");
-    return;
-  }
-
-  std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
-  if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-
-  SPDLOG_INFO("record count {} on {}", recordsCount, filename);
-
-  if (storageExistsBefore) {
+  if (alreadyExist) {
+    std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
+    if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+    SPDLOG_INFO("record count {} on {}", recordsCount, filename);
     dataFileStatus = storageState::openExisting;
-    SPDLOG_INFO("construct: Success, Descriptor&Storage [openExisting]");
     return;
   }
 
+  SPDLOG_INFO("Storage created.", recordsCount, filename);
   dataFileStatus = storageState::openAndCreate;
-  SPDLOG_INFO("construct: Success, Descriptor&Storage [openAndCreate]");
 }
 
 void storageAccessor::attachPayloadPtr(std::byte* payloadPtrVal) {
@@ -69,38 +48,51 @@ void storageAccessor::attachPayload(rdb::payload& payloadRef) {
   payloadPtr = payloadRef.get();
 }
 
-void storageAccessor::attachDescriptor(const Descriptor descriptorParam) {
-  if (isOpen(dataFileStatus)) {
-    if (descriptorParam == descriptor) {
-      SPDLOG_INFO("attachDescriptor: descriptor param match - ok, pass.");
-      return;
+void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
+  auto descriptorFile(filename + ".desc");
+
+  if (std::filesystem::exists(descriptorFile)) {
+    std::fstream myFile;
+    myFile.rdbuf()->pubsetbuf(0, 0);
+    myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
+    if (myFile.good()) myFile >> descriptor;
+    myFile.close();
+
+    if (descriptor.getSizeInBytes() == 0) {
+      SPDLOG_ERROR("Empty descriptor in file.");
+      abort();
     }
-    abort();  // data file already opend and have attached different descriptor
+
+    if (*descriptorParam != descriptor) {
+      SPDLOG_ERROR("Descriptors not match.");
+      abort();
+    }
+
+    auto it = std::find_if(descriptor.begin(),
+                           descriptor.end(),                                             //
+                           [](auto& item) { return std::get<rtype>(item) == rdb::REF; }  //
+    );
+
+    if (it != descriptor.end()) {
+      filename = std::get<rname>(*it);
+    }
+
+    SPDLOG_INFO("Descriptor from file used.");
+    return;
   }
-  descriptor = descriptorParam;
+
+  descriptor = *descriptorParam;
+
+  // Create descriptor file instance
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
-  auto fileDesc(filename + ".desc");
-  // Creating .desc file
-  descFile.open(fileDesc, std::ios::out);
+  descFile.open(descriptorFile, std::ios::out);
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile << descriptor;
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile.close();
 
-  if (descriptor.getSizeInBytes() == 0) {
-    SPDLOG_ERROR("attachDescriptor: descriptor found - but struct empty, done.");
-    return;
-  }
-
-  std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
-  if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-
-  SPDLOG_INFO("record count {} on {}", recordsCount, filename);
-
-  dataFileStatus = storageState::openAndCreate;
-
-  SPDLOG_INFO("attachDescriptor: Success, Descriptor&Storage [openAndCreate]");
+  SPDLOG_INFO("Descriptor created.");
 }
 
 storageAccessor::~storageAccessor() {

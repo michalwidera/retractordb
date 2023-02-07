@@ -13,7 +13,7 @@
 #include "payload.h"
 
 namespace rdb {
-enum class storageState { noDescriptor, openExisting, openAndCreate };
+enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
 
 class storageAccessor {
   std::unique_ptr<FileAccessorInterface<std::byte>> accessor;
@@ -23,16 +23,15 @@ class storageAccessor {
   size_t recordsCount;
   std::string filename;
   std::byte *payloadPtr;
-  Descriptor *descriptorParam;
 
  public:
   storageAccessor() = delete;
-  storageAccessor(std::string fileName, Descriptor* descriptorParam = nullptr);
+  storageAccessor(std::string fileName);
   ~storageAccessor();
 
   storageState dataFileStatus;
 
-  void attachDescriptor(const Descriptor descriptor);
+  void attachDescriptor(const Descriptor *descriptor = nullptr);
   void attachStorage();
 
   void attachPayloadPtr(std::byte *payloadPtrVal);

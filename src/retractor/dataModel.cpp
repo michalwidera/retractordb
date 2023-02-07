@@ -24,8 +24,8 @@ dataInstance::dataInstance(                   //
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
   storage = std::make_unique<rdb::storageAccessor>(file);
+  storage->attachDescriptor(&storageDescriptor);
   storage->attachStorage();
-  storage->attachDescriptor(storageDescriptor);
   storage->attachPayload(*storagePayload);
 
   {
