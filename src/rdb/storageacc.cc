@@ -14,17 +14,32 @@ namespace rdb {
 bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
 
 storageAccessor::storageAccessor(std::string fileName)
-    : filename(fileName),                         //
-      removeOnExit(true),                         //
-      recordsCount(0),                            //
-      payloadPtr(nullptr),                        //
-      dataFileStatus(storageState::noDescriptor)  //
-{}
+    :  //
+      filename(fileName) {}
 
 void storageAccessor::attachStorage() {
   auto resourceAlreadyExist = std::filesystem::exists(filename);
 
-  accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
+  auto it = std::find_if(descriptor.begin(),
+                         descriptor.end(),                                              //
+                         [](auto& item) { return std::get<rtype>(item) == rdb::TYPE; }  //
+  );
+
+  if (it != descriptor.end()) {
+    storageType = std::get<rname>(*it);
+    SPDLOG_INFO("Storage type from descriptor {}", storageType);
+  }
+
+  if (storageType == "DEFAULT") {
+    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
+  } else if (storageType == "GENERIC") {
+    accessor = std::make_unique<rdb::genericBinaryFileAccessor<std::byte>>(filename);
+  } else if (storageType == "POSIX") {
+    accessor = std::make_unique<rdb::posixBinaryFileAccessor<std::byte>>(filename);
+  } else {
+    SPDLOG_INFO("Unsupported storage type {}", storageType);
+    abort();
+  }
 
   if (resourceAlreadyExist) {
     std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
@@ -128,7 +143,7 @@ void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
 bool storageAccessor::read(const size_t recordIndex) {
-  if (descriptor.isDirty()) abort();
+  if (descriptor.isEmpty()) abort();
   if (!isOpen(dataFileStatus)) abort();  // data file is not opened
   if (payloadPtr == nullptr) abort();    // no payload attached
   auto size = descriptor.getSizeInBytes();
@@ -143,7 +158,7 @@ bool storageAccessor::read(const size_t recordIndex) {
 }
 
 bool storageAccessor::write(const size_t recordIndex) {
-  if (descriptor.isDirty()) abort();
+  if (descriptor.isEmpty()) abort();
   if (!isOpen(dataFileStatus)) abort();  // data file is not opened
   if (payloadPtr == nullptr) abort();    // no payload attached
   auto size = descriptor.getSizeInBytes();

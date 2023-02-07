@@ -108,7 +108,8 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
       DECL(BYTEARRAY),  //
       DECL(INTARRAY),   //
       DECL(DOUBLE),     //
-      DECL(REF)         //
+      DECL(TYPE),       // Type of storage - read/write, readonly, text ... etc.
+      DECL(REF)         // Reference to given location of storage
   } END_E_GEN(eType)
 }
 
