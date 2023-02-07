@@ -2,21 +2,21 @@
 
 title Storage Accessor - Activty Diagram
 
-
 start
 
 partition "construct" {
-:storageAccessor(filename,[descriptorParam]) ;
+:storageAccessor(storagename) ;
 note right: Crete storageAccessor class instance;
 
-:assume descriptor as filename.desc;
+:assume descriptor filename
+as storagename.desc;
 }
 
-partition "attachDescriptor" {
+partition "attachDescriptor [descriptorParam]" {
 if (descriptor file exists?) then (yes)
+	partition "attach [descriptorParam]" {
   :read descriptor file;
-  if (descriptorParam.has_not_value() ||
-      descriptor == descriptorParam) then (yes)
+  if (descriptor == descriptorParam) then (yes|[])
     :set storage location
     [ref];
     note right: CurrDir if no ref;
@@ -24,15 +24,14 @@ if (descriptor file exists?) then (yes)
     :<color:red>ERROR - differnet descriptors;
     stop
   endif
+  }
 else (no)
-	if (descriptorParam.has_value()) then (yes)
-  :create descriptor file
-  [ref];
-  note right: CurrDir if no ref;
-  else(no)
-     :<color:red>ERROR - no descriptor;
-    stop
-  endif
+	partition "create (descriptorParam)" {
+	  :create descriptor
+	  and descriptor file
+	  [ref];
+	  note right: CurrDir if no ref;
+	}
 endif
 
 :<color:green>descriptor is ready;
@@ -41,6 +40,10 @@ note left: Storage location estabilished
 }
 
 partition "attachStorage" {
+
+:assume storage filename
+as storagename;
+
 if (storage file exists?) then (yes)
   :attach storage;
   note left: compute storage size
