@@ -22,11 +22,11 @@ storageAccessor::storageAccessor(std::string fileName)
 {}
 
 void storageAccessor::attachStorage() {
-  auto alreadyExist = std::filesystem::exists(filename);
+  auto resourceAlreadyExist = std::filesystem::exists(filename);
 
   accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
 
-  if (alreadyExist) {
+  if (resourceAlreadyExist) {
     std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
     SPDLOG_INFO("record count {} on {}", recordsCount, filename);
@@ -51,7 +51,7 @@ void storageAccessor::attachPayload(rdb::payload& payloadRef) {
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
   auto descriptorFile(filename + ".desc");
 
-  if (std::filesystem::exists(descriptorFile)) {
+  if (peekDescriptor()) {
     std::fstream myFile;
     myFile.rdbuf()->pubsetbuf(0, 0);
     myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
@@ -63,7 +63,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
       abort();
     }
 
-    if (*descriptorParam != descriptor) {
+    if (descriptorParam != nullptr && *descriptorParam != descriptor) {
       SPDLOG_ERROR("Descriptors not match.");
       abort();
     }
@@ -75,10 +75,16 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
     if (it != descriptor.end()) {
       filename = std::get<rname>(*it);
+      SPDLOG_INFO("Storage ref from descriptor {}", filename);
     }
 
     SPDLOG_INFO("Descriptor from file used.");
     return;
+  }
+
+  if (descriptorParam == nullptr) {
+    SPDLOG_ERROR("No descriptor file found, no descriptor provided.");
+    abort();
   }
 
   descriptor = *descriptorParam;
@@ -109,6 +115,11 @@ storageAccessor::~storageAccessor() {
 }
 
 Descriptor& storageAccessor::getDescriptor() { return descriptor; }
+
+bool storageAccessor::peekDescriptor() {
+  auto descriptorFile(filename + ".desc");
+  return std::filesystem::exists(descriptorFile);
+}
 
 void storageAccessor::setReverse(bool value) { reverse = value; }
 
@@ -154,7 +165,7 @@ bool storageAccessor::write(const size_t recordIndex) {
   return result == 0;
 };
 
-bool storageAccessor::storageAlreadyExisting() {  //
+bool storageAccessor::peekStorage() {  //
   return dataFileStatus == storageState::openExisting;
 }
 
