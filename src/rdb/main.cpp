@@ -54,6 +54,7 @@ int main(int argc, char* argv[]) {
     if (cmd == "open" || cmd == "ropen") {
       std::cin >> file;
       dacc = std::make_unique<rdb::storageAccessor>(file);
+      dacc->attachStorage();
       if (dacc->storageAlreadyExisting()) {
         //
         // open existing file path
@@ -107,6 +108,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "dropfile") {
       std::string object;
       do {
+        object.clear();
         std::cin >> object;
         if (std::filesystem::exists(object)) {
           std::filesystem::remove(object);
