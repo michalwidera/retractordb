@@ -6,6 +6,7 @@
 #include <string>
 
 #include "descriptor.h"
+#include "faccbindev.h"
 #include "faccfs.h"
 #include "faccposix.h"
 #include "faccposixprm.h"

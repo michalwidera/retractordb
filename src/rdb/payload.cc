@@ -67,6 +67,10 @@ void payload::setItem(int position, std::any value) {
     float data(std::any_cast<float>(value));
     memcpy(payloadData.get() + descriptor.offset(position), &data, len);
     SPDLOG_INFO("setItem {} float:{}", position, data);
+  } else if (descriptor.type(fieldName) == "REF") {
+    SPDLOG_INFO("Skip REF");
+  } else if (descriptor.type(fieldName) == "TYPE") {
+    SPDLOG_INFO("Skip TYPE");
   } else {
     SPDLOG_ERROR("Type not supported.");
     assert(false && "type not supported on setter");
@@ -125,9 +129,15 @@ std::any payload::getItem(int position) {
     SPDLOG_INFO("getItem {} float:{}", position, data);
     data = *reinterpret_cast<double *>(reinterpret_cast<float *>(payloadData.get()) + descriptor.offset(position));
     return data;
+  } else if (descriptor.type(fieldName) == "REF") {
+    SPDLOG_ERROR("REF not supported.");
+    return 0xdead;
+  } else if (descriptor.type(fieldName) == "TYPE") {
+    SPDLOG_ERROR("TYPE not supported.");
+    return 0xdead;
   }
   SPDLOG_ERROR("Type not supported.");
-  assert(false && "type not supporte on getter.");
+  assert(false && "type not supported on getter.");
   return 0xdead;
 }
 
@@ -171,6 +181,10 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
     copyToMemory<float, payload>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "DOUBLE")
     copyToMemory<double, payload>(is, rhs, fieldName.c_str());
+  else if (desc.type(fieldName) == "REF")
+    SPDLOG_ERROR("REF store not supported.");
+  else if (desc.type(fieldName) == "TYPE")
+    SPDLOG_ERROR("TYPE store not supported.");
   else
     SPDLOG_ERROR("field {} not found", fieldName);
   return is;
@@ -242,6 +256,10 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       double data;
       memcpy(&data, rhs.get() + offset_, sizeof(double));
       os << data;
+    } else if (std::get<rtype>(r) == rdb::REF) {
+      ;  // skip ref
+    } else if (std::get<rtype>(r) == rdb::TYPE) {
+      ;  // skip type
     } else
       assert(false && "Unrecognized type");
     os << std::endl;
