@@ -13,25 +13,22 @@ namespace rdb {
 bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
 
 storageAccessor::storageAccessor(std::string fileName)
-    : filename(fileName),   //
-      removeOnExit(true),   //
-      recordsCount(0),      //
-      payloadPtr(nullptr),  //
-      dataFileStatus(storageState::noDescriptor) {
-  attachStorage();
-}
+    : filename(fileName),                         //
+      removeOnExit(true),                         //
+      recordsCount(0),                            //
+      payloadPtr(nullptr),                        //
+      dataFileStatus(storageState::noDescriptor)  //
+{}
 
 void storageAccessor::attachStorage() {
   auto storageExistsBefore = std::filesystem::exists(filename);
-  accessor =
-      std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
+  accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  auto fileDesc(filename.append(".desc"));
+  auto fileDesc(filename + ".desc");
   // --
   if (!std::filesystem::exists(fileDesc)) {
-    SPDLOG_WARN(
-        "construct: no descriptor found - expect fn createDescriptor, done.");
+    SPDLOG_WARN("construct: no descriptor found - expect fn createDescriptor, done.");
     return;
   }
 
@@ -44,9 +41,10 @@ void storageAccessor::attachStorage() {
     return;
   }
 
-  std::ifstream in(filename.c_str(),
-                   std::ifstream::ate | std::ifstream::binary);
+  std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+
+  SPDLOG_INFO("record count {} on {}", recordsCount, filename);
 
   if (storageExistsBefore) {
     dataFileStatus = storageState::openExisting;
@@ -79,7 +77,7 @@ void storageAccessor::createDescriptor(const Descriptor descriptorParam) {
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
-  auto fileDesc(accessor->fileName().append(".desc"));
+  auto fileDesc(filename + ".desc");
   // Creating .desc file
   descFile.open(fileDesc, std::ios::out);
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
@@ -94,6 +92,8 @@ void storageAccessor::createDescriptor(const Descriptor descriptorParam) {
 
   std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+
+  SPDLOG_INFO("record count {} on {}", recordsCount, filename);
 
   dataFileStatus = storageState::openAndCreate;
 
@@ -159,6 +159,8 @@ bool storageAccessor::write(const size_t recordIndex) {
   return result == 0;
 };
 
-bool storageAccessor::storageAlreadyExisting() { return dataFileStatus == storageState::openExisting; }
+bool storageAccessor::storageAlreadyExisting() {  //
+  return dataFileStatus == storageState::openExisting;
+}
 
 }  // namespace rdb

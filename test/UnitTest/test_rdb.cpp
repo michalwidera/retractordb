@@ -192,6 +192,7 @@ bool test_storage() {
   dataPayload payload1;
 
   rdb::storageAccessor dAcc2("datafile-fstream2");
+  dAcc2.attachStorage();
   dAcc2.createDescriptor(dataDescriptor);
   dAcc2.attachPayloadPtr(payload1.ptr);
 
