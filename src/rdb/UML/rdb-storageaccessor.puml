@@ -12,13 +12,13 @@ note right: Crete storageAccessor class instance
 
 if (descriptor file exists?) then (yes)
   :read descriptor file;
-  if (exist descriptorParam &&descriptor == descriptorParam)
+  if (descriptorParam.has_value() && descriptor == descriptorParam) then (yes)
     if (descriptor has ref?) then (yes)
       :storage location from ref;
     else (no)
       :default storage ref;
     endif
-  else
+  else (no)
     :<color:red>ERROR - differnet descriptors;
     stop
   endif
