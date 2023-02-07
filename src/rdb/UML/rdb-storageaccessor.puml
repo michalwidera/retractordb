@@ -5,11 +5,14 @@ title Storage Accessor - Activty Diagram
 
 start
 
+partition "construct" {
 :storageAccessor(filename,[descriptorParam]) ;
 note right: Crete storageAccessor class instance
 
 :assume descriptor as filename.desc;
+}
 
+partition "attachDescriptor" {
 if (descriptor file exists?) then (yes)
   :read descriptor file;
   if (descriptorParam.has_value() && descriptor == descriptorParam) then (yes)
@@ -29,7 +32,9 @@ else (no)
 endif
 
 :<color:green>descriptor is ready;
+}
 
+partition "attachStorage" {
 if (storage file exists?) then (yes)
   :attach storage;
   note left: compute storage size
@@ -38,6 +43,7 @@ else (no)
 endif
 
 :<color:green>storage is ready;
+}
 
 :<color:green>attach payload;
 
