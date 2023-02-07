@@ -1,0 +1,43 @@
+@startuml
+
+title Storage Accessor - Activty Diagram
+
+
+start
+
+:storageAccessor(filename) ;
+note right: Crete storageAccessor class instance
+
+:assume descriptor as filename.desc;
+
+if (descriptor file exists?) then (yes)
+  :read descriptor file;
+  if (descriptor has ref?) then (yes)
+    :storage location from ref;
+  else (no)
+    :default storage ref;
+  endif
+else (no)
+  :default storage ref;
+  :create and store descriptor;
+endif
+
+
+if (storage file exists?) then (yes)
+  :attach storage;
+  note left: compute size
+else (no)
+  :create storage;
+endif
+
+:attach payload;
+
+:storeage is ready;
+note right
+storage is open
+descriptor is read
+end note
+
+stop
+
+@enduml

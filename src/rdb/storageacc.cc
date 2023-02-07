@@ -18,14 +18,20 @@ storageAccessor::storageAccessor(std::string fileName)
       recordsCount(0),      //
       payloadPtr(nullptr),  //
       dataFileStatus(storageState::noDescriptor) {
-  auto storageExistsBefore = std::filesystem::exists(fileName);
-  accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(fileName);
+  attachStorage();
+}
+
+void storageAccessor::attachStorage() {
+  auto storageExistsBefore = std::filesystem::exists(filename);
+  accessor =
+      std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  auto fileDesc(fileName.append(".desc"));
+  auto fileDesc(filename.append(".desc"));
   // --
   if (!std::filesystem::exists(fileDesc)) {
-    SPDLOG_WARN("construct: no descriptor found - expect fn createDescriptor, done.");
+    SPDLOG_WARN(
+        "construct: no descriptor found - expect fn createDescriptor, done.");
     return;
   }
 
@@ -38,7 +44,8 @@ storageAccessor::storageAccessor(std::string fileName)
     return;
   }
 
-  std::ifstream in(fileName.c_str(), std::ifstream::ate | std::ifstream::binary);
+  std::ifstream in(filename.c_str(),
+                   std::ifstream::ate | std::ifstream::binary);
   if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
 
   if (storageExistsBefore) {
