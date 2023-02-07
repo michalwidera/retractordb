@@ -28,7 +28,7 @@ else (no)
   descriptor file;
 endif
 
-:descriptor is ready;
+:<color:green>descriptor is ready;
 
 if (storage file exists?) then (yes)
   :attach storage;
@@ -37,14 +37,9 @@ else (no)
   :create storage;
 endif
 
-:storage is ready;
+:<color:green>storage is ready;
 
-:attach payload;
-
-
-:storage is open
-descriptor is read
-payload id attached;
+:<color:green>attach payload;
 
 stop
 
