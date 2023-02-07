@@ -17,6 +17,7 @@ class Descriptor {
 
 class genericBinaryFileAccessor {
     {field} fileNameStr
+    {field} fd
 }
 
 
@@ -28,6 +29,16 @@ class posixPrmBinaryFileAccessor {
     {field} fileNameStr
     {field} fd
 }
+
+class binaryDeviceAccessor {
+    {field} fileNameStr
+    {field} fd
+}
+
+FileAccessorInterface ()-- binaryDeviceAccessor
+FileAccessorInterface ()-- posixPrmBinaryFileAccessor
+FileAccessorInterface ()-- posixBinaryFileAccessor
+FileAccessorInterface ()-- genericBinaryFileAccessor
 
 
 interface FileAccessorInterface {
@@ -65,16 +76,6 @@ class storageAccessor {
     {method} getRecordsCount
 }
 
-class externalAccessor {
-    {field} accessor
-    {field} descriptor
-    {field} filename
-
-    {method} attachDescriptor
-    {method} read
-    {method} getDescriptor
-}
-
 enum rdb::eType {
     STRING
     BYTEARRAY
@@ -83,18 +84,17 @@ enum rdb::eType {
     INTEGER
     FLOAT
     DOUBLE
+    REF
+    TYPE
 }
-
-FileAccessorInterface --> genericBinaryFileAccessor
-FileAccessorInterface --> posixBinaryFileAccessor
-FileAccessorInterface --> posixPrmBinaryFileAccessor
 
 genericBinaryFileAccessor --* storageAccessor
 posixBinaryFileAccessor --* storageAccessor
 posixPrmBinaryFileAccessor --* storageAccessor
+binaryDeviceAccessor --* storageAccessor
 
 Descriptor --* storageAccessor
-Descriptor --* externalAccessor
+
 
 Descriptor --- rdb::eType
 
