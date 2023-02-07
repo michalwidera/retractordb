@@ -25,7 +25,7 @@ dataInstance::dataInstance(                   //
 
   storage = std::make_unique<rdb::storageAccessor>(file);
   storage->attachStorage();
-  storage->createDescriptor(storageDescriptor);
+  storage->attachDescriptor(storageDescriptor);
   storage->attachPayload(*storagePayload);
 
   {

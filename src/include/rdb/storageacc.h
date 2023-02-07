@@ -32,8 +32,7 @@ class storageAccessor {
 
   storageState dataFileStatus;
 
-  void createDescriptor(const Descriptor descriptor);
-
+  void attachDescriptor(const Descriptor descriptor);
   void attachStorage();
 
   void attachPayloadPtr(std::byte *payloadPtrVal);

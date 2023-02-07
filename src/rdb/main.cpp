@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         std::stringstream scheamStringStream(sschema);
         rdb::Descriptor desc;
         scheamStringStream >> desc;
-        dacc->createDescriptor(desc);
+        dacc->attachDescriptor(desc);
       }
       dacc->setReverse(cmd == "ropen");
       payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());

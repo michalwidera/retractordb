@@ -24,15 +24,17 @@ storageAccessor::storageAccessor(std::string fileName, Descriptor* descriptorPar
 void storageAccessor::attachStorage() {
   auto storageExistsBefore = std::filesystem::exists(filename);
   accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
-  std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(0, 0);
-  auto fileDesc(filename + ".desc");
+
   // --
+  auto fileDesc(filename + ".desc");
+
   if (!std::filesystem::exists(fileDesc)) {
-    SPDLOG_WARN("construct: no descriptor found - expect fn createDescriptor, done.");
+    SPDLOG_WARN("construct: no descriptor found - expect fn attachDescriptor, done.");
     return;
   }
 
+  std::fstream myFile;
+  myFile.rdbuf()->pubsetbuf(0, 0);
   myFile.open(fileDesc, std::ios::in);  // Open existing descriptor
   if (myFile.good()) myFile >> descriptor;
   myFile.close();
@@ -67,10 +69,10 @@ void storageAccessor::attachPayload(rdb::payload& payloadRef) {
   payloadPtr = payloadRef.get();
 }
 
-void storageAccessor::createDescriptor(const Descriptor descriptorParam) {
+void storageAccessor::attachDescriptor(const Descriptor descriptorParam) {
   if (isOpen(dataFileStatus)) {
     if (descriptorParam == descriptor) {
-      SPDLOG_INFO("createDescriptor: descriptor param match - ok, pass.");
+      SPDLOG_INFO("attachDescriptor: descriptor param match - ok, pass.");
       return;
     }
     abort();  // data file already opend and have attached different descriptor
@@ -87,7 +89,7 @@ void storageAccessor::createDescriptor(const Descriptor descriptorParam) {
   descFile.close();
 
   if (descriptor.getSizeInBytes() == 0) {
-    SPDLOG_ERROR("createDescriptor: descriptor found - but struct empty, done.");
+    SPDLOG_ERROR("attachDescriptor: descriptor found - but struct empty, done.");
     return;
   }
 
@@ -98,7 +100,7 @@ void storageAccessor::createDescriptor(const Descriptor descriptorParam) {
 
   dataFileStatus = storageState::openAndCreate;
 
-  SPDLOG_INFO("createDescriptor: Success, Descriptor&Storage [openAndCreate]");
+  SPDLOG_INFO("attachDescriptor: Success, Descriptor&Storage [openAndCreate]");
 }
 
 storageAccessor::~storageAccessor() {

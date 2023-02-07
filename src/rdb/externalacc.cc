@@ -7,7 +7,7 @@
 namespace rdb {
 externalAccessor::externalAccessor(std::string fileName) {}
 
-void externalAccessor::createDescriptor(const Descriptor descriptorParam) {
+void externalAccessor::attachDescriptor(const Descriptor descriptorParam) {
   descriptor = descriptorParam;
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(0, 0);
