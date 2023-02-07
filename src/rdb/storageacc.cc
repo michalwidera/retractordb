@@ -22,7 +22,7 @@ storageAccessor::storageAccessor(std::string fileName)
   accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(fileName);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
-  auto fileDesc(accessor->fileName().append(".desc"));
+  auto fileDesc(fileName.append(".desc"));
   // --
   if (!std::filesystem::exists(fileDesc)) {
     SPDLOG_WARN("construct: no descriptor found - expect fn createDescriptor, done.");
