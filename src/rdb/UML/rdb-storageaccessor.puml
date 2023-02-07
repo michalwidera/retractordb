@@ -5,38 +5,46 @@ title Storage Accessor - Activty Diagram
 
 start
 
-:storageAccessor(filename) ;
+:storageAccessor(filename,[descriptorParam]) ;
 note right: Crete storageAccessor class instance
 
 :assume descriptor as filename.desc;
 
 if (descriptor file exists?) then (yes)
   :read descriptor file;
-  if (descriptor has ref?) then (yes)
-    :storage location from ref;
-  else (no)
-    :default storage ref;
+  if (exist descriptorParam &&descriptor == descriptorParam)
+    if (descriptor has ref?) then (yes)
+      :storage location from ref;
+    else (no)
+      :default storage ref;
+    endif
+  else
+    :<color:red>ERROR - differnet descriptors;
+    stop
   endif
 else (no)
   :default storage ref;
-  :create and store descriptor;
+  :create and store
+  descriptor file;
 endif
 
+:descriptor is ready;
 
 if (storage file exists?) then (yes)
   :attach storage;
-  note left: compute size
+  note left: compute storage size
 else (no)
   :create storage;
 endif
 
+:storage is ready;
+
 :attach payload;
 
-:storeage is ready;
-note right
-storage is open
+
+:storage is open
 descriptor is read
-end note
+payload id attached;
 
 stop
 
