@@ -172,7 +172,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   else if (desc.type(fieldName) == "DOUBLE")
     copyToMemory<double, payload>(is, rhs, fieldName.c_str());
   else
-    std::cerr << "field not found\n";
+    SPDLOG_ERROR("field {} not found", fieldName);
   return is;
 }
 
@@ -246,8 +246,11 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       assert(false && "Unrecognized type");
     os << std::endl;
   }
+  if (rhs.getDescriptor().isEmpty()) {
+    os << "Empty";
+    SPDLOG_ERROR("Empty descriptor.");
+  }
   os << "}";
-  if (rhs.getDescriptor().isDirty()) os << "[dirty]";
   return os;
 }
 

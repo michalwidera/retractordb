@@ -34,7 +34,7 @@ constexpr int error_desc_location = -1;
  */
 class Descriptor : public std::vector<rfield> {
  public:
-  bool isDirty() const;
+  bool isEmpty() const;
 
   /**
    * @brief Construct a new Descriptor object

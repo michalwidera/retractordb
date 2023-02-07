@@ -19,17 +19,18 @@ class storageAccessor {
   std::unique_ptr<FileAccessorInterface<std::byte>> accessor;
   Descriptor descriptor;
   bool reverse = false;
-  bool removeOnExit;
-  size_t recordsCount;
+  bool removeOnExit = true;
+  size_t recordsCount = 0;
   std::string filename;
-  std::byte *payloadPtr;
+  std::string storageType = "DEFAULT";
+  std::byte *payloadPtr = nullptr;
 
  public:
   storageAccessor() = delete;
   storageAccessor(std::string fileName);
   ~storageAccessor();
 
-  storageState dataFileStatus;
+  storageState dataFileStatus = storageState::noDescriptor;
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
   void attachStorage();

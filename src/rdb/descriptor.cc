@@ -42,6 +42,7 @@ rdb::eType GetFieldType(std::string name) {
                                                       {"INTEGER", rdb::INTEGER},      //
                                                       {"FLOAT", rdb::FLOAT},          //
                                                       {"REF", rdb::REF},              //
+                                                      {"TYPE", rdb::TYPE},            //
                                                       {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
@@ -55,14 +56,13 @@ std::string GetFieldType(rdb::eType e) {
                                                       {rdb::INTEGER, "INTEGER"},      //
                                                       {rdb::FLOAT, "FLOAT"},          //
                                                       {rdb::REF, "REF"},              //
+                                                      {rdb::TYPE, "TYPE"},            //
                                                       {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
 }
 
 constexpr int GetFieldLenFromType(rdb::eType ft) {
   switch (ft) {
-    case rdb::REF:
-      return 0;
     case rdb::UINT:
       return sizeof(unsigned);
     case rdb::INTEGER:
@@ -73,13 +73,16 @@ constexpr int GetFieldLenFromType(rdb::eType ft) {
       return sizeof(double);
     case rdb::BYTE:
       return 1;
+    case rdb::REF:
+    case rdb::TYPE:
+      return 0;
     case rdb::STRING:
     case rdb::BYTEARRAY:
     case rdb::INTARRAY:
-      assert("This type has other method of len-type id");
+      assert(false && "This type has other method of len-type id");
       break;
     default:
-      assert("Undefined type");
+      assert(false && "Undefined type");
   }
   return 0;
 }
@@ -96,7 +99,7 @@ Descriptor::Descriptor(fieldNameType n, rdb::eType t) {
   push_back(rfield(n, GetFieldLenFromType(t), t));
 }
 
-bool Descriptor::isDirty() const { return this->size() == 0; }
+bool Descriptor::isEmpty() const { return this->size() == 0; }
 
 void Descriptor::append(std::initializer_list<rfield> l) { insert(end(), l.begin(), l.end()); }
 
@@ -184,8 +187,8 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
     os << std::endl;
   }
+  if (rhs.isEmpty()) os << "Empty";
   os << "}";
-  if (rhs.isDirty()) os << "[dirty]";
   return os;
 }
 
