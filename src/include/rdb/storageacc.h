@@ -33,6 +33,8 @@ class storageAccessor {
 
   void createDescriptor(const Descriptor descriptor);
 
+  void attachStorage();
+
   void attachPayloadPtr(std::byte *payloadPtrVal);
   void attachPayload(rdb::payload &payloadRef);
 
