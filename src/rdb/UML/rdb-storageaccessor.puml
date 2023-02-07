@@ -21,9 +21,10 @@ if (descriptor file exists?) then (yes)
     [ref];
     note right: CurrDir if no ref;
   else (no)
-    :<color:red>ERROR - differnet descriptors;
+    :<color:red>LOG: Descriptors not match.;
     stop
   endif
+  :<color blue>LOG: Descriptor from file used.;
   }
 else (no)
 	partition "create (descriptorParam)" {
@@ -31,6 +32,7 @@ else (no)
 	  and descriptor file
 	  [ref];
 	  note right: CurrDir if no ref;
+	  :<color blue>LOG: Descriptor created.;
 	}
 endif
 
@@ -47,8 +49,10 @@ as storagename;
 if (storage file exists?) then (yes)
   :attach storage;
   note left: compute storage size
+  :<color blue>LOG: record count {} on {};
 else (no)
   :create storage;
+  :<color blue>LOG: Storage created.;
 endif
 
 :<color:green>storage is ready;
