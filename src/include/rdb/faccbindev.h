@@ -5,7 +5,7 @@
 
 namespace rdb {
 /**
- * @brief Object that implements storage interface via posix calls
+ * @brief Object that implements data source interface via posix calls
  */
 template <typename T>
 class binaryDeviceAccessor : public FileAccessorInterface<T> {

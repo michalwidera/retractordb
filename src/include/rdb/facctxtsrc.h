@@ -1,23 +1,25 @@
 #ifndef STORAGE_RDB_INCLUDE_FACCTXTSRC_H_
 #define STORAGE_RDB_INCLUDE_FACCTXTSRC_H_
 
+#include <fstream>
+
 #include "descriptor.h"
 #include "fainterface.h"
+#include "payload.h"
 
 namespace rdb {
 /**
- * @brief Object that implements storage interface via posix calls
+ * @brief Object that implements data source interface via fstream
  */
 template <typename T>
 class textSrouceAccessor : public FileAccessorInterface<T> {
   std::string fileNameStr;
 
-  /**
-   * @brief Posix File Descriptor
-   */
-  int fd;
-
   Descriptor descriptor;  // filled by fctrl method
+
+  std::unique_ptr<rdb::payload> payload;
+
+  std::fstream myFile;
 
  public:
   ~textSrouceAccessor();
