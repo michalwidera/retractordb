@@ -197,8 +197,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   else
     os << std::dec;
   for (auto const &r : rhs.getDescriptor()) {
-    if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF))
-      break;
+    if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
     os << "\t" << std::get<rname>(r) << ":";
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offset(std::get<rname>(r));

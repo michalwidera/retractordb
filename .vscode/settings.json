@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.rs": "rust",
         "cctype": "cpp",
         "clocale": "cpp",
         "cmath": "cpp",
@@ -76,6 +77,7 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "cassert": "cpp"
     }
 }

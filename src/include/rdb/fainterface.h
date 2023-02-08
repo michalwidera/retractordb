@@ -25,8 +25,7 @@ struct FileAccessorInterface {
    * @brief Reads from storage amount of bytes into memory pointed by ptrData
    * from position in storage
    *
-   * @param ptrData pointer to data in memory where data will be feteched from
-   * storage
+   * @param ptrData pointer to data in memory where data will be feteched from storage
    * @param size size of data that will be transfered
    * @param position position from the begining of file [unit: Bytes]
    * @return status of operation - 0/EXIT_SUCCESS success
@@ -36,11 +35,9 @@ struct FileAccessorInterface {
   /**
    * @brief Updates or appends data in the storage
    *
-   * @param ptrData pointer to table of bytes in memory that will be updated in
-   * storage
+   * @param ptrData pointer to table of bytes in memory that will be updated in storage
    * @param size  size of data to be updated
-   * @param position position from the begining of file [unit: Bytes]. If max
-   * possible value - works as append.
+   * @param position position from the begining of file [unit: Bytes]. If max possible value - works as append.
    * @return status of operation - 0/EXIT_SUCCESS success
    */
   virtual int write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
@@ -51,6 +48,15 @@ struct FileAccessorInterface {
    * @return std::string filename
    */
   virtual std::string fileName() = 0;
+
+  /**
+   * @brief Control method for data source
+   *
+   * @param ptrData has binary package for parametrizing storage object
+   * @param size size of ptrData package
+   * @return status of operation
+   */
+  virtual int fctrl(void* ptrData, const size_t size) { return 0; };
 
   virtual ~FileAccessorInterface(){};
 };

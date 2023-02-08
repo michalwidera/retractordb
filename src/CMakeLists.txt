@@ -18,6 +18,7 @@ set(SOURCES_RETRACTOR
     rdb/descriptor.cc
     rdb/storageacc.cc
     rdb/faccbindev.cc
+    rdb/facctxtsrc.cc
     rdb/payload.cc)
 
 set(SOURCES_COMPILER
@@ -37,6 +38,7 @@ set(SOURCES_DUMPER
     rdb/faccposix.cc
     rdb/faccposixprm.cc
     rdb/faccbindev.cc
+    rdb/facctxtsrc.cc
     rdb/descriptor.cc
     rdb/storageacc.cc
     rdb/payload.cc)
@@ -49,6 +51,7 @@ set(SOURCES_RDB
     rdb/faccposix.cc
     rdb/faccposixprm.cc
     rdb/faccbindev.cc
+    rdb/facctxtsrc.cc
     rdb/descriptor.cc
     rdb/storageacc.cc
     rdb/payload.cc)
