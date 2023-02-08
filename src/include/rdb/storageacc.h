@@ -23,9 +23,11 @@ class storageAccessor {
   bool reverse = false;
   bool removeOnExit = true;
   size_t recordsCount = 0;
-  std::string filename;
+  std::string descriptorFile;
+  std::string storageFile;
   std::string storageType = "DEFAULT";
   std::byte *payloadPtr = nullptr;
+  void moveRef();
 
  public:
   storageAccessor() = delete;

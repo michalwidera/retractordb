@@ -15,61 +15,10 @@ bool isOpen(const storageState val) { return (val == storageState::openExisting 
 
 storageAccessor::storageAccessor(std::string fileName)
     :  //
-      filename(fileName) {}
-
-void storageAccessor::attachStorage() {
-  auto resourceAlreadyExist = std::filesystem::exists(filename);
-
-  auto it = std::find_if(descriptor.begin(),
-                         descriptor.end(),                                              //
-                         [](auto& item) { return std::get<rtype>(item) == rdb::TYPE; }  //
-  );
-
-  if (it != descriptor.end()) {
-    storageType = std::get<rname>(*it);
-    SPDLOG_INFO("Storage type from descriptor {}", storageType);
-  }
-
-  if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(filename);
-  } else if (storageType == "GENERIC") {
-    accessor = std::make_unique<rdb::genericBinaryFileAccessor<std::byte>>(filename);
-  } else if (storageType == "POSIX") {
-    accessor = std::make_unique<rdb::posixBinaryFileAccessor<std::byte>>(filename);
-  } else if (storageType == "DEVICE") {
-    accessor = std::make_unique<rdb::binaryDeviceAccessor<std::byte>>(filename);
-  } else if (storageType == "TEXTSOURCE") {
-    accessor = std::make_unique<rdb::textSrouceAccessor<std::byte>>(filename);
-  } else {
-    SPDLOG_INFO("Unsupported storage type {}", storageType);
-    abort();
-  }
-
-  if (resourceAlreadyExist) {
-    std::ifstream in(filename.c_str(), std::ifstream::ate | std::ifstream::binary);
-    if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
-    SPDLOG_INFO("record count {} on {}", recordsCount, filename);
-    dataFileStatus = storageState::openExisting;
-    return;
-  }
-
-  SPDLOG_INFO("Storage created.", recordsCount, filename);
-  dataFileStatus = storageState::openAndCreate;
-}
-
-void storageAccessor::attachPayloadPtr(std::byte* payloadPtrVal) {
-  SPDLOG_INFO("required: PayloadPtr [attached]");
-  payloadPtr = payloadPtrVal;
-}
-
-void storageAccessor::attachPayload(rdb::payload& payloadRef) {
-  SPDLOG_INFO("required: Payload [attached]");
-  payloadPtr = payloadRef.get();
-}
+      descriptorFile(fileName + "desc"),
+      storageFile(fileName) {}
 
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
-  auto descriptorFile(filename + ".desc");
-
   if (peekDescriptor()) {
     std::fstream myFile;
     myFile.rdbuf()->pubsetbuf(0, 0);
@@ -87,15 +36,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
       abort();
     }
 
-    auto it = std::find_if(descriptor.begin(),
-                           descriptor.end(),                                             //
-                           [](auto& item) { return std::get<rtype>(item) == rdb::REF; }  //
-    );
-
-    if (it != descriptor.end()) {
-      filename = std::get<rname>(*it);
-      SPDLOG_INFO("Storage ref from descriptor {}", filename);
-    }
+    moveRef();
 
     SPDLOG_INFO("Descriptor from file used.");
     return;
@@ -117,17 +58,83 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile.close();
 
+  moveRef();
+
   SPDLOG_INFO("Descriptor created.");
+}
+
+void storageAccessor::moveRef() {
+  auto it = std::find_if(descriptor.begin(),
+                         descriptor.end(),                                             //
+                         [](auto& item) { return std::get<rtype>(item) == rdb::REF; }  //
+  );
+
+  // Descriptor changes storageFile location
+  if (it != descriptor.end()) {
+    storageFile = std::get<rname>(*it);
+    SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile);
+  }
+}
+
+void storageAccessor::attachStorage() {
+  // assert(descriptor.len() != 0);
+
+  auto resourceAlreadyExist = std::filesystem::exists(storageFile);
+
+  auto it = std::find_if(descriptor.begin(),
+                         descriptor.end(),                                              //
+                         [](auto& item) { return std::get<rtype>(item) == rdb::TYPE; }  //
+  );
+
+  if (it != descriptor.end()) {
+    storageType = std::get<rname>(*it);
+    SPDLOG_INFO("Storage type from descriptor {}", storageType);
+  }
+
+  if (storageType == "DEFAULT") {
+    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(storageFile);
+  } else if (storageType == "GENERIC") {
+    accessor = std::make_unique<rdb::genericBinaryFileAccessor<std::byte>>(storageFile);
+  } else if (storageType == "POSIX") {
+    accessor = std::make_unique<rdb::posixBinaryFileAccessor<std::byte>>(storageFile);
+  } else if (storageType == "DEVICE") {
+    accessor = std::make_unique<rdb::binaryDeviceAccessor<std::byte>>(storageFile);
+  } else if (storageType == "TEXTSOURCE") {
+    accessor = std::make_unique<rdb::textSrouceAccessor<std::byte>>(storageFile);
+  } else {
+    SPDLOG_INFO("Unsupported storage type {}", storageType);
+    abort();
+  }
+
+  if (resourceAlreadyExist) {
+    std::ifstream in(storageFile.c_str(), std::ifstream::ate | std::ifstream::binary);
+    if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
+    SPDLOG_INFO("record count {} on {}", recordsCount, storageFile);
+    dataFileStatus = storageState::openExisting;
+    return;
+  }
+
+  SPDLOG_INFO("Storage created.", recordsCount, storageFile);
+  dataFileStatus = storageState::openAndCreate;
+}
+
+void storageAccessor::attachPayloadPtr(std::byte* payloadPtrVal) {
+  SPDLOG_INFO("required: PayloadPtr [attached]");
+  payloadPtr = payloadPtrVal;
+}
+
+void storageAccessor::attachPayload(rdb::payload& payloadRef) {
+  SPDLOG_INFO("required: Payload [attached]");
+  payloadPtr = payloadRef.get();
 }
 
 storageAccessor::~storageAccessor() {
   if (removeOnExit) {
     // Constructor & Destructor does not fail - need to reconsider remove this
     // asserts or make this in another way.
-    auto statusRemove1 = remove(filename.c_str());
+    auto statusRemove1 = remove(storageFile.c_str());
     // assert(statusRemove1 == 0);
-    auto descFilename(filename + ".desc");
-    auto statusRemove2 = remove(descFilename.c_str());
+    auto statusRemove2 = remove(descriptorFile.c_str());
     // assert(statusRemove2 == 0);
     SPDLOG_INFO("drop storage");
   }
@@ -135,10 +142,7 @@ storageAccessor::~storageAccessor() {
 
 Descriptor& storageAccessor::getDescriptor() { return descriptor; }
 
-bool storageAccessor::peekDescriptor() {
-  auto descriptorFile(filename + ".desc");
-  return std::filesystem::exists(descriptorFile);
-}
+bool storageAccessor::peekDescriptor() { return std::filesystem::exists(descriptorFile); }
 
 void storageAccessor::setReverse(bool value) { reverse = value; }
 
@@ -147,9 +151,18 @@ void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
 bool storageAccessor::read(const size_t recordIndex) {
-  if (descriptor.isEmpty()) abort();
-  if (!isOpen(dataFileStatus)) abort();  // data file is not opened
-  if (payloadPtr == nullptr) abort();    // no payload attached
+  if (descriptor.isEmpty()) {
+    SPDLOG_ERROR("descriptor is Empty");
+    abort();
+  }
+  if (!isOpen(dataFileStatus)) {
+    SPDLOG_ERROR("store is not open");
+    abort();  // data file is not opened
+  }
+  if (payloadPtr == nullptr) {
+    SPDLOG_ERROR("no payload attached");
+    abort();  // no payload attached
+  }
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
@@ -162,9 +175,18 @@ bool storageAccessor::read(const size_t recordIndex) {
 }
 
 bool storageAccessor::write(const size_t recordIndex) {
-  if (descriptor.isEmpty()) abort();
-  if (!isOpen(dataFileStatus)) abort();  // data file is not opened
-  if (payloadPtr == nullptr) abort();    // no payload attached
+  if (descriptor.isEmpty()) {
+    SPDLOG_ERROR("descriptor is Empty");
+    abort();
+  }
+  if (!isOpen(dataFileStatus)) {
+    SPDLOG_ERROR("store is not open");
+    abort();  // data file is not opened
+  }
+  if (payloadPtr == nullptr) {
+    SPDLOG_ERROR("no payload attached");
+    abort();  // no payload attached
+  }
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {

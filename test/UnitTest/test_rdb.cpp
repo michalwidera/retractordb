@@ -165,7 +165,11 @@ bool test_descriptor_read() {
   return true;
 }
 
-bool test_storage() {
+TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
+
+TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
+
+TEST(xrdb, test_storage) {
   // This structure is tricky
   // If not aligned - size is 15
   // If aligned - size is 16
@@ -187,7 +191,7 @@ bool test_storage() {
                       rdb::Descriptor("TLen", rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
-  if (dataDescriptor.getSizeInBytes() != sizeof(dataPayload)) return false;
+  ASSERT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
   dataPayload payload1;
 
@@ -196,11 +200,13 @@ bool test_storage() {
   dAcc2.attachStorage();
   dAcc2.attachPayloadPtr(payload1.ptr);
 
+  dAcc2.setRemoveOnExit(true);
+
   std::memcpy(payload1.Name, "test data", AREA_SIZE);
   payload1.TLen = 0x66;
   payload1.Control = 0x22;
 
-  if (payload1.TLen != dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr)) return false;
+  ASSERT_TRUE(payload1.TLen == dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr));
 
   dAcc2.write();
   dAcc2.write();
@@ -220,15 +226,14 @@ bool test_storage() {
   {
     std::stringstream coutstring;
     coutstring << dAcc2.getDescriptor().toString("Name", payload2.ptr);
-    if (strcmp(coutstring.str().c_str(), "xxxx xxxx") != 0) return false;
+    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "xxxx xxxx") == 0);
   }
-
   {
     std::stringstream coutstring;
     coutstring << std::hex;
     coutstring << dAcc2.getDescriptor().cast<int>("TLen", payload2.ptr);
     coutstring << std::dec;
-    if (strcmp(coutstring.str().c_str(), "67") != 0) return false;
+    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "67") == 0);
   }
 
   {
@@ -236,23 +241,9 @@ bool test_storage() {
     coutstring << std::hex;
     coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", payload2.ptr);
     coutstring << std::dec;
-    if (strcmp(coutstring.str().c_str(), "33") != 0) return false;
+    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "33") == 0);
   }
-
-  auto statusRemove1 = remove("datafile-fstream2");
-  if (statusRemove1 != 0) return false;
-
-  auto statusRemove2 = remove("datafile-fstream2.desc");
-  if (statusRemove2 != 0) return false;
-
-  return true;
 }
-
-TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
-
-TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
-
-TEST(xrdb, test_storage) { ASSERT_TRUE(test_storage()); }
 
 TEST(xrdb, test_descriptor_compare) {
   auto dataDescriptor1{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
