@@ -52,7 +52,6 @@ int textSrouceAccessor<T>::write(const T* ptrData, const size_t size, const size
 template <typename T>
 int textSrouceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   assert(position == 0);
-  assert(size == 0);
 
   // myFile.seekg(position);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
