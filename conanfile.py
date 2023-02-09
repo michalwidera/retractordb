@@ -43,7 +43,7 @@ class Retractor(ConanFile):
                        "boost:multithreading": True,
                        "boost:without_system": False,
                        "boost:without_filesystem": False, # this could go true - but conan does not have such default
-                       "boost": "1.80.0", # 1.81.0 - Failure in debug mode-  boost/1.81.0: Error in package_info() method, line 1673
+                       "boost": "1.81.0",
                        "gtest": "1.13.0",
                        "antlr4": "4.11.1",
                        "spdlog": "1.10.0"
