@@ -1,0 +1,27 @@
+.ok
+.ok
+.[93m{	INTEGER dane
+	STRING name[5]
+	REF "data_source.txt"
+	TYPE TEXTSOURCE
+}[0m
+.2 Record(s)
+9 Byte(s) per record.
+.ok
+.{	dane:1
+	name:test1
+}
+.ok
+.{	dane:2
+	name:test2
+}
+.ok
+.{	dane:1
+	name:test1
+}
+.ok
+.{	dane:2
+	name:test2
+}
+.ok
+.

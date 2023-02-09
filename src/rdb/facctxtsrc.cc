@@ -64,8 +64,8 @@ int textSrouceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
   // Last byte was omitted.
   // Look's like some inconsistency is here.
 
+  auto i = 0;
   for (auto item : descriptor) {
-    auto i = 0;
     if (std::get<rlen>(item) != 0) {
       if (std::get<rtype>(item) == rdb::INTEGER) {
         auto var = readFromFstream<int>(myFile);
@@ -82,6 +82,17 @@ int textSrouceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
       } else if (std::get<rtype>(item) == rdb::BYTE) {  // This is different!
         auto var = readFromFstream<unsigned>(myFile);
         payload->setItem(i, static_cast<unsigned char>(var));
+      } else if (std::get<rtype>(item) == rdb::STRING) {
+        std::string var;
+        auto strLen = std::get<rlen>(item);
+        char c;
+        while (myFile.get(c) && c != '"')
+          ;
+        while (myFile.get(c) && c != '"') var += c;
+        var.erase(remove(var.begin(), var.end(), '"'), var.end());
+        var.resize(strLen);
+        SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
+        payload->setItem(i, var);
       } else {
         SPDLOG_ERROR("Unsported type in text data source: {}", std::get<rtype>(item));
         abort();
@@ -89,8 +100,7 @@ int textSrouceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
 
       // rdb::RATIONAL - deprecate ?
 
-      // DECL(STRING),     // TODO
-      // DECL(BYTEARRAY),  //
+      // DECL(BYTEARRAY),  // TODO
       // DECL(INTARRAY),   //
       i++;
     }

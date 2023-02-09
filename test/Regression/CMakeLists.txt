@@ -23,92 +23,60 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compile_pattern_source-1
+  NAME xcompile_source-1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
-  COMMAND sh -c "xcompiler -q query.rql > out.txt ; xdumper >> out.txt")
-
-add_test(
-  NAME compare_output_with_pattern-1
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
-  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt)
-
-set_tests_properties(compare_output_with_pattern-1
-                     PROPERTIES DEPENDS compile_pattern_source-1)
+  COMMAND sh -c "xcompiler -q query.rql > out.txt ; xdumper >> out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compile_pattern_source-2
+  NAME xcompile_source-2
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
-  COMMAND sh -c "xcompiler query.rql > out.txt ; xdumper >> out.txt")
-
-add_test(
-  NAME compare_output_with_pattern-2
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
-  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt)
-
-set_tests_properties(compare_output_with_pattern-2
-                     PROPERTIES DEPENDS compile_pattern_source-2)
+  COMMAND sh -c "xcompiler query.rql > out.txt ; xdumper >> out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
+  ")
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compile_pattern_source-3
+  NAME xcompile_source-3
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern3
-  COMMAND sh -c "xcompiler query-unfold.rql > out.txt ; xdumper >> out.txt")
-
-add_test(
-  NAME compare_output_with_pattern-3
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern3
-  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt)
-
-set_tests_properties(compare_output_with_pattern-3
-                     PROPERTIES DEPENDS compile_pattern_source-3)
+  COMMAND sh -c "xcompiler query-unfold.rql > out.txt ; xdumper >> out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compile_pattern_source-4
+  NAME xcompile_source-4
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
-  COMMAND sh -c "xcompiler query-crc.rql > out.txt ; xdumper >> out.txt")
-
-add_test(
-  NAME compare_output_with_pattern-4
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
-  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt)
-
-set_tests_properties(compare_output_with_pattern-4
-                     PROPERTIES DEPENDS compile_pattern_source-4)
+  COMMAND sh -c "xcompiler query-crc.rql > out.txt ; xdumper >> out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
+  ")
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME create_output_xtrdb-5
+  NAME xtrdb_on_script-5
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
-  COMMAND sh -c "xtrdb < term.script > out.txt")
-
-add_test(
-  NAME compare_output_with_pattern-5
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
-  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt)
-
-set_tests_properties(compare_output_with_pattern-5
-                     PROPERTIES DEPENDS create_output_xtrdb-5)
+  COMMAND sh -c "xtrdb < term.script > out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compile_pattern_agse-6
+  NAME xcompile_agse-6
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
-  COMMAND sh -c "xcompiler query.rql > out.txt ; xdumper >> out.txt")
+  COMMAND bash -c "xcompiler query.rql > out.txt ; xdumper >> out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+
+# -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compare_output_with_pattern-6
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
-  COMMAND ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt)
-
-set_tests_properties(compare_output_with_pattern-6
-                     PROPERTIES DEPENDS compile_pattern_agse-6)
+  NAME xtrdb_on_text_data_src-8
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
+  COMMAND bash -c "xtrdb < term.script > out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 add_test(
