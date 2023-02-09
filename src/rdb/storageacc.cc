@@ -15,7 +15,7 @@ bool isOpen(const storageState val) { return (val == storageState::openExisting 
 
 storageAccessor::storageAccessor(std::string fileName)
     :  //
-      descriptorFile(fileName + "desc"),
+      descriptorFile(fileName + ".desc"),
       storageFile(fileName) {}
 
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
@@ -101,7 +101,7 @@ void storageAccessor::attachStorage() {
     accessor = std::make_unique<rdb::binaryDeviceAccessor<std::byte>>(storageFile);
   } else if (storageType == "TEXTSOURCE") {
     accessor = std::make_unique<rdb::textSrouceAccessor<std::byte>>(storageFile);
-    accessor->fctrl(&descriptor,0);
+    accessor->fctrl(&descriptor, 0);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType);
     abort();

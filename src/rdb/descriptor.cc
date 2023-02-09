@@ -180,7 +180,11 @@ std::string Descriptor::type(const std::string name) { return GetFieldType(std::
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
-    os << "\t" << GetFieldType(std::get<rtype>(r)) << " " << std::get<rname>(r);
+    os << "\t" << GetFieldType(std::get<rtype>(r)) << " ";
+    if (std::get<rtype>(r) == rdb::REF)
+      os << "\"" << std::get<rname>(r) << "\"";
+    else
+      os << std::get<rname>(r);
     if (std::get<rtype>(r) == rdb::STRING || std::get<rtype>(r) == rdb::BYTEARRAY)
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
     else if (std::get<rtype>(r) == rdb::INTARRAY)
@@ -212,10 +216,22 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     int len = 0;
     is >> type;
     if (is.eof()) break;
-    is >> name;
-    ltrim(name);
-    rtrim(name);
     auto ft = GetFieldType(type);
+
+    if (ft == rdb::REF) {
+      char c;
+      while (is.get(c) && c != '"') {
+      }
+      while (is.get(c) && c != '"') {
+        name += c;
+      }
+      name.erase(remove(name.begin(), name.end(), '"'), name.end());
+    } else {
+      is >> name;
+      ltrim(name);
+      rtrim(name);
+    }
+
     if (ft == rdb::STRING || ft == rdb::BYTEARRAY)
       is >> len;
     else if (ft == rdb::INTARRAY) {
@@ -223,6 +239,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
       len *= sizeof(int);
     } else
       len = GetFieldLenFromType(ft);
+
     rhs | Descriptor(name, len, ft);
   } while (!is.eof());
   is.imbue(origLocale);
