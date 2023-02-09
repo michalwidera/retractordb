@@ -220,11 +220,9 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
 
     if (ft == rdb::REF) {
       char c;
-      while (is.get(c) && c != '"') {
-      }
-      while (is.get(c) && c != '"') {
-        name += c;
-      }
+      while (is.get(c) && c != '"')
+        ;
+      while (is.get(c) && c != '"') name += c;
       name.erase(remove(name.begin(), name.end(), '"'), name.end());
     } else {
       is >> name;
