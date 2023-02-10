@@ -215,9 +215,9 @@ std::string simplifyLProgram() {
             --it2;
           }
           ++it2;
-          std::list<token> lSchema;
-          lSchema.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
+          std::list<token> lTempProgram;
+          lTempProgram.push_back(token(PUSH_TSCAN));
+          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
           newQuery.id = generateStreamName(arg1, "", cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);  // After this instruction it loses context
@@ -254,9 +254,9 @@ std::string simplifyLProgram() {
             --it2;
           }
           ++it2;
-          std::list<token> lSchema;
-          lSchema.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
+          std::list<token> lTempProgram;
+          lTempProgram.push_back(token(PUSH_TSCAN));
+          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
           newQuery.id = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
@@ -405,10 +405,10 @@ std::string prepareFields() {
             // copy list of fields from one to another
             int filedPosition = 0;
             for (auto s : getQuery(t.getStr()).lSchema) {
-              std::list<token> newLProgram;
-              newLProgram.push_back(token(PUSH_ID, nameOfscanningTable, boost::rational<int>(filedPosition++)));
+              std::list<token> lTempProgram;
+              lTempProgram.push_back(token(PUSH_ID, nameOfscanningTable, boost::rational<int>(filedPosition++)));
               std::string name = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-              q.lSchema.push_back(field(name, newLProgram, rdb::INTEGER, ""));
+              q.lSchema.push_back(field(name, lTempProgram, rdb::INTEGER, ""));
             }
             break;
           }
@@ -463,17 +463,17 @@ std::string replicateIDX() {
         field oldField = *q.lSchema.begin();
         q.lSchema.clear();
         for (int i = 0; i < fieldSize; i++) {
-          std::list<token> newLProgram;
+          std::list<token> lTempProgram;
           for (auto &t : oldField.lProgram) {
             if (t.getCommandID() == PUSH_IDX)
-              newLProgram.push_back(token(PUSH_ID, t.getStr(), boost::rational<int>(i)));
+              lTempProgram.push_back(token(PUSH_ID, t.getStr(), boost::rational<int>(i)));
             else
-              newLProgram.push_back(token(t.getCommandID(), t.getStr(), t.get()));
+              lTempProgram.push_back(token(t.getCommandID(), t.getStr(), t.get()));
           }
           std::string toRepalce = oldField.getFieldText();
           replaceAll(toRepalce, "_", lexical_cast<std::string>(i));
           auto newFieldType = oldField.fieldType;
-          field newField(schemaName + "_" + lexical_cast<std::string>(i), newLProgram, newFieldType, toRepalce);
+          field newField(schemaName + "_" + lexical_cast<std::string>(i), lTempProgram, newFieldType, toRepalce);
           q.lSchema.push_back(newField);
         }
         assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());

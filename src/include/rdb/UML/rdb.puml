@@ -35,16 +35,23 @@ class binaryDeviceAccessor {
     {field} fd
 }
 
+class textSrouceAccessor {
+    {field} fileNameStr
+    {field} fd
+    {field} fctrl
+}
+
 FileAccessorInterface ()-- binaryDeviceAccessor
 FileAccessorInterface ()-- posixPrmBinaryFileAccessor
 FileAccessorInterface ()-- posixBinaryFileAccessor
 FileAccessorInterface ()-- genericBinaryFileAccessor
-
+FileAccessorInterface ()-- textSrouceAccessor
 
 interface FileAccessorInterface {
     {method} read
     {method} write
     {method} fileName
+    {method} fctrl
 }
 
 class payload {
@@ -92,6 +99,7 @@ genericBinaryFileAccessor --* storageAccessor
 posixBinaryFileAccessor --* storageAccessor
 posixPrmBinaryFileAccessor --* storageAccessor
 binaryDeviceAccessor --* storageAccessor
+textSrouceAccessor --* storageAccessor
 
 Descriptor --* storageAccessor
 

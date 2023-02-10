@@ -31,9 +31,9 @@ TEST(xschema, check_test1) {
   /*
   query qry;
   qry.id = "file_1";
-  std::list<token> lSchema;
-  lSchema.push_back(token(PUSH_TSCAN));
-  qry.lSchema.push_back(field("*", lSchema, rdb::BAD, "*"));
+  std::list<token> lTempProgram;
+  lTempProgram.push_back(token(PUSH_TSCAN));
+  qry.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
   coreInstance.push_back(qry);
   */
 
