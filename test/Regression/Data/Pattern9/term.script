@@ -1,0 +1,14 @@
+dropfile { data_source.desc }
+open data_source { INTEGER dane REF "datafile2.dat" TYPE DEVICE }
+desc
+size
+read 0
+print
+read 0
+print
+read 0
+print
+read 0
+print
+dropfile { data_source.desc }
+quit

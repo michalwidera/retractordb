@@ -1,0 +1,22 @@
+.ok
+.ok
+.[93m{	INTEGER dane
+	REF "datafile2.dat"
+	TYPE DEVICE
+}[0m
+.8 Record(s)
+4 Byte(s) per record.
+.ok
+.{	dane:10
+}
+.ok
+.{	dane:11
+}
+.ok
+.{	dane:12
+}
+.ok
+.{	dane:13
+}
+.ok
+.

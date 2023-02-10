@@ -77,6 +77,13 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
   COMMAND bash -c "xtrdb < term.script > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+# -----------------------------------------------------------------------------------------------
+
+add_test(
+  NAME xtrdb_on_bin_data_src-9
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern9
+  COMMAND bash -c "xtrdb < term.script > out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 add_test(

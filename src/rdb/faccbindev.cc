@@ -32,13 +32,13 @@ int binaryDeviceAccessor<T>::write(const T* ptrData, const size_t size, const si
 
 template <class T>
 int binaryDeviceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
-  assert(fd >= 0);
-  if (fd < 0) {
-    return fd;  // <- Error status
-  }
   assert(position == 0);
   if (position != 0) {
     return EXIT_FAILURE;
+  }
+  assert(fd >= 0);
+  if (fd < 0) {
+    return fd;  // <- Error status
   }
   ssize_t read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
   return EXIT_SUCCESS;
