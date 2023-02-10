@@ -43,6 +43,8 @@ int binaryDeviceAccessor<T>::read(T* ptrData, const size_t size, const size_t po
   ssize_t read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
   if (read_size != size) {                        // dev/random has no seek - but binary files should loop?
     ::lseek(fd, 0, SEEK_SET);
+    ssize_t read_size = ::read(fd, ptrData, size);
+    if (read_size != size) return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
 }
