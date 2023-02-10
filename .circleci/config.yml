@@ -121,7 +121,7 @@ workflows:
                  - /issue_.*/
       - build-2204-debug:
           requires:
-            build-2204
+            - build-2204
           filters:
             branches:
               only:
