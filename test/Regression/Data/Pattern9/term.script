@@ -1,7 +1,21 @@
 dropfile { data_source.desc }
-open data_source { INTEGER dane REF "datafile2.dat" TYPE DEVICE }
+open data_source { INTEGER dane REF "datafile99.dat" TYPE DEVICE }
 desc
 size
+read 0
+print
+read 0
+print
+read 0
+print
+read 0
+print
+read 0
+print
+read 0
+print
+read 0
+print
 read 0
 print
 read 0

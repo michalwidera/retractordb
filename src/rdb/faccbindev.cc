@@ -2,7 +2,7 @@
 
 #include <fcntl.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <unistd.h>  // ::read, ::open ...
 
 #include <cassert>
 
@@ -41,6 +41,9 @@ int binaryDeviceAccessor<T>::read(T* ptrData, const size_t size, const size_t po
     return fd;  // <- Error status
   }
   ssize_t read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
+  if (read_size != size) {                        // dev/random has no seek - but binary files should loop?
+    ::lseek(fd, 0, SEEK_SET);
+  }
   return EXIT_SUCCESS;
 }
 

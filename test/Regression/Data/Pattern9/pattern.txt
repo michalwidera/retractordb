@@ -1,7 +1,7 @@
 .ok
 .ok
 .[93m{	INTEGER dane
-	REF "datafile2.dat"
+	REF "datafile99.dat"
 	TYPE DEVICE
 }[0m
 .8 Record(s)
@@ -17,6 +17,27 @@
 }
 .ok
 .{	dane:13
+}
+.ok
+.{	dane:14
+}
+.ok
+.{	dane:15
+}
+.ok
+.{	dane:16
+}
+.ok
+.{	dane:17
+}
+.ok
+.{	dane:99
+}
+.ok
+.{	dane:10
+}
+.ok
+.{	dane:11
 }
 .ok
 .
