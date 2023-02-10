@@ -27,7 +27,7 @@ constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
  * This code creates xtrdb executable file.
  */
 
-enum payloadStatusType { fetched, clean, stored, changed };
+enum payloadStatusType { fetched, clean, stored, changed, error };
 
 payloadStatusType payloadStatus(clean);
 
@@ -120,8 +120,11 @@ int main(int argc, char* argv[]) {
         std::cout << RED "record out of range\n" RESET;
         continue;
       }
-      dacc->read(record);
-      payloadStatus = fetched;
+      auto returnStatus = dacc->read(record);
+      if (returnStatus != 0)
+        payloadStatus = error;
+      else
+        payloadStatus = fetched;
     } else if (cmd == "set") {
       std::cin >> *payloadAcc;
       payloadStatus = changed;
@@ -186,8 +189,11 @@ int main(int argc, char* argv[]) {
         std::cout << RED "record out of range - Check append command.\n" RESET;
         continue;
       }
-      dacc->write(record);
-      payloadStatus = stored;
+      auto writeStatus = dacc->write(record);
+      if (writeStatus == 0)
+        payloadStatus = stored;
+      else
+        payloadStatus = error;
     } else if (cmd == "append") {
       dacc->write();
       payloadStatus = stored;
