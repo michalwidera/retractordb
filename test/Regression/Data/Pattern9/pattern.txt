@@ -31,13 +31,13 @@
 .{	dane:17
 }
 .ok
-.{	dane:99
-}
-.ok
 .{	dane:10
 }
 .ok
 .{	dane:11
+}
+.ok
+.{	dane:12
 }
 .ok
 .
