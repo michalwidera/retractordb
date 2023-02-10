@@ -5,6 +5,7 @@ jobs:
     working_directory: ~/retractordb
     docker:
       - image: cimg/base:stable
+    resource_class: large
     steps:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
@@ -21,6 +22,7 @@ jobs:
     working_directory: ~/retractordb
     docker:
       - image: cimg/base:stable
+    resource_class: large
     steps:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
