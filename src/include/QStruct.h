@@ -92,15 +92,15 @@ class field {
   std::list<token> lProgram;
 
   std::string fieldName;
-  rdb::eType fieldType;
+  rdb::descFldType fieldType;
 
   field();
-  field(std::string sFieldName, std::list<token> &lProgram, rdb::eType fieldType, std::string sFieldText);
+  field(std::string sFieldName, std::list<token> &lProgram, rdb::descFldType fieldType, std::string sFieldText);
 
   std::string getFieldText();
   token getFirstFieldToken();
 
-  friend std::ostream &operator<<(std::ostream &os, const rdb::eType s);
+  friend std::ostream &operator<<(std::ostream &os, const rdb::descFldType s);
 };
 
 class query {

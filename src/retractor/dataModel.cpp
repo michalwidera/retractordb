@@ -17,13 +17,13 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 
 dataInstance::dataInstance(                   //
-    const std::string file,                   //
+    const std::string filename,               //
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
-  storage = std::make_unique<rdb::storageAccessor>(file);
+  storage = std::make_unique<rdb::storageAccessor>(filename);
   storage->attachDescriptor(&storageDescriptor);
   storage->attachStorage();
   storage->attachPayload(*storagePayload);
@@ -50,8 +50,9 @@ dataInstance::dataInstance(                   //
 */
 
 dataInstance::dataInstance(query &qry)
-    :                                           //
-      dataInstance(qry.filename,                //
-                   qry.descriptorFrom(),        //
-                   qry.descriptorExpression())  //
+    :                                          //
+      dataInstance(qry.filename,               //
+                   qry.descriptorFrom(),       //
+                   qry.descriptorExpression()  //
+                   )                           //
       {};

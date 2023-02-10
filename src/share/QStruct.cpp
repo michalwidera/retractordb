@@ -7,6 +7,7 @@
 #include <boost/lambda/bind.hpp>     // IWYU pragma: keep
 #include <boost/lambda/lambda.hpp>   // IWYU pragma: keep
 #include <cassert>                   // for assert
+#include <cctype>                    // tolower
 #include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
 #include <iostream>                  // for cerr
 #include <sstream>                   // for operator<<, basic_ostream, endl
@@ -206,7 +207,7 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 field::field() {}
 
-field::field(std::string sFieldName, std::list<token> &lProgram, rdb::eType dFieldType, std::string sFieldText)
+field::field(std::string sFieldName, std::list<token> &lProgram, rdb::descFldType dFieldType, std::string sFieldText)
     : lProgram(lProgram), sFieldText(sFieldText), fieldType(dFieldType), fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
@@ -340,6 +341,17 @@ rdb::Descriptor query::descriptorFrom() {
     default:
       assert(false);
   }
+  if (isDeclaration()) {
+    auto filenameShdw{filename};
+    std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
+
+    retVal | rdb::Descriptor(filenameShdw, rdb::REF);
+
+    if (filenameShdw.find("txt") != std::string::npos)
+      retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
+    else
+      retVal | rdb::Descriptor("DEVICE", rdb::TYPE);
+  }
   return retVal;
 }
 
@@ -355,4 +367,4 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   return std::make_tuple(sArg1, sArg2, cmd);
 }
 
-std::ostream &operator<<(std::ostream &os, rdb::eType s) { return os << rdb::GetStringeType(s); }
+std::ostream &operator<<(std::ostream &os, rdb::descFldType s) { return os << rdb::GetStringdescFldType(s); }

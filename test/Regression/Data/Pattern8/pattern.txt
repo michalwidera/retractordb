@@ -5,7 +5,7 @@
 	REF "data_source.txt"
 	TYPE TEXTSOURCE
 }[0m
-.2 Record(s)
+.1 Record(s)
 9 Byte(s) per record.
 .ok
 .{	dane:1
