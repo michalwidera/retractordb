@@ -14,13 +14,10 @@ namespace rdb {
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
-typedef int fieldLenType;
-typedef std::string fieldNameType;
-
 /**
  * @brief Tuple type - that defines field - Name, Len and Type.
  */
-typedef std::tuple<fieldNameType, fieldLenType, rdb::eType> rfield;
+typedef std::tuple<std::string, int, rdb::descFldType> rfield;
 
 /**
  * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
@@ -52,7 +49,7 @@ class Descriptor : public std::vector<rfield> {
    * @param l Field len
    * @param t Field type - STRING (Maybe tables in future)
    */
-  Descriptor(fieldNameType n, fieldLenType l, rdb::eType t);
+  Descriptor(std::string n, int l, rdb::descFldType t);
 
   /**
    * @brief Construct a new Descriptor object - only for no objects with len
@@ -60,7 +57,7 @@ class Descriptor : public std::vector<rfield> {
    * @param n Field name
    * @param t Field type - Int, Byte ...
    */
-  Descriptor(fieldNameType n, rdb::eType t);
+  Descriptor(std::string n, rdb::descFldType t);
 
   /**
    * @brief Construct a new Descriptor object - Default constructor

@@ -97,7 +97,7 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
 
     // This declaration goes into ::rdb namespace
     namespace rdb {
-  BEGIN_E_GEN(eType){
+  BEGIN_E_GEN(descFldType){
       DECL(BAD),        //
       DECL(BYTE),       //
       DECL(INTEGER),    //
@@ -110,7 +110,7 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
       DECL(DOUBLE),     //
       DECL(TYPE),       // Type of storage - read/write, readonly, text ... etc.
       DECL(REF)         // Reference to given location of storage
-  } END_E_GEN(eType)
+  } END_E_GEN(descFldType)
 }
 
 #undef BEGIN_E_GEN

@@ -107,6 +107,15 @@ void storageAccessor::attachStorage() {
     abort();
   }
 
+  bool readOnlyStorage = (storageType == "DEVICE") || (storageType == "TEXTSOURCE");
+
+  if (readOnlyStorage) {
+    recordsCount = 1;
+    SPDLOG_INFO("records source on {}", storageFile);
+    dataFileStatus = storageState::openExisting;
+    return;
+  }
+
   if (resourceAlreadyExist) {
     std::ifstream in(storageFile.c_str(), std::ifstream::ate | std::ifstream::binary);
     if (in.good()) recordsCount = int(in.tellg() / descriptor.getSizeInBytes());
