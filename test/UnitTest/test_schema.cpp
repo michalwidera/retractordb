@@ -7,6 +7,7 @@
 #include <string>
 
 #include "QStruct.h"  // coreInstance
+#include "config.h"
 #include "rdb/fainterface.h"
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
@@ -26,7 +27,6 @@ SELECT str1[0]+5 STREAM str2 FROM core0
 
 // ctest -R unittest-test-schema
 TEST(xschema, check_test0) {
-
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
@@ -67,7 +67,6 @@ TEST(xschema, check_test0) {
 
     ASSERT_TRUE(data.storage->getRecordsCount() == 1);
   }
-
 }
 TEST(xschema, check_test1) {
   /*
@@ -81,7 +80,7 @@ TEST(xschema, check_test1) {
 
   coreInstance.clear();
   auto compiled = parser("ut_example_schema.rql") == "OK";
-  ASSERT_TRUE( compiled == true );
+  ASSERT_TRUE(compiled == true);
 
   std::map<std::string, std::unique_ptr<dataInstance>> qSet;
 
@@ -89,9 +88,9 @@ TEST(xschema, check_test1) {
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 
   // Todo
-  //qSet["str1"]->storagePayload->setItem(0,2);
-  //qSet["str1"]->storagePayload->setItem(1,2);
-  //qSet["str1"]->storage->write();
+  // qSet["str1"]->storagePayload->setItem(0,2);
+  // qSet["str1"]->storagePayload->setItem(1,2);
+  // qSet["str1"]->storage->write();
 
   auto dataInternalDesciptor{
       rdb::Descriptor("A", rdb::INTEGER) |  //
@@ -100,12 +99,12 @@ TEST(xschema, check_test1) {
 
   auto internalDesc = coreInstance["str1"].descriptorExpression();
   auto externalDesc = coreInstance["str1"].descriptorFrom();
-  dataInstance q("str1a","str1a",dataInternalDesciptor,dataInternalDesciptor);
+  dataInstance q("str1a", "str1a", dataInternalDesciptor, dataInternalDesciptor);
 
-  q.storagePayload->setItem(0,2);
-  q.storagePayload->setItem(1,2);
+  q.storagePayload->setItem(0, 2);
+  q.storagePayload->setItem(1, atoi(build_id));
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  ASSERT_TRUE( coreInstance.size() == qSet.size());
+  ASSERT_TRUE(coreInstance.size() == qSet.size());
 };
