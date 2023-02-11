@@ -11,6 +11,8 @@ constexpr auto config_line = "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "
                              "Build time: @GIT_CURRENT_BUILDTIME@, "
                              "Type: @CMAKE_BUILD_TYPE@";
 
+constexpr auto build_id = "@GIT_CURRENT_BUILDTIME@";
+
 constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
 
 constexpr auto warranty = "This is free software; see the source for copying conditions.\n"
