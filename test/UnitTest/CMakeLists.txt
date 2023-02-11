@@ -77,7 +77,7 @@ add_test(
 
 add_test(
   NAME unittest-test-schema
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
   COMMAND ${CMAKE_BINARY_DIR}/bin/test_schema)
 
 set_tests_properties(

@@ -25,19 +25,7 @@ SELECT str1[0]+5 STREAM str2 FROM core0
 */
 
 // ctest -R unittest-test-schema
-
-TEST(xschema, check_test1) {
-  /*
-  query qry;
-  qry.id = "file_1";
-  std::list<token> lTempProgram;
-  lTempProgram.push_back(token(PUSH_TSCAN));
-  qry.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
-  coreInstance.push_back(qry);
-  */
-
-  coreInstance.clear();
-  auto compiled = parser("ut_example2.rql") == "OK";
+TEST(xschema, check_test0) {
 
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
@@ -61,6 +49,8 @@ TEST(xschema, check_test1) {
     data.storagePayload->setItem(0, 234);
     data.storagePayload->setItem(1, 456);
     data.storage->write();
+
+    ASSERT_TRUE(data.storage->getRecordsCount() == 1);
   }
 
   {
@@ -74,13 +64,28 @@ TEST(xschema, check_test1) {
     data.storagePayload->setItem(0, 234);
     data.storagePayload->setItem(1, 456);
     data.storage->write();
+
+    ASSERT_TRUE(data.storage->getRecordsCount() == 1);
   }
 
-  for (auto& q1 : coreInstance) {
-    SPDLOG_INFO("qry: {} {}", q1.id, q1.filename);
-    dataInstance data2(q1.id, q1.filename, q1.descriptorFrom(), q1.descriptorExpression());
-    // data2.storage->setRemoveOnExit(false);
-  }
+}
+TEST(xschema, check_test1) {
+  /*
+  query qry;
+  qry.id = "file_1";
+  std::list<token> lTempProgram;
+  lTempProgram.push_back(token(PUSH_TSCAN));
+  qry.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
+  coreInstance.push_back(qry);
+  */
 
-  ASSERT_TRUE(true);
+  coreInstance.clear();
+  auto compiled = parser("ut_example_schema.rql") == "OK";
+
+  std::map<std::string, dataInstance> qSet;
+
+  for (auto& q1 : coreInstance) qSet.emplace(q1.id, dataInstance(q1));
+  for (auto const& [key, val] : qSet) val.storage->setRemoveOnExit(false);
+
+  ASSERT_TRUE( coreInstance.size() == qSet.size());
 };
