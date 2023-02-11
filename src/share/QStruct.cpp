@@ -316,7 +316,20 @@ rdb::Descriptor query::descriptorExpression() {
 }
 
 rdb::Descriptor query::descriptorFrom() {
+  SPDLOG_INFO("call query::descriptorFrom()");
   rdb::Descriptor retVal{};
+  if (isDeclaration()) {
+    retVal | descriptorExpression();
+    retVal | rdb::Descriptor(filename, rdb::REF);
+
+    auto filenameShdw{filename};
+    std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
+    if (filenameShdw.find(".txt") != std::string::npos)
+      retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
+    else
+      retVal | rdb::Descriptor("DEVICE", rdb::TYPE);
+    return retVal;
+  }
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};
   auto i{0};
   switch (cmd.getCommandID()) {
@@ -326,6 +339,11 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_SUBSTRACT:
     case STREAM_TIMEMOVE: {
       for (auto &f : getQuery(arg1).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+    } break;
+    case PUSH_STREAM: {
+      for (auto &f : getQuery(cmd.getStr()).lSchema) {
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
       };
     } break;
@@ -345,17 +363,8 @@ rdb::Descriptor query::descriptorFrom() {
       }
     } break;
     default:
+      SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr());
       assert(false);
-  }
-  if (isDeclaration()) {
-    retVal | rdb::Descriptor('"' + filename + '"', rdb::REF);
-
-    auto filenameShdw{filename};
-    std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
-    if (filenameShdw.find(".txt") != std::string::npos)
-      retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
-    else
-      retVal | rdb::Descriptor("DEVICE", rdb::TYPE);
   }
   return retVal;
 }

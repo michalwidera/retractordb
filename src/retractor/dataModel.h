@@ -16,11 +16,10 @@ struct dataInstance {
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> internalPayload;
 
-  dataInstance(const std::string filename,                 // <- query %% filename
+  dataInstance(const std::string descriptorname,           //
+               const std::string storagename,              // <- query %% filename
                const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
                const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
   dataInstance(query &qry);
 };
-
-struct dataModel : public std::map<std::string, dataInstance> {};

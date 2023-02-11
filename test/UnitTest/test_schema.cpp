@@ -20,9 +20,8 @@ extern "C" qTree coreInstance;
 /*
 DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'
 DECLARE c INTEGER,d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
-SELECT core0[0],core0[1] STREAM str1 FROM core0#core1
-SELECT * STREAM test1 FROM core@(-1,10)
-SELECT * STREAM test2 FROM core@(1,10)
+SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
+SELECT str1[0]+5 STREAM str2 FROM core0
 */
 
 // ctest -R unittest-test-schema
@@ -38,7 +37,7 @@ TEST(xschema, check_test1) {
   */
 
   coreInstance.clear();
-  auto compiled = parser("ut_example.rql") == "OK";
+  auto compiled = parser("ut_example2.rql") == "OK";
 
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
@@ -52,7 +51,7 @@ TEST(xschema, check_test1) {
   };
 
   {
-    dataInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
+    dataInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
 
     data.internalPayload->setItem(0, 123);
     data.internalPayload->setItem(1, 345);
@@ -65,7 +64,7 @@ TEST(xschema, check_test1) {
   }
 
   {
-    dataInstance data{"file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
+    dataInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDesciptor};
 
     data.internalPayload->setItem(0, 123);
     data.internalPayload->setItem(1, 345);
@@ -77,13 +76,11 @@ TEST(xschema, check_test1) {
     data.storage->write();
   }
 
-  // for (auto q : coreInstance) {
-  //  SPDLOG_INFO("coreInstance[] {}, {}", q.id, q.filename);
-  //}
-
-  dataInstance data1(coreInstance["str1"]);
-
-  // dataInstance data2(coreInstance["core0"]);
+  for (auto& q1 : coreInstance) {
+    SPDLOG_INFO("qry: {} {}", q1.id, q1.filename);
+    dataInstance data2(q1.id, q1.filename, q1.descriptorFrom(), q1.descriptorExpression());
+    // data2.storage->setRemoveOnExit(false);
+  }
 
   ASSERT_TRUE(true);
 };
