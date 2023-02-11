@@ -81,7 +81,6 @@ std::any payload::getItem(int position) {
   auto fieldName = descriptor.fieldName(position);
   auto len = descriptor.len(fieldName);
   if (position > descriptor.size()) abort();
-  std::cerr << "set:" << fieldName << std::endl;
   if (descriptor.type(fieldName) == "STRING") {
     std::string retval;
     retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position), len);
