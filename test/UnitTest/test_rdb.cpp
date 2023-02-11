@@ -195,7 +195,7 @@ TEST(xrdb, test_storage) {
 
   dataPayload payload1;
 
-  rdb::storageAccessor dAcc2("datafile-fstream2");
+  rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2");
   dAcc2.attachDescriptor(&dataDescriptor);
   dAcc2.attachStorage();
   dAcc2.attachPayloadPtr(payload1.ptr);

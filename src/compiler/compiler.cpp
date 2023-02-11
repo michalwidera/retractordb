@@ -353,8 +353,11 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
       }
     }
     lRetVal = schema;
-  } else
-    throw std::invalid_argument("Command stack hits undefinied opeation");
+  } else {
+    SPDLOG_ERROR("Undefined: str:{} cmd:{}", cmd_token.getStr(), cmd_token.getStrCommandID());
+    // throw std::invalid_argument("Command stack hits undefinied operation");
+    abort();
+  }
   // Here are added to fields execution methods
   // by reference to schema position
   int offset(0);

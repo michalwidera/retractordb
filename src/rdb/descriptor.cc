@@ -7,6 +7,8 @@
 #include <limits>
 #include <locale>
 
+#include "spdlog/spdlog.h"
+
 namespace rdb {
 // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
 
@@ -84,6 +86,7 @@ constexpr int GetFieldLenFromType(rdb::descFldType ft) {
       assert(false && "This type has other method of len-type id");
       break;
     default:
+      SPDLOG_ERROR("Undefined type rdb->int:{}", (int)ft);
       assert(false && "Undefined type");
   }
   return 0;

@@ -51,9 +51,15 @@ int main(int argc, char* argv[]) {
       if (dacc) dacc->setRemoveOnExit(true);
       break;
     }
-    if (cmd == "open" || cmd == "ropen") {
+    if (cmd == "open" || cmd == "ropen" || cmd == "openx" || cmd == "ropenx") {
       std::cin >> file;
-      dacc = std::make_unique<rdb::storageAccessor>(file);
+      if (cmd == "open" || cmd == "ropen")
+        dacc = std::make_unique<rdb::storageAccessor>(file, file);
+      else {
+        std::string descfile;
+        std::cin >> descfile;
+        dacc = std::make_unique<rdb::storageAccessor>(descfile, file);
+      }
       if (dacc->peekDescriptor()) {
         dacc->attachDescriptor();  // we are sure here that decriptor file exist
       } else {
@@ -73,7 +79,7 @@ int main(int argc, char* argv[]) {
         dacc->attachDescriptor(&desc);
       }
       dacc->attachStorage();
-      dacc->setReverse(cmd == "ropen");
+      dacc->setReverse(cmd == "ropen" || cmd == "ropenx");
       payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
       dacc->attachPayload(*payloadAcc);
       payloadStatus = clean;
@@ -83,6 +89,7 @@ int main(int argc, char* argv[]) {
       std::cout << "exit|quit|q \t\t\t exit\n";
       std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
       std::cout << "open|ropen file [schema] \t open or create database with schema (r-reverse iterator)\n";
+      std::cout << "openx|ropenx desc file [schema] \n";
       std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] } \n";
       std::cout << "desc \t\t\t\t show schema\n";
       std::cout << "read [n] \t\t\t read record from database into payload\n";
