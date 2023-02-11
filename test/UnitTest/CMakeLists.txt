@@ -78,7 +78,9 @@ add_test(
 add_test(
   NAME unittest-test-schema
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
-  COMMAND ${CMAKE_BINARY_DIR}/bin/test_schema)
+  COMMAND bash -c "${CMAKE_BINARY_DIR}/bin/test_schema ; \
+  xtrdb < term.script > out.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 set_tests_properties(
   unittest-test-xtrdb unittest-test-xcompiler unittest-test-xqry

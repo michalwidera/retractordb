@@ -82,10 +82,16 @@ TEST(xschema, check_test1) {
   coreInstance.clear();
   auto compiled = parser("ut_example_schema.rql") == "OK";
 
-  std::map<std::string, dataInstance> qSet;
+  std::map<std::string, std::unique_ptr<dataInstance>> qSet;
 
-  for (auto& q1 : coreInstance) qSet.emplace(q1.id, dataInstance(q1));
-  for (auto const& [key, val] : qSet) val.storage->setRemoveOnExit(false);
+  for (auto& q1 : coreInstance) qSet.emplace(q1.id, std::make_unique<dataInstance>(q1));
+  for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
+
+  
+  // Todo
+  qSet["str1"]->storagePayload->setItem(0,2);
+  qSet["str1"]->storagePayload->setItem(1,2);
+  qSet["str1"]->storage->write();
 
   ASSERT_TRUE( coreInstance.size() == qSet.size());
 };
