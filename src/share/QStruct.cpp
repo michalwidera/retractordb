@@ -304,7 +304,13 @@ std::vector<std::string> query::getDepStreamName(int reqDep) {
 rdb::Descriptor query::descriptorExpression() {
   rdb::Descriptor retVal{};
   for (auto &f : lSchema) {
-    retVal | rdb::Descriptor(f.fieldName, f.fieldType);
+    bool isTableType = (f.fieldType == rdb::STRING) ||     //
+                       (f.fieldType == rdb::BYTEARRAY) ||  //
+                       (f.fieldType == rdb::INTARRAY);
+    if (isTableType)
+      assert(false && "TODO: Add support in QStruct");  // retVal | rdb::Descriptor(f.fieldName, f.XXXX , f.fieldType);
+    else
+      retVal | rdb::Descriptor(f.fieldName, f.fieldType);
   }
   return retVal;
 }
@@ -342,12 +348,11 @@ rdb::Descriptor query::descriptorFrom() {
       assert(false);
   }
   if (isDeclaration()) {
+    retVal | rdb::Descriptor('"' + filename + '"', rdb::REF);
+
     auto filenameShdw{filename};
     std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
-
-    retVal | rdb::Descriptor(filenameShdw, rdb::REF);
-
-    if (filenameShdw.find("txt") != std::string::npos)
+    if (filenameShdw.find(".txt") != std::string::npos)
       retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
     else
       retVal | rdb::Descriptor("DEVICE", rdb::TYPE);

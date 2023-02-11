@@ -34,30 +34,32 @@ static inline void rtrim(std::string &s) {
 rdb::descFldType GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
-  std::map<std::string, rdb::descFldType> typeDictionary = {{"STRING", rdb::STRING},        //
-                                                       {"BYTEARRAY", rdb::BYTEARRAY},  //
-                                                       {"INTARRAY", rdb::INTARRAY},    //
-                                                       {"UINT", rdb::UINT},            //
-                                                       {"BYTE", rdb::BYTE},            //
-                                                       {"INTEGER", rdb::INTEGER},      //
-                                                       {"FLOAT", rdb::FLOAT},          //
-                                                       {"REF", rdb::REF},              //
-                                                       {"TYPE", rdb::TYPE},            //
-                                                       {"DOUBLE", rdb::DOUBLE}};
+  std::map<std::string, rdb::descFldType> typeDictionary  //
+      = {{"STRING", rdb::STRING},                         //
+         {"BYTEARRAY", rdb::BYTEARRAY},                   //
+         {"INTARRAY", rdb::INTARRAY},                     //
+         {"UINT", rdb::UINT},                             //
+         {"BYTE", rdb::BYTE},                             //
+         {"INTEGER", rdb::INTEGER},                       //
+         {"FLOAT", rdb::FLOAT},                           //
+         {"REF", rdb::REF},                               //
+         {"TYPE", rdb::TYPE},                             //
+         {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
 
 std::string GetFieldType(rdb::descFldType e) {
-  std::map<rdb::descFldType, std::string> typeDictionary = {{rdb::STRING, "STRING"},        //
-                                                       {rdb::BYTEARRAY, "BYTEARRAY"},  //
-                                                       {rdb::INTARRAY, "INTARRAY"},    //
-                                                       {rdb::UINT, "UINT"},            //
-                                                       {rdb::BYTE, "BYTE"},            //
-                                                       {rdb::INTEGER, "INTEGER"},      //
-                                                       {rdb::FLOAT, "FLOAT"},          //
-                                                       {rdb::REF, "REF"},              //
-                                                       {rdb::TYPE, "TYPE"},            //
-                                                       {rdb::DOUBLE, "DOUBLE"}};
+  std::map<rdb::descFldType, std::string> typeDictionary  //
+      = {{rdb::STRING, "STRING"},                         //
+         {rdb::BYTEARRAY, "BYTEARRAY"},                   //
+         {rdb::INTARRAY, "INTARRAY"},                     //
+         {rdb::UINT, "UINT"},                             //
+         {rdb::BYTE, "BYTE"},                             //
+         {rdb::INTEGER, "INTEGER"},                       //
+         {rdb::FLOAT, "FLOAT"},                           //
+         {rdb::REF, "REF"},                               //
+         {rdb::TYPE, "TYPE"},                             //
+         {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
 }
 
@@ -90,7 +92,7 @@ constexpr int GetFieldLenFromType(rdb::descFldType ft) {
 Descriptor::Descriptor(std::initializer_list<rfield> l) : std::vector<rfield>(l) {}
 
 Descriptor::Descriptor(std::string n, int l, rdb::descFldType t) {  //
-  push_back(rfield(n, l, t));                                  //
+  push_back(rfield(n, l, t));                                       //
 }
 
 Descriptor::Descriptor(std::string n, rdb::descFldType t) {
