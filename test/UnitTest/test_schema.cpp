@@ -81,17 +81,31 @@ TEST(xschema, check_test1) {
 
   coreInstance.clear();
   auto compiled = parser("ut_example_schema.rql") == "OK";
+  ASSERT_TRUE( compiled == true );
 
   std::map<std::string, std::unique_ptr<dataInstance>> qSet;
 
   for (auto& q1 : coreInstance) qSet.emplace(q1.id, std::make_unique<dataInstance>(q1));
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 
-  
   // Todo
-  qSet["str1"]->storagePayload->setItem(0,2);
-  qSet["str1"]->storagePayload->setItem(1,2);
-  qSet["str1"]->storage->write();
+  //qSet["str1"]->storagePayload->setItem(0,2);
+  //qSet["str1"]->storagePayload->setItem(1,2);
+  //qSet["str1"]->storage->write();
+
+  auto dataInternalDesciptor{
+      rdb::Descriptor("A", rdb::INTEGER) |  //
+      rdb::Descriptor("B", rdb::INTEGER)    //
+  };
+
+  auto internalDesc = coreInstance["str1"].descriptorExpression();
+  auto externalDesc = coreInstance["str1"].descriptorFrom();
+  dataInstance q("str1a","str1a",dataInternalDesciptor,dataInternalDesciptor);
+
+  q.storagePayload->setItem(0,2);
+  q.storagePayload->setItem(1,2);
+  q.storage->write();
+  q.storage->setRemoveOnExit(false);
 
   ASSERT_TRUE( coreInstance.size() == qSet.size());
 };
