@@ -42,15 +42,6 @@ dataInstance::dataInstance(                   //
   }
 };
 
-/*
-dataInstance::dataInstance(                   //
-    const std::string file,                   //
-    const rdb::Descriptor storageDescriptor   //
-) {
-  storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
-}
-*/
-
 dataInstance::dataInstance(query &qry)
     :                                          //
       dataInstance(qry.id,                     // descriptor file
