@@ -94,12 +94,6 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/compiler
   SOURCES ${PROJECT_SOURCE_DIR}/compiler/RQL.g4)
 
-# pip install cmake-format sudo apt install astyle add_custom_target( astyle
-# COMMAND astyle --options=astyle.options --recursive *.cpp *.hpp *.cc *.h
-# --exclude=compiler/Parser COMMAND find ${CMAKE_SOURCE_DIR} -name
-# CMakeLists.txt | xargs cmake-format -i WORKING_DIRECTORY
-# ${PROJECT_SOURCE_DIR})
-
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
 add_custom_target(
