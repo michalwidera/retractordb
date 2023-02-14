@@ -91,9 +91,9 @@ TEST(xschema, check_test1) {
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 
   // Todo
-  // qSet["str1"]->storagePayload->setItem(0,2);
-  // qSet["str1"]->storagePayload->setItem(1,2);
-  // qSet["str1"]->storage->write();
+  qSet["str1"]->storagePayload->setItem(0,2);
+  qSet["str1"]->storagePayload->setItem(1,3);
+  qSet["str1"]->storage->write();
 
   SPDLOG_INFO("Records in str1 {}", qSet["str1"]->storage->getRecordsCount());
 

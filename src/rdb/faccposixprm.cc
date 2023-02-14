@@ -6,12 +6,18 @@
 
 #include <cassert>
 
+#include "spdlog/spdlog.h"
 namespace rdb {
 constexpr const int kOpenBaseFlags = O_CLOEXEC;
 
 template <class T>
 posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {
   fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
+  if (fd < 0)
+    SPDLOG_ERROR("::open {} -> {}", fileNameStr, fd);
+  else
+    SPDLOG_INFO("::open {} -> {}", fileNameStr, fd);
+  assert(fd >= 0);
 }
 
 template <class T>

@@ -40,7 +40,9 @@ void payload::setItem(int position, std::any value) {
     memcpy(payloadData.get() + descriptor.offset(position), data.c_str(), std::min(len, static_cast<int>(data.length())));
     SPDLOG_INFO("setItem {} string:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTE") {
-    unsigned char data(std::any_cast<unsigned char>(value));
+    std::byte data;
+    int dataint(std::any_cast<int>(value));
+    data = (std::byte)dataint;
     memcpy(payloadData.get() + descriptor.offset(position), &data, len);
     SPDLOG_INFO("setItem {} char:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTEARRAY") {
