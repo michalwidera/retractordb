@@ -79,7 +79,12 @@ add_test(
   NAME unittest-test-schema
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
   COMMAND bash -c "set -e ; \
-  ${CMAKE_BINARY_DIR}/bin/test_schema ; \
+  ${CMAKE_BINARY_DIR}/bin/test_schema")
+
+add_test(
+  NAME unittest-test-schema-comp
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
+  COMMAND bash -c "set -e ; \
   xtrdb < term.script > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
