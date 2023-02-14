@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
-      if ( !mono ) std::cout << RESET;
+      std::cout << RESET;
     } else if (cmd == "dropfile") {
       std::string object;
       do {
