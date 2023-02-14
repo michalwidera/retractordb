@@ -14,12 +14,12 @@
 #include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 #include "spdlog/spdlog.h"
 
-#define GREEN "\x1B[32m"
-#define RED "\x1B[31m"
-#define ORANGE "\x1B[33m"
-#define BLUE "\x1B[34m"
-#define YELLOW "\x1B[93m"
-#define RESET "\033[0m"
+std::string GREEN = "\x1B[32m" ;
+std::string RED = "\x1B[31m";
+std::string ORANGE = "\x1B[33m";
+std::string BLUE = "\x1B[34m";
+std::string YELLOW = "\x1B[93m";
+std::string RESET = "\033[0m";
 
 constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
 
@@ -42,6 +42,7 @@ int main(int argc, char* argv[]) {
   std::string file;
   bool reverse = false;
   bool rox = true;
+  bool mono = false;
   std::string cmd;
   std::string wasteComment;
   do {
@@ -50,6 +51,16 @@ int main(int argc, char* argv[]) {
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#") {
       std::getline(std::cin, wasteComment);
+      std::cout << "ok\n";
+      continue;
+    }
+    if (cmd == "mono")  {
+      GREEN = "" ;
+      RED = "";
+      ORANGE = "m";
+      BLUE = "";
+      YELLOW = "";
+      RESET = "";
       std::cout << "ok\n";
       continue;
     }
@@ -110,7 +121,8 @@ int main(int argc, char* argv[]) {
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
-      std::cout << RESET;
+      std::cout << "mono \t\t\t\t no color mode\n";
+      if ( !mono ) std::cout << RESET;
     } else if (cmd == "dropfile") {
       std::string object;
       do {
@@ -121,7 +133,7 @@ int main(int argc, char* argv[]) {
         }
       } while (object.find("}") == std::string::npos);
     } else if (!dacc) {
-      std::cout << RED "unconnected\n" RESET;
+      std::cout << RED << "unconnected\n" << RESET;
       continue;
     } else if (cmd == "desc") {
       std::cout << YELLOW << dacc->getDescriptor() << RESET << std::endl;
@@ -130,7 +142,7 @@ int main(int argc, char* argv[]) {
       int record;
       std::cin >> record;
       if (record >= dacc->getRecordsCount()) {
-        std::cout << RED "record out of range\n" RESET;
+        std::cout << RED << "record out of range\n" << RESET;
         continue;
       }
       auto returnStatus = dacc->read(record);
@@ -199,7 +211,7 @@ int main(int argc, char* argv[]) {
       size_t record;
       std::cin >> record;
       if (record >= dacc->getRecordsCount()) {
-        std::cout << RED "record out of range - Check append command.\n" RESET;
+        std::cout << RED << "record out of range - Check append command.\n" << RESET;
         continue;
       }
       auto writeStatus = dacc->write(record);
@@ -245,7 +257,7 @@ int main(int argc, char* argv[]) {
       }
       std::cout << "\n";
     } else {
-      std::cout << RED "?\n" RESET;
+      std::cout << RED << "?\n" << RESET;
       continue;
     }
     std::cout << "ok\n";
