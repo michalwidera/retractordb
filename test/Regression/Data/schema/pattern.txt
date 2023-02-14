@@ -18,7 +18,7 @@
 .[93m{	INTEGER str1_0
 	BYTE str1_1
 }[0m
-.0 Record(s)
+.1 Record(s)
 5 Byte(s) per record.
 .ok
 .[93m{	INTEGER str2_0
