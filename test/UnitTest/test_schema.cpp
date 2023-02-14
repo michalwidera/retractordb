@@ -84,6 +84,8 @@ TEST(xschema, check_test1) {
 
   std::map<std::string, std::unique_ptr<dataInstance>> qSet;
 
+  SPDLOG_INFO("Create struct on CORE INSTANCE");
+
   for (auto& q1 : coreInstance) qSet.emplace(q1.id, std::make_unique<dataInstance>(q1));
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 
@@ -91,6 +93,8 @@ TEST(xschema, check_test1) {
   // qSet["str1"]->storagePayload->setItem(0,2);
   // qSet["str1"]->storagePayload->setItem(1,2);
   // qSet["str1"]->storage->write();
+
+  SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
   auto dataInternalDesciptor{
       rdb::Descriptor("A", rdb::INTEGER) |  //

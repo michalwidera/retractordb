@@ -14,11 +14,11 @@ Storage supports data of following types:
 | ---  | ---: | --- | --- |
 |BYTE  | 1 | 0..255|8-bit byte|
 |INTEGER   | 4 |-2147483648 to 2147483647|C++ Integer|
-|Unit  | 4 |0 to 4294967295|Unsigned int|
+|UINT  | 4 |0 to 4294967295|Unsigned int|
 |STRING|[declared]|Array of Bytes|Array of bytes dedicated for strings|
 |BYTEARRAY|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
 |INTARRAY|[declared]|Array of Integers|Array of integers dedicated for integer array payloads|
-|FLOAT| 4 | ... | Floating point value|
+|FLOAT | 4 | ... | Floating point value|
 |DOUBLE| 8 | ... | Floating point value (double size)|
 
 Table 1. Supported types by :Rdb
