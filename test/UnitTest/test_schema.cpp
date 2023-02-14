@@ -68,6 +68,7 @@ TEST(xschema, check_test0) {
     ASSERT_TRUE(data.storage->getRecordsCount() == 1);
   }
 }
+
 TEST(xschema, check_test1) {
   /*
   query qry;
@@ -93,6 +94,8 @@ TEST(xschema, check_test1) {
   // qSet["str1"]->storagePayload->setItem(0,2);
   // qSet["str1"]->storagePayload->setItem(1,2);
   // qSet["str1"]->storage->write();
+
+  SPDLOG_INFO("Records in str1 {}", qSet["str1"]->storage->getRecordsCount());
 
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
