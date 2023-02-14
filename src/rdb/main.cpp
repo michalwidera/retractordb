@@ -43,10 +43,16 @@ int main(int argc, char* argv[]) {
   bool reverse = false;
   bool rox = true;
   std::string cmd;
+  std::string wasteComment;
   do {
     std::cout << ".";
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
+    if (cmd == "#") {
+      std::getline(std::cin, wasteComment);
+      std::cout << "ok\n";
+      continue;
+    }
     if (cmd == "quitdrop" || cmd == "qd") {
       if (dacc) dacc->setRemoveOnExit(true);
       break;
