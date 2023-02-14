@@ -1,10 +1,11 @@
 .ok
 .ok
-.[93m{	INTEGER dane
+.ok
+.{	INTEGER dane
 	STRING name[5]
 	REF "data_source.txt"
 	TYPE TEXTSOURCE
-}[0m
+}
 .1 Record(s)
 9 Byte(s) per record.
 .ok

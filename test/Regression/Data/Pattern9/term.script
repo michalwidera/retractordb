@@ -1,3 +1,4 @@
+mono
 dropfile { data_source.desc }
 open data_source { INTEGER dane REF "datafile99.dat" TYPE DEVICE }
 desc

@@ -1,9 +1,10 @@
 .ok
 .ok
-.[93m{	INTEGER dane
+.ok
+.{	INTEGER dane
 	REF "datafile99.dat"
 	TYPE DEVICE
-}[0m
+}
 .1 Record(s)
 4 Byte(s) per record.
 .ok

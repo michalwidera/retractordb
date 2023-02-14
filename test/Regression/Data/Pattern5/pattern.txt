@@ -1,5 +1,6 @@
 .ok
 .ok
+.ok
 .0 Record(s)
 29 Byte(s) per record.
 .......ok
@@ -29,11 +30,11 @@
 }
 .2 Record(s)
 29 Byte(s) per record.
-.[93m{	STRING name[5]
+.{	STRING name[5]
 	INTARRAY data[3]
 	BYTEARRAY bt[3]
 	BYTE Control
 	FLOAT m1
 	INTEGER m2
-}[0m
+}
 .
