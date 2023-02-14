@@ -18,9 +18,11 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 
 dataInstance::dataInstance(                   //
     const std::string descriptorname,         //
-    const std::string storagename,            //
+    const std::string storagenameParam,       //
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
+  // only objects with REF has storagenameParam filled.
+  const auto storagename { storagenameParam == "" ? descriptorname : storagenameParam }; 
   SPDLOG_INFO("dataInstance desc:{} storage:{}", descriptorname, storagename);
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
