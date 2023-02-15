@@ -90,4 +90,4 @@ add_test(
 
 set_tests_properties(
   unittest-test-xtrdb unittest-test-xcompiler unittest-test-xqry
-  unittest-test-schema PROPERTIES RUN_SERIAL TRUE)
+  unittest-test-schema unittest-test-schema-comp PROPERTIES RUN_SERIAL TRUE)

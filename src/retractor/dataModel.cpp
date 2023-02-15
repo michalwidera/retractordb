@@ -22,7 +22,7 @@ dataInstance::dataInstance(                   //
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
   // only objects with REF has storagenameParam filled.
-  const auto storagename { storagenameParam == "" ? descriptorname : storagenameParam }; 
+  const auto storagename{storagenameParam == "" ? descriptorname : storagenameParam};
   SPDLOG_INFO("dataInstance desc:{} storage:{}", descriptorname, storagename);
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
