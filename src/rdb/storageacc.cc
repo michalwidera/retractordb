@@ -17,8 +17,8 @@ storageAccessor::storageAccessor(std::string fileNameDesc, std::string fileName)
     :  //
       descriptorFile(fileNameDesc + ".desc"),
       storageFile(fileName) {
-        SPDLOG_INFO("descriptorFile -> {} | storageFile-> {}", descriptorFile, storageFile);
-      }
+  SPDLOG_INFO("descriptorFile -> {} | storageFile-> {}", descriptorFile, storageFile);
+}
 
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
   if (peekDescriptor()) {

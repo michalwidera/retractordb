@@ -14,7 +14,7 @@
 #include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 #include "spdlog/spdlog.h"
 
-std::string GREEN = "\x1B[32m" ;
+std::string GREEN = "\x1B[32m";
 std::string RED = "\x1B[31m";
 std::string ORANGE = "\x1B[33m";
 std::string BLUE = "\x1B[34m";
@@ -54,8 +54,8 @@ int main(int argc, char* argv[]) {
       std::cout << "ok\n";
       continue;
     }
-    if (cmd == "mono")  {
-      GREEN = "" ;
+    if (cmd == "mono") {
+      GREEN = "";
       RED = "";
       ORANGE = "m";
       BLUE = "";

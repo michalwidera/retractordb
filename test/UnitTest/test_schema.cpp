@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <locale>
 #include <string>
@@ -24,9 +25,21 @@ DECLARE c INTEGER,d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
 SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
 SELECT str1[0]+5 STREAM str2 FROM core0
 */
+namespace {
+
+class xschema : public ::testing::Test {
+ protected:
+  xschema() {}
+
+  virtual ~xschema() override {}
+
+  void SetUp() override { SPDLOG_INFO("SetUp"); }
+
+  void TearDown() override { SPDLOG_INFO("TearDown"); }
+};
 
 // ctest -R unittest-test-schema
-TEST(xschema, check_test0) {
+TEST_F(xschema, check_test0) {
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
@@ -69,7 +82,7 @@ TEST(xschema, check_test0) {
   }
 }
 
-TEST(xschema, check_test1) {
+TEST_F(xschema, check_test1) {
   /*
   query qry;
   qry.id = "file_1";
@@ -78,6 +91,19 @@ TEST(xschema, check_test1) {
   qry.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
   coreInstance.push_back(qry);
   */
+  std::vector<std::string> cleanFilesSet = {"core0.desc",  //
+                                            "core1.desc",  //
+                                            "str1",        //
+                                            "str1.desc",   //
+                                            "str2",        //
+                                            "str2.desc"};
+
+  for (auto i : cleanFilesSet)
+    if (std::filesystem::exists(i)) {
+      std::filesystem::remove(i);
+      SPDLOG_INFO("Drop file {}", i);
+    } else
+      SPDLOG_WARN("Not found {}", i);
 
   coreInstance.clear();
   auto compiled = parser("ut_example_schema.rql") == "OK";
@@ -91,8 +117,8 @@ TEST(xschema, check_test1) {
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 
   // Todo
-  qSet["str1"]->storagePayload->setItem(0,2);
-  qSet["str1"]->storagePayload->setItem(1,3);
+  qSet["str1"]->storagePayload->setItem(0, 2);
+  qSet["str1"]->storagePayload->setItem(1, 3);
   qSet["str1"]->storage->write();
 
   SPDLOG_INFO("Records in str1 {}", qSet["str1"]->storage->getRecordsCount());
@@ -115,3 +141,4 @@ TEST(xschema, check_test1) {
 
   ASSERT_TRUE(coreInstance.size() == qSet.size());
 };
+}  // namespace
