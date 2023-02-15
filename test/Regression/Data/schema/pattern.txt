@@ -9,12 +9,12 @@
 5 Byte(s) per record.
 .ok
 .{	INTEGER c
-	BYTE d
+	INTEGER d
 	REF "/dev/urandom"
 	TYPE DEVICE
 }
 .1 Record(s)
-5 Byte(s) per record.
+8 Byte(s) per record.
 .ok
 .{	INTEGER str1_0
 	BYTE str1_1
