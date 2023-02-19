@@ -192,14 +192,14 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
 }
 
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
-  os << "{";
+  //os << "{";
   if (rhs.hexFormat)
     os << std::hex;
   else
     os << std::dec;
   for (auto const &r : rhs.getDescriptor()) {
     if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
-    os << "\t" << std::get<rname>(r) << ":";
+    os << " " << std::get<rname>(r) << ":";
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
@@ -213,7 +213,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           os << std::setw(2);
         }
         os << (int)data;
-        if (i != std::get<rlen>(r)) os << " ";
+        if (i + 1 != std::get<rlen>(r)) os << " ";
       }
     } else if (std::get<rtype>(r) == rdb::INTARRAY) {
       for (auto i = 0; i < std::get<rlen>(r) / sizeof(int); i++) {
@@ -224,7 +224,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           os << std::setw(8);
         }
         os << (int)data;
-        if (i != std::get<rlen>(r)) os << " ";
+        if (i + 1 != std::get<rlen>(r) / sizeof(int)) os << " ";
       }
     } else if (std::get<rtype>(r) == rdb::BYTE) {
       unsigned char data;
@@ -265,9 +265,9 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   }
   if (rhs.getDescriptor().isEmpty()) {
     os << "Empty";
-    SPDLOG_ERROR("Empty descriptor.");
+    SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  os << "}";
+  //os << "}";
   return os;
 }
 
