@@ -50,6 +50,13 @@ int main(int argc, char* argv[]) {
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {
+      // This dual type of comment is required due fact that this tool is used on
+      // pattern matching in unit/regression tests
+      // rem - command act as normal xtrdb command - resulting ok and command prompt .
+      // # - command act as dump comment - nothing reports - even . or ok
+      // this # is used on commentary in test scripts, this rem is used when we want
+      // turn of some functionality and do not change the output pattern is script
+      // btw - I'm either suiprised by two kinds of comments ...
       std::getline(std::cin, wasteComment);
       if ( cmd == "rem" ) std::cout << "ok\n";
       continue;
@@ -57,7 +64,7 @@ int main(int argc, char* argv[]) {
     if (cmd == "mono") {
       GREEN = "";
       RED = "";
-      ORANGE = "m";
+      ORANGE = "";
       BLUE = "";
       YELLOW = "";
       RESET = "";
@@ -205,7 +212,7 @@ int main(int argc, char* argv[]) {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
     } else if (cmd == "print") {
-      std::cout << *payloadAcc << std::endl;
+      std::cout << ORANGE << *payloadAcc<< RESET;
       continue;
     } else if (cmd == "write") {
       size_t record;
