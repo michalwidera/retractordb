@@ -153,7 +153,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   Descriptor desc(rhs.getDescriptor());
   if (desc.type(fieldName) == "STRING") {
     std::string record;
-    //std::getline(is >> std::ws, record);
+    // std::getline(is >> std::ws, record);
     is >> record;
     memset(rhs.get() + desc.offset(fieldName), 0, desc.len(fieldName));
     memcpy(rhs.get() + desc.offset(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
@@ -184,16 +184,15 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   else if (desc.type(fieldName) == "DOUBLE")
     copyToMemory<double, payload>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "REF")
-    SPDLOG_ERROR("REF store not supported.");
+    SPDLOG_ERROR("REF store not supported by this operator.");
   else if (desc.type(fieldName) == "TYPE")
-    SPDLOG_ERROR("TYPE store not supported.");
+    SPDLOG_ERROR("TYPE store not supported by this operator.");
   else
     SPDLOG_ERROR("field {} not found", fieldName);
   return is;
 }
 
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
-  //os << "{";
   if (rhs.hexFormat)
     os << std::hex;
   else
@@ -268,7 +267,6 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  //os << "}";
   return os;
 }
 
