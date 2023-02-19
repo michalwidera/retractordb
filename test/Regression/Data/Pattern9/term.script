@@ -1,3 +1,8 @@
+# _Test description_
+# testing binary data source as stream input
+# reads datafile99.dat file and gets
+# sequential results in loop
+# notice: last $96 byte in overleaing intentionaly
 mono
 dropfile { data_source.desc }
 open data_source { INTEGER dane REF "datafile99.dat" TYPE DEVICE }
