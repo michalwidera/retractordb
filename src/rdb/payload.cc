@@ -1,13 +1,13 @@
 #include "rdb/payload.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>  // std::min
 #include <cassert>
 #include <cstddef>  // std::byte
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
-
-#include "spdlog/spdlog.h"
 
 namespace rdb {
 payload::payload(Descriptor descriptor)

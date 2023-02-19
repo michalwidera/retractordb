@@ -1,3 +1,6 @@
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
+
 #include <cassert>
 #include <cstring>
 #include <filesystem>
@@ -11,8 +14,6 @@
 #include "rdb/faccposix.h"
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
-#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
-#include "spdlog/spdlog.h"
 
 std::string GREEN = "\x1B[32m";
 std::string RED = "\x1B[31m";

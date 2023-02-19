@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstring>
@@ -13,7 +14,6 @@
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
 #include "retractor/dataModel.h"
-#include "spdlog/spdlog.h"
 
 extern std::string parser(std::string sInputFile);
 

@@ -1,6 +1,7 @@
 #include "rdb/facctxtsrc.h"
 
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -8,8 +9,6 @@
 #include <cstring>  // memcpy
 #include <memory>   // make_uniqe
 #include <ratio>
-
-#include "spdlog/spdlog.h"
 
 namespace rdb {
 constexpr const int kOpenBaseFlags = O_CLOEXEC;

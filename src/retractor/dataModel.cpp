@@ -1,10 +1,11 @@
 #include "dataModel.h"
 
+#include <spdlog/spdlog.h>
+
 #include <cassert>
 #include <regex>
 
 #include "QStruct.h"  // coreInstance
-#include "spdlog/spdlog.h"
 
 // ctest -R '^unittest-test-schema'
 
@@ -62,5 +63,5 @@ dataInstance::dataInstance(query &qry)
                    qry.descriptorFrom(),       //
                    qry.descriptorExpression()  //
       ) {
-  SPDLOG_INFO("dataInstance -> qry");
+  SPDLOG_INFO("dataInstance <- qry");
 };
