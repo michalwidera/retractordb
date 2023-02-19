@@ -44,13 +44,23 @@ dataInstance::dataInstance(                   //
   }
 };
 
+dataInstance::dataInstance(                    //
+    const std::string idAndStorageName,        //
+    const rdb::Descriptor storageDescriptor,   //
+    const rdb::Descriptor internalDescriptor)  //
+    : dataInstance(idAndStorageName,           // descriptor file
+                   idAndStorageName,           // storage file
+                   storageDescriptor,          //
+                   internalDescriptor          //
+      ) {
+  SPDLOG_INFO("dataInstance - storage and id are the same");
+}
+
 dataInstance::dataInstance(query &qry)
-    :                                          //
-      dataInstance(qry.id,                     // descriptor file
+    : dataInstance(qry.id,                     // descriptor file
                    qry.filename,               // storage file
                    qry.descriptorFrom(),       //
                    qry.descriptorExpression()  //
-                   )                           //
-{
+      ) {
   SPDLOG_INFO("dataInstance -> qry");
 };

@@ -125,14 +125,12 @@ TEST_F(xschema, check_test1) {
 
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
-  auto dataInternalDesciptor{
-      rdb::Descriptor("A", rdb::INTEGER) |  //
-      rdb::Descriptor("B", rdb::INTEGER)    //
-  };
+  auto dataStorageAndInternalDesciptor{rdb::Descriptor("A", rdb::INTEGER) |  //
+                                       rdb::Descriptor("B", rdb::INTEGER)};
 
-  auto internalDesc = coreInstance["str1"].descriptorExpression();
-  auto externalDesc = coreInstance["str1"].descriptorFrom();
-  dataInstance q("str1a", "str1a", dataInternalDesciptor, dataInternalDesciptor);
+  dataInstance q("str1a",                          // storage and descriptor are the same name
+                 dataStorageAndInternalDesciptor,  //
+                 dataStorageAndInternalDesciptor);
 
   q.storagePayload->setItem(0, 2);
   q.storagePayload->setItem(1, atoi(build_id));

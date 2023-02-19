@@ -23,5 +23,9 @@ struct dataInstance {
                const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
                const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
+  dataInstance(const std::string idAndStorageName,         // <- query %% filename
+               const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
+               const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+
   dataInstance(query &qry);
 };
