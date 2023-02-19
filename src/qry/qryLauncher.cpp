@@ -1,3 +1,4 @@
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
@@ -9,7 +10,6 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "qry.hpp"
-#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
 
 using namespace boost;
 using boost::property_tree::ptree;

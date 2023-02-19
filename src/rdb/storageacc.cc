@@ -1,13 +1,13 @@
 #include "rdb/storageacc.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstring>  //std::memset
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-
-#include "spdlog/spdlog.h"
 
 namespace rdb {
 

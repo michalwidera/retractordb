@@ -1,13 +1,13 @@
 #include "rdb/descriptor.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cctype>
 #include <iostream>
 #include <limits>
 #include <locale>
-
-#include "spdlog/spdlog.h"
 
 namespace rdb {
 // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/

@@ -1,3 +1,4 @@
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
 #include <boost/algorithm/string.hpp>
@@ -13,8 +14,7 @@
 
 #include "QStruct.h"
 #include "compiler.hpp"
-#include "config.h"                        // Add an automatically generated configuration file
-#include "spdlog/sinks/basic_file_sink.h"  // support for basic file logging
+#include "config.h"  // Add an automatically generated configuration file
 
 using namespace boost;
 

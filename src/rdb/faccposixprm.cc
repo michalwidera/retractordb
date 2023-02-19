@@ -1,12 +1,11 @@
 #include "rdb/faccposixprm.h"
 
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <cassert>
-
-#include "spdlog/spdlog.h"
 namespace rdb {
 constexpr const int kOpenBaseFlags = O_CLOEXEC;
 

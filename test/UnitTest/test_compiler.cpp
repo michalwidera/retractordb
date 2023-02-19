@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <spdlog/spdlog.h>
 
 #include <boost/system/error_code.hpp>
 #include <fstream>
@@ -7,7 +8,6 @@
 
 #include "QStruct.h"
 #include "compiler/compiler.hpp"
-#include "spdlog/spdlog.h"
 
 extern std::string parser(std::string sInputFile);
 
