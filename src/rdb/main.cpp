@@ -125,6 +125,7 @@ int main(int argc, char* argv[]) {
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";
       std::cout << "print \t\t\t\t show payload\n";
+      std::cout << "input [field]:[value]\n";
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
@@ -213,6 +214,10 @@ int main(int argc, char* argv[]) {
       dacc->setRemoveOnExit(rox);
     } else if (cmd == "print") {
       std::cout << ORANGE << *payloadAcc<< RESET;
+      continue;
+    } else if (cmd == "input") {
+      for (auto i : dacc->getDescriptor())
+        std::cin >> *payloadAcc;
       continue;
     } else if (cmd == "write") {
       size_t record;

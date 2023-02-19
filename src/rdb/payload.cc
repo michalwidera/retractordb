@@ -153,7 +153,8 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   Descriptor desc(rhs.getDescriptor());
   if (desc.type(fieldName) == "STRING") {
     std::string record;
-    std::getline(is >> std::ws, record);
+    //std::getline(is >> std::ws, record);
+    is >> record;
     memset(rhs.get() + desc.offset(fieldName), 0, desc.len(fieldName));
     memcpy(rhs.get() + desc.offset(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
   } else if (desc.type(fieldName) == "BYTEARRAY") {
@@ -199,7 +200,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << std::dec;
   for (auto const &r : rhs.getDescriptor()) {
     if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
-    os << " " << std::get<rname>(r) << ":";
+    os << " " << std::get<rname>(r) << " ";
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
