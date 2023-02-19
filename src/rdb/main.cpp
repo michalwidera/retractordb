@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
   std::string cmd;
   std::string wasteComment;
   do {
-    if (cmd != "#" ) std::cout << ".";
+    if (cmd != "#") std::cout << ".";
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {
@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
       // turn of some functionality and do not change the output pattern is script
       // btw - I'm either suiprised by two kinds of comments ...
       std::getline(std::cin, wasteComment);
-      if ( cmd == "rem" ) std::cout << "ok\n";
+      if (cmd == "rem") std::cout << "ok\n";
       continue;
     }
     if (cmd == "mono") {
@@ -213,11 +213,10 @@ int main(int argc, char* argv[]) {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
     } else if (cmd == "print") {
-      std::cout << ORANGE << *payloadAcc<< RESET;
+      std::cout << ORANGE << *payloadAcc << RESET;
       continue;
     } else if (cmd == "input") {
-      for (auto i : dacc->getDescriptor())
-        std::cin >> *payloadAcc;
+      for (auto i : dacc->getDescriptor()) std::cin >> *payloadAcc;
       continue;
     } else if (cmd == "write") {
       size_t record;
