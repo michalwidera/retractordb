@@ -11,5 +11,5 @@ size
 open str2
 desc
 size
-# dropfile { core0.desc core1.desc str1 str1.desc str2 str2.desc }
+rem dropfile { core0.desc core1.desc str1 str1.desc str2 str2.desc }
 quit

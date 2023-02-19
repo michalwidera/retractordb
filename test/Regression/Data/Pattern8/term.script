@@ -1,3 +1,7 @@
+# _Test description_
+# testing text data source as stream input
+# reads data_souce.txt file and gets
+# sequential results in loop from txt file
 mono
 dropfile { data_source.desc }
 open data_source { INTEGER dane STRING name[5] REF "data_source.txt" TYPE TEXTSOURCE }

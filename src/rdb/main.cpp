@@ -46,12 +46,12 @@ int main(int argc, char* argv[]) {
   std::string cmd;
   std::string wasteComment;
   do {
-    std::cout << ".";
+    if (cmd != "#" ) std::cout << ".";
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
-    if (cmd == "#") {
+    if (cmd == "#" || cmd == "rem") {
       std::getline(std::cin, wasteComment);
-      std::cout << "ok\n";
+      if ( cmd == "rem" ) std::cout << "ok\n";
       continue;
     }
     if (cmd == "mono") {
