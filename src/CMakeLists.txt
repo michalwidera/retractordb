@@ -9,6 +9,7 @@ set(SOURCES_RETRACTOR
     retractor/executorsm.cpp
     retractor/CRSMath.cpp
     retractor/dataModel.cpp
+    retractor/expressionEvaluator.cpp
     share/QStruct.cpp
     share/inputFileInstance.cpp
     share/SOperations.cpp

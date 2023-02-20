@@ -50,15 +50,35 @@ set(SOURCES_SCHEMA_TEST
     test_schema.cpp
     main.cpp)
 
+set(SOURCES_EXPEVAL_TEST
+    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/faccbindev.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/facctxtsrc.cc
+    ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
+    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
+    ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLLexer.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/Parser/RQLParser.cpp
+    test_expeval.cpp
+    main.cpp)
+
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xcompiler ${SOURCES_COMPILER_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_schema ${SOURCES_SCHEMA_TEST})
+add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 
 target_link_libraries(test_xqry ${CONAN_LIBS})
 target_link_libraries(test_xcompiler ${CONAN_LIBS})
 target_link_libraries(test_xtrdb ${CONAN_LIBS})
 target_link_libraries(test_schema ${CONAN_LIBS})
+target_link_libraries(test_expeval ${CONAN_LIBS})
 
 add_test(
   NAME unittest-test-xqry
@@ -74,6 +94,11 @@ add_test(
   NAME unittest-test-xtrdb
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/bin/test_xtrdb)
+
+add_test(
+  NAME unittest-test-expeval
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  COMMAND ${CMAKE_BINARY_DIR}/bin/test_expeval)
 
 add_test(
   NAME unittest-test-schema
