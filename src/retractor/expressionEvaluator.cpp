@@ -1,5 +1,6 @@
 #include "expressionEvaluator.h"
 
+#include <assert.h>
 #include <spdlog/spdlog.h>
 
 expressionEvaluator::expressionEvaluator(/* args */) {}
@@ -13,14 +14,30 @@ std::type_info const& var_type(V const& v) {
 
 // This function will return two data that types are common and math-able
 std::pair<variant_t, variant_t> normalize(variant_t a, variant_t b) {
-  //SPDLOG_INFO("types {} {}", var_type(a), var_type(b));
+  // SPDLOG_INFO("types {} {}", var_type(a), var_type(b));
 
-  if (var_type(a) == var_type(b)) return std::pair<variant_t, variant_t>(a, b);
+  if (a.index() == b.index()) return std::pair<variant_t, variant_t>(a, b);
 
-  return std::pair<variant_t, variant_t>(std::monostate{}, std::monostate{});
+  if (a.index() > b.index()) {
+    std::decay_t<decltype(a)> temp;
+    temp = b;
+    return std::pair<variant_t, variant_t>(a, temp);
+  } else {
+    std::decay_t<decltype(b)> temp;
+    temp = a;
+    return std::pair<variant_t, variant_t>(temp, b);
+  }
+
+  return std::pair<variant_t, variant_t>(std::monostate{}, std::monostate{});  // pro forma
 }
 
-variant_t add(const variant_t &aParam, const variant_t &bParam) {
+template <class... Ts>
+struct overload : Ts... {
+  using Ts::operator()...;
+};
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
+variant_t add(const variant_t& aParam, const variant_t& bParam) {
   auto [a, b]{normalize(aParam, aParam)};
   return 0;
 };
