@@ -3,7 +3,10 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 project(regression-test)
 
 include_directories(
-  "${Boost_INCLUDE_DIR};${CMAKE_SOURCE_DIR}/src/include;${CMAKE_SOURCE_DIR}/src/share;${CMAKE_SOURCE_DIR}/src;${CMAKE_SOURCE_DIR}/src/compiler"
+  ${CMAKE_SOURCE_DIR}/src/include
+  ${CMAKE_SOURCE_DIR}/src/share
+  ${CMAKE_SOURCE_DIR}/src
+  ${CMAKE_SOURCE_DIR}/src/compiler
 )
 
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
@@ -74,11 +77,11 @@ add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_schema ${SOURCES_SCHEMA_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 
-target_link_libraries(test_xqry ${CONAN_LIBS})
-target_link_libraries(test_xcompiler ${CONAN_LIBS})
-target_link_libraries(test_xtrdb ${CONAN_LIBS})
-target_link_libraries(test_schema ${CONAN_LIBS})
-target_link_libraries(test_expeval ${CONAN_LIBS})
+target_link_libraries(test_xqry ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} )
+target_link_libraries(test_xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xtrdb ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES})
+target_link_libraries(test_schema ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_expeval ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
 
 add_test(
   NAME unittest-test-xqry

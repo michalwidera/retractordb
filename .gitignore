@@ -21,6 +21,7 @@ scripts/CMakeFiles/*
 astyle/
 compile_commands.json
 install_manifest.txt
+CMakeUserPresets.json
 *.dmp
 *.lkn
 *.qry*

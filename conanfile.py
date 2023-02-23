@@ -28,9 +28,8 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB time series database"
     homepage = "https://retractordb.com"
-    requires = "boost/1.81.0", "gtest/1.13.0" , "antlr4-cppruntime/4.11.1" , "spdlog/1.11.0"
-    # generators = "cmake" , "cmake_find_package"
-    # generators = "CMakeDeps" , "CMakeToolchain"
+    requires = "boost/1.81.0", "gtest/1.13.0" , "antlr4-cppruntime/4.11.1" , "spdlog/1.10.0"
+    generators = "CMakeDeps" , "CMakeToolchain"
     testing = []
     package_type = "application"
 
@@ -41,15 +40,18 @@ class Retractor(ConanFile):
                        "boost/*:without_test" : False,
                        "boost/*:multithreading" : True,
                        "boost/*:without_system" : False,
-                       "boost/*:without_filesystem" : False }
+                       "boost/*:without_filesystem" : False ,
+                       "spdlog/*:header_only" : True }
 
     def validate(self):
-        check_min_cppstd(self, "17")
+        check_min_cppstd(self, "20")
         # check_max_cppstd(self, "23")
 
     def layout(self):
-        self.cpp.package.includedirs.append("other_includes")
+        # self.cpp.package.includedirs.append("other_includes")
         cmake_layout(self)
+        # self.cpp.source.includedirs = ["include"]
+        # self.cpp.source.libdirs = ["lib"]
 
     def package_info(self):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
@@ -61,13 +63,10 @@ class Retractor(ConanFile):
         antlr4_version_file.write(script.replace('VERSION',str("4.11.1")))
         antlr4_version_file.close()
 
-    def generate(self):
-        tc = CMakeToolchain(self)
-        tc.generate()
-        deps = CMakeDeps(self)
-        deps.generate()
-
     def build(self):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+    def package(self):
+        cmake.install()
