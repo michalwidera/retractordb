@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 project(retractordb-src)
 
+find_package(Boost REQUIRED)
+find_package(spdlog REQUIRED)
+
 include_directories(${Boost_INCLUDE_DIR} share include)
+include_directories(${spdlog})
 
 set(SOURCES_RETRACTOR
     retractor/Processor.cpp

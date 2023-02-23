@@ -4,12 +4,13 @@ project(retractordb)
 
 enable_testing()
 
-set(CONAN_DISABLE_CHECK_COMPILER TRUE)
+# set(CONAN_DISABLE_CHECK_COMPILER TRUE)
 
 set(CMAKE_CXX_STANDARD 20)
 
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup()
+# include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+# conan_basic_setup()
+include(${CMAKE_BINARY_DIR}/generators/conan_toolchain.cmake)
 
 add_subdirectory(src)
 add_subdirectory(scripts)
