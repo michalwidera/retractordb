@@ -21,6 +21,7 @@ scripts/CMakeFiles/*
 astyle/
 compile_commands.json
 install_manifest.txt
+CMakeUserPresets.json
 *.dmp
 *.lkn
 *.qry*
@@ -29,3 +30,7 @@ install_manifest.txt
 *.png
 *.swp
 *.log
+conan.lock
+conanbuildinfo.txt
+conaninfo.txt
+graph_info.json

@@ -12,11 +12,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
       - run: pip3 install conan==1.59
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: cd build && conan source ..
-      - run: cd build && conan install ..
-      - run: cd build && conan build ..
+      - run: conan source .
+      - run: conan install .
+      - run: conan build .
+      - run: cd build/Release && make install
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Release && make test
 
   build-2004-debug:
     working_directory: ~/retractordb
@@ -29,30 +30,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
       - run: pip3 install conan==1.59
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: cd build && conan source ..
-      - run: cd build && conan install .. -s build_type=Debug
-      - run: cd build && conan build ..
+      - run: conan source .
+      - run: conan install . -s build_type=Debug
+      - run: conan build .
+      - run: cd build/Debug && make install
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
-
-  build-2204-clang:
-    working_directory: ~/retractordb
-    docker:
-      - image: cimg/base:edge-22.04
-    resource_class: large
-    steps:
-      - checkout
-      - run: uname -a && cat /proc/version && cat /etc/issue
-      - run: sudo apt-get update && sudo apt-get -y install clang cmake make build-essential python3 python3-pip
-      - run: sudo apt-get remove gcc
-      - run: pip3 install conan==1.59
-      - run: conan profile new default --detect
-      - run: conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: cd build && conan source ..
-      - run: cd build && conan install .. --build missing
-      - run: cd build && conan build ..
-      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Debug && make test
 
   build-2204:
     working_directory: ~/retractordb
@@ -65,13 +48,14 @@ jobs:
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
       - run: pip3 install conan==1.59
       - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: cd build && conan source ..
-      - run: cd build && conan install .. --build missing
-      - run: cd build && conan build ..
+      - run: conan source .
+      - run: conan install .
+      - run: conan build .
+      - run: cd build/Release && make install
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Release && make test
 
-  build-2204-debug:
+  build-2204-conan20:
     working_directory: ~/retractordb
     docker:
       - image: cimg/base:edge-22.04
@@ -80,13 +64,14 @@ jobs:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
-      - run: pip3 install conan==1.59
-      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: cd build && conan source ..
-      - run: cd build && conan install .. --build missing -s build_type=Debug
-      - run: cd build && conan build ..
+      - run: pip3 install conan
+      - run: conan profile detect && cp .circleci/default ~/.conan2/profiles
+      - run: conan source .
+      - run: conan install . --build missing
+      - run: conan build .
+      - run: cd build/Release && make install
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Release && make test
 
   build-2204-ARM:
     working_directory: ~/retractordb
@@ -98,10 +83,11 @@ jobs:
       - run: uname -a && cat /proc/version && cat /etc/issue
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
       - run: pip3 install conan==1.59
-      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: cd build && conan source ..
-      - run: cd build && conan install .. --build missing
-      - run: cd build && conan build ..
+      - run: conan profile detect && cp .circleci/default ~/.conan2/profiles
+      - run: conan source .
+      - run: conan install . --build missing
+      - run: conan build .
+      - run: cd build/Release && make install
       - run: ~/.local/bin/xretractor -h && ~/.local/bin/xqry -h && ~/.local/bin/xdumper -h && ~/.local/bin/xcompiler -h
 # There is a problem on test on ARM - I will postopne this failure for now - build is more important that this for now.
 
@@ -115,13 +101,19 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-2004-debug:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
       - build-2204:
           filters:
             branches:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-debug:
+      - build-2204-conan20:
           filters:
             branches:
               only:
@@ -141,12 +133,10 @@ workflows:
     jobs:
       - build-2004
       - build-2204
-      - build-2204-debug:
+      - build-2204-conan20
+      - build-2004-debug:
           requires:
             - build-2204
       - build-2204-ARM:
-          requires:
-            - build-2204
-      - build-2204-clang:
           requires:
             - build-2204

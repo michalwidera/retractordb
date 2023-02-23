@@ -35,7 +35,8 @@ template <class... Ts>
 struct overload : Ts... {
   using Ts::operator()...;
 };
-template<class... Ts> overload(Ts...) -> overload<Ts...>;
+template <class... Ts>
+overload(Ts...) -> overload<Ts...>;
 
 variant_t add(const variant_t& aParam, const variant_t& bParam) {
   auto [a, b]{normalize(aParam, aParam)};
