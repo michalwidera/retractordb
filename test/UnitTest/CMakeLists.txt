@@ -3,11 +3,8 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 project(regression-test)
 
 include_directories(
-  ${CMAKE_SOURCE_DIR}/src/include
-  ${CMAKE_SOURCE_DIR}/src/share
-  ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}/src/compiler
-)
+  ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/share
+  ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/compiler)
 
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 
@@ -77,37 +74,42 @@ add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_schema ${SOURCES_SCHEMA_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 
-target_link_libraries(test_xqry ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} )
-target_link_libraries(test_xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_xtrdb ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES})
-target_link_libraries(test_schema ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_expeval ${CONAN_LIBS} ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xqry ${CONAN_LIBS} ${Boost_LIBRARIES}
+                      ${GTest_LIBRARIES})
+target_link_libraries(test_xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES}
+                      ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xtrdb ${CONAN_LIBS} ${Boost_LIBRARIES}
+                      ${GTest_LIBRARIES})
+target_link_libraries(test_schema ${CONAN_LIBS} ${Boost_LIBRARIES}
+                      ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_expeval ${CONAN_LIBS} ${Boost_LIBRARIES}
+                      ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
 
 add_test(
   NAME unittest-test-xqry
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND ${CMAKE_BINARY_DIR}/bin/test_xqry)
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
   NAME unittest-test-xcompiler
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND ${CMAKE_BINARY_DIR}/bin/test_xcompiler)
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xcompiler)
 
 add_test(
   NAME unittest-test-xtrdb
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND ${CMAKE_BINARY_DIR}/bin/test_xtrdb)
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
 add_test(
   NAME unittest-test-expeval
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND ${CMAKE_BINARY_DIR}/bin/test_expeval)
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
 
 add_test(
   NAME unittest-test-schema
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
   COMMAND bash -c "set -e ; \
-  ${CMAKE_BINARY_DIR}/bin/test_schema")
+  ${CMAKE_BINARY_DIR}/test/UnitTest/test_schema")
 
 add_test(
   NAME unittest-test-schema-comp

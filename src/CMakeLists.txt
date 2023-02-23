@@ -7,16 +7,12 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 
-message( "Boost_INCLUDE_DIR: ${Boost_INCLUDE_DIR}")
-message( "spdlog_INCLUDE_DIR: ${spdlog_INCLUDE_DIR}")
-message( "antlr4-runtime_INCLUDE_DIR: ${antlr4-runtime_INCLUDE_DIR}")
+message("Boost_INCLUDE_DIR: ${Boost_INCLUDE_DIR}")
+message("spdlog_INCLUDE_DIR: ${spdlog_INCLUDE_DIR}")
+message("antlr4-runtime_INCLUDE_DIR: ${antlr4-runtime_INCLUDE_DIR}")
 
-include_directories(
-  ${Boost_INCLUDE_DIR}
-  ${spdlog_INCLUDE_DIR}
-  ${antlr4-runtime_INCLUDE_DIR}
-  share
-  include)
+include_directories(${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR}
+                    ${antlr4-runtime_INCLUDE_DIR} share include)
 
 set(SOURCES_RETRACTOR
     retractor/Processor.cpp
@@ -78,7 +74,8 @@ add_executable(xqry ${SOURCES_QRY})
 add_executable(xtrdb ${SOURCES_RDB})
 
 target_link_libraries(xretractor ${CONAN_LIBS} ${Boost_LIBRARIES})
-target_link_libraries(xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES}
+                      ${antlr4-runtime_LIBRARIES})
 target_link_libraries(xdumper ${CONAN_LIBS} ${Boost_LIBRARIES})
 target_link_libraries(xqry ${CONAN_LIBS} ${Boost_LIBRARIES})
 target_link_libraries(xtrdb ${CONAN_LIBS} ${Boost_LIBRARIES})
@@ -114,13 +111,13 @@ add_custom_target(
 add_custom_target(
   cformat
   COMMAND
-    find ../src -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname
-    "*.cc" | grep --invert-match 'Parser/' | xargs clang-format -i
-    --style='{BasedOnStyle: Google, ColumnLimit: 129}'
+    find ${CMAKE_SOURCE_DIR}/src -iname "*.h" -o -iname "*.cpp" -o -iname
+    "*.hpp" -o -iname "*.cc" | grep --invert-match 'Parser/' | xargs
+    clang-format -i --style='{BasedOnStyle: Google, ColumnLimit: 129}'
   COMMAND
-    find ../test -iname "*.h" -o -iname "*.cpp" -o -iname "*.hpp" -o -iname
-    "*.cc" | xargs clang-format -i --style='{BasedOnStyle: Google, ColumnLimit:
-    129}'
+    find ${CMAKE_SOURCE_DIR}/test -iname "*.h" -o -iname "*.cpp" -o -iname
+    "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style='{BasedOnStyle:
+    Google, ColumnLimit: 129}'
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
           --line-width=80
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

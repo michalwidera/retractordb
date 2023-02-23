@@ -48,17 +48,13 @@ class Retractor(ConanFile):
         # check_max_cppstd(self, "23")
 
     def layout(self):
-        # self.cpp.package.includedirs.append("other_includes")
         cmake_layout(self)
-        # self.cpp.source.includedirs = ["include"]
-        # self.cpp.source.libdirs = ["lib"]
 
     def package_info(self):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
 
     def requirements(self):
         # Auto-generation of antlr4call.sh script
-
         antlr4_version_file = open("scripts/antlr4call.sh","w")
         antlr4_version_file.write(script.replace('VERSION',str("4.11.1")))
         antlr4_version_file.close()
@@ -67,6 +63,5 @@ class Retractor(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-
-    def package(self):
         cmake.install()
+        

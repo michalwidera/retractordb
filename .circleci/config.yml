@@ -16,7 +16,7 @@ jobs:
       - run: conan install . --build missing
       - run: conan build .
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Release && make test
 
   build-2004-debug:
     working_directory: ~/retractordb
@@ -33,7 +33,7 @@ jobs:
       - run: conan install . --build missing -s build_type=Debug
       - run: conan build .
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Debug && make test
 
   build-2204:
     working_directory: ~/retractordb
@@ -50,7 +50,7 @@ jobs:
       - run: conan install . --build missing
       - run: conan build .
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Release && make test
 
   build-2204-debug:
     working_directory: ~/retractordb
@@ -67,7 +67,7 @@ jobs:
       - run: conan install . --build missing
       - run: conan build .
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build && make test
+      - run: cd build/Release && make test
 
   build-2204-ARM:
     working_directory: ~/retractordb
