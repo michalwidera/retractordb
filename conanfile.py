@@ -1,8 +1,7 @@
 from curses import keyname
 
-from conan import ConanFile
+from conan import ConanFile, Version, __version__ as conan_version
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
-# from conan.tools.build import check_max_cppstd, check_min_cppstd  - works on 2.0
 
 script = """#!/bin/bash
 
@@ -43,11 +42,6 @@ class Retractor(ConanFile):
                        "boost/*:without_filesystem" : False ,
                        "spdlog/*:header_only" : True }
 
-    # works on 2.0
-    # def validate(self):
-    #    check_min_cppstd(self, "20")
-    #    check_max_cppstd(self, "23")
-
     def layout(self):
         cmake_layout(self)
 
@@ -64,4 +58,7 @@ class Retractor(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-        # cmake.install()
+        if conan_version >= Version("2.0"):
+            cmake.install()
+
+

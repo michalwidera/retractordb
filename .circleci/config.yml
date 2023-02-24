@@ -69,7 +69,6 @@ jobs:
       - run: conan source .
       - run: conan install . --build missing
       - run: conan build .
-      - run: cd build/Release && make install
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build/Release && make test
 
