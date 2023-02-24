@@ -74,16 +74,14 @@ add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_schema ${SOURCES_SCHEMA_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 
-target_link_libraries(test_xqry ${CONAN_LIBS} ${Boost_LIBRARIES}
-                      ${GTest_LIBRARIES})
-target_link_libraries(test_xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES}
-                      ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_xtrdb ${CONAN_LIBS} ${Boost_LIBRARIES}
-                      ${GTest_LIBRARIES})
-target_link_libraries(test_schema ${CONAN_LIBS} ${Boost_LIBRARIES}
-                      ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_expeval ${CONAN_LIBS} ${Boost_LIBRARIES}
-                      ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES})
+target_link_libraries(test_xcompiler ${Boost_LIBRARIES} ${GTest_LIBRARIES}
+                      ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xtrdb ${Boost_LIBRARIES} ${GTest_LIBRARIES})
+target_link_libraries(test_schema ${Boost_LIBRARIES} ${GTest_LIBRARIES}
+                      ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_expeval ${Boost_LIBRARIES} ${GTest_LIBRARIES}
+                      ${antlr4-runtime_LIBRARIES})
 
 add_test(
   NAME unittest-test-xqry

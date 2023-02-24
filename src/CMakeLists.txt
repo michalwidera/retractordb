@@ -73,22 +73,14 @@ add_executable(xdumper ${SOURCES_DUMPER})
 add_executable(xqry ${SOURCES_QRY})
 add_executable(xtrdb ${SOURCES_RDB})
 
-target_link_libraries(xretractor ${CONAN_LIBS} ${Boost_LIBRARIES})
-target_link_libraries(xcompiler ${CONAN_LIBS} ${Boost_LIBRARIES}
-                      ${antlr4-runtime_LIBRARIES})
-target_link_libraries(xdumper ${CONAN_LIBS} ${Boost_LIBRARIES})
-target_link_libraries(xqry ${CONAN_LIBS} ${Boost_LIBRARIES})
-target_link_libraries(xtrdb ${CONAN_LIBS} ${Boost_LIBRARIES})
+target_link_libraries(xretractor ${Boost_LIBRARIES})
+target_link_libraries(xcompiler ${Boost_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(xdumper ${Boost_LIBRARIES})
+target_link_libraries(xqry ${Boost_LIBRARIES})
+target_link_libraries(xtrdb ${Boost_LIBRARIES})
 
 install(TARGETS xretractor xcompiler xdumper xqry xtrdb
         DESTINATION ~/.local/bin)
-
-add_custom_target(
-  lst
-  COMMAND xretractor --compiler
-  COMMAND xcompiler --compiler
-  COMMAND xdumper --compiler
-  COMMAND xqry --compiler)
 
 add_custom_target(
   simple
