@@ -130,6 +130,4 @@ workflows:
       - build-2004-debug:
           requires:
             - build-2204
-      - build-2204-ARM:
-          requires:
-            - build-2204
+  
