@@ -7,7 +7,8 @@
 #include <tuple>
 #include <vector>
 
-#include "enumDecl.h"
+#include "commandID.h"
+#include "fldType.h"
 
 namespace rdb {
 

@@ -7,52 +7,22 @@ expressionEvaluator::expressionEvaluator(/* args */) {}
 
 expressionEvaluator::~expressionEvaluator() {}
 
-template <class V>
-std::type_info const& var_type(V const& v) {
-  return std::visit([](auto&& x) -> decltype(auto) { return typeid(x); }, v);
+rdb::variant_t neg(rdb::variant_t a) { return 0; };
+
+rdb::variant_t operator+(const rdb::variant_t& a, const rdb::variant_t& b) {
+  rdb::variant_t retVal;
+
+  std::decay_t<decltype(a)> a_;
+  std::decay_t<decltype(b)> b_;
+
+  return retVal;
 }
 
-// This function will return two data that types are common and math-able
-std::pair<variant_t, variant_t> normalize(variant_t a, variant_t b) {
-  // SPDLOG_INFO("types {} {}", var_type(a), var_type(b));
+rdb::variant_t expressionEvaluator::eval(std::list<token> program) {
+  rdb::variant_t retval;
 
-  if (a.index() == b.index()) return std::pair<variant_t, variant_t>(a, b);
-
-  if (a.index() > b.index()) {
-    std::decay_t<decltype(a)> temp;
-    temp = b;
-    return std::pair<variant_t, variant_t>(a, temp);
-  } else {
-    std::decay_t<decltype(b)> temp;
-    temp = a;
-    return std::pair<variant_t, variant_t>(temp, b);
-  }
-
-  return std::pair<variant_t, variant_t>(std::monostate{}, std::monostate{});  // pro forma
-}
-
-template <class... Ts>
-struct overload : Ts... {
-  using Ts::operator()...;
-};
-template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
-
-variant_t add(const variant_t& aParam, const variant_t& bParam) {
-  auto [a, b]{normalize(aParam, aParam)};
-  return 0;
-};
-
-variant_t sub(variant_t a, variant_t b) { return 0; };
-variant_t mul(variant_t a, variant_t b) { return 0; };
-variant_t div(variant_t a, variant_t b) { return 0; };
-variant_t neg(variant_t a) { return 0; };
-
-variant_t expressionEvaluator::eval(std::list<token> program) {
-  variant_t retval;
-
-  std::stack<variant_t> rStack;
-  variant_t a, b;
+  std::stack<rdb::variant_t> rStack;
+  rdb::variant_t a, b;
 
   for (auto tk : program) {
     switch (tk.getCommandID()) {
@@ -67,24 +37,24 @@ variant_t expressionEvaluator::eval(std::list<token> program) {
     }
     switch (tk.getCommandID()) {
       case PUSH_VAL:
-        rStack.push(tk.get());
+        // rStack.push(tk.get());
         break;
       case ADD:
-        rStack.push(add(a, b));
+        rStack.push(a + b);
         break;
       case SUBTRACT:
-        rStack.push(sub(b, a));
+        // rStack.push( b - a);
         break;
       case MULTIPLY:
-        rStack.push(mul(a, b));
+        // rStack.push( a * b );
         break;
       case DIVIDE:
-        rStack.push(div(a, b));
+        // rStack.push( a / b );
         break;
       case NEGATE:
         a = rStack.top();
         rStack.pop();
-        rStack.push(neg(a));
+        // rStack.push(neg(a));
         break;
     }
   };

@@ -14,7 +14,7 @@
 #error END_E_GEN conficts with inner tokenDef.h declaration.
 #endif
 
-#ifdef ENUMDECL_H_CREATE_DEFINITION
+#ifdef ENUMDECL_H_CREATE_DEFINITION_CMDI
 
 // Part responsible for Definition & Initialization of map structure
 #include <map>
@@ -27,10 +27,10 @@
 // This undef will force to BEGIN_E_GEN(...) - END_E_GEN(...) will appear once
 // again with new set of BEGIN_E_GEN/END_E_GEN definitions and will goto to
 // BEGIN_E_GEN sections
-#undef ENUMDECL_H_DECLARATION_DONE
+#undef ENUMDECL_H_DECLARATION_DONE_CMDI
 #endif
 
-#ifndef ENUMDECL_H_DECLARATION_DONE
+#ifndef ENUMDECL_H_DECLARATION_DONE_CMDI
 
 // Part resposible for declaration
 #ifndef BEGIN_E_GEN
@@ -95,26 +95,9 @@ BEGIN_E_GEN(command_id){DECL(VOID_COMMAND),
                         DECL(COUNT),
                         DECL(COUNT_RANGE)} END_E_GEN(command_id)
 
-    // This declaration goes into ::rdb namespace
-    namespace rdb {
-  BEGIN_E_GEN(descFldType){
-      DECL(BAD),        //
-      DECL(BYTE),       //
-      DECL(INTEGER),    //
-      DECL(UINT),       //
-      DECL(RATIONAL),   //
-      DECL(FLOAT),      //
-      DECL(STRING),     //
-      DECL(BYTEARRAY),  //
-      DECL(INTARRAY),   //
-      DECL(DOUBLE),     //
-      DECL(TYPE),       // Type of storage - read/write, readonly, text ... etc.
-      DECL(REF)         // Reference to given location of storage
-  } END_E_GEN(descFldType)
-}
-
 #undef BEGIN_E_GEN
 #undef END_E_GEN
 #undef DECL
-#define ENUMDECL_H_DECLARATION_DONE
-#endif
+#define ENUMDECL_H_DECLARATION_DONE_CMDI
+
+#endif  // ENUMDECL_H_DECLARATION_DONE_CMDI

@@ -8,21 +8,10 @@
 
 #include "QStruct.h"  // token
 
-// enumDecl.h
+#define ENUMDECL_H_CREATE_VARIANT_T
+#include "fldType.h"
 
-// sequence of types here is significatn
-// it is used to promote in math operations.
-typedef std::variant<std::monostate,        // BAD
-                     uint8_t,               // BYTE
-                     int,                   // INTEGER
-                     unsigned,              // UINT
-                     boost::rational<int>,  // RATIONAL
-                     float,                 // FLOAT
-                     double,                // DOUBLE
-                     std::string            // STRING
-                     >
-    variant_t;
-
+// typedef std::variant<int, unsigned, std::string> variant_t;
 class expressionEvaluator {
  private:
   /* data */
@@ -30,5 +19,5 @@ class expressionEvaluator {
   expressionEvaluator(/* args */);
   ~expressionEvaluator();
 
-  variant_t eval(std::list<token> program);
+  rdb::variant_t eval(std::list<token> program);
 };

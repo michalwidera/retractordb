@@ -12,7 +12,8 @@
 
 #include "QStruct.h"
 #include "SOperations.h"
-#include "enumDecl.h"
+#include "commandID.h"
+#include "fldType.h"
 
 using boost::lexical_cast;
 

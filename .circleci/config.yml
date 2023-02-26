@@ -82,7 +82,7 @@ jobs:
       - run: uname -a && cat /proc/version && cat /etc/issue
       - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
       - run: pip3 install conan==1.59
-      - run: conan profile detect && cp .circleci/default ~/.conan2/profiles
+      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
       - run: conan source .
       - run: conan install . --build missing
       - run: conan build .
@@ -130,4 +130,6 @@ workflows:
       - build-2004-debug:
           requires:
             - build-2204
-  
+      - build-2204-ARM:
+          requires:
+            - build-2204

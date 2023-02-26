@@ -18,8 +18,10 @@
 using namespace boost;
 using namespace boost::lambda;
 
-#define ENUMDECL_H_CREATE_DEFINITION
-#include "enumDecl.h"
+#define ENUMDECL_H_CREATE_DEFINITION_FLDT
+#include "fldType.h"
+#define ENUMDECL_H_CREATE_DEFINITION_CMDI
+#include "commandID.h"
 
 extern "C" {
 qTree coreInstance;

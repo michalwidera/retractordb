@@ -17,7 +17,8 @@
 #include <boost/serialization/vector.hpp>
 #include <variant>
 
-#include "enumDecl.h"
+#include "commandID.h"
+#include "fldType.h"
 #include "rdb/descriptor.h"
 
 typedef boost::rational<int> number;
