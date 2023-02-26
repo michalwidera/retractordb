@@ -2,32 +2,20 @@
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
 // Checking redefinded namespace sanity
-#ifdef DECL_T
-#error DECL_T conficts with inner fldType.h declaration.
+#if defined(DECL_T) || defined(DECL_F) || defined(DECL_E) || defined(BEGIN_E_GEN_T) || defined(END_E_GEN_T)
+#error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conficts with inner fldType.h declaration.
 #endif
-#ifdef DECL_F
-#error DECL_F conficts with inner fldType.h declaration.
-#endif
-#ifdef DECL_E
-#error DECL_E conficts with inner fldType.h declaration.
-#endif
-#ifdef BEGIN_E_GEN_T
-#error BEGIN_E_GEN_T conficts with inner fldType.h declaration.
-#endif
-#ifdef END_E_GEN_T
-#error END_E_GEN_T conficts with inner fldType.h declaration.
-#endif
+
+#include <string>
 
 #ifdef ENUMDECL_H_CREATE_VARIANT_T
 #include <boost/rational.hpp>
-#include <string>
 #include <vector>
 #define BEGIN_E_GEN_T(ENUM_NAME) typedef std::variant <
-#define DECL_T(elementName, elementType) elementType, /* elementName */
-#define DECL_E(elementName, elementType) elementType  /* elementName */
+#define DECL_T(elementName, elementType) elementType,
+#define DECL_E(elementName, elementType) elementType
 #define DECL_F(elementName)
-#define END_E_GEN_T(ENUM_NAME) \
-  > variant_t;
+#define END_E_GEN_T(ENUM_NAME) > variant_t;
 #undef ENUMDECL_H_DECLARATION_DONE_FLDT
 #undef ENUMDECL_H_CREATE_VARIANT_T
 #endif
@@ -35,7 +23,6 @@
 #ifdef ENUMDECL_H_CREATE_DEFINITION_FLDT
 // Part responsible for Definition & Initialization of map structure
 #include <map>
-#include <string>
 #define DECL_T(elementName, elementType) {elementName, #elementName},
 #define DECL_E(elementName, elementType) \
   { elementName, #elementName }
@@ -50,11 +37,9 @@
 // again with new set of BEGIN_E_GEN_T/END_E_GEN_T definitions and will goto to
 // BEGIN_E_GEN_T sections
 #undef ENUMDECL_H_DECLARATION_DONE_FLDT
-#undef ENUMDECL_H_CREATE_DEFINITION_FLDT
 #endif
 
 #ifndef ENUMDECL_H_DECLARATION_DONE_FLDT
-#include <string>
 #ifndef BEGIN_E_GEN_T
 #define BEGIN_E_GEN_T(ENUM_NAME) enum ENUM_NAME {
 #define DECL_T(elementName, elementType) elementName,
@@ -91,4 +76,4 @@ END_E_GEN_T(descFldType)
 #undef DECL_F
 #define ENUMDECL_H_DECLARATION_DONE_FLDT
 
-#endif  // ENUMDECL_H_DECLARATION_DONE
+#endif  // ENUMDECL_H_DECLARATION_DONE_FLDT

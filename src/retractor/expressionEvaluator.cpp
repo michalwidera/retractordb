@@ -11,10 +11,6 @@ rdb::variant_t neg(rdb::variant_t a) { return 0; };
 
 rdb::variant_t operator+(const rdb::variant_t& a, const rdb::variant_t& b) {
   rdb::variant_t retVal;
-
-  std::decay_t<decltype(a)> a_;
-  std::decay_t<decltype(b)> b_;
-
   return retVal;
 }
 

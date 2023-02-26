@@ -9,7 +9,7 @@
 #include "QStruct.h"  // token
 
 #define ENUMDECL_H_CREATE_VARIANT_T
-#include "fldType.h"
+#include "fldType.h"  // rdb::variant_t
 
 // typedef std::variant<int, unsigned, std::string> variant_t;
 class expressionEvaluator {

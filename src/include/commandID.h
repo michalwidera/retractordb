@@ -1,23 +1,15 @@
-#include <string>
-
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
 // Checking redefinded namespace sanity
-#ifdef DECL
-#error DECL conficts with inner tokenDef.h declaration.
-#endif
-#ifdef BEGIN_E_GEN
-#error BEGIN_E_GEN conficts with inner tokenDef.h declaration.
-#endif
-#ifdef END_E_GEN
-#error END_E_GEN conficts with inner tokenDef.h declaration.
+#if defined(DECL) || defined(BEGIN_E_GEN) || defined(END_E_GEN)
+#error DECL, BEGIN_E_GEN, END_E_GEN conficts with inner commandID.h declaration.
 #endif
 
 #ifdef ENUMDECL_H_CREATE_DEFINITION_CMDI
-
 // Part responsible for Definition & Initialization of map structure
 #include <map>
+#include <string>
 #define DECL(element) \
   { element, #element }
 #define BEGIN_E_GEN(ENUM_NAME) std::map<ENUM_NAME, std::string> tg_##ENUM_NAME =
@@ -31,9 +23,9 @@
 #endif
 
 #ifndef ENUMDECL_H_DECLARATION_DONE_CMDI
-
 // Part resposible for declaration
 #ifndef BEGIN_E_GEN
+#include <string>
 #define BEGIN_E_GEN(ENUM_NAME) enum ENUM_NAME
 #define DECL(element) element
 #define END_E_GEN(ENUM_NAME) \
