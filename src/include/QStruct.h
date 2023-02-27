@@ -17,11 +17,13 @@
 #include <boost/serialization/vector.hpp>
 #include <variant>
 
-#include "commandID.h"
-//#include "fldType.h"
+#include "cmdID.h"
 #include "rdb/descriptor.h"
 
 typedef boost::rational<int> number;
+
+#define FLDTYPE_H_CREATE_VARIANT_T
+#include "fldType.h"
 
 namespace boost {
 namespace serialization {

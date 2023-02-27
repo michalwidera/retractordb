@@ -8,7 +8,7 @@
 
 #include <string>
 
-#ifdef ENUMDECL_H_CREATE_VARIANT_T
+#ifdef FLDTYPE_H_CREATE_VARIANT_T
 #include <boost/rational.hpp>
 #include <vector>
 #define BEGIN_E_GEN_T(ENUM_NAME) typedef std::variant <
@@ -16,11 +16,11 @@
 #define DECL_E(elementName, elementType) elementType
 #define DECL_F(elementName)
 #define END_E_GEN_T(ENUM_NAME) > ENUM_NAME##VT;
-#undef ENUMDECL_H_DECLARATION_DONE_FLDT
-#undef ENUMDECL_H_CREATE_VARIANT_T
+#undef FLDTYPE_H_DECLARATION_DONE_FLDT
+#undef FLDTYPE_H_CREATE_VARIANT_T
 #endif
 
-#ifdef ENUMDECL_H_CREATE_DEFINITION_FLDT
+#ifdef FLDTYPE_H_CREATE_DEFINITION_FLDT
 // Part responsible for Definition & Initialization of map structure
 #include <map>
 #define DECL_T(elementName, elementType) {elementName, #elementName},
@@ -36,10 +36,10 @@
 // This undef will force to BEGIN_E_GEN_T(...) - END_E_GEN_T(...) will appear once
 // again with new set of BEGIN_E_GEN_T/END_E_GEN_T definitions and will goto to
 // BEGIN_E_GEN_T sections
-#undef ENUMDECL_H_DECLARATION_DONE_FLDT
+#undef FLDTYPE_H_DECLARATION_DONE_FLDT
 #endif
 
-#ifndef ENUMDECL_H_DECLARATION_DONE_FLDT
+#ifndef FLDTYPE_H_DECLARATION_DONE_FLDT
 #ifndef BEGIN_E_GEN_T
 #define BEGIN_E_GEN_T(ENUM_NAME) enum ENUM_NAME {
 #define DECL_T(elementName, elementType) elementName,
@@ -74,6 +74,6 @@ END_E_GEN_T(descFld)
 #undef DECL_T
 #undef DECL_E
 #undef DECL_F
-#define ENUMDECL_H_DECLARATION_DONE_FLDT
+#define FLDTYPE_H_DECLARATION_DONE_FLDT
 
-#endif  // ENUMDECL_H_DECLARATION_DONE_FLDT
+#endif  // FLDTYPE_H_DECLARATION_DONE_FLDT

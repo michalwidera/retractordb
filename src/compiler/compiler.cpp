@@ -12,7 +12,7 @@
 
 #include "QStruct.h"
 #include "SOperations.h"
-#include "commandID.h"
+#include "cmdID.h"
 #include "fldType.h"
 
 using boost::lexical_cast;

@@ -19,10 +19,10 @@ using namespace boost;
 using namespace boost::lambda;
 
 #include "fldType.h"
-#define ENUMDECL_H_CREATE_DEFINITION_FLDT
+#define FLDTYPE_H_CREATE_DEFINITION_FLDT
 #include "fldType.h"
-#define ENUMDECL_H_CREATE_DEFINITION_CMDI
-#include "commandID.h"
+#define CMDID_H_CREATE_DEFINITION_CMDI
+#include "cmdID.h"
 
 extern "C" {
 qTree coreInstance;

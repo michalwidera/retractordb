@@ -3,10 +3,10 @@
 
 // Checking redefinded namespace sanity
 #if defined(DECL) || defined(BEGIN_E_GEN) || defined(END_E_GEN) || defined(LAST)
-#error DECL, LAST, BEGIN_E_GEN, END_E_GEN conficts with inner commandID.h declaration.
+#error DECL, LAST, BEGIN_E_GEN, END_E_GEN conficts with inner cmdID.h declaration.
 #endif
 
-#ifdef ENUMDECL_H_CREATE_DEFINITION_CMDI
+#ifdef CMDID_H_CREATE_DEFINITION_CMDI
 // Part responsible for Definition & Initialization of map structure
 #include <map>
 #include <string>
@@ -21,10 +21,10 @@
 // This undef will force to BEGIN_E_GEN(...) - END_E_GEN(...) will appear once
 // again with new set of BEGIN_E_GEN/END_E_GEN definitions and will goto to
 // BEGIN_E_GEN sections
-#undef ENUMDECL_H_DECLARATION_DONE_CMDI
+#undef CMDID_H_DECLARATION_DONE_CMDI
 #endif
 
-#ifndef ENUMDECL_H_DECLARATION_DONE_CMDI
+#ifndef CMDID_H_DECLARATION_DONE_CMDI
 // Part resposible for declaration
 #ifndef BEGIN_E_GEN
 #include <string>
@@ -41,11 +41,11 @@
 // Clarification: This structure in default mode will create: enum XXX {
 // void_command, void_value, ... } and GetStringXXX function will be decared as
 // existing somewhere. When, before including this header macro
-// ENUMDECL_H_CREATE_DEFINITION will be defined this structure will
+// CMDID_H_CREATE_DEFINITION will be defined this structure will
 // create&initialize following map: std::map<XXX, std::string> = { {
 // VOID_COMMAND, "VOID_COMMAND
 // "} , ...} and function GetStingXXX with body. AT LEAST ONE PLACE WHEN #define
-// ENUMDECL_H_CREATE_DEFINITION with #include this file must appear to generate
+// CMDID_H_CREATE_DEFINITION with #include this file must appear to generate
 // defs Benefit of this solution: One place in code that materialize ENUM in
 // scope of Runtime.
 //
@@ -96,6 +96,6 @@ END_E_GEN(command_id)
 #undef END_E_GEN
 #undef DECL
 #undef LAST
-#define ENUMDECL_H_DECLARATION_DONE_CMDI
+#define CMDID_H_DECLARATION_DONE_CMDI
 
-#endif  // ENUMDECL_H_DECLARATION_DONE_CMDI
+#endif  // CMDID_H_DECLARATION_DONE_CMDI
