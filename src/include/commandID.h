@@ -2,8 +2,7 @@
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
 // Checking redefinded namespace sanity
-#if defined(DECL) || defined(BEGIN_E_GEN) || defined(END_E_GEN) || \
-    defined(LAST)
+#if defined(DECL) || defined(BEGIN_E_GEN) || defined(END_E_GEN) || defined(LAST)
 #error DECL, LAST, BEGIN_E_GEN, END_E_GEN conficts with inner commandID.h declaration.
 #endif
 

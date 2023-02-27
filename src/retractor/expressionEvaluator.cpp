@@ -11,8 +11,26 @@ expressionEvaluator::~expressionEvaluator() {}
 
 rdb::variant_t neg(rdb::variant_t a) { return 0; };
 
-rdb::variant_t operator+(const rdb::variant_t& a, const rdb::variant_t& b) {
+typedef std::pair<rdb::variant_t, rdb::variant_t> pairVar_t;
+pairVar_t normalize(const rdb::variant_t& a, const rdb::variant_t& b) {
+  pairVar_t retVal;
+  if (a.index() > b.index()) {
+    decltype(a) aRet = a;
+    decltype(a) bRet = b;
+    retVal = pairVar_t(aRet, bRet);
+  } else {
+    decltype(b) aRet = a;
+    decltype(b) bRet = b;
+    retVal = pairVar_t(aRet, bRet);
+  }
+  return retVal;
+}
+
+rdb::variant_t operator+(const rdb::variant_t& aParam, const rdb::variant_t& bParam) {
   rdb::variant_t retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
   const int* pval1 = std::get_if<int>(&a);
   const int* pval2 = std::get_if<int>(&b);
 
