@@ -16,7 +16,7 @@ TEST(xExpressionEval, check_compile_result) {
   program.push_back(token(ADD));
 
   expressionEvaluator test;
-  rdb::variant_t result = test.eval(program);
+  rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(std::get<boost::rational<int>>(result) == 3);
 }

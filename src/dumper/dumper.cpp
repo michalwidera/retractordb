@@ -68,7 +68,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
         std::replace(name.begin(), name.end(), '}', '/');
         std::string fieldText(f.getFieldText());
         xout << fieldText;
-        if (bShowFieldTypes) std::cout << "(" << GetStringdescFldType(f.fieldType) << ")";
+        if (bShowFieldTypes) std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
       }
       xout << "}";
     }  // if ( bShowFileds ) - end of fields in stream
@@ -267,7 +267,7 @@ void dumpRawTextFile(bool bShowFieldTypes) {
     for (auto f : q.lSchema) {
       std::cout << "\t";
       std::cout << f.fieldName << ":";
-      if (bShowFieldTypes) std::cout << "(" << GetStringdescFldType(f.fieldType) << ")";
+      if (bShowFieldTypes) std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {

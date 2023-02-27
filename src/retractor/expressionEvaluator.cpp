@@ -9,25 +9,25 @@ expressionEvaluator::expressionEvaluator(/* args */) {}
 
 expressionEvaluator::~expressionEvaluator() {}
 
-rdb::variant_t neg(rdb::variant_t a) { return 0; };
+rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
 
-typedef std::pair<rdb::variant_t, rdb::variant_t> pairVar_t;
-pairVar_t normalize(const rdb::variant_t& a, const rdb::variant_t& b) {
-  pairVar_t retVal;
+typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
+pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
+  pairVar retVal;
   if (a.index() > b.index()) {
     decltype(a) aRet = a;
     decltype(a) bRet = b;
-    retVal = pairVar_t(aRet, bRet);
+    retVal = pairVar(aRet, bRet);
   } else {
     decltype(b) aRet = a;
     decltype(b) bRet = b;
-    retVal = pairVar_t(aRet, bRet);
+    retVal = pairVar(aRet, bRet);
   }
   return retVal;
 }
 
-rdb::variant_t operator+(const rdb::variant_t& aParam, const rdb::variant_t& bParam) {
-  rdb::variant_t retVal{0};
+rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+  rdb::descFldVT retVal{0};
 
   auto [a, b] = normalize(aParam, bParam);
 
@@ -44,9 +44,9 @@ rdb::variant_t operator+(const rdb::variant_t& aParam, const rdb::variant_t& bPa
   return retVal;
 }
 
-rdb::variant_t expressionEvaluator::eval(std::list<token> program) {
-  std::stack<rdb::variant_t> rStack;
-  rdb::variant_t a, b;
+rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
+  std::stack<rdb::descFldVT> rStack;
+  rdb::descFldVT a, b;
 
   for (auto tk : program) {
     switch (tk.getCommandID()) {

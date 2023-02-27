@@ -18,7 +18,7 @@ namespace rdb {
 /**
  * @brief Tuple type - that defines field - Name, Len and Type.
  */
-typedef std::tuple<std::string, int, rdb::descFldType> rfield;
+typedef std::tuple<std::string, int, rdb::descFld> rfield;
 
 /**
  * @brief This enum helps write std::get<rlen>(i) instead std::get<1>(i)
@@ -50,7 +50,7 @@ class Descriptor : public std::vector<rfield> {
    * @param l Field len
    * @param t Field type - STRING (Maybe tables in future)
    */
-  Descriptor(std::string n, int l, rdb::descFldType t);
+  Descriptor(std::string n, int l, rdb::descFld t);
 
   /**
    * @brief Construct a new Descriptor object - only for no objects with len
@@ -58,7 +58,7 @@ class Descriptor : public std::vector<rfield> {
    * @param n Field name
    * @param t Field type - Int, Byte ...
    */
-  Descriptor(std::string n, rdb::descFldType t);
+  Descriptor(std::string n, rdb::descFld t);
 
   /**
    * @brief Construct a new Descriptor object - Default constructor

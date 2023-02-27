@@ -210,7 +210,7 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 field::field() {}
 
-field::field(std::string sFieldName, std::list<token> &lProgram, rdb::descFldType dFieldType, std::string sFieldText)
+field::field(std::string sFieldName, std::list<token> &lProgram, rdb::descFld dFieldType, std::string sFieldText)
     : lProgram(lProgram), sFieldText(sFieldText), fieldType(dFieldType), fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
@@ -384,4 +384,4 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   return std::make_tuple(sArg1, sArg2, cmd);
 }
 
-std::ostream &operator<<(std::ostream &os, rdb::descFldType s) { return os << rdb::GetStringdescFldType(s); }
+std::ostream &operator<<(std::ostream &os, rdb::descFld s) { return os << rdb::GetStringdescFld(s); }

@@ -58,7 +58,7 @@ class ParserListener : public RQLBaseListener {
   std::list<token> program;
 
   /* Type of field */
-  rdb::descFldType fType = rdb::BAD;
+  rdb::descFld fType = rdb::BAD;
 
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSize = 1;

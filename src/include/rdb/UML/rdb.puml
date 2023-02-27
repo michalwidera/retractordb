@@ -83,7 +83,7 @@ class storageAccessor {
     {method} getRecordsCount
 }
 
-enum rdb::descFldType {
+enum rdb::descFld {
     STRING
     BYTEARRAY
     UINT
@@ -104,7 +104,7 @@ textSrouceAccessor --* storageAccessor
 Descriptor --* storageAccessor
 
 
-Descriptor --- rdb::descFldType
+Descriptor --- rdb::descFld
 
 payload --* storageAccessor
 

@@ -15,7 +15,7 @@
 #define DECL_T(elementName, elementType) elementType,
 #define DECL_E(elementName, elementType) elementType
 #define DECL_F(elementName)
-#define END_E_GEN_T(ENUM_NAME) > variant_t;
+#define END_E_GEN_T(ENUM_NAME) > ENUM_NAME##VT;
 #undef ENUMDECL_H_DECLARATION_DONE_FLDT
 #undef ENUMDECL_H_CREATE_VARIANT_T
 #endif
@@ -53,7 +53,7 @@
 
 // This declaration goes into ::rdb namespace
 namespace rdb {
-BEGIN_E_GEN_T(descFldType)
+BEGIN_E_GEN_T(descFld)
 DECL_T(BAD, std::monostate)
 DECL_T(BYTE, uint8_t)
 DECL_T(INTEGER, int)
@@ -66,7 +66,7 @@ DECL_T(INTARRAY, std::vector<int>)
 DECL_E(STRING, std::string)
 DECL_F(TYPE)
 DECL_F(REF)
-END_E_GEN_T(descFldType)
+END_E_GEN_T(descFld)
 }  // namespace rdb
 
 #undef BEGIN_E_GEN_T

@@ -9,9 +9,9 @@
 #include "QStruct.h"  // token
 
 #define ENUMDECL_H_CREATE_VARIANT_T
-#include "fldType.h"  // rdb::variant_t
+#include "fldType.h"  // rdb::descFldVT
 
-// typedef std::variant<int, unsigned, std::string> variant_t;
+// typedef std::variant<int, unsigned, std::string> descFldVT;
 class expressionEvaluator {
  private:
   /* data */
@@ -19,5 +19,5 @@ class expressionEvaluator {
   expressionEvaluator(/* args */);
   ~expressionEvaluator();
 
-  rdb::variant_t eval(std::list<token> program);
+  rdb::descFldVT eval(std::list<token> program);
 };
