@@ -1,0 +1,4 @@
+DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'
+DECLARE c INTEGER,d INTEGER STREAM core1, 0.5 FILE '/dev/urandom'
+SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
+SELECT str1[0]+5 STREAM str2 FROM core0

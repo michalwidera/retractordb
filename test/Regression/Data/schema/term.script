@@ -1,0 +1,15 @@
+mono
+open core0
+desc
+size
+open core1
+desc
+size
+open str1
+desc
+size
+open str2
+desc
+size
+rem dropfile { core0.desc core1.desc str1 str1.desc str2 str2.desc }
+quit
