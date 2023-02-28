@@ -1,36 +1,23 @@
 @startuml
 
-class dataSet {
-    {field} data
-    {field} recordSize
-    {field} count
-
-    {method} streamStoredSize
-    {method} GetLen
-    {method} DefBlock
-    {method} PutBlock
-    {method} GetBlock
-}
-
 class Descriptor {
-    {field} fieldNames
-
-    {method} Append
+    {method} append
     {method} operator|
     {method} operator=
-    {method} GetSize
-    {method} Position
-    {method} Len
-    {method} Offset
-    {method} Type
-    {method} ToString
-    {method} Cast
+    {method} getSizeInBytes
+    {method} position
+    {method} len
+    {method} offset
+    {method} type
+    {method} toString
+    {method} cast
     {method} operator<<
     {method} operator>>
 }
 
 class genericBinaryFileAccessor {
     {field} fileNameStr
+    {field} fd
 }
 
 
@@ -43,33 +30,60 @@ class posixPrmBinaryFileAccessor {
     {field} fd
 }
 
-
-interface FileAccessorInterface {
-    {method} Read
-    {method} Write
-    {method} FileName
+class binaryDeviceAccessor {
+    {field} fileNameStr
+    {field} fd
 }
 
-class payLoadAccessor {
-    {field} descriptor
-    {field} ptr
-    {field} hexFormat
+class textSrouceAccessor {
+    {field} fileNameStr
+    {field} fd
+    {field} fctrl
+}
 
+FileAccessorInterface ()-- binaryDeviceAccessor
+FileAccessorInterface ()-- posixPrmBinaryFileAccessor
+FileAccessorInterface ()-- posixBinaryFileAccessor
+FileAccessorInterface ()-- genericBinaryFileAccessor
+FileAccessorInterface ()-- textSrouceAccessor
+
+interface FileAccessorInterface {
+    {method} read
+    {method} write
+    {method} fileName
+    {method} fctrl
+}
+
+class payload {
+    {field} descriptor
+
+    {method} getDescriptor
+    {method} get
+    {method} setItem
+    {method} getItem
+    {method} setHex
     {method} operator>>
     {method} operator<<
 }
 
-class DataStorageAccessor {
-    {field} pAccessor
+class storageAccessor {
+    {field} accessor
     {field} descriptor
     {field} reverse
     {field} recordsCount
+    {field} dataFileStatus
+    {field} filename
 
-    {method} Get
-    {method} Put
+    {method} attachDescriptor
+    {method} read
+    {method} write
+    {method} getDescriptor
+    {method} setReverse
+    {method} setRemoveOnExit
+    {method} getRecordsCount
 }
 
-enum rdb::eType {
+enum rdb::descFld {
     STRING
     BYTEARRAY
     UINT
@@ -77,20 +91,21 @@ enum rdb::eType {
     INTEGER
     FLOAT
     DOUBLE
+    REF
+    TYPE
 }
 
-FileAccessorInterface --> genericBinaryFileAccessor
-FileAccessorInterface --> posixBinaryFileAccessor
-FileAccessorInterface --> posixPrmBinaryFileAccessor
+genericBinaryFileAccessor --* storageAccessor
+posixBinaryFileAccessor --* storageAccessor
+posixPrmBinaryFileAccessor --* storageAccessor
+binaryDeviceAccessor --* storageAccessor
+textSrouceAccessor --* storageAccessor
 
-genericBinaryFileAccessor --* DataStorageAccessor
-posixBinaryFileAccessor --* DataStorageAccessor
-posixPrmBinaryFileAccessor --* DataStorageAccessor
+Descriptor --* storageAccessor
 
-Descriptor --* DataStorageAccessor
 
-Descriptor --- rdb::eType
+Descriptor --- rdb::descFld
 
-payLoadAccessor --* Descriptor
+payload --* storageAccessor
 
 @enduml

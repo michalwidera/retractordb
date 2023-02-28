@@ -1,21 +1,28 @@
 #include "QStruct.h"
 
+#include <spdlog/spdlog.h>
+
 #include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
 #include <boost/function.hpp>        // IWYU pragma: keep
 #include <boost/lambda/bind.hpp>     // IWYU pragma: keep
 #include <boost/lambda/lambda.hpp>   // IWYU pragma: keep
 #include <cassert>                   // for assert
+#include <cctype>                    // tolower
 #include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
 #include <iostream>                  // for cerr
 #include <sstream>                   // for operator<<, basic_ostream, endl
 #include <stack>                     // for stack
 #include <stdexcept>                 // for logic_error
+#include <type_traits>
 
 using namespace boost;
 using namespace boost::lambda;
 
-#define ENUMDECL_H_CREATE_DEFINITION
-#include "enumDecl.h"
+#include "fldType.h"
+#define FLDTYPE_H_CREATE_DEFINITION_FLDT
+#include "fldType.h"
+#define CMDID_H_CREATE_DEFINITION_CMDI
+#include "cmdID.h"
 
 extern "C" {
 qTree coreInstance;
@@ -27,9 +34,7 @@ qTree coreInstance;
 //        ) ;
 //}
 
-bool operator<(const query &lhs, const query &rhs) {
-  return lhs.rInterval < rhs.rInterval;
-}
+bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
 //{
 //  //
@@ -61,12 +66,11 @@ bool operator<(const query &lhs, const query &rhs) {
 //  }
 //}
 
-command_id token::getTokenCommand() { return command; }
+command_id token::getCommandID() { return command; }
 
-std::string token::getStrTokenName() { return GetStringcommand_id(command); }
+std::string token::getStrCommandID() { return GetStringcommand_id(command); }
 
-boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
-                                 int ttl /*=11*/) {
+boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/, int ttl /*=11*/) {
   std::stack<int> st;
   double startx(inValue), diff, err1, err2;
   unsigned int val;
@@ -91,14 +95,14 @@ boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
     st.pop();
     result1 = result2;
   }
-  err1 = abs(rational_cast<double>(result1) - inValue);
-  err2 = abs(rational_cast<double>(result2) - inValue);
+  err1 = std::abs(rational_cast<double>(result1) - inValue);
+  err2 = std::abs(rational_cast<double>(result2) - inValue);
   return err1 > err2 ? result2 : result1;
 }
 
-field &query::getField(std::string sField) {
+field &query::getField(const std::string &sField) {
   for (auto &f : lSchema) {
-    if (std::get<rdb::rname>(f.fieldDesc) == sField) return f;
+    if (f.fieldName == sField) return f;
   }
   throw std::logic_error("No such field in schema");
   return *new field();
@@ -113,7 +117,7 @@ void query::reset() {
   return;
 }
 
-bool isThere(std::vector<query> v, std::string query_name) {
+bool isThere(std::vector<query> v, const std::string &query_name) {
   for (auto &q : v) {
     if (q.id == query_name) return true;
   }
@@ -132,14 +136,14 @@ void qTree::tsort() {
   // this function is broken - this watchdog prevents hang
   int watchdog = 100;
   while (!v.empty())
-    for (vector<query>::iterator it = v.begin(); it != v.end(); ++it) {
+    for (auto it = v.begin(); it != v.end(); ++it) {
       watchdog--;
       if (watchdog == 0) {
         std::cerr << "Tsort failure." << std::endl;
         abort();
       }
       if (v.empty()) break;
-      std::list<std::string> ls = (*it).getDepStreamNameList();
+      std::vector<std::string> ls = (*it).getDepStreamName();
       bool fullDependent(true);
       for (auto s : ls) {
         if (!isThere(des, s)) fullDependent = false;
@@ -154,25 +158,20 @@ void qTree::tsort() {
   for (auto &q : des) push_back(q);
 }
 
-boost::rational<int> qTree::getDelta(std::string query_name) {
-  return getQuery(query_name).rInterval;
-}
+boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }
 
-query &getQuery(std::string query_name) {
+query &getQuery(const std::string &query_name) {
   assert(query_name != "");
   for (auto &q : coreInstance) {
     if (q.id == query_name) return q;
   }
-  std::cerr << "Missing:" << std::endl;
-  std::cerr << " " << query_name << std::endl;
-  std::cerr << "Avaiable:" << std::endl;
-  for (auto &q : coreInstance) std::cerr << " " << q.id << std::endl;
+  SPDLOG_ERROR("Missing - {}", query_name);
   throw std::logic_error("No such stream in set - getQuery");
   static query void_query;
   return (void_query);  // proforma
 }
 
-int getSeqNr(std::string query_name) {
+int getSeqNr(const std::string &query_name) {
   int cnt(0);
   for (auto &q : coreInstance) {
     if (query_name == q.id)
@@ -180,38 +179,28 @@ int getSeqNr(std::string query_name) {
     else
       cnt++;
   }
+  SPDLOG_ERROR("No such stream in set - {}", query_name);
   throw std::logic_error("No such stream in set - getSeqNr");
   return -1;  // INVALID QUERY_NR
 }
 
-bool isDeclared(std::string query_name) {
+bool isDeclared(const std::string &query_name) {
   for (auto &q : coreInstance) {
     if (query_name == q.id) return q.isDeclaration();
   }
   return false;
 }
 
-bool isExist(std::string query_name) {
+bool isExist(const std::string &query_name) {
   for (auto &q : coreInstance) {
     if (query_name == q.id) return true;
   }
   return false;
 }
 
-boost::rational<int> token::getCRValue() { return crValue; }
+boost::rational<int> token::get() { return numericValue; }
 
-std::string token::getValue() {
-  if (sValue_.empty()) {
-    std::stringstream ss;
-    ss << crValue.numerator();
-    if (crValue.denominator() != 1) {
-      ss << "_";
-      ss << crValue.denominator();
-    }
-    return std::string(ss.str());
-  } else
-    return sValue_;
-}
+std::string token::getStr() { return textValue; }
 
 bool query::isDeclaration() { return lProgram.empty(); }
 
@@ -221,60 +210,67 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 field::field() {}
 
-field::field(std::string sFieldName, std::list<token> &lProgram,
-             rdb::eType dFieldType, std::string sFieldText)
-    : lProgram(lProgram), sFieldText(sFieldText) {
-  std::get<rdb::rtype>(fieldDesc) = dFieldType;
-  std::get<rdb::rname>(fieldDesc) = sFieldName;
-}
+field::field(std::string sFieldName, std::list<token> &lProgram, rdb::descFld dFieldType, std::string sFieldText)
+    : lProgram(lProgram), sFieldText(sFieldText), fieldType(dFieldType), fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
 
 token field::getFirstFieldToken() {
-  assert(lProgram.size() >
-         0);  // If this fails that means in field no program (decl!)
+  assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
   return *lProgram.begin();
 }
 
 /** Construktor set */
+template <typename T>
+token::token(command_id id, const std::string &sValue, T value) : command(id), textValue(sValue) {
+  if constexpr (std::is_same_v<T, number>)
+    numericValue = value;
+  else if constexpr (std::is_same_v<T, int>)
+    numericValue = boost::rational<int>(value, 1);
+  else if constexpr (std::is_same_v<T, double>)
+    numericValue = Rationalize(value);
+  else if constexpr (std::is_same_v<T, float>)
+    numericValue = Rationalize(value);
+  else
+    numericValue = boost::rational<int>(-999, 1);  // Unidentified value
+  if (sValue == "") {
+    std::stringstream ss;
+    ss << numericValue.numerator();
+    if (numericValue.denominator() != 1) {
+      ss << "_";
+      ss << numericValue.denominator();
+    }
+    textValue = std::string(ss.str());
+  }
+}
 
-token::token(command_id id, std::string sValue)
-    : command(id), crValue(0), sValue_(sValue) {}
-
-token::token(command_id id, boost::rational<int> crValue, std::string sValue)
-    : command(id), crValue(crValue), sValue_(sValue) {}
-
-token::token(command_id id, double dValue)
-    : command(id), crValue(Rationalize(dValue)), sValue_("") {}
+template token::token(command_id id, const std::string &sValue, number);
+template token::token(command_id id, const std::string &sValue, int);
+template token::token(command_id id, const std::string &sValue, double);
+template token::token(command_id id, const std::string &sValue, float);
 
 /** Construktor set */
 
-query::query(boost::rational<int> rInterval, std::string id)
-    : rInterval(rInterval), id(id) {}
+query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}
 
 query::query() {}
-
-std::list<std::string> query::getFieldNamesList() {
-  std::list<std::string> schema;
-  for (auto &f : lSchema) schema.push_back(std::get<rdb::rname>(f.fieldDesc));
-  return schema;
-}
 
 int query::getFieldIndex(field f_arg) {
   int idx(0);
   for (auto f : lSchema) {
-    if (std::get<rdb::rname>(f.fieldDesc) ==
-        std::get<rdb::rname>(f_arg.fieldDesc))  // Todo
+    if (f.fieldName == f_arg.fieldName)  // Todo
       return idx;
     idx++;
   }
+  SPDLOG_ERROR("Field not found in query - {}", f_arg.fieldName);
+  throw std::logic_error("Field not found in query");
   return -1;  // not found
 }
 
 bool query::isReductionRequired() {
   int streamOperatorCount(0);
   for (auto &t : lProgram) {
-    switch (t.getTokenCommand()) {
+    switch (t.getCommandID()) {
       case STREAM_HASH:
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
@@ -289,23 +285,103 @@ bool query::isReductionRequired() {
   return streamOperatorCount > 1;
 }
 
-std::list<std::string> query::getDepStreamNameList(int reqDep) {
-  int iDep(0);
-  std::list<std::string> lRetVal;
+bool query::is(command_id command) {
+  for (auto &t : lProgram) {
+    if (t.getCommandID() == command) return true;
+  }
+  return false;
+}
+
+std::vector<std::string> query::getDepStreamName(int reqDep) {
+  std::vector<std::string> lRetVal;
   for (auto &t : lProgram) {
     if (reqDep == 0) {
       // defult behaviour
-      if (t.getTokenCommand() == PUSH_STREAM) lRetVal.push_back(t.getValue());
-    } else {
-      if (reqDep == iDep) {
-        if (t.getTokenCommand() == PUSH_STREAM) lRetVal.push_back(t.getValue());
-      }
+      if (t.getCommandID() == PUSH_STREAM) lRetVal.push_back(t.getStr());
+    } else
       ++reqDep;
-    }
   }
   return lRetVal;
 }
 
-std::ostream &operator<<(std::ostream &os, rdb::eType s) {
-  return os << rdb::GetStringeType(s);
+rdb::Descriptor query::descriptorExpression() {
+  rdb::Descriptor retVal{};
+  for (auto &f : lSchema) {
+    bool isTableType = (f.fieldType == rdb::STRING) ||     //
+                       (f.fieldType == rdb::BYTEARRAY) ||  //
+                       (f.fieldType == rdb::INTARRAY);
+    if (isTableType)
+      assert(false && "TODO: Add support in QStruct");  // retVal | rdb::Descriptor(f.fieldName, f.XXXX , f.fieldType);
+    else
+      retVal | rdb::Descriptor(f.fieldName, f.fieldType);
+  }
+  return retVal;
 }
+
+rdb::Descriptor query::descriptorFrom() {
+  SPDLOG_INFO("call query::descriptorFrom()");
+  rdb::Descriptor retVal{};
+  if (isDeclaration()) {
+    retVal | descriptorExpression();
+    retVal | rdb::Descriptor(filename, rdb::REF);
+
+    auto filenameShdw{filename};
+    std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
+    if (filenameShdw.find(".txt") != std::string::npos)
+      retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
+    else
+      retVal | rdb::Descriptor("DEVICE", rdb::TYPE);
+    return retVal;
+  }
+  auto [arg1, arg2, cmd]{GetArgs(lProgram)};
+  auto i{0};
+  switch (cmd.getCommandID()) {
+    case STREAM_HASH:
+    case STREAM_DEHASH_DIV:
+    case STREAM_DEHASH_MOD:
+    case STREAM_SUBSTRACT:
+    case STREAM_TIMEMOVE: {
+      for (auto &f : getQuery(arg1).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+    } break;
+    case PUSH_STREAM: {
+      for (auto &f : getQuery(cmd.getStr()).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+    } break;
+    case STREAM_ADD: {
+      for (auto &f : getQuery(arg1).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+      for (auto &f : getQuery(arg2).lSchema) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+      };
+    } break;
+    case STREAM_AGSE: {
+      int windowSize = abs(rational_cast<int>(cmd.get()));
+      auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
+      for (int i = 0; i < windowSize; i++) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);
+      }
+    } break;
+    default:
+      SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr());
+      assert(false);
+  }
+  return retVal;
+}
+
+std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
+  auto eIt = prog.begin();
+  std::string sArg1;
+  std::string sArg2;
+  assert(prog.size() < 4);
+  if (prog.size() == 1) sArg1 = (*eIt).getStr();   // 1
+  if (prog.size() > 1) sArg1 = (*eIt++).getStr();  // 2,3
+  if (prog.size() > 2) sArg2 = (*eIt++).getStr();  // 3
+  token cmd = (*eIt++);
+  return std::make_tuple(sArg1, sArg2, cmd);
+}
+
+std::ostream &operator<<(std::ostream &os, rdb::descFld s) { return os << rdb::GetStringdescFld(s); }

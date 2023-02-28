@@ -1,3 +1,6 @@
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
@@ -22,7 +25,7 @@ extern std::string storeParseResult(std::string sOutputFile);
 
 extern qTree coreInstance;
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   // Clarification: When gcc has been upgraded to 9.x version some tests fails.
   // Bug appear when data are passing to program via script .sh
   // additional 13 (\r) character was append - this code normalize argv list.
@@ -34,29 +37,31 @@ int main(int argc, char *argv[]) {
     if (len > 0)
       if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
   }
+  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
+  spdlog::set_default_logger(filelog);
+  spdlog::set_pattern(common_log_pattern);
+  spdlog::flush_on(spdlog::level::trace);
+  // SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   try {
     std::unique_ptr<std::ostream> p_ofs;
     namespace po = boost::program_options;
     std::string sOutputFile;
     std::string sInputFile;
     po::options_description desc("Avaiable options");
-    desc.add_options()("help,h", "Show program options")(
-        "queryfile,q", po::value<std::string>(&sInputFile), "query set file")(
-        "outfile,o",
-        po::value<std::string>(&sOutputFile)->default_value("query.qry"),
-        "output file")("dumpcross,d",
-                       "dump diagnostic cross compilation forms");
-    po::positional_options_description
-        p;  // Assume that infile is the first option
+    desc.add_options()                                                                                  //
+        ("help,h", "Show program options")                                                              //
+        ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                          //
+        ("outfile,o", po::value<std::string>(&sOutputFile)->default_value("query.qry"), "output file")  //
+        ("dumpcross,d", "dump diagnostic cross compilation forms");
+    po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
     po::variables_map vm;
-    po::store(
-        po::command_line_parser(argc, argv).options(desc).positional(p).run(),
-        vm);
+    po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
     if (vm.count("help")) {
       std::cout << desc;
-      std::cout << CONFIG_LINE;
+      std::cout << config_line << std::endl;
+      std::cout << warranty << std::endl;
       return system::errc::success;
     }
     if (vm.count("queryfile") == 0) {
@@ -66,16 +71,6 @@ int main(int argc, char *argv[]) {
     }
     std::string sQueryFile = vm["queryfile"].as<std::string>();
     std::string sOutFile = vm["outfile"].as<std::string>();
-    std::string sSubsetFile = "query.sub";
-    // override defaults if filename is matching regexp
-    {
-      boost::regex filenameRe("(\\w*).(\\w*)");  // filename.extension
-      boost::cmatch what;
-      if (regex_match(sQueryFile.c_str(), what, filenameRe)) {
-        std::string filenameNoExt = std::string(what[1]);
-        sSubsetFile = filenameNoExt + ".sub";
-      }
-    }
     std::cout << "Input file:" << sQueryFile << std::endl;
     std::cout << "Compile result:" << parser(sQueryFile) << std::endl;
     //
@@ -84,15 +79,14 @@ int main(int argc, char *argv[]) {
     std::istringstream iss(dumpInstance(""), std::ios::binary);
     boost::archive::text_iarchive ia(iss);
     ia >> coreInstance;
-    if (coreInstance.size() == 0)
-      throw std::out_of_range("No queries to process found");
+    if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
     if (vm.count("dumpcross")) {
       std::string sOutFileLog1 = vm["outfile"].as<std::string>() + ".lg1";
       dumpInstance(sOutFileLog1);
     }
-    int dAfterParserSize((int)coreInstance.size());
     std::string response;
     response = simplifyLProgram();
+    assert(response == "OK");
     if (vm.count("dumpcross")) {
       std::string sOutFileLog2 = vm["outfile"].as<std::string>() + ".lg2";
       dumpInstance(sOutFileLog2);
@@ -109,9 +103,8 @@ int main(int argc, char *argv[]) {
     assert(response == "OK");
     response = replicateIDX();
     assert(response == "OK");
-    int dAfterCompilingSize((int)coreInstance.size());
     dumpInstance(sOutFile);
-  } catch (std::exception &e) {
+  } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
     // cerr << boost::stacktrace::stacktrace() << endl ;
     return system::errc::interrupted;

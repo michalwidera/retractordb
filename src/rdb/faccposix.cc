@@ -15,21 +15,18 @@ constexpr const int kOpenBaseFlags = 0;
 
 namespace rdb {
 template <class T>
-posixBinaryFileAccessor<T>::posixBinaryFileAccessor(std::string fileName)
-    : fileNameStr(fileName){};
+posixBinaryFileAccessor<T>::posixBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {}
 
 template <class T>
-std::string posixBinaryFileAccessor<T>::FileName() {
+std::string posixBinaryFileAccessor<T>::fileName() {
   return fileNameStr;
 }
 
 template <class T>
-int posixBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
-                                      const size_t position) {
+int posixBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   int fd;
   if (position == std::numeric_limits<size_t>::max()) {
-    fd = ::open(fileNameStr.c_str(),
-                O_APPEND | O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
+    fd = ::open(fileNameStr.c_str(), O_APPEND | O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
     assert(fd >= 0);
     if (fd < 0) {
       return errno;  // Error status
@@ -63,11 +60,10 @@ int posixBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
   }
   ::close(fd);
   return EXIT_SUCCESS;
-};
+}
 
 template <class T>
-int posixBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
-                                     const size_t position) {
+int posixBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   int fd = -1;
   fd = ::open(fileNameStr.c_str(), O_RDONLY | kOpenBaseFlags);
   assert(fd >= 0);
@@ -77,7 +73,7 @@ int posixBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
   ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
   ::close(fd);
   return EXIT_SUCCESS;
-};
+}
 
 template class posixBinaryFileAccessor<std::byte>;
 template class posixBinaryFileAccessor<char>;

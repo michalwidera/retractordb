@@ -18,13 +18,11 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot(0) {
         // but does not exist natural number that 1/2 * NATURAL = 3/4
         // other words: removing all values that have
         // second value muliplicated by natural number
-        if (boost::rational<int>(rational_cast<int>(x / val), 1) == (x / val))
-          isDivided = true;
-        if (boost::rational<int>(rational_cast<int>(val / x), 1) == (val / x))
-          isDivided = true;
+        if (boost::rational<int>(rational_cast<int>(x / val), 1) == (x / val)) isDivided = true;
+        if (boost::rational<int>(rational_cast<int>(val / x), 1) == (val / x)) isDivided = true;
       }
     }
-    if (isDivided == false) {
+    if (!isDivided) {
       // If number is not divided we add sr set
       // ONLY HERE IS SR.INSERT
       // Here we insert only theses deltas to se set which are not delta = delta
@@ -52,8 +50,7 @@ boost::rational<int> &TimeLine::getNextTimeSlot() {
   // Find lowest time slot in set
   // time slots are valued delta * counter
   for (auto val : sr) {
-    if (ctSlot > val * boost::rational<int>(counter[val]))
-      ctSlot = val * boost::rational<int>(counter[val]);
+    if (ctSlot > val * boost::rational<int>(counter[val])) ctSlot = val * boost::rational<int>(counter[val]);
   }
   // Increase (+1) lowest time slots
   for (auto val : sr) {

@@ -1,7 +1,6 @@
 RetractorDB
 -----------------------------------------------------------------------
 ![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb?ref=badge_shield)
 
 These are sources of RetractorDB Time Series Database System prototype. This is work in progress.
 
@@ -21,21 +20,26 @@ Commands
 How to install
 -----------------------------------------------------------------------
 
-NOTE: If you are using conan fist time plese create default conan profile
-```
-conan profile new default --detect
-```
-
 ```
 sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
 pip install conan
+conan profile detect
 git clone https://github.com/michalwidera/retractordb.git
-cd build
-conan install ..
-conan build ..
+conan install .
+conan build .
+cd build/Release
 make test
 ```
 
+Work with antl4 and .g4 files requires java - install it with:
+```
+sudo apt install default-jre
+```
+
+If you want see graphic response, use gnuplot - install it with:
+```
+sudo apt install gnuplot
+```
 
 After installation _xretractor_, _xqry_ ... etc will be installed in ~/.local/bin on path.
 Please check proper installation by typing in command prompt - for instance: _xqry -h_
@@ -79,9 +83,6 @@ from core1+core0
 Author
 -----------------------------------------------------------------------
 
-Project created in 2003-2022 by Michal Widera
+Project created in 2003-2023 by Michal Widera
 (michal@widera.com.pl)
 
-
-## License
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmichalwidera%2Fretractordb?ref=badge_large)

@@ -6,9 +6,9 @@
 #include <locale>
 #include <string>
 
-#include "rdb/dsacc.h"
 #include "rdb/fainterface.h"
-#include "rdb/payloadacc.h"
+#include "rdb/payload.h"
+#include "rdb/storageacc.h"
 
 const uint AREA_SIZE = 10;
 
@@ -19,16 +19,17 @@ bool test_1() {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    binaryAccessor1.Write(xData, AREA_SIZE);
+    binaryAccessor1.write(xData, AREA_SIZE);
 
     if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
 
     T yData[AREA_SIZE];
-    binaryAccessor1.Read(yData, AREA_SIZE, 0);
+    binaryAccessor1.read(yData, AREA_SIZE, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
-  auto statusRemove1 = remove(binaryAccessor1.FileName().c_str());
+  auto statusRemove1 = remove(binaryAccessor1.fileName().c_str());
+  if (statusRemove1 != 0) return false;
 
   return true;
 }
@@ -40,17 +41,18 @@ bool test_2() {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    dataStore.Write(xData, AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);  // Add one extra record
+    dataStore.write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);  // Add one extra record
 
     if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
 
     T yData[AREA_SIZE];
-    dataStore.Read(yData, AREA_SIZE, 0);
+    dataStore.read(yData, AREA_SIZE, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
-  auto statusRemove1 = remove(dataStore.FileName().c_str());
+  auto statusRemove1 = remove(dataStore.fileName().c_str());
+  if (statusRemove1 != 0) return false;
 
   return true;
 }
@@ -62,48 +64,46 @@ bool test_3() {
     T xData[AREA_SIZE];
 
     std::memcpy(xData, "test aaaa", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     std::memcpy(xData, "test bbbb", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     std::memcpy(xData, "test cccc", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     std::memcpy(xData, "test xxxx", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE, AREA_SIZE);  // <- Update
+    dataStore.write(xData, AREA_SIZE, AREA_SIZE);  // <- Update
 
     std::memcpy(xData, "test dddd", AREA_SIZE);
-    dataStore.Write(xData, AREA_SIZE);
+    dataStore.write(xData, AREA_SIZE);
 
     T yData[AREA_SIZE];
 
-    dataStore.Read(yData, AREA_SIZE, 0);
+    dataStore.read(yData, AREA_SIZE, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test aaaa") != 0) return false;
 
-    dataStore.Read(yData, AREA_SIZE, AREA_SIZE);
+    dataStore.read(yData, AREA_SIZE, AREA_SIZE);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test xxxx") != 0) return false;
   }
-  auto statusRemove1 = remove(dataStore.FileName().c_str());
+  auto statusRemove1 = remove(dataStore.fileName().c_str());
+  if (statusRemove1 != 0) return false;
 
   return true;
 }
 
 bool test_descriptor() {
-  rdb::Descriptor data1{rdb::field("Name3", 10, rdb::STRING),
-                        rdb::field("Name4", 10, rdb::STRING)};
+  rdb::Descriptor data1{rdb::rfield("Name3", 10, rdb::STRING), rdb::rfield("Name4", 10, rdb::STRING)};
 
-  data1.Append({rdb::field("Name5z", 10, rdb::STRING)});
-  data1.Append({rdb::field("Name6z", 10, rdb::STRING)});
+  data1.append({rdb::rfield("Name5z", 10, rdb::STRING)});
+  data1.append({rdb::rfield("Name6z", 10, rdb::STRING)});
 
-  data1.push_back(rdb::field("Name", 10, rdb::STRING));
-  data1.push_back(rdb::field("TLen", sizeof(uint), rdb::UINT));
+  data1.push_back(rdb::rfield("Name", 10, rdb::STRING));
+  data1.push_back(rdb::rfield("TLen", sizeof(uint), rdb::UINT));
 
-  data1 | rdb::Descriptor("Name2", 10, rdb::STRING) |
-      rdb::Descriptor("Control", rdb::BYTE) |
-      rdb::Descriptor("Len3", rdb::UINT);
+  data1 | rdb::Descriptor("Name2", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Len3", rdb::UINT);
   {
     std::stringstream coutstring;
     coutstring << data1;
@@ -114,9 +114,8 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  rdb::Descriptor data2 = rdb::Descriptor("Name", 10, rdb::STRING) |
-                          rdb::Descriptor("Len3", rdb::UINT) |
-                          rdb::Descriptor("Control", rdb::BYTE);
+  rdb::Descriptor data2 =
+      rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Len3", rdb::UINT) | rdb::Descriptor("Control", rdb::BYTE);
   {
     std::stringstream coutstring;
     char test[] = "{\tSTRING Name[10]\n\tUINT Len3\n\tBYTE Control\n}";
@@ -124,10 +123,10 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  if (data2.Position("Control") != 2) return false;
-  if (data2.Len("Control") != 1) return false;
-  if (strcmp(data2.Type("Control").c_str(), "BYTE") != 0) return false;
-  if (data2.Offset("Control") != 14) return false;
+  if (data2.position("Control") != 2) return false;
+  if (data2.len("Control") != 1) return false;
+  if (strcmp(data2.type("Control").c_str(), "BYTE") != 0) return false;
+  if (data2.offset("Control") != 14) return false;
 
   return true;
 }
@@ -166,7 +165,11 @@ bool test_descriptor_read() {
   return true;
 }
 
-bool test_storage() {
+TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
+
+TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
+
+TEST(xrdb, test_storage) {
   // This structure is tricky
   // If not aligned - size is 15
   // If aligned - size is 16
@@ -183,72 +186,78 @@ bool test_storage() {
 
   static_assert(sizeof(dataPayload) == 15);
 
-  auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) |
-                      rdb::Descriptor("Control", rdb::BYTE) |
+  auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) |  //
+                      rdb::Descriptor("Control", rdb::BYTE) |     //
                       rdb::Descriptor("TLen", rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
-  if (dataDescriptor.GetSize() != sizeof(dataPayload)) return false;
+  ASSERT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
   dataPayload payload1;
 
-  rdb::DataStorageAccessor dAcc2(dataDescriptor, "datafile-fstream2");
+  rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2");
+  dAcc2.attachDescriptor(&dataDescriptor);
+  dAcc2.attachStorage();
+  dAcc2.attachPayloadPtr(payload1.ptr);
+
+  dAcc2.setRemoveOnExit(true);
 
   std::memcpy(payload1.Name, "test data", AREA_SIZE);
   payload1.TLen = 0x66;
   payload1.Control = 0x22;
 
-  if (payload1.TLen != dAcc2.getDescriptor().Cast<int>("TLen", payload1.ptr))
-    return false;
+  ASSERT_TRUE(payload1.TLen == dAcc2.getDescriptor().cast<int>("TLen", payload1.ptr));
 
-  dAcc2.Put(payload1.ptr);
-  dAcc2.Put(payload1.ptr);
-  dAcc2.Put(payload1.ptr);
+  dAcc2.write();
+  dAcc2.write();
+  dAcc2.write();
 
   dataPayload payload2;
+  dAcc2.attachPayloadPtr(payload2.ptr);
+
   std::memcpy(payload2.Name, "xxxx xxxx", AREA_SIZE);
   payload2.TLen = 0x67;
   payload2.Control = 0x33;
 
-  dAcc2.Put(payload2.ptr, 1);
+  dAcc2.write(1);
 
-  dataPayload payload3;
-  dAcc2.Get(payload3.ptr, 1);
+  dAcc2.read(1);
 
   {
     std::stringstream coutstring;
-    coutstring << dAcc2.getDescriptor().ToString("Name", payload3.ptr);
-    if (strcmp(coutstring.str().c_str(), "xxxx xxxx") != 0) return false;
+    coutstring << dAcc2.getDescriptor().toString("Name", payload2.ptr);
+    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "xxxx xxxx") == 0);
+  }
+  {
+    std::stringstream coutstring;
+    coutstring << std::hex;
+    coutstring << dAcc2.getDescriptor().cast<int>("TLen", payload2.ptr);
+    coutstring << std::dec;
+    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "67") == 0);
   }
 
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << dAcc2.getDescriptor().Cast<int>("TLen", payload3.ptr);
+    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", payload2.ptr);
     coutstring << std::dec;
-    if (strcmp(coutstring.str().c_str(), "67") != 0) return false;
+    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "33") == 0);
   }
-
-  {
-    std::stringstream coutstring;
-    coutstring << std::hex;
-    coutstring << (uint)dAcc2.getDescriptor().Cast<uint8_t>("Control",
-                                                            payload3.ptr);
-    coutstring << std::dec;
-    if (strcmp(coutstring.str().c_str(), "33") != 0) return false;
-  }
-
-  auto statusRemove1 = remove("datafile-fstream2");
-  auto statusRemove2 = remove("datafile-fstream2.desc");
-
-  return true;
 }
 
-TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
-
-TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
-
-TEST(xrdb, test_storage) { ASSERT_TRUE(test_storage()); }
+TEST(xrdb, test_descriptor_compare) {
+  auto dataDescriptor1{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+                       rdb::Descriptor("TLen", rdb::INTEGER)};
+  auto dataDescriptor2{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+                       rdb::Descriptor("TLen", rdb::INTEGER)};
+  auto dataDescriptorDiff1{rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Name", 10, rdb::STRING) |
+                           rdb::Descriptor("TLen", rdb::INTEGER)};
+  auto dataDescriptorDiff2{rdb::Descriptor("Name", 11, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+                           rdb::Descriptor("TLen", rdb::INTEGER)};
+  ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
+  ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
+  ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
+}
 
 TEST(crdb, genericBinaryFileAccessor_byte) {
   auto result1 = test_1<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
@@ -287,14 +296,11 @@ TEST(crdb, posixBinaryFileAccessor_char) {
 }
 
 TEST(crdb, posixPrmBinaryFileAccessor_byte) {
-  auto result1 =
-      test_1<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result1 = test_1<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result1);
-  auto result2 =
-      test_2<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result2 = test_2<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result2);
-  auto result3 =
-      test_3<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result3 = test_3<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result3);
 }
 

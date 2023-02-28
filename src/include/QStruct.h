@@ -15,16 +15,21 @@
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
+#include <variant>
 
-#include "enumDecl.h"
-#include "rdb/desc.h"
+#include "cmdID.h"
+#include "rdb/descriptor.h"
+
+typedef boost::rational<int> number;
+
+#define FLDTYPE_H_CREATE_VARIANT_T
+#include "fldType.h"
 
 namespace boost {
 namespace serialization {
 
 template <class Archive, class T>
-inline void serialize(Archive &ar, boost::rational<T> &p,
-                      unsigned int /* file_version */
+inline void serialize(Archive &ar, boost::rational<T> &p, unsigned int /* file_version */
 ) {
   T _num(p.numerator());
   T _den(p.denominator());
@@ -35,16 +40,14 @@ inline void serialize(Archive &ar, boost::rational<T> &p,
 
 // https://stackoverflow.com/questions/14744303/does-boost-support-serialization-of-c11s-stdtuple/14928368#14928368
 template <typename Archive, typename... Types>
-inline void serialize(Archive &ar, std::tuple<Types...> &t,
-                      const unsigned int) {
+inline void serialize(Archive &ar, std::tuple<Types...> &t, const unsigned int) {
   std::apply([&](auto &...element) { ((ar & element), ...); }, t);
 }
 
 }  // namespace serialization
 }  // namespace boost
 
-boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6,
-                                 int ttl = 11);
+boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6, int ttl = 11);
 
 class token {
   friend class boost::serialization::access;
@@ -52,26 +55,26 @@ class token {
   template <class Archive>
   void serialize(Archive &ar, unsigned int version) {
     ar &command;
-    ar &crValue;
-    ar &rcValue;
-    ar &sValue_;
+    ar &numericValue;
+    ar &textValue;
   }
 
   command_id command;
-  boost::rational<int> crValue;
-  boost::rational<int> rcValue;
-  std::string sValue_;
+  boost::rational<int> numericValue;
+  std::string textValue;
 
  public:
-  std::string getValue();
-  boost::rational<int> getCRValue();
+  std::string getStr();
+  boost::rational<int> get();
 
-  token(command_id id = VOID_COMMAND, std::string sValue = "");
-  token(command_id id, boost::rational<int> crValue, std::string sValue = "");
-  token(command_id id, double dValue);
+  token(command_id id = VOID_COMMAND) : command(id){};
+  token(command_id id, const std::string &sValue) : command(id), textValue(sValue){};
 
-  std::string getStrTokenName();
-  command_id getTokenCommand();
+  template <typename T>
+  token(command_id id, const std::string &sValue, T value);
+
+  std::string getStrCommandID();
+  command_id getCommandID();
 };
 
 class field {
@@ -82,7 +85,8 @@ class field {
   void serialize(Archive &ar, unsigned int version) {
     ar &lProgram;
     ar &sFieldText;
-    ar &fieldDesc;
+    ar &fieldName;
+    ar &fieldType;
   }
 
   std::string sFieldText;
@@ -90,16 +94,16 @@ class field {
  public:
   std::list<token> lProgram;
 
-  rdb::field fieldDesc;
+  std::string fieldName;
+  rdb::descFld fieldType;
 
   field();
-  field(std::string sFieldName, std::list<token> &lProgram,
-        rdb::eType fieldType, std::string sFieldText);
+  field(std::string sFieldName, std::list<token> &lProgram, rdb::descFld fieldType, std::string sFieldText);
 
   std::string getFieldText();
   token getFirstFieldToken();
 
-  friend std::ostream &operator<<(std::ostream &os, const rdb::eType s);
+  friend std::ostream &operator<<(std::ostream &os, const rdb::descFld s);
 };
 
 class query {
@@ -116,7 +120,7 @@ class query {
   }
 
  public:
-  query(boost::rational<int> rInterval, std::string id);
+  query(boost::rational<int> rInterval, const std::string &id);
   query();
 
   std::list<std::string> getFieldNamesList();
@@ -130,22 +134,28 @@ class query {
   bool isDeclaration();
   bool isReductionRequired();
   bool isGenerated();
+  bool is(command_id command);
 
-  field &getField(std::string sField);
+  field &getField(const std::string &sField);
 
-  std::list<std::string> getDepStreamNameList(int reqDep = 0);
+  std::vector<std::string> getDepStreamName(int reqDep = 0);
 
   int getFieldIndex(field f);
 
   void reset();
+
+  rdb::Descriptor descriptorExpression();
+  rdb::Descriptor descriptorFrom();
 };
 
 bool operator<(const query &lhs, const query &rhs);
 
-query &getQuery(std::string query_name);
-int getSeqNr(std::string query_name);
-bool isDeclared(std::string query_name);
-bool isExist(std::string query_name);
+query &getQuery(const std::string &query_name);
+int getSeqNr(const std::string &query_name);
+bool isDeclared(const std::string &query_name);
+bool isExist(const std::string &query_name);
+
+std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
 class qTree : public std::vector<query> {
  private:
@@ -156,12 +166,12 @@ class qTree : public std::vector<query> {
   }
 
  public:
-  query &operator[](std::string query_name) { return getQuery(query_name); };
+  query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   void sort() { std::sort(begin(), end()); };
 
   /** Topological sort*/
   void tsort();
 
-  boost::rational<int> getDelta(std::string query_name);
+  boost::rational<int> getDelta(const std::string &query_name);
 };

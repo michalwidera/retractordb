@@ -1,38 +1,43 @@
 .ok
+.ok
+.ok
 .0 Record(s)
 29 Byte(s) per record.
 .......ok
-.{	name:test1
-	data:1 2 3 
-	bt:1 2 3 
-	Control:2
-	m1:1.23
-	m2:234
-}
+. name test1
+ data 1 2 3
+ bt 1 2 3
+ Control 2
+ m1 1.23
+ m2 234
 .......ok
 .ok
-.{	name:test1
-	data:1 2 3 
-	bt:1 2 3 
-	Control:2
-	m1:1.23
-	m2:234
-}
+. name test1
+ data 1 2 3
+ bt 1 2 3
+ Control 2
+ m1 1.23
+ m2 234
 .ok
-.{	name:test2
-	data:3 4 5 
-	bt:4 5 6 
-	Control:3
-	m1:3.14
-	m2:5567
-}
+. name test2
+ data 3 4 5
+ bt 4 5 6
+ Control 3
+ m1 3.14
+ m2 5567
 .2 Record(s)
 29 Byte(s) per record.
-.[93m{	STRING name[5]
+.{	STRING name[5]
 	INTARRAY data[3]
 	BYTEARRAY bt[3]
 	BYTE Control
 	FLOAT m1
 	INTEGER m2
-}[0m
+}
+.. name test_
+ data 6 9 3
+ bt 1 3 3
+ Control 2
+ m1 2.333
+ m2 264
 .

@@ -1,19 +1,23 @@
 #include "rdb/faccposixprm.h"
 
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <cassert>
-
 namespace rdb {
 constexpr const int kOpenBaseFlags = O_CLOEXEC;
 
 template <class T>
-posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName)
-    : fileNameStr(fileName) {
+posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {
   fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | kOpenBaseFlags, 0644);
-};
+  if (fd < 0)
+    SPDLOG_ERROR("::open {} -> {}", fileNameStr, fd);
+  else
+    SPDLOG_INFO("::open {} -> {}", fileNameStr, fd);
+  assert(fd >= 0);
+}
 
 template <class T>
 posixPrmBinaryFileAccessor<T>::~posixPrmBinaryFileAccessor() {
@@ -21,13 +25,12 @@ posixPrmBinaryFileAccessor<T>::~posixPrmBinaryFileAccessor() {
 }
 
 template <class T>
-std::string posixPrmBinaryFileAccessor<T>::FileName() {
+std::string posixPrmBinaryFileAccessor<T>::fileName() {
   return fileNameStr;
 }
 
 template <class T>
-int posixPrmBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
-                                         const size_t position) {
+int posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
     return errno;  // Error status
@@ -56,18 +59,17 @@ int posixPrmBinaryFileAccessor<T>::Write(const T* ptrData, const size_t size,
     sizesh -= write_result;
   }
   return EXIT_SUCCESS;
-};
+}
 
 template <class T>
-int posixPrmBinaryFileAccessor<T>::Read(T* ptrData, const size_t size,
-                                        const size_t position) {
+int posixPrmBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
     return fd;  // <- Error status
   }
   ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
   return EXIT_SUCCESS;
-};
+}
 
 template class posixPrmBinaryFileAccessor<std::byte>;
 template class posixPrmBinaryFileAccessor<char>;

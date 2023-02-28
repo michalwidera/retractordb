@@ -1,5 +1,5 @@
 
-// Generated from RQL.g4 by ANTLR 4.10.1
+// Generated from RQL.g4 by ANTLR 4.11.1
 
 
 #include "RQLListener.h"
@@ -36,7 +36,7 @@ struct RQLParserStaticData final {
   std::unique_ptr<antlr4::atn::ATN> atn;
 };
 
-std::once_flag rqlParserOnceFlag;
+::antlr4::internal::OnceFlag rqlParserOnceFlag;
 RQLParserStaticData *rqlParserStaticData = nullptr;
 
 void rqlParserInitialize() {
@@ -300,10 +300,8 @@ RQLParser::ProgContext* RQLParser::prog() {
       setState(49); 
       _errHandler->sync(this);
       _la = _input->LA(1);
-    } while ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << RQLParser::SELECT)
-      | (1ULL << RQLParser::DECLARE)
-      | (1ULL << RQLParser::STORAGE))) != 0));
+    } while (((_la & ~ 0x3fULL) == 0) &&
+      ((1ULL << _la) & 11005853696) != 0);
     setState(51);
     match(RQLParser::EOF);
    
@@ -1053,10 +1051,8 @@ RQLParser::Field_typeContext* RQLParser::field_type() {
         enterOuterAlt(_localctx, 1);
         setState(92);
         _la = _input->LA(1);
-        if (!((((_la & ~ 0x3fULL) == 0) &&
-          ((1ULL << _la) & ((1ULL << RQLParser::STRING_T)
-          | (1ULL << RQLParser::BYTEARRAY_T)
-          | (1ULL << RQLParser::INTARRAY_T))) != 0))) {
+        if (!(((_la & ~ 0x3fULL) == 0) &&
+          ((1ULL << _la) & 14680064) != 0)) {
         _errHandler->recoverInline(this);
         }
         else {
@@ -3035,23 +3031,8 @@ RQLParser::Function_callContext* RQLParser::function_call() {
     enterOuterAlt(_localctx, 1);
     setState(246);
     _la = _input->LA(1);
-    if (!((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & ((1ULL << RQLParser::T__4)
-      | (1ULL << RQLParser::T__5)
-      | (1ULL << RQLParser::T__6)
-      | (1ULL << RQLParser::T__7)
-      | (1ULL << RQLParser::T__8)
-      | (1ULL << RQLParser::T__9)
-      | (1ULL << RQLParser::T__10)
-      | (1ULL << RQLParser::T__11)
-      | (1ULL << RQLParser::T__12)
-      | (1ULL << RQLParser::T__13)
-      | (1ULL << RQLParser::T__14)
-      | (1ULL << RQLParser::T__15)
-      | (1ULL << RQLParser::T__16)
-      | (1ULL << RQLParser::T__17)
-      | (1ULL << RQLParser::T__18)
-      | (1ULL << RQLParser::T__19))) != 0))) {
+    if (!(((_la & ~ 0x3fULL) == 0) &&
+      ((1ULL << _la) & 2097120) != 0)) {
     _errHandler->recoverInline(this);
     }
     else {
@@ -3121,5 +3102,5 @@ bool RQLParser::termSempred(TermContext *_localctx, size_t predicateIndex) {
 }
 
 void RQLParser::initialize() {
-  std::call_once(rqlParserOnceFlag, rqlParserInitialize);
+  ::antlr4::internal::call_once(rqlParserOnceFlag, rqlParserInitialize);
 }

@@ -127,7 +127,7 @@ function_call       : ( 'Sqrt'
                     | 'IsNonZero' ) '(' expression_factor ( COMMA expression_factor )* ')'
                     ;
 
-// sync types with: src/include/rdb/desc.h
+// sync types with: src/include/rdb/descriptor.h
 
 STRING_T:           'STRING'|'String';
 BYTEARRAY_T:        'BYTEARRAY'|'Bytearray';

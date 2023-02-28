@@ -6,8 +6,16 @@
 // Check: https://evileg.com/en/post/536/
 // and: https://cliutils.gitlab.io/modern-cmake/chapters/basics/programs.html
 
-#define CONFIG_LINE "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "                           \
-                    "Code compiler: @CMAKE_CXX_COMPILER_ID@ Ver. @CMAKE_CXX_COMPILER_VERSION@, " \
-                    "Build time: @GIT_CURRENT_BUILDTIME@\n"
+constexpr auto config_line = "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "
+                             "Code compiler: @CMAKE_CXX_COMPILER_ID@ Ver. @CMAKE_CXX_COMPILER_VERSION@, "
+                             "Build time: @GIT_CURRENT_BUILDTIME@, "
+                             "Type: @CMAKE_BUILD_TYPE@";
+
+constexpr auto build_id = "@GIT_CURRENT_BUILDTIME@";
+
+constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
+
+constexpr auto warranty = "This is free software; see the source for copying conditions.\n"
+                          "There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.";
 
 #endif // CONFIG_H_IN
