@@ -42,22 +42,6 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
-  // overloaded ovld {
-  //    [&retVal](int a, int b) { retVal = a + b; }  //
-  //};
-
-  // std::visit(ovld, a, b);
-
-  // const int* pval1 = std::get_if<int>(&a);
-  // const int* pval2 = std::get_if<int>(&b);
-
-  // const boost::rational<int>* pval1r = std::get_if<boost::rational<int>>(&a);
-  // const boost::rational<int>* pval2r = std::get_if<boost::rational<int>>(&b);
-
-  // if (pval1 && pval2) return *pval1 + *pval2;
-
-  // if (pval1r && pval2r) return *pval1r + *pval2r;
-
   std::visit(Overload{
                  [&retVal](int a, int b) { retVal = a + b; },   //
                  [&retVal](auto a, auto b) { retVal = a + b; }  //

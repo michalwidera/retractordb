@@ -72,6 +72,23 @@ jobs:
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build/Release && make test
 
+  build-2204-conan20-gcc12:
+    working_directory: ~/retractordb
+    docker:
+      - image: cimg/base:edge-22.04
+    resource_class: large
+    steps:
+      - checkout
+      - run: uname -a && cat /proc/version && cat /etc/issue
+      - run: sudo apt-get update && sudo apt-get -y install gcc-12 cmake make build-essential python3 python3-pip
+      - run: pip3 install conan
+      - run: conan profile detect && cp .circleci/default ~/.conan2/profiles
+      - run: conan source .
+      - run: conan install . --build missing
+      - run: conan build .
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
+      - run: cd build/Release && make test
+
   build-2204-ARM:
     working_directory: ~/retractordb
     machine:
@@ -112,6 +129,11 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-2204-conan20-gcc12:
+          filters:
+            branches:
+              only:
+                 - /issue_.*/
 
   nightly:
     triggers:
@@ -127,6 +149,7 @@ workflows:
       - build-2004
       - build-2204
       - build-2204-conan20
+      - build-2204-conan20-gcc12
       - build-2004-debug:
           requires:
             - build-2204
