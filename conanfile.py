@@ -47,6 +47,7 @@ class Retractor(ConanFile):
 
     def package_info(self):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
+        self.cpp_info.compiler = "20"
 
     def requirements(self):
         # Auto-generation of antlr4call.sh script

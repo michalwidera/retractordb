@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include <iostream>
+#include <typeinfo>  // operator typeid
 
 expressionEvaluator::expressionEvaluator(/* args */) {}
 
@@ -11,14 +12,12 @@ expressionEvaluator::~expressionEvaluator() {}
 
 rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
 
-// helper type for the visitor #4
-template <class... Ts>
-struct overloaded : Ts... {
+template <typename... Ts>  // (7)
+struct Overload : Ts... {
   using Ts::operator()...;
 };
-// explicit deduction guide (not needed as of C++20)
 template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+Overload(Ts...) -> Overload<Ts...>;
 
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
@@ -33,6 +32,8 @@ pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
     decltype(b) bRet = b;
     retVal = pairVar(aRet, bRet);
   }
+  static_assert(std::is_same<decltype(std::get<0>(retVal)), decltype(std::get<1>(retVal))>::value);
+
   return retVal;
 }
 
@@ -41,15 +42,27 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
-  const int* pval1 = std::get_if<int>(&a);
-  const int* pval2 = std::get_if<int>(&b);
+  // overloaded ovld {
+  //    [&retVal](int a, int b) { retVal = a + b; }  //
+  //};
 
-  const boost::rational<int>* pval1r = std::get_if<boost::rational<int>>(&a);
-  const boost::rational<int>* pval2r = std::get_if<boost::rational<int>>(&b);
+  // std::visit(ovld, a, b);
 
-  if (pval1 && pval2) return *pval1 + *pval2;
+  // const int* pval1 = std::get_if<int>(&a);
+  // const int* pval2 = std::get_if<int>(&b);
 
-  if (pval1r && pval2r) return *pval1r + *pval2r;
+  // const boost::rational<int>* pval1r = std::get_if<boost::rational<int>>(&a);
+  // const boost::rational<int>* pval2r = std::get_if<boost::rational<int>>(&b);
+
+  // if (pval1 && pval2) return *pval1 + *pval2;
+
+  // if (pval1r && pval2r) return *pval1r + *pval2r;
+
+  std::visit(Overload{
+                 [&retVal](int a, int b) { retVal = a + b; },   //
+                 [&retVal](auto a, auto b) { retVal = a + b; }  //
+             },
+             a, b);
 
   return retVal;
 }
