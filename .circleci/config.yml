@@ -137,8 +137,10 @@ workflows:
     jobs:
       - build-2004
       - build-2204
-      - build-2204-conan20
-      - build-2204-conan20-gcc12
+      - build-2204-conan20:
+          requires:
+            - build-2204
+      - build-2204-conan20-gcc12:
           requires:
             - build-2204-conan20
       - build-2204-debug:
