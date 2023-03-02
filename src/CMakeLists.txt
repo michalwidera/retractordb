@@ -7,10 +7,6 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 
-message("Boost_INCLUDE_DIR: ${Boost_INCLUDE_DIR}")
-message("spdlog_INCLUDE_DIR: ${spdlog_INCLUDE_DIR}")
-message("antlr4-runtime_INCLUDE_DIR: ${antlr4-runtime_INCLUDE_DIR}")
-
 include_directories(${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR}
                     ${antlr4-runtime_INCLUDE_DIR} share include)
 
