@@ -129,11 +129,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-conan20-gcc12:
-          filters:
-            branches:
-              only:
-                 - /issue_.*/
 
   nightly:
     triggers:
