@@ -41,6 +41,11 @@ If you want see graphic response, use gnuplot - install it with:
 sudo apt install gnuplot
 ```
 
+Build and test in debug
+```
+conan install . -s build_type=Debug  --build missing
+```
+
 After installation _xretractor_, _xqry_ ... etc will be installed in ~/.local/bin on path.
 Please check proper installation by typing in command prompt - for instance: _xqry -h_
 

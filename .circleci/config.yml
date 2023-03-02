@@ -19,10 +19,10 @@ jobs:
       - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
       - run: cd build/Release && make test
 
-  build-2004-debug:
+  build-2204-debug:
     working_directory: ~/retractordb
     docker:
-      - image: cimg/base:stable
+      - image: cimg/base:edge-22.04
     resource_class: large
     steps:
       - checkout
@@ -111,13 +111,7 @@ workflows:
   version: 2
   commit:
     jobs:
-      - build-2004:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-      - build-2004-debug:
+      - build-2204-debug:
           filters:
             branches:
               only:
@@ -145,7 +139,9 @@ workflows:
       - build-2204
       - build-2204-conan20
       - build-2204-conan20-gcc12
-      - build-2004-debug:
+          requires:
+            - build-2204-conan20
+      - build-2204-debug:
           requires:
             - build-2204
       - build-2204-ARM:
