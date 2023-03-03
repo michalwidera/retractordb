@@ -22,7 +22,7 @@ jobs:
   build-2204-debug:
     working_directory: ~/retractordb
     machine:
-      - image: ubuntu-2204:current
+      image: ubuntu-2204:2023.02.1
     resource_class: large
     steps:
       - checkout
