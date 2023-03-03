@@ -21,8 +21,10 @@ jobs:
 
   build-2204-debug:
     working_directory: ~/retractordb
-    docker:
-      - image: cimg/base:edge-22.04
+    #docker:
+    #  - image: cimg/base:edge-22.04
+    machine:
+      - image: ubuntu-2204:current
     resource_class: large
     steps:
       - checkout
@@ -107,6 +109,17 @@ jobs:
       - run: ~/.local/bin/xretractor -h && ~/.local/bin/xqry -h && ~/.local/bin/xdumper -h && ~/.local/bin/xcompiler -h
 # There is a problem on test on ARM - I will postopne this failure for now - build is more important that this for now.
 
+executors:
+  ubuntu-2204-on-docker:
+    docker:
+      - image: cimg/base:edge-22.04
+    resource_class: large
+
+  ubuntu-2204-on-linuxvm:
+    machine:
+      - image: ubuntu-2204:current
+    resource_class: large
+
 workflows:
   version: 2
   commit:
@@ -127,7 +140,7 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_1_*_*_3
+          # https://crontab.guru/#0_1_*_*_1,6
           cron: "0 1 * * 1,6"
           filters:
             branches:
