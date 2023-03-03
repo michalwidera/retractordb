@@ -79,11 +79,11 @@ commands:
             conan profile detect
 
   conan-build:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
     steps:
-      parameters:
-        build_type:
-          type: string
-          default: "Release"
       - run:
           name: conan build
           command: |
@@ -93,11 +93,11 @@ commands:
               cd build/<<parameters.build_type>> && make install
 
   conan-build-missing:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
     steps:
-      parameters:
-        build_type:
-          type: string
-          default: "Release"
       - run:
           name: conan build
           command: |
@@ -107,11 +107,11 @@ commands:
               cd build/<<parameters.build_type>> && make install
 
   run-test:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
     steps:
-      parameters:
-        build_type:
-          type: string
-          default: "Release"
       - run:
           name: test
           command: |
