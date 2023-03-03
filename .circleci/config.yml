@@ -45,7 +45,7 @@ workflows:
 executors:
     on-2204-machine:
         machine:
-        image: ubuntu-2204:current
+        - image: ubuntu-2204:current
         resource_class: large
     on-2204-docker:
         docker:
@@ -53,7 +53,7 @@ executors:
         resource_class: large
     on-2204-machine-arm:
         machine:
-        image: ubuntu-2004:202101-01
+        - image: ubuntu-2004:202101-01
         resource_class: arm.large
 
 jobs:
