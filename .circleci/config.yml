@@ -31,7 +31,7 @@ workflows:
       - build-2204-release
       - build-2204-conan20:
           requires:
-            - build-2204
+            - build-2204-release
       - build-2204-conan20-gcc12:
           requires:
             - build-2204-conan20
