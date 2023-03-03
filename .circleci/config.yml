@@ -40,7 +40,7 @@ workflows:
             - build-2204-release
 
 executors:
-  ubuntu2204:
+  ubuntu2204docker:
     docker:
       - image: cimg/base:edge-22.04
     resource_class: large
@@ -78,9 +78,7 @@ jobs:
 
   build-2204-release:
     working_directory: ~/retractordb
-    docker:
-      - image: cimg/base:edge-22.04
-    resource_class: large
+    executor: ubuntu2204docker
     steps:
       - checkout
       - run:
