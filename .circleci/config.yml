@@ -22,18 +22,25 @@ jobs:
   build-2204-debug:
     working_directory: ~/retractordb
     machine:
-      image: ubuntu-2204:2023.02.1
+      image: ubuntu-2204:current
     resource_class: large
     steps:
       - checkout
-      - run: uname -a && cat /proc/version && cat /etc/issue
-      - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
-      - run: pip3 install conan==1.59
-      - run: conan profile new default --detect && conan profile update settings.compiler.libcxx=libstdc++11 default
-      - run: conan source .
-      - run: conan install . -s build_type=Debug
-      - run: conan build .
-      - run: cd build/Debug && make install
+      - run:
+            name: prep env
+            command: |
+                uname -a && cat /proc/version && cat /etc/issue
+                sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+                pip3 install conan==1.59
+      - run:
+            name: conan build
+            command: |
+                conan profile new default --detect
+                conan profile update settings.compiler.libcxx=libstdc++11 default
+                conan source .
+                conan install . -s build_type=Debug
+                conan build .
+                cd build/Debug && make install
       - run:
             name: test
             command: |
