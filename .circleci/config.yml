@@ -21,8 +21,6 @@ jobs:
 
   build-2204-debug:
     working_directory: ~/retractordb
-    #docker:
-    #  - image: cimg/base:edge-22.04
     machine:
       - image: ubuntu-2204:current
     resource_class: large
