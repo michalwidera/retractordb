@@ -83,28 +83,17 @@ commands:
       build_type:
         type: string
         default: "Release"
-    steps:
-      - run:
-          name: conan build
-          command: |
-              conan source .
-              conan install . -s build_type=<<parameters.build_type>>
-              conan build .
-              cd build/<<parameters.build_type>> && make install
-
-  conan-build-missing:
-    parameters:
-      build_type:
+      build_param:
         type: string
-        default: "Release"
+        default: ""
     steps:
       - run:
           name: conan build
           command: |
-              conan source .
-              conan install . -s build_type=<<parameters.build_type>> --build missing
-              conan build .
-              cd build/<<parameters.build_type>> && make install
+            conan source .
+            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
+            conan build .
+            cd build/<<parameters.build_type>> && make install
 
   run-test:
     parameters:
@@ -115,9 +104,9 @@ commands:
       - run:
           name: test
           command: |
-              export PATH="$HOME/.local/bin:$PATH"
-              xretractor -h && xqry -h && xdumper -h && xcompiler -h
-              cd build/<<parameters.build_type>> && make test
+            export PATH="$HOME/.local/bin:$PATH"
+            xretractor -h && xqry -h && xdumper -h && xcompiler -h
+            cd build/<<parameters.build_type>> && make test
 jobs:
 
   build-2204-debug:
@@ -149,7 +138,8 @@ jobs:
     steps:
       - checkout
       - prep-env-200
-      - conan-build-missing
+      - conan-build:
+          build_param: --build missing
       - run-test
 
   build-2204-ARM:
@@ -160,7 +150,7 @@ jobs:
     steps:
       - checkout
       - prep-env-159
-      - conan-build
+      - conan-build:
       - run:
             name: test
             command: |
