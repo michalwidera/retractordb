@@ -150,7 +150,7 @@ jobs:
     steps:
       - checkout
       - prep-env-159
-      - conan-build:
+      - conan-build
       - run:
             name: test
             command: |
