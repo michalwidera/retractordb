@@ -49,6 +49,11 @@ executors:
       image: ubuntu-2204:current
     resource_class: large
 
+  ubuntu2004machine-arm:
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.large
+
 commands:
   prep-env-159:
     steps:
@@ -104,9 +109,7 @@ commands:
 jobs:
   build-2204-debug:
     working_directory: ~/retractordb
-    machine:
-      image: ubuntu-2204:current
-    resource_class: large
+    executor: ubuntu2204machine
     steps:
       - checkout
       - prep-env-159
@@ -137,9 +140,7 @@ jobs:
 
   build-2204-ARM:
     working_directory: ~/retractordb
-    machine:
-      image: ubuntu-2004:202101-01
-    resource_class: arm.large
+    executor: ubuntu2004machine-arm
     steps:
       - checkout
       - prep-env-159
