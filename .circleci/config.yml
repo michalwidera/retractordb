@@ -34,9 +34,12 @@ jobs:
       - run: conan install . -s build_type=Debug
       - run: conan build .
       - run: cd build/Debug && make install
-      - run: export PATH="$HOME/.local/bin:$PATH"
-      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
-      - run: cd build/Debug && make test
+      - run:
+            name: test
+            command: |
+                export PATH="$HOME/.local/bin:$PATH"
+                xretractor -h && xqry -h && xdumper -h && xcompiler -h
+                cd build/Debug && make test
 
   build-2204:
     working_directory: ~/retractordb
