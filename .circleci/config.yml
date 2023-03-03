@@ -15,18 +15,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-conan20:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-      - build-2204-ARM:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
 
   nightly:
     triggers:
@@ -54,6 +42,11 @@ executors:
   ubuntu2204docker:
     docker:
       - image: cimg/base:edge-22.04
+    resource_class: large
+
+  ubuntu2204machine:
+    machine:
+      image: ubuntu-2204:current
     resource_class: large
 
 commands:
@@ -107,8 +100,8 @@ commands:
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h && xcompiler -h
             cd build/<<parameters.build_type>> && make test
-jobs:
 
+jobs:
   build-2204-debug:
     working_directory: ~/retractordb
     machine:
