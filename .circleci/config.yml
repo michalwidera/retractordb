@@ -34,7 +34,7 @@ jobs:
       - run: conan install . -s build_type=Debug
       - run: conan build .
       - run: cd build/Debug && make install
-      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
+      - run: ~/.local/bin/xretractor -h && ~/.local/bin/xqry -h && ~/.local/bin/xdumper -h && ~/.local/bin/xcompiler -h
       - run: cd build/Debug && make test
 
   build-2204:
