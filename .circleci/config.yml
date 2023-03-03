@@ -127,27 +127,30 @@ jobs:
     resource_class: large
     steps:
       - checkout
-      - run: prep-env-159
-      - run: conan-build Debug
-      - run: run-test Debug
+      - prep-env-159
+      - conan-build:
+          build_type: Debug
+      - run-test:
+          build_type: Debug
+
 
   build-2204-release:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
     steps:
       - checkout
-      - run: prep-env-159
-      - run: conan-build
-      - run: run-test
+      - prep-env-159
+      - conan-build
+      - run-test
 
   build-2204-conan20:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
     steps:
       - checkout
-      - run: prep-env-200
-      - run: conan-build-missing
-      - run: run-test
+      - prep-env-200
+      - conan-build-missing
+      - run-test
 
   build-2204-ARM:
     working_directory: ~/retractordb
@@ -156,8 +159,8 @@ jobs:
     resource_class: arm.large
     steps:
       - checkout
-      - run: prep-env-159
-      - run: conan-build
+      - prep-env-159
+      - conan-build
       - run:
             name: test
             command: |
