@@ -42,25 +42,13 @@ workflows:
           requires:
             - build-2204-release
 
-executors:
-  on-2204-machine:
-    machine:
-      - image: ubuntu-2204:current
-    resource_class: large
-  on-2204-docker:
-    docker:
-      - image: cimg/base:edge-22.04
-    resource_class: large
-  on-2204-machine-arm:
-    machine:
-      - image: ubuntu-2004:202101-01
-    resource_class: arm.large
-
 jobs:
 
   build-2204-debug:
     working_directory: ~/retractordb
-    executor: on-2204-machine
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large
     steps:
       - checkout
       - run:
@@ -87,7 +75,9 @@ jobs:
 
   build-2204-release:
     working_directory: ~/retractordb
-    executor: on-2204-machine
+    docker:
+      - image: cimg/base:edge-22.04
+    resource_class: large
     steps:
       - checkout
       - run:
@@ -114,59 +104,43 @@ jobs:
 
   build-2204-conan20:
     working_directory: ~/retractordb
-    executor: on-2204-machine
+    docker:
+      - image: cimg/base:edge-22.04
+    resource_class: large
     steps:
       - checkout
-      - run:
-            name: prep env
-            command: |
-                uname -a && cat /proc/version && cat /etc/issue
-                sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
-                pip3 install conan
-      - run:
-            name: conan build
-            command: |
-                conan profile detect
-                conan source .
-                conan install . -s build_type=Release
-                conan build .
-                cd build/Debug && make install
-      - run:
-            name: test
-            command: |
-                export PATH="$HOME/.local/bin:$PATH"
-                xretractor -h && xqry -h && xdumper -h && xcompiler -h
-                cd build/Debug && make test
+      - run: uname -a && cat /proc/version && cat /etc/issue
+      - run: sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+      - run: pip3 install conan
+      - run: conan profile detect && cp .circleci/default ~/.conan2/profiles
+      - run: conan source .
+      - run: conan install . --build missing
+      - run: conan build .
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
+      - run: cd build/Release && make test
 
   build-2204-conan20-gcc12:
     working_directory: ~/retractordb
-    executor: on-2204-machine
+    docker:
+      - image: cimg/base:edge-22.04
+    resource_class: large
     steps:
       - checkout
-      - run:
-            name: prep env
-            command: |
-                uname -a && cat /proc/version && cat /etc/issue
-                sudo apt-get update && sudo apt-get -y install gcc-12 cmake make build-essential python3 python3-pip
-                pip3 install conan
-      - run:
-            name: conan build
-            command: |
-                conan profile detect
-                conan source .
-                conan install . -s build_type=Release
-                conan build .
-                cd build/Debug && make install
-      - run:
-            name: test
-            command: |
-                export PATH="$HOME/.local/bin:$PATH"
-                xretractor -h && xqry -h && xdumper -h && xcompiler -h
-                cd build/Debug && make test
+      - run: uname -a && cat /proc/version && cat /etc/issue
+      - run: sudo apt-get update && sudo apt-get -y install gcc-12 cmake make build-essential python3 python3-pip
+      - run: pip3 install conan
+      - run: conan profile detect && cp .circleci/default ~/.conan2/profiles
+      - run: conan source .
+      - run: conan install . --build missing
+      - run: conan build .
+      - run: xretractor -h && xqry -h && xdumper -h && xcompiler -h
+      - run: cd build/Release && make test
 
   build-2204-ARM:
     working_directory: ~/retractordb
-    executor: on-2204-machine-arm
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.large
     steps:
       - checkout
       - run: uname -a && cat /proc/version && cat /etc/issue
@@ -178,5 +152,6 @@ jobs:
       - run: conan build .
       - run: cd build/Release && make install
       - run: ~/.local/bin/xretractor -h && ~/.local/bin/xqry -h && ~/.local/bin/xdumper -h && ~/.local/bin/xcompiler -h
-
 # There is a problem on test on ARM - I will postopne this failure for now - build is more important that this for now.
+
+
