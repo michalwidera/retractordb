@@ -200,6 +200,8 @@ bool isExist(const std::string &query_name) {
 
 boost::rational<int> token::get() { return numericValue; }
 
+rdb::descFldVT token::getVT() { return valueVT; };
+
 std::string token::getStr_() { return textValue; }
 
 bool query::isDeclaration() { return lProgram.empty(); }
@@ -223,16 +225,21 @@ token field::getFirstFieldToken() {
 /** Construktor set */
 template <typename T>
 token::token(command_id id, const std::string &sValue, T value) : command(id), textValue(sValue) {
-  if constexpr (std::is_same_v<T, number>)
+  if constexpr (std::is_same_v<T, number>) {
     numericValue = value;
-  else if constexpr (std::is_same_v<T, int>)
+    valueVT = value;
+  } else if constexpr (std::is_same_v<T, int>) {
     numericValue = boost::rational<int>(value, 1);
-  else if constexpr (std::is_same_v<T, double>)
+    valueVT = value;
+  } else if constexpr (std::is_same_v<T, double>) {
     numericValue = Rationalize(value);
-  else if constexpr (std::is_same_v<T, float>)
+    valueVT = value;
+  } else if constexpr (std::is_same_v<T, float>) {
     numericValue = Rationalize(value);
-  else
+    valueVT = value;
+  } else {
     numericValue = boost::rational<int>(-999, 1);  // Unidentified value
+  }
   if (sValue == "") {
     std::stringstream ss;
     ss << numericValue.numerator();
@@ -249,7 +256,7 @@ template token::token(command_id id, const std::string &sValue, int);
 template token::token(command_id id, const std::string &sValue, double);
 template token::token(command_id id, const std::string &sValue, float);
 
-token::token(command_id id, const std::string &sValue, rdb::descFldVT value)
+token::token(command_id id, rdb::descFldVT value, const std::string sValue)
     :  //
       command(id),
       textValue(sValue),

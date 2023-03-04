@@ -69,7 +69,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
     }
     switch (tk.getCommandID()) {
       case PUSH_VAL:
-        rStack.push(tk.get());
+        rStack.push(tk.getVT());
         break;
       case ADD:
         rStack.push(a + b);
