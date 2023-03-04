@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stack>
 #include <string>
+#include <variant>
 
 // Boost libraries
 #include <boost/archive/text_iarchive.hpp>
@@ -15,7 +16,7 @@
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
-#include <variant>
+#include <boost/serialization/variant.hpp>
 
 #include "cmdID.h"
 #include "rdb/descriptor.h"
@@ -38,6 +39,38 @@ inline void serialize(Archive &ar, boost::rational<T> &p, unsigned int /* file_v
   p.assign(_num, _den);
 }
 
+template <class Archive, typename ...Ts>
+void save(Archive& ar, const std::variant<Ts...>& obj, const unsigned int version)
+{
+  boost::variant<Ts...> v;
+  std::visit([&](const auto& arg) {
+    v = arg; 
+  }, obj);
+
+  ar & v;
+}
+
+template <class Archive, typename ...Ts>
+void load(Archive& ar, std::variant<Ts...>& obj, const unsigned int version)
+{
+  boost::variant<Ts...> v;
+  ar& v;
+
+  boost::apply_visitor([&](auto& arg) {
+    obj = arg;
+  }, v);
+}
+
+template <class Archive, typename ...Ts>
+void serialize(Archive& ar, std::variant<Ts...>& t, const unsigned int file_version)
+{
+  split_free(ar, t, file_version);
+}
+
+template<class Archive>
+void serialize(Archive &ar, std::monostate &, const unsigned int /*version*/)
+{}
+
 // https://stackoverflow.com/questions/14744303/does-boost-support-serialization-of-c11s-stdtuple/14928368#14928368
 template <typename Archive, typename... Types>
 inline void serialize(Archive &ar, std::tuple<Types...> &t, const unsigned int) {
@@ -57,11 +90,13 @@ class token {
     ar &command;
     ar &numericValue;
     ar &textValue;
+    ar &valueVT;
   }
 
   command_id command;
   boost::rational<int> numericValue;
   std::string textValue;
+  rdb::descFldVT valueVT;
 
  public:
   std::string getStr();
@@ -72,6 +107,8 @@ class token {
 
   template <typename T>
   token(command_id id, const std::string &sValue, T value);
+
+  token(command_id id, const std::string &sValue, rdb::descFldVT value);
 
   std::string getStrCommandID();
   command_id getCommandID();

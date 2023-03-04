@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <iostream>
 #include <typeinfo>  // operator typeid
 
@@ -11,13 +12,6 @@ expressionEvaluator::expressionEvaluator(/* args */) {}
 expressionEvaluator::~expressionEvaluator() {}
 
 rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
-
-template <typename... Ts>  // (7)
-struct Overload : Ts... {
-  using Ts::operator()...;
-};
-template <class... Ts>
-Overload(Ts...) -> Overload<Ts...>;
 
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
@@ -43,7 +37,14 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   auto [a, b] = normalize(aParam, bParam);
 
   std::visit(Overload{
-                 [&retVal](int a, int b) { retVal = a + b; },   //
+                 [&retVal](int a, int b) { retVal = a + b; },  //
+                 [&retVal](std::string a, std::string b) { retVal = a + b; },
+                 [&retVal](std::vector<int> a, std::vector<int> b) {
+                   std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<int>());
+                 },
+                 [&retVal](std::vector<uint8_t> a, std::vector<uint8_t> b) {
+                   std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<uint8_t>());
+                 },
                  [&retVal](auto a, auto b) { retVal = a + b; }  //
              },
              a, b);

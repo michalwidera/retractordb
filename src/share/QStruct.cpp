@@ -249,6 +249,11 @@ template token::token(command_id id, const std::string &sValue, int);
 template token::token(command_id id, const std::string &sValue, double);
 template token::token(command_id id, const std::string &sValue, float);
 
+token::token(command_id id, const std::string &sValue, rdb::descFldVT value)
+    :  //
+      command(id),
+      textValue(sValue),
+      valueVT(value) {}
 /** Construktor set */
 
 query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}

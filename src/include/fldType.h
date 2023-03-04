@@ -10,6 +10,7 @@
 
 #ifdef FLDTYPE_H_CREATE_VARIANT_T
 #include <boost/rational.hpp>
+#include <variant>
 #include <vector>
 #define BEGIN_E_GEN_T(ENUM_NAME) typedef std::variant <
 #define DECL_T(elementName, elementType) elementType,
@@ -75,5 +76,15 @@ END_E_GEN_T(descFld)
 #undef DECL_E
 #undef DECL_F
 #define FLDTYPE_H_DECLARATION_DONE_FLDT
-
 #endif  // FLDTYPE_H_DECLARATION_DONE_FLDT
+
+// Support for std::visit over std::variant
+#ifndef FLDTYPE_H_DECLARATION_OVERLOAD
+template <typename... Ts>
+struct Overload : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts>
+Overload(Ts...) -> Overload<Ts...>;
+#define FLDTYPE_H_DECLARATION_OVERLOAD
+#endif  // !FLDTYPE_H_DECLARATION_DONE_FLDT
