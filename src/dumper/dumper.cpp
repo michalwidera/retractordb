@@ -97,7 +97,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
           xout << t.getStrCommandID() << " ";
           if (t.getStrCommandID() != "STREAM_HASH" && t.getStrCommandID() != "STREAM_ADD" &&
               t.getStrCommandID() != "STREAM_DEHASH_DIV" && t.getStrCommandID() != "STREAM_DEHASH_MOD")
-            xout << t.getStr();
+            xout << t.getStr_();
           xout << "\\n";
         }
         xout << "\"]";
@@ -152,7 +152,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
             std::basic_string<char>::size_type idx = sTokenName.find("PUSH_");
             if (idx != std::string::npos) {
               xout << " ";
-              xout << t.getStr();
+              xout << t.getStr_();
               // becasue after compilation disapear schema[1,2] and translate to
               // schema & crvalue
               if (sTokenName == "PUSH_ID") {
@@ -184,7 +184,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
     for (auto t : q.lProgram) {
       if (t.getStrCommandID() == "PUSH_STREAM") {
         if (q.isDeclaration()) continue;
-        std::string relation(q.id + " -> " + t.getStr());
+        std::string relation(q.id + " -> " + t.getStr_());
         if (bShowStreamProgs) relation = "prg_" + relation;
         streamRelationsSet.insert(relation);
       }
@@ -203,7 +203,7 @@ void dumpQFieldsProgram() {
         std::cout << q.id << "\t";
         std::cout << f.fieldName << "\t";
         std::cout << t.getStrCommandID() << "\t";
-        std::cout << t.getStr();
+        std::cout << t.getStr_();
         if (t.getStrCommandID() == "PUSH_ID") std::cout << "[" << t.get() << "]";
         std::cout << std::endl;
       }
@@ -234,7 +234,7 @@ void dumpQPrograms() {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
       std::cout << t.getStrCommandID() << "\t";
-      std::cout << t.getStr();
+      std::cout << t.getStr_();
       std::cout << std::endl;
     }
   }
@@ -261,7 +261,7 @@ void dumpRawTextFile(bool bShowFieldTypes) {
     for (auto t : q.lProgram)
       if (t.getStrCommandID() == "PUSH_ID" || t.getStrCommandID() == "PUSH_STREAM" || t.getStrCommandID() == "PUSH_VAL" ||
           t.getStrCommandID() == "STREAM_AGSE" || t.getStrCommandID() == "STREAM_SUBSTRACT")
-        std::cout << "\t:- " << t.getStrCommandID() << "(" << t.getStr() << ")" << std::endl;
+        std::cout << "\t:- " << t.getStrCommandID() << "(" << t.getStr_() << ")" << std::endl;
       else
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
     for (auto f : q.lSchema) {
@@ -271,9 +271,9 @@ void dumpRawTextFile(bool bShowFieldTypes) {
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr() << "[" << tf.get() << "])" << std::endl;
+          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << "[" << tf.get() << "])" << std::endl;
         } else if ((tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr() << ")" << std::endl;
+          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << ")" << std::endl;
         } else
           std::cout << "\t\t" << tf.getStrCommandID() << std::endl;
     }

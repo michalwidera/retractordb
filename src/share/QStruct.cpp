@@ -200,7 +200,7 @@ bool isExist(const std::string &query_name) {
 
 boost::rational<int> token::get() { return numericValue; }
 
-std::string token::getStr() { return textValue; }
+std::string token::getStr_() { return textValue; }
 
 bool query::isDeclaration() { return lProgram.empty(); }
 
@@ -302,7 +302,7 @@ std::vector<std::string> query::getDepStreamName(int reqDep) {
   for (auto &t : lProgram) {
     if (reqDep == 0) {
       // defult behaviour
-      if (t.getCommandID() == PUSH_STREAM) lRetVal.push_back(t.getStr());
+      if (t.getCommandID() == PUSH_STREAM) lRetVal.push_back(t.getStr_());
     } else
       ++reqDep;
   }
@@ -351,7 +351,7 @@ rdb::Descriptor query::descriptorFrom() {
       };
     } break;
     case PUSH_STREAM: {
-      for (auto &f : getQuery(cmd.getStr()).lSchema) {
+      for (auto &f : getQuery(cmd.getStr_()).lSchema) {
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
       };
     } break;
@@ -371,7 +371,7 @@ rdb::Descriptor query::descriptorFrom() {
       }
     } break;
     default:
-      SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr());
+      SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
       assert(false);
   }
   return retVal;
@@ -382,9 +382,9 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   std::string sArg1;
   std::string sArg2;
   assert(prog.size() < 4);
-  if (prog.size() == 1) sArg1 = (*eIt).getStr();   // 1
-  if (prog.size() > 1) sArg1 = (*eIt++).getStr();  // 2,3
-  if (prog.size() > 2) sArg2 = (*eIt++).getStr();  // 3
+  if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
+  if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3
+  if (prog.size() > 2) sArg2 = (*eIt++).getStr_();  // 3
   token cmd = (*eIt++);
   return std::make_tuple(sArg1, sArg2, cmd);
 }

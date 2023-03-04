@@ -92,10 +92,10 @@ number getValueOfRollup(const query &q, int offset) {
   const command_id cmd = arg[progSize - 1].getCommandID();
   switch (cmd) {
     case PUSH_STREAM:
-      return getValueProc(arg[0].getStr(), 0, offset);
+      return getValueProc(arg[0].getStr_(), 0, offset);
     case STREAM_TIMEMOVE:
       /* signalRow>1 : PUSH_STREAM(signalRow), STREAM_TIMEMOVE(1) */
-      return getValueProc(arg[0].getStr(), rational_cast<int>(arg[1].get()), offset);
+      return getValueProc(arg[0].getStr_(), rational_cast<int>(arg[1].get()), offset);
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
       /* signalRow&0.5 : PUSH_STREAM(signalRow), PUSH_VAL(1_2),
@@ -104,7 +104,7 @@ number getValueOfRollup(const query &q, int offset) {
       // TODO: This is copy&paste&fix - need to refactor
       {
         assert(q.lProgram.size() == 3);
-        auto streamNameArg = arg[0].getStr();
+        auto streamNameArg = arg[0].getStr_();
         assert(streamNameArg != "");
         auto rationalArgument = arg[1].get();
         assert(rationalArgument > 0);
@@ -121,20 +121,20 @@ number getValueOfRollup(const query &q, int offset) {
       }
     case STREAM_SUBSTRACT:
       // TODO: Check
-      return getValueProc(arg[0].getStr(), 0, offset);
+      return getValueProc(arg[0].getStr_(), 0, offset);
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
       assert(offset == 1);
-      return getValueProc(arg[0].getStr(), 0, offset);
+      return getValueProc(arg[0].getStr_(), 0, offset);
     case STREAM_SUM:
-      assert(arg[0].getStr() != "");
+      assert(arg[0].getStr_() != "");
       {
         assert(q.lProgram.size() == 2);
         boost::rational<int> ret = 0; /* limits.h */
-        for (auto f : getQuery(arg[0].getStr()).lSchema) {
+        for (auto f : getQuery(arg[0].getStr_()).lSchema) {
           int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
-          auto schema = f.getFirstFieldToken().getStr();
+          auto schema = f.getFirstFieldToken().getStr_();
           auto val = getValueProc(schema, 0, pos);
           ret += boost::rational<int>(val);
         }
@@ -147,11 +147,11 @@ number getValueOfRollup(const query &q, int offset) {
           STREAM_ADD(0)          arg[2]
       */
       {
-        const auto sizeOfFirstSchema = getQuery(arg[0].getStr()).lSchema.size();
+        const auto sizeOfFirstSchema = getQuery(arg[0].getStr_()).lSchema.size();
         if (offset < sizeOfFirstSchema)
-          return getValueProc(arg[0].getStr(), 0, offset);
+          return getValueProc(arg[0].getStr_(), 0, offset);
         else
-          return getValueProc(arg[1].getStr(), 0, offset - sizeOfFirstSchema);
+          return getValueProc(arg[1].getStr_(), 0, offset - sizeOfFirstSchema);
       }
     case STREAM_AGSE:
       // PUSH_STREAM core -> delta_source (argument1) arg[0]
@@ -163,7 +163,7 @@ number getValueOfRollup(const query &q, int offset) {
       // if (mirror) - two conditions
       {
         assert(q.lProgram.size() == 3);
-        std::string nameSrc = arg[0].getStr();
+        std::string nameSrc = arg[0].getStr_();
         std::string nameOut = q.id;
         bool mirror = arg[2].get() < 0;
         // step - means step of how long moving window will over data stream
@@ -191,10 +191,10 @@ number getValueOfRollup(const query &q, int offset) {
       {
         const auto timeSeqence = (gDataMap[q.id].len) > 1 ? gDataMap[q.id].len : 1;
         int timeOffset = 0;
-        if (Hash(getQuery(arg[0].getStr()).rInterval, getQuery(arg[1].getStr()).rInterval, timeSeqence, timeOffset))
-          return getValueProc(arg[1].getStr(), timeOffset, offset);
+        if (Hash(getQuery(arg[0].getStr_()).rInterval, getQuery(arg[1].getStr_()).rInterval, timeSeqence, timeOffset))
+          return getValueProc(arg[1].getStr_(), timeOffset, offset);
         else
-          return getValueProc(arg[0].getStr(), timeOffset, offset);
+          return getValueProc(arg[0].getStr_(), timeOffset, offset);
       }
       assert(false);  // TODO
   }
@@ -253,12 +253,12 @@ void Processor::processRows(std::set<std::string> inSet) {
         case PUSH_STREAM:
           // PUSH_STREAM core0
           // push stream operation does not have additonal stack arguments
-          streamNameArg = operation.getStr();
+          streamNameArg = operation.getStr_();
           {
             auto pos = 0;
             for (auto f : getQuery(streamNameArg).lSchema) {
               // rowValues.push_back(row[streamNameArg][pos++]);
-              std::string schema = f.getFirstFieldToken().getStr();
+              std::string schema = f.getFirstFieldToken().getStr_();
               rowValues.push_back(getValueProc(schema, 0, pos++));
             }
           }
@@ -273,14 +273,14 @@ void Processor::processRows(std::set<std::string> inSet) {
           TimeOffset = 0;
           argument1 = *(it++);
           argument2 = *(it++);
-          if (Hash(getQuery(argument1.getStr()).rInterval, getQuery(argument2.getStr()).rInterval, gDataMap[q.id].len,
+          if (Hash(getQuery(argument1.getStr_()).rInterval, getQuery(argument2.getStr_()).rInterval, gDataMap[q.id].len,
                    TimeOffset))
-            streamNameArg = argument2.getStr();
+            streamNameArg = argument2.getStr_();
           else
-            streamNameArg = argument1.getStr();
+            streamNameArg = argument1.getStr_();
           if (TimeOffset <= 0) {
-            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}", TimeOffset, argument1.getStr(),
-                         argument2.getStr(), q.id);
+            SPDLOG_ERROR("Timeoffset is (<=0) = {}, arg1={}, arg2={} q.id={}", TimeOffset, argument1.getStr_(),
+                         argument2.getStr_(), q.id);
           }
           // TimeOffset = TimeOffset - gDataMap[streamNameArg].len;  - need to
           // investigate here.
@@ -292,8 +292,8 @@ void Processor::processRows(std::set<std::string> inSet) {
           // If this assert fails - you are probably trying to hash a#b when a
           // and b has different schema sizes. This should be identified on
           // compilation phase in future.
-          assert(gDataMap[streamNameArg].row.size() == getQuery(argument1.getStr()).lSchema.size());
-          assert(gDataMap[streamNameArg].row.size() == getQuery(argument2.getStr()).lSchema.size());
+          assert(gDataMap[streamNameArg].row.size() == getQuery(argument1.getStr_()).lSchema.size());
+          assert(gDataMap[streamNameArg].row.size() == getQuery(argument2.getStr_()).lSchema.size());
           rowValues = getRow(streamNameArg, TimeOffset);
           break;
         case STREAM_ADD:
@@ -304,8 +304,8 @@ void Processor::processRows(std::set<std::string> inSet) {
           argument1 = *(it++);
           argument2 = *(it++);
           assert(streamNameArg == "");
-          assert(argument1.getStr() != "");
-          assert(argument2.getStr() != "");
+          assert(argument1.getStr_() != "");
+          assert(argument2.getStr_() != "");
           for (auto f : q.lSchema) rowValues.push_back(computeValue(f, q));
           // same as below ... - wait for c++20
           // std::ranges::for_each(
@@ -314,14 +314,14 @@ void Processor::processRows(std::set<std::string> inSet) {
           break;
         case STREAM_AVG:
           argument1 = *(it++);
-          streamNameArg = argument1.getStr();
+          streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
             number ret = 0;
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
-              std::string schema = f.getFirstFieldToken().getStr();
+              std::string schema = f.getFirstFieldToken().getStr_();
               ret = ret + getValueProc(schema, 0, pos);
             }
             ret = ret / static_cast<int>(q.lSchema.size());
@@ -330,14 +330,14 @@ void Processor::processRows(std::set<std::string> inSet) {
           break;
         case STREAM_MAX:
           argument1 = *(it++);
-          streamNameArg = argument1.getStr();
+          streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
             number ret = INT_MIN; /* limits.h */
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
-              std::string schema = f.getFirstFieldToken().getStr();
+              std::string schema = f.getFirstFieldToken().getStr_();
               number val = getValueProc(schema, 0, pos);
               if (val > ret) ret = val;
             }
@@ -346,14 +346,14 @@ void Processor::processRows(std::set<std::string> inSet) {
           break;
         case STREAM_MIN:
           argument1 = *(it++);
-          streamNameArg = argument1.getStr();
+          streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
             number ret = INT_MAX; /* limits.h */
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
-              std::string schema = f.getFirstFieldToken().getStr();
+              std::string schema = f.getFirstFieldToken().getStr_();
               number val = getValueProc(schema, 0, pos);
               if (val < ret) ret = val;
             }
@@ -362,14 +362,14 @@ void Processor::processRows(std::set<std::string> inSet) {
           break;
         case STREAM_SUM:
           argument1 = *(it++);
-          streamNameArg = argument1.getStr();
+          streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           {
             assert(q.lProgram.size() == 2);
             number ret = 0; /* limits.h */
             for (auto f : getQuery(streamNameArg).lSchema) {
               int pos = boost::rational_cast<int>(f.getFirstFieldToken().get());
-              std::string schema = f.getFirstFieldToken().getStr();
+              std::string schema = f.getFirstFieldToken().getStr_();
               number val = getValueProc(schema, 0, pos);
               ret += val;
             }
@@ -381,7 +381,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           // STREAM_TIMEMOVE 10
           assert(q.lProgram.size() == 2);
           argument1 = *(it++);
-          streamNameArg = argument1.getStr();
+          streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           TimeOffset = rational_cast<int>(operation.get());
           assert(TimeOffset >= 0);
@@ -397,7 +397,7 @@ void Processor::processRows(std::set<std::string> inSet) {
             number rationalArgument;
             argument1 = *(it++);
             argument2 = *(it++);
-            streamNameArg = argument1.getStr();
+            streamNameArg = argument1.getStr_();
             assert(streamNameArg != "");
             rationalArgument = argument2.get();
             assert(rationalArgument > 0);
@@ -421,7 +421,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           {
             argument1 = *(it++);
             argument2 = *(it++);
-            std::string nameSrc = argument1.getStr();
+            std::string nameSrc = argument1.getStr_();
             std::string nameOut = q.id;
             bool mirror = operation.get() < 0;
             // step - means step of how long moving window will over data stream
@@ -460,7 +460,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           // This need to be checked - I was tired when I wrote this
           assert(q.lProgram.size() == 2);
           argument1 = *(it++);
-          streamNameArg = argument1.getStr();
+          streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           if (operation.get() > q.rInterval) {
             // Check if parameters are in oposite order
@@ -556,33 +556,33 @@ number Processor::computeValue(field &f, query &q) {
         break;
       case CALL: {
         double real = (double)a.numerator() / (double)a.denominator();
-        if (tk.getStr() == "floor") {
+        if (tk.getStr_() == "floor") {
           a = rStack.top();
           rStack.pop();
           rStack.push(Rationalize(floor(real)));
-        } else if (tk.getStr() == "getRowValueceil") {
+        } else if (tk.getStr_() == "getRowValueceil") {
           a = rStack.top();
           rStack.pop();
           rStack.push(Rationalize(ceil(real)));
-        } else if (tk.getStr() == "iszero") {
+        } else if (tk.getStr_() == "iszero") {
           a = rStack.top();
           rStack.pop();
           if (a.numerator() == 0)
             rStack.push(Rationalize(1));
           else
             rStack.push(Rationalize(0));
-        } else if (tk.getStr() == "isnonzero") {
+        } else if (tk.getStr_() == "isnonzero") {
           a = rStack.top();
           rStack.pop();
           if (a.numerator() == 0)
             rStack.push(Rationalize(0));
           else
             rStack.push(Rationalize(1));
-        } else if (tk.getStr() == "sqrt") {
+        } else if (tk.getStr_() == "sqrt") {
           a = rStack.top();
           rStack.pop();
           rStack.push(Rationalize(sqrt(real)));
-        } else if (tk.getStr() == "sum") {
+        } else if (tk.getStr_() == "sum") {
           number data_sum(0);
           for (int i = 0; i < getRowSize(q); i++) data_sum += getValueOfRollup(q, i);
           rStack.push(data_sum);
@@ -601,7 +601,7 @@ number Processor::computeValue(field &f, query &q) {
         break;
       case PUSH_ID: {  // Schema_name[indeks,indeks] like PUSH_ID4
         int offsetInSchema(rational_cast<int>(tk.get()));
-        std::string argument(tk.getStr());
+        std::string argument(tk.getStr_());
         // If operation ADD exist - then position schema will be moved
         // first argument
         int offsetFromArg = 0;
