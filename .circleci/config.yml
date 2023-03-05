@@ -161,7 +161,7 @@ jobs:
       - conan-build:
           build_type: Debug
           build_param: --build missing
-      - run-test
+      - run-test:
           build_type: Debug
 
   build-2204-ARM:
