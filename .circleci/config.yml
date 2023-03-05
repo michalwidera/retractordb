@@ -15,6 +15,18 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-2204-conan20:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
+      - build-2204-conan20-debug:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
 
   nightly:
     triggers:
@@ -31,6 +43,9 @@ workflows:
       - build-2204-conan20:
           requires:
             - build-2204-release
+      - build-2204-conan20-debug:
+          requires:
+            - build-2204-conan20
       - build-2204-debug:
           requires:
             - build-2204-release
@@ -90,7 +105,7 @@ commands:
           command: |
             conan source .
             conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
-            conan build .
+            conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && make install
 
   run-test:
@@ -118,7 +133,6 @@ jobs:
       - run-test:
           build_type: Debug
 
-
   build-2204-release:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
@@ -137,6 +151,18 @@ jobs:
       - conan-build:
           build_param: --build missing
       - run-test
+
+  build-2204-conan20-debug:
+    working_directory: ~/retractordb
+    executor: ubuntu2204docker
+    steps:
+      - checkout
+      - prep-env-200
+      - conan-build:
+          build_type: Debug
+          build_param: --build missing
+      - run-test
+          build_type: Debug
 
   build-2204-ARM:
     working_directory: ~/retractordb

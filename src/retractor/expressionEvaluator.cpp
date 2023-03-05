@@ -5,7 +5,9 @@
 
 #include <algorithm>
 #include <iostream>
+#include <string>
 #include <typeinfo>  // operator typeid
+#include <variant>
 
 expressionEvaluator::expressionEvaluator(/* args */) {}
 
@@ -16,6 +18,17 @@ rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
 pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
+  if (a.index() == b.index()) return pairVar(a, b);
+  /*
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>)
+            std::cout << arg;
+        else if constexpr (std::is_same_v<T, std::string>)
+            std::cout << std::quoted(arg);
+    }, a);
+  */
+
   pairVar retVal;
   if (a.index() > b.index()) {
     decltype(a) aRet = a;
