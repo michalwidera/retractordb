@@ -1,5 +1,10 @@
 version: 2.1
 
+parameters:
+  my_trigger_parameter:
+    type: string
+    default: ""
+
 workflows:
   commit:
     jobs:
@@ -15,19 +20,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-conan20:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-      - build-2204-conan20-debug:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-
   nightly:
     triggers:
       - schedule:
@@ -52,6 +44,21 @@ workflows:
       - build-2204-ARM:
           requires:
             - build-2204-release
+  api-triggered-workflow:
+    when: << pipeline.parameters.my_trigger_parameter >>
+      jobs:
+        - build-2204-conan20:
+            filters:
+              branches:
+                only:
+                  - master
+                  - /issue_.*/
+        - build-2204-conan20-debug:
+            filters:
+              branches:
+                only:
+                  - master
+                  - /issue_.*/
 
 executors:
   ubuntu2204docker:
