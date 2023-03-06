@@ -28,23 +28,29 @@ do
             conan source $build_folder
             conan install $build_folder -s build_type=Release --build missing
             conan build $build_folder -s build_type=Release --build missing
+            break
             ;;
         "Debug")
             conan source $build_folder
             conan install $build_folder -s build_type=Debug --build missing
             conan build $build_folder -s build_type=Debug --build missing
+            break
             ;;
         "Relase (build only)")
             conan build $build_folder -s build_type=Release
+            break
             ;;
         "Debug (build only)")
             conan build $build_folder -s build_type=Debug
+            break
             ;;
         "Relase (make)")
             cd $build_folder/build/Release && make
+            break
             ;;
         "Debug (make)")
             cd $build_folder/build/Debug && make
+            break
             ;;
         "Quit")
             echo "Ok, quit - no action."
