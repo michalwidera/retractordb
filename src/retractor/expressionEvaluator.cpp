@@ -17,6 +17,36 @@ rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
 
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
+// https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
+rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
+  rdb::descFldVT retVal;
+  switch (reqType) {
+    case rdb::BYTE: {
+      uint8_t val;
+      /* put code tak convert descFldVT into uint8_t */
+      retVal = val;
+    } break;
+    case rdb::INTEGER: {
+      int val;
+      /* put code tak convert descFldVT into int */
+      retVal = val;
+    } break;
+    case rdb::DOUBLE: {
+      double val;
+      /* put code tak convert descFldVT into double */
+      retVal = val;
+    } break;
+    case rdb::STRING: {
+      std::string val;
+      /* put code tak convert descFldVT into string */
+      retVal = val;
+    } break;
+    default:
+      break;
+  }
+  return retVal;
+}
+
 pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
   if (a.index() == b.index()) return pairVar(a, b);
   /*
@@ -31,13 +61,11 @@ pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
 
   pairVar retVal;
   if (a.index() > b.index()) {
-    decltype(a) aRet = a;
     decltype(a) bRet = b;
-    return pairVar(aRet, bRet);
+    return pairVar(a, bRet);
   } else {
     decltype(b) aRet = a;
-    decltype(b) bRet = b;
-    return pairVar(aRet, bRet);
+    return pairVar(aRet, b);
   }
 }
 
@@ -46,16 +74,31 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
+  assert(typeid(a) == typeid(b));
+
   std::visit(Overload{
-                 [&retVal](int a, int b) { retVal = a + b; },  //
-                 [&retVal](std::string a, std::string b) { retVal = a + b; },
+                 [&retVal](int a, int b) {
+                   retVal = a + b;
+                   std::cerr << "int-int" << std::endl;
+                 },  //
+                 [&retVal](std::string a, std::string b) {
+                   std::cerr << "str-str" << std::endl;
+                   retVal = a + b;
+                 },  //
+                 [&retVal](double a, double b) {
+                   std::cerr << "dbl-dbl" << std::endl;
+                   retVal = a + b;
+                 },  //
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<int>());
                  },
                  [&retVal](std::vector<uint8_t> a, std::vector<uint8_t> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<uint8_t>());
                  },
-                 [&retVal](auto a, auto b) { retVal = a + b; }  //
+                 [&retVal](auto a, auto b) {
+                   retVal = a + b;
+                   std::cerr << "auto-auto:" << typeid(a).name() << "-" << typeid(b).name() << std::endl;
+                 }  //
              },
              a, b);
 
