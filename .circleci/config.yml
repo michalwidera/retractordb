@@ -75,12 +75,16 @@ commands:
             conan profile update settings.compiler.libcxx=libstdc++11 default
 
   prep-env-200:
+    parameters:
+      gcc_version:
+        type: string
+        default: "gcc"
     steps:
       - run:
           name: prep env
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+            sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip
             pip3 install conan
             conan profile detect
 
@@ -162,7 +166,8 @@ jobs:
     executor: ubuntu2004machine-arm
     steps:
       - checkout
-      - prep-env-200
+      - prep-env-200:
+          gcc_version: gcc-10
       - conan-build:
           build_param: --build missing
       - run:
