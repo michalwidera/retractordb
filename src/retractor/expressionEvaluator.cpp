@@ -33,15 +33,12 @@ pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
   if (a.index() > b.index()) {
     decltype(a) aRet = a;
     decltype(a) bRet = b;
-    retVal = pairVar(aRet, bRet);
+    return pairVar(aRet, bRet);
   } else {
     decltype(b) aRet = a;
     decltype(b) bRet = b;
-    retVal = pairVar(aRet, bRet);
+    return pairVar(aRet, bRet);
   }
-  static_assert(std::is_same<decltype(std::get<0>(retVal)), decltype(std::get<1>(retVal))>::value);
-
-  return retVal;
 }
 
 rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
