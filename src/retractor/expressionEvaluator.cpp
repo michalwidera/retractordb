@@ -111,27 +111,15 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   std::visit(Overload{
                  [&retVal](int a, int b) {
                    retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
-                 },  //
-                 [&retVal](unit_8 a, unit_8 b) {
-                   retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
-                 },  //
-                 [&retVal](unsigned a, unsigned b) {
-                   retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
                  },  //
                  [&retVal](std::string a, std::string b) {
                    retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
                  },  //
                  [&retVal](double a, double b) {
                    retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
-                 },  //
-                 [&retVal](float a, float b) {
-                   retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
                  },  //
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<int>());
@@ -141,7 +129,7 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  },
                  [&retVal](auto a, auto b) {
                    retVal = a + b;
-                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
                  }  //
              },
              a, b);
