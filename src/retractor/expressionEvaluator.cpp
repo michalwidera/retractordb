@@ -17,41 +17,72 @@ rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
 
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
+template <typename T>
+void visit_descFld(rdb::descFldVT& inVar, rdb::descFldVT& retVal) {
+  std::visit(Overload{
+                 [&retVal](std::monostate a) { retVal = 0; },                                 //
+                 [&retVal](uint8_t a) { retVal = a; },                                        //
+                 [&retVal](int a) { retVal = static_cast<T>(a); },                            //
+                 [&retVal](unsigned a) { retVal = static_cast<T>(a); },                       //
+                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },  //
+                 [&retVal](float a) { retVal = static_cast<T>(a); },                          //
+                 [&retVal](double a) { retVal = static_cast<T>(a); },                         //
+                 [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->byte"); },   //
+                 [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->byte"); },    //
+                 [&retVal](std::string a) { retVal = static_cast<T>(std::stoi(a)); }          //
+             },
+             inVar);
+}
+
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
 rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
   rdb::descFldVT retVal;
   switch (reqType) {
+    case rdb::BAD: {
+      SPDLOG_ERROR("Unspported bad cast");
+    } break;
     case rdb::BYTE: {
-      uint8_t val{0};
-      std::visit(Overload{
-                     [&retVal](std::monostate a) { std::cerr << "std::monostate" << std::endl; },      //                //
-                     [&retVal](uint8_t a) { std::cerr << "uint8_t" << std::endl; },                    //
-                     [&retVal](int a) { std::cerr << "int" << std::endl; },                            //
-                     [&retVal](unsigned a) { std::cerr << "unsigned" << std::endl; },                  //
-                     [&retVal](boost::rational<int> a) { std::cerr << "boost-rat" << std::endl; },     //
-                     [&retVal](float a) { std::cerr << "float" << std::endl; },                        //
-                     [&retVal](double a) { std::cerr << "double" << std::endl; },                      //
-                     [&retVal](std::vector<uint8_t> a) { std::cerr << "vect-uint8_t" << std::endl; },  //
-                     [&retVal](std::vector<int> a) { std::cerr << "vect-int" << std::endl; },          //
-                     [&retVal](std::string a) { std::cerr << "std::string" << std::endl; }             //
-                 },
-                 inVar);
-      retVal = val;
+      visit_descFld<uint8_t>(inVar, retVal);
     } break;
     case rdb::INTEGER: {
-      int val;
-      /* put code tak convert descFldVT into int */
-      retVal = val;
+      visit_descFld<int>(inVar, retVal);
+    } break;
+    case rdb::UINT: {
+      visit_descFld<unsigned>(inVar, retVal);
     } break;
     case rdb::DOUBLE: {
-      double val;
-      /* put code tak convert descFldVT into double */
-      retVal = val;
+      visit_descFld<double>(inVar, retVal);
+    } break;
+    case rdb::FLOAT: {
+      visit_descFld<float>(inVar, retVal);
+    } break;
+    case rdb::RATIONAL: {
+      SPDLOG_ERROR("TODO - rational cast");
+    } break;
+    case rdb::INTARRAY: {
+      SPDLOG_ERROR("TODO - INTARRAY cast");
+    } break;
+    case rdb::BYTEARRAY: {
+      SPDLOG_ERROR("TODO - BYTEARRAY cast");
     } break;
     case rdb::STRING: {
-      std::string val;
-      /* put code tak convert descFldVT into string */
-      retVal = val;
+      std::visit(Overload{
+                     [&retVal](std::monostate a) { retVal = "NaN"; },        //
+                     [&retVal](uint8_t a) { retVal = std::to_string(a); },   //
+                     [&retVal](int a) { retVal = std::to_string(a); },       //
+                     [&retVal](unsigned a) { retVal = std::to_string(a); },  //
+                     [&retVal](boost::rational<int> a) {
+                       std::stringstream ss;
+                       ss << a;
+                       retVal = ss.str();
+                     },                                                                          //
+                     [&retVal](float a) { retVal = std::to_string(a); },                         //
+                     [&retVal](double a) { retVal = std::to_string(a); },                        //
+                     [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->byte"); },  //
+                     [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->byte"); },   //
+                     [&retVal](std::string a) { retVal = a; }                                    //
+                 },
+                 inVar);
     } break;
     default:
       break;
@@ -61,23 +92,12 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
 
 pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
   if (a.index() == b.index()) return pairVar(a, b);
-  /*
-    std::visit([&](auto&& arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, int>)
-            std::cout << arg;
-        else if constexpr (std::is_same_v<T, std::string>)
-            std::cout << std::quoted(arg);
-    }, a);
-  */
 
   pairVar retVal;
   if (a.index() > b.index()) {
-    decltype(a) bRet = b;
-    return pairVar(a, bRet);
+    return pairVar(a, cast(b, (rdb::descFld)a.index()));
   } else {
-    decltype(b) aRet = a;
-    return pairVar(aRet, b);
+    return pairVar(cast(a, (rdb::descFld)b.index()), b);
   }
 }
 
@@ -91,15 +111,27 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   std::visit(Overload{
                  [&retVal](int a, int b) {
                    retVal = a + b;
-                   std::cerr << "int-int" << std::endl;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                 },  //
+                 [&retVal](unit_8 a, unit_8 b) {
+                   retVal = a + b;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                 },  //
+                 [&retVal](unsigned a, unsigned b) {
+                   retVal = a + b;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
                  },  //
                  [&retVal](std::string a, std::string b) {
-                   std::cerr << "str-str" << std::endl;
                    retVal = a + b;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
                  },  //
                  [&retVal](double a, double b) {
-                   std::cerr << "dbl-dbl" << std::endl;
                    retVal = a + b;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
+                 },  //
+                 [&retVal](float a, float b) {
+                   retVal = a + b;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
                  },  //
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<int>());
@@ -109,7 +141,7 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  },
                  [&retVal](auto a, auto b) {
                    retVal = a + b;
-                   std::cerr << "auto-auto:" << typeid(a).name() << "-" << typeid(b).name() << std::endl;
+                   SPDLOG_INFO("[tx:{}-{}]", typeid(a).name(), typeid(b).name());
                  }  //
              },
              a, b);

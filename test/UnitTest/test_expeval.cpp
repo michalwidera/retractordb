@@ -56,23 +56,21 @@ TEST(xExpressionEval, add_double_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);  // int in Token
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
 
   ASSERT_TRUE(std::get<double>(result) == 3.1);
 }
 
-/* Work in progress...
 TEST(xExpressionEval, add_string_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, std::string("data1")));
-  program.push_back(token(PUSH_VAL, std::string("data2")));
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(PUSH_VAL, rdb::descFldVT("data1")));
   program.push_back(token(ADD));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  //ASSERT_TRUE(result.index() == rdb::DOUBLE);  // int in Token
+  ASSERT_TRUE(result.index() == rdb::STRING);
 
-  //ASSERT_TRUE(std::get<double>(result) == 3.1);
+  ASSERT_TRUE(std::get<std::string>(result) == "data11");
 }
-*/
