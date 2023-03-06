@@ -12,8 +12,8 @@ case "$foldername" in
   "build")       build_folder="..";;
   "Release")     build_folder="../..";;
   "Debug")       build_folder="../..";;
-  *)             echo "Unknown build folder: $foldername"
-                 break
+  *)             echo "Unknown current build folder << $foldername >>"
+                 exit
                  ;;
 esac
 
