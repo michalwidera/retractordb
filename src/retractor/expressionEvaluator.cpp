@@ -22,8 +22,20 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
   rdb::descFldVT retVal;
   switch (reqType) {
     case rdb::BYTE: {
-      uint8_t val;
-      /* put code tak convert descFldVT into uint8_t */
+      uint8_t val{0};
+      std::visit(Overload{
+                     [&retVal](std::monostate a) { std::cerr << "std::monostate" << std::endl; },      //                //
+                     [&retVal](uint8_t a) { std::cerr << "uint8_t" << std::endl; },                    //
+                     [&retVal](int a) { std::cerr << "int" << std::endl; },                            //
+                     [&retVal](unsigned a) { std::cerr << "unsigned" << std::endl; },                  //
+                     [&retVal](boost::rational<int> a) { std::cerr << "boost-rat" << std::endl; },     //
+                     [&retVal](float a) { std::cerr << "float" << std::endl; },                        //
+                     [&retVal](double a) { std::cerr << "double" << std::endl; },                      //
+                     [&retVal](std::vector<uint8_t> a) { std::cerr << "vect-uint8_t" << std::endl; },  //
+                     [&retVal](std::vector<int> a) { std::cerr << "vect-int" << std::endl; },          //
+                     [&retVal](std::string a) { std::cerr << "std::string" << std::endl; }             //
+                 },
+                 inVar);
       retVal = val;
     } break;
     case rdb::INTEGER: {
