@@ -111,7 +111,8 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h && xcompiler -h
-            cd build/<<parameters.build_type>> && make test
+            cd build/<<parameters.build_type>>/UnitTest && make test
+            cd build/<<parameters.build_type>>/Regression && make test
 
 jobs:
   build-2204-debug:

@@ -34,6 +34,17 @@ void visit_descFld(rdb::descFldVT& inVar, rdb::descFldVT& retVal) {
              inVar);
 }
 
+// https://stackoverflow.com/questions/23304177/c-alternative-for-parsing-input-with-sscanf
+template <char C>
+std::istream& expect(std::istream& in) {
+  if ((in >> std::ws).peek() == C) {
+    in.ignore();
+  } else {
+    in.setstate(std::ios_base::failbit);
+  }
+  return in;
+}
+
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
 rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
   rdb::descFldVT retVal;
@@ -57,7 +68,25 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
       visit_descFld<float>(inVar, retVal);
     } break;
     case rdb::RATIONAL: {
-      SPDLOG_ERROR("TODO - rational cast");
+      // Requested type is RATIONAL
+      std::visit(Overload{
+                     [&retVal](std::monostate a) { retVal = "NaN"; },                                //
+                     [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
+                     [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
+                     [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
+                     [&retVal](boost::rational<int> a) { retVal = a; },                              //
+                     [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
+                     [&retVal](double a) { retVal = Rationalize(a); },                               //
+                     [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },         //
+                     [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },          //
+                     [&retVal](std::string a) {
+                       std::istringstream in(a);
+                       int nom{0}, den{1};
+                       in >> nom >> expect<'/'> >> den;
+                       retVal = boost::rational<int>(nom, den);
+                     }  //
+                 },
+                 inVar);
     } break;
     case rdb::INTARRAY: {
       SPDLOG_ERROR("TODO - INTARRAY cast");
@@ -66,6 +95,7 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
       SPDLOG_ERROR("TODO - BYTEARRAY cast");
     } break;
     case rdb::STRING: {
+      // Requested type is STRING
       std::visit(Overload{
                      [&retVal](std::monostate a) { retVal = "NaN"; },        //
                      [&retVal](uint8_t a) { retVal = std::to_string(a); },   //
@@ -75,12 +105,12 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
                        std::stringstream ss;
                        ss << a;
                        retVal = ss.str();
-                     },                                                                          //
-                     [&retVal](float a) { retVal = std::to_string(a); },                         //
-                     [&retVal](double a) { retVal = std::to_string(a); },                        //
-                     [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->byte"); },  //
-                     [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->byte"); },   //
-                     [&retVal](std::string a) { retVal = a; }                                    //
+                     },                                                                       //
+                     [&retVal](float a) { retVal = std::to_string(a); },                      //
+                     [&retVal](double a) { retVal = std::to_string(a); },                     //
+                     [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },  //
+                     [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },   //
+                     [&retVal](std::string a) { retVal = a; }                                 //
                  },
                  inVar);
     } break;
@@ -109,28 +139,20 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](int a, int b) {
-                   retVal = a + b;
-                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
-                 },  //
-                 [&retVal](std::string a, std::string b) {
-                   retVal = a + b;
-                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
-                 },  //
-                 [&retVal](double a, double b) {
-                   retVal = a + b;
-                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
-                 },  //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                            //
+                 [&retVal](int a, int b) { retVal = a + b; },                                    //
+                 [&retVal](unsigned a, unsigned b) { retVal = a + b; },                          //
+                 [&retVal](std::string a, std::string b) { retVal = a + b; },                    //
+                 [&retVal](double a, double b) { retVal = a + b; },                              //
+                 [&retVal](float a, float b) { retVal = a + b; },                                //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a + b; },  //
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<int>());
                  },
                  [&retVal](std::vector<uint8_t> a, std::vector<uint8_t> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<uint8_t>());
                  },
-                 [&retVal](auto a, auto b) {
-                   retVal = a + b;
-                   SPDLOG_INFO( "[tx:{}-{}]" , typeid(a).name() , typeid(b).name() );
-                 }  //
+                 [&retVal](auto a, auto b) { retVal = a + b; }  //
              },
              a, b);
 

@@ -74,3 +74,17 @@ TEST(xExpressionEval, add_string_int) {
 
   ASSERT_TRUE(std::get<std::string>(result) == "data11");
 }
+
+TEST(xExpressionEval, add_rational_int) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(PUSH_VAL, boost::rational<int>(1,2)));
+  program.push_back(token(ADD));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::RATIONAL);
+
+  ASSERT_TRUE(std::get<boost::rational<int>>(result) == boost::rational<int>(3,2));
+}
