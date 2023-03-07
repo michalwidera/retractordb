@@ -122,8 +122,14 @@ commands:
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h && xcompiler -h
             cd build/<<parameters.build_type>>/test/Regression && make test
+      - run:
+          command: |
+            mkdir -p /tmp/test_dumps
+            cp build/<<parameters.build_type>>/test/UnitTest/*.log /tmp/test_dumps
+            cp build/<<parameters.build_type>>/test/Regression/Testing/Temporary/* /tmp/test_dumps
+          # when: on_fail
       - store_artifacts:
-          path: build/<<parameters.build_type>>/test/UnitTest
+          path: /tmp/test_dumps
 
 
 jobs:
