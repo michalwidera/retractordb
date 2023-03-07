@@ -123,7 +123,7 @@ commands:
             xretractor -h && xqry -h && xdumper -h && xcompiler -h
             cd build/<<parameters.build_type>>/test/Regression && make test
       - store_artifacts:
-          path: build/<<parameters.build_type>>/test/UnitTest/*.log
+          path: build/<<parameters.build_type>>/test/UnitTest
 
 
 jobs:
