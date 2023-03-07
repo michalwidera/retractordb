@@ -115,13 +115,13 @@ commands:
           name: UnitTest
           command: |
             export PATH="$HOME/.local/bin:$PATH"
-            cd build/<<parameters.build_type>>/UnitTest && make test
+            cd build/<<parameters.build_type>>/test/UnitTest && make test
       - run:
           name: Regression
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h && xcompiler -h
-            cd build/<<parameters.build_type>>/Regression && make test
+            cd build/<<parameters.build_type>>/test/Regression && make test
 
 
 jobs:
