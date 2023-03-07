@@ -65,8 +65,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
-            pip install --upgrade pip
-            pip install conan==1.59
+            pip3 install conan==1.59
             conan profile new default --detect
             conan profile update settings.compiler.libcxx=libstdc++11 default
 
@@ -81,8 +80,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip
-            pip install --upgrade pip
-            pip install conan
+            pip3 install conan
             conan profile detect
 
   conan-build:
@@ -130,6 +128,7 @@ jobs:
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
+    parallelism: 3
     steps:
       - checkout
       - prep-env-159
@@ -141,6 +140,7 @@ jobs:
   build-2204-release:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
+    parallelism: 3
     steps:
       - checkout
       - prep-env-159
@@ -150,6 +150,7 @@ jobs:
   build-2204-conan20:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
+    parallelism: 3
     steps:
       - checkout
       - prep-env-200
@@ -160,6 +161,7 @@ jobs:
   build-2204-conan20-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
+    parallelism: 3
     steps:
       - checkout
       - prep-env-200
