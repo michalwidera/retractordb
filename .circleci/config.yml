@@ -109,12 +109,22 @@ commands:
         default: "Release"
     steps:
       - run:
-          name: test
+          name: Smoke
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h && xcompiler -h
+      - run:
+          name: UnitTest
+          command: |
+            export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>>/UnitTest && make test
+      - run:
+          name: Regression
+          command: |
+            export PATH="$HOME/.local/bin:$PATH"
+            xretractor -h && xqry -h && xdumper -h && xcompiler -h
             cd build/<<parameters.build_type>>/Regression && make test
+
 
 jobs:
   build-2204-debug:
