@@ -128,8 +128,6 @@ jobs:
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
-
-
     steps:
       - checkout
       - prep-env-159
