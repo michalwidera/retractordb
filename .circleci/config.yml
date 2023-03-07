@@ -128,7 +128,8 @@ jobs:
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
-    parallelism: 3
+
+
     steps:
       - checkout
       - prep-env-159
@@ -140,7 +141,6 @@ jobs:
   build-2204-release:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
-    parallelism: 3
     steps:
       - checkout
       - prep-env-159
@@ -150,7 +150,6 @@ jobs:
   build-2204-conan20:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
-    parallelism: 3
     steps:
       - checkout
       - prep-env-200
@@ -161,7 +160,6 @@ jobs:
   build-2204-conan20-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204docker
-    parallelism: 3
     steps:
       - checkout
       - prep-env-200
