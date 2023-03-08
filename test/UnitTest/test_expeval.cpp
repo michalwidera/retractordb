@@ -182,3 +182,27 @@ TEST(xExpressionEval, neg_byte_as_xor_ff) {
   ASSERT_TRUE(result.index() == rdb::BYTE);
   ASSERT_TRUE(std::get<uint8_t>(result) == 0xf0);
 }
+
+TEST(xExpressionEval, call_floor_function_double) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.25));
+  program.push_back(token(CALL, std::string("floor")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  ASSERT_TRUE(std::get<double>(result) == 1);
+}
+
+TEST(xExpressionEval, call_floor_function_rational) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, boost::rational<int>(3 / 2)));
+  program.push_back(token(CALL, std::string("floor")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::RATIONAL);
+  ASSERT_TRUE(std::get<boost::rational<int>>(result) == 1);
+}

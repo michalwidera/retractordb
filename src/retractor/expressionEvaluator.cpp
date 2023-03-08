@@ -343,7 +343,24 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
       case NEGATE:
         a = rStack.top();
         rStack.pop();
+
         rStack.push(neg(a));
+        break;
+      case CALL: {
+        /* TODO */
+        if (tk.getStr_() == "floor") {
+          a = rStack.top();
+          rStack.pop();
+
+          auto cacheInTypeIdx = a.index();
+          auto real = cast(a, rdb::DOUBLE);
+
+          rdb::descFldVT floValue{floor(std::get<double>(real))};
+          rStack.push(cast(floValue, (rdb::descFld)cacheInTypeIdx));
+        }
+      } break;
+      case PUSH_ID:
+        /* TODO */
         break;
     }
   };
