@@ -102,3 +102,31 @@ TEST(xExpressionEval, add_rational_string) {
 
   ASSERT_TRUE(std::get<std::string>(result) == "1/2test");
 }
+
+TEST(xExpressionEval, sub_int_int) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 2));
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(SUBTRACT));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::INTEGER);
+
+  ASSERT_TRUE(std::get<int>(result) == 1);
+}
+
+TEST(xExpressionEval, sub_int_dobule) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 2.1));
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(SUBTRACT));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+
+  ASSERT_TRUE(std::get<double>(result) == 1.1);
+}
