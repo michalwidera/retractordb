@@ -13,8 +13,6 @@ expressionEvaluator::expressionEvaluator(/* args */) {}
 
 expressionEvaluator::~expressionEvaluator() {}
 
-rdb::descFldVT neg(rdb::descFldVT a) { return 0; };
-
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
 template <typename T>
@@ -231,6 +229,86 @@ rdb::descFldVT operator-(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   return retVal;
 }
 
+rdb::descFldVT operator*(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                            //
+                 [&retVal](int a, int b) { retVal = a * b; },                                    //
+                 [&retVal](unsigned a, unsigned b) { retVal = a * b; },                          //
+                 [&retVal](std::string a, std::string b) { /* define string-mult-string */ },    //
+                 [&retVal](double a, double b) { retVal = a * b; },                              //
+                 [&retVal](float a, float b) { retVal = a * b; },                                //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a * b; },  //
+                 [&retVal](std::vector<int> a, std::vector<int> b) {
+                   std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::multiplies<int>());
+                   retVal = a;
+                 },
+                 [&retVal](std::vector<uint8_t> a, std::vector<uint8_t> b) {
+                   std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::multiplies<uint8_t>());
+                   retVal = a;
+                 },
+                 [&retVal](auto a, auto b) { retVal = a * b; }  //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT operator/(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                            //
+                 [&retVal](int a, int b) { retVal = a / b; },                                    //
+                 [&retVal](unsigned a, unsigned b) { retVal = a / b; },                          //
+                 [&retVal](std::string a, std::string b) { /* define string-div-string */ },     //
+                 [&retVal](double a, double b) { retVal = a / b; },                              //
+                 [&retVal](float a, float b) { retVal = a / b; },                                //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a / b; },  //
+                 [&retVal](std::vector<int> a, std::vector<int> b) {
+                   std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::divides<int>());
+                   retVal = a;
+                 },
+                 [&retVal](std::vector<uint8_t> a, std::vector<uint8_t> b) {
+                   std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::divides<uint8_t>());
+                   retVal = a;
+                 },
+                 [&retVal](auto a, auto b) { retVal = a / b; }  //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT neg(const rdb::descFldVT& inVar) {
+  rdb::descFldVT retVal;
+
+  std::visit(Overload{
+                 [&retVal](std::monostate a) {},                                                 //
+                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                    // xor ?
+                 [&retVal](int a) { retVal = -a; },                                              //
+                 [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                  // xor ?
+                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<int>(-a); },  //
+                 [&retVal](float a) { retVal = -a; },                                            //
+                 [&retVal](double a) { retVal = -a; },                                           //
+                 [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },         //
+                 [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },          //
+                 [&retVal](std::string a) { /* define neg of string ? */ }                       //
+             },
+             inVar);
+
+  return retVal;
+}
+
 rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;
@@ -257,15 +335,15 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
         rStack.push(b - a);
         break;
       case MULTIPLY:
-        // rStack.push( a * b );
+        rStack.push(a * b);
         break;
       case DIVIDE:
-        // rStack.push( a / b );
+        rStack.push(a / b);
         break;
       case NEGATE:
         a = rStack.top();
         rStack.pop();
-        // rStack.push(neg(a));
+        rStack.push(neg(a));
         break;
     }
   };

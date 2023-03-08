@@ -130,3 +130,55 @@ TEST(xExpressionEval, sub_int_dobule) {
 
   ASSERT_TRUE(std::get<double>(result) == 1.1);
 }
+
+TEST(xExpressionEval, mul_int_dobule) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 2.1));
+  program.push_back(token(PUSH_VAL, 2));
+  program.push_back(token(MULTIPLY));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  // std::cerr << std::get<double>(result) << std::endl;
+  ASSERT_TRUE(std::get<double>(result) == 4.2);
+}
+
+TEST(xExpressionEval, div_int_dobule) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 2));
+  program.push_back(token(PUSH_VAL, 2.1));
+  program.push_back(token(DIVIDE));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  // std::cerr << std::get<double>(result) << std::endl;
+  ASSERT_TRUE(std::get<double>(result) == 1.05);
+}
+
+TEST(xExpressionEval, neg_dobule) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 2.1));
+  program.push_back(token(NEGATE));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  ASSERT_TRUE(std::get<double>(result) == -2.1);
+}
+
+TEST(xExpressionEval, neg_byte_as_xor_ff) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, static_cast<uint8_t>(0x0f)));
+  program.push_back(token(NEGATE));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::BYTE);
+  ASSERT_TRUE(std::get<uint8_t>(result) == 0xf0);
+}
