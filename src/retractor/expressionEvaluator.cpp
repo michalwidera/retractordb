@@ -332,6 +332,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
   rdb::descFldVT a, b;
 
   for (auto tk : program) {
+    auto tkStr = tk.getStr_();
     switch (tk.getCommandID()) {
       case ADD:
       case SUBTRACT:
@@ -364,9 +365,29 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
         rStack.push(neg(b));
         break;
       case CALL:
-        if (tk.getStr_() == "floor") rStack.push(callFun(b, floor));
-        if (tk.getStr_() == "ceil") rStack.push(callFun(b, ceil));
-        if (tk.getStr_() == "sqrt") rStack.push(callFun(b, sqrt));
+        // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
+        if (tkStr == "floor")
+          rStack.push(callFun(b, floor));
+        else if (tkStr == "ceil")
+          rStack.push(callFun(b, ceil));
+        else if (tkStr == "sqrt")
+          rStack.push(callFun(b, sqrt));
+        else if (tkStr == "round")
+          rStack.push(callFun(b, round));
+        else if (tkStr == "sin")
+          rStack.push(callFun(b, sin));
+        else if (tkStr == "cos")
+          rStack.push(callFun(b, cos));
+        else if (tkStr == "tan")
+          rStack.push(callFun(b, tan));
+        else if (tkStr == "log")
+          rStack.push(callFun(b, log));
+        else if (tkStr == "log2")
+          rStack.push(callFun(b, log2));
+        else if (tkStr == "trunc")
+          rStack.push(callFun(b, trunc));
+        else if (tkStr == "pow")
+          rStack.push(callFun(b, pow));
         break;
       case PUSH_ID:
         /* TODO */
