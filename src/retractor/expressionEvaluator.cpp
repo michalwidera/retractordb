@@ -4,6 +4,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>       // sqrt
+#include <functional>  // std::function
 #include <iostream>
 #include <string>
 #include <typeinfo>  // operator typeid
@@ -309,6 +311,22 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
   return retVal;
 }
 
+rdb::descFldVT callFun(rdb::descFldVT& inVar, std::function<double(double)> fnName) {
+  auto backResultType = inVar.index();
+  if (backResultType > rdb::BAD && backResultType <= rdb::DOUBLE) {
+    auto real = cast(inVar, rdb::DOUBLE);
+
+    rdb::descFldVT floValue{fnName(std::get<double>(real))};
+    return cast(floValue, (rdb::descFld)backResultType);
+  } else {
+    // There is no definition of floor( std::string ) or sqrt( vector ) ?
+    // throw error ?
+    assert(false);
+  }
+
+  return inVar;
+}
+
 rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;
@@ -321,6 +339,8 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
       case DIVIDE:
         a = rStack.top();
         rStack.pop();
+      case CALL:
+      case NEGATE:
         b = rStack.top();
         rStack.pop();
     }
@@ -341,24 +361,13 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
         rStack.push(a / b);
         break;
       case NEGATE:
-        a = rStack.top();
-        rStack.pop();
-
-        rStack.push(neg(a));
+        rStack.push(neg(b));
         break;
-      case CALL: {
-        /* TODO */
-        if (tk.getStr_() == "floor") {
-          a = rStack.top();
-          rStack.pop();
-
-          auto cacheInTypeIdx = a.index();
-          auto real = cast(a, rdb::DOUBLE);
-
-          rdb::descFldVT floValue{floor(std::get<double>(real))};
-          rStack.push(cast(floValue, (rdb::descFld)cacheInTypeIdx));
-        }
-      } break;
+      case CALL:
+        if (tk.getStr_() == "floor") rStack.push(callFun(b, floor));
+        if (tk.getStr_() == "ceil") rStack.push(callFun(b, ceil));
+        if (tk.getStr_() == "sqrt") rStack.push(callFun(b, sqrt));
+        break;
       case PUSH_ID:
         /* TODO */
         break;

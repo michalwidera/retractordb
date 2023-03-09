@@ -206,3 +206,15 @@ TEST(xExpressionEval, call_floor_function_rational) {
   ASSERT_TRUE(result.index() == rdb::RATIONAL);
   ASSERT_TRUE(std::get<boost::rational<int>>(result) == 1);
 }
+
+TEST(xExpressionEval, call_ceil_function_double) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.25));
+  program.push_back(token(CALL, std::string("ceil")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  ASSERT_TRUE(std::get<double>(result) == 2);
+}
