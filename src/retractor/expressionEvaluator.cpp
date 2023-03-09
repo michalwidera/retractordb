@@ -386,8 +386,6 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
           rStack.push(callFun(b, log2));
         else if (tkStr == "trunc")
           rStack.push(callFun(b, trunc));
-        else if (tkStr == "pow")
-          rStack.push(callFun(b, pow));
         break;
       case PUSH_ID:
         /* TODO */
