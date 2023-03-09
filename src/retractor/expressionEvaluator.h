@@ -11,7 +11,6 @@
 #define FLDTYPE_H_CREATE_VARIANT_T
 #include "fldType.h"  // rdb::descFldVT
 
-// typedef std::variant<int, unsigned, std::string> descFldVT;
 class expressionEvaluator {
  private:
   /* data */
