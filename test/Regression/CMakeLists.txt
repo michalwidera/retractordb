@@ -9,7 +9,7 @@ set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 # hang during startup My fail count #2
 
 add_test(
-  NAME check-output-artifacts
+  NAME check-banned-artifacts
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-artifacts.sh xrdb)
 
