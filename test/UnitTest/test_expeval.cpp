@@ -4,6 +4,8 @@
 
 #include "retractor/expressionEvaluator.h"
 
+// ctest -R '^unittest-test-expeval'
+
 TEST(xExpressionEval, add_int_int) {
   /*
   PUSH_VAL(1)

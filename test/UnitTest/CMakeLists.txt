@@ -7,6 +7,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/compiler)
 
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
+set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_SOURCE_DIR}/test/UnitTest/Data)
 
 set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
 
@@ -85,33 +86,33 @@ target_link_libraries(test_expeval ${Boost_LIBRARIES} ${GTest_LIBRARIES}
 
 add_test(
   NAME unittest-test-xqry
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
   NAME unittest-test-xcompiler
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/compiler
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xcompiler)
 
 add_test(
   NAME unittest-test-xtrdb
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
 add_test(
   NAME unittest-test-expeval
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
 
 add_test(
   NAME unittest-test-schema
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/schema
   COMMAND bash -c "set -e ; \
   ${CMAKE_BINARY_DIR}/test/UnitTest/test_schema")
 
 add_test(
   NAME unittest-test-schema-comp
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/schema
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/schema
   COMMAND bash -c "set -e ; \
   xtrdb < term.script > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
