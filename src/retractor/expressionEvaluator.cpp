@@ -10,6 +10,7 @@
 #include <string>
 #include <typeinfo>  // operator typeid
 #include <variant>
+#include <stack>
 
 expressionEvaluator::expressionEvaluator(/* args */) {}
 
