@@ -96,7 +96,7 @@ add_test(
 
 add_test(
   NAME unittest-test-xtrdb
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
 add_test(
