@@ -218,3 +218,19 @@ TEST(xExpressionEval, call_ceil_function_double) {
   ASSERT_TRUE(result.index() == rdb::DOUBLE);
   ASSERT_TRUE(std::get<double>(result) == 2);
 }
+
+TEST(xExpressionEval, long_program) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.25));
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(PUSH_VAL, 2));
+  program.push_back(token(ADD));
+  program.push_back(token(MULTIPLY));
+  program.push_back(token(CALL, std::string("ceil")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  ASSERT_TRUE(std::get<double>(result) == 4);
+}
