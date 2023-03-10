@@ -6,7 +6,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/share
   ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/compiler)
 
-set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_SOURCE_DIR}/test/UnitTest/Data)
 
 set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)

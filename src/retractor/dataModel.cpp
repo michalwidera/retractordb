@@ -9,8 +9,6 @@
 
 // ctest -R '^unittest-test-schema'
 
-extern "C" qTree coreInstance;
-
 enum { noHexFormat = false, HexFormat = true };
 
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
