@@ -24,7 +24,7 @@ extern std::string parser(std::string sInputFile);
 extern std::string storeParseResult(std::string sOutputFile);
 extern int main_retractor( bool verbose , bool waterfall , int iTimeLimitCntParam );
 
-int iTimeLimitCnt{0};
+int iTimeLimitCntParam{0};
 
 extern qTree coreInstance;
 
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
         ("dumpcross,d", "dump diagnostic cross compilation forms") //
         ("waterfall,f", "show waterfall mode")             //                                                //
         ("verbose,v", "Dump diagnostic info on screen while work") //
-        ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0), "query limit, 0 - no limit") //
+        ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0), "query limit, 0 - no limit") //
         ("onlycompile,c", "compile only");   
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);  
@@ -144,5 +144,5 @@ int main(int argc, char* argv[]) {
   //
   if (vm.count("onlycompile")) return system::errc::success;
 
-  return main_retractor( vm.count("verbose") , vm.count("waterfall") , iTimeLimitCnt );  
+  return main_retractor( vm.count("verbose") , vm.count("waterfall") , iTimeLimitCntParam );  
 }

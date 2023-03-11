@@ -1,12 +1,7 @@
-# declaration of input time series
-
-declare a INTEGER,b INTEGER stream core0, 1 file 'datafile2.dat'
-declare c INTEGER,d INTEGER stream core1, 0.5 file 'datafile3.dat'
-
-# time series junction
-select core0[0],core0[1] stream str1 from core0#core1
-select (core1[0]+1)*2+1,1 stream str2 from core1-1/2
-select core0[0],core0[1] stream str3 from core1+core0
-
-select * stream str4 from core0&2
-select * stream str5 from core0%0.5
+DECLARE a INTEGER,b INTEGER STREAM core0, 1 FILE 'datafile2.dat'
+DECLARE c INTEGER,d INTEGER STREAM core1, 0.5 FILE 'datafile3.dat'
+SELECT core0[0],core0[1] STREAM str1 FROM core0#core1
+SELECT (core1[0]+1)*2+1,1 STREAM str2 FROM core1-1/2
+SELECT core0[0],core0[1] STREAM str3 FROM core1+core0
+SELECT * STREAM str4 FROM core0&2
+SELECT * STREAM str5 FROM core0%0.5
