@@ -7,6 +7,8 @@
 
 #include "QStruct.h"  // coreInstance
 
+extern "C" qTree coreInstance;
+
 // ctest -R '^unittest-test-schema'
 
 enum { noHexFormat = false, HexFormat = true };
@@ -55,7 +57,7 @@ dataInstance::dataInstance(                    //
   SPDLOG_INFO("dataInstance - storage and id are the same");
 }
 
-dataInstance::dataInstance(query &qry)
+dataInstance::dataInstance(query& qry)
     : dataInstance(qry.id,                     // descriptor file
                    qry.filename,               // storage file
                    qry.descriptorFrom(),       //
@@ -63,3 +65,34 @@ dataInstance::dataInstance(query &qry)
       ) {
   SPDLOG_INFO("dataInstance <- qry");
 };
+
+dataModel::dataModel(/* args */) {}
+
+dataModel::~dataModel() {}
+
+void dataModel::load(std::string compiledQueryFile) {
+  std::ifstream ifs(compiledQueryFile.c_str(), std::ios::binary);
+  assert(ifs);
+  //
+  // Load of compiled query from file
+  //
+  boost::archive::text_iarchive ia(ifs);
+  ia >> coreInstance;
+}
+
+void dataModel::prepare() {
+  //
+  // Special parameters support in qurey set
+  // fetch all ':*' - and remove them from coreInstance
+  //
+  for (auto qry : coreInstance) if (qry.id == ":STORAGE") storagePath = qry.filename;
+
+  auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
+                                [](const query& qry) { return qry.id[0] == ':'; });
+  coreInstance.erase(new_end, coreInstance.end());
+
+  SPDLOG_INFO("Create struct on CORE INSTANCE");
+
+  for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<dataInstance>(qry));
+  for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
+}

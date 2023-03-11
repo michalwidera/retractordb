@@ -105,23 +105,21 @@ TEST_F(xschema, check_test1) {
     } else
       SPDLOG_WARN("Not found {}", i);
 
+  // This simplified dataModel::load
   coreInstance.clear();
   auto compiled = parser("ut_example_schema.rql") == "OK";
   ASSERT_TRUE(compiled == true);
 
-  std::map<std::string, std::unique_ptr<dataInstance>> qSet;
+  dataModel dataArea ;
 
-  SPDLOG_INFO("Create struct on CORE INSTANCE");
-
-  for (auto& q1 : coreInstance) qSet.emplace(q1.id, std::make_unique<dataInstance>(q1));
-  for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
+  dataArea.prepare();
 
   // Todo
-  qSet["str1"]->storagePayload->setItem(0, 2);
-  qSet["str1"]->storagePayload->setItem(1, 3);
-  qSet["str1"]->storage->write();
+  dataArea.qSet["str1"]->storagePayload->setItem(0, 2);
+  dataArea.qSet["str1"]->storagePayload->setItem(1, 3);
+  dataArea.qSet["str1"]->storage->write();
 
-  SPDLOG_INFO("Records in str1 {}", qSet["str1"]->storage->getRecordsCount());
+  SPDLOG_INFO("Records in str1 {}", dataArea.qSet["str1"]->storage->getRecordsCount());
 
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
@@ -137,6 +135,6 @@ TEST_F(xschema, check_test1) {
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  ASSERT_TRUE(coreInstance.size() == qSet.size());
+  ASSERT_TRUE(coreInstance.size() == dataArea.qSet.size());
 };
 }  // namespace

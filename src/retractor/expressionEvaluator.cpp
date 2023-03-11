@@ -7,10 +7,10 @@
 #include <cmath>       // sqrt
 #include <functional>  // std::function
 #include <iostream>
+#include <stack>
 #include <string>
 #include <typeinfo>  // operator typeid
 #include <variant>
-#include <stack>
 
 expressionEvaluator::expressionEvaluator(/* args */) {}
 

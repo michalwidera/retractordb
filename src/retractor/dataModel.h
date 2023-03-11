@@ -30,3 +30,17 @@ struct dataInstance {
   // This constructor will create data based on QStruct query
   dataInstance(query &qry);
 };
+
+class dataModel {
+ private:
+  std::string storagePath;
+
+ public:
+  std::map<std::string, std::unique_ptr<dataInstance>> qSet;
+
+  dataModel(/* args */);
+  ~dataModel();
+
+  void load(std::string compiledQueryFile);
+  void prepare();
+};
