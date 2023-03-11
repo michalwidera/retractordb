@@ -297,7 +297,8 @@ std::string printRowValue(const std::string query_name) {
   return strstream.str();
 }
 
-int main_retractor( bool verbose , bool waterfall ) {
+int main_retractor( bool verbose , bool waterfall , int iTimeLimitCntParam ) {
+  iTimeLimitCnt = iTimeLimitCntParam;
   auto retVal = system::errc::success;
   thread bt(commmandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !

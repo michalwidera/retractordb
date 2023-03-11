@@ -22,9 +22,9 @@ using boost::lexical_cast;
 
 extern std::string parser(std::string sInputFile);
 extern std::string storeParseResult(std::string sOutputFile);
-extern int main_retractor( bool verbose , bool waterfall );
+extern int main_retractor( bool verbose , bool waterfall , int iTimeLimitCntParam );
 
-extern int iTimeLimitCnt;
+int iTimeLimitCnt{0};
 
 extern qTree coreInstance;
 
@@ -144,5 +144,5 @@ int main(int argc, char* argv[]) {
   //
   if (vm.count("onlycompile")) return system::errc::success;
 
-  return main_retractor( vm.count("verbose") , vm.count("waterfall") );  
+  return main_retractor( vm.count("verbose") , vm.count("waterfall") , iTimeLimitCnt );  
 }

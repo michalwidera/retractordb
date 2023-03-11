@@ -4,7 +4,7 @@ if [ "$1" != "" ]; then
 
 if ! xretractor $1 -c ; then exit ; fi
 
-xretractor $1 -m 8000 &
+xretractor -q $1 -m 8000 &
 xqry -d
 xqry -s str2 -m 5
 xqry -s str2 -m 5
