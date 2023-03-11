@@ -2,9 +2,9 @@
 
 if [ "$1" != "" ]; then
 
-if ! xcompiler -q $1 ; then exit ; fi
+if ! xretractor $1 -c; then exit ; fi
 
-xretractor -m 8000 &
+xretractor $1 -m 8000 &
 
 sleep 5
 xqry -d

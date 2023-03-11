@@ -24,7 +24,7 @@ fi
 
 if [[ $FILE == *.qry ]] ; then
 echo "Calling compiler for" $FILE
-if ! xcompiler -q $FILE ; then exit 1 ; fi
+if ! xretractor -q $FILE -c ; then exit 1 ; fi
 fi
 
 echo 'Phase view: query.'$PHASE

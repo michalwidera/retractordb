@@ -297,89 +297,16 @@ std::string printRowValue(const std::string query_name) {
   return strstream.str();
 }
 
-int main(int argc, char *argv[]) {
-  // Clarification: When gcc has been upgraded to 9.x version some tests fails.
-  // Bug appear when data are passing to program via script .sh
-  // additional 13 (\r) character was append - this code normalize argv list.
-  // C99: The parameters argc and argv and the strings pointed to by the argv
-  // array shall be modifiable by the program, and retain their last-stored
-  // values between program startup and program termination.
+int main_retractor( bool verbose , bool waterfall ) {
   auto retVal = system::errc::success;
-  for (int i = 0; i < argc; i++) {
-    auto len = strlen(argv[i]);
-    if (len > 0)
-      if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
-  }
-  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
-  spdlog::set_default_logger(filelog);
-  spdlog::set_pattern(common_log_pattern);
-  spdlog::flush_on(spdlog::level::trace);
-  SPDLOG_INFO("{} start  [-------------------]", argv[0]);
   thread bt(commmandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {
-    namespace po = boost::program_options;
-    std::string sInputFile;
-    std::string sQuery;
-    std::string sDumpFile;
-    po::options_description desc("Supported program options");
-    desc.add_options()                                                                                     //
-        ("help,h", "show help")                                                                            //
-        ("infile,i", po::value<std::string>(&sInputFile)->default_value("query.qry"), "input query plan")  //
-        ("display,s", po::value<std::string>(&sQuery), "process single query")                             //
-        ("dump,d", po::value<std::string>(&sDumpFile)->default_value("query.dmp"), "dump file name")       //
-        ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0), "query limit, 0 - no limit")     //
-        ("waterfall,f", "show waterfall mode")                                                             //
-        ("verbose,v", "Dump diagnostic info on screen while work");
-    // Assume that infile is the first option
-    po::positional_options_description p;
-    p.add("infile", -1);
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-    po::notify(vm);
-    if (vm.count("verbose")) std::cerr << argv[0] << " - query plan executor." << std::endl;
-    if (vm.count("help")) {
-      std::cout << desc;
-      std::cout << config_line << std::endl;
-      std::cout << warranty << std::endl;
-      return system::errc::success;
-    }
-    if (!std::filesystem::exists(sInputFile)) {
-      std::cout << argv[0] << ": fatal error: no input file" << std::endl;
-      std::cout << "query processing terminated." << std::endl;
-      return EPERM;  // ERROR defined in errno-base.h
-    }
-    if (vm.count("verbose")) std::cerr << "Input :" << sInputFile << std::endl;
-    std::ifstream ifs(sInputFile.c_str(), std::ios::binary);
-    if (!ifs) {
-      std::cerr << sInputFile << " - no input file" << std::endl;
-      return system::errc::invalid_argument;
-    }
-    //
-    // Load of compiled query from file
-    //
-    boost::archive::text_iarchive ia(ifs);
-    ia >> coreInstance;
-    //
-    // Special parameters support in qurey set
-    // fetch all ':*' - and remove them from coreInstance
-    //
-    std::string storagePath("");
-    for (auto qry : coreInstance) {
-      if (qry.id == ":STORAGE") storagePath = qry.filename;
-    }
-    auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(), [](const query &qry) { return qry.id[0] == ':'; });
-    coreInstance.erase(new_end, coreInstance.end());
-    // setStorageLocation(storagePath);
-    //
-    // End of special parameters support
-    //
     Processor proc;
-    if (vm.count("verbose")) {
+    if (verbose) {
       std::cerr << "Objects:" << std::endl;
       dumpCore(std::cerr);
-      std::cerr << "Storage location:" << storagePath << std::endl;
     }
     TimeLine tl(getListFromCore());
     //
@@ -387,7 +314,7 @@ int main(int argc, char *argv[]) {
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (vm.count("verbose")) {
+    if (verbose) {
       std::cout << ((iTimeLimitCnt == 0) ? "Press any key to stop." : "Query limit (-m) waiting for fullfil") << std::endl;
     }
     boost::rational<int> prev_interval(0);
@@ -411,9 +338,9 @@ int main(int argc, char *argv[]) {
       // screen if additional -w -s str2 (when -s means display) only given one
       // query will appear
       //
-      if (vm.count("waterfall")) {
+      if (waterfall) {
         std::cout << period << "\t";
-        showAwaitedStreams(tl, vm.count("display") ? sQuery : "");
+        showAwaitedStreams(tl, "");
         std::cout << std::endl;
       }
       std::set<std::string> inSet = getAwaitedStreamsSet(tl);
@@ -447,7 +374,7 @@ int main(int argc, char *argv[]) {
         //
         for (const auto &element : eraseList) {
           id2StreamName_Relation.erase(element);
-          if (vm.count("verbose")) std::cout << "queue erased on timeout, procId=" << element << std::endl;
+          if (verbose) std::cout << "queue erased on timeout, procId=" << element << std::endl;
         }
       }
       //
@@ -464,7 +391,7 @@ int main(int argc, char *argv[]) {
     if (iTimeLimitCnt != 1) {
       _getch();  // no wait ... feed key from kbhit
     } else {
-      if (vm.count("verbose")) std::cout << "Query limit (-m) waiting for fullfil" << std::endl;
+      if (verbose) std::cout << "Query limit (-m) waiting for fullfil" << std::endl;
     }
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;

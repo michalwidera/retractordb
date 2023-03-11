@@ -6,7 +6,7 @@ else
 FILE=query-mwnd.rql
 fi
 
-if ! xcompiler -q $FILE ; then exit 1 ; fi
+if ! xretractor -q $FILE -c ; then exit 1 ; fi
 
 if [ "$2" == "x" ]; then exit 1 ; fi
 
@@ -38,7 +38,7 @@ then
     # Therefore sleep 5 here.
     sleep 5
 
-    tmux send-keys -t dev:0.0 'xretractor -v' Enter
+    tmux send-keys -t dev:0.0 'xretractor -v -q $FILE' Enter
     sleep 1
     tmux send-keys -t dev:0.1 'clear; xqry -s core' Enter
     sleep 1

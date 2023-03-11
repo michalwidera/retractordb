@@ -16,9 +16,14 @@ set(SOURCES_RETRACTOR
     retractor/CRSMath.cpp
     retractor/dataModel.cpp
     retractor/expressionEvaluator.cpp
+    retractor/launcher.cpp
+    retractor/compiler.cpp
+    retractor/parser.cpp
+    retractor/Parser/RQLLexer.cpp
+    retractor/Parser/RQLParser.cpp
+    share/SOperations.cpp
     share/QStruct.cpp
     share/inputFileInstance.cpp
-    share/SOperations.cpp
     rdb/faccfs.cc
     rdb/faccposix.cc
     rdb/faccposixprm.cc
@@ -28,15 +33,6 @@ set(SOURCES_RETRACTOR
     rdb/facctxtsrc.cc
     rdb/payload.cc)
 
-set(SOURCES_COMPILER
-    compiler/comLauncher.cpp
-    compiler/compiler.cpp
-    compiler/parser.cpp
-    share/QStruct.cpp
-    share/SOperations.cpp
-    compiler/Parser/RQLLexer.cpp
-    compiler/Parser/RQLParser.cpp
-    rdb/descriptor.cc)
 
 set(SOURCES_DUMPER
     dumper/dumper.cpp
@@ -64,18 +60,16 @@ set(SOURCES_RDB
     rdb/payload.cc)
 
 add_executable(xretractor ${SOURCES_RETRACTOR})
-add_executable(xcompiler ${SOURCES_COMPILER})
 add_executable(xdumper ${SOURCES_DUMPER})
 add_executable(xqry ${SOURCES_QRY})
 add_executable(xtrdb ${SOURCES_RDB})
 
-target_link_libraries(xretractor ${Boost_LIBRARIES})
-target_link_libraries(xcompiler ${Boost_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(xretractor ${Boost_LIBRARIES} ${antlr4-runtime_LIBRARIES})
 target_link_libraries(xdumper ${Boost_LIBRARIES})
 target_link_libraries(xqry ${Boost_LIBRARIES})
 target_link_libraries(xtrdb ${Boost_LIBRARIES})
 
-install(TARGETS xretractor xcompiler xdumper xqry xtrdb
+install(TARGETS xretractor xdumper xqry xtrdb
         DESTINATION ~/.local/bin)
 
 add_custom_target(
@@ -91,8 +85,8 @@ add_custom_target(
 add_custom_target(
   grammar
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/antlr4call.sh RQL.g4
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/compiler
-  SOURCES ${PROJECT_SOURCE_DIR}/compiler/RQL.g4)
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/retractor
+  SOURCES ${PROJECT_SOURCE_DIR}/retractor/RQL.g4)
 
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/

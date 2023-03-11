@@ -18,7 +18,7 @@ add_test(
 add_test(
   NAME compiler-test-on-query
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND xcompiler -q query-lnx.rql)
+  COMMAND xretractor -q query-lnx.rql -c)
 
 # -----------------------------------------------------------------------------------------------
 
@@ -26,7 +26,7 @@ add_test(
   NAME xcompile_source-1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
   COMMAND sh -c "set -e ; \
-  xcompiler -q query.rql > out.txt ; xdumper >> out.txt ; \
+  xretractor -q query.rql -c > out.txt ; xdumper >> out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -36,7 +36,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
   COMMAND
     sh -c "set -e ; \
-  xcompiler query.rql > out.txt ; xdumper >> out.txt ; \
+    xretractor -q query.rql -c > out.txt ; xdumper >> out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
   ")
 
@@ -46,7 +46,7 @@ add_test(
   NAME xcompile_source-3
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern3
   COMMAND sh -c "set -e ; \
-  xcompiler query-unfold.rql > out.txt ; xdumper >> out.txt ; \
+  xretractor query-unfold.rql -c > out.txt ; xdumper >> out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
   COMMAND
     sh -c "set -e ; \
-  xcompiler query-crc.rql > out.txt ; xdumper >> out.txt ; \
+    xretractor query-crc.rql -c > out.txt ; xdumper >> out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
   ")
 
@@ -75,7 +75,7 @@ add_test(
   NAME xcompile_agse-6
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
   COMMAND bash -c "set -e ; \
-  xcompiler query.rql > out.txt ; xdumper >> out.txt ; \
+  xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -99,14 +99,14 @@ add_test(
 add_test(
   NAME dumper-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND sh -c "xcompiler -q query-lnx.rql; xdumper -d")
+  COMMAND sh -c "xretractor query-lnx.rql -c; xdumper -d")
 
 set_tests_properties(dumper-test PROPERTIES DEPENDS compiler-test-on-query)
 
 add_test(
   NAME retractor-waterfall
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND sh -c "xcompiler query-lnx.rql; xretractor -m 20 --waterfall")
+  COMMAND sh -c "xretractor query-lnx.rql -m 20 --waterfall")
 
 add_test(
   NAME workflow-test

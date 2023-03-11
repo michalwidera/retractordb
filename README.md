@@ -13,7 +13,6 @@ Commands
 
 * _xqry_: database client
 * _xdumper_: query plan dumper
-* _xcompiler_: query compiler
 * _xretractor_: database main process
 * _xdisplay_: query plan presentation script
 
