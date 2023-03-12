@@ -127,9 +127,8 @@ std::set<std::string> getAwaitedStreamsSet(TimeLine &tl) {
   return retVal;
 }
 
-void showAwaitedStreams(TimeLine &tl, std::string streamName = "") {
-  std::set<std::string> strSet = getAwaitedStreamsSet(tl);
-  for (const auto &str : strSet) std::cout << "-" << getSeqNr(str) << "-";
+void showAwaitedStreams(TimeLine &tl) {
+  for (const auto &str : getAwaitedStreamsSet(tl)) std::cout << "-" << getSeqNr(str) << "-";
 }
 
 ptree commandProcessor(ptree ptInval) {
@@ -335,7 +334,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
       //
       if (waterfall) {
         std::cout << period << "\t";
-        showAwaitedStreams(tl, "");
+        showAwaitedStreams(tl);
         std::cout << std::endl;
       }
       std::set<std::string> inSet = getAwaitedStreamsSet(tl);

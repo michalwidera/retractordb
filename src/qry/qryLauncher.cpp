@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
     if (vm.count("raw")) setmode("RAW");
     if (vm.count("influxdb")) setmode("INFLUXDB");
     if (vm.count("help")) {
-      std::cout << argv[0] << " - data processing tool." << std::endl;
+      std::cout << argv[0] << " - data query tool." << std::endl << std::endl;
+      std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << warranty << std::endl;

@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
   namespace po = boost::program_options;
   po::variables_map vm;
   try {
-    po::options_description desc("Avaiable options");
+    po::options_description desc("Avaiable options:");
     desc.add_options()                                                                                  //
         ("help,h", "Show program options")                                                              //
         ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                          //
@@ -62,14 +62,15 @@ int main(int argc, char* argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
     if (vm.count("help")) {
+      std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
+      std::cout << "Usage: " << argv[0] << " queryfile [option]" << std::endl << std::endl;
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << warranty << std::endl;
       return system::errc::success;
     }
-    if (vm.count("queryfile") == 0) {
+    if (!vm.count("queryfile")) {
       std::cout << argv[0] << ": fatal error: no input file" << std::endl;
-      std::cout << "compilation terminated." << std::endl;
       return EPERM;  // ERROR defined in errno-base.h
     }
     auto parseOut = parser(sInputFile);
@@ -100,7 +101,7 @@ int main(int argc, char* argv[]) {
     assert(response == "OK");
     response = replicateIDX();
     assert(response == "OK");
-    if (vm.count("onlycompile")) dumpInstance(sOutputFile);
+    if (vm.count("onlycompile") || vm.count("dumpcross")) dumpInstance(sOutputFile);
 
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
