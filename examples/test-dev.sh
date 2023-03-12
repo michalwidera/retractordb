@@ -6,7 +6,7 @@ else
 FILE=query-dev.rql
 fi
 
-if ! xretractor -q $FILE -c ; then exit 1 ; fi
+if ! xretractor $FILE -c ; then exit 1 ; fi
 
 if [ "$2" == "x" ]; then exit 1 ; fi
 
@@ -26,7 +26,7 @@ then
     tmux resize-pane -t dev:0.2 -x 15
     tmux resize-pane -t dev:0.3 -x 15
 
-    tmux send-keys -t dev:0.0 'xretractor -v -q $FILE' C-m
+    tmux send-keys -t dev:0.0 'xretractor $FILE -v ' C-m
     sleep 4
     tmux send-keys -t dev:0.1 'clear; xqry -s core0' C-m
     tmux send-keys -t dev:0.2 'clear; xqry -s core1' C-m
