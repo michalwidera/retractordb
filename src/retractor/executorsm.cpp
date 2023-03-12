@@ -184,13 +184,10 @@ ptree commandProcessor(ptree ptInval) {
       // so - we need 10 elements for one second buffer
       int maxElements = boost::rational_cast<int>(1 / coreInstance[streamName].rInterval);
       maxElements = (maxElements < 2) ? 2 : maxElements;
-      IPC::message_queue mq(IPC::open_or_create  // open or crate
-                            ,
-                            queueName.c_str()  // name
-                            ,
-                            maxElements  // max message number
-                            ,
-                            1024  // max message size
+      IPC::message_queue mq(IPC::open_or_create,  // open or crate
+                            queueName.c_str(),    // name
+                            maxElements,          // max message number
+                            1024                  // max message size
       );
       boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
     }
@@ -231,13 +228,10 @@ void commmandProcessorLoop() {
     IPC::managed_shared_memory mapSegment(IPC::open_or_create, "RetractorShmemMap", 65536);
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create  // open or crate
-                          ,
-                          "RetractorQueryQueue"  // name
-                          ,
-                          1000  // max message number
-                          ,
-                          1000  // max message size
+    IPC::message_queue mq(IPC::open_or_create,    // open or crate
+                          "RetractorQueryQueue",  // name
+                          1000,                   // max message number
+                          1000                    // max message size
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>("MyMap")  // object name
                     (std::less<int>(), allocatorShmemMapInstance);
@@ -297,7 +291,7 @@ std::string printRowValue(const std::string query_name) {
   return strstream.str();
 }
 
-int main_retractor( bool verbose , bool waterfall , int iTimeLimitCntParam ) {
+int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   iTimeLimitCnt = iTimeLimitCntParam;
   auto retVal = system::errc::success;
   thread bt(commmandProcessorLoop);  // Sending service in thread

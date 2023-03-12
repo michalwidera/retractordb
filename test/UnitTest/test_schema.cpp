@@ -110,7 +110,7 @@ TEST_F(xschema, check_test1) {
   auto compiled = parser("ut_example_schema.rql") == "OK";
   ASSERT_TRUE(compiled == true);
 
-  dataModel dataArea ;
+  dataModel dataArea;
 
   dataArea.prepare();
 

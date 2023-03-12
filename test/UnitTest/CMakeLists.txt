@@ -73,7 +73,8 @@ add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_schema ${SOURCES_SCHEMA_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 
-target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES} ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES}
+                      ${antlr4-runtime_LIBRARIES})
 target_link_libraries(test_xtrdb ${Boost_LIBRARIES} ${GTest_LIBRARIES})
 target_link_libraries(test_schema ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
@@ -108,6 +109,5 @@ add_test(
   xtrdb < term.script > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(
-  unittest-test-xtrdb unittest-test-xqry
-  unittest-test-schema unittest-test-schema-comp PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(unittest-test-xtrdb unittest-test-xqry unittest-test-schema
+                     unittest-test-schema-comp PROPERTIES RUN_SERIAL TRUE)

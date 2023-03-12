@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <vector>
 
 std::string intervalCounter();
 std::string dumpInstance(std::string sOutFile);

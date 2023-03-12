@@ -33,7 +33,6 @@ set(SOURCES_RETRACTOR
     rdb/facctxtsrc.cc
     rdb/payload.cc)
 
-
 set(SOURCES_DUMPER
     dumper/dumper.cpp
     share/QStruct.cpp
@@ -69,8 +68,7 @@ target_link_libraries(xdumper ${Boost_LIBRARIES})
 target_link_libraries(xqry ${Boost_LIBRARIES})
 target_link_libraries(xtrdb ${Boost_LIBRARIES})
 
-install(TARGETS xretractor xdumper xqry xtrdb
-        DESTINATION ~/.local/bin)
+install(TARGETS xretractor xdumper xqry xtrdb DESTINATION ~/.local/bin)
 
 add_custom_target(
   simple
