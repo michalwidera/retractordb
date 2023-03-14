@@ -87,6 +87,12 @@ class ParserListener : public RQLBaseListener {
 
   void exitExpFloat(RQLParser::ExpFloatContext* ctx) { recpToken(PUSH_VAL, "", std::stof(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, "", std::stoi(ctx->getText())); }
+  void exitExpString(RQLParser::ExpStringContext* ctx) { program.push_back(token(PUSH_VAL, rdb::descFldVT(ctx->getText()))); }
+  void exitExpRational(RQLParser::ExpRationalContext* ctx) {
+    const int nom = std::stoi(ctx->children[0]->getText());
+    const int den = std::stoi(ctx->children[2]->getText());
+    program.push_back(token(PUSH_VAL, boost::rational<int>(nom, den)));
+  }
 
   void exitSExpHash(RQLParser::SExpHashContext* ctx) { recpToken(STREAM_HASH); }
 

@@ -16,7 +16,7 @@ select_statement    : SELECT select_list
                     # Select
                     ;
 
-rational            : fraction # RationalAsFraction_proforma
+rational_se         : fraction # RationalAsFraction_proforma
                     | FLOAT    # RationalAsFloat
                     | DECIMAL  # RationalAsDecimal
                     ;
@@ -25,7 +25,7 @@ fraction            : DECIMAL DIVIDE DECIMAL
                     ;
 
 declare_statement   : DECLARE declare_list
-                      STREAM stream_name=ID COMMA rational
+                      STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
                     # Declare
                     ;
@@ -79,21 +79,23 @@ term
 
 factor              : '-'? FLOAT                   # ExpFloat
                     | '-'? DECIMAL                 # ExpDec
+                    | fraction                     # ExpRational
+                    | STRING                       # ExpString
                     | unary_op_expression          # ExpUnary
                     | field_id                     # ExpField
                     | agregator                    # ExpAgg
                     | function_call                # ExpFnCall
                     ;
 
-stream_expression   : stream_term GREATER DECIMAL  # SExpTimeMove
-                    | stream_term MINUS rational   # SExpMinus
-                    | stream_term PLUS stream_term # SExpPlus
-                    | stream_term                  # SExpTerm
+stream_expression   : stream_term GREATER DECIMAL   # SExpTimeMove
+                    | stream_term MINUS rational_se # SExpMinus
+                    | stream_term PLUS stream_term  # SExpPlus
+                    | stream_term                   # SExpTerm
                     ;
 
 stream_term         : stream_factor SHARP stream_factor # SExpHash
-                    | stream_factor AND rational        # SExpAnd
-                    | stream_factor MOD rational        # SExpMod
+                    | stream_factor AND rational_se     # SExpAnd
+                    | stream_factor MOD rational_se     # SExpMod
                     | stream_factor AT '(' '-'? window=DECIMAL COMMA step=DECIMAL ')' # SExpAgse
                     | stream_factor DOT agregator       # SExpAgregate_proforma
                     | stream_factor                     # SExpFactor

@@ -115,6 +115,12 @@ public:
   virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
   virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
 
+  virtual void enterExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
+  virtual void exitExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
+
+  virtual void enterExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
+  virtual void exitExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
+
   virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
   virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
 

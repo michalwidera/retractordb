@@ -26,7 +26,7 @@ public:
   };
 
   enum {
-    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleRational = 3, 
+    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleRational_se = 3, 
     RuleFraction = 4, RuleDeclare_statement = 5, RuleDeclare_list = 6, RuleField_declaration = 7, 
     RuleField_type = 8, RuleSelect_list = 9, RuleField_id = 10, RuleUnary_op_expression = 11, 
     RuleAsterisk = 12, RuleExpression = 13, RuleExpression_factor = 14, 
@@ -54,7 +54,7 @@ public:
   class ProgContext;
   class Storage_statementContext;
   class Select_statementContext;
-  class RationalContext;
+  class Rational_seContext;
   class FractionContext;
   class Declare_statementContext;
   class Declare_listContext;
@@ -148,12 +148,12 @@ public:
 
   Select_statementContext* select_statement();
 
-  class  RationalContext : public antlr4::ParserRuleContext {
+  class  Rational_seContext : public antlr4::ParserRuleContext {
   public:
-    RationalContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    Rational_seContext(antlr4::ParserRuleContext *parent, size_t invokingState);
    
-    RationalContext() = default;
-    void copyFrom(RationalContext *context);
+    Rational_seContext() = default;
+    void copyFrom(Rational_seContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
@@ -161,34 +161,34 @@ public:
    
   };
 
-  class  RationalAsDecimalContext : public RationalContext {
+  class  RationalAsDecimalContext : public Rational_seContext {
   public:
-    RationalAsDecimalContext(RationalContext *ctx);
+    RationalAsDecimalContext(Rational_seContext *ctx);
 
     antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  RationalAsFloatContext : public RationalContext {
+  class  RationalAsFloatContext : public Rational_seContext {
   public:
-    RationalAsFloatContext(RationalContext *ctx);
+    RationalAsFloatContext(Rational_seContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  RationalAsFraction_proformaContext : public RationalContext {
+  class  RationalAsFraction_proformaContext : public Rational_seContext {
   public:
-    RationalAsFraction_proformaContext(RationalContext *ctx);
+    RationalAsFraction_proformaContext(Rational_seContext *ctx);
 
     FractionContext *fraction();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  RationalContext* rational();
+  Rational_seContext* rational_se();
 
   class  FractionContext : public antlr4::ParserRuleContext {
   public:
@@ -228,7 +228,7 @@ public:
     Declare_listContext *declare_list();
     antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *COMMA();
-    RationalContext *rational();
+    Rational_seContext *rational_se();
     antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
@@ -620,6 +620,15 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpRationalContext : public FactorContext {
+  public:
+    ExpRationalContext(FactorContext *ctx);
+
+    FractionContext *fraction();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpDecContext : public FactorContext {
   public:
     ExpDecContext(FactorContext *ctx);
@@ -653,6 +662,15 @@ public:
     ExpFieldContext(FactorContext *ctx);
 
     Field_idContext *field_id();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpStringContext : public FactorContext {
+  public:
+    ExpStringContext(FactorContext *ctx);
+
+    antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -718,7 +736,7 @@ public:
 
     Stream_termContext *stream_term();
     antlr4::tree::TerminalNode *MINUS();
-    RationalContext *rational();
+    Rational_seContext *rational_se();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -764,7 +782,7 @@ public:
 
     Stream_factorContext *stream_factor();
     antlr4::tree::TerminalNode *MOD();
-    RationalContext *rational();
+    Rational_seContext *rational_se();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -802,7 +820,7 @@ public:
 
     Stream_factorContext *stream_factor();
     antlr4::tree::TerminalNode *AND();
-    RationalContext *rational();
+    Rational_seContext *rational_se();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

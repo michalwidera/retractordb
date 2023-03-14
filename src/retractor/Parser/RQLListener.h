@@ -113,6 +113,12 @@ public:
   virtual void enterExpDec(RQLParser::ExpDecContext *ctx) = 0;
   virtual void exitExpDec(RQLParser::ExpDecContext *ctx) = 0;
 
+  virtual void enterExpRational(RQLParser::ExpRationalContext *ctx) = 0;
+  virtual void exitExpRational(RQLParser::ExpRationalContext *ctx) = 0;
+
+  virtual void enterExpString(RQLParser::ExpStringContext *ctx) = 0;
+  virtual void exitExpString(RQLParser::ExpStringContext *ctx) = 0;
+
   virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
   virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
 

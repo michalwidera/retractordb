@@ -1,6 +1,5 @@
 version: 2.1
 
-
 workflows:
   commit:
     jobs:
@@ -38,8 +37,6 @@ workflows:
       - build-2204-debug:
           requires:
             - build-2204-release
-
-
 
 executors:
   ubuntu2204docker:
@@ -130,7 +127,6 @@ commands:
           # when: on_fail
       - store_artifacts:
           path: /tmp/test_dumps
-
 
 jobs:
   build-2204-debug:
