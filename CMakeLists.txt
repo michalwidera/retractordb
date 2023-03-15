@@ -4,8 +4,6 @@ project(retractordb)
 
 enable_testing()
 
-# set(CONAN_DISABLE_CHECK_COMPILER TRUE)
-
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(antlr4-runtime REQUIRED)
@@ -17,8 +15,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/share)
 
 set(CMAKE_CXX_STANDARD 20)
-
-# include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake) conan_basic_setup()
 
 add_subdirectory(src)
 add_subdirectory(scripts)
