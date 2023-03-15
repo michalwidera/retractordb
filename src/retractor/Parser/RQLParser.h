@@ -30,8 +30,8 @@ public:
     RuleFraction = 4, RuleDeclare_statement = 5, RuleDeclare_list = 6, RuleField_declaration = 7, 
     RuleField_type = 8, RuleSelect_list = 9, RuleField_id = 10, RuleUnary_op_expression = 11, 
     RuleAsterisk = 12, RuleExpression = 13, RuleExpression_factor = 14, 
-    RuleTerm = 15, RuleFactor = 16, RuleStream_expression = 17, RuleStream_term = 18, 
-    RuleStream_factor = 19, RuleAgregator = 20, RuleFunction_call = 21
+    RuleTerm = 15, RuleStream_expression = 16, RuleStream_term = 17, RuleStream_factor = 18, 
+    RuleAgregator = 19, RuleFunction_call = 20
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -67,7 +67,6 @@ public:
   class ExpressionContext;
   class Expression_factorContext;
   class TermContext;
-  class FactorContext;
   class Stream_expressionContext;
   class Stream_termContext;
   class Stream_factorContext;
@@ -564,6 +563,53 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpRationalContext : public TermContext {
+  public:
+    ExpRationalContext(TermContext *ctx);
+
+    FractionContext *fraction();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFloatContext : public TermContext {
+  public:
+    ExpFloatContext(TermContext *ctx);
+
+    antlr4::tree::TerminalNode *FLOAT();
+    antlr4::tree::TerminalNode *MINUS();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpDecContext : public TermContext {
+  public:
+    ExpDecContext(TermContext *ctx);
+
+    antlr4::tree::TerminalNode *DECIMAL();
+    antlr4::tree::TerminalNode *MINUS();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpAggContext : public TermContext {
+  public:
+    ExpAggContext(TermContext *ctx);
+
+    AgregatorContext *agregator();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFnCallContext : public TermContext {
+  public:
+    ExpFnCallContext(TermContext *ctx);
+
+    Function_callContext *function_call();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpDivContext : public TermContext {
   public:
     ExpDivContext(TermContext *ctx);
@@ -575,11 +621,29 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  ExpFactorContext : public TermContext {
+  class  ExpFieldContext : public TermContext {
   public:
-    ExpFactorContext(TermContext *ctx);
+    ExpFieldContext(TermContext *ctx);
 
-    FactorContext *factor();
+    Field_idContext *field_id();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpStringContext : public TermContext {
+  public:
+    ExpStringContext(TermContext *ctx);
+
+    antlr4::tree::TerminalNode *STRING();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpUnaryContext : public TermContext {
+  public:
+    ExpUnaryContext(TermContext *ctx);
+
+    Unary_op_expressionContext *unary_op_expression();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -597,95 +661,6 @@ public:
 
   TermContext* term();
   TermContext* term(int precedence);
-  class  FactorContext : public antlr4::ParserRuleContext {
-  public:
-    FactorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    FactorContext() = default;
-    void copyFrom(FactorContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  ExpFloatContext : public FactorContext {
-  public:
-    ExpFloatContext(FactorContext *ctx);
-
-    antlr4::tree::TerminalNode *FLOAT();
-    antlr4::tree::TerminalNode *MINUS();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpRationalContext : public FactorContext {
-  public:
-    ExpRationalContext(FactorContext *ctx);
-
-    FractionContext *fraction();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpDecContext : public FactorContext {
-  public:
-    ExpDecContext(FactorContext *ctx);
-
-    antlr4::tree::TerminalNode *DECIMAL();
-    antlr4::tree::TerminalNode *MINUS();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpAggContext : public FactorContext {
-  public:
-    ExpAggContext(FactorContext *ctx);
-
-    AgregatorContext *agregator();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpFnCallContext : public FactorContext {
-  public:
-    ExpFnCallContext(FactorContext *ctx);
-
-    Function_callContext *function_call();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpFieldContext : public FactorContext {
-  public:
-    ExpFieldContext(FactorContext *ctx);
-
-    Field_idContext *field_id();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpStringContext : public FactorContext {
-  public:
-    ExpStringContext(FactorContext *ctx);
-
-    antlr4::tree::TerminalNode *STRING();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ExpUnaryContext : public FactorContext {
-  public:
-    ExpUnaryContext(FactorContext *ctx);
-
-    Unary_op_expressionContext *unary_op_expression();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  FactorContext* factor();
-
   class  Stream_expressionContext : public antlr4::ParserRuleContext {
   public:
     Stream_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);

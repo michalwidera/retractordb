@@ -73,13 +73,10 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
 term
                     : term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
-                    | '(' expression_factor ')'    # ExpIn
-                    | factor                       # ExpFactor
-                    ;
-
-factor              : '-'? FLOAT                   # ExpFloat
-                    | '-'? DECIMAL                 # ExpDec
                     | fraction                     # ExpRational
+                    | '(' expression_factor ')'    # ExpIn
+                    | '-'? FLOAT                   # ExpFloat
+                    | '-'? DECIMAL                 # ExpDec
                     | STRING                       # ExpString
                     | unary_op_expression          # ExpUnary
                     | field_id                     # ExpField

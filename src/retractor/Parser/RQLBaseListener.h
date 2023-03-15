@@ -100,14 +100,8 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
   virtual void exitExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
 
-  virtual void enterExpDiv(RQLParser::ExpDivContext * /*ctx*/) override { }
-  virtual void exitExpDiv(RQLParser::ExpDivContext * /*ctx*/) override { }
-
-  virtual void enterExpFactor(RQLParser::ExpFactorContext * /*ctx*/) override { }
-  virtual void exitExpFactor(RQLParser::ExpFactorContext * /*ctx*/) override { }
-
-  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
-  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+  virtual void enterExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
+  virtual void exitExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
 
   virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
   virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
@@ -115,8 +109,17 @@ public:
   virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
   virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
 
-  virtual void enterExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
-  virtual void exitExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
+  virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
+  virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
+
+  virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+  virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+
+  virtual void enterExpDiv(RQLParser::ExpDivContext * /*ctx*/) override { }
+  virtual void exitExpDiv(RQLParser::ExpDivContext * /*ctx*/) override { }
+
+  virtual void enterExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
+  virtual void exitExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
 
   virtual void enterExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
   virtual void exitExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
@@ -124,14 +127,8 @@ public:
   virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
   virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
 
-  virtual void enterExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
-  virtual void exitExpField(RQLParser::ExpFieldContext * /*ctx*/) override { }
-
-  virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
-  virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
-
-  virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
-  virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
+  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
 
   virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
   virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
