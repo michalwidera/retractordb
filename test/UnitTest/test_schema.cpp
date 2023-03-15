@@ -15,7 +15,7 @@
 #include "rdb/storageacc.h"
 #include "retractor/dataModel.h"
 
-extern std::string parser(std::string sInputFile);
+extern std::string parserFile(std::string sInputFile);
 
 extern "C" qTree coreInstance;
 
@@ -107,7 +107,7 @@ TEST_F(xschema, check_test1) {
 
   // This simplified dataModel::load
   coreInstance.clear();
-  auto compiled = parser("ut_example_schema.rql") == "OK";
+  auto compiled = parserFile("ut_example_schema.rql") == "OK";
   ASSERT_TRUE(compiled == true);
 
   dataModel dataArea;

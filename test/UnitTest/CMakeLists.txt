@@ -72,6 +72,7 @@ add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_schema ${SOURCES_SCHEMA_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
+add_executable(test_compiler ${SOURCES_EXPEVAL_TEST})
 
 target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
@@ -79,6 +80,8 @@ target_link_libraries(test_xtrdb ${Boost_LIBRARIES} ${GTest_LIBRARIES})
 target_link_libraries(test_schema ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
 target_link_libraries(test_expeval ${Boost_LIBRARIES} ${GTest_LIBRARIES}
+                      ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_compiler ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
 
 add_test(
@@ -95,6 +98,11 @@ add_test(
   NAME unittest-test-expeval
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
+
+add_test(
+  NAME unittest-test-compiler
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
 
 add_test(
   NAME unittest-test-schema

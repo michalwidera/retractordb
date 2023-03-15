@@ -9,7 +9,8 @@
 #include "QStruct.h"
 #include "compiler/compiler.hpp"
 
-extern std::string parser(std::string sInputFile);
+extern std::string parserFile(std::string sInputFile);
+extern std::string parserString(std::string sInputFile);
 
 extern qTree coreInstance;
 
@@ -24,7 +25,7 @@ bool check_compile_function() {
 
   if (!compiled) {
     coreInstance.clear();
-    compiled = parser("ut_example.rql") == "OK";
+    compiled = parserFile("ut_example.rql") == "OK";
   }
   return compiled;
 }
@@ -49,4 +50,9 @@ TEST(xcompiler, check_compile_result) {
       ASSERT_TRUE(q.isDeclaration() == false);
     }
   }
+}
+
+TEST(xcompiler, check_compile_result) {
+  auto compiled = parserString("DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK";
+  ASSERT_TRUE( compiled == true );
 }

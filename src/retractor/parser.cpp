@@ -228,11 +228,33 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parser(std::string sInputFile) {
+std::string parserFile(std::string sInputFile) {
   std::ifstream ins;
   // Create the input stream.
   ins.open(sInputFile.c_str());
   ANTLRInputStream input(ins);
+  // Create a lexer which scans the input stream
+  // to create a token stream.
+  RQLLexer lexer(&input);
+  CommonTokenStream tokens(&lexer);
+  LexerErrorListener lexerErrorListener;
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(&lexerErrorListener);
+  // Create a parser which parses the token stream
+  // to create a parse tree.
+  RQLParser parser(&tokens);
+  ParserErrorListener parserErrorListener;
+  ParserListener parserListener;
+  parser.removeParseListeners();
+  parser.removeErrorListeners();
+  parser.addErrorListener(&parserErrorListener);
+  parser.addParseListener(&parserListener);
+  tree::ParseTree* tree = parser.prog();
+  return status;
+}
+
+std::string parserString(std::string inlet) {
+  ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
   RQLLexer lexer(&input);

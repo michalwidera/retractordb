@@ -19,7 +19,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::string parser(std::string sInputFile);
+extern std::string parserFile(std::string sInputFile);
 extern int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam);
 
 int iTimeLimitCntParam{0};
@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
       std::cout << argv[0] << ": fatal error: no input file" << std::endl;
       return EPERM;  // ERROR defined in errno-base.h
     }
-    auto parseOut = parser(sInputFile);
+    auto parseOut = parserFile(sInputFile);
     if (vm.count("onlycompile")) {
       std::cout << "Input file:" << sInputFile << std::endl;
       std::cout << "Compile result:" << parseOut << std::endl;
