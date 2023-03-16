@@ -17,14 +17,14 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 
-dataInstance::dataInstance(                   //
+streamInstance::streamInstance(               //
     const std::string descriptorname,         //
     const std::string storagenameParam,       //
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
   // only objects with REF has storagenameParam filled.
   const auto storagename{storagenameParam == "" ? descriptorname : storagenameParam};
-  SPDLOG_INFO("dataInstance desc:{} storage:{}", descriptorname, storagename);
+  SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorname, storagename);
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
@@ -45,25 +45,25 @@ dataInstance::dataInstance(                   //
   }
 };
 
-dataInstance::dataInstance(                    //
+streamInstance::streamInstance(                //
     const std::string idAndStorageName,        //
     const rdb::Descriptor storageDescriptor,   //
     const rdb::Descriptor internalDescriptor)  //
-    : dataInstance(idAndStorageName,           // descriptor file
-                   idAndStorageName,           // storage file
-                   storageDescriptor,          //
-                   internalDescriptor          //
+    : streamInstance(idAndStorageName,         // descriptor file
+                     idAndStorageName,         // storage file
+                     storageDescriptor,        //
+                     internalDescriptor        //
       ) {
-  SPDLOG_INFO("dataInstance - storage and id are the same");
+  SPDLOG_INFO("streamInstance - storage and id are the same");
 }
 
-dataInstance::dataInstance(query& qry)
-    : dataInstance(qry.id,                     // descriptor file
-                   qry.filename,               // storage file
-                   qry.descriptorFrom(),       //
-                   qry.descriptorExpression()  //
+streamInstance::streamInstance(query& qry)
+    : streamInstance(qry.id,                     // descriptor file
+                     qry.filename,               // storage file
+                     qry.descriptorFrom(),       //
+                     qry.descriptorExpression()  //
       ) {
-  SPDLOG_INFO("dataInstance <- qry");
+  SPDLOG_INFO("streamInstance <- qry");
 };
 
 dataModel::dataModel(/* args */) {}
@@ -94,6 +94,6 @@ void dataModel::prepare() {
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
 
-  for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<dataInstance>(qry));
+  for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 }

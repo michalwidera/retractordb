@@ -2,9 +2,7 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
 project(regression-test)
 
-include_directories(
-  ${CMAKE_SOURCE_DIR}/src/include
-  ${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src)
 
 set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_SOURCE_DIR}/test/UnitTest/Data)
 

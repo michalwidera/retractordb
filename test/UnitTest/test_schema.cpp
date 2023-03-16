@@ -52,7 +52,7 @@ TEST_F(xschema, check_test0) {
   };
 
   {
-    dataInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
+    streamInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
 
     data.internalPayload->setItem(0, 123);
     data.internalPayload->setItem(1, 345);
@@ -67,7 +67,7 @@ TEST_F(xschema, check_test0) {
   }
 
   {
-    dataInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDesciptor};
+    streamInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDesciptor};
 
     data.internalPayload->setItem(0, 123);
     data.internalPayload->setItem(1, 345);
@@ -126,9 +126,9 @@ TEST_F(xschema, check_test1) {
   auto dataStorageAndInternalDesciptor{rdb::Descriptor("A", rdb::INTEGER) |  //
                                        rdb::Descriptor("B", rdb::INTEGER)};
 
-  dataInstance q("str1a",                          // storage and descriptor are the same name
-                 dataStorageAndInternalDesciptor,  //
-                 dataStorageAndInternalDesciptor);
+  streamInstance q("str1a",                          // storage and descriptor are the same name
+                   dataStorageAndInternalDesciptor,  //
+                   dataStorageAndInternalDesciptor);
 
   q.storagePayload->setItem(0, 2);
   q.storagePayload->setItem(1, atoi(build_id));

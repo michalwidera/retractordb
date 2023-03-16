@@ -11,24 +11,24 @@
 #include <string>
 #include <vector>
 
-struct dataInstance {
+struct streamInstance {
   std::unique_ptr<rdb::storageAccessor> storage;
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> internalPayload;
 
   // This constructor cover issue when storage name is differnt from descriptor name
-  dataInstance(const std::string descriptorname,           //
-               const std::string storagename,              // <- query %% filename
-               const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
-               const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  streamInstance(const std::string descriptorname,           //
+                 const std::string storagename,              // <- query %% filename
+                 const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
+                 const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
   // This constructor cover same name for storge and decriptor file name (+.desc)
-  dataInstance(const std::string idAndStorageName,         // <- query %% filename
-               const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
-               const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  streamInstance(const std::string idAndStorageName,         // <- query %% filename
+                 const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
+                 const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
   // This constructor will create data based on QStruct query
-  dataInstance(query &qry);
+  streamInstance(query &qry);
 };
 
 class dataModel {
@@ -36,7 +36,7 @@ class dataModel {
   std::string storagePath;
 
  public:
-  std::map<std::string, std::unique_ptr<dataInstance>> qSet;
+  std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
   dataModel(/* args */);
   ~dataModel();

@@ -54,5 +54,5 @@ TEST(xcompiler, check_compile_result) {
 
 TEST(xcompiler, check_compile_result) {
   auto compiled = parserString("DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK";
-  ASSERT_TRUE( compiled == true );
+  ASSERT_TRUE(compiled == true);
 }
