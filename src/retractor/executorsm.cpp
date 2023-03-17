@@ -58,7 +58,7 @@ using namespace CRationalStreamMath;
 // "RetractorShmemStr", 65536); const StringAllocator allocatorShmemStrInstance
 // (strSegment.get_segment_manager());
 
-// Map stores realtions processId -> sended stream
+// Map stores relations processId -> sended stream
 std::map<const int, std::string> id2StreamName_Relation;
 
 std::vector<IPC::message_queue> qset;
@@ -68,7 +68,7 @@ extern "C" qTree coreInstance;
 
 extern Processor *pProc;
 
-// varialbe connected with tlimitqry (-m) parameter
+// variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
 int iTimeLimitCnt(0);
 
@@ -107,7 +107,7 @@ std::set<boost::rational<int>> getListFromCore() {
 }
 
 void dumpCore(std::ostream &xout) {
-  xout << "Seqence\tItrval\tQuery id" << std::endl;
+  xout << "Sequence\tItrval\tQuery id" << std::endl;
   for (const auto &it : coreInstance) {
     xout << getSeqNr(it.id) << "\t";
     xout << it.rInterval << "\t";
@@ -178,8 +178,8 @@ ptree commandProcessor(ptree ptInval) {
       id2StreamName_Relation[streamId] = streamName;
       // Create a message_queue
       std::string queueName = "brcdbr" + ptInval.get("db.id", "");
-      // let's assuem that we have 1/10 duration
-      // that menas 10 elements are going in second
+      // let's assume that we have 1/10 duration
+      // that means 10 elements are going in second
       // so - we need 10 elements for one second buffer
       int maxElements = boost::rational_cast<int>(1 / coreInstance[streamName].rInterval);
       maxElements = (maxElements < 2) ? 2 : maxElements;
@@ -219,11 +219,11 @@ ptree commandProcessor(ptree ptInval) {
 }
 
 // Thread procedure
-void commmandProcessorLoop() {
+void commandProcessorLoop() {
   try {
     IPC::message_queue::remove("RetractorQueryQueue");
     IPC::shared_memory_object::remove("RetractorShmemMap");
-    // Segment and allogator for map purposes
+    // Segment and allocator for map purposes
     IPC::managed_shared_memory mapSegment(IPC::open_or_create, "RetractorShmemMap", 65536);
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     // Create a message_queue.
@@ -293,7 +293,7 @@ std::string printRowValue(const std::string query_name) {
 int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   iTimeLimitCnt = iTimeLimitCntParam;
   auto retVal = system::errc::success;
-  thread bt(commmandProcessorLoop);  // Sending service in thread
+  thread bt(commandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {

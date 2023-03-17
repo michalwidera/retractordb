@@ -57,7 +57,7 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
   rdb::descFldVT retVal;
   switch (reqType) {
     case rdb::BAD:
-      SPDLOG_ERROR("Unspported bad cast");
+      SPDLOG_ERROR("Unsupported bad cast");
       break;
     case rdb::BYTE:
       visit_descFld<uint8_t>(inVar, retVal);
