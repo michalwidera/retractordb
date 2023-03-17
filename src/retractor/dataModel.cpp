@@ -23,8 +23,7 @@ streamInstance::streamInstance(               //
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
   // only objects with REF has storageNameParam filled.
-  const auto storageName{storageNameParam == "" ? descriptorName
-                                                : storageNameParam};
+  const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
   SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
@@ -97,4 +96,29 @@ void dataModel::prepare() {
 
   for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
+}
+
+void dataModel::computeInstance(std::string instance) {
+  auto qry = coreInstance[instance];
+  const command_id cmd = qry.lProgram.end()->getCommandID();
+  switch (cmd) {
+    case PUSH_STREAM:
+      // store in internal payload data from argumnet payload
+
+      break;
+    case STREAM_TIMEMOVE:
+    case STREAM_DEHASH_MOD:
+    case STREAM_DEHASH_DIV:
+    case STREAM_SUBSTRACT:
+    case STREAM_AVG:
+    case STREAM_MIN:
+    case STREAM_MAX:
+    case STREAM_SUM:
+    case STREAM_ADD:
+    case STREAM_AGSE:
+    case STREAM_HASH:
+    default:
+      SPDLOG_ERROR("Undefined command_id:{}", cmd);
+      abort();
+  }
 }

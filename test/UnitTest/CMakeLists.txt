@@ -3,8 +3,12 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 project(regression-test)
 
 include_directories(
-  ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR} ${antlr4-runtime_INCLUDE_DIR}
-  ${GTest_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src
+  ${Boost_INCLUDE_DIR}
+  ${spdlog_INCLUDE_DIR}
+  ${antlr4-runtime_INCLUDE_DIR}
+  ${GTest_INCLUDE_DIR}
+  ${CMAKE_SOURCE_DIR}/src/include
+  ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/share)
 
 set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_SOURCE_DIR}/test/UnitTest/Data)

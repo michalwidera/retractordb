@@ -33,7 +33,7 @@ struct streamInstance {
 
 class dataModel {
  private:
-  std::string storagePath;
+  std::string storagePath{""};
 
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
@@ -41,6 +41,7 @@ class dataModel {
   dataModel(/* args */);
   ~dataModel();
 
+  void computeInstance(std::string instance);
   void load(std::string compiledQueryFile);
   void prepare();
 };
