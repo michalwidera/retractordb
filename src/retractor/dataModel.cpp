@@ -102,10 +102,13 @@ void dataModel::computeInstance(std::string instance) {
   auto qry = coreInstance[instance];
   const command_id cmd = qry.lProgram.end()->getCommandID();
   switch (cmd) {
-    case PUSH_STREAM:
-      // store in internal payload data from argumnet payload
-
-      break;
+    case PUSH_STREAM: {
+      // store in internal payload data from argument payload
+      auto argumentQueryName = qry.lProgram.end()->getStr_();
+      *(qSet[instance]->internalPayload) = *(qSet[argumentQueryName]->storagePayload);
+      // invocation of payload &payload::operator=(payload &other) from payload.cc
+      // TODO: Add check if storagePayload is empty or argumentQueryName exist?
+    } break;
     case STREAM_TIMEMOVE:
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
