@@ -79,5 +79,8 @@
         "variant": "cpp",
         "*.ipp": "cpp",
         "cassert": "cpp"
-    }
+    },
+    "cSpell.words": [
+      "iarchive"
+    ]
 }

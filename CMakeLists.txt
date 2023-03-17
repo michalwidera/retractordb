@@ -9,11 +9,6 @@ find_package(spdlog REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 find_package(GTest REQUIRED)
 
-include_directories(
-  ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR} ${antlr4-runtime_INCLUDE_DIR}
-  ${GTest_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/src/include
-  ${CMAKE_SOURCE_DIR}/src/share)
-
 set(CMAKE_CXX_STANDARD 20)
 
 add_subdirectory(src)

@@ -18,17 +18,18 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 
 streamInstance::streamInstance(               //
-    const std::string descriptorname,         //
-    const std::string storagenameParam,       //
+    const std::string descriptorName,         //
+    const std::string storageNameParam,       //
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
-  // only objects with REF has storagenameParam filled.
-  const auto storagename{storagenameParam == "" ? descriptorname : storagenameParam};
-  SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorname, storagename);
+  // only objects with REF has storageNameParam filled.
+  const auto storageName{storageNameParam == "" ? descriptorName
+                                                : storageNameParam};
+  SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
   storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
-  storage = std::make_unique<rdb::storageAccessor>(descriptorname, storagename);
+  storage = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
   storage->attachDescriptor(&storageDescriptor);
   storage->attachStorage();
   storage->attachPayload(*storagePayload);

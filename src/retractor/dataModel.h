@@ -16,13 +16,13 @@ struct streamInstance {
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> internalPayload;
 
-  // This constructor cover issue when storage name is differnt from descriptor name
-  streamInstance(const std::string descriptorname,           //
-                 const std::string storagename,              // <- query %% filename
+  // This constructor cover issue when storage name is different from descriptor name
+  streamInstance(const std::string descriptorName,           //
+                 const std::string storageName,              // <- query %% filename
                  const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
                  const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
-  // This constructor cover same name for storge and decriptor file name (+.desc)
+  // This constructor cover same name for storage and descriptor file name (+.desc)
   streamInstance(const std::string idAndStorageName,         // <- query %% filename
                  const rdb::Descriptor storageDescriptor,    // <- query %% descriptorExpression()
                  const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
