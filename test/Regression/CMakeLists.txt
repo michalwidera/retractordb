@@ -11,7 +11,7 @@ set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 add_test(
   NAME check-banned-artifacts
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND test-artifacts.sh xrdb)
+  COMMAND fail-if-file-exist.sh xrdb)
 
 # -----------------------------------------------------------------------------------------------
 
