@@ -76,10 +76,22 @@ void storageAccessor::moveRef() {
     storageFile = std::get<rname>(*it);
     SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile);
   }
+
+  // if storageAccessor object was created with default storage as ""
+  // and there is no specified storage as REF in descriptor - we should
+  // stop immediately.
+  if (storageFile == "") {
+    SPDLOG_ERROR("Storage file was not set in descriptor.");
+    abort();
+  }
 }
 
 void storageAccessor::attachStorage() {
   // assert(descriptor.len() != 0);
+  if (storageFile == "") {
+    SPDLOG_ERROR("Bad sequence of attach operations, first attach descriptor");
+    abort();
+  }
 
   auto resourceAlreadyExist = std::filesystem::exists(storageFile);
 
@@ -142,7 +154,7 @@ void storageAccessor::attachPayload(rdb::payload& payloadRef) {
 
 storageAccessor::~storageAccessor() {
   if (removeOnExit) {
-    auto statusRemove1 = remove(storageFile.c_str());
+    if (storageFile != "") auto statusRemove1 = remove(storageFile.c_str());
     auto statusRemove2 = remove(descriptorFile.c_str());
     SPDLOG_INFO("drop storage, drop descriptor");
   }
