@@ -259,6 +259,31 @@ TEST(xrdb, test_descriptor_compare) {
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
+TEST(xrdb, test_ref_storage) {
+  auto storageDescriptor{rdb::Descriptor("dane", rdb::INTEGER) |       //
+                         rdb::Descriptor("datafile1.txt", rdb::REF) |  //
+                         rdb::Descriptor("TEXTSOURCE", rdb::TYPE)};
+
+  std::unique_ptr<rdb::payload> storagePayload;
+  std::unique_ptr<rdb::storageAccessor> storage;
+
+  storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
+
+  storage = std::make_unique<rdb::storageAccessor>("datafile1.txt" /* descriptorName */, "datafile1.txt" /* storageName */);
+  storage->attachDescriptor(&storageDescriptor);
+  storage->setRemoveOnExit(false);
+  storage->attachStorage();
+  storage->attachPayload(*storagePayload);
+
+  storage->read(0);
+
+  ASSERT_TRUE(std::any_cast<int>(storagePayload->getItem(0)) == 60);
+
+  storage->read(0);
+
+  ASSERT_TRUE(std::any_cast<int>(storagePayload->getItem(0)) == 61);
+}
+
 TEST(crdb, genericBinaryFileAccessor_byte) {
   auto result1 = test_1<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
   ASSERT_TRUE(result1);
@@ -323,7 +348,6 @@ TEST(crdb, payload_assign_operator) {
   ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
   ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
-
 
 TEST(crdb, payload_copy_constructor) {
   auto data1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
