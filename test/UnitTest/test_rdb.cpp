@@ -246,13 +246,17 @@ TEST(xrdb, test_storage) {
 }
 
 TEST(xrdb, test_descriptor_compare) {
-  auto dataDescriptor1{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+  auto dataDescriptor1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
+                       rdb::Descriptor("Control", rdb::BYTE) |     //
                        rdb::Descriptor("TLen", rdb::INTEGER)};
-  auto dataDescriptor2{rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+  auto dataDescriptor2{rdb::Descriptor("Name", 10, rdb::STRING) |  //
+                       rdb::Descriptor("Control", rdb::BYTE) |     //
                        rdb::Descriptor("TLen", rdb::INTEGER)};
-  auto dataDescriptorDiff1{rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Name", 10, rdb::STRING) |
+  auto dataDescriptorDiff1{rdb::Descriptor("Control", rdb::BYTE) |     //
+                           rdb::Descriptor("Name", 10, rdb::STRING) |  //
                            rdb::Descriptor("TLen", rdb::INTEGER)};
-  auto dataDescriptorDiff2{rdb::Descriptor("Name", 11, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) |
+  auto dataDescriptorDiff2{rdb::Descriptor("Name", 11, rdb::STRING) |  //
+                           rdb::Descriptor("Control", rdb::BYTE) |     //
                            rdb::Descriptor("TLen", rdb::INTEGER)};
   ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
