@@ -41,7 +41,7 @@ field_declaration   : ID field_type
 field_type          : (STRING_T | INTARRAY_T | BYTEARRAY_T) '[' type_size=DECIMAL ']' # typeArray
                     | BYTE_T     # typeByte
                     | INTEGER_T  # typeInt
-                    | UNSIGNED_T # typeUnsiged
+                    | UNSIGNED_T # typeUnsigned
                     | FLOAT_T    # typeFloat
                     ;
 
@@ -51,7 +51,7 @@ select_list         : asterisk                       # SelectListFullscan
 
 field_id            : column_name=ID                             # FieldID            // id    - ID3
                     | tablename=ID '[' UNDERLINE ']'             # FieldIDUnderline   // id[_] - IDX
-                    | tablename=ID DOT column_name=ID            # FieldIDColumnname  // id.id - ID1
+                    | tablename=ID DOT column_name=ID            # FieldIDColumnName  // id.id - ID1
                     | tablename=ID '[' column_index=DECIMAL ']'  # FieldIDTable       // id[x] - ID2
                     ;
 
@@ -126,7 +126,7 @@ function_call       : ( 'Sqrt'
                     | 'IsNonZero' ) '(' expression_factor ( COMMA expression_factor )* ')'
                     ;
 
-// sync types with: src/include/rdb/descriptor.h
+// sync types with: src/include/rdb/fldType.h
 
 STRING_T:           'STRING'|'String';
 BYTEARRAY_T:        'BYTEARRAY'|'Bytearray';

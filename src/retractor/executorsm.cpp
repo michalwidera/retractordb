@@ -136,7 +136,7 @@ ptree commandProcessor(ptree ptInval) {
   std::string command = ptInval.get("db.message", "");
   try {
     //
-    // This command return stream idenifiers
+    // This command return stream identifiers
     //
     if (command == "get" && pProc != nullptr) {
       SPDLOG_DEBUG("get cmd rcv.");
@@ -161,9 +161,9 @@ ptree commandProcessor(ptree ptInval) {
       for (const auto &s : coreInstance[streamName].lSchema) ptRetval.put(std::string("db.field.") + s.fieldName, s.fieldName);
     }
     //
-    // This command will add stream to list of transmited streams
+    // This command will add stream to list of transmitted streams
     // there are created next queue with stream for client
-    // and map indentifier with this stream
+    // and map identifier with this stream
     //
     if (command == "show" && pProc != nullptr) {
       std::string streamName = ptInval.get("db.argument", "");
@@ -173,7 +173,7 @@ ptree commandProcessor(ptree ptInval) {
       assert(ptInval.get("db.id", "") != "");
       // Testing purposes only - get it off after testing
       SPDLOG_DEBUG("got show {} rcv.", streamName);
-      // Here we set that for porcess of given id we send apropriate data stream
+      // Here we set that for process of given id we send appropriate data stream
       int streamId = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       id2StreamName_Relation[streamId] = streamName;
       // Create a message_queue
@@ -276,7 +276,7 @@ std::string printRowValue(const std::string query_name) {
   int i = 0;
   for (auto value : pProc->getRow(query_name, 0)) {
     //
-    // There is part of communication format - here data are formated for
+    // There is part of communication format - here data are formatted for
     // transmission via internal queue.
     //
     std::stringstream retVal;

@@ -1,7 +1,7 @@
 /*
 How xqry terminal works
 
-1. Take a comand line arguemnt ie. xqry list
+1. Take a command line argument ie. xqry list
 2. Connect to server
 3. Execute command
 4. Show result (Show result,....) (wait for ctrl+c)
@@ -35,7 +35,7 @@ How xqry terminal works
 #include <iostream>
 #include <sstream>
 
-// For data transmision purposes
+// For data transmission purposes
 #include <boost/asio.hpp>
 #include <boost/atomic.hpp>
 #include <boost/bind/bind.hpp>
@@ -93,7 +93,7 @@ int iTimeLimitCnt;  // testing purposes - time limit query (-m)
 
 enum outputFormatMode { RAW, GRAPHITE, INFLUXDB } outputFormatMode(RAW);
 
-// Graphite nbeed scheamt in format "path.to.data value timestamp"
+// Graphite embedded schema in format "path.to.data value timestamp"
 ptree schema;
 std::string sInputStream;
 
@@ -131,7 +131,7 @@ int _kbhit(void) {
 int _getch() { return getchar(); }
 
 //
-// Consumer process asynchronusly fetch data from quere and puts on
+// Consumer process asynchronously fetch data from query and puts on
 // screen/output
 //
 void consumer() {
@@ -333,7 +333,7 @@ int hello() {
   return system::errc::success;
   // Fail in this part of code could means that server in in json mode
   // and query is going xml. (or otherwise)
-  // catched in regressions
+  // catches in regressions
 }
 
 void dir() {

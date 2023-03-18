@@ -102,7 +102,7 @@ void storageAccessor::attachStorage() {
   } else if (storageType == "DEVICE") {
     accessor = std::make_unique<rdb::binaryDeviceAccessor<std::byte>>(storageFile);
   } else if (storageType == "TEXTSOURCE") {
-    accessor = std::make_unique<rdb::textSrouceAccessor<std::byte>>(storageFile);
+    accessor = std::make_unique<rdb::textSourceAccessor<std::byte>>(storageFile);
     accessor->fctrl(&descriptor, 0);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType);

@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
       // # - command act as dump comment - nothing reports - even . or ok
       // this # is used on commentary in test scripts, this rem is used when we want
       // turn of some functionality and do not change the output pattern is script
-      // btw - I'm either suiprised by two kinds of comments ...
+      // btw - I'm either surprised by two kinds of comments ...
       std::getline(std::cin, wasteComment);
       if (cmd == "rem") std::cout << "ok\n";
       continue;
@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
         dacc = std::make_unique<rdb::storageAccessor>(descfile, file);
       }
       if (dacc->peekDescriptor()) {
-        dacc->attachDescriptor();  // we are sure here that decriptor file exist
+        dacc->attachDescriptor();  // we are sure here that descriptor file exist
       } else {
         //
         // no descriptor found - need to create

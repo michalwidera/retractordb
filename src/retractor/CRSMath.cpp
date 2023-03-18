@@ -17,7 +17,7 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot(0) {
         // because 1/2 * 2 == 1 , 1 * 4 == 4 and 1/2 * 2 == 1
         // but does not exist natural number that 1/2 * NATURAL = 3/4
         // other words: removing all values that have
-        // second value muliplicated by natural number
+        // second value multiplicate by natural number
         if (boost::rational<int>(rational_cast<int>(x / val), 1) == (x / val)) isDivided = true;
         if (boost::rational<int>(rational_cast<int>(val / x), 1) == (val / x)) isDivided = true;
       }
@@ -38,13 +38,13 @@ bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(boost::rational<int> &inDelta) {
   return (value.denominator() == 1);
 }
 
-// MAGIC Warnning
+// MAGIC Warning
 
 boost::rational<int> &TimeLine::getNextTimeSlot() {
   assert(sr.size() > 0);
   // In constructor we were set deltas and indexes
   // Take first value from tje edge
-  // even good we can take maxrational here.
+  // even good we can take max rational here.
   ctSlot = *sr.begin() * boost::rational<int>(counter[*sr.begin()]);
   // Note: These two loops cannot be mixed together!
   // Find lowest time slot in set

@@ -226,7 +226,7 @@ void Processor::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {  // For all queries in system
     // Drop off rows that not computed now
     if (inSet.find(q.id) == inSet.end()) continue;
-    // If given stream is aledy synchronized with context
+    // If given stream is already synchronized with context
     // there is no sens to make computed twice
     // if (gDataMap[q.id].len == gDataMap[q.id].size) continue;
     if (gDataMap[q.id].row.size() == 0) continue;
@@ -244,7 +244,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       assert(q.lProgram.size() > 0);
       auto it = q.lProgram.begin();
       token operation = q.lProgram.back();  // Operation is always last element on stack
-      token argument1, argument2;           // This arugments are optionally fullfiled
+      token argument1, argument2;           // This arguments are optionally fulfilled
       std::string streamNameArg;            // Same as argument
       int TimeOffset(0);
       assert(rowValues.empty());
@@ -252,7 +252,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       switch (operation.getCommandID()) {
         case PUSH_STREAM:
           // PUSH_STREAM core0
-          // push stream operation does not have additonal stack arguments
+          // push stream operation does not have additional stack arguments
           streamNameArg = operation.getStr_();
           {
             auto pos = 0;
@@ -425,7 +425,7 @@ void Processor::processRows(std::set<std::string> inSet) {
             std::string nameOut = q.id;
             bool mirror = operation.get() < 0;
             // step - means step of how long moving window will over data stream
-            // step is counted in tuples/atribute
+            // step is counted in tuples/attribute
             // windowsSize - is length of moving data window
             int step = rational_cast<int>(argument2.get());
             assert(step >= 0);
@@ -463,14 +463,14 @@ void Processor::processRows(std::set<std::string> inSet) {
           streamNameArg = argument1.getStr_();
           assert(streamNameArg != "");
           if (operation.get() > q.rInterval) {
-            // Check if parameters are in oposite order
+            // Check if parameters are in opposite order
             TimeOffset = Substract(q.rInterval, operation.get(), gDataMap[q.id].len);
             TimeOffset = gDataMap[q.id].len - TimeOffset;
           }
           rowValues = getRow(streamNameArg, TimeOffset);
           break;
         default:
-          // Stack hits non supported opertation
+          // Stack hits non supported operation
           assert(false);
       }
     }
@@ -479,7 +479,7 @@ void Processor::processRows(std::set<std::string> inSet) {
     gDataMap[q.id].row = rowValues;
     gDataMap[q.id].len++;
   }
-  // Oryginal processRows is start here
+  // Original processRows is start here
   for (auto q : coreInstance) {
     // Drop rows that not come with this to compute
     if (inSet.find(q.id) == inSet.end()) continue;
@@ -491,7 +491,7 @@ void Processor::processRows(std::set<std::string> inSet) {
       for (auto i = 0; i < getRowSize(q); i++) gDataMap[q.id].row[i] = getValueOfRollup(q, i);
     }
     // here should be computer values of stream tuples
-    // computed value shoud be stored in file
+    // computed value should be stored in file
     std::vector<number> rowValues;
     int cnt(0);
     for (auto &f : q.lSchema) rowValues.push_back(computeValue(f, q));
@@ -505,7 +505,7 @@ std::vector<number> Processor::getRow(std::string streamName, int timeOffset, bo
   std::vector<number> retVal;
   if (timeOffset < 0) {
     // This need more investigation - this is kind of workaround.
-    // Because from different queations sometimes -1 a timeOffset could appear.
+    // Because from different questions sometimes -1 a timeOffset could appear.
     for (auto f : getQuery(streamName).lSchema) retVal.push_back(boost::rational<int>(0));
     return retVal;
   }

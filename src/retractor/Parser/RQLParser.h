@@ -302,6 +302,15 @@ public:
    
   };
 
+  class  TypeUnsignedContext : public Field_typeContext {
+  public:
+    TypeUnsignedContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *UNSIGNED_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  TypeArrayContext : public Field_typeContext {
   public:
     TypeArrayContext(Field_typeContext *ctx);
@@ -329,15 +338,6 @@ public:
     TypeFloatContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT_T();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  TypeUnsigedContext : public Field_typeContext {
-  public:
-    TypeUnsigedContext(Field_typeContext *ctx);
-
-    antlr4::tree::TerminalNode *UNSIGNED_T();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -435,9 +435,9 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  FieldIDColumnnameContext : public Field_idContext {
+  class  FieldIDColumnNameContext : public Field_idContext {
   public:
-    FieldIDColumnnameContext(Field_idContext *ctx);
+    FieldIDColumnNameContext(Field_idContext *ctx);
 
     antlr4::Token *tablename = nullptr;
     antlr4::Token *column_name = nullptr;

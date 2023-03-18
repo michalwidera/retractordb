@@ -55,8 +55,8 @@ public:
   virtual void enterTypeInt(RQLParser::TypeIntContext * /*ctx*/) override { }
   virtual void exitTypeInt(RQLParser::TypeIntContext * /*ctx*/) override { }
 
-  virtual void enterTypeUnsiged(RQLParser::TypeUnsigedContext * /*ctx*/) override { }
-  virtual void exitTypeUnsiged(RQLParser::TypeUnsigedContext * /*ctx*/) override { }
+  virtual void enterTypeUnsigned(RQLParser::TypeUnsignedContext * /*ctx*/) override { }
+  virtual void exitTypeUnsigned(RQLParser::TypeUnsignedContext * /*ctx*/) override { }
 
   virtual void enterTypeFloat(RQLParser::TypeFloatContext * /*ctx*/) override { }
   virtual void exitTypeFloat(RQLParser::TypeFloatContext * /*ctx*/) override { }
@@ -73,8 +73,8 @@ public:
   virtual void enterFieldIDUnderline(RQLParser::FieldIDUnderlineContext * /*ctx*/) override { }
   virtual void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext * /*ctx*/) override { }
 
-  virtual void enterFieldIDColumnname(RQLParser::FieldIDColumnnameContext * /*ctx*/) override { }
-  virtual void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext * /*ctx*/) override { }
+  virtual void enterFieldIDColumnName(RQLParser::FieldIDColumnNameContext * /*ctx*/) override { }
+  virtual void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext * /*ctx*/) override { }
 
   virtual void enterFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
   virtual void exitFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }

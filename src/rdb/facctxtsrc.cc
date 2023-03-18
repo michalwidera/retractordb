@@ -26,30 +26,30 @@ K readFromFstream(std::fstream& myFile) {
 }
 
 template <typename T>
-textSrouceAccessor<T>::textSrouceAccessor(std::string fileName) : fileNameStr(fileName) {
+textSourceAccessor<T>::textSourceAccessor(std::string fileName) : fileNameStr(fileName) {
   myFile.rdbuf()->pubsetbuf(0, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 }
 
 template <typename T>
-textSrouceAccessor<T>::~textSrouceAccessor() {
+textSourceAccessor<T>::~textSourceAccessor() {
   myFile.close();
 }
 
 template <class T>
-std::string textSrouceAccessor<T>::fileName() {
+std::string textSourceAccessor<T>::fileName() {
   return fileNameStr;
 }
 
 template <typename T>
-int textSrouceAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+int textSourceAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
 template <typename T>
-int textSrouceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   assert(position == 0);
 
   // myFile.seekg(position);
@@ -110,14 +110,14 @@ int textSrouceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
 }
 
 template <typename T>
-int textSrouceAccessor<T>::fctrl(void* ptrData, const size_t size) {
+int textSourceAccessor<T>::fctrl(void* ptrData, const size_t size) {
   descriptor = *(reinterpret_cast<rdb::Descriptor*>(ptrData));
   payload = std::make_unique<rdb::payload>(descriptor);
   return EXIT_SUCCESS;
 }
 
-template class textSrouceAccessor<std::byte>;
-template class textSrouceAccessor<char>;
-template class textSrouceAccessor<unsigned char>;
+template class textSourceAccessor<std::byte>;
+template class textSourceAccessor<char>;
+template class textSourceAccessor<unsigned char>;
 
 }  // namespace rdb

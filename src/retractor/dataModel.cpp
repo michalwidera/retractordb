@@ -82,7 +82,7 @@ void dataModel::load(std::string compiledQueryFile) {
 
 void dataModel::prepare() {
   //
-  // Special parameters support in qurey set
+  // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
   for (auto qry : coreInstance)

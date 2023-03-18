@@ -334,4 +334,3 @@ TEST(crdb, payload_copy_constructor) {
   ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
   ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
-

@@ -925,6 +925,24 @@ void RQLParser::Field_typeContext::copyFrom(Field_typeContext *ctx) {
   ParserRuleContext::copyFrom(ctx);
 }
 
+//----------------- TypeUnsignedContext ------------------------------------------------------------------
+
+tree::TerminalNode* RQLParser::TypeUnsignedContext::UNSIGNED_T() {
+  return getToken(RQLParser::UNSIGNED_T, 0);
+}
+
+RQLParser::TypeUnsignedContext::TypeUnsignedContext(Field_typeContext *ctx) { copyFrom(ctx); }
+
+void RQLParser::TypeUnsignedContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterTypeUnsigned(this);
+}
+void RQLParser::TypeUnsignedContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitTypeUnsigned(this);
+}
 //----------------- TypeArrayContext ------------------------------------------------------------------
 
 tree::TerminalNode* RQLParser::TypeArrayContext::STRING_T() {
@@ -990,24 +1008,6 @@ void RQLParser::TypeFloatContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeFloat(this);
-}
-//----------------- TypeUnsigedContext ------------------------------------------------------------------
-
-tree::TerminalNode* RQLParser::TypeUnsigedContext::UNSIGNED_T() {
-  return getToken(RQLParser::UNSIGNED_T, 0);
-}
-
-RQLParser::TypeUnsigedContext::TypeUnsigedContext(Field_typeContext *ctx) { copyFrom(ctx); }
-
-void RQLParser::TypeUnsigedContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterTypeUnsiged(this);
-}
-void RQLParser::TypeUnsigedContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitTypeUnsiged(this);
 }
 //----------------- TypeByteContext ------------------------------------------------------------------
 
@@ -1084,7 +1084,7 @@ RQLParser::Field_typeContext* RQLParser::field_type() {
       }
 
       case RQLParser::UNSIGNED_T: {
-        _localctx = _tracker.createInstance<RQLParser::TypeUnsigedContext>(_localctx);
+        _localctx = _tracker.createInstance<RQLParser::TypeUnsignedContext>(_localctx);
         enterOuterAlt(_localctx, 4);
         setState(96);
         match(RQLParser::UNSIGNED_T);
@@ -1311,31 +1311,31 @@ void RQLParser::FieldIDContext::exitRule(tree::ParseTreeListener *listener) {
   if (parserListener != nullptr)
     parserListener->exitFieldID(this);
 }
-//----------------- FieldIDColumnnameContext ------------------------------------------------------------------
+//----------------- FieldIDColumnNameContext ------------------------------------------------------------------
 
-tree::TerminalNode* RQLParser::FieldIDColumnnameContext::DOT() {
+tree::TerminalNode* RQLParser::FieldIDColumnNameContext::DOT() {
   return getToken(RQLParser::DOT, 0);
 }
 
-std::vector<tree::TerminalNode *> RQLParser::FieldIDColumnnameContext::ID() {
+std::vector<tree::TerminalNode *> RQLParser::FieldIDColumnNameContext::ID() {
   return getTokens(RQLParser::ID);
 }
 
-tree::TerminalNode* RQLParser::FieldIDColumnnameContext::ID(size_t i) {
+tree::TerminalNode* RQLParser::FieldIDColumnNameContext::ID(size_t i) {
   return getToken(RQLParser::ID, i);
 }
 
-RQLParser::FieldIDColumnnameContext::FieldIDColumnnameContext(Field_idContext *ctx) { copyFrom(ctx); }
+RQLParser::FieldIDColumnNameContext::FieldIDColumnNameContext(Field_idContext *ctx) { copyFrom(ctx); }
 
-void RQLParser::FieldIDColumnnameContext::enterRule(tree::ParseTreeListener *listener) {
+void RQLParser::FieldIDColumnNameContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->enterFieldIDColumnname(this);
+    parserListener->enterFieldIDColumnName(this);
 }
-void RQLParser::FieldIDColumnnameContext::exitRule(tree::ParseTreeListener *listener) {
+void RQLParser::FieldIDColumnNameContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
-    parserListener->exitFieldIDColumnname(this);
+    parserListener->exitFieldIDColumnName(this);
 }
 RQLParser::Field_idContext* RQLParser::field_id() {
   Field_idContext *_localctx = _tracker.createInstance<Field_idContext>(_ctx, getState());
@@ -1375,14 +1375,14 @@ RQLParser::Field_idContext* RQLParser::field_id() {
     }
 
     case 3: {
-      _localctx = _tracker.createInstance<RQLParser::FieldIDColumnnameContext>(_localctx);
+      _localctx = _tracker.createInstance<RQLParser::FieldIDColumnNameContext>(_localctx);
       enterOuterAlt(_localctx, 3);
       setState(116);
-      antlrcpp::downCast<FieldIDColumnnameContext *>(_localctx)->tablename = match(RQLParser::ID);
+      antlrcpp::downCast<FieldIDColumnNameContext *>(_localctx)->tablename = match(RQLParser::ID);
       setState(117);
       match(RQLParser::DOT);
       setState(118);
-      antlrcpp::downCast<FieldIDColumnnameContext *>(_localctx)->column_name = match(RQLParser::ID);
+      antlrcpp::downCast<FieldIDColumnNameContext *>(_localctx)->column_name = match(RQLParser::ID);
       break;
     }
 

@@ -53,8 +53,8 @@ public:
   virtual void enterTypeInt(RQLParser::TypeIntContext *ctx) = 0;
   virtual void exitTypeInt(RQLParser::TypeIntContext *ctx) = 0;
 
-  virtual void enterTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) = 0;
-  virtual void exitTypeUnsiged(RQLParser::TypeUnsigedContext *ctx) = 0;
+  virtual void enterTypeUnsigned(RQLParser::TypeUnsignedContext *ctx) = 0;
+  virtual void exitTypeUnsigned(RQLParser::TypeUnsignedContext *ctx) = 0;
 
   virtual void enterTypeFloat(RQLParser::TypeFloatContext *ctx) = 0;
   virtual void exitTypeFloat(RQLParser::TypeFloatContext *ctx) = 0;
@@ -71,8 +71,8 @@ public:
   virtual void enterFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) = 0;
   virtual void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) = 0;
 
-  virtual void enterFieldIDColumnname(RQLParser::FieldIDColumnnameContext *ctx) = 0;
-  virtual void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext *ctx) = 0;
+  virtual void enterFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) = 0;
+  virtual void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) = 0;
 
   virtual void enterFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
   virtual void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;

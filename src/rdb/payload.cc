@@ -175,7 +175,7 @@ std::any payload::getItem(int position) {
   return 0xdead;
 }
 
-// Firend opearators
+// Friend operators
 
 std::istream &operator>>(std::istream &is, const payload &rhs) {
   std::string fieldName;

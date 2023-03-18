@@ -53,7 +53,7 @@ int posixBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const
         continue;  // Retry
       }
       assert(errno);
-      return errno;  // Error staus
+      return errno;  // Error status
     }
     ptrData += write_result;
     sizesh -= write_result;

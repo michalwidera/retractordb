@@ -28,7 +28,7 @@ enum FieldColumn { rname = 0, rlen = 1, rtype = 2 };
 constexpr int error_desc_location = -1;
 
 /**
- * @brief Structure resposible for mapping types into binary struct
+ * @brief Structure responsible for mapping types into binary struct
  */
 class Descriptor : public std::vector<rfield> {
  public:
@@ -77,14 +77,14 @@ class Descriptor : public std::vector<rfield> {
    *
    * DescriptorObject | Descriptor("A",10,STRING) | Descriptor("B",BYTE)
    *
-   * @param rhs Right Hand Side - it is reference to Right arguemnt of operator
+   * @param rhs Right Hand Side - it is reference to Right argument of operator
    * @return Descriptor& This return reference to result
    */
   Descriptor &operator|(const Descriptor &rhs);
   /**
    * @brief This constructor define Descriptor = Descriptor operation
    *
-   * As it is a vector ... it wouldn't be necessary - but there are uniqnees
+   * As it is a vector ... it wouldn't be necessary - but there are uniques
    * name requirement - and if vectors of tuples stacked in container will have
    * same names - these name map will be zeroed and this signs and error
    *
@@ -145,7 +145,7 @@ class Descriptor : public std::vector<rfield> {
 
   /**
    * @brief Counts over inner container and finds offset of given field position
-   * from package begining
+   * from package beginning
    *
    * @param position Field position
    * @return int Filed offset [unit: Bytes]
@@ -161,7 +161,7 @@ class Descriptor : public std::vector<rfield> {
   std::string type(const std::string name);
 
   /**
-   * @brief In case of string types this funcion will get binary representation
+   * @brief In case of string types this function will get binary representation
    * and convert it to string by accessing name
    *
    * @param name Name of searched field
@@ -176,9 +176,9 @@ class Descriptor : public std::vector<rfield> {
   /**
    * @brief Reads data from binary package via tuple-data from inner container
    *
-   * @tparam T Type that data should be converted (returned)
+   * @param T Type that data should be converted (returned)
    * @param name name of given field
-   * @param ptr pointer to begininng of package
+   * @param ptr pointer to beginning of package
    * @return auto Value from binary package that corresponds to field from
    * container
    */

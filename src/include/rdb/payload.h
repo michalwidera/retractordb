@@ -36,18 +36,18 @@ class payload {
   /// @param from destructor
   payload(const payload &other);
 
-  /// @brief Default constructor is dissalowed
+  /// @brief Default constructor is disallowed
   payload() = delete;
 
-  /// @brief Dirrect setter
+  /// @brief Direct setter
   /// @param position position according to descriptor
-  /// @param value value of given type according to desciptor that will be set
+  /// @param value value of given type according to descriptor that will be set
   /// in payload
   void setItem(int position, std::any value);
 
-  /// @brief Dirrect getter
+  /// @brief Direct getter
   /// @param position position according to descriptor
-  /// @return address of begining memory that contains data descibed by
+  /// @return address of beginning memory that contains data described by
   /// descriptor
   std::any getItem(int position);
 

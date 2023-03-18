@@ -1,9 +1,9 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
-// Checking redefinded namespace sanity
+// Checking redefined namespace sanity
 #if defined(DECL_T) || defined(DECL_F) || defined(DECL_E) || defined(BEGIN_E_GEN_T) || defined(END_E_GEN_T)
-#error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conficts with inner fldType.h declaration.
+#error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conflicts with inner fldType.h declaration.
 #endif
 
 #include <string>

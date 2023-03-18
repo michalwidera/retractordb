@@ -57,14 +57,14 @@ ok
 
 ```
 $ xtrdb
-.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INTEGER intdata FLOAT measurment }
+.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INTEGER intdata FLOAT measurement }
 ok
 .desc
 {       STRING name[5]
         BYTEARRAY data[3]
         BYTE control
         INTEGER intdata
-        FLOAT measurment
+        FLOAT measurement
 }
 ```
 
@@ -81,19 +81,19 @@ ok
         BYTEARRAY data[3]
         BYTE control
         INTEGER intdata
-        FLOAT measurment
+        FLOAT measurement
 }
 .set name test1
 .set data 5 7 8
 .set control 233
 .set intdata 345678
-.set measurment 3.1415926
+.set measurement 3.1415926
 .print
 {       name:test1
         data:5 7 8
         control:233
         intdata:345678
-        measurment:3.14159
+        measurement:3.14159
 }
 .append
 ok
@@ -110,7 +110,7 @@ ok
         data:5 7 8
         control:233
         intdata:345678
-        measurment:3.14159
+        measurement:3.14159
 }
 .set name test2
 .print
@@ -118,7 +118,7 @@ ok
         data:5 7 8
         control:233
         intdata:345678
-        measurment:3.14159
+        measurement:3.14159
 }
 .append
 ok
@@ -129,7 +129,7 @@ ok
         data:5 7 8
         control:233
         intdata:345678
-        measurment:3.14159
+        measurement:3.14159
 }
 .
 ```

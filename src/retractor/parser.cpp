@@ -77,7 +77,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitFieldID(RQLParser::FieldIDContext* ctx) { recpToken(PUSH_ID3, ctx->getText()); }
   void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext* ctx) { recpToken(PUSH_IDX, ctx->getText()); }
-  void exitFieldIDColumnname(RQLParser::FieldIDColumnnameContext* ctx) { recpToken(PUSH_ID1, ctx->getText()); }
+  void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext* ctx) { recpToken(PUSH_ID1, ctx->getText()); }
   void exitFieldIDTable(RQLParser::FieldIDTableContext* ctx) { recpToken(PUSH_ID2, ctx->getText()); }
 
   void exitExpPlus(RQLParser::ExpPlusContext* ctx) { recpToken(ADD); }
@@ -210,7 +210,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitTypeByte(RQLParser::TypeByteContext* ctx) { fType = rdb::BYTE; }
   void exitTypeInt(RQLParser::TypeIntContext* ctx) { fType = rdb::INTEGER; }
-  void exitTypeUnsiged(RQLParser::TypeUnsigedContext* ctx) { fType = rdb::UINT; }
+  void exitTypeUnsigned(RQLParser::TypeUnsignedContext* ctx) { fType = rdb::UINT; }
   void exitTypeFloat(RQLParser::TypeFloatContext* ctx) { fType = rdb::FLOAT; }
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx) {

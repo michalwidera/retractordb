@@ -149,7 +149,7 @@ std::string intervalCounter() {
           throw std::out_of_range("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
       assert(delta != -1);
-      q.rInterval = delta;  // There is estabilished delta value - return value
+      q.rInterval = delta;  // There is established delta value - return value
     }                       // BOOST_FOREACH ( query & q , coreInstance )
     if (!bOnceAgain)
       break;
@@ -168,13 +168,13 @@ std::string generateStreamName(std::string sName1, std::string sName2, command_i
     return sOperation + std::string("_") + sName2 + std::string("_") + sName1;
 }
 
-/* Goal of this procedure is to provide stream to canonincal form
+/* Goal of this procedure is to provide stream to canonical form
 TODO: Stream_MAX,MIN,AVG...
 */
 std::string simplifyLProgram() {
   coreInstance.sort();
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
-    // Agse pahse optization
+    // Agse phase optimization
     token t0, t1, t2;
     for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
       t0 = t1;
@@ -226,8 +226,8 @@ std::string simplifyLProgram() {
           break;
         } else if ((*it2).getStrCommandID() != "PUSH_STREAM" && (*it2).getStrCommandID() != "PUSH_VAL") {
           query newQuery;
-          std::string arg1,  //< Name of first opeartion arguemnt
-              arg2;          //< Name of second opeartion arguemnt
+          std::string arg1,  //< Name of first operation argument
+              arg2;          //< Name of second operation argument
           command_id cmd;
           {
             token newVal(*it2);
@@ -270,7 +270,7 @@ std::string simplifyLProgram() {
   return std::string("OK");
 }
 
-// Goal of this procedure is to unroll schema bsased of given command
+// Goal of this procedure is to unroll schema based of given command
 std::list<field> combine(std::string sName1, std::string sName2, token cmd_token) {
   std::list<field> lRetVal;
   command_id cmd = cmd_token.getCommandID();
@@ -356,7 +356,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
     lRetVal = schema;
   } else {
     SPDLOG_ERROR("Undefined: str:{} cmd:{}", cmd_token.getStr_(), cmd_token.getStrCommandID());
-    // throw std::invalid_argument("Command stack hits undefinied operation");
+    // throw std::invalid_argument("Command stack hits undefined operation");
     abort();
   }
   // Here are added to fields execution methods
@@ -383,17 +383,17 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
 }
 
 // goal of this procedure is setup of all possible fields name and unroll *
-// unfortunatlle algorithm if broken - because does not search backward but next
-// by next and some * can be process which have arguments appear as two asterixe
-// In such case unrool does not appear and algorithm gets shitin-shitout
+// unfortunately algorithm if broken - because does not search backward but next
+// by next and some * can be process which have arguments appear as two asterisk
+// In such case unroll does not appear and algorithm gets shitin-shitout
 
 std::string prepareFields() {
   coreInstance.tsort();
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
       assert(q.lProgram.size() < 4);
-      // fail of this asseration means that all streams are
-      // after otimization alerady
+      // fail of this assertion means that all streams are
+      // after optimization already
       std::vector<std::list<field>::iterator> eraseList;
       auto it = q.lSchema.begin();
       for (auto &f : q.lSchema) {
@@ -488,7 +488,7 @@ std::string replicateIDX() {
   return std::string("OK");
 }
 
-/* Purpose of this function is to translate all refrences to fields
+/* Purpose of this function is to translate all references to fields
 to form schema_name[postion, time_offset]
 Command method of presentation aims simple data processing
 Aim of this procedure is change all of push_idXXX to push_id
@@ -515,7 +515,7 @@ std::string convertReferences() {
               assert(what.size() == 3);
               const std::string schema(what[1]);
               const std::string field(what[2]);
-              // aim of this procedure is found scheamt, next field in schema
+              // aim of this procedure is found schema, next field in schema
               // and then insert
               for (auto &q1 : coreInstance) {
                 if (q1.id == schema) {
@@ -529,7 +529,7 @@ std::string convertReferences() {
                   }
                   if (offset1 == q1.lSchema.size())
                     throw std::out_of_range(
-                        "Failure during refernece converstion - schema exist, "
+                        "Failure during reference conversation - schema exist, "
                         "no "
                         "fields");
                   break;
@@ -608,7 +608,7 @@ std::string convertReferences() {
                   break;
                 }
               }
-              if (!foundSchema) throw std::logic_error("Field calls nonexist schema - config.log (-g)");
+              if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
               t = token(PUSH_ID, schema, boost::rational<int>(offset1 + offset2 * q.lSchema.size()));
             } else
               throw std::out_of_range("No mach on type conversion ID4");
