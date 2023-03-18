@@ -1,5 +1,7 @@
 @startuml
 
+/' To preview in VSCode: Alt-D '/
+
 participant  Client #Application
 Entity       Payload #Lime
 participant  Rdb #Lime

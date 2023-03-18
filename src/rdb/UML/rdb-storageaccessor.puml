@@ -1,5 +1,7 @@
 @startuml
 
+/' To preview in VSCode: Alt-D '/
+
 title Storage Accessor - Activty Diagram
 
 start

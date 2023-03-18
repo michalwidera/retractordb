@@ -1,5 +1,7 @@
 # RetractorDB:Rdb
 
+[comment]: <> (VSCode view: Ctrl+k,v)
+
 ## Retractor DB - inner database structure
 
 Retractor DB is using inner database format. This format supports read,update, append commands interface. This database is called _STORAGE_ here.
