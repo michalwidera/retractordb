@@ -22,6 +22,7 @@ class storageAccessor {
   Descriptor descriptor;
   bool reverse = false;
   bool removeOnExit = true;
+  bool removeDescriptorOnExit = false;
   size_t recordsCount = 0;
   std::string descriptorFile;
   std::string storageFile;
@@ -49,6 +50,7 @@ class storageAccessor {
 
   void setReverse(bool value);
   void setRemoveOnExit(bool value);
+  void setRemoveDescriptorOnExit(bool value);
   const size_t getRecordsCount();
   bool peekStorage();
   bool peekDescriptor();

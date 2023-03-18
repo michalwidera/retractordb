@@ -142,13 +142,13 @@ void storageAccessor::attachPayload(rdb::payload& payloadRef) {
 
 storageAccessor::~storageAccessor() {
   if (removeOnExit) {
-    // Constructor & Destructor does not fail - need to reconsider remove this
-    // asserts or make this in another way.
     auto statusRemove1 = remove(storageFile.c_str());
-    // assert(statusRemove1 == 0);
     auto statusRemove2 = remove(descriptorFile.c_str());
-    // assert(statusRemove2 == 0);
-    SPDLOG_INFO("drop storage");
+    SPDLOG_INFO("drop storage, drop descriptor");
+  }
+  if (removeDescriptorOnExit) {
+    auto statusRemove2 = remove(descriptorFile.c_str());
+    SPDLOG_INFO("drop descriptor");
   }
 }
 
@@ -159,6 +159,8 @@ bool storageAccessor::peekDescriptor() { return std::filesystem::exists(descript
 void storageAccessor::setReverse(bool value) { reverse = value; }
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
+
+void storageAccessor::setRemoveDescriptorOnExit(bool value) { removeDescriptorOnExit = value; }
 
 const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
