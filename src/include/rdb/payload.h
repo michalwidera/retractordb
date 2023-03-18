@@ -32,6 +32,10 @@ class payload {
   /// @param descriptor descriptor of payload area
   payload(Descriptor descriptor);
 
+  /// @brief Copy constructor
+  /// @param from destructor
+  payload(const payload &other);
+
   /// @brief Default constructor is dissalowed
   payload() = delete;
 

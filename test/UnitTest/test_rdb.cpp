@@ -323,3 +323,15 @@ TEST(crdb, payload_assign_operator) {
   ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
   ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
+
+
+TEST(crdb, payload_copy_constructor) {
+  auto data1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
+             rdb::Descriptor("Control", rdb::BYTE) |     //
+             rdb::Descriptor("TLen", rdb::INTEGER)};
+  rdb::Descriptor data2{data1};
+  ASSERT_TRUE(data2.position("Control") == data1.position("Control"));
+  ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
+  ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
+}
+

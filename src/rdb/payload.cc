@@ -10,11 +10,22 @@
 #include <iostream>
 
 namespace rdb {
+
+// default constructor
+
 payload::payload(Descriptor descriptor)
     : descriptor(descriptor),  //
       hexFormat(false) {
   payloadData = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
   std::memset(payloadData.get(), 0, descriptor.getSizeInBytes());
+}
+
+// copy constructor
+
+payload::payload(const payload &other) {
+  payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
+  descriptor = other.getDescriptor();
+  std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
 }
 
 // Copy assignment operator
@@ -27,6 +38,7 @@ payload &payload::operator=(payload &other) {
   }
   return *this;
 }
+
 payload &payload::operator=(const payload &other) {
   if (this != &other) {  // not a self-assignment
     payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
