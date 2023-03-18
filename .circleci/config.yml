@@ -3,7 +3,13 @@ version: 2.1
 workflows:
   commit:
     jobs:
-      - build-2204-debug:
+      - build-2204-make-debug:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
+      - build-2204-make-debug-test:
           filters:
             branches:
               only:
@@ -97,7 +103,39 @@ commands:
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && make install
 
-  run-test:
+  conan-install-build-make:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
+      build_param:
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: conan build
+          command: |
+            conan source .
+            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
+            cd build/<<parameters.build_type>>/src && make && make install
+
+  conan-install-build-make-test:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
+      build_param:
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: conan build
+          command: |
+            conan source .
+            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
+            cd build/<<parameters.build_type>>/test && make && make test
+
+  run-test-smoke:
     parameters:
       build_type:
         type: string
@@ -108,6 +146,13 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h
+
+  run-test:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
+    steps:
       - run:
           name: UnitTest
           command: |
@@ -129,6 +174,28 @@ commands:
           path: /tmp/test_dumps
 
 jobs:
+  build-2204-make-debug:
+    working_directory: ~/retractordb
+    executor: ubuntu2204machine
+    steps:
+      - checkout
+      - prep-env-159
+      - conan-install-build-make:
+          build_type: Debug
+      - run-test-smoke:
+          build_type: Debug
+
+  build-2204-make-debug-test:
+    working_directory: ~/retractordb
+    executor: ubuntu2204machine
+    steps:
+      - checkout
+      - prep-env-159
+      - conan-install-build-make-test:
+          build_type: Debug
+      - run-test:
+          build_type: Debug
+
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
@@ -136,6 +203,8 @@ jobs:
       - checkout
       - prep-env-159
       - conan-build:
+          build_type: Debug
+      - run-test-smoke:
           build_type: Debug
       - run-test:
           build_type: Debug
@@ -147,6 +216,7 @@ jobs:
       - checkout
       - prep-env-159
       - conan-build
+      - run-test-smoke
       - run-test
 
   build-2204-conan20:
@@ -157,6 +227,7 @@ jobs:
       - prep-env-200
       - conan-build:
           build_param: --build missing
+      - run-test-smoke
       - run-test
 
   build-2204-conan20-debug:
@@ -168,6 +239,7 @@ jobs:
       - conan-build:
           build_type: Debug
           build_param: --build missing
+      - run-test-smoke
       - run-test:
           build_type: Debug
 
