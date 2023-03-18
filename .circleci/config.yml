@@ -3,13 +3,7 @@ version: 2.1
 workflows:
   commit:
     jobs:
-      - build-2204-make-debug:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-      - build-2204-make-debug-test:
+      - build-2204-debug:
           filters:
             branches:
               only:
@@ -71,7 +65,6 @@ commands:
             pip3 install conan==1.59
             conan profile new default --detect
             conan profile update settings.compiler.libcxx=libstdc++11 default
-
   prep-env-200:
     parameters:
       gcc_version:
@@ -85,7 +78,6 @@ commands:
             sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip
             pip3 install conan
             conan profile detect
-
   conan-build:
     parameters:
       build_type:
@@ -102,40 +94,7 @@ commands:
             conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && make install
-
-  conan-install-build-make:
-    parameters:
-      build_type:
-        type: string
-        default: "Release"
-      build_param:
-        type: string
-        default: ""
-    steps:
-      - run:
-          name: conan build
-          command: |
-            conan source .
-            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
-            cd build/<<parameters.build_type>>/src && make && make install
-
-  conan-install-build-make-test:
-    parameters:
-      build_type:
-        type: string
-        default: "Release"
-      build_param:
-        type: string
-        default: ""
-    steps:
-      - run:
-          name: conan build
-          command: |
-            conan source .
-            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
-            cd build/<<parameters.build_type>>/test && make && make test
-
-  run-test-smoke:
+  run-test:
     parameters:
       build_type:
         type: string
@@ -146,13 +105,6 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h
-
-  run-test:
-    parameters:
-      build_type:
-        type: string
-        default: "Release"
-    steps:
       - run:
           name: UnitTest
           command: |
@@ -174,28 +126,6 @@ commands:
           path: /tmp/test_dumps
 
 jobs:
-  build-2204-make-debug:
-    working_directory: ~/retractordb
-    executor: ubuntu2204machine
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-install-build-make:
-          build_type: Debug
-      - run-test-smoke:
-          build_type: Debug
-
-  build-2204-make-debug-test:
-    working_directory: ~/retractordb
-    executor: ubuntu2204machine
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-install-build-make-test:
-          build_type: Debug
-      - run-test:
-          build_type: Debug
-
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
@@ -203,8 +133,6 @@ jobs:
       - checkout
       - prep-env-159
       - conan-build:
-          build_type: Debug
-      - run-test-smoke:
           build_type: Debug
       - run-test:
           build_type: Debug
@@ -216,7 +144,6 @@ jobs:
       - checkout
       - prep-env-159
       - conan-build
-      - run-test-smoke
       - run-test
 
   build-2204-conan20:
@@ -227,7 +154,6 @@ jobs:
       - prep-env-200
       - conan-build:
           build_param: --build missing
-      - run-test-smoke
       - run-test
 
   build-2204-conan20-debug:
@@ -239,7 +165,6 @@ jobs:
       - conan-build:
           build_type: Debug
           build_param: --build missing
-      - run-test-smoke
       - run-test:
           build_type: Debug
 
@@ -258,4 +183,4 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
               xretractor -h && xqry -h && xdumper -h
               # cd build/Release && make test
-              # There is a problem on test on ARM - I will postopne this failure for now - build is more important that this for now.
+              # There is a problem on test on ARM - I will postpone this failure for now - build is more important that this for now.
