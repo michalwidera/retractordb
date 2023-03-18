@@ -1,6 +1,6 @@
 # RetractorDB:Rdb
 
-[comment]: <> (VSCode view: Ctrl+k,v)
+[comment]: # (VSCode view: Ctrl+k,v)
 
 ## Retractor DB - inner database structure
 

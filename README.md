@@ -2,7 +2,7 @@ RetractorDB
 -----------------------------------------------------------------------
 ![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
 
-[comment]: <> (VSCode view: Ctrl+k,v)
+[comment]: # (VSCode view: Ctrl+k,v)
 
 These are sources of RetractorDB Time Series Database System prototype. This is work in progress.
 
