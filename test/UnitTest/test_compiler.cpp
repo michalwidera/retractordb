@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "QStruct.h"
-#include "compiler/compiler.hpp"
+#include "retractor/compiler.hpp"
 
 extern std::string parserFile(std::string sInputFile);
 extern std::string parserString(std::string sInputFile);
@@ -37,9 +37,9 @@ bool check_compile_function() {
 // SELECT * STREAM test1 FROM core@(-1,10)
 // SELECT * STREAM test2 FROM core@(1,10)
 
-TEST(xcompiler, check_compile) { ASSERT_TRUE(check_compile_function()); }
+TEST(xparser, check_compile) { ASSERT_TRUE(check_compile_function()); }
 
-TEST(xcompiler, check_compile_result) {
+TEST(xparser, check_compile_result) {
   ASSERT_TRUE(check_compile_function());
 
   SPDLOG_INFO("coreInstance.size() {}", coreInstance.size());
@@ -52,7 +52,6 @@ TEST(xcompiler, check_compile_result) {
   }
 }
 
-TEST(xcompiler, check_compile_result) {
-  auto compiled = parserString("DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK";
-  ASSERT_TRUE(compiled == true);
+TEST(xparser, check_parserString) {
+  ASSERT_TRUE(parserString("DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK");
 }

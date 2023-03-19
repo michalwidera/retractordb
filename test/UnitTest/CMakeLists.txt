@@ -38,7 +38,7 @@ set(SOURCES_RDB_TEST
     test_rdb.cpp
     main.cpp)
 
-set(SOURCES_SCHEMA_TEST
+set(SOURCES_DATAMODEL_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
@@ -75,9 +75,9 @@ set(SOURCES_EXPEVAL_TEST
 
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
-add_executable(test_dataModel ${SOURCES_SCHEMA_TEST})
+add_executable(test_dataModel ${SOURCES_DATAMODEL_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
-add_executable(test_compiler ${SOURCES_EXPEVAL_TEST})
+add_executable(test_compiler ${SOURCES_COMPILER_TEST})
 
 target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
@@ -106,7 +106,7 @@ add_test(
 
 add_test(
   NAME ut-compiler
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/compiler
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
 
 add_test(
