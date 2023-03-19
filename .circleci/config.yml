@@ -139,7 +139,7 @@ jobs:
 
   build-2204-release:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker
+    executor: ubuntu2204machine
     steps:
       - checkout
       - prep-env-159
