@@ -60,6 +60,8 @@ class payload {
 
   payload &operator=(payload &other);
   payload &operator=(const payload &other);
+
+  payload operator+(payload &other);
 };
 }  // namespace rdb
 

@@ -28,11 +28,12 @@ payload::payload(const payload &other) {
   std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
 }
 
-// Copy assignment operator
+// Copy & assignment operator
 
 payload &payload::operator=(payload &other) {
-  if (this != &other) {  // not a self-assignment
-    payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
+  if (this != &other) {                                // assure not a self-assignment
+    if (other.descriptor.size() != descriptor.size())  // speed up memory management
+      payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
     descriptor = other.getDescriptor();
     std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   }
@@ -40,12 +41,23 @@ payload &payload::operator=(payload &other) {
 }
 
 payload &payload::operator=(const payload &other) {
-  if (this != &other) {  // not a self-assignment
-    payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
+  if (this != &other) {                                // assure not a self-assignment
+    if (other.descriptor.size() != descriptor.size())  // speed up memory management
+      payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
     descriptor = other.getDescriptor();
     std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   }
   return *this;
+}
+
+// Math operation operators
+
+payload payload::operator+(payload &other) {
+  auto descSum = descriptor | other.getDescriptor();  // ! moving this into constructor fails
+  payload result(descSum);
+  std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
+  std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
+  return result;
 }
 
 // Member Functions
@@ -111,6 +123,10 @@ void payload::setItem(int position, std::any value) {
     assert(false && "type not supported on setter");
   }
 }
+template <typename T>
+T getVal(void *ptr, int offset) {
+  return *(reinterpret_cast<T *>(static_cast<std::byte *>(ptr) + offset));
+}
 
 std::any payload::getItem(int position) {
   auto fieldName = descriptor.fieldName(position);
@@ -122,46 +138,40 @@ std::any payload::getItem(int position) {
     SPDLOG_INFO("getItem {} string:{}", position, retval);
     return retval;
   } else if (descriptor.type(fieldName) == "BYTEARRAY") {
-    std::vector<unsigned char> data;
+    std::vector<uint8_t> data;
     for (auto i = 0; i < descriptor.len(fieldName); i++) {
-      unsigned char data8 =
-          *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position) + i);
+      uint8_t data8 = getVal<uint8_t>(payloadData.get(), descriptor.offset(position) + i);
       data.push_back(data8);
     }
     SPDLOG_INFO("getItem {} bytearray", position);
     return data;
   } else if (descriptor.type(fieldName) == "BYTE") {
-    unsigned char data;
-    data = *reinterpret_cast<unsigned char *>(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position));
+    uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(position));
     SPDLOG_INFO("getItem {} byte:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "INTARRAY") {
     std::vector<int> data;
     for (auto i = 0; i < descriptor.len(fieldName); i++) {
-      int dataInt = *reinterpret_cast<int *>(reinterpret_cast<int *>(payloadData.get()) + descriptor.offset(position) + i);
+      int dataInt = getVal<int>(payloadData.get(), descriptor.offset(position) + i);
       data.push_back(dataInt);
     }
     SPDLOG_INFO("getItem {} intarray", position);
     return data;
   } else if (descriptor.type(fieldName) == "INTEGER") {
-    int data;
-    data = *reinterpret_cast<int *>(reinterpret_cast<int *>(payloadData.get()) + descriptor.offset(position));
-    SPDLOG_INFO("getItem {} int:{}", position, data);
+    int data = getVal<int>(payloadData.get(), descriptor.offset(position));
+    SPDLOG_INFO("getItem {} int:{} offset:{}", position, data, descriptor.offset(position));
     return data;
   } else if (descriptor.type(fieldName) == "UINT") {
-    uint data;
-    data = *reinterpret_cast<uint *>(reinterpret_cast<uint *>(payloadData.get()) + descriptor.offset(position));
+    uint data = getVal<uint>(payloadData.get(), descriptor.offset(position));
     SPDLOG_INFO("getItem {} uint:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "DOUBLE") {
-    double data;
-    data = *reinterpret_cast<double *>(reinterpret_cast<double *>(payloadData.get()) + descriptor.offset(position));
+    double data = getVal<double>(payloadData.get(), descriptor.offset(position));
     SPDLOG_INFO("getItem {} double:{}", position, data);
     return data;
   } else if (descriptor.type(fieldName) == "FLOAT") {
-    float data;
+    float data = getVal<float>(payloadData.get(), descriptor.offset(position));
     SPDLOG_INFO("getItem {} float:{}", position, data);
-    data = *reinterpret_cast<double *>(reinterpret_cast<float *>(payloadData.get()) + descriptor.offset(position));
     return data;
   } else if (descriptor.type(fieldName) == "REF") {
     SPDLOG_ERROR("REF not supported.");

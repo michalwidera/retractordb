@@ -363,3 +363,58 @@ TEST(crdb, payload_copy_constructor) {
   ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
   ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
+
+TEST(crdb, payload_add_operator) {
+  auto data1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
+             rdb::Descriptor("Control", rdb::BYTE) |     //
+             rdb::Descriptor("ll", rdb::INTEGER) |       //
+             rdb::Descriptor("TLen", rdb::INTEGER)};
+
+  union dataPayload {
+    std::byte ptr[19];
+    struct __attribute__((packed)) {
+      char Name[10];    // 10
+      uint8_t Control;  // 1
+      int ll;           // 4
+      int TLen;         // 4
+    };
+  };
+
+  auto data2{rdb::Descriptor("TLen2", rdb::INTEGER)};
+
+  rdb::payload data1Payload(data1);
+  rdb::payload data2Payload(data2);
+
+  data1Payload.setItem(0, std::string("test"));  // ! "test" without std::string claims exception
+  data1Payload.setItem(1, 24);
+  data1Payload.setItem(2, 2000);
+  data1Payload.setItem(3, 3333);
+
+  auto Name_ = data1Payload.getItem(0);
+  auto Control_ = data1Payload.getItem(1);
+  auto ll_ = data1Payload.getItem(2);
+  auto TLen_ = data1Payload.getItem(3);
+
+  dataPayload var;
+
+  std::memcpy(&var, data1Payload.get(), 19);
+
+  ASSERT_TRUE(var.ll == std::any_cast<int>(ll_));
+  ASSERT_TRUE(var.TLen == std::any_cast<int>(TLen_));
+
+  data2Payload.setItem(0, 4004);
+
+  ASSERT_TRUE(std::any_cast<int>(data1Payload.getItem(2)) == 2000);
+
+  rdb::payload data3Payload(rdb::Descriptor("bad", rdb::BYTE));
+
+  // data3Payload = data1Payload + data2Payload;
+
+  // std::cerr << data3Payload.getDescriptor() << std::endl ;
+
+  // ASSERT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
+  // ASSERT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
+  // ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
+  // ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
+  // ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
+}
