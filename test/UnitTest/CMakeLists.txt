@@ -52,7 +52,7 @@ set(SOURCES_SCHEMA_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLParser.cpp
-    test_schema.cpp
+    test_dataModel.cpp
     main.cpp)
 
 set(SOURCES_EXPEVAL_TEST
@@ -75,14 +75,14 @@ set(SOURCES_EXPEVAL_TEST
 
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
-add_executable(test_schema ${SOURCES_SCHEMA_TEST})
+add_executable(test_dataModel ${SOURCES_SCHEMA_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 add_executable(test_compiler ${SOURCES_EXPEVAL_TEST})
 
 target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
 target_link_libraries(test_xtrdb ${Boost_LIBRARIES} ${GTest_LIBRARIES})
-target_link_libraries(test_schema ${Boost_LIBRARIES} ${GTest_LIBRARIES}
+target_link_libraries(test_dataModel ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
 target_link_libraries(test_expeval ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
@@ -90,37 +90,37 @@ target_link_libraries(test_compiler ${Boost_LIBRARIES} ${GTest_LIBRARIES}
                       ${antlr4-runtime_LIBRARIES})
 
 add_test(
-  NAME unittest-test-xqry
+  NAME ut-xqry
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
-  NAME unittest-test-xtrdb
+  NAME ut-xtrdb
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
 add_test(
-  NAME unittest-test-expeval
+  NAME ut-expeval
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
 
 add_test(
-  NAME unittest-test-compiler
+  NAME ut-compiler
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
 
 add_test(
-  NAME unittest-test-schema
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/schema
+  NAME ut-dataModel
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
   COMMAND bash -c "set -e ; \
-  ${CMAKE_BINARY_DIR}/test/UnitTest/test_schema")
+  ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
 
 add_test(
-  NAME unittest-test-schema-comp
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/schema
+  NAME ut-dataModel-comp
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
   COMMAND bash -c "set -e ; \
   xtrdb < term.script > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(unittest-test-xtrdb unittest-test-xqry unittest-test-schema
-                     unittest-test-schema-comp PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(ut-xtrdb ut-xqry ut-dataModel
+                     ut-dataModel-comp PROPERTIES RUN_SERIAL TRUE)

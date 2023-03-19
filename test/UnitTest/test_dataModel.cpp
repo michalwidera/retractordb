@@ -38,7 +38,8 @@ class xschema : public ::testing::Test {
   void TearDown() override { SPDLOG_INFO("TearDown"); }
 };
 
-// ctest -R unittest-test-schema
+// ctest -R ut-dataModel
+
 TEST_F(xschema, check_test0) {
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //

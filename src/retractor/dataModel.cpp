@@ -9,7 +9,7 @@
 
 extern "C" qTree coreInstance;
 
-// ctest -R '^unittest-test-schema'
+// ctest -R '^ut-dataModel'
 
 enum { noHexFormat = false, HexFormat = true };
 
