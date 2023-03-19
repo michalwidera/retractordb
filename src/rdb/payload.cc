@@ -53,8 +53,13 @@ payload &payload::operator=(const payload &other) {
 // Math operation operators
 
 payload payload::operator+(payload &other) {
-  auto descSum = descriptor | other.getDescriptor();  // ! moving this into constructor fails
+  rdb::Descriptor descSum(descriptor);
+  descSum | other.getDescriptor();  // ! moving this into constructor fails
   payload result(descSum);
+  SPDLOG_INFO("operator+ {} {} {}",               //
+              descriptor.getSizeInBytes(),        //
+              other.descriptor.getSizeInBytes(),  //
+              result.getDescriptor().getSizeInBytes());
   std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
   std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
   return result;

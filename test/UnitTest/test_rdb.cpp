@@ -408,13 +408,11 @@ TEST(crdb, payload_add_operator) {
 
   rdb::payload data3Payload(rdb::Descriptor("bad", rdb::BYTE));
 
-  // data3Payload = data1Payload + data2Payload;
+  data3Payload = data1Payload + data2Payload;
 
-  // std::cerr << data3Payload.getDescriptor() << std::endl ;
-
-  // ASSERT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
-  // ASSERT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
-  // ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
-  // ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
-  // ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
+  //ASSERT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
+  ASSERT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
+  ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
+  ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
+  ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
 }
