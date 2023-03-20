@@ -29,7 +29,6 @@ streamInstance::streamInstance(               //
 
   storage = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
   storage->attachDescriptor(&storageDescriptor);
-  // storage->attachPayload(*storagePayload);
 
   {
     std::stringstream strStream;
