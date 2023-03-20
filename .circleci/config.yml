@@ -15,12 +15,15 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+              ignore:
+                 - /*[debug]*/
 
   nightly:
     triggers:
       - schedule:
           # https://crontab.guru/#0_1_*_*_1,6
-          cron: "0 1 * * 1,6"
+          # 0 1 * * 6 - At 01:00 on Saturday.
+          cron: "0 1 * * 6"
           filters:
             branches:
               only:
