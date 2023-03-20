@@ -263,26 +263,20 @@ TEST(xrdb, test_ref_storage) {
   auto storageDescriptor{rdb::Descriptor("dane", rdb::INTEGER) |       //
                          rdb::Descriptor("datafile1.txt", rdb::REF) |  //
                          rdb::Descriptor("TEXTSOURCE", rdb::TYPE)};
-
-  // std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::storageAccessor> storage;
-
-  // storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
 
   storage = std::make_unique<rdb::storageAccessor>("datafile1" /* descriptorName (.desc auto-attach) */);
   storage->attachDescriptor(&storageDescriptor);
   storage->setRemoveOnExit(false);
   storage->setRemoveDescriptorOnExit(true);
-  // storage->attachPayload(*storagePayload);
 
   storage->read(0);
 
-  // TODO
-  // ASSERT_TRUE(std::any_cast<int>(storagePayload->getItem(0)) == 60);
+  ASSERT_TRUE(std::any_cast<int>(storage->getPayload()->getItem(0)) == 60);
 
   storage->read(0);
 
-  // ASSERT_TRUE(std::any_cast<int>(storagePayload->getItem(0)) == 61);
+  ASSERT_TRUE(std::any_cast<int>(storage->getPayload()->getItem(0)) == 61);
 }
 
 TEST(crdb, genericBinaryFileAccessor_byte) {
