@@ -41,9 +41,6 @@ endif
 :<color:green>descriptor is ready;
 
 note left: Storage location estabilished
-}
-
-partition "attachStorage" {
 
 :assume storage filename
 as storagename;
@@ -58,7 +55,9 @@ else (no)
 endif
 
 :<color:green>storage is ready;
+
 }
+
 
 :<color:green>attach payload;
 

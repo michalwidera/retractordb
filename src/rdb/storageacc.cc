@@ -39,8 +39,11 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
     }
 
     moveRef();
+    storagePayload = std::make_unique<rdb::payload>(descriptor);
 
-    SPDLOG_INFO("Descriptor from file used.");
+    SPDLOG_INFO("Payload created, Descriptor from file used.");
+
+    attachStorage();
     return;
   }
 
@@ -61,8 +64,10 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
   descFile.close();
 
   moveRef();
+  storagePayload = std::make_unique<rdb::payload>(descriptor);
 
-  SPDLOG_INFO("Descriptor created.");
+  SPDLOG_INFO("Payload & Descriptor created.");
+  attachStorage();
 }
 
 void storageAccessor::moveRef() {
@@ -87,12 +92,6 @@ void storageAccessor::moveRef() {
 }
 
 void storageAccessor::attachStorage() {
-  // assert(descriptor.len() != 0);
-  if (storageFile == "") {
-    SPDLOG_ERROR("Bad sequence of attach operations, first attach descriptor");
-    abort();
-  }
-
   auto resourceAlreadyExist = std::filesystem::exists(storageFile);
 
   auto it = std::find_if(descriptor.begin(),
@@ -142,29 +141,27 @@ void storageAccessor::attachStorage() {
   dataFileStatus = storageState::openAndCreate;
 }
 
-void storageAccessor::attachPayloadPtr(std::byte* payloadPtrVal) {
-  SPDLOG_INFO("required: PayloadPtr [attached]");
-  payloadPtr = payloadPtrVal;
-}
-
-void storageAccessor::attachPayload(rdb::payload& payloadRef) {
-  SPDLOG_INFO("required: Payload [attached]");
-  payloadPtr = payloadRef.get();
-}
-
 storageAccessor::~storageAccessor() {
   if (removeOnExit) {
     if (storageFile != "") auto statusRemove1 = remove(storageFile.c_str());
-    auto statusRemove2 = remove(descriptorFile.c_str());
+    if (peekDescriptor()) remove(descriptorFile.c_str());
     SPDLOG_INFO("drop storage, drop descriptor");
   }
   if (removeDescriptorOnExit) {
-    auto statusRemove2 = remove(descriptorFile.c_str());
+    if (peekDescriptor()) remove(descriptorFile.c_str());
     SPDLOG_INFO("drop descriptor");
   }
 }
 
 Descriptor& storageAccessor::getDescriptor() { return descriptor; }
+
+std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
+  if (!storagePayload) {
+    SPDLOG_ERROR("no payload attached");
+    abort();  // no payload attached
+  }
+  return storagePayload.get();
+}
 
 bool storageAccessor::peekDescriptor() { return std::filesystem::exists(descriptorFile); }
 
@@ -185,7 +182,7 @@ bool storageAccessor::read(const size_t recordIndex) {
     SPDLOG_ERROR("store is not open");
     abort();  // data file is not opened
   }
-  if (payloadPtr == nullptr) {
+  if (!storagePayload) {
     SPDLOG_ERROR("no payload attached");
     abort();  // no payload attached
   }
@@ -193,7 +190,7 @@ bool storageAccessor::read(const size_t recordIndex) {
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->read(payloadPtr, size, recordIndexRv * size);
+    result = accessor->read(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("read {}", recordIndexRv);
   }
@@ -209,14 +206,15 @@ bool storageAccessor::write(const size_t recordIndex) {
     SPDLOG_ERROR("store is not open");
     abort();  // data file is not opened
   }
-  if (payloadPtr == nullptr) {
+  if (!storagePayload) {
     SPDLOG_ERROR("no payload attached");
     abort();  // no payload attached
   }
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
-    result = accessor->write(payloadPtr, size);  // <- Call to append Function
+    result = accessor->write(static_cast<std::byte*>(storagePayload->get()),
+                             size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
     SPDLOG_INFO("append");
@@ -225,7 +223,7 @@ bool storageAccessor::write(const size_t recordIndex) {
 
   if (recordsCount > 0 && recordIndex < recordsCount) {
     auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-    result = accessor->write(payloadPtr, size, recordIndexRv * size);
+    result = accessor->write(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("write {}", recordIndexRv);
   }

@@ -60,8 +60,8 @@ TEST_F(xschema, check_test0) {
 
     auto v1 = data.internalPayload->getItem(0);
 
-    data.storagePayload->setItem(0, 234);
-    data.storagePayload->setItem(1, 456);
+    data.storage->getPayload()->setItem(0, 234);
+    data.storage->getPayload()->setItem(1, 456);
     data.storage->write();
 
     ASSERT_TRUE(data.storage->getRecordsCount() == 1);
@@ -75,8 +75,8 @@ TEST_F(xschema, check_test0) {
 
     auto v1 = data.internalPayload->getItem(0);
 
-    data.storagePayload->setItem(0, 234);
-    data.storagePayload->setItem(1, 456);
+    data.storage->getPayload()->setItem(0, 234);
+    data.storage->getPayload()->setItem(1, 456);
     data.storage->write();
 
     ASSERT_TRUE(data.storage->getRecordsCount() == 1);
@@ -116,8 +116,8 @@ TEST_F(xschema, check_test1) {
   dataArea.prepare();
 
   // Todo
-  dataArea.qSet["str1"]->storagePayload->setItem(0, 2);
-  dataArea.qSet["str1"]->storagePayload->setItem(1, 3);
+  dataArea.qSet["str1"]->storage->getPayload()->setItem(0, 2);
+  dataArea.qSet["str1"]->storage->getPayload()->setItem(1, 3);
   dataArea.qSet["str1"]->storage->write();
 
   SPDLOG_INFO("Records in str1 {}", dataArea.qSet["str1"]->storage->getRecordsCount());
@@ -131,8 +131,8 @@ TEST_F(xschema, check_test1) {
                    dataStorageAndInternalDesciptor,  //
                    dataStorageAndInternalDesciptor);
 
-  q.storagePayload->setItem(0, 2);
-  q.storagePayload->setItem(1, atoi(build_id));
+  q.storage->getPayload()->setItem(0, 2);
+  q.storage->getPayload()->setItem(1, atoi(build_id));
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 

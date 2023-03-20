@@ -25,17 +25,15 @@ streamInstance::streamInstance(               //
   // only objects with REF has storageNameParam filled.
   const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
   SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
-  storagePayload = std::make_unique<rdb::payload>(storageDescriptor);
   internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
   storage = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
   storage->attachDescriptor(&storageDescriptor);
-  storage->attachStorage();
-  storage->attachPayload(*storagePayload);
+  // storage->attachPayload(*storagePayload);
 
   {
     std::stringstream strStream;
-    strStream << storagePayload->getDescriptor();
+    strStream << storage->getDescriptor();
     SPDLOG_INFO("storage/external descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
   {
@@ -105,7 +103,7 @@ void dataModel::computeInstance(std::string instance) {
     case PUSH_STREAM: {
       // store in internal payload data from argument payload
       auto argumentQueryName = qry.lProgram.end()->getStr_();
-      *(qSet[instance]->internalPayload) = *(qSet[argumentQueryName]->storagePayload);
+      *(qSet[instance]->internalPayload) = *(qSet[argumentQueryName]->storage->getPayload());
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;

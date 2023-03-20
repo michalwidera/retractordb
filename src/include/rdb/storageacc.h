@@ -19,6 +19,7 @@ enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAn
 
 class storageAccessor {
   std::unique_ptr<FileAccessorInterface<std::byte>> accessor;
+  std::unique_ptr<rdb::payload> storagePayload;
   Descriptor descriptor;
   bool reverse = false;
   bool removeOnExit = true;
@@ -27,8 +28,8 @@ class storageAccessor {
   std::string descriptorFile;
   std::string storageFile;
   std::string storageType = "DEFAULT";
-  std::byte *payloadPtr = nullptr;
   void moveRef();
+  void attachStorage();
 
  public:
   storageAccessor() = delete;
@@ -38,15 +39,12 @@ class storageAccessor {
   storageState dataFileStatus = storageState::noDescriptor;
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
-  void attachStorage();
-
-  void attachPayloadPtr(std::byte *payloadPtrVal);
-  void attachPayload(rdb::payload &payloadRef);
 
   bool read(const size_t recordIndex);
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
 
   Descriptor &getDescriptor();
+  std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setReverse(bool value);
   void setRemoveOnExit(bool value);

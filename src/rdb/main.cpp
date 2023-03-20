@@ -39,7 +39,6 @@ int main(int argc, char* argv[]) {
   spdlog::flush_on(spdlog::level::trace);
 
   std::unique_ptr<rdb::storageAccessor> dacc;
-  std::unique_ptr<rdb::payload> payloadAcc;
   std::string file;
   bool reverse = false;
   bool rox = true;
@@ -103,10 +102,7 @@ int main(int argc, char* argv[]) {
         scheamStringStream >> desc;
         dacc->attachDescriptor(&desc);
       }
-      dacc->attachStorage();
       dacc->setReverse(cmd == "ropen" || cmd == "ropenx");
-      payloadAcc = std::make_unique<rdb::payload>(dacc->getDescriptor());
-      dacc->attachPayload(*payloadAcc);
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
@@ -160,7 +156,7 @@ int main(int argc, char* argv[]) {
       else
         payloadStatus = fetched;
     } else if (cmd == "set") {
-      std::cin >> *payloadAcc;
+      std::cin >> *(dacc->getPayload());
       payloadStatus = changed;
       continue;
     } else if (cmd == "setpos") {
@@ -170,19 +166,19 @@ int main(int argc, char* argv[]) {
       if (dacc->getDescriptor().type(fieldname) == "INTEGER") {
         int value;
         std::cin >> value;
-        payloadAcc->setItem(position, value);
+        dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldname) == "DOUBLE") {
         double value;
         std::cin >> value;
-        payloadAcc->setItem(position, value);
+        dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldname) == "BYTE") {
         unsigned char value;
         std::cin >> value;
-        payloadAcc->setItem(position, value);
+        dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldname) == "STRING") {
         std::string record;
         std::cin >> record;
-        payloadAcc->setItem(position, record);
+        dacc->getPayload()->setItem(position, record);
       } else
         std::cerr << "field not found\n";
       payloadStatus = changed;
@@ -191,7 +187,7 @@ int main(int argc, char* argv[]) {
       int position;
       std::cin >> position;
       auto fieldname = dacc->getDescriptor().fieldName(position);
-      std::any value = payloadAcc->getItem(position);
+      std::any value = dacc->getPayload()->getItem(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
       }
@@ -214,10 +210,10 @@ int main(int argc, char* argv[]) {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
     } else if (cmd == "print") {
-      std::cout << ORANGE << *payloadAcc << RESET;
+      std::cout << ORANGE << *(dacc->getPayload()) << RESET;
       continue;
     } else if (cmd == "input") {
-      for (auto i : dacc->getDescriptor()) std::cin >> *payloadAcc;
+      for (auto i : dacc->getDescriptor()) std::cin >> *(dacc->getPayload());
       continue;
     } else if (cmd == "write") {
       size_t record;
@@ -254,11 +250,11 @@ int main(int argc, char* argv[]) {
       std::cout << dacc->getDescriptor().getSizeInBytes() << " Byte(s) per record.\n";
       continue;
     } else if (cmd == "hex") {
-      payloadAcc->setHex(true);
+      dacc->getPayload()->setHex(true);
     } else if (cmd == "dec") {
-      payloadAcc->setHex(false);
+      dacc->getPayload()->setHex(false);
     } else if (cmd == "dump") {
-      auto* ptr = reinterpret_cast<unsigned char*>(payloadAcc->get());
+      auto* ptr = reinterpret_cast<unsigned char*>(dacc->getPayload()->get());
       for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');

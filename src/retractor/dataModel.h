@@ -13,7 +13,6 @@
 
 struct streamInstance {
   std::unique_ptr<rdb::storageAccessor> storage;
-  std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> internalPayload;
 
   // This constructor cover issue when storage name is different from descriptor name

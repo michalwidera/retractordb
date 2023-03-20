@@ -122,5 +122,5 @@ add_test(
   xtrdb < term.script > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(ut-xtrdb ut-xqry ut-dataModel
-                     ut-dataModel-comp PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(ut-xtrdb ut-xqry ut-dataModel ut-dataModel-comp
+                     PROPERTIES RUN_SERIAL TRUE)
