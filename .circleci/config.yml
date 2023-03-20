@@ -15,9 +15,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-            tags:
-              ignore:
-                 - /debug.*/
 
   nightly:
     triggers:

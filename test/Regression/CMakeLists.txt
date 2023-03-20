@@ -9,21 +9,21 @@ set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
 # hang during startup My fail count #2
 
 add_test(
-  NAME check-banned-artifacts
+  NAME rg-check-banned-artifacts
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND fail-if-file-exist.sh xrdb)
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME compiler-test-on-query
+  NAME rg-compiler-test-on-query
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND xretractor -q query-lnx.rql -c)
 
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xcompile_source-1
+  NAME rg-compile_1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
   COMMAND sh -c "set -e ; \
   xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
@@ -32,7 +32,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xcompile_source-2
+  NAME rg-compile_2
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
   COMMAND
     sh -c "set -e ; \
@@ -43,7 +43,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xcompile_source-3
+  NAME rg-compile_3
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern3
   COMMAND sh -c "set -e ; \
   xretractor query-unfold.rql -c > out.txt ; xdumper >> out.txt ; \
@@ -52,7 +52,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xcompile_source-4
+  NAME rg-compile_4
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
   COMMAND
     sh -c "set -e ; \
@@ -63,7 +63,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xtrdb_on_script-5
+  NAME rg-xtrdb_5
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
   COMMAND sh -c "set -e ; \
   xtrdb < term.script > out.txt ; \
@@ -72,7 +72,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xcompile_agse-6
+  NAME rg-compile_agse_6
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
   COMMAND bash -c "set -e ; \
   xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
@@ -81,7 +81,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xtrdb_on_text_data_src-8
+  NAME rg-xtrdb_on_text_data
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
   COMMAND bash -c "set -e ; \
   xtrdb < term.script > out.txt ; \
@@ -89,7 +89,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME xtrdb_on_bin_data_src-9
+  NAME rg-xtrdb_on_bin_data
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern9
   COMMAND bash -c "set -e ; \
   xtrdb < term.script > out.txt ; \
@@ -97,26 +97,26 @@ add_test(
 
 # -----------------------------------------------------------------------------------------------
 add_test(
-  NAME dumper-test
+  NAME rg-dumper-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND sh -c "xretractor query-lnx.rql -c; xdumper -d")
 
-set_tests_properties(dumper-test PROPERTIES DEPENDS compiler-test-on-query)
+set_tests_properties(rg-dumper-test PROPERTIES DEPENDS rg-compiler-test-on-query)
 
 add_test(
-  NAME retractor-waterfall
+  NAME rg-retractor-waterfall
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND sh -c "xretractor query-lnx.rql -m 20 --waterfall")
 
 add_test(
-  NAME workflow-test
+  NAME rg-workflow-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-workflow.sh query-lnx.rql)
 
 add_test(
-  NAME workflow-all-operators
+  NAME rg-workflow-all-operators
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-all-operators.sh query-all.rql)
 
-set_tests_properties(retractor-waterfall workflow-test workflow-all-operators
+set_tests_properties(rg-retractor-waterfall rg-workflow-test rg-workflow-all-operators
                      PROPERTIES RUN_SERIAL TRUE)
