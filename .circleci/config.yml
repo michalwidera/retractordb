@@ -17,7 +17,7 @@ workflows:
                  - /issue_.*/
             tags:
               ignore:
-                 - /*[debug]*/
+                 - /[debug].*/
 
   nightly:
     triggers:
