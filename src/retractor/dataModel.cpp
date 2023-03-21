@@ -95,18 +95,33 @@ void dataModel::prepare() {
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 }
 
+std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, int offset) {
+  qSet[instance]->storage->readReverse(offset);
+  return qSet[instance]->storage->getPayload();
+}
+
 void dataModel::computeInstance(std::string instance) {
   auto qry = coreInstance[instance];
+  token arg[3];
+  int i = 0;
+  for (auto tk : qry.lProgram) arg[i++] = tk;
+
   const command_id cmd = qry.lProgram.end()->getCommandID();
   switch (cmd) {
     case PUSH_STREAM: {
       // store in internal payload data from argument payload
       auto argumentQueryName = qry.lProgram.end()->getStr_();
-      *(qSet[instance]->internalPayload) = *(qSet[argumentQueryName]->storage->getPayload());
+      *(qSet[instance]->internalPayload) = *getPayload(instance);
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
-    case STREAM_TIMEMOVE:
+    case STREAM_TIMEMOVE: {
+      // store in internal payload data from argument payload
+      auto argumentQueryName = qry.lProgram.end()->getStr_();
+      *(qSet[instance]->internalPayload) = *getPayload(instance, rational_cast<int>(arg[1].get()));
+      // invocation of payload &payload::operator=(payload &other) from payload.cc
+      // TODO: Add check if storagePayload is empty or argumentQueryName exist?
+    } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV:
     case STREAM_SUBSTRACT:

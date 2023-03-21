@@ -197,6 +197,30 @@ bool storageAccessor::read(const size_t recordIndex) {
   return result == 0;
 }
 
+bool storageAccessor::readReverse(const size_t recordIndex) {
+  if (descriptor.isEmpty()) {
+    SPDLOG_ERROR("descriptor is Empty");
+    abort();
+  }
+  if (!isOpen(dataFileStatus)) {
+    SPDLOG_ERROR("store is not open");
+    abort();  // data file is not opened
+  }
+  if (!storagePayload) {
+    SPDLOG_ERROR("no payload attached");
+    abort();  // no payload attached
+  }
+  auto size = descriptor.getSizeInBytes();
+  auto result = 0;
+  auto recordIndexRv = (recordsCount - 1) - recordIndex;
+  if (recordsCount > 0 && recordIndex < recordsCount) {
+    result = accessor->read(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
+    assert(result == 0);
+    SPDLOG_INFO("read {}", recordIndexRv);
+  }
+  return result == 0;
+}
+
 bool storageAccessor::write(const size_t recordIndex) {
   if (descriptor.isEmpty()) {
     SPDLOG_ERROR("descriptor is Empty");

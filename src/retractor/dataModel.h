@@ -12,8 +12,9 @@
 #include <vector>
 
 struct streamInstance {
-  std::unique_ptr<rdb::storageAccessor> storage;
-  std::unique_ptr<rdb::payload> internalPayload;
+  std::unique_ptr<rdb::storageAccessor> storage;  // here is payload that will be stored - select clause
+  std::unique_ptr<rdb::payload> internalPayload;  // payload used for computation in select
+                                                  // clause - created by from clause.
 
   // This constructor cover issue when storage name is different from descriptor name
   streamInstance(const std::string descriptorName,           //
@@ -39,6 +40,8 @@ class dataModel {
 
   dataModel(/* args */);
   ~dataModel();
+
+  std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int offset = 0);
 
   void computeInstance(std::string instance);
   void load(std::string compiledQueryFile);
