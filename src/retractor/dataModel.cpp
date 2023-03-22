@@ -6,7 +6,6 @@
 #include <regex>
 
 #include "QStruct.h"  // coreInstance
-
 #include "SOperations.h"
 
 extern "C" qTree coreInstance;
@@ -140,17 +139,24 @@ void dataModel::computeInstance(std::string instance) {
       if (cmd == STREAM_DEHASH_MOD) newTimeOffset = Mod(rationalArgument, qry.rInterval, 0);
       if (newTimeOffset < 0) assert(false);
       *(qSet[instance]->fromPayload) = *getPayload(instance, newTimeOffset);
-    } break ;
+    } break;
     case STREAM_SUBSTRACT:
     case STREAM_AVG:
     case STREAM_MIN:
-    case STREAM_MAX: {
+    case STREAM_MAX:
       *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_());
-    } break ;
+      break;
     case STREAM_SUM:
+      assert(false && "TODO");
     case STREAM_ADD:
+      *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_()) + *getPayload(arg[1].getStr_());
+      // operator + from payload payload::operator+(payload &other) step into action here
+      // TODO support renaming of fields after merge
+      break;
     case STREAM_AGSE:
+      assert(false && "TODO");
     case STREAM_HASH:
+      assert(false && "TODO");
     default:
       SPDLOG_ERROR("Undefined command_id:{}", cmd);
       abort();
