@@ -54,8 +54,8 @@ payload &payload::operator=(const payload &other) {
 
 payload payload::operator+(payload &other) {
   rdb::Descriptor descSum(descriptor);
-  descSum | other.getDescriptor();  // ! moving this into constructor fails
-  payload result(descSum);
+  descSum | other.getDescriptor();                // ! moving this into constructor fails
+  payload result(descSum);                        //
   SPDLOG_INFO("operator+ {} {} {}",               //
               descriptor.getSizeInBytes(),        //
               other.descriptor.getSizeInBytes(),  //

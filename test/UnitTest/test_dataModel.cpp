@@ -55,10 +55,10 @@ TEST_F(xschema, check_test0) {
   {
     streamInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
 
-    data.internalPayload->setItem(0, 123);
-    data.internalPayload->setItem(1, 345);
+    data.fromPayload->setItem(0, 123);
+    data.fromPayload->setItem(1, 345);
 
-    auto v1 = data.internalPayload->getItem(0);
+    auto v1 = data.fromPayload->getItem(0);
 
     data.storage->getPayload()->setItem(0, 234);
     data.storage->getPayload()->setItem(1, 456);
@@ -70,10 +70,10 @@ TEST_F(xschema, check_test0) {
   {
     streamInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDesciptor};
 
-    data.internalPayload->setItem(0, 123);
-    data.internalPayload->setItem(1, 345);
+    data.fromPayload->setItem(0, 123);
+    data.fromPayload->setItem(1, 345);
 
-    auto v1 = data.internalPayload->getItem(0);
+    auto v1 = data.fromPayload->getItem(0);
 
     data.storage->getPayload()->setItem(0, 234);
     data.storage->getPayload()->setItem(1, 456);

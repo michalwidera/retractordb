@@ -7,6 +7,8 @@
 
 #include "QStruct.h"  // coreInstance
 
+#include "SOperations.h"
+
 extern "C" qTree coreInstance;
 
 // ctest -R '^ut-dataModel'
@@ -25,7 +27,7 @@ streamInstance::streamInstance(               //
   // only objects with REF has storageNameParam filled.
   const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
   SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
-  internalPayload = std::make_unique<rdb::payload>(internalDescriptor);
+  fromPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
   storage = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
   storage->attachDescriptor(&storageDescriptor);
@@ -37,7 +39,7 @@ streamInstance::streamInstance(               //
   }
   {
     std::stringstream strStream;
-    strStream << internalPayload->getDescriptor();
+    strStream << fromPayload->getDescriptor();
     SPDLOG_INFO("image/internal descriptor: {}", removeSpc(removeCRLF(strStream.str())));
   }
 };
@@ -111,23 +113,40 @@ void dataModel::computeInstance(std::string instance) {
     case PUSH_STREAM: {
       // store in internal payload data from argument payload
       auto argumentQueryName = qry.lProgram.end()->getStr_();
-      *(qSet[instance]->internalPayload) = *getPayload(instance);
+      *(qSet[instance]->fromPayload) = *getPayload(instance);
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
     case STREAM_TIMEMOVE: {
       // store in internal payload data from argument payload
       auto argumentQueryName = qry.lProgram.end()->getStr_();
-      *(qSet[instance]->internalPayload) = *getPayload(instance, rational_cast<int>(arg[1].get()));
+      *(qSet[instance]->fromPayload) = *getPayload(instance, rational_cast<int>(arg[1].get()));
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
     case STREAM_DEHASH_MOD:
-    case STREAM_DEHASH_DIV:
+    case STREAM_DEHASH_DIV: {
+      auto streamNameArg = arg[0].getStr_();
+      assert(streamNameArg != "");
+      auto rationalArgument = arg[1].get();
+      assert(rationalArgument > 0);
+      // q.id - name of output stream
+      // size[q.id] - count of record in output stream
+      // q.rInterval - delta of output stream (rational) - contains
+      // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
+      // (2/3) argument of operation (rational)
+      int newTimeOffset = -1;  // catch on assert(false);
+      if (cmd == STREAM_DEHASH_DIV) newTimeOffset = Div(qry.rInterval, rationalArgument, 0);
+      if (cmd == STREAM_DEHASH_MOD) newTimeOffset = Mod(rationalArgument, qry.rInterval, 0);
+      if (newTimeOffset < 0) assert(false);
+      *(qSet[instance]->fromPayload) = *getPayload(instance, newTimeOffset);
+    } break ;
     case STREAM_SUBSTRACT:
     case STREAM_AVG:
     case STREAM_MIN:
-    case STREAM_MAX:
+    case STREAM_MAX: {
+      *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_());
+    } break ;
     case STREAM_SUM:
     case STREAM_ADD:
     case STREAM_AGSE:
