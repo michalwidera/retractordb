@@ -8,6 +8,8 @@
 #include "QStruct.h"  // coreInstance
 #include "SOperations.h"
 
+#include "iostream"
+
 extern "C" qTree coreInstance;
 
 // ctest -R '^ut-dataModel'
@@ -64,7 +66,8 @@ streamInstance::streamInstance(query& qry)
   SPDLOG_INFO("streamInstance <- qry");
 };
 
-// TODO TEST THIS FREAKING CODE ... ASAP
+// TODO: TEST THIS FREAKING CODE ... ASAP
+// ! Work in progress
 // https://en.cppreference.com/w/cpp/numeric/math/div
 void streamInstance::constructPayload(int offset, int length) {
   // First construct descriptor
@@ -75,13 +78,19 @@ void streamInstance::constructPayload(int offset, int length) {
   }
   // Second construct payload
   localPayload = std::make_unique<rdb::payload>(descriptor);
+  std::cerr << "DESC:" << descriptor << std::endl;
   // 3rd - fill payload with data from storage
-  auto j = 0;
+  auto prevQuot = 0;
   for (auto i = 0; i < length; i++) {
     auto dv = std::div(i + offset, descriptorVecSize);
-    localPayload->setItem(i, storage->getPayload()->getItem(dv.quot));
-    if (dv.rem == 0)
-      storage->readReverse(dv.quot);
+    std::cerr << i << "," << dv.quot << "," << dv.rem << std::endl ;
+    if (prevQuot != dv.quot) {
+      prevQuot = dv.quot;
+      std::cerr << "ReadReverse:" << dv.quot-1 << std::endl ;
+      //storage->readReverse(dv.quot-1);  // TODO: fix non existing data
+    }
+    std::cerr << "setItem:" << dv.rem << std::endl;
+    // localPayload->setItem(dv.rem, storage->getPayload()->getItem(dv.rem)); // TODO: fix bad any_cast
   }
 }
 

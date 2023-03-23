@@ -138,4 +138,21 @@ TEST_F(xschema, check_test1) {
 
   ASSERT_TRUE(coreInstance.size() == dataArea.qSet.size());
 };
+
+TEST_F(xschema, check_construct_payload) {
+  auto dataInternalDesciptor{
+      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", rdb::BYTE)       //
+  };
+
+  auto dataStorageDescriptor{
+      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", rdb::BYTE)       //
+  };
+
+  streamInstance data{"str1", "str1.desc", dataStorageDescriptor, dataInternalDesciptor};
+  data.constructPayload( 2 , 5 );
+  //std::cerr << data.localPayload.get()->getDescriptor();
+}
+
 }  // namespace
