@@ -64,6 +64,27 @@ streamInstance::streamInstance(query& qry)
   SPDLOG_INFO("streamInstance <- qry");
 };
 
+// TODO TEST THIS FREAKING CODE ... ASAP
+// https://en.cppreference.com/w/cpp/numeric/math/div
+void streamInstance::constructPayload(int offset, int length) {
+  // First construct descriptor
+  rdb::Descriptor descriptor;
+  auto descriptorVecSize = storage->getDescriptor().size();
+  for (auto i = offset; i < offset + length; i++) {
+    descriptor | rdb::Descriptor{storage->getDescriptor()[std::div(i, descriptorVecSize).rem]};
+  }
+  // Second construct payload
+  localPayload = std::make_unique<rdb::payload>(descriptor);
+  // 3rd - fill payload with data from storage
+  auto j = 0;
+  for (auto i = 0; i < length; i++) {
+    auto dv = std::div(i + offset, descriptorVecSize);
+    localPayload->setItem(i, storage->getPayload()->getItem(dv.quot));
+    if (dv.rem == 0)
+      storage->readReverse(dv.quot);
+  }
+}
+
 dataModel::dataModel(/* args */) {}
 
 dataModel::~dataModel() {}
