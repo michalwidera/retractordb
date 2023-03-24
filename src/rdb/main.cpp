@@ -1,6 +1,7 @@
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <filesystem>
@@ -127,6 +128,7 @@ int main(int argc, char* argv[]) {
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
+      std::cout << "fetch [amount] \t\t\t fetch and print amount of data from database\n";
       std::cout << RESET;
     } else if (cmd == "dropfile") {
       std::string object;
@@ -151,10 +153,10 @@ int main(int argc, char* argv[]) {
         continue;
       }
       auto returnStatus = dacc->read(record);
-      if (returnStatus != 0)
-        payloadStatus = error;
-      else
+      if (returnStatus)
         payloadStatus = fetched;
+      else
+        payloadStatus = error;
     } else if (cmd == "set") {
       std::cin >> *(dacc->getPayload());
       payloadStatus = changed;
@@ -209,6 +211,22 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
+    } else if (cmd == "fetch") {
+      size_t wantFetchRecords;
+      std::cin >> wantFetchRecords;
+      wantFetchRecords = std::min(wantFetchRecords, dacc->getRecordsCount());
+      for (auto i = 0; i < wantFetchRecords; i++) {
+        // read part
+        auto returnStatus = dacc->read(i);
+        if (returnStatus)
+          payloadStatus = fetched;
+        else
+          payloadStatus = error;
+        // print part
+
+        if (returnStatus) std::cout << ORANGE << *(dacc->getPayload()) << RESET;
+      }
+      continue;
     } else if (cmd == "print") {
       std::cout << ORANGE << *(dacc->getPayload()) << RESET;
       continue;

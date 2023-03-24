@@ -153,7 +153,7 @@ TEST_F(xschema, check_construct_payload) {
   streamInstance data{"str1", "str1.desc", dataStorageDescriptor, dataInternalDesciptor};
   data.storage->setRemoveOnExit(false);
 
-  data.constructPayload(2, 5);
+  data.constructPayload(3, 5);
   // std::cerr << data.localPayload.get()->getDescriptor();
 }
 
