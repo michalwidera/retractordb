@@ -7,7 +7,6 @@
 
 #include "QStruct.h"  // coreInstance
 #include "SOperations.h"
-
 #include "iostream"
 
 extern "C" qTree coreInstance;
@@ -79,18 +78,31 @@ void streamInstance::constructPayload(int offset, int length) {
   // Second construct payload
   localPayload = std::make_unique<rdb::payload>(descriptor);
   std::cerr << "DESC:" << descriptor << std::endl;
+  for (auto i : descriptor) std::cout << rdb::GetStringdescFld(std::get<rdb::rtype>(i)) << std::endl;
   // 3rd - fill payload with data from storage
   auto prevQuot = 0;
   for (auto i = 0; i < length; i++) {
     auto dv = std::div(i + offset, descriptorVecSize);
-    std::cerr << i << "," << dv.quot << "," << dv.rem << std::endl ;
+    std::cerr << i << "," << dv.quot << "," << dv.rem << std::endl;
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
-      std::cerr << "ReadReverse:" << dv.quot-1 << std::endl ;
-      //storage->readReverse(dv.quot-1);  // TODO: fix non existing data
+      std::cerr << "ReadReverse:" << dv.quot - 1 << std::endl;
+      // storage->readReverse(dv.quot-1);
+      // TODO: fix non existing data
     }
     std::cerr << "setItem:" << dv.rem << std::endl;
-    // localPayload->setItem(dv.rem, storage->getPayload()->getItem(dv.rem)); // TODO: fix bad any_cast
+
+    std::any value = storage->getPayload()->getItem(dv.rem);
+    try {
+      localPayload->setItem(dv.rem, value);
+    } catch (const std::bad_any_cast& e) {
+      rdb::rfield p1{storage->getPayload()->getDescriptor()[dv.rem]};
+      rdb::rfield p2{localPayload->getDescriptor()[dv.rem]};
+      SPDLOG_ERROR("Bad cast in constructPayload {} -> {}",          //
+                   rdb::GetStringdescFld(std::get<rdb::rtype>(p1)),  //
+                   rdb::GetStringdescFld(std::get<rdb::rtype>(p2)));
+    }
+    // TODO: fix bad any_cast - intro checkUniform function?
   }
 }
 
