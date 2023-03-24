@@ -181,7 +181,7 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_ADD:
       *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_()) + *getPayload(arg[1].getStr_());
       // operator + from payload payload::operator+(payload &other) step into action here
-      // TODO support renaming of fields after merge
+      // TODO support renaming of double-same fields after merge
       break;
     case STREAM_AGSE:
       assert(false && "TODO");
