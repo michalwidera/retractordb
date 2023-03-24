@@ -38,28 +38,28 @@ else (no)
 	}
 endif
 
-:<color:green>descriptor is ready;
+partition "attachStorage" {
+  :<color:green>descriptor is ready;
 
-note left: Storage location estabilished
+  note left: Storage location estabilished
 
-:assume storage filename
-as storagename;
+  :assume storage filename
+  as storagename;
 
-if (storage file exists?) then (yes)
-  :attach storage;
-  note left: compute storage size
-  :<color blue>LOG: record count {} on {}>
-else (no)
-  :create storage;
-  :<color blue>LOG: Storage created.>
-endif
+  if (storage file exists?) then (yes)
+    :attach storage;
+    note left: compute storage size
+    :<color blue>LOG: record count {} on {}>
+  else (no)
+    :create storage;
+    :<color blue>LOG: Storage created.>
+  endif
 
-:<color:green>storage is ready;
-
+  :<color:green>storage is ready;
+  :<color:green>attach payload;
 }
 
-
-:<color:green>attach payload;
+}
 
 stop
 
