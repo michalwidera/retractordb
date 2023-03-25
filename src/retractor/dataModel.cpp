@@ -16,9 +16,10 @@ extern "C" qTree coreInstance;
 
 enum { noHexFormat = false, HexFormat = true };
 
+/*
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
-
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
+*/
 
 streamInstance::streamInstance(               //
     const std::string descriptorName,         //
@@ -35,13 +36,13 @@ streamInstance::streamInstance(               //
 
   {
     std::stringstream strStream;
-    strStream << storage->getDescriptor();
-    SPDLOG_INFO("storage/external descriptor: {}", removeSpc(removeCRLF(strStream.str())));
+    strStream << rdb::flat << storage->getDescriptor() << rdb::noFlat;
+    SPDLOG_INFO("storage/external descriptor: {}", strStream.str());
   }
   {
     std::stringstream strStream;
-    strStream << fromPayload->getDescriptor();
-    SPDLOG_INFO("image/internal descriptor: {}", removeSpc(removeCRLF(strStream.str())));
+    strStream << rdb::flat << fromPayload->getDescriptor() << rdb::noFlat;
+    SPDLOG_INFO("image/internal descriptor: {}", strStream.str());
   }
 };
 
@@ -105,15 +106,15 @@ void streamInstance::constructPayload(int offset, int length) {
 
       SPDLOG_INFO("Ok cast in constructPayload src:{}[{}] -> dst:{}[{}] / {}",  //
                   rdb::GetStringdescFld(std::get<rdb::rtype>(p1)),              //
-                  locSrc,
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(p2)),  //
+                  locSrc,                                                       //
+                  rdb::GetStringdescFld(std::get<rdb::rtype>(p2)),              //
                   locDst, value.type().name());
     } catch (const std::bad_any_cast& e) {
       std::any value = storage->getPayload()->getItem(locSrc);
       SPDLOG_INFO("Ok cast in constructPayload src:{}[{}] -> dst:{}[{}] / {}",  //
                   rdb::GetStringdescFld(std::get<rdb::rtype>(p1)),              //
-                  locSrc,
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(p2)),  //
+                  locSrc,                                                       //
+                  rdb::GetStringdescFld(std::get<rdb::rtype>(p2)),              //
                   locDst, value.type().name());
     }
     // TODO: fix bad any_cast - intro checkUniform function?

@@ -194,6 +194,9 @@ class Descriptor : public std::vector<rfield> {
   friend std::istream &operator>>(std::istream &is, Descriptor &rhs);
 };
 
+std::ostream &flat(std::ostream &os);
+std::ostream &noFlat(std::ostream &os);
+
 }  // namespace rdb
 
 #endif  // STORAGE_RDB_INCLUDE_DESC_H_

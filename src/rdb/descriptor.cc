@@ -33,6 +33,8 @@ static inline void rtrim(std::string &s) {
       s.end());
 }
 
+static bool flatOutput = false;
+
 rdb::descFld GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);
@@ -182,10 +184,23 @@ int Descriptor::offset(const int position) {
 
 std::string Descriptor::type(const std::string name) { return GetFieldType(std::get<rtype>((*this)[position(name)])); }
 
+std::ostream &flat(std::ostream &os) {
+  flatOutput = true;
+  return os;
+}
+std::ostream &noFlat(std::ostream &os) {
+  flatOutput = false;
+  return os;
+}
+
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
-    os << "\t" << GetFieldType(std::get<rtype>(r)) << " ";
+    if (!flatOutput)
+      os << "\t";
+    else
+      os << " ";
+    os << GetFieldType(std::get<rtype>(r)) << " ";
     if (std::get<rtype>(r) == rdb::REF)
       os << "\"" << std::get<rname>(r) << "\"";
     else
@@ -194,7 +209,10 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << std::to_string(std::get<rlen>(r)) << "]";
     else if (std::get<rtype>(r) == rdb::INTARRAY)
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
-    os << std::endl;
+    if (!flatOutput)
+      os << std::endl;
+    else
+      os << " ";
   }
   if (rhs.isEmpty()) os << "Empty";
   os << "}";
