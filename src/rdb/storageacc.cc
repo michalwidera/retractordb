@@ -192,33 +192,20 @@ bool storageAccessor::read(const size_t recordIndex) {
   if (recordsCount > 0 && recordIndex < recordsCount) {
     result = accessor->read(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
     assert(result == 0);
-    SPDLOG_INFO("read {}", recordIndexRv);
+    SPDLOG_INFO("read fn from pos:{} limit:{}", recordIndexRv, recordsCount);
+  } else {
+    std::memset(storagePayload->get(), 0, size);
+    SPDLOG_WARN("read fn - non existing data from pos:{} limit:{}", recordIndexRv, recordsCount);
   }
   return result == 0;
 }
 
 bool storageAccessor::readReverse(const size_t recordIndex) {
-  if (descriptor.isEmpty()) {
-    SPDLOG_ERROR("descriptor is Empty");
-    abort();
-  }
-  if (!isOpen(dataFileStatus)) {
-    SPDLOG_ERROR("store is not open");
-    abort();  // data file is not opened
-  }
-  if (!storagePayload) {
-    SPDLOG_ERROR("no payload attached");
-    abort();  // no payload attached
-  }
-  auto size = descriptor.getSizeInBytes();
-  auto result = 0;
-  auto recordIndexRv = (recordsCount - 1) - recordIndex;
-  if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->read(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
-    assert(result == 0);
-    SPDLOG_INFO("read {}", recordIndexRv);
-  }
-  return result == 0;
+  auto reversePrevValue = reverse;
+  reverse = true;
+  auto return_value = read(recordIndex);
+  reverse = reversePrevValue;
+  return return_value;
 }
 
 bool storageAccessor::write(const size_t recordIndex) {

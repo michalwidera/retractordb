@@ -150,10 +150,10 @@ TEST_F(xschema, check_construct_payload) {
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
 
-  streamInstance data{"str1", "str1.desc", dataStorageDescriptor, dataInternalDesciptor};
+  streamInstance data{"str1", dataStorageDescriptor, dataInternalDesciptor};
   data.storage->setRemoveOnExit(false);
 
-  data.constructPayload(1, 5);
+  data.constructPayload(3, 5);
   // std::cerr << data.localPayload.get()->getDescriptor();
 }
 

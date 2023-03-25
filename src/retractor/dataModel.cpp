@@ -87,8 +87,8 @@ void streamInstance::constructPayload(int offset, int length) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
-      SPDLOG_INFO("ReadReverse: {}", dv.quot - 1);
-      // storage->readReverse(dv.quot-1);
+      SPDLOG_INFO("ReadReverse: {}", dv.quot);
+      storage->readReverse(dv.quot);
       // TODO: fix non existing data
     }
 
@@ -97,33 +97,41 @@ void streamInstance::constructPayload(int offset, int length) {
 
     assert(i < descriptor.size());
 
-    rdb::rfield p1{storage->getPayload()->getDescriptor()[locSrc]};
-    rdb::rfield p2{localPayload->getDescriptor()[locDst]};
+    rdb::rfield srcFld{storage->getPayload()->getDescriptor()[locSrc]};
+    rdb::rfield dstFld{localPayload->getDescriptor()[locDst]};
 
     try {
       std::any value = storage->getPayload()->getItem(locSrc);
+      value = convertFldAsAny(value, std::get<rdb::rtype>(srcFld), std::get<rdb::rtype>(dstFld));
       localPayload->setItem(locDst, value);
 
       SPDLOG_INFO("Ok cast in constructPayload src:{}[{}] -> dst:{}[{}] / {}",  //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(p1)),              //
+                  rdb::GetStringdescFld(std::get<rdb::rtype>(srcFld)),          //
                   locSrc,                                                       //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(p2)),              //
+                  rdb::GetStringdescFld(std::get<rdb::rtype>(dstFld)),          //
                   locDst, value.type().name());
     } catch (const std::bad_any_cast& e) {
       std::any value = storage->getPayload()->getItem(locSrc);
       SPDLOG_INFO("Ok cast in constructPayload src:{}[{}] -> dst:{}[{}] / {}",  //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(p1)),              //
+                  rdb::GetStringdescFld(std::get<rdb::rtype>(srcFld)),          //
                   locSrc,                                                       //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(p2)),              //
+                  rdb::GetStringdescFld(std::get<rdb::rtype>(dstFld)),          //
                   locDst, value.type().name());
     }
     // TODO: fix bad any_cast - intro checkUniform function?
   }
+  storage->readReverse(0);
 }
 
 dataModel::dataModel(/* args */) {}
 
 dataModel::~dataModel() {}
+
+std::any streamInstance::convertFldAsAny(std::any inVal, rdb::descFld inType, rdb::descFld outType) {
+  // TODO
+  std::any retVal = inVal;
+  return retVal;
+}
 
 void dataModel::load(std::string compiledQueryFile) {
   std::ifstream ifs(compiledQueryFile.c_str(), std::ios::binary);
@@ -153,8 +161,8 @@ void dataModel::prepare() {
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 }
 
-std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, int offset) {
-  qSet[instance]->storage->readReverse(offset);
+std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, int revOffset) {
+  qSet[instance]->storage->readReverse(revOffset);
   return qSet[instance]->storage->getPayload();
 }
 
