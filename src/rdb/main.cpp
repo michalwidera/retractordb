@@ -81,9 +81,9 @@ int main(int argc, char* argv[]) {
       if (cmd == "open" || cmd == "ropen")
         dacc = std::make_unique<rdb::storageAccessor>(file, file);
       else {
-        std::string descfile;
-        std::cin >> descfile;
-        dacc = std::make_unique<rdb::storageAccessor>(descfile, file);
+        std::string descFile;
+        std::cin >> descFile;
+        dacc = std::make_unique<rdb::storageAccessor>(descFile, file);
       }
       if (dacc->peekDescriptor()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
       std::cout << "open|ropen file [schema] \t open or create database with schema (r-reverse iterator)\n";
       std::cout << "openx|ropenx desc file [schema] \n";
       std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] } \n";
-      std::cout << "desc \t\t\t\t show schema\n";
+      std::cout << "desc|descc \t\t\t show schema\n";
       std::cout << "read [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t send record to database from payload\n";
       std::cout << "append \t\t\t\t append payload to database\n";
@@ -145,6 +145,9 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "desc") {
       std::cout << YELLOW << dacc->getDescriptor() << RESET << std::endl;
       continue;
+    } else if (cmd == "descc") {
+      std::cout << YELLOW << rdb::flat << dacc->getDescriptor() << RESET << std::endl;
+      continue;
     } else if (cmd == "read") {
       int record;
       std::cin >> record;
@@ -164,20 +167,20 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "setpos") {
       int position;
       std::cin >> position;
-      auto fieldname = dacc->getDescriptor().fieldName(position);
-      if (dacc->getDescriptor().type(fieldname) == "INTEGER") {
+      auto fieldName = dacc->getDescriptor().fieldName(position);
+      if (dacc->getDescriptor().type(fieldName) == "INTEGER") {
         int value;
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->getDescriptor().type(fieldname) == "DOUBLE") {
+      } else if (dacc->getDescriptor().type(fieldName) == "DOUBLE") {
         double value;
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->getDescriptor().type(fieldname) == "BYTE") {
+      } else if (dacc->getDescriptor().type(fieldName) == "BYTE") {
         unsigned char value;
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->getDescriptor().type(fieldname) == "STRING") {
+      } else if (dacc->getDescriptor().type(fieldName) == "STRING") {
         std::string record;
         std::cin >> record;
         dacc->getPayload()->setItem(position, record);
@@ -188,7 +191,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "getpos") {
       int position;
       std::cin >> position;
-      auto fieldname = dacc->getDescriptor().fieldName(position);
+      auto fieldName = dacc->getDescriptor().fieldName(position);
       std::any value = dacc->getPayload()->getItem(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;

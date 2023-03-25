@@ -474,10 +474,10 @@ std::string replicateIDX() {
             else
               lTempProgram.push_back(token(t.getCommandID(), t.getStr_(), t.get()));
           }
-          std::string toRepalce = oldField.getFieldText();
-          replaceAll(toRepalce, "_", lexical_cast<std::string>(i));
+          std::string toReplace = oldField.getFieldText();
+          replaceAll(toReplace, "_", lexical_cast<std::string>(i));
           auto newFieldType = oldField.fieldType;
-          field newField(schemaName + "_" + lexical_cast<std::string>(i), lTempProgram, newFieldType, toRepalce);
+          field newField(schemaName + "_" + lexical_cast<std::string>(i), lTempProgram, newFieldType, toReplace);
           q.lSchema.push_back(newField);
         }
         assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());

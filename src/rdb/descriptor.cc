@@ -188,10 +188,6 @@ std::ostream &flat(std::ostream &os) {
   flatOutput = true;
   return os;
 }
-std::ostream &noFlat(std::ostream &os) {
-  flatOutput = false;
-  return os;
-}
 
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
@@ -216,6 +212,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   }
   if (rhs.isEmpty()) os << "Empty";
   os << "}";
+  flatOutput = false;
   return os;
 }
 

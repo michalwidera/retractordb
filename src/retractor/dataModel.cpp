@@ -36,12 +36,12 @@ streamInstance::streamInstance(               //
 
   {
     std::stringstream strStream;
-    strStream << rdb::flat << storage->getDescriptor() << rdb::noFlat;
+    strStream << rdb::flat << storage->getDescriptor();
     SPDLOG_INFO("storage/external descriptor: {}", strStream.str());
   }
   {
     std::stringstream strStream;
-    strStream << rdb::flat << fromPayload->getDescriptor() << rdb::noFlat;
+    strStream << rdb::flat << fromPayload->getDescriptor();
     SPDLOG_INFO("image/internal descriptor: {}", strStream.str());
   }
 };

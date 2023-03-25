@@ -92,7 +92,7 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
         SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
         payload->setItem(i, var);
       } else {
-        SPDLOG_ERROR("Unsported type in text data source: {}", std::get<rtype>(item));
+        SPDLOG_ERROR("Unsupported type in text data source: {}", std::get<rtype>(item));
         abort();
       }
 

@@ -118,7 +118,7 @@ class Descriptor : public std::vector<rfield> {
   int position(std::string name);
 
   /**
-   * @brief Return fieldname in vector of tuples on given fieldPosition
+   * @brief Return fieldName in vector of tuples on given fieldPosition
    *
    * @param fieldPosition Field postion
    * @return string Position
@@ -165,7 +165,7 @@ class Descriptor : public std::vector<rfield> {
    * and convert it to string by accessing name
    *
    * @param name Name of searched field
-   * @param ptr Pointer to std::byte table / begininng package
+   * @param ptr Pointer to std::byte table / beginning package
    * @return std::string Returned string from field.
    */
   template <typename T>
@@ -195,7 +195,6 @@ class Descriptor : public std::vector<rfield> {
 };
 
 std::ostream &flat(std::ostream &os);
-std::ostream &noFlat(std::ostream &os);
 
 }  // namespace rdb
 

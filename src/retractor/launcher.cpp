@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
   namespace po = boost::program_options;
   po::variables_map vm;
   try {
-    po::options_description desc("Avaiable options:");
+    po::options_description desc("Available options:");
     desc.add_options()                                                                                  //
         ("help,h", "Show program options")                                                              //
         ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                          //
