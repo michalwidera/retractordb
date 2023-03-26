@@ -102,26 +102,10 @@ void streamInstance::constructPayload(int offset, int length) {
     rdb::rfield srcFld{storage->getPayload()->getDescriptor()[locSrc]};
     rdb::rfield dstFld{localPayload->getDescriptor()[locDst]};
 
-    try {
-      std::any value = storage->getPayload()->getItem(locSrc);
-      // value = convertFldAsAny(value, std::get<rdb::rtype>(srcFld), std::get<rdb::rtype>(dstFld));
-      if (value.type() == typeid(int)) {
-        SPDLOG_INFO("Ok - read, will write at {} value {}" , locDst , std::any_cast<int>(value));
-      }
-      else if (value.type() == typeid(uint8_t)) {
-        SPDLOG_INFO("Ok - read, will write at {} value {}" , locDst , std::any_cast<uint8_t>(value));
-      }
-      else SPDLOG_INFO("Ok - read, will write at {}" , locDst );
+    std::any value = storage->getPayload()->getItem(locSrc);
+    value = convertFldAsAny(value, std::get<rdb::rtype>(srcFld), std::get<rdb::rtype>(dstFld));
+    localPayload->setItem(locDst, value);
 
-      localPayload->setItem(locDst, value);
-      SPDLOG_INFO("Ok - write");
-    } catch (const std::bad_any_cast& e) {
-      SPDLOG_ERROR("BAD - write cast in constructPayload src:{}[{}] -> dst:{}[{}]",  //
-                   rdb::GetStringdescFld(std::get<rdb::rtype>(srcFld)),           //
-                   locSrc,                                                        //
-                   rdb::GetStringdescFld(std::get<rdb::rtype>(dstFld)),           //
-                   locDst);
-    }
     // TODO: fix bad any_cast - intro checkUniform function?
   }
   storage->readReverse(0);

@@ -81,50 +81,64 @@ Descriptor payload::getDescriptor() const { return descriptor; }
 uint8_t *payload::get() const { return payloadData.get(); }
 
 void payload::setItem(int position, std::any value) {
-  auto fieldName = descriptor.fieldName(position);
-  auto len = descriptor.len(fieldName);
+  auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
-  if (descriptor.type(fieldName) == "STRING") {
-    std::string data(std::any_cast<std::string>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(), std::min(len, static_cast<int>(data.length())));
-    SPDLOG_INFO("setItem {} string:{}", position, data);
-  } else if (descriptor.type(fieldName) == "BYTE") {
-    uint8_t data;
-    int dataint(std::any_cast<uint8_t>(value));
-    data = (uint8_t)dataint;
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-    SPDLOG_INFO("setItem {} char:{}", position, data);
-  } else if (descriptor.type(fieldName) == "BYTEARRAY") {
-    std::vector<uint8_t> data(std::any_cast<std::vector<uint8_t>>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
-    SPDLOG_INFO("setItem {} bytearray", position);
-  } else if (descriptor.type(fieldName) == "INTEGER") {
-    int data(std::any_cast<int>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-    SPDLOG_INFO("setItem {} int:{}", position, data);
-  } else if (descriptor.type(fieldName) == "INTARRAY") {
-    std::vector<int> data(std::any_cast<std::vector<int>>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
-    SPDLOG_INFO("setItem {} intarray", position);
-  } else if (descriptor.type(fieldName) == "UINT") {
-    uint data(std::any_cast<uint>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-    SPDLOG_INFO("setItem {} uint:{}", position, data);
-  } else if (descriptor.type(fieldName) == "DOUBLE") {
-    double data(std::any_cast<double>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-    SPDLOG_INFO("setItem {} double:{}", position, data);
-  } else if (descriptor.type(fieldName) == "FLOAT") {
-    float data(std::any_cast<float>(value));
-    std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-    SPDLOG_INFO("setItem {} float:{}", position, data);
-  } else if (descriptor.type(fieldName) == "REF") {
-    SPDLOG_INFO("Skip REF");
-  } else if (descriptor.type(fieldName) == "TYPE") {
-    SPDLOG_INFO("Skip TYPE");
-  } else {
-    SPDLOG_ERROR("Type not supported.");
-    assert(false && "type not supported on setter");
+  try {
+    switch (std::get<rtype>(descriptor[position])) {
+      case rdb::STRING: {
+        std::string data(std::any_cast<std::string>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(),
+                    std::min(len, static_cast<int>(data.length())));
+        SPDLOG_INFO("setItem {} string:{}", position, data);
+      } break;
+      case rdb::BYTE: {
+        uint8_t data = std::any_cast<uint8_t>(value);
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
+        SPDLOG_INFO("setItem {} char:{}", position, data);
+      } break;
+      case rdb::BYTEARRAY: {
+        std::vector<uint8_t> data(std::any_cast<std::vector<uint8_t>>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
+        SPDLOG_INFO("setItem {} bytearray", position);
+      } break;
+      case rdb::INTEGER: {
+        int data = std::any_cast<int>(value);
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
+        SPDLOG_INFO("setItem {} int:{}", position, data);
+      } break;
+      case rdb::INTARRAY: {
+        std::vector<int> data(std::any_cast<std::vector<int>>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
+        SPDLOG_INFO("setItem {} intarray", position);
+      } break;
+      case rdb::UINT: {
+        uint data(std::any_cast<uint>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
+        SPDLOG_INFO("setItem {} uint:{}", position, data);
+      } break;
+      case rdb::DOUBLE: {
+        double data(std::any_cast<double>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
+        SPDLOG_INFO("setItem {} double:{}", position, data);
+      } break;
+      case rdb::FLOAT: {
+        float data(std::any_cast<float>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
+        SPDLOG_INFO("setItem {} float:{}", position, data);
+      } break;
+      case rdb::REF: {
+        SPDLOG_INFO("Skip REF");
+      } break;
+      case rdb::TYPE: {
+        SPDLOG_INFO("Skip TYPE");
+      } break;
+      default: {
+        SPDLOG_ERROR("Type not supported.");
+        abort();
+      }
+    }
+  } catch (const std::bad_any_cast &e) {
+    SPDLOG_ERROR("Error on payload::setItem");
   }
 }
 template <typename T>
@@ -133,57 +147,64 @@ T getVal(void *ptr, int offset) {
 }
 
 std::any payload::getItem(int position) {
-  auto fieldName = descriptor.fieldName(position);
-  auto len = descriptor.len(fieldName);
+  auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
-  if (descriptor.type(fieldName) == "STRING") {
-    std::string retval;
-    retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position), len);
-    SPDLOG_INFO("getItem {} string:{}", position, retval);
-    return retval;
-  } else if (descriptor.type(fieldName) == "BYTEARRAY") {
-    std::vector<uint8_t> data;
-    for (auto i = 0; i < descriptor.len(fieldName); i++) {
-      uint8_t data8 = getVal<uint8_t>(payloadData.get(), descriptor.offset(position) + i);
-      data.push_back(data8);
+
+  switch (std::get<rtype>(descriptor[position])) {
+    case rdb::STRING: {
+      std::string retval;
+      retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position), len);
+      SPDLOG_INFO("getItem {} string:{}", position, retval);
+      return retval;
     }
-    SPDLOG_INFO("getItem {} bytearray", position);
-    return data;
-  } else if (descriptor.type(fieldName) == "BYTE") {
-    uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(position));
-    SPDLOG_INFO("getItem {} byte:{}", position, data);
-    return data;
-  } else if (descriptor.type(fieldName) == "INTARRAY") {
-    std::vector<int> data;
-    for (auto i = 0; i < descriptor.len(fieldName); i++) {
-      int dataInt = getVal<int>(payloadData.get(), descriptor.offset(position) + i);
-      data.push_back(dataInt);
+    case rdb::BYTEARRAY: {
+      std::vector<uint8_t> data;
+      for (auto i = 0; i < len; i++)
+        data.push_back(getVal<uint8_t>(payloadData.get(), descriptor.offset(position) + i));
+      SPDLOG_INFO("getItem {} bytearray", position);
+      return data;
     }
-    SPDLOG_INFO("getItem {} intarray", position);
-    return data;
-  } else if (descriptor.type(fieldName) == "INTEGER") {
-    int data = getVal<int>(payloadData.get(), descriptor.offset(position));
-    SPDLOG_INFO("getItem {} int:{} offset:{}", position, data, descriptor.offset(position));
-    return data;
-  } else if (descriptor.type(fieldName) == "UINT") {
-    uint data = getVal<uint>(payloadData.get(), descriptor.offset(position));
-    SPDLOG_INFO("getItem {} uint:{}", position, data);
-    return data;
-  } else if (descriptor.type(fieldName) == "DOUBLE") {
-    double data = getVal<double>(payloadData.get(), descriptor.offset(position));
-    SPDLOG_INFO("getItem {} double:{}", position, data);
-    return data;
-  } else if (descriptor.type(fieldName) == "FLOAT") {
-    float data = getVal<float>(payloadData.get(), descriptor.offset(position));
-    SPDLOG_INFO("getItem {} float:{}", position, data);
-    return data;
-  } else if (descriptor.type(fieldName) == "REF") {
-    SPDLOG_ERROR("REF not supported.");
-    return 0xdead;
-  } else if (descriptor.type(fieldName) == "TYPE") {
-    SPDLOG_ERROR("TYPE not supported.");
-    return 0xdead;
-  }
+    case rdb::BYTE: {
+      uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(position));
+      SPDLOG_INFO("getItem {} byte:{}", position, data);
+      return data;
+    }
+    case rdb::INTARRAY: {
+      std::vector<int> data;
+      for (auto i = 0; i < len; i++)
+        data.push_back(getVal<int>(payloadData.get(), descriptor.offset(position) + i));
+      SPDLOG_INFO("getItem {} intarray", position);
+      return data;
+    }
+    case rdb::INTEGER: {
+      int data = getVal<int>(payloadData.get(), descriptor.offset(position));
+      SPDLOG_INFO("getItem {} int:{} offset:{}", position, data, descriptor.offset(position));
+      return data;
+    }
+    case rdb::UINT: {
+      uint data = getVal<uint>(payloadData.get(), descriptor.offset(position));
+      SPDLOG_INFO("getItem {} uint:{}", position, data);
+      return data;
+    }
+    case rdb::DOUBLE: {
+      double data = getVal<double>(payloadData.get(), descriptor.offset(position));
+      SPDLOG_INFO("getItem {} double:{}", position, data);
+      return data;
+    }
+    case rdb::FLOAT: {
+      float data = getVal<float>(payloadData.get(), descriptor.offset(position));
+      SPDLOG_INFO("getItem {} float:{}", position, data);
+      return data;
+    }
+    case rdb::REF: {
+      SPDLOG_ERROR("REF not supported.");
+      return 0xdead;
+    }
+    case rdb::TYPE: {
+      SPDLOG_ERROR("TYPE not supported.");
+      return 0xdead;
+    }
+  };
   SPDLOG_ERROR("Type not supported.");
   assert(false && "type not supported on getter.");
   return 0xdead;

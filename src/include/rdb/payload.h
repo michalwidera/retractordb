@@ -2,7 +2,7 @@
 #define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 
 #include <any>
-#include <memory>   // std::unique_ptr
+#include <memory>  // std::unique_ptr
 
 #include "descriptor.h"
 

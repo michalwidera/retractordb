@@ -1,8 +1,7 @@
 #ifndef STORAGE_RDB_INCLUDE_DACC_H_
 #define STORAGE_RDB_INCLUDE_DACC_H_
 
-
-#include <memory>   // std::unique_ptr
+#include <memory>  // std::unique_ptr
 #include <string>
 
 #include "descriptor.h"

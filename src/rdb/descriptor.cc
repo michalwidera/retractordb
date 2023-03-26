@@ -69,6 +69,9 @@ std::string GetFieldType(rdb::descFld e) {
 
 constexpr int GetFieldLenFromType(rdb::descFld ft) {
   switch (ft) {
+    case rdb::BAD:
+      SPDLOG_ERROR("rdb::BAD in type");
+      abort();
     case rdb::UINT:
       return sizeof(unsigned);
     case rdb::INTEGER:
