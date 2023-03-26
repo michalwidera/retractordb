@@ -88,7 +88,7 @@ void payload::setItem(int position, std::any valueParam) {
   if (position > descriptor.size()) abort();
 
   auto requestedType = std::get<rtype>(descriptor[position]);
-  if (value.type() == typeid(std::string)) {
+  if (value.type() == typeid(std::string) && requestedType != rdb::STRING) {
     std::string var = std::any_cast<std::string>(value);
     switch (requestedType) {
       case rdb::STRING:
@@ -131,7 +131,7 @@ void payload::setItem(int position, std::any valueParam) {
         abort();
     }
   };
-  if (value.type() == typeid(int)) {
+  if (value.type() == typeid(int) && requestedType != rdb::INTEGER ) {
     int var = std::any_cast<int>(value);
     // TODO
     switch (requestedType) {
@@ -143,10 +143,63 @@ void payload::setItem(int position, std::any valueParam) {
         // value remains unchanged
         break;
       case rdb::BYTE:
+        {
+          uint8_t retval;
+          if (var < 0) {
+            retval = 0;
+          } else if (var > 0xff) {
+            retval = 0xff;
+          } else
+            retval = (uint8_t)var;
+          value = retval;
+        }
+        break;
       case rdb::UINT:
+        value = std::make_unsigned_t<int>(var);
+        break;
       case rdb::FLOAT:
+        value = static_cast<float>(var);
+        break;
       case rdb::DOUBLE:
+        value = static_cast<double>(var);
+        break;
       case rdb::RATIONAL:
+        value = boost::rational<int>(var,1);
+        break;
+      case rdb::BYTEARRAY:
+      case rdb::INTARRAY:
+        SPDLOG_INFO("TODO");
+      default:
+        SPDLOG_ERROR("Type conversion not supported.");
+        abort();
+    }
+  }
+  if (value.type() == typeid(uint8_t) && requestedType != rdb::BYTE ) {
+    uint8_t var = std::any_cast<uint8_t>(value);
+    // TODO
+    switch (requestedType) {
+      case rdb::STRING:
+        value = std::to_string(var);
+        break;
+      case rdb::BYTE:
+        // no conversion needed byte->byte
+        // value remains unchanged
+        break;
+      case rdb::INTEGER:
+        value = static_cast<int>(var);
+        break;
+      case rdb::UINT:
+        value = static_cast<unsigned int>(var);
+        break;
+      case rdb::FLOAT:
+        value = static_cast<float>(var);
+        break;
+      case rdb::DOUBLE:
+        value = static_cast<double>(var);
+        break;
+      case rdb::RATIONAL:
+        value = boost::rational<int>(var,1);
+        break;
       case rdb::BYTEARRAY:
       case rdb::INTARRAY:
         SPDLOG_INFO("TODO");
