@@ -5,10 +5,10 @@
 #include <algorithm>  // std::min
 #include <boost/rational.hpp>
 #include <cassert>
-#include <numeric>  // itoa
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
+#include <numeric>  // itoa
 
 namespace rdb {
 
@@ -131,7 +131,7 @@ void payload::setItem(int position, std::any valueParam) {
         abort();
     }
   };
-  if (value.type() == typeid(int) && requestedType != rdb::INTEGER ) {
+  if (value.type() == typeid(int) && requestedType != rdb::INTEGER) {
     int var = std::any_cast<int>(value);
     // TODO
     switch (requestedType) {
@@ -142,18 +142,16 @@ void payload::setItem(int position, std::any valueParam) {
         // no conversion needed integer->integer
         // value remains unchanged
         break;
-      case rdb::BYTE:
-        {
-          uint8_t retval;
-          if (var < 0) {
-            retval = 0;
-          } else if (var > 0xff) {
-            retval = 0xff;
-          } else
-            retval = (uint8_t)var;
-          value = retval;
-        }
-        break;
+      case rdb::BYTE: {
+        uint8_t retval;
+        if (var < 0) {
+          retval = 0;
+        } else if (var > 0xff) {
+          retval = 0xff;
+        } else
+          retval = (uint8_t)var;
+        value = retval;
+      } break;
       case rdb::UINT:
         value = std::make_unsigned_t<int>(var);
         break;
@@ -164,7 +162,7 @@ void payload::setItem(int position, std::any valueParam) {
         value = static_cast<double>(var);
         break;
       case rdb::RATIONAL:
-        value = boost::rational<int>(var,1);
+        value = boost::rational<int>(var, 1);
         break;
       case rdb::BYTEARRAY:
       case rdb::INTARRAY:
@@ -174,7 +172,7 @@ void payload::setItem(int position, std::any valueParam) {
         abort();
     }
   }
-  if (value.type() == typeid(uint8_t) && requestedType != rdb::BYTE ) {
+  if (value.type() == typeid(uint8_t) && requestedType != rdb::BYTE) {
     uint8_t var = std::any_cast<uint8_t>(value);
     // TODO
     switch (requestedType) {
@@ -198,7 +196,7 @@ void payload::setItem(int position, std::any valueParam) {
         value = static_cast<double>(var);
         break;
       case rdb::RATIONAL:
-        value = boost::rational<int>(var,1);
+        value = boost::rational<int>(var, 1);
         break;
       case rdb::BYTEARRAY:
       case rdb::INTARRAY:

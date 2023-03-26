@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <iostream>
 #include <locale>
+#include <sstream>
 #include <string>
 
 #include "QStruct.h"  // coreInstance
@@ -153,8 +154,14 @@ TEST_F(xschema, check_construct_payload) {
   streamInstance data{"str1", dataStorageDescriptor, dataInternalDesciptor};
   data.storage->setRemoveOnExit(false);
 
-  data.constructPayload(3, 5);
-  // std::cerr << data.localPayload.get()->getDescriptor();
+  std::unique_ptr<rdb::payload> payload;
+  payload = std::make_unique<rdb::payload>(data.constructPayload(3, 5));
+
+  std::string expectedOut = "{ BYTE str1_3 INTEGER str1_4 BYTE str1_5 INTEGER str1_6 BYTE str1_7 }";
+  std::stringstream coutstring;
+  coutstring << rdb::flat << payload.get()->getDescriptor();
+
+  ASSERT_TRUE(expectedOut == coutstring.str());
 }
 
 }  // namespace

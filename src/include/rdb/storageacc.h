@@ -52,6 +52,8 @@ class storageAccessor {
   const size_t getRecordsCount();
   bool peekStorage();
   bool peekDescriptor();
+
+  std::string getStorageName();
 };
 }  // namespace rdb
 

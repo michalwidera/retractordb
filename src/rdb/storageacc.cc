@@ -173,6 +173,8 @@ void storageAccessor::setRemoveDescriptorOnExit(bool value) { removeDescriptorOn
 
 const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
+std::string storageAccessor::getStorageName() { return storageFile; }
+
 bool storageAccessor::read(const size_t recordIndex) {
   if (descriptor.isEmpty()) {
     SPDLOG_ERROR("descriptor is Empty");

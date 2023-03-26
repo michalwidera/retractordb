@@ -70,12 +70,17 @@ streamInstance::streamInstance(query& qry)
 // TODO: TEST THIS FREAKING CODE ... ASAP
 // ! Work in progress
 // https://en.cppreference.com/w/cpp/numeric/math/div
-void streamInstance::constructPayload(int offset, int length) {
+rdb::payload streamInstance::constructPayload(int offset, int length) {
   // First construct descriptor
   rdb::Descriptor descriptor;
   auto descriptorVecSize = storage->getDescriptor().size();
+  std::string storage_name = storage->getStorageName();
   for (auto i = offset; i < offset + length; i++) {
-    descriptor | rdb::Descriptor{storage->getDescriptor()[std::div(i, descriptorVecSize).rem]};
+    rdb::rfield f{storage->getDescriptor()[std::div(i, descriptorVecSize).rem]};
+    rdb::rfield x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
+                                  std::get<rdb::rlen>(f),                  //
+                                  std::get<rdb::rtype>(f))};
+    descriptor | rdb::Descriptor{x};
   }
 
   // Second construct payload
@@ -109,6 +114,8 @@ void streamInstance::constructPayload(int offset, int length) {
     // TODO: fix bad any_cast - intro checkUniform function?
   }
   storage->readReverse(0);
+
+  return *(localPayload.get());
 }
 
 dataModel::dataModel(/* args */) {}

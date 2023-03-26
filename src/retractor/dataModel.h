@@ -31,7 +31,7 @@ struct streamInstance {
   streamInstance(query &qry);
 
   std::any convertFldAsAny(std::any inVal, rdb::descFld inType, rdb::descFld outType);
-  void constructPayload(int offset, int length);
+  rdb::payload constructPayload(int offset, int length);
 };
 
 class dataModel {
