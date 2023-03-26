@@ -271,6 +271,7 @@ void payload::setItem(int position, std::any valueParam) {
     SPDLOG_ERROR("Error on payload::setItem");
   }
 }
+
 template <typename T>
 T getVal(void *ptr, int offset) {
   return *(reinterpret_cast<T *>(static_cast<uint8_t *>(ptr) + offset));

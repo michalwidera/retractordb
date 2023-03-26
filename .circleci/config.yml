@@ -110,13 +110,13 @@ commands:
           name: UnitTest
           command: |
             export PATH="$HOME/.local/bin:$PATH"
-            cd build/<<parameters.build_type>>/test/UnitTest && make test
+            cd build/<<parameters.build_type>>/test/UnitTest && ctest -V
       - run:
           name: Regression
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h && xdumper -h
-            cd build/<<parameters.build_type>>/test/Regression && make test
+            cd build/<<parameters.build_type>>/test/Regression && ctest -V
       - run:
           name: Collect artifacts
           command: |
