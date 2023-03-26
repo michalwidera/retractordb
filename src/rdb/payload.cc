@@ -138,8 +138,11 @@ void payload::setItem(int position, std::any valueParam) {
       case rdb::STRING:
         value = std::to_string(var);
         break;
-      case rdb::BYTE:
       case rdb::INTEGER:
+        // no conversion needed integer->integer
+        // value remains unchanged
+        break;
+      case rdb::BYTE:
       case rdb::UINT:
       case rdb::FLOAT:
       case rdb::DOUBLE:
