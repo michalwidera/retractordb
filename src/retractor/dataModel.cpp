@@ -77,8 +77,10 @@ void streamInstance::constructPayload(int offset, int length) {
   for (auto i = offset; i < offset + length; i++) {
     descriptor | rdb::Descriptor{storage->getDescriptor()[std::div(i, descriptorVecSize).rem]};
   }
+
   // Second construct payload
-  localPayload = std::make_unique<rdb::payload>(descriptor);
+  std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
+
   // std::cerr << "DESC:" << descriptor << std::endl;
   // for (auto i : descriptor) std::cout << rdb::GetStringdescFld(std::get<rdb::rtype>(i)) << std::endl;
   // 3rd - fill payload with data from storage
@@ -102,21 +104,23 @@ void streamInstance::constructPayload(int offset, int length) {
 
     try {
       std::any value = storage->getPayload()->getItem(locSrc);
-      value = convertFldAsAny(value, std::get<rdb::rtype>(srcFld), std::get<rdb::rtype>(dstFld));
-      localPayload->setItem(locDst, value);
+      // value = convertFldAsAny(value, std::get<rdb::rtype>(srcFld), std::get<rdb::rtype>(dstFld));
+      if (value.type() == typeid(int)) {
+        SPDLOG_INFO("Ok - read, will write at {} value {}" , locDst , std::any_cast<int>(value));
+      }
+      else if (value.type() == typeid(uint8_t)) {
+        SPDLOG_INFO("Ok - read, will write at {} value {}" , locDst , std::any_cast<uint8_t>(value));
+      }
+      else SPDLOG_INFO("Ok - read, will write at {}" , locDst );
 
-      SPDLOG_INFO("Ok cast in constructPayload src:{}[{}] -> dst:{}[{}] / {}",  //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(srcFld)),          //
-                  locSrc,                                                       //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(dstFld)),          //
-                  locDst, value.type().name());
+      localPayload->setItem(locDst, value);
+      SPDLOG_INFO("Ok - write");
     } catch (const std::bad_any_cast& e) {
-      std::any value = storage->getPayload()->getItem(locSrc);
-      SPDLOG_INFO("Ok cast in constructPayload src:{}[{}] -> dst:{}[{}] / {}",  //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(srcFld)),          //
-                  locSrc,                                                       //
-                  rdb::GetStringdescFld(std::get<rdb::rtype>(dstFld)),          //
-                  locDst, value.type().name());
+      SPDLOG_ERROR("BAD - write cast in constructPayload src:{}[{}] -> dst:{}[{}]",  //
+                   rdb::GetStringdescFld(std::get<rdb::rtype>(srcFld)),           //
+                   locSrc,                                                        //
+                   rdb::GetStringdescFld(std::get<rdb::rtype>(dstFld)),           //
+                   locDst);
     }
     // TODO: fix bad any_cast - intro checkUniform function?
   }

@@ -178,7 +178,7 @@ TEST(xrdb, test_storage) {
   // Note that this should be packed and size should be 15
 
   union dataPayload {
-    std::byte ptr[15];
+    uint8_t ptr[15];
     struct __attribute__((packed)) {
       char Name[10];    // 10
       uint8_t Control;  // 1
@@ -280,11 +280,11 @@ TEST(xrdb, test_ref_storage) {
 }
 
 TEST(crdb, genericBinaryFileAccessor_byte) {
-  auto result1 = test_1<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
+  auto result1 = test_1<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result1);
-  auto result2 = test_2<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
+  auto result2 = test_2<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result2);
-  auto result3 = test_3<std::byte, rdb::genericBinaryFileAccessor<std::byte>>();
+  auto result3 = test_3<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result3);
 }
 
@@ -298,11 +298,11 @@ TEST(crdb, genericBinaryFileAccessor_char) {
 }
 
 TEST(crdb, posixBinaryFileAccessor_byte) {
-  auto result1 = test_1<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
+  auto result1 = test_1<uint8_t, rdb::posixBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result1);
-  auto result2 = test_2<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
+  auto result2 = test_2<uint8_t, rdb::posixBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result2);
-  auto result3 = test_3<std::byte, rdb::posixBinaryFileAccessor<std::byte>>();
+  auto result3 = test_3<uint8_t, rdb::posixBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result3);
 }
 
@@ -316,11 +316,11 @@ TEST(crdb, posixBinaryFileAccessor_char) {
 }
 
 TEST(crdb, posixPrmBinaryFileAccessor_byte) {
-  auto result1 = test_1<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result1 = test_1<uint8_t, rdb::posixPrmBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result1);
-  auto result2 = test_2<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result2 = test_2<uint8_t, rdb::posixPrmBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result2);
-  auto result3 = test_3<std::byte, rdb::posixPrmBinaryFileAccessor<std::byte>>();
+  auto result3 = test_3<uint8_t, rdb::posixPrmBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result3);
 }
 
@@ -361,7 +361,7 @@ TEST(crdb, payload_add_operator) {
              rdb::Descriptor("TLen", rdb::INTEGER)};
 
   union dataPayload {
-    std::byte ptr[19];
+    uint8_t ptr[19];
     struct __attribute__((packed)) {
       char Name[10];    // 10
       uint8_t Control;  // 1
@@ -376,7 +376,7 @@ TEST(crdb, payload_add_operator) {
   rdb::payload data2Payload(data2);
 
   data1Payload.setItem(0, std::string("test"));  // ! "test" without std::string claims exception
-  data1Payload.setItem(1, 24);
+  data1Payload.setItem(1, static_cast<uint8_t>(24));
   data1Payload.setItem(2, 2000);
   data1Payload.setItem(3, 3333);
 

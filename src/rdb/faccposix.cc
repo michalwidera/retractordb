@@ -75,8 +75,8 @@ int posixBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t
   return EXIT_SUCCESS;
 }
 
-template class posixBinaryFileAccessor<std::byte>;
+template class posixBinaryFileAccessor<uint8_t>;
 template class posixBinaryFileAccessor<char>;
-template class posixBinaryFileAccessor<unsigned char>;
+
 
 }  // namespace rdb

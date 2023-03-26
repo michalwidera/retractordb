@@ -79,7 +79,7 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
         payload->setItem(i, var);
       } else if (std::get<rtype>(item) == rdb::BYTE) {  // This is different!
         auto var = readFromFstream<unsigned>(myFile);
-        payload->setItem(i, static_cast<unsigned char>(var));
+        payload->setItem(i, static_cast<uint8_t>(var));
       } else if (std::get<rtype>(item) == rdb::STRING) {
         std::string var;
         auto strLen = std::get<rlen>(item);
@@ -116,8 +116,7 @@ int textSourceAccessor<T>::fctrl(void* ptrData, const size_t size) {
   return EXIT_SUCCESS;
 }
 
-template class textSourceAccessor<std::byte>;
+template class textSourceAccessor<uint8_t>;
 template class textSourceAccessor<char>;
-template class textSourceAccessor<unsigned char>;
 
 }  // namespace rdb

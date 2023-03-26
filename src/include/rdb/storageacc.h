@@ -1,7 +1,7 @@
 #ifndef STORAGE_RDB_INCLUDE_DACC_H_
 #define STORAGE_RDB_INCLUDE_DACC_H_
 
-#include <cstddef>  // std::byte
+
 #include <memory>   // std::unique_ptr
 #include <string>
 
@@ -18,7 +18,7 @@ namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
 
 class storageAccessor {
-  std::unique_ptr<FileAccessorInterface<std::byte>> accessor;
+  std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
   std::unique_ptr<rdb::payload> storagePayload;
   Descriptor descriptor;
   bool reverse = false;

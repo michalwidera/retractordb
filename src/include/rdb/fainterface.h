@@ -17,7 +17,7 @@ namespace rdb {
  * append :== write(data, position == max_possible_value )
  * update :== write(data, position)
  *
- * @tparam T Type of stored data - std::byte or char
+ * @tparam T Type of stored data - uint8_t or char
  */
 template <typename T>
 struct FileAccessorInterface {

@@ -177,7 +177,7 @@ int main(int argc, char* argv[]) {
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldName) == "BYTE") {
-        unsigned char value;
+        uint8_t value;
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldName) == "STRING") {
@@ -199,8 +199,8 @@ int main(int argc, char* argv[]) {
       if (value.type() == typeid(int)) {
         std::cout << std::any_cast<int>(value) << std::endl;
       }
-      if (value.type() == typeid(unsigned char)) {
-        std::cout << std::any_cast<unsigned char>(value) << std::endl;
+      if (value.type() == typeid(uint8_t)) {
+        std::cout << std::any_cast<uint8_t>(value) << std::endl;
       }
       if (value.type() == typeid(float)) {
         std::cout << std::any_cast<float>(value) << std::endl;
@@ -275,7 +275,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "dec") {
       dacc->getPayload()->setHex(false);
     } else if (cmd == "dump") {
-      auto* ptr = reinterpret_cast<unsigned char*>(dacc->getPayload()->get());
+      auto* ptr = reinterpret_cast<uint8_t*>(dacc->getPayload()->get());
       for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');

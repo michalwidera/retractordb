@@ -12,8 +12,6 @@
 #include <vector>
 
 struct streamInstance {
-  std::unique_ptr<rdb::payload> localPayload;
-
   std::unique_ptr<rdb::storageAccessor> storage;  // here is payload that will be stored - select clause
   std::unique_ptr<rdb::payload> fromPayload;      // payload used for computation in select
                                                   // clause - created by from clause.

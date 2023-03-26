@@ -105,15 +105,15 @@ void storageAccessor::attachStorage() {
   }
 
   if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<std::byte>>(storageFile);
+    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<uint8_t>>(storageFile);
   } else if (storageType == "GENERIC") {
-    accessor = std::make_unique<rdb::genericBinaryFileAccessor<std::byte>>(storageFile);
+    accessor = std::make_unique<rdb::genericBinaryFileAccessor<uint8_t>>(storageFile);
   } else if (storageType == "POSIX") {
-    accessor = std::make_unique<rdb::posixBinaryFileAccessor<std::byte>>(storageFile);
+    accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
   } else if (storageType == "DEVICE") {
-    accessor = std::make_unique<rdb::binaryDeviceAccessor<std::byte>>(storageFile);
+    accessor = std::make_unique<rdb::binaryDeviceAccessor<uint8_t>>(storageFile);
   } else if (storageType == "TEXTSOURCE") {
-    accessor = std::make_unique<rdb::textSourceAccessor<std::byte>>(storageFile);
+    accessor = std::make_unique<rdb::textSourceAccessor<uint8_t>>(storageFile);
     accessor->fctrl(&descriptor, 0);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType);
@@ -190,7 +190,7 @@ bool storageAccessor::read(const size_t recordIndex) {
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->read(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
+    result = accessor->read(static_cast<uint8_t*>(storagePayload->get()), size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("read fn from pos:{} limit:{}", recordIndexRv, recordsCount);
   } else {
@@ -224,7 +224,7 @@ bool storageAccessor::write(const size_t recordIndex) {
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
-    result = accessor->write(static_cast<std::byte*>(storagePayload->get()),
+    result = accessor->write(static_cast<uint8_t*>(storagePayload->get()),
                              size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
@@ -234,7 +234,7 @@ bool storageAccessor::write(const size_t recordIndex) {
 
   if (recordsCount > 0 && recordIndex < recordsCount) {
     auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-    result = accessor->write(static_cast<std::byte*>(storagePayload->get()), size, recordIndexRv * size);
+    result = accessor->write(static_cast<uint8_t*>(storagePayload->get()), size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("write {}", recordIndexRv);
   }

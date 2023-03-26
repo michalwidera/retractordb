@@ -117,7 +117,7 @@ TEST_F(xschema, check_test1) {
 
   // Todo
   dataArea.qSet["str1"]->storage->getPayload()->setItem(0, 2);
-  dataArea.qSet["str1"]->storage->getPayload()->setItem(1, 3);
+  dataArea.qSet["str1"]->storage->getPayload()->setItem(1, static_cast<uint8_t>(3));
   dataArea.qSet["str1"]->storage->write();
 
   SPDLOG_INFO("Records in str1 {}", dataArea.qSet["str1"]->storage->getRecordsCount());

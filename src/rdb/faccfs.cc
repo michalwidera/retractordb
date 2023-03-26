@@ -1,7 +1,6 @@
 #include "rdb/faccfs.h"
 
 #include <cassert>
-#include <cstddef>  // std::byte
 #include <fstream>
 #include <limits>
 
@@ -70,8 +69,7 @@ int genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size
   return EXIT_SUCCESS;
 }
 
-template class genericBinaryFileAccessor<std::byte>;
+template class genericBinaryFileAccessor<uint8_t>;
 template class genericBinaryFileAccessor<char>;
-template class genericBinaryFileAccessor<unsigned char>;
 
 }  // namespace rdb

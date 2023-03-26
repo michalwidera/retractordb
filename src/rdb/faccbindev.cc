@@ -49,8 +49,7 @@ int binaryDeviceAccessor<T>::read(T* ptrData, const size_t size, const size_t po
   return EXIT_SUCCESS;
 }
 
-template class binaryDeviceAccessor<std::byte>;
+template class binaryDeviceAccessor<uint8_t>;
 template class binaryDeviceAccessor<char>;
-template class binaryDeviceAccessor<unsigned char>;
 
 }  // namespace rdb

@@ -165,7 +165,7 @@ class Descriptor : public std::vector<rfield> {
    * and convert it to string by accessing name
    *
    * @param name Name of searched field
-   * @param ptr Pointer to std::byte table / beginning package
+   * @param ptr Pointer to char* table / beginning package
    * @return std::string Returned string from field.
    */
   template <typename T>

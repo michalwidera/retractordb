@@ -77,7 +77,7 @@ std::vector<number> inputDF::getFileRow() {
     boost::rational<int> val;
     switch (f.fieldType) {
       case rdb::BYTE:
-        val = readFromFile<unsigned char>();
+        val = readFromFile<uint8_t>();
         break;
       case rdb::INTEGER:
         val = readFromFile<int>();

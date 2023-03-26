@@ -4,7 +4,6 @@
 
 #include <algorithm>  // std::min
 #include <cassert>
-#include <cstddef>  // std::byte
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
@@ -16,14 +15,14 @@ namespace rdb {
 payload::payload(Descriptor descriptor)
     : descriptor(descriptor),  //
       hexFormat(false) {
-  payloadData = std::make_unique<std::byte[]>(descriptor.getSizeInBytes());
+  payloadData = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
   std::memset(payloadData.get(), 0, descriptor.getSizeInBytes());
 }
 
 // copy constructor
 
 payload::payload(const payload &other) {
-  payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
+  payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
   descriptor = other.getDescriptor();
   std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
 }
@@ -33,7 +32,7 @@ payload::payload(const payload &other) {
 payload &payload::operator=(payload &other) {
   if (this != &other) {                                // assure not a self-assignment
     if (other.descriptor.size() != descriptor.size())  // speed up memory management
-      payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
+      payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
     descriptor = other.getDescriptor();
     std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   }
@@ -43,7 +42,7 @@ payload &payload::operator=(payload &other) {
 payload &payload::operator=(const payload &other) {
   if (this != &other) {                                // assure not a self-assignment
     if (other.descriptor.size() != descriptor.size())  // speed up memory management
-      payloadData = std::make_unique<std::byte[]>(other.descriptor.getSizeInBytes());
+      payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
     descriptor = other.getDescriptor();
     std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   }
@@ -79,7 +78,7 @@ void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
 
 Descriptor payload::getDescriptor() const { return descriptor; }
 
-std::byte *payload::get() const { return payloadData.get(); }
+uint8_t *payload::get() const { return payloadData.get(); }
 
 void payload::setItem(int position, std::any value) {
   auto fieldName = descriptor.fieldName(position);
@@ -90,13 +89,13 @@ void payload::setItem(int position, std::any value) {
     std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(), std::min(len, static_cast<int>(data.length())));
     SPDLOG_INFO("setItem {} string:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTE") {
-    std::byte data;
-    int dataint(std::any_cast<int>(value));
-    data = (std::byte)dataint;
+    uint8_t data;
+    int dataint(std::any_cast<uint8_t>(value));
+    data = (uint8_t)dataint;
     std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
     SPDLOG_INFO("setItem {} char:{}", position, data);
   } else if (descriptor.type(fieldName) == "BYTEARRAY") {
-    std::vector<unsigned char> data(std::any_cast<std::vector<unsigned char>>(value));
+    std::vector<uint8_t> data(std::any_cast<std::vector<uint8_t>>(value));
     std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
     SPDLOG_INFO("setItem {} bytearray", position);
   } else if (descriptor.type(fieldName) == "INTEGER") {
@@ -130,7 +129,7 @@ void payload::setItem(int position, std::any value) {
 }
 template <typename T>
 T getVal(void *ptr, int offset) {
-  return *(reinterpret_cast<T *>(static_cast<std::byte *>(ptr) + offset));
+  return *(reinterpret_cast<T *>(static_cast<uint8_t *>(ptr) + offset));
 }
 
 std::any payload::getItem(int position) {
@@ -211,8 +210,8 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
     for (auto i = 0; i < desc.len(fieldName); i++) {
       int data;
       is >> data;
-      unsigned char data8 = static_cast<unsigned char>(data);
-      std::memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(unsigned char), &data8, sizeof(unsigned char));
+      uint8_t data8 = static_cast<uint8_t>(data);
+      std::memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(uint8_t), &data8, sizeof(uint8_t));
     }
   } else if (desc.type(fieldName) == "INTARRAY") {
     for (auto i = 0; i < desc.len(fieldName) / sizeof(int); i++) {
@@ -223,8 +222,8 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   } else if (desc.type(fieldName) == "BYTE") {
     int data;
     is >> data;
-    unsigned char data8 = static_cast<unsigned char>(data);
-    std::memcpy(rhs.get() + desc.offset(fieldName), &data8, sizeof(unsigned char));
+    uint8_t data8 = static_cast<uint8_t>(data);
+    std::memcpy(rhs.get() + desc.offset(fieldName), &data8, sizeof(uint8_t));
   } else if (desc.type(fieldName) == "UINT")
     copyToMemory<uint, payload>(is, rhs, fieldName.c_str());
   else if (desc.type(fieldName) == "INTEGER")
@@ -256,8 +255,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << std::string(reinterpret_cast<char *>(rhs.get() + offset_), desc.len(std::get<rname>(r)));
     } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
-        unsigned char data;
-        std::memcpy(&data, rhs.get() + offset_ + i * sizeof(unsigned char), sizeof(unsigned char));
+        uint8_t data;
+        std::memcpy(&data, rhs.get() + offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
         if (rhs.hexFormat) {
           os << std::setfill('0');
           os << std::setw(2);
@@ -277,8 +276,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         if (i + 1 != std::get<rlen>(r) / sizeof(int)) os << " ";
       }
     } else if (std::get<rtype>(r) == rdb::BYTE) {
-      unsigned char data;
-      std::memcpy(&data, rhs.get() + offset_, sizeof(unsigned char));
+      uint8_t data;
+      std::memcpy(&data, rhs.get() + offset_, sizeof(uint8_t));
       if (rhs.hexFormat) {
         os << std::setfill('0');
         os << std::setw(2);

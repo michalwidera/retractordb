@@ -2,7 +2,6 @@
 #define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 
 #include <any>
-#include <cstddef>  // std::byte
 #include <memory>   // std::unique_ptr
 
 #include "descriptor.h"
@@ -14,7 +13,7 @@ class payload {
   Descriptor descriptor;
 
   /// @brief Payload memory area
-  std::unique_ptr<std::byte[]> payloadData;
+  std::unique_ptr<uint8_t[]> payloadData;
 
   /// @brief Type of dumped or read numeric formats
   bool hexFormat;
@@ -26,7 +25,7 @@ class payload {
 
   /// @brief Accessor to pointer to payload
   /// @return  T* pointer to payload
-  std::byte *get() const;
+  uint8_t *get() const;
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
