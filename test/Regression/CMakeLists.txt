@@ -7,7 +7,8 @@ project(regression-test)
 # then copy.
 
 file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/Data)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 
 # Purpose of this test is to fail if someone will create xrdb artifact If such

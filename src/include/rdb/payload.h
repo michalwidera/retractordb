@@ -40,9 +40,9 @@ class payload {
 
   /// @brief Direct setter
   /// @param position position according to descriptor
-  /// @param value value of given type according to descriptor that will be set
+  /// @param valueParam value of given type according to descriptor that will be set
   /// in payload
-  void setItem(int position, std::any value);
+  void setItem(int position, std::any valueParam);
 
   /// @brief Direct getter
   /// @param position position according to descriptor

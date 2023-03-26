@@ -3,7 +3,9 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // std::min
+#include <boost/rational.hpp>
 #include <cassert>
+#include <numeric>  // itoa
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
@@ -80,9 +82,77 @@ Descriptor payload::getDescriptor() const { return descriptor; }
 
 uint8_t *payload::get() const { return payloadData.get(); }
 
-void payload::setItem(int position, std::any value) {
+void payload::setItem(int position, std::any valueParam) {
+  std::any value = valueParam;
   auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
+
+  auto requestedType = std::get<rtype>(descriptor[position]);
+  if (value.type() == typeid(std::string)) {
+    std::string var = std::any_cast<std::string>(value);
+    switch (requestedType) {
+      case rdb::STRING:
+        // no conversion needed string->string
+        // value remains unchanged
+        break;
+      case rdb::BYTE:
+        // requested is BYTE - but we have string
+        // trying to convert string into byte
+        {
+          uint8_t retval;
+          auto intVal = std::atoi(var.c_str());
+          if (intVal < 0) {
+            retval = 0;
+          } else if (intVal > 0xff) {
+            retval = 0xff;
+          } else
+            retval = (uint8_t)intVal;
+          value = retval;
+        }
+        break;
+      case rdb::INTEGER:
+        value = std::atoi(var.c_str());
+        break;
+      case rdb::UINT:
+        value = static_cast<unsigned int>(std::atol(var.c_str()));
+        break;
+      case rdb::FLOAT:
+        value = static_cast<float>(std::atof(var.c_str()));
+        break;
+      case rdb::DOUBLE:
+        value = std::atof(var.c_str());
+        break;
+      case rdb::RATIONAL:
+      case rdb::BYTEARRAY:
+      case rdb::INTARRAY:
+        SPDLOG_INFO("TODO");
+      default:
+        SPDLOG_ERROR("Type conversion not supported.");
+        abort();
+    }
+  };
+  if (value.type() == typeid(int)) {
+    int var = std::any_cast<int>(value);
+    // TODO
+    switch (requestedType) {
+      case rdb::STRING:
+        value = std::to_string(var);
+        break;
+      case rdb::BYTE:
+      case rdb::INTEGER:
+      case rdb::UINT:
+      case rdb::FLOAT:
+      case rdb::DOUBLE:
+      case rdb::RATIONAL:
+      case rdb::BYTEARRAY:
+      case rdb::INTARRAY:
+        SPDLOG_INFO("TODO");
+      default:
+        SPDLOG_ERROR("Type conversion not supported.");
+        abort();
+    }
+  }
+
   try {
     switch (std::get<rtype>(descriptor[position])) {
       case rdb::STRING: {
@@ -126,6 +196,10 @@ void payload::setItem(int position, std::any value) {
         std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
         SPDLOG_INFO("setItem {} float:{}", position, data);
       } break;
+      case rdb::RATIONAL: {
+        boost::rational<int> data(std::any_cast<boost::rational<int>>(value));
+        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
+      } break;
       case rdb::REF: {
         SPDLOG_INFO("Skip REF");
       } break;
@@ -159,8 +233,7 @@ std::any payload::getItem(int position) {
     }
     case rdb::BYTEARRAY: {
       std::vector<uint8_t> data;
-      for (auto i = 0; i < len; i++)
-        data.push_back(getVal<uint8_t>(payloadData.get(), descriptor.offset(position) + i));
+      for (auto i = 0; i < len; i++) data.push_back(getVal<uint8_t>(payloadData.get(), descriptor.offset(position) + i));
       SPDLOG_INFO("getItem {} bytearray", position);
       return data;
     }
@@ -171,8 +244,7 @@ std::any payload::getItem(int position) {
     }
     case rdb::INTARRAY: {
       std::vector<int> data;
-      for (auto i = 0; i < len; i++)
-        data.push_back(getVal<int>(payloadData.get(), descriptor.offset(position) + i));
+      for (auto i = 0; i < len; i++) data.push_back(getVal<int>(payloadData.get(), descriptor.offset(position) + i));
       SPDLOG_INFO("getItem {} intarray", position);
       return data;
     }
@@ -194,6 +266,11 @@ std::any payload::getItem(int position) {
     case rdb::FLOAT: {
       float data = getVal<float>(payloadData.get(), descriptor.offset(position));
       SPDLOG_INFO("getItem {} float:{}", position, data);
+      return data;
+    }
+    case rdb::RATIONAL: {
+      boost::rational<int> data = getVal<boost::rational<int>>(payloadData.get(), descriptor.offset(position));
+      SPDLOG_INFO("getItem {} rational:{}", position, data);
       return data;
     }
     case rdb::REF: {
