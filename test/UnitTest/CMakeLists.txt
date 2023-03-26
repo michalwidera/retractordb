@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
 project(regression-test)
 
+# these set of 3 commands will copy artifacts from UnitTest/Data into
+# build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
+# then copy.
+
+file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/Data)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
+
 include_directories(
   ${Boost_INCLUDE_DIR}
   ${spdlog_INCLUDE_DIR}
@@ -10,8 +18,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/include
   ${CMAKE_SOURCE_DIR}/src
   ${CMAKE_SOURCE_DIR}/src/share)
-
-set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_SOURCE_DIR}/test/UnitTest/Data)
 
 set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
 

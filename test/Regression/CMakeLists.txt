@@ -2,7 +2,13 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
 project(regression-test)
 
-set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_SOURCE_DIR}/test/Regression/Data)
+# these set of 3 commands will copy artifacts from Regression/Data into
+# build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
+# then copy.
+
+file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/Data)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 
 # Purpose of this test is to fail if someone will create xrdb artifact If such
 # file will appear in .local/bin folder or in a path this will cause to system
