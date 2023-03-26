@@ -40,11 +40,9 @@ add_test(
 add_test(
   NAME rg-compile_2
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
-  COMMAND
-    sh -c "set -e ; \
+  COMMAND sh -c "set -e ; \
     xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
-  ")
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
@@ -60,11 +58,9 @@ add_test(
 add_test(
   NAME rg-compile_4
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
-  COMMAND
-    sh -c "set -e ; \
+  COMMAND sh -c "set -e ; \
     xretractor query-crc.rql -c > out.txt ; xdumper >> out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt
-  ")
+  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
