@@ -18,7 +18,7 @@
 #define DECL_E(elementName, elementType) elementType
 #define DECL_F(elementName)
 #define END_E_GEN_T(ENUM_NAME) > ENUM_NAME##VT;
-#include "fldList.h"
+#include "internal/fldList.h"
 #endif
 
 #ifdef FLDTYPE_H_CREATE_DEFINITION_FLDT
@@ -35,7 +35,7 @@
   }                            \
   ;                            \
   std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
-#include "fldList.h"
+#include "internal/fldList.h"
 #endif
 
 #ifndef FLDTYPE_H_DECLARATION_DONE_FLDT
@@ -48,7 +48,7 @@
   }                            \
   ;                            \
   std::string GetString##ENUM_NAME(enum ENUM_NAME index);
-#include "fldList.h"
+#include "internal/fldList.h"
 #endif
 
 // Support for std::visit over std::variant
