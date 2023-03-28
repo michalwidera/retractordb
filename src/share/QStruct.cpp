@@ -18,7 +18,6 @@
 using namespace boost;
 using namespace boost::lambda;
 
-#include "fldType.h"
 #define FLDTYPE_H_CREATE_DEFINITION_FLDT
 #include "fldType.h"
 #define CMDID_H_CREATE_DEFINITION_CMDI

@@ -23,7 +23,6 @@
 
 typedef boost::rational<int> number;
 
-#define FLDTYPE_H_CREATE_VARIANT_T
 #include "fldType.h"
 
 namespace boost {
