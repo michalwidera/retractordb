@@ -210,8 +210,10 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
     if (!flatOutput) os << std::endl;
   }
-  if (rhs.isEmpty()) os << "Empty";
-  else if (flatOutput) os << " ";
+  if (rhs.isEmpty())
+    os << "Empty";
+  else if (flatOutput)
+    os << " ";
   os << "}";
   flatOutput = false;
   return os;

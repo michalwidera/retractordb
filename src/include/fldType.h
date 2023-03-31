@@ -6,8 +6,8 @@
 #error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conflicts with inner fldType.h declaration.
 #endif
 
-#include <string>
 #include <boost/rational.hpp>
+#include <string>
 #include <vector>
 
 #ifndef FLDTYPE_H_CREATE_VARIANT_T

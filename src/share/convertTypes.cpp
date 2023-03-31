@@ -1,13 +1,14 @@
 #include "convertTypes.h"
 
 #include <spdlog/spdlog.h>
+
 #include <istream>
+#include <stack>
 #include <string>
 #include <type_traits>
-#include <stack>
 
 template <typename T, typename K>
-void visit_descFld(K& inVar, K& retVal) {
+void visit_descFld(const K& inVar, K& retVal) {
   // List of unsupported types by this function
   static_assert(!std::is_same_v<T, std::string>);
   static_assert(!std::is_same_v<T, boost::rational<int>>);
@@ -15,24 +16,16 @@ void visit_descFld(K& inVar, K& retVal) {
   static_assert(!std::is_same_v<T, std::vector<int>>);
 
   std::visit(Overload{
-                 [&retVal](std::monostate a) { retVal = 0; },            //
-                 [&retVal](uint8_t a) { retVal = static_cast<T>(a); },   //
-                 [&retVal](int a) { retVal = static_cast<T>(a); },       //
-                 [&retVal](unsigned a) { retVal = static_cast<T>(a); },  //
-                 [&retVal](boost::rational<int> a) {
-                   retVal = boost::rational_cast<T>(a);
-                 },                                                    //
-                 [&retVal](float a) { retVal = static_cast<T>(a); },   //
-                 [&retVal](double a) { retVal = static_cast<T>(a); },  //
-                 [&retVal](std::vector<uint8_t> a) {
-                   SPDLOG_ERROR("TODO - vect8->T");
-                 },  //
-                 [&retVal](std::vector<int> a) {
-                   SPDLOG_ERROR("TODO - vect-int->T");
-                 },  //
-                 [&retVal](std::string a) {
-                   retVal = static_cast<T>(std::stoi(a));
-                 }  //
+                 [&retVal](std::monostate a) { retVal = 0; },                                 //
+                 [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                        //
+                 [&retVal](int a) { retVal = static_cast<T>(a); },                            //
+                 [&retVal](unsigned a) { retVal = static_cast<T>(a); },                       //
+                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },  //
+                 [&retVal](float a) { retVal = static_cast<T>(a); },                          //
+                 [&retVal](double a) { retVal = static_cast<T>(a); },                         //
+                 [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },      //
+                 [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },       //
+                 [&retVal](std::string a) { retVal = static_cast<T>(std::stoi(a)); }          //
              },
              inVar);
 }
@@ -49,8 +42,7 @@ std::istream& expect(std::istream& in) {
 }
 
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
-rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
-  rdb::descFldVT retVal;
+void cast(const rdb::descFldVT& inVar, rdb::descFldVT& retVal, rdb::descFld reqType) {
   switch (reqType) {
     case rdb::BAD:
       SPDLOG_ERROR("Unsupported bad cast");
@@ -72,33 +64,24 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
       break;
     case rdb::RATIONAL:
       // Requested type is RATIONAL
-      std::visit(
-          Overload{
-              [&retVal](std::monostate a) { retVal = "NaN"; },             //
-              [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },  //
-              [&retVal](int a) { retVal = boost::rational<int>(a); },      //
-              [&retVal](unsigned a) {
-                retVal = boost::rational<int>(static_cast<int>(a));
-              },                                                  //
-              [&retVal](boost::rational<int> a) { retVal = a; },  //
-              [&retVal](float a) {
-                retVal = Rationalize(static_cast<double>(a));
-              },                                                 //
-              [&retVal](double a) { retVal = Rationalize(a); },  //
-              [&retVal](std::vector<uint8_t> a) {
-                SPDLOG_ERROR("TODO - vect8->T");
-              },  //
-              [&retVal](std::vector<int> a) {
-                SPDLOG_ERROR("TODO - vect-int->T");
-              },  //
-              [&retVal](std::string a) {
-                std::istringstream in(a);
-                int nom{0}, den{1};
-                in >> nom >> expect<'/'> >> den;
-                retVal = boost::rational<int>(nom, den);
-              }  //
-          },
-          inVar);
+      std::visit(Overload{
+                     [&retVal](std::monostate a) { retVal = "NaN"; },                                //
+                     [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
+                     [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
+                     [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
+                     [&retVal](boost::rational<int> a) { retVal = a; },                              //
+                     [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
+                     [&retVal](double a) { retVal = Rationalize(a); },                               //
+                     [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },         //
+                     [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },          //
+                     [&retVal](std::string a) {
+                       std::istringstream in(a);
+                       int nom{0}, den{1};
+                       in >> nom >> expect<'/'> >> den;
+                       retVal = boost::rational<int>(nom, den);
+                     }  //
+                 },
+                 inVar);
       break;
     case rdb::INTARRAY:
       // Requested type is std::vector<int>
@@ -144,35 +127,28 @@ rdb::descFldVT cast(rdb::descFldVT inVar, rdb::descFld reqType) {
       break;
     case rdb::STRING:
       // Requested type is STRING
-      std::visit(
-          Overload{[&retVal](std::monostate a) { retVal = "NaN"; },        //
-                   [&retVal](uint8_t a) { retVal = std::to_string(a); },   //
-                   [&retVal](int a) { retVal = std::to_string(a); },       //
-                   [&retVal](unsigned a) { retVal = std::to_string(a); },  //
-                   [&retVal](float a) { retVal = std::to_string(a); },     //
-                   [&retVal](double a) { retVal = std::to_string(a); },    //
-                   [&retVal](std::vector<uint8_t> a) {
-                     SPDLOG_ERROR("TODO - vect8->T");
-                   },  //
-                   [&retVal](std::vector<int> a) {
-                     SPDLOG_ERROR("TODO - vect-int->T");
-                   },                                         //
-                   [&retVal](std::string a) { retVal = a; },  //
-                   [&retVal](boost::rational<int> a) {
-                     std::stringstream ss;
-                     ss << a;
-                     retVal = ss.str();
-                   }},
-          inVar);
+      std::visit(Overload{[&retVal](std::monostate a) { retVal = "NaN"; },                         //
+                          [&retVal](uint8_t a) { retVal = std::to_string(a); },                    //
+                          [&retVal](int a) { retVal = std::to_string(a); },                        //
+                          [&retVal](unsigned a) { retVal = std::to_string(a); },                   //
+                          [&retVal](float a) { retVal = std::to_string(a); },                      //
+                          [&retVal](double a) { retVal = std::to_string(a); },                     //
+                          [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },  //
+                          [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },   //
+                          [&retVal](std::string a) { retVal = a; },                                //
+                          [&retVal](boost::rational<int> a) {
+                            std::stringstream ss;
+                            ss << a;
+                            retVal = ss.str();
+                          }},
+                 inVar);
       break;
     default:
       break;
   }
-  return retVal;
 }
 
-boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
-                                 int ttl /*=11*/) {
+boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/, int ttl /*=11*/) {
   std::stack<int> st;
   double startx(inValue), diff, err1, err2;
   unsigned int val;
@@ -201,4 +177,3 @@ boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/,
   err2 = std::abs(rational_cast<double>(result2) - inValue);
   return err1 > err2 ? result2 : result1;
 }
-

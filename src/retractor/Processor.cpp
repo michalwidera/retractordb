@@ -22,8 +22,8 @@
 
 #include "QStruct.h"
 #include "SOperations.h"
-#include "inputFileInstance.h"
 #include "convertTypes.h"
+#include "inputFileInstance.h"
 
 extern "C" qTree coreInstance;
 
