@@ -148,9 +148,12 @@ void cast(const rdb::descFldVT& inVar, rdb::descFldVT& retVal, rdb::descFld reqT
   }
 }
 
-boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/, int ttl /*=11*/) {
+boost::rational<int> Rationalize(const double inValue,
+                                 const double DIFF /*=1E-6*/,
+                                 const int ttl_const /*=11*/) {
   std::stack<int> st;
-  double startx(inValue), diff, err1, err2;
+  double startx = inValue, diff, err1, err2;
+  int ttl = ttl_const;
   unsigned int val;
   for (;;) {
     val = static_cast<unsigned int>(startx);
