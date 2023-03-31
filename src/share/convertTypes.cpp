@@ -6,8 +6,8 @@
 #include <type_traits>
 #include <stack>
 
-template <typename T>
-void visit_descFld(rdb::descFldVT& inVar, rdb::descFldVT& retVal) {
+template <typename T, typename K>
+void visit_descFld(K& inVar, K& retVal) {
   // List of unsupported types by this function
   static_assert(!std::is_same_v<T, std::string>);
   static_assert(!std::is_same_v<T, boost::rational<int>>);
