@@ -24,9 +24,9 @@ pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
 
   pairVar retVal;
   if (a.index() > b.index()) {
-    return pairVar(a, cast(b, (rdb::descFld)a.index()));
+    return pairVar(a, cast(b, static_cast<rdb::descFld>(a.index())));
   } else {
-    return pairVar(cast(a, (rdb::descFld)b.index()), b);
+    return pairVar(cast(a, static_cast<rdb::descFld>(b.index())), b);
   }
 }
 
