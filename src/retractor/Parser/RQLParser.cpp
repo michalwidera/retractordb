@@ -1,5 +1,5 @@
 
-// Generated from RQL.g4 by ANTLR 4.11.1
+// Generated from RQL.g4 by ANTLR 4.12.0
 
 
 #include "RQLListener.h"
@@ -299,8 +299,8 @@ RQLParser::ProgContext* RQLParser::prog() {
       setState(47); 
       _errHandler->sync(this);
       _la = _input->LA(1);
-    } while (((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & 11005853696) != 0);
+    } while ((((_la & ~ 0x3fULL) == 0) &&
+      ((1ULL << _la) & 11005853696) != 0));
     setState(49);
     match(RQLParser::EOF);
    
@@ -1050,8 +1050,8 @@ RQLParser::Field_typeContext* RQLParser::field_type() {
         enterOuterAlt(_localctx, 1);
         setState(90);
         _la = _input->LA(1);
-        if (!(((_la & ~ 0x3fULL) == 0) &&
-          ((1ULL << _la) & 14680064) != 0)) {
+        if (!((((_la & ~ 0x3fULL) == 0) &&
+          ((1ULL << _la) & 14680064) != 0))) {
         _errHandler->recoverInline(this);
         }
         else {
@@ -2993,8 +2993,8 @@ RQLParser::Function_callContext* RQLParser::function_call() {
     enterOuterAlt(_localctx, 1);
     setState(243);
     _la = _input->LA(1);
-    if (!(((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & 2097120) != 0)) {
+    if (!((((_la & ~ 0x3fULL) == 0) &&
+      ((1ULL << _la) & 2097120) != 0))) {
     _errHandler->recoverInline(this);
     }
     else {
