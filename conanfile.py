@@ -27,7 +27,7 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB time series database"
     homepage = "https://retractordb.com"
-    requires = "boost/1.81.0", "gtest/1.13.0" , "antlr4-cppruntime/4.11.1" , "spdlog/1.10.0"
+    requires = "boost/1.81.0", "gtest/1.13.0" , "antlr4-cppruntime/4.12.0" , "spdlog/1.10.0"
     generators = "CMakeToolchain"
     testing = []
     package_type = "application"
