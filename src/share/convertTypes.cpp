@@ -6,6 +6,7 @@
 #include <stack>
 #include <string>
 #include <type_traits>
+#include <any>
 
 template <typename T, typename K>
 void visit_descFld(const K& inVar, K& retVal) {
@@ -42,7 +43,9 @@ std::istream& expect(std::istream& in) {
 }
 
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
-void cast(const rdb::descFldVT& inVar, rdb::descFldVT& retVal, rdb::descFld reqType) {
+template <typename T>
+T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
+  T retVal;
   switch (reqType) {
     case rdb::BAD:
       SPDLOG_ERROR("Unsupported bad cast");
@@ -146,11 +149,10 @@ void cast(const rdb::descFldVT& inVar, rdb::descFldVT& retVal, rdb::descFld reqT
     default:
       break;
   }
+  return retVal;
 }
 
-boost::rational<int> Rationalize(const double inValue,
-                                 const double DIFF /*=1E-6*/,
-                                 const int ttl_const /*=11*/) {
+boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6*/, const int ttl_const /*=11*/) {
   std::stack<int> st;
   double startx = inValue, diff, err1, err2;
   int ttl = ttl_const;
@@ -180,3 +182,6 @@ boost::rational<int> Rationalize(const double inValue,
   err2 = std::abs(rational_cast<double>(result2) - inValue);
   return err1 > err2 ? result2 : result1;
 }
+
+template struct cast<rdb::descFldVT>;
+//template struct cast<std::any>;

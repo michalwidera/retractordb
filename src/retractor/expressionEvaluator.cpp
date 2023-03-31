@@ -14,6 +14,8 @@
 
 #include "convertTypes.h"
 
+cast<rdb::descFldVT> castFldVT;
+
 expressionEvaluator::expressionEvaluator(/* args */) {}
 
 expressionEvaluator::~expressionEvaluator() {}
@@ -25,13 +27,9 @@ pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
 
   pairVar retVal;
   if (a.index() > b.index()) {
-    rdb::descFldVT b_conv;
-    cast(b, b_conv, static_cast<rdb::descFld>(a.index()));
-    return pairVar(a, b_conv);
+    return pairVar(a, castFldVT(b, static_cast<rdb::descFld>(a.index())));
   } else {
-    rdb::descFldVT a_conv;
-    cast(a, a_conv, static_cast<rdb::descFld>(b.index()));
-    return pairVar(a_conv, b);
+    return pairVar(castFldVT(a, static_cast<rdb::descFld>(b.index())), b);
   }
 }
 
@@ -178,13 +176,8 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
 rdb::descFldVT callFun(rdb::descFldVT& inVar, std::function<double(double)> fnName) {
   auto backResultType = inVar.index();
   if (backResultType > rdb::BAD && backResultType <= rdb::DOUBLE) {
-    rdb::descFldVT inVar_conv;
-    cast(inVar, inVar_conv, rdb::DOUBLE);
-
-    rdb::descFldVT floValue{fnName(std::get<double>(inVar_conv))};
-    rdb::descFldVT floValue_conv;
-    cast(floValue, floValue_conv, (rdb::descFld)backResultType);
-    return floValue_conv;
+    rdb::descFldVT floValue{fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)))};
+    return castFldVT(floValue, (rdb::descFld)backResultType);
   } else {
     // There is no definition of floor( std::string ) or sqrt( vector ) ?
     // throw error ?
