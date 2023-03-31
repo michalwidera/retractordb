@@ -13,6 +13,7 @@
 #include <stdexcept>  // for out_of_range
 
 #include "QStruct.h"  // for field, BAD
+#include "convertTypes.h"
 
 using namespace boost;
 

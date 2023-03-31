@@ -71,8 +71,6 @@ inline void serialize(Archive &ar, std::tuple<Types...> &t, const unsigned int) 
 }  // namespace serialization
 }  // namespace boost
 
-boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6, int ttl = 11);
-
 class token {
   friend class boost::serialization::access;
 

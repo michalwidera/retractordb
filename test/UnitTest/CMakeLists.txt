@@ -26,6 +26,7 @@ set(SOURCES_COMPILER_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
     ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
@@ -56,6 +57,7 @@ set(SOURCES_DATAMODEL_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
@@ -74,6 +76,7 @@ set(SOURCES_EXPEVAL_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
+    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp

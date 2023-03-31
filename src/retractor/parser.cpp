@@ -12,6 +12,7 @@
 #include "Parser/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
+#include "convertTypes.h"
 
 extern qTree coreInstance;
 

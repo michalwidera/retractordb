@@ -24,6 +24,7 @@ set(SOURCES_RETRACTOR
     share/SOperations.cpp
     share/QStruct.cpp
     share/inputFileInstance.cpp
+    share/convertTypes.cpp
     rdb/faccfs.cc
     rdb/faccposix.cc
     rdb/faccposixprm.cc
@@ -36,6 +37,7 @@ set(SOURCES_RETRACTOR
 set(SOURCES_DUMPER
     dumper/dumper.cpp
     share/QStruct.cpp
+    share/convertTypes.cpp
     rdb/faccfs.cc
     rdb/faccposix.cc
     rdb/faccposixprm.cc

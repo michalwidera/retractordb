@@ -23,6 +23,8 @@ using namespace boost::lambda;
 #define CMDID_H_CREATE_DEFINITION_CMDI
 #include "cmdID.h"
 
+#include "convertTypes.h"
+
 extern "C" {
 qTree coreInstance;
 }
@@ -68,36 +70,6 @@ bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.
 command_id token::getCommandID() { return command; }
 
 std::string token::getStrCommandID() { return GetStringcommand_id(command); }
-
-boost::rational<int> Rationalize(double inValue, double DIFF /*=1E-6*/, int ttl /*=11*/) {
-  std::stack<int> st;
-  double startx(inValue), diff, err1, err2;
-  unsigned int val;
-  for (;;) {
-    val = static_cast<unsigned int>(startx);
-    st.push(static_cast<int>(val));
-    if ((ttl--) == 0) break;
-    diff = startx - val;
-    if (diff < DIFF)
-      break;
-    else
-      startx = 1 / diff;
-    if (startx > (1 / DIFF)) break;
-  }
-  if (st.empty()) return boost::rational<int>(0, 1);
-  boost::rational<int> result1(0, 1), result2(0, 1);
-  while (!st.empty()) {
-    if (result1.numerator() != 0)
-      result2 = st.top() + (1 / result1);
-    else
-      result2 = st.top();
-    st.pop();
-    result1 = result2;
-  }
-  err1 = std::abs(rational_cast<double>(result1) - inValue);
-  err2 = std::abs(rational_cast<double>(result2) - inValue);
-  return err1 > err2 ? result2 : result1;
-}
 
 field &query::getField(const std::string &sField) {
   for (auto &f : lSchema) {
