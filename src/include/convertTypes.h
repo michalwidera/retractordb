@@ -1,3 +1,5 @@
+#pragma once
+
 #include <boost/rational.hpp>
 
 #include "fldType.h"
