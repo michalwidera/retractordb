@@ -115,8 +115,8 @@ TEST_F(xschema, check_test1) {
 
   // This simplified dataModel::load
   coreInstance.clear();
-  auto compiled = parserFile("ut_example_schema.rql") == "OK";
-  ASSERT_TRUE(compiled == true);
+  auto compiled = parserFile("ut_example_schema.rql");
+  ASSERT_TRUE(compiled == "OK");
 
   dataModel dataArea;
 
