@@ -10,6 +10,8 @@
 #include <iostream>
 #include <numeric>  // itoa
 
+#include "convertTypes.h"
+
 namespace rdb {
 
 // default constructor
@@ -82,131 +84,26 @@ Descriptor payload::getDescriptor() const { return descriptor; }
 
 uint8_t *payload::get() const { return payloadData.get(); }
 
+cast<std::any> castAny;
+
+// TODO: Work is here - type casting
 void payload::setItem(int position, std::any valueParam) {
-  std::any value = valueParam;
   auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
 
   auto requestedType = std::get<rtype>(descriptor[position]);
-  if (value.type() == typeid(std::string) && requestedType != rdb::STRING) {
-    std::string var = std::any_cast<std::string>(value);
-    switch (requestedType) {
-      case rdb::STRING:
-        // no conversion needed string->string
-        // value remains unchanged
-        break;
-      case rdb::BYTE:
-        // requested is BYTE - but we have string
-        // trying to convert string into byte
-        {
-          uint8_t retval;
-          auto intVal = std::atoi(var.c_str());
-          if (intVal < 0) {
-            retval = 0;
-          } else if (intVal > 0xff) {
-            retval = 0xff;
-          } else
-            retval = (uint8_t)intVal;
-          value = retval;
-        }
-        break;
-      case rdb::INTEGER:
-        value = std::atoi(var.c_str());
-        break;
-      case rdb::UINT:
-        value = static_cast<unsigned int>(std::atol(var.c_str()));
-        break;
-      case rdb::FLOAT:
-        value = static_cast<float>(std::atof(var.c_str()));
-        break;
-      case rdb::DOUBLE:
-        value = std::atof(var.c_str());
-        break;
-      case rdb::RATIONAL:
-      case rdb::BYTEARRAY:
-      case rdb::INTARRAY:
-        SPDLOG_INFO("TODO");
-      default:
-        SPDLOG_ERROR("Type conversion not supported.");
-        abort();
-    }
-  };
-  if (value.type() == typeid(int) && requestedType != rdb::INTEGER) {
-    int var = std::any_cast<int>(value);
-    // TODO
-    switch (requestedType) {
-      case rdb::STRING:
-        value = std::to_string(var);
-        break;
-      case rdb::INTEGER:
-        // no conversion needed integer->integer
-        // value remains unchanged
-        break;
-      case rdb::BYTE: {
-        uint8_t retval;
-        if (var < 0) {
-          retval = 0;
-        } else if (var > 0xff) {
-          retval = 0xff;
-        } else
-          retval = (uint8_t)var;
-        value = retval;
-      } break;
-      case rdb::UINT:
-        value = std::make_unsigned_t<int>(var);
-        break;
-      case rdb::FLOAT:
-        value = static_cast<float>(var);
-        break;
-      case rdb::DOUBLE:
-        value = static_cast<double>(var);
-        break;
-      case rdb::RATIONAL:
-        value = boost::rational<int>(var, 1);
-        break;
-      case rdb::BYTEARRAY:
-      case rdb::INTARRAY:
-        SPDLOG_INFO("TODO");
-      default:
-        SPDLOG_ERROR("Type conversion not supported.");
-        abort();
-    }
-  }
-  if (value.type() == typeid(uint8_t) && requestedType != rdb::BYTE) {
-    uint8_t var = std::any_cast<uint8_t>(value);
-    // TODO
-    switch (requestedType) {
-      case rdb::STRING:
-        value = std::to_string(var);
-        break;
-      case rdb::BYTE:
-        // no conversion needed byte->byte
-        // value remains unchanged
-        break;
-      case rdb::INTEGER:
-        value = static_cast<int>(var);
-        break;
-      case rdb::UINT:
-        value = static_cast<unsigned int>(var);
-        break;
-      case rdb::FLOAT:
-        value = static_cast<float>(var);
-        break;
-      case rdb::DOUBLE:
-        value = static_cast<double>(var);
-        break;
-      case rdb::RATIONAL:
-        value = boost::rational<int>(var, 1);
-        break;
-      case rdb::BYTEARRAY:
-      case rdb::INTARRAY:
-        SPDLOG_INFO("TODO");
-      default:
-        SPDLOG_ERROR("Type conversion not supported.");
-        abort();
-    }
-  }
 
+  std::any value = castAny(valueParam, requestedType);
+/*
+  if ( requestedType == rdb::STRING )
+    len = std::min(len, static_cast<int>(std::any_cast<std::string>(value).length()));
+
+  if ( requestedType == rdb::REF || requestedType == rdb::TYPE )
+    SPDLOG_INFO("Skip REF or TYPE");
+  else
+    std::memcpy(payloadData.get() + descriptor.offset(position), std::any_cast<void*>(&value), len);
+  return;
+*/
   try {
     switch (std::get<rtype>(descriptor[position])) {
       case rdb::STRING: {

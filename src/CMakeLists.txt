@@ -58,7 +58,8 @@ set(SOURCES_RDB
     rdb/facctxtsrc.cc
     rdb/descriptor.cc
     rdb/storageacc.cc
-    rdb/payload.cc)
+    rdb/payload.cc
+    share/convertTypes.cpp)
 
 add_executable(xretractor ${SOURCES_RETRACTOR})
 add_executable(xdumper ${SOURCES_DUMPER})

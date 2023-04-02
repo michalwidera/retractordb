@@ -43,6 +43,7 @@ set(SOURCES_RDB_TEST
     ${CMAKE_SOURCE_DIR}/src/rdb/faccbindev.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/facctxtsrc.cc
     ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
+    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
     test_rdb.cpp
     main.cpp)
 

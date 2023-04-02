@@ -115,7 +115,7 @@ void Descriptor::append(std::initializer_list<rfield> l) { insert(end(), l.begin
 
 Descriptor &Descriptor::operator|(const Descriptor &rhs) {
   if (this != &rhs)
-    insert(end(), rhs.begin(), rhs.end());
+    insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
   else {
     // Descriptor b(*this);
     // insert(end(), b.begin(), b.end());

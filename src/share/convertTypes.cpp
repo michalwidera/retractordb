@@ -27,7 +27,13 @@ void visit_descFld(const K& inVar, K& retVal) {
                    [&retVal](double a) { retVal = static_cast<T>(a); },                         //
                    [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },      //
                    [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },       //
-                   [&retVal](std::string a) { retVal = static_cast<T>(std::stoi(a)); }          //
+                   [&retVal](std::string a) {
+                     try {
+                       retVal = static_cast<T>(std::stoi(a));
+                     } catch (std::exception& err) {
+                       SPDLOG_ERROR("Cant conv nonint string to integer.");
+                     };
+                   }  //
                },
                inVar);
   } else {
@@ -44,7 +50,11 @@ void visit_descFld(const K& inVar, K& retVal) {
     } else if (inVar.type() == typeid(double)) {
       retVal = static_cast<T>(std::any_cast<double>(inVar));
     } else if (inVar.type() == typeid(std::string)) {
-      retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
+      try {
+        retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
+      } catch (std::exception& err) {
+        SPDLOG_ERROR("Cant conv nonint string to integer.");
+      };
     } else {
       SPDLOG_ERROR("TODO - std::any->T");
     }
@@ -184,7 +194,8 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                               std::stringstream ss;
                               ss << a;
                               retVal = ss.str();
-                            }}, inVar);
+                            }},
+                   inVar);
       } else {
         if (inVar.type() == typeid(uint8_t)) {
           retVal = std::to_string(std::any_cast<uint8_t>(inVar));
@@ -201,7 +212,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(double)) {
           retVal = std::to_string(std::any_cast<double>(inVar));
         } else if (inVar.type() == typeid(std::string)) {
-          retVal = std::to_string(std::stoi(std::any_cast<std::string>(inVar)));
+          retVal = inVar;
         } else {
           SPDLOG_ERROR("TODO - std::any->T");
         }
