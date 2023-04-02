@@ -42,6 +42,20 @@ class xschema : public ::testing::Test {
 // ctest -R ut-dataModel
 
 TEST_F(xschema, check_test0) {
+  std::vector<std::string> cleanFilesSet = {
+      "file_A.dat",   //
+      "file_A.desc",  //
+      "file_B.dat",   //
+      "file_B.desc"   //
+  };
+
+  for (auto i : cleanFilesSet)
+    if (std::filesystem::exists(i)) {
+      std::filesystem::remove(i);
+      SPDLOG_INFO("Drop file {}", i);
+    } else
+      SPDLOG_WARN("Not found {}", i);
+
   auto dataInternalDesciptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
@@ -85,14 +99,6 @@ TEST_F(xschema, check_test0) {
 }
 
 TEST_F(xschema, check_test1) {
-  /*
-  query qry;
-  qry.id = "file_1";
-  std::list<token> lTempProgram;
-  lTempProgram.push_back(token(PUSH_TSCAN));
-  qry.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
-  coreInstance.push_back(qry);
-  */
   std::vector<std::string> cleanFilesSet = {"core0.desc",  //
                                             "core1.desc",  //
                                             "str1",        //

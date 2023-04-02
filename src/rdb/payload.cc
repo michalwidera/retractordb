@@ -94,16 +94,16 @@ void payload::setItem(int position, std::any valueParam) {
   auto requestedType = std::get<rtype>(descriptor[position]);
 
   std::any value = castAny(valueParam, requestedType);
-/*
-  if ( requestedType == rdb::STRING )
-    len = std::min(len, static_cast<int>(std::any_cast<std::string>(value).length()));
+  /*
+    if ( requestedType == rdb::STRING )
+      len = std::min(len, static_cast<int>(std::any_cast<std::string>(value).length()));
 
-  if ( requestedType == rdb::REF || requestedType == rdb::TYPE )
-    SPDLOG_INFO("Skip REF or TYPE");
-  else
-    std::memcpy(payloadData.get() + descriptor.offset(position), std::any_cast<void*>(&value), len);
-  return;
-*/
+    if ( requestedType == rdb::REF || requestedType == rdb::TYPE )
+      SPDLOG_INFO("Skip REF or TYPE");
+    else
+      std::memcpy(payloadData.get() + descriptor.offset(position), std::any_cast<void*>(&value), len);
+    return;
+  */
   try {
     switch (std::get<rtype>(descriptor[position])) {
       case rdb::STRING: {
