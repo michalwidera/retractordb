@@ -86,6 +86,12 @@ uint8_t *payload::get() const { return payloadData.get(); }
 
 cast<std::any> castAny;
 
+template <typename T>
+void payload::setItemBy(int position, std::any value) {
+  T data = std::any_cast<T>(value);
+  std::memcpy(payloadData.get() + descriptor.offset(position), &data, std::get<rlen>(descriptor[position]));
+}
+
 void payload::setItem(int position, std::any valueParam) {
   auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
@@ -101,39 +107,30 @@ void payload::setItem(int position, std::any valueParam) {
         std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(),
                     std::min(len, static_cast<int>(data.length())));
       } break;
-      case rdb::BYTE: {
-        uint8_t data = std::any_cast<uint8_t>(value);
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-      } break;
-      case rdb::BYTEARRAY: {
-        std::vector<uint8_t> data(std::any_cast<std::vector<uint8_t>>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
-      } break;
-      case rdb::INTEGER: {
-        int data = std::any_cast<int>(value);
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-      } break;
-      case rdb::INTARRAY: {
-        std::vector<int> data(std::any_cast<std::vector<int>>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);  //- check & todo
-      } break;
-      case rdb::UINT: {
-        uint data(std::any_cast<uint>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-        SPDLOG_INFO("setItem {} uint:{}", position, data);
-      } break;
-      case rdb::DOUBLE: {
-        double data(std::any_cast<double>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-      } break;
-      case rdb::FLOAT: {
-        float data(std::any_cast<float>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-      } break;
-      case rdb::RATIONAL: {
-        boost::rational<int> data(std::any_cast<boost::rational<int>>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), &data, len);
-      } break;
+      case rdb::BYTE:
+        setItemBy<uint8_t>(position, value);
+        break;
+      case rdb::BYTEARRAY:
+        setItemBy<std::vector<uint8_t>>(position, value);
+        break;
+      case rdb::INTEGER:
+        setItemBy<int>(position, value);
+        break;
+      case rdb::INTARRAY:
+        setItemBy<std::vector<int>>(position, value);
+        break;
+      case rdb::UINT:
+        setItemBy<unsigned>(position, value);
+        break;
+      case rdb::DOUBLE:
+        setItemBy<double>(position, value);
+        break;
+      case rdb::FLOAT:
+        setItemBy<float>(position, value);
+        break;
+      case rdb::RATIONAL:
+        setItemBy<boost::rational<int>>(position, value);
+        break;
       case rdb::REF: {
         SPDLOG_INFO("Skip REF");
       } break;

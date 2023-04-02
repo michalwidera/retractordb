@@ -54,6 +54,9 @@ class payload {
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
 
+  template <typename T>
+  void setItemBy(int position, std::any value);
+
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
 
