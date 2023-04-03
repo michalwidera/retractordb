@@ -161,7 +161,7 @@ TEST_F(xschema, check_construct_payload) {
   data.storage->setRemoveOnExit(false);
 
   std::unique_ptr<rdb::payload> payload;
-  payload = std::make_unique<rdb::payload>(data.constructPayload(3, 5));
+  payload = std::make_unique<rdb::payload>(data.constructAgsePayload(3, 5));
 
   std::string expectedOut = "{ BYTE str1_3 INTEGER str1_4 BYTE str1_5 INTEGER str1_6 BYTE str1_7 }";
   std::stringstream coutstring;

@@ -70,7 +70,7 @@ streamInstance::streamInstance(query& qry)
 // TODO: TEST THIS FREAKING CODE ... ASAP
 // ! Work in progress
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructPayload(int offset, int length) {
+rdb::payload streamInstance::constructAgsePayload(int offset, int length) {
   // First construct descriptor
   rdb::Descriptor descriptor;
   auto descriptorVecSize = storage->getDescriptor().size();
@@ -108,7 +108,6 @@ rdb::payload streamInstance::constructPayload(int offset, int length) {
     rdb::rfield dstFld{localPayload->getDescriptor()[locDst]};
 
     std::any value = storage->getPayload()->getItem(locSrc);
-    value = convertFldAsAny(value, std::get<rdb::rtype>(srcFld), std::get<rdb::rtype>(dstFld));
     localPayload->setItem(locDst, value);
 
     // TODO: fix bad any_cast - intro checkUniform function?
@@ -121,12 +120,6 @@ rdb::payload streamInstance::constructPayload(int offset, int length) {
 dataModel::dataModel(/* args */) {}
 
 dataModel::~dataModel() {}
-
-std::any streamInstance::convertFldAsAny(std::any inVal, rdb::descFld inType, rdb::descFld outType) {
-  // TODO
-  std::any retVal = inVal;
-  return retVal;
-}
 
 void dataModel::load(std::string compiledQueryFile) {
   std::ifstream ifs(compiledQueryFile.c_str(), std::ios::binary);
