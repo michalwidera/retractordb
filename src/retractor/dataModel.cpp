@@ -94,7 +94,6 @@ rdb::payload streamInstance::constructAgsePayload(int offset, int length) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
-      SPDLOG_INFO("ReadReverse: {}", dv.quot);
       storage->readReverse(dv.quot);
       // TODO: fix non existing data
     }
@@ -103,9 +102,6 @@ rdb::payload streamInstance::constructAgsePayload(int offset, int length) {
     auto locDst = i;
 
     assert(i < descriptor.size());
-
-    rdb::rfield srcFld{storage->getPayload()->getDescriptor()[locSrc]};
-    rdb::rfield dstFld{localPayload->getDescriptor()[locDst]};
 
     std::any value = storage->getPayload()->getItem(locSrc);
     localPayload->setItem(locDst, value);
