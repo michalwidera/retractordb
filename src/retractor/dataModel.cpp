@@ -117,7 +117,7 @@ dataModel::dataModel(/* args */) {}
 
 dataModel::~dataModel() {}
 
-void dataModel::load(std::string compiledQueryFile) {
+void dataModel::loadCoreInstance(std::string compiledQueryFile) {
   std::ifstream ifs(compiledQueryFile.c_str(), std::ios::binary);
   assert(ifs);
   //
@@ -127,7 +127,7 @@ void dataModel::load(std::string compiledQueryFile) {
   ia >> coreInstance;
 }
 
-void dataModel::prepare() {
+void dataModel::prepareQSet() {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
@@ -156,18 +156,20 @@ void dataModel::computeInstance(std::string instance) {
   int i = 0;
   for (auto tk : qry.lProgram) arg[i++] = tk;
 
-  const command_id cmd = qry.lProgram.end()->getCommandID();
+  auto operation = qry.lProgram.back();  // Operation is always last element on stack
+
+  const command_id cmd = operation.getCommandID();
   switch (cmd) {
     case PUSH_STREAM: {
       // store in internal payload data from argument payload
-      auto argumentQueryName = qry.lProgram.end()->getStr_();
+      auto argumentQueryName = operation.getStr_();
       *(qSet[instance]->fromPayload) = *getPayload(instance);
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
     case STREAM_TIMEMOVE: {
       // store in internal payload data from argument payload
-      auto argumentQueryName = qry.lProgram.end()->getStr_();
+      auto argumentQueryName = operation.getStr_();
       *(qSet[instance]->fromPayload) = *getPayload(instance, rational_cast<int>(arg[1].get()));
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
@@ -202,8 +204,15 @@ void dataModel::computeInstance(std::string instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge
       break;
-    case STREAM_AGSE:
-      assert(false && "TODO");
+    case STREAM_AGSE: {                                    // (program sequence)
+      bool mirror = operation.get() < 0;                   // PUSH_STREAM core -> delta_source (arg[0]) - operation
+      int length = abs(rational_cast<int>(arg[1].get()));  // PUSH_VAL 2 -> window_length (arg[1])
+      assert(length > 0);                                  //
+      int step = rational_cast<int>(arg[2].get());         // STREAM_AGSE 3 -> window_step (arg[2])
+      assert(step >= 0);                                   //
+
+      *(qSet[instance]->fromPayload) = qSet[instance]->constructAgsePayload(step, length);
+    } break;
     case STREAM_HASH:
       assert(false && "TODO");
     default:

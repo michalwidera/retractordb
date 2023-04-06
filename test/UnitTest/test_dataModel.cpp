@@ -120,7 +120,7 @@ TEST_F(xschema, check_test1) {
 
   dataModel dataArea;
 
-  dataArea.prepare();
+  dataArea.prepareQSet();
 
   // Todo
   dataArea.qSet["str1"]->storage->getPayload()->setItem(0, 2);

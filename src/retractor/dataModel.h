@@ -46,6 +46,6 @@ class dataModel {
   std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int revOffset = 0);
 
   void computeInstance(std::string instance);
-  void load(std::string compiledQueryFile);
-  void prepare();
+  void loadCoreInstance(std::string compiledQueryFile);
+  void prepareQSet();
 };
