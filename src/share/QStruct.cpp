@@ -226,10 +226,9 @@ template token::token(command_id id, const std::string &sValue, int);
 template token::token(command_id id, const std::string &sValue, double);
 template token::token(command_id id, const std::string &sValue, float);
 
-token::token(command_id id, rdb::descFldVT value, const std::string sValue)
+token::token(command_id id, rdb::descFldVT value)
     :  //
       command(id),
-      textValue(sValue),
       valueVT(value) {}
 /** Construktor set */
 

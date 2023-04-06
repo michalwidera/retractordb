@@ -98,7 +98,7 @@ class token {
   template <typename T>
   token(command_id id, const std::string &sValue, T value);
 
-  token(command_id id, rdb::descFldVT value, const std::string sValue = "");
+  token(command_id id, rdb::descFldVT value);
 
   std::string getStrCommandID();
   command_id getCommandID();
