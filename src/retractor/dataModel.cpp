@@ -152,6 +152,9 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instanc
 
 void dataModel::computeInstance(std::string instance) {
   auto qry = coreInstance[instance];
+
+  assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
+
   token arg[3];
   int i = 0;
   for (auto tk : qry.lProgram) arg[i++] = tk;
