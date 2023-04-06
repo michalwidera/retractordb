@@ -229,7 +229,24 @@ template token::token(command_id id, const std::string &sValue, float);
 token::token(command_id id, rdb::descFldVT value)
     :  //
       command(id),
-      valueVT(value) {}
+      valueVT(value) {
+  switch (value.index()) {
+    case rdb::FLOAT:
+      numericValue = Rationalize(std::get<float>(value));
+      break;
+    case rdb::DOUBLE:
+      numericValue = Rationalize(std::get<double>(value));
+      break;
+    case rdb::INTEGER:
+      numericValue = boost::rational<int>(std::get<int>(value), 1);
+      break;
+    case rdb::RATIONAL:
+      numericValue = std::get<number>(value);
+      break;
+    default:
+      numericValue = boost::rational<int>(-999, 1);  // Unidentified value
+  }
+}
 /** Construktor set */
 
 query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}
