@@ -13,8 +13,8 @@ TEST(xExpressionEval, add_int_int) {
   ADD
   */
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, "", 1));
-  program.push_back(token(PUSH_VAL, "", 2));
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(PUSH_VAL, 2));
   program.push_back(token(ADD));
 
   expressionEvaluator test;
