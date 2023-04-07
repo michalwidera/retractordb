@@ -181,7 +181,7 @@ std::string simplifyLProgram() {
       t1 = t2;
       t2 = (*it2);
       if (t2.getStrCommandID() == "STREAM_AGSE" && t1.getStrCommandID() == "PUSH_VAL" && t0.getStrCommandID() == "PUSH_VAL") {
-        token newVal(t2.getCommandID(), t1.getStr_(), t1.get());
+        token newVal(t2.getCommandID(), t1.get(), t1.getStr_());
         it2 = (*it).lProgram.erase(it2);
         --it2;
         it2 = (*it).lProgram.erase(it2);
@@ -288,14 +288,14 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
     for (auto f : getQuery(sName1).lSchema) {
       field intf;
       intf.fieldName = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-      intf.lProgram.push_front(token(PUSH_ID, sName1, boost::rational<int>(i++)));
+      intf.lProgram.push_front(token(PUSH_ID, boost::rational<int>(i++), sName1));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
       field intf;
       intf.fieldName = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
-      intf.lProgram.push_front(token(PUSH_ID, sName2, boost::rational<int>(i++)));
+      intf.lProgram.push_front(token(PUSH_ID, boost::rational<int>(i++), sName2));
       lRetVal.push_back(intf);
     }
     return lRetVal;
@@ -410,7 +410,7 @@ std::string prepareFields() {
             int filedPosition = 0;
             for (auto s : getQuery(t.getStr_()).lSchema) {
               std::list<token> lTempProgram;
-              lTempProgram.push_back(token(PUSH_ID, nameOfscanningTable, boost::rational<int>(filedPosition++)));
+              lTempProgram.push_back(token(PUSH_ID, boost::rational<int>(filedPosition++), nameOfscanningTable));
               std::string name = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
               q.lSchema.push_back(field(name, lTempProgram, rdb::INTEGER, ""));
             }
@@ -470,9 +470,9 @@ std::string replicateIDX() {
           std::list<token> lTempProgram;
           for (auto &t : oldField.lProgram) {
             if (t.getCommandID() == PUSH_IDX)
-              lTempProgram.push_back(token(PUSH_ID, t.getStr_(), boost::rational<int>(i)));
+              lTempProgram.push_back(token(PUSH_ID, boost::rational<int>(i), t.getStr_()));
             else
-              lTempProgram.push_back(token(t.getCommandID(), t.getStr_(), t.get()));
+              lTempProgram.push_back(token(t.getCommandID(), t.get(), t.getStr_()));
           }
           std::string toReplace = oldField.getFieldText();
           replaceAll(toReplace, "_", lexical_cast<std::string>(i));
@@ -522,7 +522,7 @@ std::string convertReferences() {
                   int offset1(0);
                   for (auto &f1 : q1.lSchema) {
                     if (f1.fieldName == field) {
-                      t = token(PUSH_ID, schema, boost::rational<int>(offset1));
+                      t = token(PUSH_ID, boost::rational<int>(offset1), schema);
                       break;
                     } else
                       ++offset1;
@@ -542,7 +542,7 @@ std::string convertReferences() {
             if (regex_search(text.c_str(), what, xprFieldIdX)) {
               assert(what.size() == 2);
               const std::string schema(what[1]);
-              t = token(PUSH_IDX, schema, boost::rational<int>(0));
+              t = token(PUSH_IDX, boost::rational<int>(0), schema);
             } else
               throw std::out_of_range("No mach on type conversion IDX");
             break;
@@ -552,7 +552,7 @@ std::string convertReferences() {
               const std::string schema(what[1]);
               const std::string sOffset1(what[2]);
               const int offset1(atoi(sOffset1.c_str()));
-              t = token(PUSH_ID, schema, boost::rational<int>(offset1));
+              t = token(PUSH_ID, boost::rational<int>(offset1), schema);
             } else {
               SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
               throw std::out_of_range("No mach on type conversion");
@@ -572,7 +572,7 @@ std::string convertReferences() {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
                   if (f1.fieldName == field) {
-                    t = token(PUSH_ID, schema1, boost::rational<int>(offset1));
+                    t = token(PUSH_ID, boost::rational<int>(offset1), schema1);
                     bFieldFound = true;
                   }
                   ++offset1;
@@ -582,7 +582,7 @@ std::string convertReferences() {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
                   if (f2.fieldName == field) {
-                    t = token(PUSH_ID, schema2, boost::rational<int>(offset1));
+                    t = token(PUSH_ID, boost::rational<int>(offset1), schema2);
                     bFieldFound = true;
                   }
                   ++offset1;
@@ -609,7 +609,7 @@ std::string convertReferences() {
                 }
               }
               if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
-              t = token(PUSH_ID, schema, boost::rational<int>(offset1 + offset2 * q.lSchema.size()));
+              t = token(PUSH_ID, boost::rational<int>(offset1 + offset2 * q.lSchema.size()), schema);
             } else
               throw std::out_of_range("No mach on type conversion ID4");
             break;

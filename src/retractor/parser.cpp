@@ -66,10 +66,8 @@ class ParserListener : public RQLBaseListener {
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
-  void recpToken(command_id id, std::string arg1) { program.push_back(token(id, arg1)); };
-
   template <typename T>
-  void recpToken(command_id id, std::string arg1, T arg2) {
+  void recpToken(command_id id, T arg1, std::string arg2 = "") {
     program.push_back(token(id, arg1, arg2));
   };
 
@@ -86,8 +84,8 @@ class ParserListener : public RQLBaseListener {
   void exitExpMult(RQLParser::ExpMultContext* ctx) { recpToken(MULTIPLY); }
   void exitExpDiv(RQLParser::ExpDivContext* ctx) { recpToken(DIVIDE); }
 
-  void exitExpFloat(RQLParser::ExpFloatContext* ctx) { recpToken(PUSH_VAL, "", std::stof(ctx->getText())); }
-  void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, "", std::stoi(ctx->getText())); }
+  void exitExpFloat(RQLParser::ExpFloatContext* ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
+  void exitExpDec(RQLParser::ExpDecContext* ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
   void exitExpString(RQLParser::ExpStringContext* ctx) { program.push_back(token(PUSH_VAL, rdb::descFldVT(ctx->getText()))); }
   void exitExpRational(RQLParser::ExpRationalContext* ctx) {
     const int nom = std::stoi(ctx->children[0]->getText());
@@ -98,12 +96,12 @@ class ParserListener : public RQLBaseListener {
   void exitSExpHash(RQLParser::SExpHashContext* ctx) { recpToken(STREAM_HASH); }
 
   void exitSExpAnd(RQLParser::SExpAndContext* ctx) {
-    recpToken(PUSH_VAL, "", rationalResult);
+    recpToken(PUSH_VAL, rationalResult);
     recpToken(STREAM_DEHASH_DIV);
   }
 
   void exitSExpMod(RQLParser::SExpModContext* ctx) {
-    recpToken(PUSH_VAL, "", rationalResult);
+    recpToken(PUSH_VAL, rationalResult);
     recpToken(STREAM_DEHASH_MOD);
   }
 
@@ -112,14 +110,14 @@ class ParserListener : public RQLBaseListener {
   void exitStreamAvg(RQLParser::StreamAvgContext* ctx) { recpToken(STREAM_AVG); }
   void exitStreamSum(RQLParser::StreamSumContext* ctx) { recpToken(STREAM_SUM); }
   void exitSExpPlus(RQLParser::SExpPlusContext* ctx) { recpToken(STREAM_ADD); }
-  void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, "", rationalResult); }
+  void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, rationalResult); }
 
   void exitSExpAgse(RQLParser::SExpAgseContext* ctx) {
     if (ctx->children[3]->getText() == "-")
-      program.push_back(token(PUSH_VAL, "", -std::stoi(ctx->window->getText())));
+      program.push_back(token(PUSH_VAL, -std::stoi(ctx->window->getText())));
     else
-      program.push_back(token(PUSH_VAL, "", std::stoi(ctx->window->getText())));
-    program.push_back(token(PUSH_VAL, "", std::stoi(ctx->step->getText())));
+      program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
+    program.push_back(token(PUSH_VAL, std::stoi(ctx->step->getText())));
     program.push_back(token(STREAM_AGSE));
   }
 
@@ -177,7 +175,7 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext* ctx) {
-    recpToken(STREAM_TIMEMOVE, "", std::stoi(ctx->DECIMAL()->getText()));
+    recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
   }
 
   void exitStream_factor(RQLParser::Stream_factorContext* ctx) {

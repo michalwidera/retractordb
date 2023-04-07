@@ -93,12 +93,7 @@ class token {
   rdb::descFldVT getVT();
 
   token(command_id id = VOID_COMMAND) : command(id){};
-  token(command_id id, const std::string &sValue) : command(id), textValue(sValue){};
-
-  template <typename T>
-  token(command_id id, const std::string &sValue, T value);
-
-  token(command_id id, rdb::descFldVT value);
+  token(command_id id, rdb::descFldVT value, std::string desc = "");
 
   std::string getStrCommandID();
   command_id getCommandID();

@@ -193,44 +193,16 @@ token field::getFirstFieldToken() {
 }
 
 /** Construktor set */
-template <typename T>
-token::token(command_id id, const std::string &sValue, T value) : command(id), textValue(sValue) {
-  if constexpr (std::is_same_v<T, number>) {
-    numericValue = value;
-    valueVT = value;
-  } else if constexpr (std::is_same_v<T, int>) {
-    numericValue = boost::rational<int>(value, 1);
-    valueVT = value;
-  } else if constexpr (std::is_same_v<T, double>) {
-    numericValue = Rationalize(value);
-    valueVT = value;
-  } else if constexpr (std::is_same_v<T, float>) {
-    numericValue = Rationalize(value);
-    valueVT = value;
-  } else {
-    numericValue = boost::rational<int>(-999, 1);  // Unidentified value
-  }
-  if (sValue == "") {
-    std::stringstream ss;
-    ss << numericValue.numerator();
-    if (numericValue.denominator() != 1) {
-      ss << "_";
-      ss << numericValue.denominator();
-    }
-    textValue = std::string(ss.str());
-  }
-}
 
-template token::token(command_id id, const std::string &sValue, number);
-template token::token(command_id id, const std::string &sValue, int);
-template token::token(command_id id, const std::string &sValue, double);
-template token::token(command_id id, const std::string &sValue, float);
-
-token::token(command_id id, rdb::descFldVT value)
+token::token(command_id id, rdb::descFldVT value, std::string desc)
     :  //
       command(id),
-      valueVT(value) {
+      valueVT(value),
+      textValue(desc) {
   switch (value.index()) {
+    case rdb::STRING:
+      if (desc == "") textValue = std::get<std::string>(value);
+      break;
     case rdb::FLOAT:
       numericValue = Rationalize(std::get<float>(value));
       break;
@@ -240,11 +212,26 @@ token::token(command_id id, rdb::descFldVT value)
     case rdb::INTEGER:
       numericValue = boost::rational<int>(std::get<int>(value), 1);
       break;
+    case rdb::UINT:
+      numericValue = boost::rational<int>(std::get<unsigned>(value), 1);
+      break;
+    case rdb::BYTE:
+      numericValue = boost::rational<int>(std::get<uint8_t>(value), 1);
+      break;
     case rdb::RATIONAL:
       numericValue = std::get<number>(value);
       break;
     default:
       numericValue = boost::rational<int>(-999, 1);  // Unidentified value
+  }
+  if (textValue == "") {
+    std::stringstream ss;
+    ss << numericValue.numerator();
+    if (numericValue.denominator() != 1) {
+      ss << "_";
+      ss << numericValue.denominator();
+    }
+    textValue = std::string(ss.str());
   }
 }
 /** Construktor set */
