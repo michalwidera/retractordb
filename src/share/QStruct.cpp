@@ -168,7 +168,7 @@ bool isExist(const std::string &query_name) {
   return false;
 }
 
-boost::rational<int> token::get() { return numericValue; }
+boost::rational<int> token::getRI() { return numericValue; }
 
 rdb::descFldVT token::getVT() { return valueVT; };
 
@@ -344,7 +344,7 @@ rdb::Descriptor query::descriptorFrom() {
       };
     } break;
     case STREAM_AGSE: {
-      int windowSize = abs(rational_cast<int>(cmd.get()));
+      int windowSize = abs(rational_cast<int>(cmd.getRI()));
       auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
       for (int i = 0; i < windowSize; i++) {
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);

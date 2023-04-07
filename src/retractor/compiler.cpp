@@ -59,7 +59,7 @@ std::string intervalCounter() {
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
-          boost::rational<int> delta2 = t2.get();  // There is no second stream
+          boost::rational<int> delta2 = t2.getRI();  // There is no second stream
           // - just fraction argument
           assert(delta2 != 0);
           if (delta1 == 0) {
@@ -78,7 +78,7 @@ std::string intervalCounter() {
         } break;
         case STREAM_DEHASH_MOD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
-          boost::rational<int> delta2 = t2.get();
+          boost::rational<int> delta2 = t2.getRI();
           assert(delta2 != 0);
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -132,11 +132,11 @@ std::string intervalCounter() {
           // stream agse 3 -> step_of_window
           boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> schemaSizeSrc = getQuery(t1.getStr_()).lSchema.size();
-          boost::rational<int> step = abs(t2.get());
-          boost::rational<int> windowSize = abs(op.get());
+          boost::rational<int> step = abs(t2.getRI());
+          boost::rational<int> windowSize = abs(op.getRI());
           assert(windowSize > 0);
           assert(step > 0);
-          if (t2.get() < 0) {  // windowSize < 0
+          if (t2.getRI() < 0) {  // windowSize < 0
             delta = deltaSrc;
             delta /= schemaSizeSrc;
             delta *= windowSize;
@@ -145,7 +145,7 @@ std::string intervalCounter() {
             delta = (deltaSrc / schemaSizeSrc) * step;
         } break;
         default:
-          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.get(), op.getStr_());
+          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.getRI(), op.getStr_());
           throw std::out_of_range("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
       assert(delta != -1);
@@ -181,7 +181,7 @@ std::string simplifyLProgram() {
       t1 = t2;
       t2 = (*it2);
       if (t2.getStrCommandID() == "STREAM_AGSE" && t1.getStrCommandID() == "PUSH_VAL" && t0.getStrCommandID() == "PUSH_VAL") {
-        token newVal(t2.getCommandID(), t1.get(), t1.getStr_());
+        token newVal(t2.getCommandID(), t1.getRI(), t1.getStr_());
         it2 = (*it).lProgram.erase(it2);
         --it2;
         it2 = (*it).lProgram.erase(it2);
@@ -334,9 +334,9 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
     std::list<field> schema;
-    int windowSize = abs(rational_cast<int>(cmd_token.get()));
+    int windowSize = abs(rational_cast<int>(cmd_token.getRI()));
     // If winows is negative - reverted schema
-    if (rational_cast<int>(cmd_token.get()) > 0) {
+    if (rational_cast<int>(cmd_token.getRI()) > 0) {
       for (int i = 0; i < windowSize; i++) {
         field intf;
         intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
@@ -472,7 +472,7 @@ std::string replicateIDX() {
             if (t.getCommandID() == PUSH_IDX)
               lTempProgram.push_back(token(PUSH_ID, boost::rational<int>(i), t.getStr_()));
             else
-              lTempProgram.push_back(token(t.getCommandID(), t.get(), t.getStr_()));
+              lTempProgram.push_back(token(t.getCommandID(), t.getRI(), t.getStr_()));
           }
           std::string toReplace = oldField.getFieldText();
           replaceAll(toReplace, "_", lexical_cast<std::string>(i));

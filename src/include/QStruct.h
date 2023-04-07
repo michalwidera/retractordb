@@ -89,7 +89,7 @@ class token {
 
  public:
   std::string getStr_();
-  boost::rational<int> get();
+  boost::rational<int> getRI();
   rdb::descFldVT getVT();
 
   token(command_id id = VOID_COMMAND) : command(id){};

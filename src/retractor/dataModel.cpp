@@ -173,7 +173,7 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_TIMEMOVE: {
       // store in internal payload data from argument payload
       auto argumentQueryName = operation.getStr_();
-      *(qSet[instance]->fromPayload) = *getPayload(instance, rational_cast<int>(arg[1].get()));
+      *(qSet[instance]->fromPayload) = *getPayload(instance, rational_cast<int>(arg[1].getRI()));
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
@@ -181,7 +181,7 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_DEHASH_DIV: {
       auto streamNameArg = arg[0].getStr_();
       assert(streamNameArg != "");
-      auto rationalArgument = arg[1].get();
+      auto rationalArgument = arg[1].getRI();
       assert(rationalArgument > 0);
       // q.id - name of output stream
       // size[q.id] - count of record in output stream
@@ -207,12 +207,12 @@ void dataModel::computeInstance(std::string instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge
       break;
-    case STREAM_AGSE: {                                    // (program sequence)
-      bool mirror = operation.get() < 0;                   // PUSH_STREAM core -> delta_source (arg[0]) - operation
-      int length = abs(rational_cast<int>(arg[1].get()));  // PUSH_VAL 2 -> window_length (arg[1])
-      assert(length > 0);                                  //
-      int step = rational_cast<int>(arg[2].get());         // STREAM_AGSE 3 -> window_step (arg[2])
-      assert(step >= 0);                                   //
+    case STREAM_AGSE: {                                      // (program sequence)
+      bool mirror = operation.getRI() < 0;                   // PUSH_STREAM core -> delta_source (arg[0]) - operation
+      int length = abs(rational_cast<int>(arg[1].getRI()));  // PUSH_VAL 2 -> window_length (arg[1])
+      assert(length > 0);                                    //
+      int step = rational_cast<int>(arg[2].getRI());         // STREAM_AGSE 3 -> window_step (arg[2])
+      assert(step >= 0);                                     //
 
       *(qSet[instance]->fromPayload) = qSet[instance]->constructAgsePayload(step, length);
     } break;

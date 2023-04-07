@@ -157,10 +157,10 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
               // schema & crvalue
               if (sTokenName == "PUSH_ID") {
                 xout << "[";
-                if (t.get().denominator() == 1)
-                  xout << t.get().numerator();
+                if (t.getRI().denominator() == 1)
+                  xout << t.getRI().numerator();
                 else
-                  xout << t.get();
+                  xout << t.getRI();
                 xout << "]";
               }
             }
@@ -204,7 +204,7 @@ void dumpQFieldsProgram() {
         std::cout << f.fieldName << "\t";
         std::cout << t.getStrCommandID() << "\t";
         std::cout << t.getStr_();
-        if (t.getStrCommandID() == "PUSH_ID") std::cout << "[" << t.get() << "]";
+        if (t.getStrCommandID() == "PUSH_ID") std::cout << "[" << t.getRI() << "]";
         std::cout << std::endl;
       }
     }
@@ -271,7 +271,7 @@ void dumpRawTextFile(bool bShowFieldTypes) {
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << "[" << tf.get() << "])" << std::endl;
+          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << "[" << tf.getRI() << "])" << std::endl;
         } else if ((tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL")) {
           std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << ")" << std::endl;
         } else
