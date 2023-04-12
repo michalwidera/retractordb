@@ -89,33 +89,28 @@ void query::reset() {
 
 bool isThere(std::vector<query> v, const std::string &query_name) {
   for (auto &q : v) {
+    if (q.id == "") continue;
     if (q.id == query_name) return true;
   }
   return false;
 }
 
+bool isEmpty(std::vector<query> &v) {
+  for (auto &qry : v)
+    if (qry.id != "") return false;
+  return true;
+}
+
 // https://en.wikipedia.org/wiki/Topological_sorting
 //
-// NOTE: Technical debt!! - if in compiled query set
-// there is missing declaration of one stream this tsort
-// function will go into infinite loop
-// This is bug that need to be resolved
 void qTree::tsort() {
   vector<query> v = *this;
   vector<query> des;
-  // this function is broken - this watchdog prevents hang
-  int watchdog = 100;
   while (!v.empty())
     for (auto it = v.begin(); it != v.end(); ++it) {
-      watchdog--;
-      if (watchdog == 0) {
-        std::cerr << "Tsort failure." << std::endl;
-        abort();
-      }
       if (v.empty()) break;
-      std::vector<std::string> ls = (*it).getDepStreamName();
       bool fullDependent(true);
-      for (auto s : ls) {
+      for (auto s : (*it).getDepStreamName()) {
         if (!isThere(des, s)) fullDependent = false;
       }
       if (fullDependent) {
@@ -124,7 +119,8 @@ void qTree::tsort() {
         it = v.begin();
       }
     }
-  erase(begin(), end());
+  assert(des.size() == coreInstance.size());
+  clear();
   for (auto &q : des) push_back(q);
 }
 
