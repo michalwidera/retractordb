@@ -55,3 +55,5 @@ TEST(xparser, check_compile_result) {
 TEST(xparser, check_parserString) {
   ASSERT_TRUE(parserString("DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK");
 }
+
+TEST(xparser, check_topological_sort) { qTree myInstance; }

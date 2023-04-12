@@ -119,7 +119,10 @@ class field {
   rdb::descFld fieldType;
 
   field();
-  field(std::string sFieldName, std::list<token> &lProgram, rdb::descFld fieldType, std::string sFieldText);
+  field(std::string sFieldName,     //
+        std::list<token> lProgram,  //
+        rdb::descFld fieldType,     //
+        std::string sFieldText);
 
   std::string getFieldText();
   token getFirstFieldToken();

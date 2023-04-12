@@ -95,12 +95,6 @@ bool isThere(std::vector<query> v, const std::string &query_name) {
   return false;
 }
 
-bool isEmpty(std::vector<query> &v) {
-  for (auto &qry : v)
-    if (qry.id != "") return false;
-  return true;
-}
-
 // https://en.wikipedia.org/wiki/Topological_sorting
 //
 void qTree::tsort() {
@@ -178,7 +172,10 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 field::field() {}
 
-field::field(std::string sFieldName, std::list<token> &lProgram, rdb::descFld dFieldType, std::string sFieldText)
+field::field(std::string sFieldName,     //
+             std::list<token> lProgram,  //
+             rdb::descFld dFieldType,    //
+             std::string sFieldText)
     : lProgram(lProgram), sFieldText(sFieldText), fieldType(dFieldType), fieldName(sFieldName) {}
 
 std::string field::getFieldText() { return sFieldText; }
