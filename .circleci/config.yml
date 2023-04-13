@@ -3,13 +3,13 @@ version: 2.1
 workflows:
   commit:
     jobs:
-      - build-2204-conan20-debug:
+      - build-2204-debug:
           filters:
             branches:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-conan20:
+      - build-2204-release:
           filters:
             branches:
               only:
