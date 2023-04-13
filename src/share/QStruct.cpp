@@ -28,6 +28,8 @@ extern "C" {
 qTree coreInstance;
 }
 
+static_assert(std::is_copy_constructible_v<rdb::descFldVT> == true);
+
 // int _floor( boost::rational<int> & value ) {
 //    return static_cast<int> (
 //            floor ( rational_cast<double>( value ) )
@@ -159,6 +161,14 @@ bool isExist(const std::string &query_name) {
 }
 
 boost::rational<int> token::getRI() { return numericValue; }
+/*
+cast<rdb::descFldVT> castRI;
+
+boost::rational<int> token::getRI() {
+  auto ret = castRI(valueVT, rdb::RATIONAL);
+  return std::get<boost::rational<int>>(ret);
+}
+*/
 
 rdb::descFldVT token::getVT() { return valueVT; };
 
@@ -175,10 +185,10 @@ field::field() {}
 field::field(std::string sFieldName,     //
              std::list<token> lProgram,  //
              rdb::descFld dFieldType,    //
-             std::string sFieldText)
-    : lProgram(lProgram), sFieldText(sFieldText), fieldType(dFieldType), fieldName(sFieldName) {}
+             std::string fieldText)
+    : lProgram(lProgram), fieldText(fieldText), fieldType(dFieldType), fieldName(sFieldName) {}
 
-std::string field::getFieldText() { return sFieldText; }
+std::string field::getFieldText() { return fieldText; }
 
 token field::getFirstFieldToken() {
   assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
@@ -227,6 +237,39 @@ token::token(command_id id, rdb::descFldVT value, std::string desc)
     textValue = std::string(ss.str());
   }
 }
+
+std::ostream &operator<<(std::ostream &os, const token &rhs) {
+  switch (rhs.valueVT.index()) {
+    case rdb::STRING:
+      os << std::get<std::string>(rhs.valueVT);
+      break;
+    case rdb::FLOAT:
+      os << std::get<float>(rhs.valueVT);
+      break;
+    case rdb::DOUBLE:
+      os << std::get<double>(rhs.valueVT);
+      break;
+    case rdb::INTEGER:
+      os << std::get<int>(rhs.valueVT);
+      break;
+    case rdb::UINT:
+      os << std::get<unsigned>(rhs.valueVT);
+      break;
+    case rdb::BYTE:
+      os << std::get<uint8_t>(rhs.valueVT);
+      break;
+    case rdb::RATIONAL:
+      os << std::get<number>(rhs.valueVT);
+      break;
+    case rdb::BAD:
+      os << "not initialized";
+      break;
+    default:
+      os << "not supported";
+  }
+  return os;
+}
+
 /** Construktor set */
 
 query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}
@@ -362,4 +405,26 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   return std::make_tuple(sArg1, sArg2, cmd);
 }
 
-std::ostream &operator<<(std::ostream &os, rdb::descFld s) { return os << rdb::GetStringdescFld(s); }
+std::ostream &operator<<(std::ostream &os, rdb::descFld &s) { return os << rdb::GetStringdescFld(s); }
+
+std::ostream &operator<<(std::ostream &os, const field &s) {
+  os << "FLD/";
+  os << "name:" << s.fieldName << ",";
+  os << "type:" << s.fieldType << ",";
+  os << "text:" << s.fieldText << ",";
+  os << "prog:";
+  for (auto &i : s.lProgram) os << i << ",";
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const query &s) {
+  os << "QRY/";
+  os << "id:" << s.id << ",";
+  os << "filename:" << s.filename << ",";
+  os << "rInterval:" << s.rInterval << ",";
+  os << "lSchema:";
+  for (auto &i : s.lSchema) os << i << ",";
+  os << "lProgram:";
+  for (auto &i : s.lProgram) os << i << ",";
+  return os;
+}

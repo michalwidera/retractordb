@@ -2,6 +2,7 @@
 
 // Standard template library
 #include <algorithm>
+#include <iostream>
 #include <list>
 #include <set>
 #include <sstream>
@@ -96,6 +97,8 @@ class token {
 
   std::string getStrCommandID();
   command_id getCommandID();
+
+  friend std::ostream &operator<<(std::ostream &os, const token &rhs);
 };
 
 class field {
@@ -105,12 +108,12 @@ class field {
   template <class Archive>
   void serialize(Archive &ar, unsigned int version) {
     ar &lProgram;
-    ar &sFieldText;
+    ar &fieldText;
     ar &fieldName;
     ar &fieldType;
   }
 
-  std::string sFieldText;
+  std::string fieldText;
 
  public:
   std::list<token> lProgram;
@@ -122,12 +125,13 @@ class field {
   field(std::string sFieldName,     //
         std::list<token> lProgram,  //
         rdb::descFld fieldType,     //
-        std::string sFieldText);
+        std::string fieldText);
 
   std::string getFieldText();
   token getFirstFieldToken();
 
-  friend std::ostream &operator<<(std::ostream &os, const rdb::descFld s);
+  friend std::ostream &operator<<(std::ostream &os, const rdb::descFld &s);
+  friend std::ostream &operator<<(std::ostream &os, const field &s);
 };
 
 class query {
@@ -170,6 +174,8 @@ class query {
 
   rdb::Descriptor descriptorExpression();
   rdb::Descriptor descriptorFrom();
+
+  friend std::ostream &operator<<(std::ostream &os, const query &s);
 };
 
 bool operator<(const query &lhs, const query &rhs);
