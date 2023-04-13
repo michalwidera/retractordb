@@ -6,6 +6,7 @@ enable_testing()
 
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 find_package(GTest REQUIRED)
 
