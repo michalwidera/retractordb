@@ -2,14 +2,6 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 project(retractordb-src)
 
-find_package(Boost REQUIRED)
-find_package(spdlog REQUIRED)
-find_package(fmt REQUIRED)
-find_package(antlr4-runtime REQUIRED)
-
-include_directories(${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR}
-                    ${antlr4-runtime_INCLUDE_DIR} include)
-
 set(SOURCES_RETRACTOR
     retractor/Processor.cpp
     retractor/executorsm.cpp

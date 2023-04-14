@@ -11,14 +11,8 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data
      DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 
-include_directories(
-  ${Boost_INCLUDE_DIR}
-  ${spdlog_INCLUDE_DIR}
-  ${antlr4-runtime_INCLUDE_DIR}
-  ${GTest_INCLUDE_DIR}
-  ${CMAKE_SOURCE_DIR}/src/include
-  ${CMAKE_SOURCE_DIR}/src
-  ${CMAKE_SOURCE_DIR}/src/share)
+include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
+                    ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/share)
 
 set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
 
