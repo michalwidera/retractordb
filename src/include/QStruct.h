@@ -60,9 +60,6 @@ void serialize(Archive &ar, std::variant<Ts...> &t, const unsigned int file_vers
   split_free(ar, t, file_version);
 }
 
-template <class Archive>
-void serialize(Archive &ar, std::monostate &, const unsigned int /*version*/) {}
-
 // https://stackoverflow.com/questions/14744303/does-boost-support-serialization-of-c11s-stdtuple/14928368#14928368
 template <typename Archive, typename... Types>
 inline void serialize(Archive &ar, std::tuple<Types...> &t, const unsigned int) {

@@ -4,7 +4,7 @@
 
 #include "retractor/expressionEvaluator.h"
 
-// ctest -R '^ut-expeval'
+// ctest -R '^ut-expeval' -V
 
 TEST(xExpressionEval, add_int_int) {
   /*
@@ -20,7 +20,7 @@ TEST(xExpressionEval, add_int_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == 2);  // int in Token
+  ASSERT_TRUE(result.index() == rdb::INTEGER);  // int in Token
 
   ASSERT_TRUE(std::get<int>(result) == 3);  // (int)3 in Token
 }
@@ -39,7 +39,7 @@ TEST(xExpressionEval, add_int_int_new_token) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == 2);  // int in Token
+  ASSERT_TRUE(result.index() == rdb::INTEGER);  // int in Token
 
   ASSERT_TRUE(std::get<int>(result) == 3);
 }

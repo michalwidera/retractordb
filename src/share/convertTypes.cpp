@@ -18,7 +18,6 @@ void visit_descFld(const K& inVar, K& retVal) {
 
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
-                   [&retVal](std::monostate a) { retVal = 0; },                                 //
                    [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                        //
                    [&retVal](int a) { retVal = static_cast<T>(a); },                            //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                       //
@@ -77,9 +76,6 @@ template <typename T>
 T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
   T retVal;
   switch (reqType) {
-    case rdb::BAD:
-      SPDLOG_ERROR("Unsupported bad cast");
-      break;
     case rdb::BYTE:
       visit_descFld<uint8_t>(inVar, retVal);
       break;
@@ -98,7 +94,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
     case rdb::RATIONAL:
       // Requested type is RATIONAL
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{[&retVal](std::monostate a) { retVal = "NaN"; },                                //
+        std::visit(Overload{                                                                                //
                             [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
                             [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
                             [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
@@ -140,7 +136,6 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
       // Requested type is std::vector<int>
       SPDLOG_ERROR("TODO - INTARRAY cast");
       std::visit(Overload{
-                     [&retVal](std::monostate a) { retVal = "NaN"; },
                      [&retVal](uint8_t a) {
                        std::vector<int> r{static_cast<int>(a)};
                        retVal = r;
@@ -181,7 +176,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
     case rdb::STRING:
       // Requested type is STRING
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{[&retVal](std::monostate a) { retVal = "NaN"; },                         //
+        std::visit(Overload{                                                                         //
                             [&retVal](uint8_t a) { retVal = std::to_string(a); },                    //
                             [&retVal](int a) { retVal = std::to_string(a); },                        //
                             [&retVal](unsigned a) { retVal = std::to_string(a); },                   //

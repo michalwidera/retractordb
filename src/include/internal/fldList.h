@@ -7,7 +7,6 @@
 // This declaration goes into ::rdb namespace
 namespace rdb {
 BEGIN_E_GEN_T(descFld)
-DECL_T(BAD, std::monostate)
 DECL_T(BYTE, uint8_t)
 DECL_T(INTEGER, int)
 DECL_T(UINT, unsigned)

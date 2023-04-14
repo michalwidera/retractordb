@@ -157,7 +157,6 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
   rdb::descFldVT retVal;
 
   std::visit(Overload{
-                 [&retVal](std::monostate a) {},                                                 //
                  [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                    // xor ?
                  [&retVal](int a) { retVal = -a; },                                              //
                  [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                  // xor ?
@@ -175,7 +174,7 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
 
 rdb::descFldVT callFun(rdb::descFldVT& inVar, std::function<double(double)> fnName) {
   auto backResultType = inVar.index();
-  if (backResultType > rdb::BAD && backResultType <= rdb::DOUBLE) {
+  if (backResultType >= rdb::BYTE && backResultType <= rdb::DOUBLE) {
     rdb::descFldVT floValue{fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)))};
     return castFldVT(floValue, (rdb::descFld)backResultType);
   } else {

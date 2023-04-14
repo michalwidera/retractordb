@@ -89,7 +89,6 @@ std::vector<number> inputDF::getFileRow() {
       case rdb::RATIONAL:
         val = readFromFile<boost::rational<int>>();
         break;
-      case rdb::BAD:
       default:
         std::cerr << "field:" << f.fieldType << std::endl;
         throw std::out_of_range("processRow/undefined type");

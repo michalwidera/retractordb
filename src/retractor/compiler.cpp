@@ -218,7 +218,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
+          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE, "*"));
           newQuery.id = generateStreamName(arg1, "", cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);  // After this instruction it loses context
@@ -257,7 +257,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BAD, "*"));
+          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE, "*"));
           newQuery.id = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);

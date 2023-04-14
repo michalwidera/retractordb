@@ -59,7 +59,7 @@ class ParserListener : public RQLBaseListener {
   std::list<token> program;
 
   /* Type of field */
-  rdb::descFld fType = rdb::BAD;
+  rdb::descFld fType = rdb::BYTE;
 
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSize = 1;
@@ -222,7 +222,7 @@ class ParserListener : public RQLBaseListener {
         qry.lSchema.push_back(field(fieldName, emptyProgram, fType, ""));
       }
     }
-    fType = rdb::BAD;
+    fType = rdb::BYTE;
     fTypeSize = 1;
   }
 };

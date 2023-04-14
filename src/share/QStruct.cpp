@@ -261,9 +261,6 @@ std::ostream &operator<<(std::ostream &os, const token &rhs) {
     case rdb::RATIONAL:
       os << std::get<number>(rhs.valueVT);
       break;
-    case rdb::BAD:
-      os << "not initialized";
-      break;
     default:
       os << "not supported";
   }
