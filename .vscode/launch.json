@@ -5,13 +5,13 @@
   "version": "0.2.0",
   "configurations": [
   {
-    "name": "(gdb) Launch - rg-compiler-test-on-query",
+    "name": "(gdb) Launch",
     "type": "cppdbg",
     "request": "launch",
     "program": "/home/michal/GitHub/retractordb/build/Debug/src/xretractor",
-    "args": ["query-lnx.rql","-c"],
+    "args": ["query.rql","-c"],
     "stopAtEntry": false,
-    "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data",
+    "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/Pattern6",
     "environment": [],
     "externalConsole": false,
     "MIMode": "gdb",

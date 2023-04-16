@@ -81,11 +81,13 @@ int main(int argc, char* argv[]) {
     //
     // Compile part
     //
-    std::istringstream iss(dumpInstance(""), std::ios::binary);
-    boost::archive::text_iarchive ia(iss);
-    ia >> coreInstance;
+    //if (vm.count("dumpcross")) {
+    //  std::istringstream iss(dumpInstance(""), std::ios::binary);
+    //  boost::archive::text_iarchive ia(iss);
+    //  ia >> coreInstance;
     if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
-
+    //}
+  
     if (vm.count("dumpcross")) dumpInstance(sOutputFile + ".lg1");
 
     std::string response;

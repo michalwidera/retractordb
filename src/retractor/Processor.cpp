@@ -156,23 +156,26 @@ number getValueOfRollup(const query &q, int offset) {
       }
     case STREAM_AGSE:
       // PUSH_STREAM core -> delta_source (argument1) arg[0]
-      // PUSH_VAL 2 -> window_length (argument2) arg[1]
-      // STREAM_AGSE 3 -> window_step (operation) arg[2]
+      // STREAM_AGSE 2,3 -> window_length, window_step (operation) arg[1]
       // TODO: This is copy&paste&fix - need to refactor
       // This code I've wrote when when was late - 1.00 AM
       // need to put more effort to analysis expecially for
       // if (mirror) - two conditions
       {
-        assert(q.lProgram.size() == 3);
+        assert(q.lProgram.size() == 2);
+        assert(arg[progSize - 1].getCommandID() == STREAM_AGSE);
+        assert(arg[progSize - 1].getVT().index() == rdb::INTPAIR);
+
+        auto r = std::get<std::pair<int, int>>(arg[progSize - 1].getVT());
         std::string nameSrc = arg[0].getStr_();
         std::string nameOut = q.id;
-        bool mirror = arg[2].getRI() < 0;
+        bool mirror = r.first < 0;
         // step - means step of how long moving window will over data stream
-        // step is counted in tuples/atribute
+        // step is counted in tuples/attribute
         // windowsSize - is length of moving data window
-        int step = rational_cast<int>(arg[1].getRI());
+        int step = r.second;
         assert(step >= 0);
-        int windowSize = abs(rational_cast<int>(arg[2].getRI()));
+        int windowSize = abs(r.first);
         assert(windowSize > 0);
         int schemaSizeSrc = gDataMap[nameSrc].row.size();
         int schemaSizeOut = gDataMap[nameOut].row.size();
@@ -417,20 +420,20 @@ void Processor::processRows(std::set<std::string> inSet) {
           break;
         case STREAM_AGSE:
           // PUSH_STREAM core -> delta_source (argument1)
-          // PUSH_VAL 2 -> window_length (argument2)
-          // STREAM_AGSE 3 -> window_step (operation)
+          // STREAM_AGSE 2,3 -> window_length.window_step (operation)
           {
             argument1 = *(it++);
-            argument2 = *(it++);
             std::string nameSrc = argument1.getStr_();
             std::string nameOut = q.id;
-            bool mirror = operation.getRI() < 0;
+
+            auto r = std::get<std::pair<int, int>>(operation.getVT());
+            bool mirror = r.first < 0;
             // step - means step of how long moving window will over data stream
             // step is counted in tuples/attribute
             // windowsSize - is length of moving data window
-            int step = rational_cast<int>(argument2.getRI());
+            int step = r.second;
             assert(step >= 0);
-            int windowSize = abs(rational_cast<int>(operation.getRI()));
+            int windowSize = abs(r.first);
             assert(windowSize > 0);
             int schemaSizeSrc = gDataMap[nameSrc].row.size();
             int schemaSizeOut = gDataMap[nameOut].row.size();

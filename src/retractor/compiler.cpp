@@ -128,15 +128,16 @@ std::string intervalCounter() {
           // ->>> check need
           // core1@(5,3) ->
           // push_stream core0 -> deltaSrc
-          // push_val 5 -> size_of_window
-          // stream agse 3 -> step_of_window
+          // stream agse <5,3> -> size_of_window,step_of_window
           boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> schemaSizeSrc = getQuery(t1.getStr_()).lSchema.size();
-          boost::rational<int> step = abs(t2.getRI());
-          boost::rational<int> windowSize = abs(op.getRI());
+          assert(op.getCommandID() == STREAM_AGSE);
+          auto arg = std::get<std::pair<int, int>>(op.getVT());
+          int step = abs(arg.first);
+          int windowSize = abs(arg.second);
           assert(windowSize > 0);
           assert(step > 0);
-          if (t2.getRI() < 0) {  // windowSize < 0
+          if (arg.second < 0) {  // windowSize < 0
             delta = deltaSrc;
             delta /= schemaSizeSrc;
             delta *= windowSize;
@@ -181,7 +182,7 @@ std::string simplifyLProgram() {
       t1 = t2;
       t2 = (*it2);
       if (t2.getStrCommandID() == "STREAM_AGSE" && t1.getStrCommandID() == "PUSH_VAL" && t0.getStrCommandID() == "PUSH_VAL") {
-        token newVal(t2.getCommandID(), t1.getRI(), t1.getStr_());
+        token newVal(t2.getCommandID(), t2.getVT(), t1.getStr_());
         it2 = (*it).lProgram.erase(it2);
         --it2;
         it2 = (*it).lProgram.erase(it2);
@@ -271,7 +272,7 @@ std::string simplifyLProgram() {
 }
 
 // Goal of this procedure is to unroll schema based of given command
-std::list<field> combine(std::string sName1, std::string sName2, token cmd_token) {
+std::list<field> combine(std::string sName1, std::string sName2, token &cmd_token) {
   std::list<field> lRetVal;
   command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
@@ -334,9 +335,12 @@ std::list<field> combine(std::string sName1, std::string sName2, token cmd_token
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
     std::list<field> schema;
-    int windowSize = abs(rational_cast<int>(cmd_token.getRI()));
+    assert(cmd_token.getCommandID() == STREAM_AGSE);
+    assert(cmd_token.getVT().index() == rdb::INTPAIR);
+    auto r = std::get<std::pair<int, int>>(cmd_token.getVT());
+    int windowSize = abs(r.second);
     // If winows is negative - reverted schema
-    if (rational_cast<int>(cmd_token.getRI()) > 0) {
+    if (r.second > 0) {
       for (int i = 0; i < windowSize; i++) {
         field intf;
         intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
