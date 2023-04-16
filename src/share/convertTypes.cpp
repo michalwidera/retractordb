@@ -15,6 +15,7 @@ void visit_descFld(const K& inVar, K& retVal) {
   static_assert(!std::is_same_v<T, boost::rational<int>>);
   static_assert(!std::is_same_v<T, std::vector<uint8_t>>);
   static_assert(!std::is_same_v<T, std::vector<int>>);
+  static_assert(!std::is_same_v<T, std::pair<int,int>>);
 
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
@@ -50,13 +51,13 @@ void visit_descFld(const K& inVar, K& retVal) {
     } else if (inVar.type() == typeid(double)) {
       retVal = static_cast<T>(std::any_cast<double>(inVar));
     } else if (inVar.type() == typeid(std::pair<int, int>)) {
-      SPDLOG_ERROR("No cast INTPAIR to any type");
+      SPDLOG_ERROR("No cast INTPAIR to any type here");
       retVal = static_cast<T>(0);
     } else if (inVar.type() == typeid(std::string)) {
       try {
         retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
       } catch (std::exception& err) {
-        SPDLOG_ERROR("Cant conv nonint string to integer.");
+        SPDLOG_ERROR("Cant conv nonint string to integer here.");
       };
     } else {
       SPDLOG_ERROR("TODO - std::any->T");
@@ -127,7 +128,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(int)) {
           retVal = std::make_pair(0, std::any_cast<int>(inVar));
         } else if (inVar.type() == typeid(unsigned)) {
-          retVal =  std::make_pair(0, std::any_cast<unsigned>(inVar));
+          retVal = std::make_pair(0, std::any_cast<unsigned>(inVar));
         } else if (inVar.type() == typeid(boost::rational<int>)) {
           auto r = std::any_cast<boost::rational<int>>(inVar);
           retVal = std::make_pair(r.numerator(), r.denominator());
@@ -150,15 +151,17 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
     case rdb::RATIONAL:
       // Requested type is RATIONAL
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{                                                                                         //
-                            [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                              //
-                            [&retVal](int a) { retVal = boost::rational<int>(a); },                                  //
-                            [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },           //
-                            [&retVal](boost::rational<int> a) { retVal = a; },                                       //
-                            [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },                    //
-                            [&retVal](double a) { retVal = Rationalize(a); },                                        //
-                            [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                  //
-                            [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                   //
+        std::visit(Overload{                                                                                //
+                            [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
+                            [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
+                            [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
+                            [&retVal](boost::rational<int> a) { retVal = a; },                              //
+                            [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
+                            [&retVal](double a) { retVal = Rationalize(a); },                               //
+                            [&retVal](std::vector<uint8_t> a) {
+                              retVal = boost::rational<int>(static_cast<int>(a[0]), static_cast<int>(a[1]));
+                            },                                                                                       //
+                            [&retVal](std::vector<int> a) { retVal = boost::rational<int>(a[0], a[1]); },            //
                             [&retVal](std::pair<int, int> a) { retVal = boost::rational<int>(a.first, a.second); },  //
                             [&retVal](std::string a) {
                               std::istringstream in(a);
