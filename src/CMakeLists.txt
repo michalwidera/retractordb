@@ -58,10 +58,10 @@ add_executable(xdumper ${SOURCES_DUMPER})
 add_executable(xqry ${SOURCES_QRY})
 add_executable(xtrdb ${SOURCES_RDB})
 
-target_link_libraries(xretractor ${Boost_LIBRARIES} ${antlr4-runtime_LIBRARIES})
-target_link_libraries(xdumper ${Boost_LIBRARIES})
-target_link_libraries(xqry ${Boost_LIBRARIES})
-target_link_libraries(xtrdb ${Boost_LIBRARIES})
+target_link_libraries(xretractor boost::boost antlr4_static)
+target_link_libraries(xdumper boost::boost)
+target_link_libraries(xqry boost::boost)
+target_link_libraries(xtrdb boost::boost)
 
 install(TARGETS xretractor xdumper xqry xtrdb DESTINATION ~/.local/bin)
 

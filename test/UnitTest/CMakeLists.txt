@@ -86,15 +86,11 @@ add_executable(test_dataModel ${SOURCES_DATAMODEL_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 add_executable(test_compiler ${SOURCES_COMPILER_TEST})
 
-target_link_libraries(test_xqry ${Boost_LIBRARIES} ${GTest_LIBRARIES}
-                      ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_xtrdb ${Boost_LIBRARIES} ${GTest_LIBRARIES})
-target_link_libraries(test_dataModel ${Boost_LIBRARIES} ${GTest_LIBRARIES}
-                      ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_expeval ${Boost_LIBRARIES} ${GTest_LIBRARIES}
-                      ${antlr4-runtime_LIBRARIES})
-target_link_libraries(test_compiler ${Boost_LIBRARIES} ${GTest_LIBRARIES}
-                      ${antlr4-runtime_LIBRARIES})
+target_link_libraries(test_xqry boost::boost gtest::gtest antlr4_static)
+target_link_libraries(test_xtrdb boost::boost gtest::gtest)
+target_link_libraries(test_dataModel boost::boost gtest::gtest antlr4_static)
+target_link_libraries(test_expeval boost::boost gtest::gtest antlr4_static)
+target_link_libraries(test_compiler boost::boost gtest::gtest antlr4_static)
 
 add_test(
   NAME ut-xqry

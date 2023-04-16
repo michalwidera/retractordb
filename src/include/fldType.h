@@ -6,9 +6,10 @@
 #error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conflicts with inner fldType.h declaration.
 #endif
 
-#include <boost/rational.hpp>
-#include <string>
-#include <vector>
+#include <boost/rational.hpp>  // boost::rational
+#include <string>              // std::string
+#include <utility>             // std::pair
+#include <vector>              // std::vector
 
 #ifndef FLDTYPE_H_CREATE_VARIANT_T
 #define FLDTYPE_H_CREATE_VARIANT_T

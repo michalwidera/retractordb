@@ -39,6 +39,12 @@ inline void serialize(Archive &ar, boost::rational<T> &p, unsigned int /* file_v
   p.assign(_num, _den);
 }
 
+template <class Archive, typename T1, typename T2>
+void serialize(Archive &ar, std::pair<T1, T2> &pr, const unsigned int version) {
+  ar &pr.first;
+  ar &pr.second;
+}
+
 template <class Archive, typename... Ts>
 void save(Archive &ar, const std::variant<Ts...> &obj, const unsigned int version) {
   boost::variant<Ts...> v;
