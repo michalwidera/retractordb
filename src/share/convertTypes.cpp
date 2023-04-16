@@ -96,7 +96,56 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
       visit_descFld<float>(inVar, retVal);
       break;
     case rdb::INTPAIR:
-      SPDLOG_ERROR("No cast INTPAIR to any type");
+      // Requested type is INT PAIR
+      if constexpr (std::is_same_v<T, rdb::descFldVT>) {
+        std::visit(Overload{                                                                                                 //
+                            [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
+                            [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
+                            [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
+                            [&retVal](boost::rational<int> a) { retVal = std::make_pair(a.numerator(), a.denominator()); },  //
+                            [&retVal](float a) {
+                              auto r = Rationalize(static_cast<double>(a));
+                              retVal = std::make_pair(r.numerator(), r.denominator());
+                            },
+                            [&retVal](double a) {
+                              auto r = Rationalize(a);
+                              retVal = std::make_pair(r.numerator(), r.denominator());
+                            },                                                                           //
+                            [&retVal](std::vector<uint8_t> a) { retVal = std::make_pair(a[0], a[1]); },  //
+                            [&retVal](std::vector<int> a) { retVal = std::make_pair(a[0], a[1]); },      //
+                            [&retVal](std::pair<int, int> a) { retVal = a; },                            //
+                            [&retVal](std::string a) {
+                              std::istringstream in(a);
+                              int first{0}, second{1};
+                              in >> first >> expect<','> >> second;
+                              retVal = std::make_pair(first, second);
+                            }},
+                   inVar);
+      } else {
+        if (inVar.type() == typeid(uint8_t)) {
+          retVal = std::make_pair(0, std::any_cast<uint8_t>(inVar));
+        } else if (inVar.type() == typeid(int)) {
+          retVal = std::make_pair(0, std::any_cast<int>(inVar));
+        } else if (inVar.type() == typeid(unsigned)) {
+          retVal =  std::make_pair(0, std::any_cast<unsigned>(inVar));
+        } else if (inVar.type() == typeid(boost::rational<int>)) {
+          auto r = std::any_cast<boost::rational<int>>(inVar);
+          retVal = std::make_pair(r.numerator(), r.denominator());
+        } else if (inVar.type() == typeid(float)) {
+          auto r = Rationalize(std::any_cast<float>(inVar));
+          retVal = std::make_pair(r.numerator(), r.denominator());
+        } else if (inVar.type() == typeid(double)) {
+          auto r = Rationalize(std::any_cast<double>(inVar));
+          retVal = std::make_pair(r.numerator(), r.denominator());
+        } else if (inVar.type() == typeid(std::pair<int, int>)) {
+          retVal = std::any_cast<std::pair<int, int>>(inVar);
+        } else if (inVar.type() == typeid(std::string)) {
+          std::istringstream in(std::any_cast<std::string>(inVar));
+          int first{0}, second{1};
+          in >> first >> expect<','> >> second;
+          retVal = std::make_pair(first, second);
+        }
+      }
       break;
     case rdb::RATIONAL:
       // Requested type is RATIONAL
