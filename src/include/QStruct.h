@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <list>
+#include <map>
 #include <set>
 #include <sstream>
 #include <stack>
@@ -21,9 +22,7 @@ typedef boost::rational<int> number;
 #include "fldType.h"
 
 class token {
-
   command_id command;
-  boost::rational<int> numericValue;
   std::string textValue;
   rdb::descFldVT valueVT;
 
@@ -32,7 +31,7 @@ class token {
   boost::rational<int> getRI();
   rdb::descFldVT getVT();
 
-  token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0, std::string desc = "");
+  token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0);
 
   std::string getStrCommandID();
   command_id getCommandID();
@@ -42,7 +41,6 @@ class token {
 
 class field {
  private:
-
   std::string fieldText;
 
  public:
@@ -65,7 +63,6 @@ class field {
 };
 
 class query {
-
  public:
   query(boost::rational<int> rInterval, const std::string &id);
   query();
@@ -85,7 +82,7 @@ class query {
 
   field &getField(const std::string &sField);
 
-  std::vector<std::string> getDepStreamName(int reqDep = 0);
+  std::vector<std::string> getDepStream();
 
   int getFieldIndex(field f);
 
@@ -107,14 +104,18 @@ bool isExist(const std::string &query_name);
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
 class qTree : public std::vector<query> {
-
  public:
   query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   void sort() { std::sort(begin(), end()); };
 
   /** Topological sort*/
+  std::map<std::string, bool> visited;
+  std::map<std::string, vector<std::string>> adj;  // adjacency list of graph
+  vector<std::string> ans;
+
   void tsort();
+  void dfs(std::string v);
 
   boost::rational<int> getDelta(const std::string &query_name);
 };

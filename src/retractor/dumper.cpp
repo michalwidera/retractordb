@@ -151,18 +151,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
             // Token PUSH_ something has always some value on somethin
             std::basic_string<char>::size_type idx = sTokenName.find("PUSH_");
             if (idx != std::string::npos) {
-              xout << " ";
-              xout << t.getStr_();
-              // becasue after compilation disapear schema[1,2] and translate to
-              // schema & crvalue
-              if (sTokenName == "PUSH_ID") {
-                xout << "[";
-                if (t.getRI().denominator() == 1)
-                  xout << t.getRI().numerator();
-                else
-                  xout << t.getRI();
-                xout << "]";
-              }
+              xout << t;
             }
           }
         xout << "}";
@@ -259,15 +248,14 @@ void dumpRawTextFile(bool bShowFieldTypes) {
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
-      if (t.getStrCommandID() == "PUSH_ID" || //
-          t.getStrCommandID() == "PUSH_STREAM" || //
-          t.getStrCommandID() == "PUSH_VAL" || //
-          t.getStrCommandID() == "STREAM_SUBSTRACT")
-        std::cout << "\t:- " << t.getStrCommandID() << "(" << t.getStr_() << ")" << std::endl;
-      else if (t.getStrCommandID() == "STREAM_AGSE") {
+      if (t.getStrCommandID() == "PUSH_ID" ||      //
+          t.getStrCommandID() == "PUSH_STREAM" ||  //
+          t.getStrCommandID() == "PUSH_VAL" ||     //
+          t.getStrCommandID() == "STREAM_SUBSTRACT" || //
+          t.getStrCommandID() == "STREAM_AGSE")
         std::cout << "\t:- " << t << std::endl;
-      }
-        else std::cout << "\t:- " << t.getStrCommandID() << std::endl;
+      else
+        std::cout << "\t:- " << t.getStrCommandID() << std::endl;
     for (auto f : q.lSchema) {
       std::cout << "\t";
       std::cout << f.fieldName << ":";
@@ -275,9 +263,9 @@ void dumpRawTextFile(bool bShowFieldTypes) {
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << "[" << tf.getRI() << "])" << std::endl;
+          std::cout << "\t\t" << tf << std::endl;
         } else if ((tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf.getStrCommandID() << "(" << tf.getStr_() << ")" << std::endl;
+          std::cout << "\t\t" << tf << std::endl;
         } else
           std::cout << "\t\t" << tf.getStrCommandID() << std::endl;
     }
@@ -307,7 +295,7 @@ int dumper(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
     po::notify(vm);
 
-    assert(vm.count("onlycompile"));   // we can call this function only from main
+    assert(vm.count("onlycompile"));  // we can call this function only from main
 
     if (vm.count("verbose") || vm.count("help")) std::cerr << argv[0] << " - qry file decoder.\n";
     if (vm.count("help")) {

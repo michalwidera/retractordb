@@ -1,24 +1,24 @@
 Input file:query-crc.rql
 Compile result:OK
-out2(1/2)
-	:- PUSH_STREAM(datasrc)
-	Field_3:
-		PUSH_ID(datasrc[0/1])
-	Field_4:
-		PUSH_ID(datasrc[1/1])
-	Field_5:
-		PUSH_VAL(8)
-		PUSH_VAL(12)
-		CALL(Crc)
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
 	Field_0:
-		PUSH_ID(datasrc[0/1])
+		PUSH_ID(datasrc[0])
 	Field_1:
-		PUSH_ID(datasrc[1/1])
+		PUSH_ID(datasrc[1])
 	Field_2:
 		PUSH_VAL(16)
 		PUSH_VAL(1234)
+		CALL(Crc)
+out2(1/2)
+	:- PUSH_STREAM(datasrc)
+	Field_3:
+		PUSH_ID(datasrc[0])
+	Field_4:
+		PUSH_ID(datasrc[1])
+	Field_5:
+		PUSH_VAL(8)
+		PUSH_VAL(12)
 		CALL(Crc)
 datasrc(1/2)	datafile2.dat
 	a:

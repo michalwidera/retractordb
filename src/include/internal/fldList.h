@@ -6,6 +6,7 @@
 
 // This declaration goes into ::rdb namespace
 #define INTINT int, int
+#define STRINT std::string, int
 namespace rdb {
 BEGIN_E_GEN_T(descFld)
 DECL_T(BYTE, uint8_t)
@@ -17,6 +18,7 @@ DECL_T(DOUBLE, double)
 DECL_T(BYTEARRAY, std::vector<uint8_t>)
 DECL_T(INTARRAY, std::vector<int>)
 DECL_T(INTPAIR, std::pair<INTINT>)
+DECL_T(IDXPAIR, std::pair<STRINT>)
 DECL_E(STRING, std::string)
 DECL_F(TYPE)
 DECL_F(REF)
