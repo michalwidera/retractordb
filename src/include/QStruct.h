@@ -23,7 +23,6 @@ typedef boost::rational<int> number;
 
 class token {
   command_id command;
-  std::string textValue;
   rdb::descFldVT valueVT;
 
  public:
