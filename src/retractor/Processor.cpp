@@ -163,9 +163,6 @@ number getValueOfRollup(const query &q, int offset) {
       // if (mirror) - two conditions
       {
         assert(q.lProgram.size() == 2);
-        assert(arg[progSize - 1].getCommandID() == STREAM_AGSE);
-        assert(arg[progSize - 1].getVT().index() == rdb::INTPAIR);
-
         auto r = std::get<std::pair<int, int>>(arg[progSize - 1].getVT());
         std::string nameSrc = arg[0].getStr_();
         std::string nameOut = q.id;

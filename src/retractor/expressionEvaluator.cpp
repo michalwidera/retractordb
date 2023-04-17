@@ -51,6 +51,9 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first + b.first, a.second + b.second);
                  },
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) {
+                   retVal = std::make_pair(a.first + b.first, a.second + b.second);
+                 },
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::plus<int>());
                    retVal = a;
@@ -83,6 +86,9 @@ rdb::descFldVT operator-(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a - b; },  //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first - b.first, a.second - b.second);
+                 },
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) {
+                   retVal = std::make_pair(/* TODO? define str-str */ "?? -", a.second - b.second);
                  },
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::minus<int>());
@@ -117,6 +123,9 @@ rdb::descFldVT operator*(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first * b.first, a.second * b.second);
                  },
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) {
+                   retVal = std::make_pair(/* TODO? define str*str */ "?? *", a.second * b.second);
+                 },
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::multiplies<int>());
                    retVal = a;
@@ -150,6 +159,9 @@ rdb::descFldVT operator/(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first / b.first, a.second / b.second);
                  },  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) {
+                   retVal = std::make_pair(/* TODO? define str/str */ "?? /", a.second / b.second);
+                 },  //
                  [&retVal](std::vector<int> a, std::vector<int> b) {
                    std::transform(a.begin(), a.end(), b.begin(), a.begin(), std::divides<int>());
                    retVal = a;
@@ -169,16 +181,17 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
   rdb::descFldVT retVal;
 
   std::visit(Overload{
-                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                         // xor ?
-                 [&retVal](int a) { retVal = -a; },                                                   //
-                 [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                       // xor ?
-                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<int>(-a); },       //
-                 [&retVal](float a) { retVal = -a; },                                                 //
-                 [&retVal](double a) { retVal = -a; },                                                //
-                 [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },              //
-                 [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },               //
-                 [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },  //
-                 [&retVal](std::string a) { /* define neg of string ? */ }                            //
+                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                                      // xor ?
+                 [&retVal](int a) { retVal = -a; },                                                                //
+                 [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                                    // xor ?
+                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<int>(-a); },                    //
+                 [&retVal](float a) { retVal = -a; },                                                              //
+                 [&retVal](double a) { retVal = -a; },                                                             //
+                 [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                           //
+                 [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                            //
+                 [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },               //
+                 [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
+                 [&retVal](std::string a) { /* define neg of string ? */ }                                         //
              },
              inVar);
 

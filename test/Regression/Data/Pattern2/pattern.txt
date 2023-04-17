@@ -3,7 +3,7 @@ Compile result:OK
 str1(1/2)
 	:- PUSH_STREAM(core1)
 	Field_1:
-		PUSH_ID(core1[0/1])
+		PUSH_ID(core1[0])
 		PUSH_VAL(1)
 		ADD
 str2(1/2)
@@ -11,18 +11,18 @@ str2(1/2)
 	:- PUSH_STREAM(core0)
 	:- STREAM_ADD
 	Field_2:
-		PUSH_ID(core1[0/1])
+		PUSH_ID(core1[0])
 		PUSH_VAL(2)
 		DIVIDE
 		PUSH_VAL(1)
 		ADD
 	Field_3:
-		PUSH_ID(core0[0/1])
+		PUSH_ID(core0[0])
 core1(1/2)	/dev/urandom
 	c:
 str0(1/1)
 	:- PUSH_STREAM(core0)
 	Field_0:
-		PUSH_ID(core0[0/1])
+		PUSH_ID(core0[0])
 core0(1/1)	/dev/urandom
 	a:

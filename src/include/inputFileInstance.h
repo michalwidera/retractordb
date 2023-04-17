@@ -1,13 +1,14 @@
 #pragma once
 
-#include <QStruct.h>           // for field
+#include <QStruct.h>  // for field
+
 #include <boost/any.hpp>       // for any
 #include <boost/rational.hpp>  // for rational
 #include <fstream>             // for ifstream
 #include <list>                // for list
+#include <memory>              // for shared_ptr
 #include <string>              // for string
 #include <vector>              // for vector
-#include <memory>              // for shared_ptr
 
 class inputDF {
   std::vector<boost::any> lResult;

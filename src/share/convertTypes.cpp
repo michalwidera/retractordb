@@ -16,18 +16,20 @@ void visit_descFld(const K& inVar, K& retVal) {
   static_assert(!std::is_same_v<T, std::vector<uint8_t>>);
   static_assert(!std::is_same_v<T, std::vector<int>>);
   static_assert(!std::is_same_v<T, std::pair<int, int>>);
+  static_assert(!std::is_same_v<T, std::pair<std::string, int>>);
 
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
-                   [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                        //
-                   [&retVal](int a) { retVal = static_cast<T>(a); },                            //
-                   [&retVal](unsigned a) { retVal = static_cast<T>(a); },                       //
-                   [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },  //
-                   [&retVal](float a) { retVal = static_cast<T>(a); },                          //
-                   [&retVal](double a) { retVal = static_cast<T>(a); },                         //
-                   [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },      //
-                   [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },       //
-                   [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },    //
+                   [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                                 //
+                   [&retVal](int a) { retVal = static_cast<T>(a); },                                     //
+                   [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                //
+                   [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },           //
+                   [&retVal](float a) { retVal = static_cast<T>(a); },                                   //
+                   [&retVal](double a) { retVal = static_cast<T>(a); },                                  //
+                   [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },               //
+                   [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                //
+                   [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },             //
+                   [&retVal](std::pair<std::string, int> a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
                    [&retVal](std::string a) {
                      try {
                        retVal = static_cast<T>(std::stoi(a));
@@ -52,6 +54,9 @@ void visit_descFld(const K& inVar, K& retVal) {
       retVal = static_cast<T>(std::any_cast<double>(inVar));
     } else if (inVar.type() == typeid(std::pair<int, int>)) {
       SPDLOG_ERROR("No cast INTPAIR to any type here");
+      retVal = static_cast<T>(0);
+    } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
+      SPDLOG_ERROR("No cast IDXPAIR to any type here");
       retVal = static_cast<T>(0);
     } else if (inVar.type() == typeid(std::string)) {
       try {
@@ -96,32 +101,38 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
     case rdb::FLOAT:
       visit_descFld<float>(inVar, retVal);
       break;
+    case rdb::IDXPAIR:
+      SPDLOG_ERROR("TODO - IDXPAIR->T");
+      assert(false);
+      break;
     case rdb::INTPAIR:
       // Requested type is INT PAIR
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{                                                                                                 //
-                            [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
-                            [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
-                            [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
-                            [&retVal](boost::rational<int> a) { retVal = std::make_pair(a.numerator(), a.denominator()); },  //
-                            [&retVal](float a) {
-                              auto r = Rationalize(static_cast<double>(a));
-                              retVal = std::make_pair(r.numerator(), r.denominator());
-                            },
-                            [&retVal](double a) {
-                              auto r = Rationalize(a);
-                              retVal = std::make_pair(r.numerator(), r.denominator());
-                            },                                                                           //
-                            [&retVal](std::vector<uint8_t> a) { retVal = std::make_pair(a[0], a[1]); },  //
-                            [&retVal](std::vector<int> a) { retVal = std::make_pair(a[0], a[1]); },      //
-                            [&retVal](std::pair<int, int> a) { retVal = a; },                            //
-                            [&retVal](std::string a) {
-                              std::istringstream in(a);
-                              int first{0}, second{1};
-                              in >> first >> expect<','> >> second;
-                              retVal = std::make_pair(first, second);
-                            }},
-                   inVar);
+        std::visit(
+            Overload{                                                                                                 //
+                     [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
+                     [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
+                     [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
+                     [&retVal](boost::rational<int> a) { retVal = std::make_pair(a.numerator(), a.denominator()); },  //
+                     [&retVal](float a) {
+                       auto r = Rationalize(static_cast<double>(a));
+                       retVal = std::make_pair(r.numerator(), r.denominator());
+                     },
+                     [&retVal](double a) {
+                       auto r = Rationalize(a);
+                       retVal = std::make_pair(r.numerator(), r.denominator());
+                     },                                                                                                       //
+                     [&retVal](std::vector<uint8_t> a) { retVal = std::make_pair(a[0], a[1]); },                              //
+                     [&retVal](std::vector<int> a) { retVal = std::make_pair(a[0], a[1]); },                                  //
+                     [&retVal](std::pair<int, int> a) { retVal = a; },                                                        //
+                     [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair(atoi(a.first.c_str()), a.second); },  //
+                     [&retVal](std::string a) {
+                       std::istringstream in(a);
+                       int first{0}, second{1};
+                       in >> first >> expect<','> >> second;
+                       retVal = std::make_pair(first, second);
+                     }},
+            inVar);
       } else {
         if (inVar.type() == typeid(uint8_t)) {
           retVal = std::make_pair(0, std::any_cast<uint8_t>(inVar));
@@ -163,6 +174,9 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                             },                                                                                       //
                             [&retVal](std::vector<int> a) { retVal = boost::rational<int>(a[0], a[1]); },            //
                             [&retVal](std::pair<int, int> a) { retVal = boost::rational<int>(a.first, a.second); },  //
+                            [&retVal](std::pair<std::string, int> a) {
+                              retVal = boost::rational<int>(a.second, 1);
+                            },  //  first is skipped
                             [&retVal](std::string a) {
                               std::istringstream in(a);
                               int nom{0}, den{1};
@@ -249,6 +263,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                      [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                                   //
                      [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                                    //
                      [&retVal](std::pair<int, int> a) { retVal = std::to_string(a.first) + "," + std::to_string(a.second); },  //
+                     [&retVal](std::pair<std::string, int> a) { retVal = a.first + "," + std::to_string(a.second); },          //
                      [&retVal](std::string a) { retVal = a; },                                                                 //
                      [&retVal](boost::rational<int> a) {
                        std::stringstream ss;
@@ -276,6 +291,9 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           std::pair pairVar = std::any_cast<std::pair<int, int>>(inVar);
           retVal = std::to_string(pairVar.first) + "," + std::to_string(pairVar.second);
+        } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
+          std::pair pairVar = std::any_cast<std::pair<std::string, int>>(inVar);
+          retVal = pairVar.first + "," + std::to_string(pairVar.second);
         } else {
           SPDLOG_ERROR("TODO - std::any->T");
         }

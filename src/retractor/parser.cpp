@@ -67,8 +67,8 @@ class ParserListener : public RQLBaseListener {
   void recpToken(command_id id) { program.push_back(token(id)); };
 
   template <typename T>
-  void recpToken(command_id id, T arg1, std::string arg2 = "") {
-    program.push_back(token(id, arg1, arg2));
+  void recpToken(command_id id, T arg1) {
+    program.push_back(token(id, arg1));
   };
 
  public:
@@ -113,13 +113,6 @@ class ParserListener : public RQLBaseListener {
   void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, rationalResult); }
 
   void exitSExpAgse(RQLParser::SExpAgseContext* ctx) {
-    /*
-    if (ctx->children[3]->getText() == "-")
-      program.push_back(token(PUSH_VAL, -std::stoi(ctx->window->getText())));
-    else
-      program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
-    program.push_back(token(PUSH_VAL, std::stoi(ctx->step->getText())));
-    */
     int window{0}, step{0};
     if (ctx->children[3]->getText() == "-")
       window = -std::stoi(ctx->window->getText());

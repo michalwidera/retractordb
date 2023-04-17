@@ -197,9 +197,7 @@ void dataModel::computeInstance(std::string instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge
       break;
-    case STREAM_AGSE: {  // (program sequence)
-      assert(operation.getCommandID() == STREAM_AGSE);
-      assert(operation.getVT().index() == rdb::INTPAIR);
+    case STREAM_AGSE: {                     // (program sequence)
       bool mirror = operation.getRI() < 0;  // PUSH_STREAM core -> delta_source (arg[0]) - operation
       auto reg = get<std::pair<int, int>>(arg[1].getVT());
       int length = reg.first;  // window_length

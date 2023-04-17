@@ -1,19 +1,19 @@
 Input file:query-unfold.rql
 Compile result:OK
+out1(1/2)
+	:- PUSH_STREAM(datasrc)
+	Field_4:
+		PUSH_ID(datasrc[0])
+	Field_5:
+		PUSH_ID(datasrc[1])
 out2(1/2)
 	:- PUSH_STREAM(datasrc)
 	Field_1:
 		PUSH_VAL(1)
 	Field_2:
-		PUSH_ID(datasrc[0/1])
+		PUSH_ID(datasrc[0])
 	Field_3:
-		PUSH_ID(datasrc[1/1])
-out1(1/2)
-	:- PUSH_STREAM(datasrc)
-	Field_4:
-		PUSH_ID(datasrc[0/1])
-	Field_5:
-		PUSH_ID(datasrc[1/1])
+		PUSH_ID(datasrc[1])
 datasrc(1/2)	datafile2.dat
 	a:
 	b:

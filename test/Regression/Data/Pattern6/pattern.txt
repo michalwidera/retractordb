@@ -1,50 +1,50 @@
 Input file:query.rql
 Compile result:OK
-test_2(1/1)
-	:- PUSH_STREAM(core)
-	:- STREAM_AGSE(-1,10)
-	core_0:
-		PUSH_ID(core[0/1])
-	core_1:
-		PUSH_ID(core[1/1])
-	core_2:
-		PUSH_ID(core[2/1])
-	core_3:
-		PUSH_ID(core[3/1])
-	core_4:
-		PUSH_ID(core[4/1])
-	core_5:
-		PUSH_ID(core[5/1])
-	core_6:
-		PUSH_ID(core[6/1])
-	core_7:
-		PUSH_ID(core[7/1])
-	core_8:
-		PUSH_ID(core[8/1])
-	core_9:
-		PUSH_ID(core[9/1])
 test_1(1/1)
 	:- PUSH_STREAM(core)
 	:- STREAM_AGSE(1,10)
 	core_0:
-		PUSH_ID(core[0/1])
+		PUSH_ID(core[0])
 	core_1:
-		PUSH_ID(core[1/1])
+		PUSH_ID(core[1])
 	core_2:
-		PUSH_ID(core[2/1])
+		PUSH_ID(core[2])
 	core_3:
-		PUSH_ID(core[3/1])
+		PUSH_ID(core[3])
 	core_4:
-		PUSH_ID(core[4/1])
+		PUSH_ID(core[4])
 	core_5:
-		PUSH_ID(core[5/1])
+		PUSH_ID(core[5])
 	core_6:
-		PUSH_ID(core[6/1])
+		PUSH_ID(core[6])
 	core_7:
-		PUSH_ID(core[7/1])
+		PUSH_ID(core[7])
 	core_8:
-		PUSH_ID(core[8/1])
+		PUSH_ID(core[8])
 	core_9:
-		PUSH_ID(core[9/1])
+		PUSH_ID(core[9])
+test_2(1/1)
+	:- PUSH_STREAM(core)
+	:- STREAM_AGSE(-1,10)
+	core_0:
+		PUSH_ID(core[0])
+	core_1:
+		PUSH_ID(core[1])
+	core_2:
+		PUSH_ID(core[2])
+	core_3:
+		PUSH_ID(core[3])
+	core_4:
+		PUSH_ID(core[4])
+	core_5:
+		PUSH_ID(core[5])
+	core_6:
+		PUSH_ID(core[6])
+	core_7:
+		PUSH_ID(core[7])
+	core_8:
+		PUSH_ID(core[8])
+	core_9:
+		PUSH_ID(core[9])
 core(1/1)	/dev/urandom
 	b:
