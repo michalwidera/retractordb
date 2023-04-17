@@ -113,12 +113,21 @@ class ParserListener : public RQLBaseListener {
   void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, rationalResult); }
 
   void exitSExpAgse(RQLParser::SExpAgseContext* ctx) {
+    /*
     if (ctx->children[3]->getText() == "-")
       program.push_back(token(PUSH_VAL, -std::stoi(ctx->window->getText())));
     else
       program.push_back(token(PUSH_VAL, std::stoi(ctx->window->getText())));
     program.push_back(token(PUSH_VAL, std::stoi(ctx->step->getText())));
-    program.push_back(token(STREAM_AGSE));
+    */
+    int window{0}, step{0};
+    if (ctx->children[3]->getText() == "-")
+      window = -std::stoi(ctx->window->getText());
+    else
+      window = std::stoi(ctx->window->getText());
+    step = std::stoi(ctx->step->getText());
+
+    program.push_back(token(STREAM_AGSE, std::make_pair(window, step)));
   }
 
   void exitFunction_call(RQLParser::Function_callContext* ctx) { recpToken(CALL, ctx->children[0]->getText()); }

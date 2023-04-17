@@ -15,7 +15,7 @@ void visit_descFld(const K& inVar, K& retVal) {
   static_assert(!std::is_same_v<T, boost::rational<int>>);
   static_assert(!std::is_same_v<T, std::vector<uint8_t>>);
   static_assert(!std::is_same_v<T, std::vector<int>>);
-  static_assert(!std::is_same_v<T, std::pair<int,int>>);
+  static_assert(!std::is_same_v<T, std::pair<int, int>>);
 
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{

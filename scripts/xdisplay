@@ -3,31 +3,18 @@
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 if [ $# -eq 0 ] ; then
-    echo "Usage: $me queryFileName{noext} [phaseLnkExt][PicType]"
+    echo "Usage: $me queryFileName [PicType]"
     echo "Example: $me query"
     exit
 fi
 
 FILE=$1
 
-if [ "$2" != "" ] ; then
-PHASE="qry."$2
-else
-PHASE=qry
-fi
-
 if [ "$3" != "" ] ; then
-PICTYPE=$3
+PICTYPE=$2
 else
 PICTYPE=png
 fi
-
-if [[ $FILE == *.qry ]] ; then
-echo "Calling compiler for" $FILE
-if ! xretractor $FILE -c ; then exit 1 ; fi
-fi
-
-echo 'Phase view: query.'$PHASE
 
 arg=""
 
@@ -55,9 +42,9 @@ if [ "$answer" == "${answer#[Nn]}" ] ;then
 arg=$arg" -w"
 fi
 
-echo 'Calling xdumper for query.'$PHASE
+echo 'Calling xretractor/dumper for '
 
-if ! xdumper -i 'query.'$PHASE -d $arg > ${FILE%%.*}'.dot' ; then exit 1 ; fi
+if ! xretractor -c $FILE -d $arg > ${FILE%%.*}'.dot' ; then exit 1 ; fi
 
 dot -T$PICTYPE ${FILE%%.*}'.dot' -o ${FILE%%.*}'.'$PICTYPE
 

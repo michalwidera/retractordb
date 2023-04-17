@@ -33,7 +33,7 @@ add_test(
   NAME rg-compile_1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
   COMMAND sh -c "set -e ; \
-  xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
+  xretractor query.rql -c > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ add_test(
   NAME rg-compile_2
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
   COMMAND sh -c "set -e ; \
-    xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
+    xretractor query.rql -c > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ add_test(
   NAME rg-compile_3
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern3
   COMMAND sh -c "set -e ; \
-  xretractor query-unfold.rql -c > out.txt ; xdumper >> out.txt ; \
+  xretractor query-unfold.rql -c > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -60,7 +60,7 @@ add_test(
   NAME rg-compile_4
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
   COMMAND sh -c "set -e ; \
-    xretractor query-crc.rql -c > out.txt ; xdumper >> out.txt ; \
+    xretractor query-crc.rql -c > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -78,7 +78,7 @@ add_test(
   NAME rg-compile_agse_6
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
   COMMAND bash -c "set -e ; \
-  xretractor query.rql -c > out.txt ; xdumper >> out.txt ; \
+  xretractor query.rql -c > out.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
@@ -102,7 +102,7 @@ add_test(
 add_test(
   NAME rg-dumper-test
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
-  COMMAND sh -c "xretractor query-lnx.rql -c; xdumper -d")
+  COMMAND sh -c "xretractor query-lnx.rql -c")
 
 set_tests_properties(rg-dumper-test PROPERTIES DEPENDS
                                                rg-compiler-test-on-query)

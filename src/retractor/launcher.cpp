@@ -21,6 +21,7 @@ using boost::lexical_cast;
 
 extern std::string parserFile(std::string sInputFile);
 extern int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam);
+extern int dumper(int argc, char* argv[]);
 
 int iTimeLimitCntParam{0};
 
@@ -56,12 +57,12 @@ int main(int argc, char* argv[]) {
         ("waterfall,f", "show waterfall mode")                      //                                                //
         ("verbose,v", "Dump diagnostic info on screen while work")  //
         ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0), "query limit, 0 - no limit")  //
-        ("onlycompile,c", "compile only");
+        ("onlycompile,c", "compile only mode");
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
-    if (vm.count("help")) {
+    if (vm.count("help") && !vm.count("onlycompile")) {
       std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
       std::cout << "Usage: " << argv[0] << " queryfile [option]" << std::endl << std::endl;
       std::cout << desc;
@@ -74,41 +75,34 @@ int main(int argc, char* argv[]) {
       return EPERM;  // ERROR defined in errno-base.h
     }
     auto parseOut = parserFile(sInputFile);
-    if (vm.count("onlycompile")) {
-      std::cout << "Input file:" << sInputFile << std::endl;
-      std::cout << "Compile result:" << parseOut << std::endl;
-    }
+
     //
     // Compile part
     //
-    std::istringstream iss(dumpInstance(""), std::ios::binary);
-    boost::archive::text_iarchive ia(iss);
-    ia >> coreInstance;
     if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
-
-    if (vm.count("dumpcross")) dumpInstance(sOutputFile + ".lg1");
 
     std::string response;
     response = simplifyLProgram();
     assert(response == "OK");
-    if (vm.count("dumpcross")) dumpInstance(sOutputFile + ".lg2");
     response = prepareFields();
     assert(response == "OK");
-    if (vm.count("dumpcross")) dumpInstance(sOutputFile + ".lg3");
     response = intervalCounter();
     assert(response == "OK");
     response = convertReferences();
     assert(response == "OK");
     response = replicateIDX();
     assert(response == "OK");
-    if (vm.count("onlycompile") || vm.count("dumpcross")) dumpInstance(sOutputFile);
 
+    if (vm.count("onlycompile")) {
+      std::cout << "Input file:" << sInputFile << std::endl;
+      std::cout << "Compile result:" << parseOut << std::endl;
+      dumper(argc, argv);
+      return system::errc::success;
+    }
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
     return system::errc::interrupted;
   }
-
-  if (vm.count("onlycompile")) return system::errc::success;
 
   return main_retractor(vm.count("verbose"), vm.count("waterfall"), iTimeLimitCntParam);
 }

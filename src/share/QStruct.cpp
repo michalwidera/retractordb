@@ -239,6 +239,7 @@ token::token(command_id id, rdb::descFldVT value, std::string desc)
 }
 
 std::ostream &operator<<(std::ostream &os, const token &rhs) {
+  os << GetStringcommand_id(rhs.command) << "(";
   switch (rhs.valueVT.index()) {
     case rdb::STRING:
       os << std::get<std::string>(rhs.valueVT);
@@ -261,9 +262,15 @@ std::ostream &operator<<(std::ostream &os, const token &rhs) {
     case rdb::RATIONAL:
       os << std::get<number>(rhs.valueVT);
       break;
+    case rdb::INTPAIR: {
+      auto r = std::get<std::pair<int,int>>(rhs.valueVT);
+      os << r.first << "," << r.second;
+      }
+      break;
     default:
       os << "not supported";
   }
+  os << ")";
   return os;
 }
 
@@ -377,7 +384,10 @@ rdb::Descriptor query::descriptorFrom() {
       };
     } break;
     case STREAM_AGSE: {
-      int windowSize = abs(rational_cast<int>(cmd.getRI()));
+      assert(cmd.getCommandID() == STREAM_AGSE);
+      assert(cmd.getVT().index() == rdb::INTPAIR);
+      auto r = std::get<std::pair<int, int>>(cmd.getVT());
+      int windowSize = abs(r.second);
       auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
       for (int i = 0; i < windowSize; i++) {
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);
@@ -398,7 +408,11 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr_();  // 3
-  token cmd = (*eIt++);
+
+  token cmd(*eIt);
+  if ( cmd.getCommandID() == STREAM_AGSE) {
+    assert(cmd.getVT().index() == rdb::INTPAIR);
+  }
   return std::make_tuple(sArg1, sArg2, cmd);
 }
 

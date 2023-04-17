@@ -207,12 +207,15 @@ void dataModel::computeInstance(std::string instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge
       break;
-    case STREAM_AGSE: {                                      // (program sequence)
-      bool mirror = operation.getRI() < 0;                   // PUSH_STREAM core -> delta_source (arg[0]) - operation
-      int length = abs(rational_cast<int>(arg[1].getRI()));  // PUSH_VAL 2 -> window_length (arg[1])
-      assert(length > 0);                                    //
-      int step = rational_cast<int>(arg[2].getRI());         // STREAM_AGSE 3 -> window_step (arg[2])
-      assert(step >= 0);                                     //
+    case STREAM_AGSE: {  // (program sequence)
+      assert(operation.getCommandID() == STREAM_AGSE);
+      assert(operation.getVT().index() == rdb::INTPAIR);
+      bool mirror = operation.getRI() < 0;  // PUSH_STREAM core -> delta_source (arg[0]) - operation
+      auto reg = get<std::pair<int, int>>(arg[1].getVT());
+      int length = reg.first;  // window_length
+      int step = reg.second;   // STREAM_AGSE 2,3 -> window_step (arg[2])
+      assert(step >= 0);       //
+      assert(length > 0);      //
 
       *(qSet[instance]->fromPayload) = qSet[instance]->constructAgsePayload(step, length);
     } break;

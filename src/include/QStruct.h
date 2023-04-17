@@ -18,6 +18,7 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/variant.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/utility.hpp>      // std::pair serialization
 
 #include "cmdID.h"
 #include "rdb/descriptor.h"
@@ -37,12 +38,6 @@ inline void serialize(Archive &ar, boost::rational<T> &p, unsigned int /* file_v
   ar &_num;
   ar &_den;
   p.assign(_num, _den);
-}
-
-template <class Archive, typename T1, typename T2>
-void serialize(Archive &ar, std::pair<T1, T2> &pr, const unsigned int version) {
-  ar &pr.first;
-  ar &pr.second;
 }
 
 template <class Archive, typename... Ts>
