@@ -239,7 +239,7 @@ token::token(command_id id, rdb::descFldVT value, std::string desc)
 }
 
 std::ostream &operator<<(std::ostream &os, const token &rhs) {
-  //os << GetStringcommand_id(rhs.command) << "(";
+  os << GetStringcommand_id(rhs.command) << "(";
   switch (rhs.valueVT.index()) {
     case rdb::STRING:
       os << std::get<std::string>(rhs.valueVT);
@@ -270,9 +270,7 @@ std::ostream &operator<<(std::ostream &os, const token &rhs) {
     default:
       os << "not supported";
   }
-  os << ") type:" << rhs.valueVT.index(); 
-  if (rhs.textValue!="")
-    os << " tx:" << rhs.textValue ;
+  os << ")";
   return os;
 }
 
@@ -410,7 +408,7 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr_();  // 3
-  
+
   token cmd(*eIt);
   if ( cmd.getCommandID() == STREAM_AGSE) {
     assert(cmd.getVT().index() == rdb::INTPAIR);

@@ -11,6 +11,7 @@ set(SOURCES_RETRACTOR
     retractor/launcher.cpp
     retractor/compiler.cpp
     retractor/parser.cpp
+    retractor/dumper.cpp
     retractor/Parser/RQLLexer.cpp
     retractor/Parser/RQLParser.cpp
     share/SOperations.cpp
@@ -24,19 +25,6 @@ set(SOURCES_RETRACTOR
     rdb/storageacc.cc
     rdb/faccbindev.cc
     rdb/facctxtsrc.cc
-    rdb/payload.cc)
-
-set(SOURCES_DUMPER
-    dumper/dumper.cpp
-    share/QStruct.cpp
-    share/convertTypes.cpp
-    rdb/faccfs.cc
-    rdb/faccposix.cc
-    rdb/faccposixprm.cc
-    rdb/faccbindev.cc
-    rdb/facctxtsrc.cc
-    rdb/descriptor.cc
-    rdb/storageacc.cc
     rdb/payload.cc)
 
 set(SOURCES_QRY qry/qryLauncher.cpp qry/qry.cpp)
@@ -54,16 +42,14 @@ set(SOURCES_RDB
     share/convertTypes.cpp)
 
 add_executable(xretractor ${SOURCES_RETRACTOR})
-add_executable(xdumper ${SOURCES_DUMPER})
 add_executable(xqry ${SOURCES_QRY})
 add_executable(xtrdb ${SOURCES_RDB})
 
 target_link_libraries(xretractor boost::boost antlr4_static)
-target_link_libraries(xdumper boost::boost)
 target_link_libraries(xqry boost::boost)
 target_link_libraries(xtrdb boost::boost)
 
-install(TARGETS xretractor xdumper xqry xtrdb DESTINATION ~/.local/bin)
+install(TARGETS xretractor xqry xtrdb DESTINATION ~/.local/bin)
 
 add_custom_target(
   simple
