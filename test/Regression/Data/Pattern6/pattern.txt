@@ -1,9 +1,31 @@
 Input file:query.rql
 Compile result:OK
+test_2(1/1)
+	:- PUSH_STREAM(core)
+	:- STREAM_AGSE(-1,10)
+	core_0:
+		PUSH_ID(core[0/1])
+	core_1:
+		PUSH_ID(core[1/1])
+	core_2:
+		PUSH_ID(core[2/1])
+	core_3:
+		PUSH_ID(core[3/1])
+	core_4:
+		PUSH_ID(core[4/1])
+	core_5:
+		PUSH_ID(core[5/1])
+	core_6:
+		PUSH_ID(core[6/1])
+	core_7:
+		PUSH_ID(core[7/1])
+	core_8:
+		PUSH_ID(core[8/1])
+	core_9:
+		PUSH_ID(core[9/1])
 test_1(1/1)
 	:- PUSH_STREAM(core)
-	:- PUSH_VAL(1)
-	:- STREAM_AGSE(10)
+	:- STREAM_AGSE(1,10)
 	core_0:
 		PUSH_ID(core[0/1])
 	core_1:
@@ -26,27 +48,3 @@ test_1(1/1)
 		PUSH_ID(core[9/1])
 core(1/1)	/dev/urandom
 	b:
-test_2(10/1)
-	:- PUSH_STREAM(core)
-	:- PUSH_VAL(-1)
-	:- STREAM_AGSE(10)
-	core_0:
-		PUSH_ID(core[0/1])
-	core_1:
-		PUSH_ID(core[1/1])
-	core_2:
-		PUSH_ID(core[2/1])
-	core_3:
-		PUSH_ID(core[3/1])
-	core_4:
-		PUSH_ID(core[4/1])
-	core_5:
-		PUSH_ID(core[5/1])
-	core_6:
-		PUSH_ID(core[6/1])
-	core_7:
-		PUSH_ID(core[7/1])
-	core_8:
-		PUSH_ID(core[8/1])
-	core_9:
-		PUSH_ID(core[9/1])

@@ -117,16 +117,6 @@ dataModel::dataModel(/* args */) {}
 
 dataModel::~dataModel() {}
 
-void dataModel::loadCoreInstance(std::string compiledQueryFile) {
-  std::ifstream ifs(compiledQueryFile.c_str(), std::ios::binary);
-  assert(ifs);
-  //
-  // Load of compiled query from file
-  //
-  boost::archive::text_iarchive ia(ifs);
-  ia >> coreInstance;
-}
-
 void dataModel::prepareQSet() {
   //
   // Special parameters support in query set

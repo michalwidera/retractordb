@@ -11,14 +11,7 @@
 #include <variant>
 
 // Boost libraries
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
 #include <boost/rational.hpp>
-#include <boost/serialization/list.hpp>
-#include <boost/serialization/set.hpp>
-#include <boost/serialization/variant.hpp>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/utility.hpp>      // std::pair serialization
 
 #include "cmdID.h"
 #include "rdb/descriptor.h"
@@ -27,59 +20,7 @@ typedef boost::rational<int> number;
 
 #include "fldType.h"
 
-namespace boost {
-namespace serialization {
-
-template <class Archive, class T>
-inline void serialize(Archive &ar, boost::rational<T> &p, unsigned int /* file_version */
-) {
-  T _num(p.numerator());
-  T _den(p.denominator());
-  ar &_num;
-  ar &_den;
-  p.assign(_num, _den);
-}
-
-template <class Archive, typename... Ts>
-void save(Archive &ar, const std::variant<Ts...> &obj, const unsigned int version) {
-  boost::variant<Ts...> v;
-  std::visit([&](const auto &arg) { v = arg; }, obj);
-
-  ar &v;
-}
-
-template <class Archive, typename... Ts>
-void load(Archive &ar, std::variant<Ts...> &obj, const unsigned int version) {
-  boost::variant<Ts...> v;
-  ar &v;
-
-  boost::apply_visitor([&](auto &arg) { obj = arg; }, v);
-}
-
-template <class Archive, typename... Ts>
-void serialize(Archive &ar, std::variant<Ts...> &t, const unsigned int file_version) {
-  split_free(ar, t, file_version);
-}
-
-// https://stackoverflow.com/questions/14744303/does-boost-support-serialization-of-c11s-stdtuple/14928368#14928368
-template <typename Archive, typename... Types>
-inline void serialize(Archive &ar, std::tuple<Types...> &t, const unsigned int) {
-  std::apply([&](auto &...element) { ((ar & element), ...); }, t);
-}
-
-}  // namespace serialization
-}  // namespace boost
-
 class token {
-  friend class boost::serialization::access;
-
-  template <class Archive>
-  void serialize(Archive &ar, unsigned int version) {
-    ar &command;
-    ar &numericValue;
-    ar &textValue;
-    ar &valueVT;
-  }
 
   command_id command;
   boost::rational<int> numericValue;
@@ -101,15 +42,6 @@ class token {
 
 class field {
  private:
-  friend class boost::serialization::access;
-
-  template <class Archive>
-  void serialize(Archive &ar, unsigned int version) {
-    ar &lProgram;
-    ar &fieldText;
-    ar &fieldName;
-    ar &fieldType;
-  }
 
   std::string fieldText;
 
@@ -133,17 +65,6 @@ class field {
 };
 
 class query {
- private:
-  friend class boost::serialization::access;
-
-  template <class Archive>
-  void serialize(Archive &ar, unsigned int version) {
-    ar &id;
-    ar &filename;
-    ar &rInterval;
-    ar &lSchema;
-    ar &lProgram;
-  }
 
  public:
   query(boost::rational<int> rInterval, const std::string &id);
@@ -186,12 +107,6 @@ bool isExist(const std::string &query_name);
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
 class qTree : public std::vector<query> {
- private:
-  friend class boost::serialization::access;
-  template <class Archive>
-  void serialize(Archive &ar, unsigned int version) {
-    ar &boost::serialization::base_object<vector<query>>(*this);
-  }
 
  public:
   query &operator[](const std::string &query_name) { return getQuery(query_name); };

@@ -623,18 +623,3 @@ std::string convertReferences() {
   }
   return std::string("OK");
 }
-
-std::string dumpInstance(std::string sOutFile) {
-  // dumped object must be const
-  const qTree coreInstanceCopy(coreInstance);
-  std::stringstream retval;
-  if (sOutFile == "") {
-    boost::archive::text_oarchive oa(retval);
-    oa << coreInstanceCopy;
-  } else {
-    std::ofstream ofs(sOutFile.c_str());
-    boost::archive::text_oarchive oa(ofs);
-    oa << coreInstanceCopy;
-  }
-  return retval.str();
-}
