@@ -5,6 +5,7 @@
 #include <iostream>
 #include <list>
 #include <set>
+#include <map>
 #include <sstream>
 #include <stack>
 #include <string>
@@ -23,7 +24,6 @@ typedef boost::rational<int> number;
 class token {
 
   command_id command;
-  boost::rational<int> numericValue;
   std::string textValue;
   rdb::descFldVT valueVT;
 
@@ -85,7 +85,7 @@ class query {
 
   field &getField(const std::string &sField);
 
-  std::vector<std::string> getDepStreamName(int reqDep = 0);
+  std::vector<std::string> getDepStream();
 
   int getFieldIndex(field f);
 
@@ -114,7 +114,12 @@ class qTree : public std::vector<query> {
   void sort() { std::sort(begin(), end()); };
 
   /** Topological sort*/
+  std::map<std::string,bool> visited;
+  std::map<std::string,vector<std::string>> adj;  // adjacency list of graph
+  vector<std::string> ans;
+
   void tsort();
+  void dfs(std::string v);
 
   boost::rational<int> getDelta(const std::string &query_name);
 };

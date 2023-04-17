@@ -89,7 +89,7 @@ void query::reset() {
   return;
 }
 
-bool isThere(std::vector<query> v, const std::string &query_name) {
+bool isThere(const std::vector<query> &v, const std::string query_name) {
   for (auto &q : v) {
     if (q.id == "") continue;
     if (q.id == query_name) return true;
@@ -97,16 +97,26 @@ bool isThere(std::vector<query> v, const std::string &query_name) {
   return false;
 }
 
+void qTree::dfs(std::string v) {
+  visited[v] = true;
+  for (auto u : adj[v]) {
+    std::cerr << u << std::endl ;
+    if (!visited[u]) dfs(u);
+  }
+  ans.push_back(v);
+}
+
 // https://en.wikipedia.org/wiki/Topological_sorting
 //
 void qTree::tsort() {
-  vector<query> v = *this;
+  /*
+  vector<query> v = coreInstance;
   vector<query> des;
   while (!v.empty())
     for (auto it = v.begin(); it != v.end(); ++it) {
       if (v.empty()) break;
       bool fullDependent(true);
-      for (auto s : (*it).getDepStreamName()) {
+      for (auto s : (*it).getDepStream()) {
         if (!isThere(des, s)) fullDependent = false;
       }
       if (fullDependent) {
@@ -118,6 +128,21 @@ void qTree::tsort() {
   assert(des.size() == coreInstance.size());
   clear();
   for (auto &q : des) push_back(q);
+  */
+
+  // https://cp-algorithms.com/graph/topological-sort.html#implementation
+
+  ans.clear();
+  for(auto q : coreInstance) visited[q.id] = false;
+  for(auto q : coreInstance) adj[q.id] = q.getDepStream();
+  for(auto q : coreInstance) if (!visited[q.id]) dfs(q.id);
+
+  // reverse(ans.begin(), ans.end());
+
+  qTree tempInstance;
+  for (auto qname : ans) tempInstance.push_back(coreInstance[qname]);
+  coreInstance.clear();
+  coreInstance = tempInstance;
 }
 
 boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }
@@ -160,15 +185,14 @@ bool isExist(const std::string &query_name) {
   return false;
 }
 
-boost::rational<int> token::getRI() { return numericValue; }
-/*
+// boost::rational<int> token::getRI() { return numericValue; }
+
 cast<rdb::descFldVT> castRI;
 
 boost::rational<int> token::getRI() {
   auto ret = castRI(valueVT, rdb::RATIONAL);
   return std::get<boost::rational<int>>(ret);
 }
-*/
 
 rdb::descFldVT token::getVT() { return valueVT; };
 
@@ -202,31 +226,8 @@ token::token(command_id id, rdb::descFldVT value, std::string desc)
       command(id),
       valueVT(value),
       textValue(desc) {
-  switch (value.index()) {
-    case rdb::STRING:
-      if (desc == "") textValue = std::get<std::string>(value);
-      break;
-    case rdb::FLOAT:
-      numericValue = Rationalize(std::get<float>(value));
-      break;
-    case rdb::DOUBLE:
-      numericValue = Rationalize(std::get<double>(value));
-      break;
-    case rdb::INTEGER:
-      numericValue = boost::rational<int>(std::get<int>(value), 1);
-      break;
-    case rdb::UINT:
-      numericValue = boost::rational<int>(std::get<unsigned>(value), 1);
-      break;
-    case rdb::BYTE:
-      numericValue = boost::rational<int>(std::get<uint8_t>(value), 1);
-      break;
-    case rdb::RATIONAL:
-      numericValue = std::get<number>(value);
-      break;
-    default:
-      numericValue = boost::rational<int>(-999, 1);  // Unidentified value
-  }
+  auto ret = castRI(valueVT, rdb::RATIONAL);
+  boost::rational<int> numericValue = std::get<boost::rational<int>>(ret);
   if (textValue == "") {
     std::stringstream ss;
     ss << numericValue.numerator();
@@ -317,15 +318,11 @@ bool query::is(command_id command) {
   return false;
 }
 
-std::vector<std::string> query::getDepStreamName(int reqDep) {
+std::vector<std::string> query::getDepStream() {
   std::vector<std::string> lRetVal;
-  for (auto &t : lProgram) {
-    if (reqDep == 0) {
-      // defult behaviour
-      if (t.getCommandID() == PUSH_STREAM) lRetVal.push_back(t.getStr_());
-    } else
-      ++reqDep;
-  }
+  for (auto &t : lProgram)
+    if (t.getCommandID() == PUSH_STREAM)
+      lRetVal.push_back(std::get<std::string>(t.getVT()));
   return lRetVal;
 }
 
