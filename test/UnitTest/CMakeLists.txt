@@ -5,6 +5,15 @@ project(regression-test)
 # these set of 3 commands will copy artifacts from UnitTest/Data into
 # build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
 # then copy.
+add_definitions(-DSPDLOG_FMT_EXTERNAL)
+add_definitions(-DFMT_HEADER_ONLY)
+add_definitions(-Wno-deprecated-declarations)
+
+find_package(Boost REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
+find_package(antlr4-runtime REQUIRED)
+find_package(GTest REQUIRED)
 
 file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/Data)
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data
@@ -86,11 +95,16 @@ add_executable(test_dataModel ${SOURCES_DATAMODEL_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 add_executable(test_compiler ${SOURCES_COMPILER_TEST})
 
-target_link_libraries(test_xqry boost::boost gtest::gtest antlr4_static)
-target_link_libraries(test_xtrdb boost::boost gtest::gtest)
-target_link_libraries(test_dataModel boost::boost gtest::gtest antlr4_static)
-target_link_libraries(test_expeval boost::boost gtest::gtest antlr4_static)
-target_link_libraries(test_compiler boost::boost gtest::gtest antlr4_static)
+target_link_libraries(test_xqry boost::boost gtest::gtest antlr4_static
+                      spdlog::spdlog_header_only)
+target_link_libraries(test_xtrdb boost::boost gtest::gtest
+                      spdlog::spdlog_header_only)
+target_link_libraries(test_dataModel boost::boost gtest::gtest antlr4_static
+                      spdlog::spdlog_header_only)
+target_link_libraries(test_expeval boost::boost gtest::gtest antlr4_static
+                      spdlog::spdlog_header_only)
+target_link_libraries(test_compiler boost::boost gtest::gtest antlr4_static
+                      spdlog::spdlog_header_only)
 
 add_test(
   NAME ut-xqry

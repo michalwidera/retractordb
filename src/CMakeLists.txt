@@ -1,55 +1,8 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
-project(retractordb-src)
-
-set(SOURCES_RETRACTOR
-    retractor/Processor.cpp
-    retractor/executorsm.cpp
-    retractor/CRSMath.cpp
-    retractor/dataModel.cpp
-    retractor/expressionEvaluator.cpp
-    retractor/launcher.cpp
-    retractor/compiler.cpp
-    retractor/parser.cpp
-    retractor/dumper.cpp
-    retractor/Parser/RQLLexer.cpp
-    retractor/Parser/RQLParser.cpp
-    share/SOperations.cpp
-    share/QStruct.cpp
-    share/inputFileInstance.cpp
-    share/convertTypes.cpp
-    rdb/faccfs.cc
-    rdb/faccposix.cc
-    rdb/faccposixprm.cc
-    rdb/descriptor.cc
-    rdb/storageacc.cc
-    rdb/faccbindev.cc
-    rdb/facctxtsrc.cc
-    rdb/payload.cc)
-
-set(SOURCES_QRY qry/qryLauncher.cpp qry/qry.cpp)
-
-set(SOURCES_RDB
-    rdb/main.cpp
-    rdb/faccfs.cc
-    rdb/faccposix.cc
-    rdb/faccposixprm.cc
-    rdb/faccbindev.cc
-    rdb/facctxtsrc.cc
-    rdb/descriptor.cc
-    rdb/storageacc.cc
-    rdb/payload.cc
-    share/convertTypes.cpp)
-
-add_executable(xretractor ${SOURCES_RETRACTOR})
-add_executable(xqry ${SOURCES_QRY})
-add_executable(xtrdb ${SOURCES_RDB})
-
-target_link_libraries(xretractor boost::boost antlr4_static)
-target_link_libraries(xqry boost::boost)
-target_link_libraries(xtrdb boost::boost)
-
-install(TARGETS xretractor xqry xtrdb DESTINATION ~/.local/bin)
+add_subdirectory(rdb)
+add_subdirectory(qry)
+add_subdirectory(retractor)
 
 add_custom_target(
   simple
@@ -60,12 +13,6 @@ add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-dsp.sh
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)
-
-add_custom_target(
-  grammar
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/antlr4call.sh RQL.g4
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/retractor
-  SOURCES ${PROJECT_SOURCE_DIR}/retractor/RQL.g4)
 
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
@@ -112,4 +59,4 @@ else()
   set(GIT_CURRENT_BRANCH Deatached)
   set(GIT_PREV_COMMIT none)
 endif()
-configure_file(config.h.in ${PROJECT_SOURCE_DIR}/include/config.h @ONLY)
+configure_file(config.h.in ${PROJECT_SOURCE_DIR}/src/include/config.h @ONLY)
