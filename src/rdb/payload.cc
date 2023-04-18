@@ -94,7 +94,7 @@ void payload::setItemBy(int position, std::any value) {
 
 void payload::setItem(int position, std::any valueParam) {
   auto len = std::get<rlen>(descriptor[position]);
-  if (position > descriptor.size()) abort();
+  if (position > descriptor.size() - 1) abort();
 
   auto requestedType = std::get<rtype>(descriptor[position]);
 

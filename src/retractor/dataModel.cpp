@@ -70,9 +70,12 @@ streamInstance::streamInstance(query& qry)
 // TODO: TEST THIS FREAKING CODE ... ASAP
 // ! Work in progress
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructAgsePayload(int offset, int length) {
+rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
+  assert(offset > 0);
   // First construct descriptor
   rdb::Descriptor descriptor;
+  bool flip = (length < 0);
+  length = abs(length);
   auto descriptorVecSize = storage->getDescriptor().size();
   std::string storage_name = storage->getStorageName();
   for (auto i = offset; i < offset + length; i++) {
@@ -99,7 +102,7 @@ rdb::payload streamInstance::constructAgsePayload(int offset, int length) {
     }
 
     auto locSrc = dv.rem;
-    auto locDst = i;
+    auto locDst = (!flip) ? i : length - i - 1;  // * Flipping is here
 
     assert(i < descriptor.size());
 
@@ -108,8 +111,7 @@ rdb::payload streamInstance::constructAgsePayload(int offset, int length) {
 
     // TODO: fix bad any_cast - intro checkUniform function?
   }
-  storage->readReverse(0);
-
+  storage->readReverse(0);  // Set pre-function state
   return *(localPayload.get());
 }
 
@@ -197,15 +199,15 @@ void dataModel::computeInstance(std::string instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge
       break;
-    case STREAM_AGSE: {                     // (program sequence)
-      bool mirror = operation.getRI() < 0;  // PUSH_STREAM core -> delta_source (arg[0]) - operation
-      auto reg = get<std::pair<int, int>>(arg[1].getVT());
-      int length = reg.first;  // window_length
-      int step = reg.second;   // STREAM_AGSE 2,3 -> window_step (arg[2])
-      assert(step >= 0);       //
-      assert(length > 0);      //
+    case STREAM_AGSE: {
+      assert(qry.lProgram.size() == 2);                        // (program sequence)
+      std::string nameSrc = arg[0].getStr_();                  // 0: PUSH_STREAM core -> delta_source (arg[0]) - operation
+      auto reg = get<std::pair<int, int>>(operation.getVT());  // 1: STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
+      int step = reg.first;                                    //
+      int length = reg.second;                                 //
+      assert(step >= 0);                                       //
 
-      *(qSet[instance]->fromPayload) = qSet[instance]->constructAgsePayload(step, length);
+      *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
     } break;
     case STREAM_HASH:
       assert(false && "TODO");

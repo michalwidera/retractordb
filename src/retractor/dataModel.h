@@ -30,7 +30,7 @@ struct streamInstance {
   // This constructor will create data based on QStruct query
   streamInstance(query &qry);
 
-  rdb::payload constructAgsePayload(int offset, int length);
+  rdb::payload constructAgsePayload(int length, int offset);
 };
 
 class dataModel {
