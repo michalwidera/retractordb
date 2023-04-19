@@ -170,10 +170,17 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                             [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
                             [&retVal](double a) { retVal = Rationalize(a); },                               //
                             [&retVal](std::vector<uint8_t> a) {
+                              assert(static_cast<int>(a[1]) != 0);
                               retVal = boost::rational<int>(static_cast<int>(a[0]), static_cast<int>(a[1]));
-                            },                                                                                       //
-                            [&retVal](std::vector<int> a) { retVal = boost::rational<int>(a[0], a[1]); },            //
-                            [&retVal](std::pair<int, int> a) { retVal = boost::rational<int>(a.first, a.second); },  //
+                            },  //
+                            [&retVal](std::vector<int> a) {
+                              assert(static_cast<int>(a[1]) != 0);
+                              retVal = boost::rational<int>(a[0], a[1]);
+                            },  //
+                            [&retVal](std::pair<int, int> a) {
+                              assert(a.second != 0);
+                              retVal = boost::rational<int>(a.first, a.second);
+                            },  //
                             [&retVal](std::pair<std::string, int> a) {
                               retVal = boost::rational<int>(a.second, 1);
                             },  //  first is skipped
@@ -181,6 +188,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                               std::istringstream in(a);
                               int nom{0}, den{1};
                               in >> nom >> expect<'/'> >> den;
+                              assert(den != 0);
                               retVal = boost::rational<int>(nom, den);
                             }},
                    inVar);
@@ -199,11 +207,13 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
           retVal = Rationalize(std::any_cast<double>(inVar));
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           std::pair pairVar = std::any_cast<std::pair<int, int>>(inVar);
+          assert(pairVar.second != 0);
           retVal = boost::rational<int>(pairVar.first, pairVar.second);
         } else if (inVar.type() == typeid(std::string)) {
           std::istringstream in(std::any_cast<std::string>(inVar));
           int nom{0}, den{1};
           in >> nom >> expect<'/'> >> den;
+          assert(den != 0);
           retVal = boost::rational<int>(nom, den);
         }
       }

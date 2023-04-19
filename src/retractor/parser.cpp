@@ -149,6 +149,7 @@ class ParserListener : public RQLBaseListener {
   void exitFraction(RQLParser::FractionContext* ctx) {
     const int nom = std::stoi(ctx->children[0]->getText());
     const int den = std::stoi(ctx->children[2]->getText());
+    assert(den != 0);
     rationalResult = boost::rational<int>(nom, den);
   }
 

@@ -11,10 +11,7 @@ find_package(fmt REQUIRED)
 
 file(GLOB_RECURSE BUILDRDB_CC "*.cc")
 
-set(SOURCES_RDB
-    main.cpp
-    ${BUILDRDB_CC}
-    ../share/convertTypes.cpp)
+set(SOURCES_RDB main.cpp ${BUILDRDB_CC} ../share/convertTypes.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 
