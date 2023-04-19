@@ -102,7 +102,10 @@ int _getch() { return getchar(); }
 
 std::set<boost::rational<int>> getListFromCore() {
   std::set<boost::rational<int>> lstTimeIntervals;
-  for (const auto &it : coreInstance) lstTimeIntervals.insert(it.rInterval);
+  for (const auto &it : coreInstance) {
+    assert(it.rInterval != 0);  // :STORAGE has created ugly error here
+    lstTimeIntervals.insert(it.rInterval);
+  }
   return lstTimeIntervals;
 }
 
@@ -302,6 +305,15 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
       std::cerr << "Objects:" << std::endl;
       dumpCore(std::cerr);
     }
+
+    // This code goes here temporary - removes :STORAGE from coreInstance - this functionality
+    // will appear and will be supported in DataModel version
+    // * TEMP_BEG
+    auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
+                                  [](const query &qry) { return qry.id[0] == ':'; });
+    coreInstance.erase(new_end, coreInstance.end());
+    // * TEMP_END
+
     TimeLine tl(getListFromCore());
     //
     // Main loop of data processing

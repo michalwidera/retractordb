@@ -124,8 +124,9 @@ void dataModel::prepareQSet() {
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
-  for (auto qry : coreInstance)
+  for (auto qry : coreInstance) {
     if (qry.id == ":STORAGE") storagePath = qry.filename;
+  }
 
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
                                 [](const query& qry) { return qry.id[0] == ':'; });

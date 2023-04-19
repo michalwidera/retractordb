@@ -160,14 +160,13 @@ TEST_F(xschema, check_construct_payload) {
   streamInstance data{"str1", dataStorageDescriptor, dataInternalDesciptor};
   data.storage->setRemoveOnExit(false);
 
-  std::unique_ptr<rdb::payload> payload;
-  payload = std::make_unique<rdb::payload>(data.constructAgsePayload(5, 3));
-
   {
+    std::unique_ptr<rdb::payload> payload;
+    payload = std::make_unique<rdb::payload>(data.constructAgsePayload(5, 3));
     std::string expectedOut = "{ BYTE str1_3 INTEGER str1_4 BYTE str1_5 INTEGER str1_6 BYTE str1_7 }";
     std::stringstream coutstring;
     coutstring << rdb::flat << payload.get()->getDescriptor();
-
+    // std::cerr << rdb::flat << payload.get()->getDescriptor();
     ASSERT_TRUE(expectedOut == coutstring.str());
   }
 
@@ -177,7 +176,7 @@ TEST_F(xschema, check_construct_payload) {
     std::string expectedOut = "{ BYTE str1_3 INTEGER str1_4 BYTE str1_5 INTEGER str1_6 BYTE str1_7 }";
     std::stringstream coutstring;
     coutstring << rdb::flat << payload.get()->getDescriptor();
-
+    // std::cerr << rdb::flat << payload.get()->getDescriptor();
     ASSERT_TRUE(expectedOut == coutstring.str());
   }
 }
