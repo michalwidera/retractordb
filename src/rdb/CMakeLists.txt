@@ -9,16 +9,11 @@ find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 
+file(GLOB_RECURSE BUILDRDB_CC "*.cc")
+
 set(SOURCES_RDB
     main.cpp
-    faccfs.cc
-    faccposix.cc
-    faccposixprm.cc
-    faccbindev.cc
-    facctxtsrc.cc
-    descriptor.cc
-    storageacc.cc
-    payload.cc
+    ${BUILDRDB_CC}
     ../share/convertTypes.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})

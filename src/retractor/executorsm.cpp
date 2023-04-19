@@ -391,8 +391,8 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
     std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;
     retVal = system::errc::no_child_process;
   } catch (std::exception &e) {
-    std::cerr << "Fail";
-    std::cerr << "." << std::endl;
+    std::cerr << "IPC Fail." << std::endl;
+    std::cerr << e.what() << std::endl;
     SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
   }

@@ -10,32 +10,14 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 
-set(SOURCES_RETRACTOR
-    Processor.cpp
-    executorsm.cpp
-    CRSMath.cpp
-    dataModel.cpp
-    expressionEvaluator.cpp
-    launcher.cpp
-    compiler.cpp
-    parser.cpp
-    dumper.cpp
-    Parser/RQLLexer.cpp
-    Parser/RQLParser.cpp
-    ../share/SOperations.cpp
-    ../share/QStruct.cpp
-    ../share/inputFileInstance.cpp
-    ../share/convertTypes.cpp
-    ../rdb/faccfs.cc
-    ../rdb/faccposix.cc
-    ../rdb/faccposixprm.cc
-    ../rdb/descriptor.cc
-    ../rdb/storageacc.cc
-    ../rdb/faccbindev.cc
-    ../rdb/facctxtsrc.cc
-    ../rdb/payload.cc)
+file(GLOB_RECURSE BUILDSRCS_CPP "*.cpp")
+file(GLOB_RECURSE BUILDSHARE_CPP "../share/*.cpp")
+file(GLOB_RECURSE BUILDRDB_CC "../rdb/*.cc")
 
-file(GLOB BUILDSRCS "*.cc")
+set(SOURCES_RETRACTOR
+    ${BUILDSRCS_CPP}
+    ${BUILDSHARE_CPP}
+    ${BUILDRDB_CC})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 
