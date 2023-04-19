@@ -1,0 +1,25 @@
+Input file:query-simple.rql
+Compile result:OK
+:STORAGE(0/1)	temp/
+str1(1/10)
+	:- PUSH_STREAM(core0)
+	:- PUSH_STREAM(core1)
+	:- STREAM_ADD
+	Field_0:
+		PUSH_ID(core0[0])
+		PUSH_VAL(10)
+		MULTIPLY
+	Field_1:
+		PUSH_ID(core1[0])
+		PUSH_VAL(10)
+		MULTIPLY
+	Field_2:
+		PUSH_ID(core0[0])
+		PUSH_ID(core1[0])
+		MULTIPLY
+		PUSH_VAL(20)
+		ADD
+core0(1/10)	datafile2.dat
+	a:
+core1(1/5)	datafile3.dat
+	b:
