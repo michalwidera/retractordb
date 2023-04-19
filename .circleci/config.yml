@@ -63,6 +63,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+            pip3 install --upgrade pip
             pip3 install conan==1.59
             conan profile new default --detect
             conan profile update settings.compiler.libcxx=libstdc++11 default
@@ -77,6 +78,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip
+            pip3 install --upgrade pip
             pip3 install conan
             conan profile detect
   conan-build:
