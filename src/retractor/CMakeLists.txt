@@ -13,9 +13,8 @@ find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 
 file(GLOB BUILDSRCS_CPP "*.cpp")
-file(GLOB_RECURSE BUILDSHARE_CPP "../share/*.cpp")
 
-set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDSHARE_CPP})
+set(SOURCES_RETRACTOR ${BUILDSRCS_CPP})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 
