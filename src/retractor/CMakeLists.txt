@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(xretractor LANGUAGES CXX)
 
+add_subdirectory(Parser)
+
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
@@ -10,7 +12,7 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 
-file(GLOB_RECURSE BUILDSRCS_CPP "*.cpp")
+file(GLOB BUILDSRCS_CPP "*.cpp")
 file(GLOB_RECURSE BUILDSHARE_CPP "../share/*.cpp")
 
 set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDSHARE_CPP})
@@ -18,7 +20,7 @@ set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDSHARE_CPP})
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 
 target_link_libraries(${PROJECT_NAME} boost::boost spdlog::spdlog_header_only
-                      antlr4_static rdb)
+                      antlr4_static rdb parser)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 

@@ -31,8 +31,6 @@ set(SOURCES_COMPILER_TEST
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLParser.cpp
     test_compiler.cpp
     main.cpp)
 
@@ -45,8 +43,6 @@ set(SOURCES_DATAMODEL_TEST
     ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLParser.cpp
     test_dataModel.cpp
     main.cpp)
 
@@ -57,8 +53,6 @@ set(SOURCES_EXPEVAL_TEST
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLParser.cpp
     test_expeval.cpp
     main.cpp)
 
@@ -73,11 +67,11 @@ target_link_libraries(test_xqry boost::boost gtest::gtest antlr4_static
 target_link_libraries(test_xtrdb boost::boost gtest::gtest
                       spdlog::spdlog_header_only rdb)
 target_link_libraries(test_dataModel boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only rdb)
+                      spdlog::spdlog_header_only rdb parser)
 target_link_libraries(test_expeval boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only rdb)
+                      spdlog::spdlog_header_only rdb parser)
 target_link_libraries(test_compiler boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only rdb)
+                      spdlog::spdlog_header_only rdb parser)
 
 add_test(
   NAME ut-xqry
