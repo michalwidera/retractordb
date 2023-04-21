@@ -9,12 +9,7 @@ find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 
-file(GLOB_RECURSE BUILDRDB_CC "*.cc")
-
-add_library(rdb STATIC ${BUILDRDB_CC} ../share/convertTypes.cpp)
-
-target_include_directories(rdb PRIVATE ${Boost_INCLUDE_DIR}
-                                       ${spdlog_INCLUDE_DIR} ${fmt_INCLUDE_DIR})
+add_subdirectory(lib)
 
 set(SOURCES_RDB main.cpp)
 
