@@ -7,6 +7,6 @@ file(GLOB BUILDPARSER_CPP "*.cpp")
 
 add_library(${PROJECT_NAME} STATIC ${BUILDPARSER_CPP})
 
-target_include_directories(${PROJECT_NAME} PRIVATE .)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(${PROJECT_NAME} antlr4_static )
+target_link_libraries(${PROJECT_NAME} antlr4_static)
