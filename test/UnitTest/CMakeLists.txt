@@ -21,27 +21,25 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data
 set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 
 include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
-                    ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/share)
+                    ${CMAKE_SOURCE_DIR}/src)
 
 set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
 
 set(SOURCES_COMPILER_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
     test_compiler.cpp
     main.cpp)
 
-set(SOURCES_RDB_TEST ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
+set(SOURCES_RDB_TEST 
                      test_rdb.cpp main.cpp)
 
 set(SOURCES_DATAMODEL_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
     test_dataModel.cpp
     main.cpp)
@@ -49,9 +47,8 @@ set(SOURCES_DATAMODEL_TEST
 set(SOURCES_EXPEVAL_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
     test_expeval.cpp
     main.cpp)
