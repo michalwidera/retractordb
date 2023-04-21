@@ -30,35 +30,16 @@ set(SOURCES_COMPILER_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
-    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
     ${CMAKE_SOURCE_DIR}/src/share/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLLexer.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/Parser/RQLParser.cpp
     test_compiler.cpp
     main.cpp)
 
-set(SOURCES_RDB_TEST
-    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccbindev.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/facctxtsrc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
-    ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
-    test_rdb.cpp
-    main.cpp)
+set(SOURCES_RDB_TEST ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
+                     test_rdb.cpp main.cpp)
 
 set(SOURCES_DATAMODEL_TEST
-    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccbindev.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/facctxtsrc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/share/QStruct.cpp
     ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
@@ -70,14 +51,6 @@ set(SOURCES_DATAMODEL_TEST
     main.cpp)
 
 set(SOURCES_EXPEVAL_TEST
-    ${CMAKE_SOURCE_DIR}/src/rdb/descriptor.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/storageacc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccfs.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccposix.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccposixprm.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/faccbindev.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/facctxtsrc.cc
-    ${CMAKE_SOURCE_DIR}/src/rdb/payload.cc
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
     ${CMAKE_SOURCE_DIR}/src/share/convertTypes.cpp
@@ -96,15 +69,15 @@ add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 add_executable(test_compiler ${SOURCES_COMPILER_TEST})
 
 target_link_libraries(test_xqry boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only)
+                      spdlog::spdlog_header_only rdb)
 target_link_libraries(test_xtrdb boost::boost gtest::gtest
-                      spdlog::spdlog_header_only)
+                      spdlog::spdlog_header_only rdb)
 target_link_libraries(test_dataModel boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only)
+                      spdlog::spdlog_header_only rdb)
 target_link_libraries(test_expeval boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only)
+                      spdlog::spdlog_header_only rdb)
 target_link_libraries(test_compiler boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only)
+                      spdlog::spdlog_header_only rdb)
 
 add_test(
   NAME ut-xqry

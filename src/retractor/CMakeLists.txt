@@ -12,14 +12,13 @@ find_package(antlr4-runtime REQUIRED)
 
 file(GLOB_RECURSE BUILDSRCS_CPP "*.cpp")
 file(GLOB_RECURSE BUILDSHARE_CPP "../share/*.cpp")
-file(GLOB_RECURSE BUILDRDB_CC "../rdb/*.cc")
 
-set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDSHARE_CPP} ${BUILDRDB_CC})
+set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDSHARE_CPP})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 
 target_link_libraries(${PROJECT_NAME} boost::boost spdlog::spdlog_header_only
-                      antlr4_static)
+                      antlr4_static rdb)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 

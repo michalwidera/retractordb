@@ -85,7 +85,8 @@ add_test(
 add_test(
   NAME rg-xcompiler-simple
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
-  COMMAND bash -c "set -e ; \
+  COMMAND
+    bash -c "set -e ; \
   xretractor query-simple.rql -c > out.txt ; \
   xretractor query-simple.rql -m 5 ; \
   ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
