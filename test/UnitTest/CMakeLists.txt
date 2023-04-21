@@ -33,8 +33,7 @@ set(SOURCES_COMPILER_TEST
     test_compiler.cpp
     main.cpp)
 
-set(SOURCES_RDB_TEST 
-                     test_rdb.cpp main.cpp)
+set(SOURCES_RDB_TEST test_rdb.cpp main.cpp)
 
 set(SOURCES_DATAMODEL_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
@@ -63,12 +62,30 @@ target_link_libraries(test_xqry boost::boost gtest::gtest antlr4_static
                       spdlog::spdlog_header_only rdb)
 target_link_libraries(test_xtrdb boost::boost gtest::gtest
                       spdlog::spdlog_header_only rdb)
-target_link_libraries(test_dataModel boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only rdb parser)
-target_link_libraries(test_expeval boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only rdb parser)
-target_link_libraries(test_compiler boost::boost gtest::gtest antlr4_static
-                      spdlog::spdlog_header_only rdb parser)
+target_link_libraries(
+  test_dataModel
+  boost::boost
+  gtest::gtest
+  antlr4_static
+  spdlog::spdlog_header_only
+  rdb
+  parser)
+target_link_libraries(
+  test_expeval
+  boost::boost
+  gtest::gtest
+  antlr4_static
+  spdlog::spdlog_header_only
+  rdb
+  parser)
+target_link_libraries(
+  test_compiler
+  boost::boost
+  gtest::gtest
+  antlr4_static
+  spdlog::spdlog_header_only
+  rdb
+  parser)
 
 add_test(
   NAME ut-xqry

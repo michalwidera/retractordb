@@ -18,12 +18,9 @@ set(SOURCES_RETRACTOR ${BUILDSRCS_CPP})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
-                      boost::boost
-                      spdlog::spdlog_header_only
-                      antlr4_static
-                      rdb
-                      parser)
+target_link_libraries(
+  ${PROJECT_NAME} PUBLIC boost::boost spdlog::spdlog_header_only antlr4_static
+                         rdb parser)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 

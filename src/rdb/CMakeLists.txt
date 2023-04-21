@@ -15,9 +15,7 @@ set(SOURCES_RDB main.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
-                      boost::boost
-                      spdlog::spdlog_header_only
-                      rdb)
+target_link_libraries(${PROJECT_NAME} PUBLIC boost::boost
+                                             spdlog::spdlog_header_only rdb)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
