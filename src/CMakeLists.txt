@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
+find_package(Boost REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
+
 add_subdirectory(rdb)
 add_subdirectory(qry)
 add_subdirectory(retractor)

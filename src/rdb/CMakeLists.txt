@@ -1,14 +1,6 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 project(xtrdb LANGUAGES CXX)
 
-add_definitions(-DSPDLOG_FMT_EXTERNAL)
-add_definitions(-DFMT_HEADER_ONLY)
-add_definitions(-Wno-deprecated-declarations)
-
-find_package(Boost REQUIRED)
-find_package(spdlog REQUIRED)
-find_package(fmt REQUIRED)
-
 add_subdirectory(lib)
 
 set(SOURCES_RDB main.cpp)
