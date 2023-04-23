@@ -29,7 +29,7 @@ class payload {
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
-  payload(Descriptor descriptor);
+  payload(const Descriptor descriptor);
 
   /// @brief Copy constructor
   /// @param from destructor
@@ -42,28 +42,27 @@ class payload {
   /// @param position position according to descriptor
   /// @param valueParam value of given type according to descriptor that will be set
   /// in payload
-  void setItem(int position, std::any valueParam);
+  void setItem(const int position, std::any valueParam);
 
   /// @brief Direct getter
   /// @param position position according to descriptor
   /// @return address of beginning memory that contains data described by
   /// descriptor
-  std::any getItem(int position);
+  std::any getItem(const int position);
 
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
 
   template <typename T>
-  void setItemBy(int position, std::any value);
+  void setItemBy(const int position, std::any value);
 
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
 
-  payload &operator=(payload &other);
   payload &operator=(const payload &other);
 
-  payload operator+(payload &other);
+  payload operator+(const payload &other);
 };
 }  // namespace rdb
 

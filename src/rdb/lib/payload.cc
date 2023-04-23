@@ -16,7 +16,7 @@ namespace rdb {
 
 // default constructor
 
-payload::payload(Descriptor descriptor)
+payload::payload(const Descriptor descriptor)
     : descriptor(descriptor),  //
       hexFormat(false) {
   payloadData = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
@@ -33,16 +33,6 @@ payload::payload(const payload &other) {
 
 // Copy & assignment operator
 
-payload &payload::operator=(payload &other) {
-  if (this != &other) {                                // assure not a self-assignment
-    if (other.descriptor.size() != descriptor.size())  // speed up memory management
-      payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
-    descriptor = other.getDescriptor();
-    std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
-  }
-  return *this;
-}
-
 payload &payload::operator=(const payload &other) {
   if (this != &other) {                                // assure not a self-assignment
     if (other.descriptor.size() != descriptor.size())  // speed up memory management
@@ -55,7 +45,7 @@ payload &payload::operator=(const payload &other) {
 
 // Math operation operators
 
-payload payload::operator+(payload &other) {
+payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
   descSum | other.getDescriptor();                // ! moving this into constructor fails
   payload result(descSum);                        //
@@ -87,12 +77,12 @@ uint8_t *payload::get() const { return payloadData.get(); }
 cast<std::any> castAny;
 
 template <typename T>
-void payload::setItemBy(int position, std::any value) {
+void payload::setItemBy(const int position, std::any value) {
   T data = std::any_cast<T>(value);
   std::memcpy(payloadData.get() + descriptor.offset(position), &data, std::get<rlen>(descriptor[position]));
 }
 
-void payload::setItem(int position, std::any valueParam) {
+void payload::setItem(const int position, std::any valueParam) {
   auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size() - 1) abort();
 
@@ -152,7 +142,7 @@ T getVal(void *ptr, int offset) {
   return *(reinterpret_cast<T *>(static_cast<uint8_t *>(ptr) + offset));
 }
 
-std::any payload::getItem(int position) {
+std::any payload::getItem(const int position) {
   auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
 
