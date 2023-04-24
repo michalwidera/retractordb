@@ -129,6 +129,19 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
   return *this;
 }
 
+bool Descriptor::operator==(const Descriptor &rhs) {
+  if (size() == rhs.size()) {
+    auto i = 0;
+    for (rfield &f : *this)
+      if (std::get<rdb::rlen>(f) != std::get<rdb::rlen>(rhs[i]) || std::get<rdb::rtype>(f) != std::get<rdb::rtype>(rhs[i]))
+        return false;
+      else
+        i++;
+    return true;
+  }
+  return false;
+}
+
 Descriptor::Descriptor(const Descriptor &init) { *this | init; }
 
 int Descriptor::getSizeInBytes() const {

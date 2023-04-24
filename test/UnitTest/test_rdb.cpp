@@ -10,7 +10,7 @@
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
 
-// ctest -R '^ut-xtrdb'
+// ctest -R '^ut-xtrdb' -V
 
 const uint AREA_SIZE = 10;
 
@@ -396,7 +396,7 @@ TEST(crdb, payload_add_operator) {
 
   ASSERT_TRUE(std::any_cast<int>(data1Payload.getItem(2)) == 2000);
 
-  rdb::payload data3Payload(rdb::Descriptor("bad", rdb::BYTE));
+  rdb::payload data3Payload;
 
   data3Payload = data1Payload + data2Payload;
 

@@ -34,10 +34,8 @@ payload::payload(const payload &other) {
 // Copy & assignment operator
 
 payload &payload::operator=(const payload &other) {
-  if (this != &other) {                                // assure not a self-assignment
-    if (other.descriptor.size() != descriptor.size())  // speed up memory management
-      payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
-    descriptor = other.getDescriptor();
+  if (this != &other) {             // assure not a self-assignment
+    *this = other.getDescriptor();  // call operator=(const Descriptor
     std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   }
   return *this;
@@ -55,9 +53,11 @@ payload &payload::operator=(const Descriptor &otherDescriptor) {
     descriptor = otherDescriptor;
     payloadData = std::make_unique<uint8_t[]>(otherDescriptor.getSizeInBytes());
   } else {
-    assert(false && "Descriptor should be empty before this assign.");
+    if (descriptor == otherDescriptor) {  // compare rlen and rtype only here
+      descriptor = otherDescriptor;       // Just change field names - descriptor remains the same, payload remains the same
+    } else
+      assert(false && "Descriptor should be empty before this assign.");
   }
-  assert(false);
   return *this;
 }
 

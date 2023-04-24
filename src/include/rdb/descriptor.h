@@ -94,6 +94,11 @@ class Descriptor : public std::vector<rfield> {
   Descriptor &operator=(const Descriptor &rhs);
 
   /**
+   * @brief Required for comparing desciptors
+   */
+  bool operator==(const Descriptor &rhs);
+
+  /**
    * @brief Copy constructor a new Descriptor object based on another Descriptor
    * object.
    *

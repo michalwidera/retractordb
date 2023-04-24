@@ -35,8 +35,8 @@ class payload {
   /// @param from destructor
   payload(const payload &other);
 
-  /// @brief Default constructor is disallowed
-  payload() = delete;
+  /// @brief Default constructor is allowed
+  payload() = default;
 
   /// @brief Direct setter
   /// @param position position according to descriptor
