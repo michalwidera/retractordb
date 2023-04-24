@@ -36,12 +36,15 @@ struct streamInstance {
 class dataModel {
  private:
   std::string storagePath{""};
+  qTree &coreInstance;
 
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
   dataModel(qTree &coreInstance);
   ~dataModel();
+
+  dataModel() = delete;
 
   std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int revOffset = 0);
 

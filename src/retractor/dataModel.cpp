@@ -115,7 +115,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   return *(localPayload.get());
 }
 
-dataModel::dataModel(qTree& coreInstance) {
+dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
