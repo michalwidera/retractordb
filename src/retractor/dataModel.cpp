@@ -115,11 +115,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   return *(localPayload.get());
 }
 
-dataModel::dataModel(/* args */) {}
-
-dataModel::~dataModel() {}
-
-void dataModel::prepareQSet() {
+dataModel::dataModel(qTree& coreInstance) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
@@ -137,6 +133,8 @@ void dataModel::prepareQSet() {
   for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
   for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
 }
+
+dataModel::~dataModel() {}
 
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, int revOffset) {
   qSet[instance]->storage->readReverse(revOffset);
@@ -215,22 +213,5 @@ void dataModel::computeInstance(std::string instance) {
     default:
       SPDLOG_ERROR("Undefined command_id:{}", cmd);
       abort();
-  }
-}
-
-void initializePayloadDescriptorFromOperation(std::string instance) {
-  auto qry = coreInstance[instance];
-  assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
-
-  token arg[3];
-  int i = 0;
-  for (auto tk : qry.lProgram) arg[i++] = tk;
-
-  auto operation = qry.lProgram.back();  // Operation is always last element on stack
-
-  const command_id cmd = operation.getCommandID();
-  switch (cmd) {
-    case PUSH_STREAM: {
-    }
   }
 }

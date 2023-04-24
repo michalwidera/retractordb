@@ -43,18 +43,18 @@ payload &payload::operator=(const payload &other) {
 
 // Special init operator
 
-payload &payload::operator=(const Descriptor &otherDescriptor) {
+payload &payload::operator=(const Descriptor &other) {
   // TODO: - create assignment operator, cover with test
   // * Plan: when descriptor is empty =Descriptor or =payload
   // * will create descriptor or descriptor with payload
   // * if non empty - this goes strange
   if (descriptor.size() == 0) {
-    // default descriptor constructor has been used and descriptor is empty
-    descriptor = otherDescriptor;
-    payloadData = std::make_unique<uint8_t[]>(otherDescriptor.getSizeInBytes());
+    // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
+    descriptor = other;
+    payloadData = std::make_unique<uint8_t[]>(other.getSizeInBytes());
   } else {
-    if (descriptor == otherDescriptor) {  // compare rlen and rtype only here
-      descriptor = otherDescriptor;       // Just change field names - descriptor remains the same, payload remains the same
+    if (descriptor == other) {  // compare rlen and rtype only here
+      descriptor = other;       // Just change field names - descriptor remains the same, payload remains the same
     } else
       assert(false && "Descriptor should be empty before this assign.");
   }

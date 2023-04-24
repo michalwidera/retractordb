@@ -35,7 +35,7 @@ class payload {
   /// @param from destructor
   payload(const payload &other);
 
-  /// @brief Default constructor is allowed
+  /// @brief Default constructor is allowed - creates uninitialized object, ready to assign
   payload() = default;
 
   /// @brief Direct setter

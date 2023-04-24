@@ -40,12 +40,10 @@ class dataModel {
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
-  dataModel(/* args */);
+  dataModel(qTree &coreInstance);
   ~dataModel();
 
   std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int revOffset = 0);
 
   void computeInstance(std::string instance);
-  void prepareQSet();
-  void initializePayloadDescriptorFromOperation(std::string instance);
 };

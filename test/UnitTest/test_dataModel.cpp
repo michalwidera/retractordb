@@ -118,9 +118,7 @@ TEST_F(xschema, check_test1) {
   auto compiled = parserFile("ut_example_schema.rql");
   ASSERT_TRUE(compiled == "OK");
 
-  dataModel dataArea;
-
-  dataArea.prepareQSet();
+  dataModel dataArea(coreInstance);
 
   // Todo
   dataArea.qSet["str1"]->storage->getPayload()->setItem(0, 2);
