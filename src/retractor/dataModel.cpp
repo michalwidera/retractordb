@@ -10,7 +10,7 @@
 #include "SOperations.h"
 #include "iostream"
 
-extern "C" qTree coreInstance;
+// extern "C" qTree coreInstance;
 
 // ctest -R '^ut-dataModel'
 
