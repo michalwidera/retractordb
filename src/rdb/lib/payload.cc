@@ -43,6 +43,24 @@ payload &payload::operator=(const payload &other) {
   return *this;
 }
 
+// Special init operator
+
+payload &payload::operator=(const Descriptor &otherDescriptor) {
+  // TODO: - create assignment operator, cover with test
+  // * Plan: when descriptor is empty =Descriptor or =payload
+  // * will create descriptor or descriptor with payload
+  // * if non empty - this goes strange
+  if (descriptor.size() == 0) {
+    // default descriptor constructor has been used and descriptor is empty
+    descriptor = otherDescriptor;
+    payloadData = std::make_unique<uint8_t[]>(otherDescriptor.getSizeInBytes());
+  } else {
+    assert(false && "Descriptor should be empty before this assign.");
+  }
+  assert(false);
+  return *this;
+}
+
 // Math operation operators
 
 payload payload::operator+(const payload &other) {

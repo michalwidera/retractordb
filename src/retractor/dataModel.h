@@ -47,4 +47,5 @@ class dataModel {
 
   void computeInstance(std::string instance);
   void prepareQSet();
+  void initializePayloadDescriptorFromOperation(std::string instance);
 };

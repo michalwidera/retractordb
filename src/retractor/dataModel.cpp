@@ -217,3 +217,20 @@ void dataModel::computeInstance(std::string instance) {
       abort();
   }
 }
+
+void initializePayloadDescriptorFromOperation(std::string instance) {
+  auto qry = coreInstance[instance];
+  assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
+
+  token arg[3];
+  int i = 0;
+  for (auto tk : qry.lProgram) arg[i++] = tk;
+
+  auto operation = qry.lProgram.back();  // Operation is always last element on stack
+
+  const command_id cmd = operation.getCommandID();
+  switch (cmd) {
+    case PUSH_STREAM: {
+    }
+  }
+}
