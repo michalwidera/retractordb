@@ -28,6 +28,8 @@ SELECT str1[0]+5 STREAM str2 FROM core0
 */
 namespace {
 
+std::unique_ptr<dataModel> dataArea;
+
 class xschema : public ::testing::Test {
  protected:
   xschema() {}
@@ -117,15 +119,14 @@ TEST_F(xschema, check_test1) {
   coreInstance.clear();
   auto compiled = parserFile("ut_example_schema.rql");
   ASSERT_TRUE(compiled == "OK");
-
-  dataModel dataArea(coreInstance);
+  dataArea = std::make_unique<dataModel>(coreInstance);
 
   // Todo
-  dataArea.qSet["str1"]->storage->getPayload()->setItem(0, 2);
-  dataArea.qSet["str1"]->storage->getPayload()->setItem(1, static_cast<uint8_t>(3));
-  dataArea.qSet["str1"]->storage->write();
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 2);
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, static_cast<uint8_t>(3));
+  dataArea->qSet["str1"]->storage->write();
 
-  SPDLOG_INFO("Records in str1 {}", dataArea.qSet["str1"]->storage->getRecordsCount());
+  SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->storage->getRecordsCount());
 
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
@@ -141,7 +142,7 @@ TEST_F(xschema, check_test1) {
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  ASSERT_TRUE(coreInstance.size() == dataArea.qSet.size());
+  ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
 };
 
 TEST_F(xschema, check_construct_payload) {

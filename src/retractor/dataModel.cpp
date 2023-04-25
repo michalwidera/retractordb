@@ -12,7 +12,7 @@
 
 // extern "C" qTree coreInstance;
 
-// ctest -R '^ut-dataModel'
+// ctest -R '^ut-dataModel' -V
 
 enum { noHexFormat = false, HexFormat = true };
 
