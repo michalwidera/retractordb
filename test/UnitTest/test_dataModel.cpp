@@ -23,6 +23,8 @@ extern std::string parserFile(std::string sInputFile);
 extern "C" qTree coreInstance;
 
 /*
+file path: test/UnitTest/Data/dataModel/ut_example_schema.rql
+
 DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'
 DECLARE c INTEGER,d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
 SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
@@ -135,7 +137,9 @@ TEST_F(xschema, check_test1) {
   ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 1);
 
   ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
+}
 
+TEST_F(xschema, create_struct_local) {
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
   auto dataStorageAndInternalDesciptor{rdb::Descriptor("A", rdb::INTEGER) |  //
@@ -150,10 +154,10 @@ TEST_F(xschema, check_test1) {
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  std::cerr << q.storage->getRecordsCount() << std::endl ;
+  std::cerr << q.storage->getRecordsCount() << std::endl;
 
   ASSERT_TRUE(q.storage->getRecordsCount() == 1);
-};
+}
 
 TEST_F(xschema, check_construct_payload) {
   auto dataInternalDesciptor{
