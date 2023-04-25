@@ -27,6 +27,8 @@ enum FieldColumn { rname = 0, rlen = 1, rtype = 2 };
 
 constexpr int error_desc_location = -1;
 
+extern bool flatOutput;
+
 /**
  * @brief Structure responsible for mapping types into binary struct
  */

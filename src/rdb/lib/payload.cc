@@ -229,6 +229,8 @@ std::any payload::getItem(const int position) {
 
 // Friend operators
 
+extern bool flatOutput;
+
 std::istream &operator>>(std::istream &is, const payload &rhs) {
   std::string fieldName;
   is >> fieldName;
@@ -284,9 +286,15 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << std::hex;
   else
     os << std::dec;
+  os << "{";
   for (auto const &r : rhs.getDescriptor()) {
     if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
-    os << " " << std::get<rname>(r) << " ";
+    if (!flatOutput)
+      os << "\t";
+    else
+      os << " ";
+    os << std::get<rname>(r);
+    os << ":" ;
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
@@ -348,12 +356,15 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     } else
       assert(false && "Unrecognized type");
 
-    os << std::endl;
+    if (!flatOutput) os << std::endl;
   }
   if (rhs.getDescriptor().isEmpty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
+  if (flatOutput) os << " ";
+  os << "}";
+  flatOutput = false;
   return os;
 }
 

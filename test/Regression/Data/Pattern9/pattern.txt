@@ -8,26 +8,26 @@
 .1 Record(s)
 4 Byte(s) per record.
 .ok
-. dane 10
-.ok
-. dane 11
-.ok
-. dane 12
-.ok
-. dane 13
-.ok
-. dane 14
-.ok
-. dane 15
-.ok
-. dane 16
-.ok
-. dane 17
-.ok
-. dane 10
-.ok
-. dane 11
-.ok
-. dane 12
-.ok
+.{	dane:10
+}.ok
+.{	dane:11
+}.ok
+.{	dane:12
+}.ok
+.{	dane:13
+}.ok
+.{	dane:14
+}.ok
+.{	dane:15
+}.ok
+.{	dane:16
+}.ok
+.{	dane:17
+}.ok
+.{	dane:10
+}.ok
+.{	dane:11
+}.ok
+.{	dane:12
+}.ok
 .

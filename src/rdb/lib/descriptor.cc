@@ -33,7 +33,7 @@ static inline void rtrim(std::string &s) {
       s.end());
 }
 
-static bool flatOutput = false;
+bool flatOutput = false;
 
 rdb::descFld GetFieldType(std::string name) {
   ltrim(name);
