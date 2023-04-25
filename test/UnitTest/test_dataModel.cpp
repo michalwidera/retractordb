@@ -128,6 +128,10 @@ TEST_F(xschema, check_test1) {
 
   SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->storage->getRecordsCount());
 
+  ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 1);
+
+  ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
+
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
   auto dataStorageAndInternalDesciptor{rdb::Descriptor("A", rdb::INTEGER) |  //
@@ -142,7 +146,7 @@ TEST_F(xschema, check_test1) {
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
+  //ASSERT_TRUE(q.storage->getRecordsCount() == 1);
 };
 
 TEST_F(xschema, check_construct_payload) {
