@@ -16,6 +16,8 @@
 #include "rdb/storageacc.h"
 #include "retractor/dataModel.h"
 
+// ctest -R '^ut-dataModel' -V
+
 extern std::string parserFile(std::string sInputFile);
 
 extern "C" qTree coreInstance;
@@ -106,7 +108,9 @@ TEST_F(xschema, check_test1) {
                                             "str1",        //
                                             "str1.desc",   //
                                             "str2",        //
-                                            "str2.desc"};
+                                            "str2.desc",   //
+                                            "str1a",       //
+                                            "str1a.desc"};
 
   for (auto i : cleanFilesSet)
     if (std::filesystem::exists(i)) {
@@ -146,7 +150,9 @@ TEST_F(xschema, check_test1) {
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  //ASSERT_TRUE(q.storage->getRecordsCount() == 1);
+  std::cerr << q.storage->getRecordsCount() << std::endl ;
+
+  ASSERT_TRUE(q.storage->getRecordsCount() == 1);
 };
 
 TEST_F(xschema, check_construct_payload) {
