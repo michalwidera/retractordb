@@ -9,7 +9,7 @@ set Control 2
 set m1 1.23
 set m2 234
 append
-print
+printt
 set name test2
 set data 3 4 5
 set bt 4 5 6
@@ -18,11 +18,11 @@ set m1 3.14
 set m2 5567
 append
 read 0
-print
+printt
 read 1
-print
+printt
 size
 desc
 input name test_1 data 6 9 3 bt 1 3 3 Control 2 m1 2.333 m2 264
-print
+printt
 quitdrop

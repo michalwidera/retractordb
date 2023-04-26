@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
       std::cout << "status \t\t\t\t show status of payload\n";
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";
-      std::cout << "print \t\t\t\t show payload\n";
+      std::cout << "print|printt \t\t\t show payload\n";
       std::cout << "input [[field][value]] \t\t fill payload\n";
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
@@ -232,6 +232,9 @@ int main(int argc, char* argv[]) {
       continue;
     } else if (cmd == "print") {
       std::cout << ORANGE << *(dacc->getPayload()) << RESET;
+      continue;
+    } else if (cmd == "printt") {
+      std::cout << ORANGE << rdb::flat << *(dacc->getPayload()) << RESET << std::endl;
       continue;
     } else if (cmd == "input") {
       for (auto i : dacc->getDescriptor()) std::cin >> *(dacc->getPayload());

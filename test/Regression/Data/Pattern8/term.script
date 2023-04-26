@@ -8,12 +8,12 @@ open data_source { INTEGER dane STRING name[5] REF "data_source.txt" TYPE TEXTSO
 desc
 size
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 dropfile { data_source.desc }
 quit
