@@ -189,8 +189,8 @@ TEST_F(xschema, check_construct_payload) {
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
-    //std::cerr << rdb::flat << payload.get()->getDescriptor();
-    //std::cerr << rdb::flat << *(payload.get()) ;
+    // std::cerr << rdb::flat << payload.get()->getDescriptor();
+    // std::cerr << rdb::flat << *(payload.get()) ;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
@@ -204,8 +204,8 @@ TEST_F(xschema, check_construct_payload) {
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
-    //std::cerr << rdb::flat << payload.get()->getDescriptor();
-    //std::cerr << rdb::flat << *(payload.get()) ;
+    // std::cerr << rdb::flat << payload.get()->getDescriptor();
+    // std::cerr << rdb::flat << *(payload.get()) ;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());

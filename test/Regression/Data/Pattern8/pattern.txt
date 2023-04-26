@@ -11,14 +11,18 @@
 .ok
 .{	dane:1
 	name:test1
-}.ok
+}
+.ok
 .{	dane:2
 	name:test2
-}.ok
+}
+.ok
 .{	dane:1
 	name:test1
-}.ok
+}
+.ok
 .{	dane:2
 	name:test2
-}.ok
+}
+.ok
 .

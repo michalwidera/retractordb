@@ -294,7 +294,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     else
       os << " ";
     os << std::get<rname>(r);
-    os << ":" ;
+    os << ":";
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
@@ -364,6 +364,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   }
   if (flatOutput) os << " ";
   os << "}";
+  if (!flatOutput) os << std::endl;
   flatOutput = false;
   return os;
 }
