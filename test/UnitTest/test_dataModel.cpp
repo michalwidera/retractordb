@@ -182,11 +182,13 @@ TEST_F(xschema, check_construct_payload) {
   data.storage->setRemoveOnExit(false);
 
   // str1
-  // 11,12
-  // 13,14
-  // 15,16
+  // [0] [1]
+  //  11, 12
+  //  13, 14
+  //  15, 16
 
-  // @(4,1) 16,13,14,11
+  // @(4,1)  15,14,13,12
+  // @(-4,1) 12,13,14,15
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1));
     std::string expectedOutDesc = "{ INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 INTEGER str1_4 }";
