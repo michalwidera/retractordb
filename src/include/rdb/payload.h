@@ -19,6 +19,9 @@ class payload {
   bool hexFormat;
 
  public:
+  /// @brief binary dump
+  bool specialDebug = false;
+
   /// @brief Accessor to descriptor object
   /// @return Descriptor
   Descriptor getDescriptor() const;

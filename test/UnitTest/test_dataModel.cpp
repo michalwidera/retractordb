@@ -128,16 +128,16 @@ TEST_F(xschema, check_test1) {
   dataArea = std::make_unique<dataModel>(coreInstance);
 
   // Todo
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 2);
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, static_cast<uint8_t>(3));
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 11);
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 12);
   dataArea->qSet["str1"]->storage->write();
 
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 3);
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, static_cast<uint8_t>(4));
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 13);
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 14);
   dataArea->qSet["str1"]->storage->write();
 
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 4);
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, static_cast<uint8_t>(5));
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 15);
+  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 16);
   dataArea->qSet["str1"]->storage->write();
 
   SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->storage->getRecordsCount());
@@ -181,31 +181,37 @@ TEST_F(xschema, check_construct_payload) {
   streamInstance data{"str1", dataStorageDescriptor, dataInternalDesciptor};
   data.storage->setRemoveOnExit(false);
 
+  // str1
+  // 11,12
+  // 13,14
+  // 15,16
+
+  // @(4,1) 16,13,14,11
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(5, 1));
-    std::string expectedOutDesc = "{ BYTE str1_1 INTEGER str1_2 BYTE str1_3 INTEGER str1_4 BYTE str1_5 }";
-    std::string expectedOutData = "{ str1_1:0 str1_2:3 str1_3:4 str1_4:2 str1_5:3 }";
+    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1));
+    std::string expectedOutDesc = "{ INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 INTEGER str1_4 }";
+    std::string expectedOutData = "{ str1_1:16 str1_2:13 str1_3:14 str1_4:11 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
-    // std::cerr << rdb::flat << payload.get()->getDescriptor();
-    // std::cerr << rdb::flat << *(payload.get()) ;
+
+    // payload->specialDebug = true;
+    // std::cerr << "t " << rdb::flat << payload.get()->getDescriptor() << std::endl;
+    // std::cerr << "t " << rdb::flat << *(payload.get())  << std::endl ;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
   }
 
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-5, 1));
-    std::string expectedOutDesc = "{ BYTE str1_1 INTEGER str1_2 BYTE str1_3 INTEGER str1_4 BYTE str1_5 }";
-    std::string expectedOutData = "{ str1_1:3 str1_2:2 str1_3:4 str1_4:3 str1_5:5 }";
+    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1));
+    std::string expectedOutDesc = "{ INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 INTEGER str1_4 }";
+    std::string expectedOutData = "{ str1_1:11 str1_2:14 str1_3:13 str1_4:16 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
-    // std::cerr << rdb::flat << payload.get()->getDescriptor();
-    // std::cerr << rdb::flat << *(payload.get()) ;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());

@@ -168,6 +168,16 @@ class Descriptor : public std::vector<rfield> {
   std::string type(const std::string name);
 
   /**
+   * @brief Max type from descriptor type set
+   *
+   * @return maximum type value
+   *
+   * This function is used in agse operator - pick highest type in descriptor set and
+   * create descriptor with maximum type as base.
+   */
+  rdb::descFld getMaxType();
+
+  /**
    * @brief In case of string types this function will get binary representation
    * and convert it to string by accessing name
    *
@@ -203,6 +213,7 @@ class Descriptor : public std::vector<rfield> {
 
 std::ostream &flat(std::ostream &os);
 
+int GetFieldLenFromType(rdb::descFld ft);
 }  // namespace rdb
 
 #endif  // STORAGE_RDB_INCLUDE_DESC_H_

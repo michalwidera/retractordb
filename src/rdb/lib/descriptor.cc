@@ -67,7 +67,7 @@ std::string GetFieldType(rdb::descFld e) {
   return typeDictionary[e];
 }
 
-constexpr int GetFieldLenFromType(rdb::descFld ft) {
+int GetFieldLenFromType(rdb::descFld ft) {
   switch (ft) {
     case rdb::UINT:
       return sizeof(unsigned);
@@ -196,6 +196,14 @@ int Descriptor::offset(const int position) {
 }
 
 std::string Descriptor::type(const std::string name) { return GetFieldType(std::get<rtype>((*this)[position(name)])); }
+
+rdb::descFld Descriptor::getMaxType() {
+  rdb::descFld retVal{rdb::BYTE};
+  for (auto const field : *this) {
+    if (retVal < std::get<rtype>(field)) retVal = std::get<rtype>(field);
+  }
+  return retVal;
+}
 
 std::ostream &flat(std::ostream &os) {
   flatOutput = true;

@@ -92,8 +92,6 @@ Descriptor payload::getDescriptor() const { return descriptor; }
 
 uint8_t *payload::get() const { return payloadData.get(); }
 
-cast<std::any> castAny;
-
 template <typename T>
 void payload::setItemBy(const int position, std::any value) {
   T data = std::any_cast<T>(value);
@@ -106,6 +104,7 @@ void payload::setItem(const int position, std::any valueParam) {
 
   auto requestedType = std::get<rtype>(descriptor[position]);
 
+  cast<std::any> castAny;
   std::any value = castAny(valueParam, requestedType);
 
   try {
@@ -282,11 +281,25 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
 }
 
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
+  if (rhs.specialDebug) {
+    os << "[ ";
+    for (auto i = 0; i < rhs.getDescriptor().getSizeInBytes(); i++) {
+      os << std::hex;
+      os << std::setfill('0');
+      os << std::setw(2);
+      os << static_cast<int>(*(rhs.get() + i));
+      os << " ";
+    }
+    os << "]";
+    return os;
+  }
+
   if (rhs.hexFormat)
     os << std::hex;
   else
     os << std::dec;
   os << "{";
+
   for (auto const &r : rhs.getDescriptor()) {
     if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
     if (!flatOutput)
@@ -301,7 +314,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << std::string(reinterpret_cast<char *>(rhs.get() + offset_), desc.len(std::get<rname>(r)));
     } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
       for (auto i = 0; i < std::get<rlen>(r); i++) {
-        uint8_t data;
+        uint8_t data{0};
         std::memcpy(&data, rhs.get() + offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
         if (rhs.hexFormat) {
           os << std::setfill('0');
@@ -312,7 +325,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
     } else if (std::get<rtype>(r) == rdb::INTARRAY) {
       for (auto i = 0; i < std::get<rlen>(r) / sizeof(int); i++) {
-        int data;
+        int data{0};
         std::memcpy(&data, rhs.get() + offset_ + i * sizeof(int), sizeof(int));
         if (rhs.hexFormat) {
           os << std::setfill('0');
@@ -322,7 +335,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         if (i + 1 != std::get<rlen>(r) / sizeof(int)) os << " ";
       }
     } else if (std::get<rtype>(r) == rdb::BYTE) {
-      uint8_t data;
+      uint8_t data{0};
       std::memcpy(&data, rhs.get() + offset_, sizeof(uint8_t));
       if (rhs.hexFormat) {
         os << std::setfill('0');
@@ -330,7 +343,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
       os << (int)data;
     } else if (std::get<rtype>(r) == rdb::INTEGER) {
-      int data;
+      int data{0};
       std::memcpy(&data, rhs.get() + offset_, sizeof(int));
       if (rhs.hexFormat) {
         os << std::setfill('0');
@@ -338,7 +351,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
       os << data;
     } else if (std::get<rtype>(r) == rdb::UINT) {
-      unsigned int data;
+      unsigned int data{0};
       std::memcpy(&data, rhs.get() + offset_, sizeof(unsigned int));
       if (rhs.hexFormat) {
         os << std::setfill('0');
@@ -346,11 +359,11 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
       os << data;
     } else if (std::get<rtype>(r) == rdb::FLOAT) {
-      float data;
+      float data{0};
       std::memcpy(&data, rhs.get() + offset_, sizeof(float));
       os << data;
     } else if (std::get<rtype>(r) == rdb::DOUBLE) {
-      double data;
+      double data{0};
       std::memcpy(&data, rhs.get() + offset_, sizeof(double));
       os << data;
     } else

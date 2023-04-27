@@ -8,6 +8,7 @@
 
 #include "QStruct.h"  // coreInstance
 #include "SOperations.h"
+#include "convertTypes.h"
 #include "iostream"
 
 // extern "C" qTree coreInstance;
@@ -78,11 +79,13 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   length = abs(length);
   auto descriptorVecSize = storage->getDescriptor().size();
   std::string storage_name = storage->getStorageName();
+
+  auto maxType = storage->getDescriptor().getMaxType();
+  auto maxLen = GetFieldLenFromType(maxType);
   for (auto i = offset; i < offset + length; i++) {
-    rdb::rfield f{storage->getDescriptor()[std::div(i, descriptorVecSize).rem]};
     rdb::rfield x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
-                                  std::get<rdb::rlen>(f),                  //
-                                  std::get<rdb::rtype>(f))};
+                                  maxLen,                                  //
+                                  maxType)};
     descriptor | rdb::Descriptor{x};
   }
 
@@ -92,7 +95,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   // std::cerr << "DESC:" << descriptor << std::endl;
   // for (auto i : descriptor) std::cout << rdb::GetStringdescFld(std::get<rdb::rtype>(i)) << std::endl;
   // 3rd - fill payload with data from storage
-  auto prevQuot = 0;
+  auto prevQuot{-1};
   for (auto i = 0; i < length; i++) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
@@ -108,10 +111,9 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
 
     std::any value = storage->getPayload()->getItem(locSrc);
     localPayload->setItem(locDst, value);
-
-    // TODO: fix bad any_cast - intro checkUniform function?
   }
   storage->readReverse(0);  // Set pre-function state
+
   return *(localPayload.get());
 }
 
