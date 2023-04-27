@@ -104,7 +104,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
       // TODO: fix non existing data
     }
 
-    auto locSrc = dv.rem;
+    auto locSrc = descriptorVecSize - dv.rem - 1;
     auto locDst = (!flip) ? i : length - i - 1;  // * Flipping is here
 
     assert(i < descriptor.size());

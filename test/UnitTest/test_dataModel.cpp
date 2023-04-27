@@ -190,7 +190,7 @@ TEST_F(xschema, check_construct_payload) {
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1));
     std::string expectedOutDesc = "{ INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 INTEGER str1_4 }";
-    std::string expectedOutData = "{ str1_1:16 str1_2:13 str1_3:14 str1_4:11 }";
+    std::string expectedOutData = "{ str1_1:15 str1_2:14 str1_3:13 str1_4:12 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
@@ -207,7 +207,7 @@ TEST_F(xschema, check_construct_payload) {
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1));
     std::string expectedOutDesc = "{ INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 INTEGER str1_4 }";
-    std::string expectedOutData = "{ str1_1:11 str1_2:14 str1_3:13 str1_4:16 }";
+    std::string expectedOutData = "{ str1_1:12 str1_2:13 str1_3:14 str1_4:15 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
