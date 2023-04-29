@@ -62,7 +62,7 @@ TEST_F(xschema, check_test0) {
     } else
       SPDLOG_WARN("Not found {}", i);
 
-  auto dataInternalDesciptor{
+  auto dataInternalDescriptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
       rdb::Descriptor("A[3]", rdb::INTEGER)    //
@@ -74,7 +74,7 @@ TEST_F(xschema, check_test0) {
   };
 
   {
-    streamInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDesciptor};
+    streamInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDescriptor};
 
     data.fromPayload->setItem(0, 123);
     data.fromPayload->setItem(1, 345);
@@ -89,7 +89,7 @@ TEST_F(xschema, check_test0) {
   }
 
   {
-    streamInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDesciptor};
+    streamInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDescriptor};
 
     data.fromPayload->setItem(0, 123);
     data.fromPayload->setItem(1, 345);
@@ -150,12 +150,12 @@ TEST_F(xschema, check_test1) {
 TEST_F(xschema, create_struct_local) {
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
-  auto dataStorageAndInternalDesciptor{rdb::Descriptor("A", rdb::INTEGER) |  //
+  auto dataStorageAndInternalDescriptor{rdb::Descriptor("A", rdb::INTEGER) |  //
                                        rdb::Descriptor("B", rdb::INTEGER)};
 
   streamInstance q("str1a",                          // storage and descriptor are the same name
-                   dataStorageAndInternalDesciptor,  //
-                   dataStorageAndInternalDesciptor);
+                   dataStorageAndInternalDescriptor,  //
+                   dataStorageAndInternalDescriptor);
 
   q.storage->getPayload()->setItem(0, 2);
   q.storage->getPayload()->setItem(1, atoi(build_id));
@@ -168,7 +168,7 @@ TEST_F(xschema, create_struct_local) {
 }
 
 TEST_F(xschema, check_construct_payload) {
-  auto dataInternalDesciptor{
+  auto dataInternalDescriptor{
       rdb::Descriptor("str1_0", rdb::INTEGER) |  //
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
@@ -178,7 +178,7 @@ TEST_F(xschema, check_construct_payload) {
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
 
-  streamInstance data{"str1", dataStorageDescriptor, dataInternalDesciptor};
+  streamInstance data{"str1", dataStorageDescriptor, dataInternalDescriptor};
   data.storage->setRemoveOnExit(false);
 
   // str1
