@@ -18,6 +18,9 @@ class payload {
   /// @brief Type of dumped or read numeric formats
   bool hexFormat;
 
+  template <typename T>
+  void setItemBy(const int position, std::any value);
+
  public:
   /// @brief binary dump
   bool specialDebug = false;
@@ -56,9 +59,6 @@ class payload {
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
-
-  template <typename T>
-  void setItemBy(const int position, std::any value);
 
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);

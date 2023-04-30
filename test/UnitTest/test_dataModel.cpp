@@ -151,9 +151,9 @@ TEST_F(xschema, create_struct_local) {
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
   auto dataStorageAndInternalDescriptor{rdb::Descriptor("A", rdb::INTEGER) |  //
-                                       rdb::Descriptor("B", rdb::INTEGER)};
+                                        rdb::Descriptor("B", rdb::INTEGER)};
 
-  streamInstance q("str1a",                          // storage and descriptor are the same name
+  streamInstance q("str1a",                           // storage and descriptor are the same name
                    dataStorageAndInternalDescriptor,  //
                    dataStorageAndInternalDescriptor);
 
