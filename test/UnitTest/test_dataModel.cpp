@@ -205,7 +205,30 @@ TEST_F(xschema, check_construct_payload) {
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
   }
+}
 
+TEST_F(xschema, check_construct_payload_mirror) {
+  auto dataInternalDescriptor{
+      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", rdb::BYTE)       //
+  };
+
+  auto dataStorageDescriptor{
+      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", rdb::BYTE)       //
+  };
+
+  streamInstance data{"str1", dataStorageDescriptor, dataInternalDescriptor};
+  data.storage->setRemoveOnExit(false);
+
+  // str1
+  // [0] [1]
+  //  11, 12
+  //  13, 14
+  //  15, 16
+
+  // @(4,1)  15,14,13,12
+  // @(-4,1) 12,13,14,15
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1));
     std::string expectedOutDesc = "{ INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 INTEGER str1_4 }";
