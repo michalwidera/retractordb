@@ -77,6 +77,15 @@ class xschema : public ::testing::Test {
     dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 15);
     dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 16);
     dataArea->qSet["str1"]->storage->write();
+
+    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 11);
+    dataArea->qSet["str2"]->storage->write();
+
+    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 22);
+    dataArea->qSet["str2"]->storage->write();
+
+    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 33);
+    dataArea->qSet["str2"]->storage->write();
   }
 
   virtual ~xschema() override {}

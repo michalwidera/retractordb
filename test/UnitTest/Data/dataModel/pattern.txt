@@ -25,7 +25,7 @@
 .{	INTEGER str2_0
 	BYTE str2_1
 }
-.0 Record(s)
+.3 Record(s)
 5 Byte(s) per record.
 .ok
 .
