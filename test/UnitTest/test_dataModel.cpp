@@ -17,6 +17,7 @@
 #include "retractor/dataModel.h"
 
 // ctest -R '^ut-dataModel' -V
+// ctest -R ut-dataModel
 
 extern std::string parserFile(std::string sInputFile);
 
@@ -36,7 +37,47 @@ std::unique_ptr<dataModel> dataArea;
 
 class xschema : public ::testing::Test {
  protected:
-  xschema() {}
+  xschema() {
+    SPDLOG_INFO("Constructor");
+    std::vector<std::string> cleanFilesSet = {
+        "core0.desc",   //
+        "core1.desc",   //
+        "str1",         //
+        "str1.desc",    //
+        "str2",         //
+        "str2.desc",    //
+        "str1a",        //
+        "str1a.desc",   //
+        "file_A.dat",   //
+        "file_A.desc",  //
+        "file_B.dat",   //
+        "file_B.desc"   //
+    };
+
+    for (auto i : cleanFilesSet)
+      if (std::filesystem::exists(i)) {
+        std::filesystem::remove(i);
+        SPDLOG_INFO("Drop file {}", i);
+      } else
+        SPDLOG_WARN("Not found {}", i);
+
+    // This simplified dataModel::load
+    coreInstance.clear();
+    auto compiled = parserFile("ut_example_schema.rql");
+    dataArea = std::make_unique<dataModel>(coreInstance);
+
+    dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 11);
+    dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 12);
+    dataArea->qSet["str1"]->storage->write();
+
+    dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 13);
+    dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 14);
+    dataArea->qSet["str1"]->storage->write();
+
+    dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 15);
+    dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 16);
+    dataArea->qSet["str1"]->storage->write();
+  }
 
   virtual ~xschema() override {}
 
@@ -45,23 +86,7 @@ class xschema : public ::testing::Test {
   void TearDown() override { SPDLOG_INFO("TearDown"); }
 };
 
-// ctest -R ut-dataModel
-
 TEST_F(xschema, check_test0) {
-  std::vector<std::string> cleanFilesSet = {
-      "file_A.dat",   //
-      "file_A.desc",  //
-      "file_B.dat",   //
-      "file_B.desc"   //
-  };
-
-  for (auto i : cleanFilesSet)
-    if (std::filesystem::exists(i)) {
-      std::filesystem::remove(i);
-      SPDLOG_INFO("Drop file {}", i);
-    } else
-      SPDLOG_WARN("Not found {}", i);
-
   auto dataInternalDescriptor{
       rdb::Descriptor("A[1]", rdb::INTEGER) |  //
       rdb::Descriptor("A[2]", rdb::INTEGER) |  //
@@ -104,42 +129,7 @@ TEST_F(xschema, check_test0) {
   }
 }
 
-TEST_F(xschema, check_test1) {
-  std::vector<std::string> cleanFilesSet = {"core0.desc",  //
-                                            "core1.desc",  //
-                                            "str1",        //
-                                            "str1.desc",   //
-                                            "str2",        //
-                                            "str2.desc",   //
-                                            "str1a",       //
-                                            "str1a.desc"};
-
-  for (auto i : cleanFilesSet)
-    if (std::filesystem::exists(i)) {
-      std::filesystem::remove(i);
-      SPDLOG_INFO("Drop file {}", i);
-    } else
-      SPDLOG_WARN("Not found {}", i);
-
-  // This simplified dataModel::load
-  coreInstance.clear();
-  auto compiled = parserFile("ut_example_schema.rql");
-  ASSERT_TRUE(compiled == "OK");
-  dataArea = std::make_unique<dataModel>(coreInstance);
-
-  // Todo
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 11);
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 12);
-  dataArea->qSet["str1"]->storage->write();
-
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 13);
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 14);
-  dataArea->qSet["str1"]->storage->write();
-
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 15);
-  dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 16);
-  dataArea->qSet["str1"]->storage->write();
-
+TEST_F(xschema, check_test_check_constructor) {
   SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->storage->getRecordsCount());
 
   ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 3);
@@ -147,38 +137,31 @@ TEST_F(xschema, check_test1) {
   ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
 }
 
-TEST_F(xschema, create_struct_local) {
+TEST_F(xschema, create_struct_local_str1a) {
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
-  auto dataStorageAndInternalDescriptor{rdb::Descriptor("A", rdb::INTEGER) |  //
-                                        rdb::Descriptor("B", rdb::INTEGER)};
+  auto dataDescriptor{rdb::Descriptor("A", rdb::INTEGER) |  //
+                      rdb::Descriptor("B", rdb::INTEGER)};
 
-  streamInstance q("str1a",                           // storage and descriptor are the same name
-                   dataStorageAndInternalDescriptor,  //
-                   dataStorageAndInternalDescriptor);
+  streamInstance q("str1a",         // storage and descriptor are the same name
+                   dataDescriptor,  //
+                   dataDescriptor);
 
   q.storage->getPayload()->setItem(0, 2);
   q.storage->getPayload()->setItem(1, atoi(build_id));
   q.storage->write();
   q.storage->setRemoveOnExit(false);
 
-  std::cerr << q.storage->getRecordsCount() << std::endl;
-
   ASSERT_TRUE(q.storage->getRecordsCount() == 1);
 }
 
 TEST_F(xschema, check_construct_payload) {
-  auto dataInternalDescriptor{
+  auto dataDescriptor{
       rdb::Descriptor("str1_0", rdb::INTEGER) |  //
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
 
-  auto dataStorageDescriptor{
-      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
-      rdb::Descriptor("str1_1", rdb::BYTE)       //
-  };
-
-  streamInstance data{"str1", dataStorageDescriptor, dataInternalDescriptor};
+  streamInstance data{"str1", dataDescriptor, dataDescriptor};
   data.storage->setRemoveOnExit(false);
 
   // str1
@@ -200,7 +183,7 @@ TEST_F(xschema, check_construct_payload) {
 
     // payload->specialDebug = true;
     // std::cerr << "t " << rdb::flat << payload.get()->getDescriptor() << std::endl;
-    // std::cerr << "t " << rdb::flat << *(payload.get())  << std::endl ;
+    // std::cerr << "t " << rdb::flat << *(payload.get()) << std::endl;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
