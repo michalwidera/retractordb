@@ -200,17 +200,12 @@ TEST_F(xschema, check_construct_payload) {
 }
 
 TEST_F(xschema, check_construct_payload_mirror) {
-  auto dataInternalDescriptor{
+  auto dataDescriptor{
       rdb::Descriptor("str1_0", rdb::INTEGER) |  //
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
 
-  auto dataStorageDescriptor{
-      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
-      rdb::Descriptor("str1_1", rdb::BYTE)       //
-  };
-
-  streamInstance data{"str1", dataStorageDescriptor, dataInternalDescriptor};
+  streamInstance data{"str1", dataDescriptor, dataDescriptor};
   data.storage->setRemoveOnExit(false);
 
   // str1
@@ -229,6 +224,52 @@ TEST_F(xschema, check_construct_payload_mirror) {
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
+
+    ASSERT_TRUE(expectedOutData == coutstring2.str());
+    ASSERT_TRUE(expectedOutDesc == coutstring1.str());
+  }
+}
+
+TEST_F(xschema, check_sum) {
+  auto dataDescriptorStr1{
+      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", rdb::BYTE)       //
+  };
+
+  auto dataDescriptorStr2Storage{
+      rdb::Descriptor("str2_0", rdb::INTEGER)
+  };
+  auto dataDescriptorStr2Internal{
+      rdb::Descriptor("str2_0", rdb::INTEGER) |  //
+      rdb::Descriptor("str2_1", rdb::BYTE)       //
+  };
+
+  streamInstance dataStr1{"str1", dataDescriptorStr1, dataDescriptorStr1};
+  dataStr1.storage->setRemoveOnExit(false);
+
+  // Tutaj trzeba sprawdzic co tu jest storage a co internal - bo chyba doszlo do zamiany
+  streamInstance dataStr2{"str2", dataDescriptorStr2Internal, dataDescriptorStr2Storage }; 
+  dataStr2.storage->setRemoveOnExit(false);
+
+  // str1
+  // [0] [1]
+  //  11, 12
+  //  13, 14
+  //  15, 16
+
+  // str2
+  // 11
+  // 22
+  // 33
+  // 44
+  {
+    auto payload = *(dataStr1.storage->getPayload()) + *(dataStr2.storage->getPayload());
+    std::string expectedOutDesc = "{ INTEGER str1_0 BYTE str1_1 INTEGER str2_0 BYTE str2_1 }";
+    std::string expectedOutData = "{ str1_0:0 str1_1:0 str2_0:0 str2_1:0 }";
+    std::stringstream coutstring1;
+    coutstring1 << rdb::flat << payload.getDescriptor();
+    std::stringstream coutstring2;
+    coutstring2 << rdb::flat << payload;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
