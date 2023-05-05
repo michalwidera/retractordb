@@ -236,9 +236,7 @@ TEST_F(xschema, check_sum) {
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
 
-  auto dataDescriptorStr2Storage{
-      rdb::Descriptor("str2_0", rdb::INTEGER)
-  };
+  auto dataDescriptorStr2Storage{rdb::Descriptor("str2_0", rdb::INTEGER)};
   auto dataDescriptorStr2Internal{
       rdb::Descriptor("str2_0", rdb::INTEGER) |  //
       rdb::Descriptor("str2_1", rdb::BYTE)       //
@@ -248,7 +246,7 @@ TEST_F(xschema, check_sum) {
   dataStr1.storage->setRemoveOnExit(false);
 
   // Tutaj trzeba sprawdzic co tu jest storage a co internal - bo chyba doszlo do zamiany
-  streamInstance dataStr2{"str2", dataDescriptorStr2Internal, dataDescriptorStr2Storage }; 
+  streamInstance dataStr2{"str2", dataDescriptorStr2Internal, dataDescriptorStr2Storage};
   dataStr2.storage->setRemoveOnExit(false);
 
   // str1

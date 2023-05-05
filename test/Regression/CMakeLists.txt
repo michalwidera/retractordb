@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
-project(regression-test)
-
 # these set of 3 commands will copy artifacts from Regression/Data into
 # build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
 # then copy.

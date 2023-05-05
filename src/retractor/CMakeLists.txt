@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+
 project(xretractor LANGUAGES CXX)
 
 add_subdirectory(Parser)

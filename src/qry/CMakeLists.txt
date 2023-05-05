@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+
 project(xqry LANGUAGES CXX)
 
 set(SOURCES_QRY qryLauncher.cpp qry.cpp)

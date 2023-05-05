@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+
 project(parser LANGUAGES CXX)
 
 find_package(antlr4-runtime REQUIRED)
