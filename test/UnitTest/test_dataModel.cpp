@@ -78,13 +78,13 @@ class xschema : public ::testing::Test {
     dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 16);
     dataArea->qSet["str1"]->storage->write();
 
-    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 11);
+    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 111);
     dataArea->qSet["str2"]->storage->write();
 
-    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 22);
+    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 222);
     dataArea->qSet["str2"]->storage->write();
 
-    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 33);
+    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 333);
     dataArea->qSet["str2"]->storage->write();
   }
 
@@ -261,9 +261,11 @@ TEST_F(xschema, check_sum) {
   // 33
   // 44
   {
+    dataStr1.storage->read(0);
+    dataStr2.storage->read(0);
     auto payload = *(dataStr1.storage->getPayload()) + *(dataStr2.storage->getPayload());
     std::string expectedOutDesc = "{ INTEGER str1_0 BYTE str1_1 INTEGER str2_0 BYTE str2_1 }";
-    std::string expectedOutData = "{ str1_0:0 str1_1:0 str2_0:0 str2_1:0 }";
+    std::string expectedOutData = "{ str1_0:11 str1_1:12 str2_0:111 str2_1:0 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.getDescriptor();
     std::stringstream coutstring2;
