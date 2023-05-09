@@ -135,6 +135,7 @@ class ParserListener : public RQLBaseListener {
     qry.rInterval = rationalResult;
     coreInstance.push_back(qry);
     qry.reset();
+    fieldCount = 0;
   }
 
   // https://www.programiz.com/cpp-programming/string-float-conversion
@@ -154,11 +155,17 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSelect(RQLParser::SelectContext* ctx) {
+    // this loop creates field names in streamName + "_" + counter++
+    for (auto& i : qry.lSchema) {
+      if (i.fieldName.substr(0, 1) == "_") i.fieldName = ctx->ID()->getText() + i.fieldName;
+    }
+
     qry.id = ctx->ID()->getText();
     qry.lProgram = program;
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
+    fieldCount = 0;
   }
 
   void exitStorage(RQLParser::StorageContext* ctx) {
@@ -175,6 +182,7 @@ class ParserListener : public RQLBaseListener {
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
+    fieldCount = 0;
   }
 
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext* ctx) {
@@ -187,12 +195,14 @@ class ParserListener : public RQLBaseListener {
 
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx) {
     recpToken(PUSH_TSCAN, ctx->getText());
-    qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, "todo 3"));
+    qry.lSchema.push_back(
+        field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, "todo 3"));
     program.clear();
   }
 
   void exitExpression(RQLParser::ExpressionContext* ctx) {
-    qry.lSchema.push_back(field("Field_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, "todo 2"));
+    qry.lSchema.push_back(
+        field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, "todo 2"));
     program.clear();
   }
 

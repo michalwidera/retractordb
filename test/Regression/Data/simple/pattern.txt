@@ -5,15 +5,15 @@ str1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_ADD
-	Field_0:
+	str1_0:
 		PUSH_ID(core0[0])
 		PUSH_VAL(10)
 		MULTIPLY
-	Field_1:
+	str1_1:
 		PUSH_ID(core1[0])
 		PUSH_VAL(10)
 		MULTIPLY
-	Field_2:
+	str1_2:
 		PUSH_ID(core0[0])
 		PUSH_ID(core1[0])
 		MULTIPLY

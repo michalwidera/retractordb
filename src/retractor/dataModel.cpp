@@ -60,10 +60,10 @@ streamInstance::streamInstance(                //
 }
 
 streamInstance::streamInstance(query& qry)
-    : streamInstance(qry.id,                     // descriptor file
-                     qry.filename,               // storage file
-                     qry.descriptorFrom(),       //
-                     qry.descriptorExpression()  //
+    : streamInstance(qry.id,                   // descriptor file
+                     qry.filename,             // storage file
+                     qry.descriptorStorage(),  //
+                     qry.descriptorFrom()      //
       ) {
   SPDLOG_INFO("streamInstance <- qry");
 };

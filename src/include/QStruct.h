@@ -87,7 +87,7 @@ class query {
 
   void reset();
 
-  rdb::Descriptor descriptorExpression();
+  rdb::Descriptor descriptorStorage();
   rdb::Descriptor descriptorFrom();
 
   friend std::ostream &operator<<(std::ostream &os, const query &s);

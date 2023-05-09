@@ -4,14 +4,14 @@ str1(1/3)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_HASH
-	Field_0:
+	str1_0:
 		PUSH_ID(core0[0])
-	Field_1:
+	str1_1:
 		PUSH_ID(core0[1])
 str2(1/2)
 	:- PUSH_STREAM(core1)
 	:- STREAM_SUBSTRACT(1/2)
-	Field_2:
+	str2_0:
 		PUSH_ID(core1[0])
 		PUSH_VAL(1)
 		ADD
@@ -19,15 +19,15 @@ str2(1/2)
 		MULTIPLY
 		PUSH_VAL(1)
 		ADD
-	Field_3:
+	str2_1:
 		PUSH_VAL(1)
 str3(1/2)
 	:- PUSH_STREAM(core1)
 	:- PUSH_STREAM(core0)
 	:- STREAM_ADD
-	Field_4:
+	str3_0:
 		PUSH_ID(core0[0])
-	Field_5:
+	str3_1:
 		PUSH_ID(core0[1])
 core1(1/2)	datafile3.dat
 	c:

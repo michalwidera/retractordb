@@ -165,12 +165,7 @@ TEST_F(xschema, create_struct_local_str1a) {
 }
 
 TEST_F(xschema, check_construct_payload) {
-  auto dataDescriptor{
-      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
-      rdb::Descriptor("str1_1", rdb::BYTE)       //
-  };
-
-  streamInstance data{"str1", dataDescriptor, dataDescriptor};
+  streamInstance data{coreInstance["str1"]};
   data.storage->setRemoveOnExit(false);
 
   // str1
@@ -190,9 +185,8 @@ TEST_F(xschema, check_construct_payload) {
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
 
-    // payload->specialDebug = true;
-    // std::cerr << "t " << rdb::flat << payload.get()->getDescriptor() << std::endl;
-    // std::cerr << "t " << rdb::flat << *(payload.get()) << std::endl;
+    std::cerr << "t " << coutstring2.str() << std::endl;
+    std::cerr << "t " << coutstring1.str() << std::endl;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
@@ -205,7 +199,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
       rdb::Descriptor("str1_1", rdb::BYTE)       //
   };
 
-  streamInstance data{"str1", dataDescriptor, dataDescriptor};
+  streamInstance data{coreInstance["str1"]};
   data.storage->setRemoveOnExit(false);
 
   // str1
@@ -225,29 +219,22 @@ TEST_F(xschema, check_construct_payload_mirror) {
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
 
+    std::cerr << "t " << coutstring2.str() << std::endl;
+    std::cerr << "t " << coutstring1.str() << std::endl;
+
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
   }
 }
 
 TEST_F(xschema, check_sum) {
-  auto dataDescriptorStr1{
-      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
-      rdb::Descriptor("str1_1", rdb::BYTE)       //
-  };
-
-  auto dataDescriptorStr2Storage{rdb::Descriptor("str2_0", rdb::INTEGER)};
-  auto dataDescriptorStr2Internal{
-      rdb::Descriptor("str2_0", rdb::INTEGER) |  //
-      rdb::Descriptor("str2_1", rdb::BYTE)       //
-  };
-
-  streamInstance dataStr1{"str1", dataDescriptorStr1, dataDescriptorStr1};
+  streamInstance dataStr1{coreInstance["str1"]};
   dataStr1.storage->setRemoveOnExit(false);
+  dataStr1.storage->read(0);
 
-  // Tutaj trzeba sprawdzic co tu jest storage a co internal - bo chyba doszlo do zamiany
-  streamInstance dataStr2{"str2", dataDescriptorStr2Internal, dataDescriptorStr2Storage};
+  streamInstance dataStr2{coreInstance["str2"]};
   dataStr2.storage->setRemoveOnExit(false);
+  dataStr2.storage->read(0);
 
   // str1
   // [0] [1]
@@ -261,15 +248,16 @@ TEST_F(xschema, check_sum) {
   // 33
   // 44
   {
-    dataStr1.storage->read(0);
-    dataStr2.storage->read(0);
     auto payload = *(dataStr1.storage->getPayload()) + *(dataStr2.storage->getPayload());
-    std::string expectedOutDesc = "{ INTEGER str1_0 BYTE str1_1 INTEGER str2_0 BYTE str2_1 }";
-    std::string expectedOutData = "{ str1_0:11 str1_1:12 str2_0:111 str2_1:0 }";
+    std::string expectedOutDesc = "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }";
+    std::string expectedOutData = "{ str1_0:11 str1_1:12 str2_0:111 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << payload;
+
+    std::cerr << "t " << coutstring2.str() << std::endl;
+    std::cerr << "t " << coutstring1.str() << std::endl;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());

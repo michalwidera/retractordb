@@ -302,7 +302,7 @@ std::vector<std::string> query::getDepStream() {
   return lRetVal;
 }
 
-rdb::Descriptor query::descriptorExpression() {
+rdb::Descriptor query::descriptorStorage() {
   rdb::Descriptor retVal{};
   for (auto &f : lSchema) {
     bool isTableType = (f.fieldType == rdb::STRING) ||     //
@@ -313,14 +313,7 @@ rdb::Descriptor query::descriptorExpression() {
     else
       retVal | rdb::Descriptor(f.fieldName, f.fieldType);
   }
-  return retVal;
-}
-
-rdb::Descriptor query::descriptorFrom() {
-  SPDLOG_INFO("call query::descriptorFrom()");
-  rdb::Descriptor retVal{};
   if (isDeclaration()) {
-    retVal | descriptorExpression();
     retVal | rdb::Descriptor(filename, rdb::REF);
 
     auto filenameShdw{filename};
@@ -329,6 +322,15 @@ rdb::Descriptor query::descriptorFrom() {
       retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
     else
       retVal | rdb::Descriptor("DEVICE", rdb::TYPE);
+  }
+  return retVal;
+}
+
+rdb::Descriptor query::descriptorFrom() {
+  SPDLOG_INFO("call query::descriptorFrom()");
+  rdb::Descriptor retVal{};
+  if (isDeclaration()) {
+    retVal | descriptorStorage();
     return retVal;
   }
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};

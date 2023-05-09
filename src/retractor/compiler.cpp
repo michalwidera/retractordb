@@ -271,17 +271,18 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
   else if (cmd == STREAM_DEHASH_MOD)
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_ADD) {
+    int fieldCount = 0;
     int i = 0;
     for (auto f : getQuery(sName1).lSchema) {
       field intf;
-      intf.fieldName = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
+      intf.fieldName = /*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCount++);
       intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
       field intf;
-      intf.fieldName = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
+      intf.fieldName = /*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCount++);
       intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName2, i++)));
       lRetVal.push_back(intf);
     }
@@ -376,6 +377,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
 // In such case unroll does not appear and algorithm gets shitin-shitout
 
 std::string prepareFields() {
+  int fieldCount = 0;
   coreInstance.tsort();
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
@@ -399,7 +401,7 @@ std::string prepareFields() {
             for (auto s : getQuery(t.getStr_()).lSchema) {
               std::list<token> lTempProgram;
               lTempProgram.push_back(token(PUSH_ID, std::pair<std::string, int>(nameOfscanningTable, filedPosition++)));
-              std::string name = "Field_" + boost::lexical_cast<std::string>(fieldCount++);
+              std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCount++);
               q.lSchema.push_back(field(name, lTempProgram, rdb::INTEGER, ""));
             }
             break;

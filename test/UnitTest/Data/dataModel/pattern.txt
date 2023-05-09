@@ -17,15 +17,14 @@
 8 Byte(s) per record.
 .ok
 .{	INTEGER str1_0
-	BYTE str1_1
+	INTEGER str1_1
 }
 .3 Record(s)
-5 Byte(s) per record.
+8 Byte(s) per record.
 .ok
 .{	INTEGER str2_0
-	BYTE str2_1
 }
 .3 Record(s)
-5 Byte(s) per record.
+4 Byte(s) per record.
 .ok
 .
