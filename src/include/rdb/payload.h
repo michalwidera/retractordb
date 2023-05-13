@@ -16,7 +16,7 @@ class payload {
   std::unique_ptr<uint8_t[]> payloadData;
 
   /// @brief Type of dumped or read numeric formats
-  bool hexFormat;
+  bool hexFormat = false;
 
   template <typename T>
   void setItemBy(const int position, std::any value);
