@@ -84,7 +84,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
   COMMAND bash -c "set -e ; \
   valgrind --error-exitcode=1 --leak-check=full xretractor query.rql -c")
-  
+
 # -----------------------------------------------------------------------------------------------
 
 add_test(
@@ -100,10 +100,11 @@ add_test(
   NAME rg-xcompiler-simple-vg
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
   COMMAND
-    bash -c "set -e ; \
+    bash -c
+    "set -e ; \
     valgrind --error-exitcode=1 --leak-check=full xretractor query-simple.rql -c > out.txt ; \
-    valgrind --error-exitcode=1 --leak-check=full xretractor query-simple.rql -m 5")
-
+    valgrind --error-exitcode=1 --leak-check=full xretractor query-simple.rql -m 5"
+)
 
 # -----------------------------------------------------------------------------------------------
 

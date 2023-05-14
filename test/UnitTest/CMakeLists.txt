@@ -68,8 +68,9 @@ add_test(
 add_test(
   NAME ut-xqry-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
-  COMMAND valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
-    
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
+
 add_test(
   NAME ut-xtrdb
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
@@ -78,8 +79,9 @@ add_test(
 add_test(
   NAME ut-xtrdb-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
-  COMMAND valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
-  
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
+
 add_test(
   NAME ut-expeval
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
@@ -88,7 +90,8 @@ add_test(
 add_test(
   NAME ut-expeval-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
-  COMMAND valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
 
 add_test(
   NAME ut-compiler
@@ -98,8 +101,9 @@ add_test(
 add_test(
   NAME ut-compiler-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/compiler
-  COMMAND valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
-  
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
+
 add_test(
   NAME ut-dataModel
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
@@ -109,8 +113,11 @@ add_test(
 add_test(
   NAME ut-dataModel-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
-  COMMAND bash -c "set -e ; \
-  valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
+  COMMAND
+    bash -c
+    "set -e ; \
+  valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel"
+)
 
 add_test(
   NAME ut-dataModel-comp

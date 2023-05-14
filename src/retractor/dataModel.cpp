@@ -143,6 +143,15 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instanc
   return qSet[instance]->storage->getPayload();
 }
 
+// TODO: work area
+void dataModel::processRows(std::set<std::string> inSet) {
+  for (auto q : coreInstance) {
+    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
+    if (q.isDeclaration()) continue;                // Declarations are not need to process
+    computeInstance(q.id);
+  }
+}
+
 void dataModel::computeInstance(std::string instance) {
   auto qry = coreInstance[instance];
 
@@ -211,6 +220,7 @@ void dataModel::computeInstance(std::string instance) {
       *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
     } break;
     case STREAM_HASH:
+      // TODO hash operation on payloads
       assert(false && "TODO");
     default:
       SPDLOG_ERROR("Undefined command_id:{}", cmd);
