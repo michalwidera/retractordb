@@ -129,11 +129,22 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
   return *this;
 }
 
+// this      rhs
+// 4,INT  == 1,BYTE   1
+// 1,BYTE == 4,INT    0
+// 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) {
-  if (size() == rhs.size()) {
+  auto refCount = std::count_if(rhs.begin(), rhs.end(),                          //
+                                [](const rfield &i) {                            //
+                                  return std::get<rdb::rtype>(i) == rdb::REF ||  //
+                                         std::get<rdb::rtype>(i) == rdb::TYPE;
+                                });
+
+  if (size() == rhs.size() - refCount) {
     auto i = 0;
     for (rfield &f : *this)
-      if (std::get<rdb::rlen>(f) != std::get<rdb::rlen>(rhs[i]) || std::get<rdb::rtype>(f) != std::get<rdb::rtype>(rhs[i]))
+      if (std::get<rdb::rlen>(f) < std::get<rdb::rlen>(rhs[i]) ||  //
+          std::get<rdb::rtype>(f) > std::get<rdb::rtype>(rhs[i]))
         return false;
       else
         i++;

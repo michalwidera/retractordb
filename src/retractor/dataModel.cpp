@@ -156,10 +156,10 @@ void dataModel::computeInstance(std::string instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
+  assert(qry.lProgram.size() > 0 && "all stream are not declarations");
 
-  token arg[3];
-  int i = 0;
-  for (auto tk : qry.lProgram) arg[i++] = tk;
+  std::vector<token> arg;
+  for (auto tk : qry.lProgram) arg.push_back(tk);
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
 
@@ -210,7 +210,7 @@ void dataModel::computeInstance(std::string instance) {
       // TODO support renaming of double-same fields after merge
       break;
     case STREAM_AGSE: {
-      assert(qry.lProgram.size() == 2);                        // (program sequence)
+      assert(arg.size() == 2);                                 // (program sequence)
       std::string nameSrc = arg[0].getStr_();                  // 0: PUSH_STREAM core -> delta_source (arg[0]) - operation
       auto reg = get<std::pair<int, int>>(operation.getVT());  // 1: STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
       int step = reg.first;                                    //
@@ -221,7 +221,28 @@ void dataModel::computeInstance(std::string instance) {
     } break;
     case STREAM_HASH:
       // TODO hash operation on payloads
-      assert(false && "TODO");
+      // 	:- PUSH_STREAM(core0)
+      //  :- PUSH_STREAM(core1)
+      //  :- STREAM_HASH
+      {
+        assert(arg.size() == 3);
+        const auto nameSrc1 = arg[0].getStr_();
+        const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
+        const auto nameSrc2 = arg[1].getStr_();
+        const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
+
+        const auto recordOffset = qSet[instance]->storage->getRecordsCount();
+
+        int retPos;
+        if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
+          qSet[nameSrc1]->storage->read(retPos);
+          *(qSet[instance]->fromPayload) = *getPayload(nameSrc1);
+        } else {
+          qSet[nameSrc2]->storage->read(retPos);
+          *(qSet[instance]->fromPayload) = *getPayload(nameSrc2);
+        }
+      }
+      break;
     default:
       SPDLOG_ERROR("Undefined command_id:{}", cmd);
       abort();

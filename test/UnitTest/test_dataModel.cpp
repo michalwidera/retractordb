@@ -264,4 +264,19 @@ TEST_F(xschema, check_sum) {
   }
 }
 
+TEST_F(xschema, compute_instance_1) {
+  // str1
+  // [0] [1]
+  //  11, 12
+  //  13, 14
+  //  15, 16
+
+  // str2
+  // 11
+  // 22
+  // 33
+  // 44
+  { dataArea->computeInstance("str1"); }
+}
+
 }  // namespace
