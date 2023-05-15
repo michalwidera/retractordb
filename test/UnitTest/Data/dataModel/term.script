@@ -11,5 +11,9 @@ size
 open str2
 desc
 size
-rem dropfile { core0.desc core1.desc str1 str1.desc str2 str2.desc }
+open str3
+desc
+open str4
+desc
+rem dropfile { core0.desc core1.desc str1 str1.desc str2 str2.desc str3 str3.desc str4 str4.desc str5 str5.desc}
 quit

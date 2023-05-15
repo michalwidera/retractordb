@@ -105,6 +105,13 @@ add_test(
     ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
 
 add_test(
+  NAME ut-dataModel-compile
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
+  COMMAND sh -c "set -e ; \
+    xretractor ut_example_schema.rql -c > out_compile.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt")
+
+add_test(
   NAME ut-dataModel-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
   COMMAND valgrind --error-exitcode=1 --leak-check=full
