@@ -200,35 +200,40 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
+      assert(false && "TODO");
       *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_());
       break;
     case STREAM_SUM:
       assert(false && "TODO");
-    case STREAM_ADD:
-      *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_()) + *getPayload(arg[1].getStr_());
-      // operator + from payload payload::operator+(payload &other) step into action here
-      // TODO support renaming of double-same fields after merge
-      break;
+    case STREAM_ADD: {
+      // operator + from payload payload::operator+(payload &other) step into
+      // action here
+      // TODO support renaming of double-same fields after merge?
+      const auto nameSrc1 = arg[0].getStr_();
+      const auto nameSrc2 = arg[1].getStr_();
+      qSet[nameSrc1]->storage->readReverse(0);
+      qSet[nameSrc2]->storage->readReverse(0);
+      *(qSet[instance]->fromPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
+    } break;
     case STREAM_AGSE: {
-      assert(arg.size() == 2);                                 // (program sequence)
-      std::string nameSrc = arg[0].getStr_();                  // 0: PUSH_STREAM core -> delta_source (arg[0]) - operation
-      auto reg = get<std::pair<int, int>>(operation.getVT());  // 1: STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
-      int step = reg.first;                                    //
-      int length = reg.second;                                 //
-      assert(step >= 0);                                       //
+      // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
+      //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
+      assert(arg.size() == 2);
+      const auto nameSrc = arg[0].getStr_();
+      auto [step, length] = get<std::pair<int, int>>(operation.getVT());
+      assert(step >= 0);
 
       *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
     } break;
     case STREAM_HASH:
-      // TODO hash operation on payloads
       // 	:- PUSH_STREAM(core0)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
       {
         assert(arg.size() == 3);
         const auto nameSrc1 = arg[0].getStr_();
-        const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
         const auto nameSrc2 = arg[1].getStr_();
+        const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
         const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
 
         const auto recordOffset = qSet[instance]->storage->getRecordsCount();
