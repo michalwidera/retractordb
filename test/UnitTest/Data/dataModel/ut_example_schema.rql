@@ -5,3 +5,4 @@ SELECT str2[0]+5 STREAM str2 FROM core0
 SELECT str3[0] STREAM str3 FROM core0+core1
 SELECT str4[0] STREAM str4 FROM core0%2
 SELECT str5[0] STREAM str5 FROM core0>1
+SELECT str6[0] STREAM str6 FROM core0

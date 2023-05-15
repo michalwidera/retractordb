@@ -28,6 +28,10 @@ str5(1/1)
 	:- STREAM_TIMEMOVE
 	str5_0:
 		PUSH_ID(str5[0])
+str6(1/1)
+	:- PUSH_STREAM(core0)
+	str6_0:
+		PUSH_ID(str6[0])
 core0(1/1)	datafile1.txt
 	a:
 	b:

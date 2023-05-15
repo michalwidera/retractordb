@@ -13,7 +13,7 @@ find_package(antlr4-runtime REQUIRED)
 find_package(GTest REQUIRED)
 
 find_program(PROG valgrind REQUIRED)
-message(STATUS "Tool: ${PROG}")
+message(STATUS "Required tool: ${PROG}")
 
 enable_testing()
 
