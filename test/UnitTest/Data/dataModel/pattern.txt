@@ -2,16 +2,16 @@
 .ok
 .{	INTEGER a
 	BYTE b
-	REF "/dev/urandom"
-	TYPE DEVICE
+	REF "datafile1.txt"
+	TYPE TEXTSOURCE
 }
 .1 Record(s)
 5 Byte(s) per record.
 .ok
 .{	INTEGER c
 	INTEGER d
-	REF "/dev/urandom"
-	TYPE DEVICE
+	REF "datafile2.txt"
+	TYPE TEXTSOURCE
 }
 .1 Record(s)
 8 Byte(s) per record.
