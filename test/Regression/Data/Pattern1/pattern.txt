@@ -4,14 +4,14 @@ str1(1/3)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_HASH
-	str1_0:
+	str1_0: INTEGER
 		PUSH_ID(core0[0])
-	str1_1:
+	str1_1: INTEGER
 		PUSH_ID(core0[1])
 str2(1/2)
 	:- PUSH_STREAM(core1)
 	:- STREAM_SUBSTRACT(1/2)
-	str2_0:
+	str2_0: INTEGER
 		PUSH_ID(core1[0])
 		PUSH_VAL(1)
 		ADD
@@ -19,19 +19,19 @@ str2(1/2)
 		MULTIPLY
 		PUSH_VAL(1)
 		ADD
-	str2_1:
+	str2_1: INTEGER
 		PUSH_VAL(1)
 str3(1/2)
 	:- PUSH_STREAM(core1)
 	:- PUSH_STREAM(core0)
 	:- STREAM_ADD
-	str3_0:
+	str3_0: INTEGER
 		PUSH_ID(core0[0])
-	str3_1:
+	str3_1: INTEGER
 		PUSH_ID(core0[1])
 core1(1/2)	datafile3.dat
-	c:
-	d:
+	c: INTEGER
+	d: INTEGER
 core0(1/1)	datafile2.dat
-	a:
-	b:
+	a: INTEGER
+	b: INTEGER

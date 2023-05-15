@@ -2,18 +2,18 @@ Input file:query-unfold.rql
 Compile result:OK
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
-	datasrc_0:
+	datasrc_0: INTEGER
 		PUSH_ID(datasrc[0])
-	datasrc_1:
+	datasrc_1: INTEGER
 		PUSH_ID(datasrc[1])
 out2(1/2)
 	:- PUSH_STREAM(datasrc)
-	out2_0:
+	out2_0: INTEGER
 		PUSH_VAL(1)
-	out2_1:
+	out2_1: INTEGER
 		PUSH_ID(datasrc[0])
-	out2_2:
+	out2_2: INTEGER
 		PUSH_ID(datasrc[1])
 datasrc(1/2)	datafile2.dat
-	a:
-	b:
+	a: INTEGER
+	b: INTEGER

@@ -2,7 +2,7 @@ Input file:query.rql
 Compile result:OK
 str1(1/2)
 	:- PUSH_STREAM(core1)
-	str1_0:
+	str1_0: INTEGER
 		PUSH_ID(core1[0])
 		PUSH_VAL(1)
 		ADD
@@ -10,19 +10,19 @@ str2(1/2)
 	:- PUSH_STREAM(core1)
 	:- PUSH_STREAM(core0)
 	:- STREAM_ADD
-	str2_0:
+	str2_0: INTEGER
 		PUSH_ID(core1[0])
 		PUSH_VAL(2)
 		DIVIDE
 		PUSH_VAL(1)
 		ADD
-	str2_1:
+	str2_1: INTEGER
 		PUSH_ID(core0[0])
 core1(1/2)	/dev/urandom
-	c:
+	c: BYTE
 str0(1/1)
 	:- PUSH_STREAM(core0)
-	str0_0:
+	str0_0: INTEGER
 		PUSH_ID(core0[0])
 core0(1/1)	/dev/urandom
-	a:
+	a: BYTE

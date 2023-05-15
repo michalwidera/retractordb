@@ -18,7 +18,7 @@ extern "C" qTree coreInstance;
 // 2. dot -Tjpg out.dot -o file.jpg
 // 3. start file.jgp
 //
-void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowFieldTypes) {
+void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
@@ -68,7 +68,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
         std::replace(name.begin(), name.end(), '}', '/');
         std::string fieldText(f.getFieldText());
         xout << fieldText;
-        if (bShowFieldTypes) std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
+        std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
       }
       xout << "}";
     }  // if ( bShowFileds ) - end of fields in stream
@@ -242,7 +242,7 @@ void dumpQSet() {
   }
 }
 
-void dumpRawTextFile(bool bShowFieldTypes) {
+void dumpRawTextFile() {
   for (auto q : coreInstance) {
     std::cout << q.id << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
@@ -258,8 +258,7 @@ void dumpRawTextFile(bool bShowFieldTypes) {
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
     for (auto f : q.lSchema) {
       std::cout << "\t";
-      std::cout << f.fieldName << ":";
-      if (bShowFieldTypes) std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
+      std::cout << f.fieldName << ": " << GetStringdescFld(f.fieldType);
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {
@@ -288,7 +287,6 @@ int dumper(int argc, char *argv[]) {
         ("streamprogs,s", "show stream programs in dot file")    //
         ("sdump,p", "take as input file executor dump")          //
         ("leavedot,e", "dont delete temporary dot file")         //
-        ("showtypes,w", "show field types in dot file")          //
         ("onlycompile,c", "compile only mode");                  // linking inheritance from launcher
 
     po::variables_map vm;
@@ -322,8 +320,7 @@ int dumper(int argc, char *argv[]) {
       const std::string sTempPngFile("temp_$$$.png");
       {
         std::ofstream ofs(sTempDotFile.c_str());
-        dumpGraphiz(ofs, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0,
-                    vm.count("showtypes") != 0);
+        dumpGraphiz(ofs, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0);
       }
       auto ret = std::system(std::string("dot -Tpng " + sTempDotFile + " -o " + sTempPngFile).c_str());
       if (ret < 0)
@@ -333,8 +330,7 @@ int dumper(int argc, char *argv[]) {
       if (!vm.count("leavedot")) std::remove(sTempDotFile.c_str());
       std::cerr << "type: start " << sTempPngFile << std::endl;
     } else if (vm.count("dot")) {
-      dumpGraphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0,
-                  vm.count("showtypes") != 0);
+      dumpGraphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0);
     } else if (vm.count("csv")) {
       std::cerr << "Core count:" << (int)coreInstance.size() << std::endl;
       dumpQSet();
@@ -343,7 +339,7 @@ int dumper(int argc, char *argv[]) {
       dumpQFieldsProgram();
     } else {
       // Default
-      dumpRawTextFile(vm.count("showtypes"));
+      dumpRawTextFile();
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << std::endl;

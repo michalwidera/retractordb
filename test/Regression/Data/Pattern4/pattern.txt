@@ -2,24 +2,24 @@ Input file:query-crc.rql
 Compile result:OK
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
-	out1_0:
+	out1_0: INTEGER
 		PUSH_ID(datasrc[0])
-	out1_1:
+	out1_1: INTEGER
 		PUSH_ID(datasrc[1])
-	out1_2:
+	out1_2: INTEGER
 		PUSH_VAL(16)
 		PUSH_VAL(1234)
 		CALL(Crc)
 out2(1/2)
 	:- PUSH_STREAM(datasrc)
-	out2_0:
+	out2_0: INTEGER
 		PUSH_ID(datasrc[0])
-	out2_1:
+	out2_1: INTEGER
 		PUSH_ID(datasrc[1])
-	out2_2:
+	out2_2: INTEGER
 		PUSH_VAL(8)
 		PUSH_VAL(12)
 		CALL(Crc)
 datasrc(1/2)	datafile2.dat
-	a:
-	b:
+	a: INTEGER
+	b: INTEGER
