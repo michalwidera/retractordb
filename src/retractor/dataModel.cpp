@@ -112,7 +112,6 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
     std::any value = storage->getPayload()->getItem(locSrc);
     localPayload->setItem(locDst, value);
   }
-  storage->readReverse(0);  // Set pre-function state
 
   return *(localPayload.get());
 }
@@ -166,16 +165,15 @@ void dataModel::computeInstance(std::string instance) {
   const command_id cmd = operation.getCommandID();
   switch (cmd) {
     case PUSH_STREAM: {
-      // store in internal payload data from argument payload
-      auto argumentQueryName = operation.getStr_();
-      *(qSet[instance]->fromPayload) = *getPayload(instance);
-      // invocation of payload &payload::operator=(payload &other) from payload.cc
-      // TODO: Add check if storagePayload is empty or argumentQueryName exist?
+      // 	:- PUSH_STREAM(core0)
+      const auto nameSrc = operation.getStr_();
+      *(qSet[instance]->fromPayload) = *getPayload(nameSrc);
     } break;
     case STREAM_TIMEMOVE: {
       // store in internal payload data from argument payload
-      auto argumentQueryName = operation.getStr_();
-      *(qSet[instance]->fromPayload) = *getPayload(instance, rational_cast<int>(arg[1].getRI()));
+      const auto nameSrc = operation.getStr_();
+      const auto timeOffset = std::get<int>(operation.getVT());
+      *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
       // invocation of payload &payload::operator=(payload &other) from payload.cc
       // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
@@ -190,11 +188,11 @@ void dataModel::computeInstance(std::string instance) {
       // q.rInterval - delta of output stream (rational) - contains
       // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
       // (2/3) argument of operation (rational)
-      int newTimeOffset = -1;  // catch on assert(false);
-      if (cmd == STREAM_DEHASH_DIV) newTimeOffset = Div(qry.rInterval, rationalArgument, 0);
-      if (cmd == STREAM_DEHASH_MOD) newTimeOffset = Mod(rationalArgument, qry.rInterval, 0);
-      if (newTimeOffset < 0) assert(false);
-      *(qSet[instance]->fromPayload) = *getPayload(instance, newTimeOffset);
+      int timeOffset = -1;  // catch on assert(false);
+      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, 0);
+      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, 0);
+      if (timeOffset < 0) assert(false);
+      *(qSet[instance]->fromPayload) = *getPayload(instance, timeOffset);
     } break;
     case STREAM_SUBSTRACT:
     case STREAM_AVG:
@@ -206,13 +204,16 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_SUM:
       assert(false && "TODO");
     case STREAM_ADD: {
+      // 	:- PUSH_STREAM(core0)
+      //  :- PUSH_STREAM(core1)
+      //  :- STREAM_ADD
+      //
+      const auto nameSrc1 = arg[0].getStr_();
+      const auto nameSrc2 = arg[1].getStr_();
       // operator + from payload payload::operator+(payload &other) step into
       // action here
       // TODO support renaming of double-same fields after merge?
-      const auto nameSrc1 = arg[0].getStr_();
-      const auto nameSrc2 = arg[1].getStr_();
-      qSet[nameSrc1]->storage->readReverse(0);
-      qSet[nameSrc2]->storage->readReverse(0);
+
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
     } break;
     case STREAM_AGSE: {
@@ -225,29 +226,27 @@ void dataModel::computeInstance(std::string instance) {
 
       *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
     } break;
-    case STREAM_HASH:
+    case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
-      {
-        assert(arg.size() == 3);
-        const auto nameSrc1 = arg[0].getStr_();
-        const auto nameSrc2 = arg[1].getStr_();
-        const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
-        const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
+      assert(arg.size() == 3);
+      const auto nameSrc1 = arg[0].getStr_();
+      const auto nameSrc2 = arg[1].getStr_();
+      const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
+      const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
 
-        const auto recordOffset = qSet[instance]->storage->getRecordsCount();
+      const auto recordOffset = qSet[instance]->storage->getRecordsCount();
 
-        int retPos;
-        if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
-          qSet[nameSrc1]->storage->read(retPos);
-          *(qSet[instance]->fromPayload) = *getPayload(nameSrc1);
-        } else {
-          qSet[nameSrc2]->storage->read(retPos);
-          *(qSet[instance]->fromPayload) = *getPayload(nameSrc2);
-        }
+      int retPos;
+      if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
+        qSet[nameSrc1]->storage->read(retPos);
+        *(qSet[instance]->fromPayload) = *getPayload(nameSrc1);
+      } else {
+        qSet[nameSrc2]->storage->read(retPos);
+        *(qSet[instance]->fromPayload) = *getPayload(nameSrc2);
       }
-      break;
+    } break;
     default:
       SPDLOG_ERROR("Undefined command_id:{}", cmd);
       abort();
