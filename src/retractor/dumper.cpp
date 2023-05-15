@@ -148,7 +148,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
             std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
             std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
             xout << sTokenName;
-            // Token PUSH_ something has always some value on somethin
+            // Token PUSH_ something has always some value on something
             std::basic_string<char>::size_type idx = sTokenName.find("PUSH_");
             if (idx != std::string::npos) {
               xout << t;
