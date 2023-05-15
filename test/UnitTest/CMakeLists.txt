@@ -1,11 +1,5 @@
 cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
-find_package(Boost REQUIRED)
-find_package(spdlog REQUIRED)
-find_package(fmt REQUIRED)
-find_package(antlr4-runtime REQUIRED)
-find_package(GTest REQUIRED)
-
 # these set of 3 commands will copy artifacts from UnitTest/Data into
 # build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
 # then copy.
@@ -108,23 +102,19 @@ add_test(
   NAME ut-dataModel
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
   COMMAND bash -c "set -e ; \
-  ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
+    ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
 
 add_test(
   NAME ut-dataModel-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
-  COMMAND
-    bash -c
-    "set -e ; \
-  valgrind --error-exitcode=1 --leak-check=full ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel"
-)
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel)
 
 add_test(
   NAME ut-dataModel-comp
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
-  COMMAND bash -c "set -e ; \
-  xtrdb < term.script > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+  COMMAND bash -c "set -e ; xtrdb < term.script > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 set_tests_properties(ut-xtrdb ut-xqry ut-dataModel ut-dataModel-comp
                      PROPERTIES RUN_SERIAL TRUE)

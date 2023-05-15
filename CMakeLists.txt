@@ -6,6 +6,15 @@ add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
 
+find_package(Boost REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
+find_package(antlr4-runtime REQUIRED)
+find_package(GTest REQUIRED)
+
+find_program(PROG valgrind REQUIRED)
+message(STATUS "Tool: ${PROG}")
+
 enable_testing()
 
 include_directories(

@@ -31,8 +31,8 @@ add_test(
   NAME rg-compile_1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern1
   COMMAND sh -c "set -e ; \
-  xretractor query.rql -c > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xretractor query.rql -c > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern2
   COMMAND sh -c "set -e ; \
     xretractor query.rql -c > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
@@ -49,8 +49,8 @@ add_test(
   NAME rg-compile_3
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern3
   COMMAND sh -c "set -e ; \
-  xretractor query-unfold.rql -c > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xretractor query-unfold.rql -c > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
@@ -59,7 +59,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern4
   COMMAND sh -c "set -e ; \
     xretractor query-crc.rql -c > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
@@ -67,8 +67,8 @@ add_test(
   NAME rg-xtrdb_5
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern5
   COMMAND sh -c "set -e ; \
-  xtrdb < term.script > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xtrdb < term.script > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 
@@ -76,14 +76,13 @@ add_test(
   NAME rg-compile_agse_6
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
   COMMAND bash -c "set -e ; \
-  xretractor query.rql -c > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xretractor query.rql -c > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 add_test(
   NAME rg-compile_agse_6-vg
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern6
-  COMMAND bash -c "set -e ; \
-  valgrind --error-exitcode=1 --leak-check=full xretractor query.rql -c")
+  COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor query.rql -c)
 
 # -----------------------------------------------------------------------------------------------
 
@@ -92,19 +91,21 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
   COMMAND
     bash -c "set -e ; \
-  xretractor query-simple.rql -c > out.txt ; \
-  xretractor query-simple.rql -m 5 ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xretractor query-simple.rql -c > out.txt ; \
+    xretractor query-simple.rql -m 5 ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 add_test(
-  NAME rg-xcompiler-simple-vg
+  NAME rg-xcompiler-simple-vg-1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
-  COMMAND
-    bash -c
-    "set -e ; \
-    valgrind --error-exitcode=1 --leak-check=full xretractor query-simple.rql -c > out.txt ; \
-    valgrind --error-exitcode=1 --leak-check=full xretractor query-simple.rql -m 5"
-)
+  COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor
+          query-simple.rql -c)
+
+add_test(
+  NAME rg-xcompiler-simple-vg-2
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
+  COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor
+          query-simple.rql -m 5)
 
 # -----------------------------------------------------------------------------------------------
 
@@ -112,16 +113,16 @@ add_test(
   NAME rg-xtrdb_on_text_data
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
   COMMAND bash -c "set -e ; \
-  xtrdb < term.script > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xtrdb < term.script > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 # -----------------------------------------------------------------------------------------------
 
 add_test(
   NAME rg-xtrdb_on_bin_data
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern9
   COMMAND bash -c "set -e ; \
-  xtrdb < term.script > out.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    xtrdb < term.script > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 add_test(
