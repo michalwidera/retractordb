@@ -171,7 +171,7 @@ void dataModel::computeInstance(std::string instance) {
     } break;
     case STREAM_TIMEMOVE: {
       // store in internal payload data from argument payload
-      const auto nameSrc = operation.getStr_();
+      const auto nameSrc = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
       // invocation of payload &payload::operator=(payload &other) from payload.cc
@@ -179,9 +179,9 @@ void dataModel::computeInstance(std::string instance) {
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
-      auto streamNameArg = arg[0].getStr_();
-      assert(streamNameArg != "");
-      auto rationalArgument = arg[1].getRI();
+      const auto nameSrc = arg[0].getStr_();
+      assert(nameSrc != "");
+      const auto rationalArgument = arg[1].getRI();
       assert(rationalArgument > 0);
       // q.id - name of output stream
       // size[q.id] - count of record in output stream
@@ -192,15 +192,23 @@ void dataModel::computeInstance(std::string instance) {
       if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, 0);
       if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, 0);
       if (timeOffset < 0) assert(false);
-      *(qSet[instance]->fromPayload) = *getPayload(instance, timeOffset);
+      *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
     } break;
-    case STREAM_SUBSTRACT:
     case STREAM_AVG:
     case STREAM_MIN:
-    case STREAM_MAX:
+    case STREAM_MAX: {
       assert(false && "TODO");
       *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_());
-      break;
+    } break;
+    case STREAM_SUBSTRACT: {
+      //  :- PUSH_STREAM(core0)
+      //  :- STREAM_SUBSTRACT(1/2)
+      const auto nameSrc = arg[0].getStr_();
+      auto rationalArgument = arg[1].getRI();
+      const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
+      const auto timeOffset = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
+    } break;
     case STREAM_SUM:
       assert(false && "TODO");
     case STREAM_ADD: {

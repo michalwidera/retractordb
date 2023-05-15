@@ -100,7 +100,7 @@ std::string intervalCounter() {
             bOnceAgain = true;
             continue;
           } else
-            delta = deltaSubstract(delta1);
+            delta = deltaSubtract(delta1);
         } break;
         case STREAM_ADD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());

@@ -252,7 +252,8 @@ void dumpRawTextFile() {
           t.getStrCommandID() == "PUSH_STREAM" ||       //
           t.getStrCommandID() == "PUSH_VAL" ||          //
           t.getStrCommandID() == "STREAM_SUBSTRACT" ||  //
-          t.getStrCommandID() == "STREAM_AGSE")
+          t.getStrCommandID() == "STREAM_AGSE" ||       //
+          t.getStrCommandID() == "STREAM_TIMEMOVE")
         std::cout << "\t:- " << t << std::endl;
       else
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;

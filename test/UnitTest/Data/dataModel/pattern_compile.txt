@@ -25,7 +25,7 @@ str2(1/1)
 		ADD
 str5(1/1)
 	:- PUSH_STREAM(core0)
-	:- STREAM_TIMEMOVE
+	:- STREAM_TIMEMOVE(1)
 	str5_0: INTEGER
 		PUSH_ID(str5[0])
 str6(1/1)

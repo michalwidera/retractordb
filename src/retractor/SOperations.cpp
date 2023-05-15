@@ -121,9 +121,9 @@ for i in range(0,10):
         print C[i][0],
 */
 
-rational<int> deltaSubstract(const rational<int> &arg1) { return arg1; }
+rational<int> deltaSubtract(const rational<int> &arg1) { return arg1; }
 // todo
-int Substract(const rational<int> &deltaA, const rational<int> &deltaB, const int i) { return ceil(i * deltaA / deltaB); }
+int Subtract(const rational<int> &deltaA, const rational<int> &deltaB, const int i) { return ceil(i * deltaA / deltaB); }
 
 rational<int> deltaAdd(const rational<int> &arg1, const rational<int> &arg2) { return std::min(arg1, arg2); }
 

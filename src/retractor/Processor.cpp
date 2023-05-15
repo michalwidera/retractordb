@@ -465,7 +465,7 @@ void Processor::processRows(std::set<std::string> inSet) {
           assert(streamNameArg != "");
           if (operation.getRI() > q.rInterval) {
             // Check if parameters are in opposite order
-            TimeOffset = Substract(q.rInterval, operation.getRI(), gDataMap[q.id].len);
+            TimeOffset = Subtract(q.rInterval, operation.getRI(), gDataMap[q.id].len);
             TimeOffset = gDataMap[q.id].len - TimeOffset;
           }
           rowValues = getRow(streamNameArg, TimeOffset);

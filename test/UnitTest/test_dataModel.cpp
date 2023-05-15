@@ -268,9 +268,9 @@ TEST_F(xschema, compute_instance_1) {
   { dataArea->computeInstance("str1"); }
   { dataArea->computeInstance("str2"); }
   { dataArea->computeInstance("str3"); }
-  //{ dataArea->computeInstance("str4"); }
-  //{ dataArea->computeInstance("str5"); }
-  //{ dataArea->computeInstance("str6"); }
+  { dataArea->computeInstance("str4"); }
+  { dataArea->computeInstance("str5"); }
+  { dataArea->computeInstance("str6"); }
 }
 
 }  // namespace
