@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
   {
-    "name": "(gdb) Launch",
+    "name": "(gdb) test_dataModel",
     "type": "cppdbg",
     "request": "launch",
     "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_dataModel",

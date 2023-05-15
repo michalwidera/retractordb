@@ -30,6 +30,7 @@ str5(1/1)
 		PUSH_ID(str5[0])
 str6(1/1)
 	:- PUSH_STREAM(core0)
+	:- STREAM_SUBSTRACT(1/2)
 	str6_0: INTEGER
 		PUSH_ID(str6[0])
 core0(1/1)	datafile1.txt
