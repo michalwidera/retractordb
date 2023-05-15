@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
+project(retractordb)
+
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
