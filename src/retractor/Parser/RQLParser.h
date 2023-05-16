@@ -16,13 +16,14 @@ public:
     T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     STRING_T = 21, BYTEARRAY_T = 22, INTARRAY_T = 23, BYTE_T = 24, UNSIGNED_T = 25, 
-    INTEGER_T = 26, FLOAT_T = 27, SELECT = 28, STREAM = 29, FROM = 30, DECLARE = 31, 
-    FILE = 32, STORAGE = 33, MIN = 34, MAX = 35, AVG = 36, SUMC = 37, ID = 38, 
-    STRING = 39, FLOAT = 40, DECIMAL = 41, REAL = 42, EQUAL = 43, GREATER = 44, 
-    LESS = 45, EXCLAMATION = 46, DOUBLE_BAR = 47, DOT = 48, UNDERLINE = 49, 
-    AT = 50, SHARP = 51, AND = 52, MOD = 53, DOLLAR = 54, COMMA = 55, SEMI = 56, 
-    COLON = 57, DOUBLE_COLON = 58, STAR = 59, DIVIDE = 60, PLUS = 61, MINUS = 62, 
-    BIT_NOT = 63, BIT_OR = 64, BIT_XOR = 65, SPACE = 66, COMMENT = 67, LINE_COMMENT = 68
+    INTEGER_T = 26, FLOAT_T = 27, DOUBLE_T = 28, SELECT = 29, STREAM = 30, 
+    FROM = 31, DECLARE = 32, FILE = 33, STORAGE = 34, MIN = 35, MAX = 36, 
+    AVG = 37, SUMC = 38, ID = 39, STRING = 40, FLOAT = 41, DECIMAL = 42, 
+    REAL = 43, EQUAL = 44, GREATER = 45, LESS = 46, EXCLAMATION = 47, DOUBLE_BAR = 48, 
+    DOT = 49, UNDERLINE = 50, AT = 51, SHARP = 52, AND = 53, MOD = 54, DOLLAR = 55, 
+    COMMA = 56, SEMI = 57, COLON = 58, DOUBLE_COLON = 59, STAR = 60, DIVIDE = 61, 
+    PLUS = 62, MINUS = 63, BIT_NOT = 64, BIT_OR = 65, BIT_XOR = 66, SPACE = 67, 
+    COMMENT = 68, LINE_COMMENT = 69
   };
 
   enum {
@@ -347,6 +348,15 @@ public:
     TypeByteContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *BYTE_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  TypeDoubleContext : public Field_typeContext {
+  public:
+    TypeDoubleContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *DOUBLE_T();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

@@ -48,7 +48,7 @@ struct field {
   field();
   field(std::string sFieldName,     //
         std::list<token> lProgram,  //
-        rdb::descFld fieldType);
+        rdb::descFld fieldType, int fieldLen);
 
   token getFirstFieldToken();
 

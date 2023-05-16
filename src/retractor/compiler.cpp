@@ -204,7 +204,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE));
+          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE, 1));
           newQuery.id = generateStreamName(arg1, "", cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);  // After this instruction it loses context
@@ -244,7 +244,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE));
+          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE, 1));
           newQuery.id = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
@@ -402,7 +402,7 @@ std::string prepareFields() {
               std::list<token> lTempProgram;
               lTempProgram.push_back(token(PUSH_ID, std::pair<std::string, int>(nameOfscanningTable, filedPosition++)));
               std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCount++);
-              q.lSchema.push_back(field(name, lTempProgram, rdb::INTEGER));
+              q.lSchema.push_back(field(name, lTempProgram, rdb::INTEGER, 4));
             }
             break;
           }
@@ -466,8 +466,7 @@ std::string replicateIDX() {
           }
           // std::string toReplace = oldField.getFieldText();
           // replaceAll(toReplace, "_", lexical_cast<std::string>(i));
-          auto newFieldType = oldField.fieldType;
-          field newField(schemaName + "_" + lexical_cast<std::string>(i), lTempProgram, newFieldType);
+          field newField(schemaName + "_" + lexical_cast<std::string>(i), lTempProgram, oldField.fieldType, oldField.fieldLen);
           q.lSchema.push_back(newField);
         }
         assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());

@@ -43,6 +43,7 @@ field_type          : (STRING_T | INTARRAY_T | BYTEARRAY_T) '[' type_size=DECIMA
                     | INTEGER_T  # typeInt
                     | UNSIGNED_T # typeUnsigned
                     | FLOAT_T    # typeFloat
+                    | DOUBLE_T   # typeDouble
                     ;
 
 select_list         : asterisk                       # SelectListFullscan
@@ -135,6 +136,7 @@ BYTE_T:             'BYTE'|'Byte';
 UNSIGNED_T:         'UINT'|'Uint';
 INTEGER_T:          'INTEGER'|'Integer';
 FLOAT_T:            'FLOAT'|'Float';
+DOUBLE_T:           'DOUBLE'|'Double';
 
 SELECT:             'SELECT'|'select';
 STREAM:             'STREAM'|'stream';

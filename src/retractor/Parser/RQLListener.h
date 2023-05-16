@@ -59,6 +59,9 @@ public:
   virtual void enterTypeFloat(RQLParser::TypeFloatContext *ctx) = 0;
   virtual void exitTypeFloat(RQLParser::TypeFloatContext *ctx) = 0;
 
+  virtual void enterTypeDouble(RQLParser::TypeDoubleContext *ctx) = 0;
+  virtual void exitTypeDouble(RQLParser::TypeDoubleContext *ctx) = 0;
+
   virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) = 0;
   virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) = 0;
 

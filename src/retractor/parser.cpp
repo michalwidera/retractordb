@@ -61,8 +61,11 @@ class ParserListener : public RQLBaseListener {
   /* Type of field */
   rdb::descFld fType = rdb::BYTE;
 
-  /* Type of field - eq.1-atomic, >1 - array */
+  /* Filed type */
   int fTypeSize = 1;
+
+  /* Type of field - eq.1-atomic, >1 - array */
+  int fTypeSizeArray = 1;
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
@@ -195,46 +198,63 @@ class ParserListener : public RQLBaseListener {
 
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx) {
     recpToken(PUSH_TSCAN, ctx->getText());
-    qry.lSchema.push_back(field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER));
+    qry.lSchema.push_back(field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, 4));
     program.clear();
   }
 
   void exitExpression(RQLParser::ExpressionContext* ctx) {
-    qry.lSchema.push_back(field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER));
+    qry.lSchema.push_back(field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, 4));
     program.clear();
   }
 
   void exitTypeArray(RQLParser::TypeArrayContext* ctx) {
     std::string name = ctx->children[0]->getText();
     boost::to_upper(name);
-    if (name == "STRING")
-      fType = rdb::BYTE;
-    else if (name == "BYTEARRAY")
-      fType = rdb::BYTE;
-    else if (name == "INTARRAY")
-      fType = rdb::INTEGER;
-    else
+    if (name == "STRING") {
+      fType = rdb::STRING;
+      fTypeSize = sizeof(uint8_t);
+    } else if (name == "BYTEARRAY") {
+      fType = rdb::BYTEARRAY;
+      fTypeSize = sizeof(uint8_t);
+    } else if (name == "INTARRAY") {
+      fType = rdb::INTARRAY;
+      fTypeSize = sizeof(int);
+    } else
       abort();
-    fTypeSize = std::stoi(ctx->type_size->getText());
+    fTypeSizeArray = std::stoi(ctx->type_size->getText());
   }
 
-  void exitTypeByte(RQLParser::TypeByteContext* ctx) { fType = rdb::BYTE; }
-  void exitTypeInt(RQLParser::TypeIntContext* ctx) { fType = rdb::INTEGER; }
-  void exitTypeUnsigned(RQLParser::TypeUnsignedContext* ctx) { fType = rdb::UINT; }
-  void exitTypeFloat(RQLParser::TypeFloatContext* ctx) { fType = rdb::FLOAT; }
+  void exitTypeByte(RQLParser::TypeByteContext* ctx) {
+    fType = rdb::BYTE;
+    fTypeSize = sizeof(uint8_t);
+  }
+  void exitTypeInt(RQLParser::TypeIntContext* ctx) {
+    fType = rdb::INTEGER;
+    fTypeSize = sizeof(int);
+  }
+  void exitTypeUnsigned(RQLParser::TypeUnsignedContext* ctx) {
+    fType = rdb::UINT;
+    fTypeSize = sizeof(unsigned);
+  }
+  void exitTypeFloat(RQLParser::TypeFloatContext* ctx) {
+    fType = rdb::FLOAT;
+    fTypeSize = sizeof(float);
+  }
+  void exitTypeDouble(RQLParser::TypeDoubleContext* ctx) {
+    fType = rdb::DOUBLE;
+    fTypeSize = sizeof(double);
+  }
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx) {
     std::list<token> emptyProgram;
-    if (fTypeSize == 1)
-      qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType));
+    if (fTypeSizeArray == 1)
+      qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, fTypeSize));
     else {
-      for (auto i = 0; i < fTypeSize; i++) {
-        std::string fieldName = ctx->ID()->getText() + "_" + std::to_string(i);
-        qry.lSchema.push_back(field(fieldName, emptyProgram, fType));
-      }
+      std::string fieldName = ctx->ID()->getText();
+      qry.lSchema.push_back(field(fieldName, emptyProgram, fType, fTypeSizeArray));
     }
     fType = rdb::BYTE;
-    fTypeSize = 1;
+    fTypeSizeArray = 1;
   }
 };
 

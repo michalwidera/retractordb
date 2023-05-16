@@ -61,6 +61,9 @@ public:
   virtual void enterTypeFloat(RQLParser::TypeFloatContext * /*ctx*/) override { }
   virtual void exitTypeFloat(RQLParser::TypeFloatContext * /*ctx*/) override { }
 
+  virtual void enterTypeDouble(RQLParser::TypeDoubleContext * /*ctx*/) override { }
+  virtual void exitTypeDouble(RQLParser::TypeDoubleContext * /*ctx*/) override { }
+
   virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
   virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
 
