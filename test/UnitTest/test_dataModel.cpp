@@ -97,14 +97,14 @@ class xschema : public ::testing::Test {
 
 TEST_F(xschema, check_test0) {
   auto dataInternalDescriptor{
-      rdb::Descriptor("A[1]", rdb::INTEGER) |  //
-      rdb::Descriptor("A[2]", rdb::INTEGER) |  //
-      rdb::Descriptor("A[3]", rdb::INTEGER)    //
+      rdb::Descriptor("A[1]", 4, rdb::INTEGER) |  //
+      rdb::Descriptor("A[2]", 4, rdb::INTEGER) |  //
+      rdb::Descriptor("A[3]", 4, rdb::INTEGER)    //
   };
 
   auto dataStorageDescriptor{
-      rdb::Descriptor("A[1]", rdb::INTEGER) |  //
-      rdb::Descriptor("A[2]", rdb::INTEGER)    //
+      rdb::Descriptor("A[1]", 4, rdb::INTEGER) |  //
+      rdb::Descriptor("A[2]", 4, rdb::INTEGER)    //
   };
 
   {
@@ -149,8 +149,8 @@ TEST_F(xschema, check_test_check_constructor) {
 TEST_F(xschema, create_struct_local_str1a) {
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
-  auto dataDescriptor{rdb::Descriptor("A", rdb::INTEGER) |  //
-                      rdb::Descriptor("B", rdb::INTEGER)};
+  auto dataDescriptor{rdb::Descriptor("A", 4, rdb::INTEGER) |  //
+                      rdb::Descriptor("B", 4, rdb::INTEGER)};
 
   streamInstance q("str1a",         // storage and descriptor are the same name
                    dataDescriptor,  //
@@ -195,8 +195,8 @@ TEST_F(xschema, check_construct_payload) {
 
 TEST_F(xschema, check_construct_payload_mirror) {
   auto dataDescriptor{
-      rdb::Descriptor("str1_0", rdb::INTEGER) |  //
-      rdb::Descriptor("str1_1", rdb::BYTE)       //
+      rdb::Descriptor("str1_0", 4, rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", 1, rdb::BYTE)       //
   };
 
   streamInstance data{coreInstance["str1"]};

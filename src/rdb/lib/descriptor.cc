@@ -101,12 +101,6 @@ Descriptor::Descriptor(std::string n, int l, rdb::descFld t) {  //
   push_back(rField(n, l, t));                                   //
 }
 
-Descriptor::Descriptor(std::string n, rdb::descFld t) {
-  assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
-         "This method does not work for Stings and Bytearrays.");
-  push_back(rField(n, GetFieldLenFromType(t), t));
-}
-
 bool Descriptor::isEmpty() const { return this->size() == 0; }
 
 void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }

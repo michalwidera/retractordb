@@ -302,24 +302,17 @@ std::vector<std::string> query::getDepStream() {
 
 rdb::Descriptor query::descriptorStorage() {
   rdb::Descriptor retVal{};
-  for (auto &f : lSchema) {
-    bool isTableType = (f.fieldType == rdb::STRING) ||     //
-                       (f.fieldType == rdb::BYTEARRAY) ||  //
-                       (f.fieldType == rdb::INTARRAY);
-    if (isTableType)
-      assert(false && "TODO: Add support in QStruct");  // retVal | rdb::Descriptor(f.fieldName, f.XXXX , f.fieldType);
-    else
-      retVal | rdb::Descriptor(f.fieldName, f.fieldType);
-  }
+  for (auto &f : lSchema) retVal | rdb::Descriptor(f.fieldName, f.fieldLen, f.fieldType);
+
   if (isDeclaration()) {
-    retVal | rdb::Descriptor(filename, rdb::REF);
+    retVal | rdb::Descriptor(filename, 0, rdb::REF);
 
     auto filenameShdw{filename};
     std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
     if (filenameShdw.find(".txt") != std::string::npos)
-      retVal | rdb::Descriptor("TEXTSOURCE", rdb::TYPE);
+      retVal | rdb::Descriptor("TEXTSOURCE", 0, rdb::TYPE);
     else
-      retVal | rdb::Descriptor("DEVICE", rdb::TYPE);
+      retVal | rdb::Descriptor("DEVICE", 0, rdb::TYPE);
   }
   return retVal;
 }
@@ -351,28 +344,30 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_SUBSTRACT:
     case STREAM_TIMEMOVE: {
       for (auto &f : getQuery(arg1).lSchema) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
     } break;
     case PUSH_STREAM: {
       for (auto &f : getQuery(cmd.getStr_()).lSchema) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
     } break;
     case STREAM_ADD: {
       for (auto &f : getQuery(arg1).lSchema) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
       for (auto &f : getQuery(arg2).lSchema) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
     } break;
     case STREAM_AGSE: {
+      // TODO - check - sync with dataModel.cpp
       auto r = std::get<std::pair<int, int>>(cmd.getVT());
       int windowSize = abs(r.second);
       auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
+      auto firstFieldLen = getQuery(arg1).lSchema.front().fieldLen;
       for (int i = 0; i < windowSize; i++) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldLen, firstFieldType);
       }
     } break;
     default:

@@ -105,7 +105,8 @@ bool test_descriptor() {
   data1.push_back(rdb::rField("Name", 10, rdb::STRING));
   data1.push_back(rdb::rField("TLen", sizeof(uint), rdb::UINT));
 
-  data1 | rdb::Descriptor("Name2", 10, rdb::STRING) | rdb::Descriptor("Control", rdb::BYTE) | rdb::Descriptor("Len3", rdb::UINT);
+  data1 | rdb::Descriptor("Name2", 10, rdb::STRING) | rdb::Descriptor("Control", 1, rdb::BYTE) |
+      rdb::Descriptor("Len3", 4, rdb::UINT);
   {
     std::stringstream coutstring;
     coutstring << data1;
@@ -116,8 +117,8 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  rdb::Descriptor data2 =
-      rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Len3", rdb::UINT) | rdb::Descriptor("Control", rdb::BYTE);
+  rdb::Descriptor data2 = rdb::Descriptor("Name", 10, rdb::STRING) | rdb::Descriptor("Len3", 4, rdb::UINT) |
+                          rdb::Descriptor("Control", 1, rdb::BYTE);
   {
     std::stringstream coutstring;
     char test[] = "{\tSTRING Name[10]\n\tUINT Len3\n\tBYTE Control\n}";
@@ -189,8 +190,8 @@ TEST(xrdb, test_storage) {
   static_assert(sizeof(dataPayload) == 15);
 
   auto dataDescriptor{rdb::Descriptor("Name", 10, rdb::STRING) |  //
-                      rdb::Descriptor("Control", rdb::BYTE) |     //
-                      rdb::Descriptor("TLen", rdb::INTEGER)};
+                      rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+                      rdb::Descriptor("TLen", 4, rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
   ASSERT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
@@ -243,26 +244,26 @@ TEST(xrdb, test_storage) {
 
 TEST(xrdb, test_descriptor_compare) {
   auto dataDescriptor1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
-                       rdb::Descriptor("Control", rdb::BYTE) |     //
-                       rdb::Descriptor("TLen", rdb::INTEGER)};
+                       rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+                       rdb::Descriptor("TLen", 4, rdb::INTEGER)};
   auto dataDescriptor2{rdb::Descriptor("Name", 10, rdb::STRING) |  //
-                       rdb::Descriptor("Control", rdb::BYTE) |     //
-                       rdb::Descriptor("TLen", rdb::INTEGER)};
-  auto dataDescriptorDiff1{rdb::Descriptor("Control", rdb::BYTE) |     //
+                       rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+                       rdb::Descriptor("TLen", 4, rdb::INTEGER)};
+  auto dataDescriptorDiff1{rdb::Descriptor("Control", 1, rdb::BYTE) |  //
                            rdb::Descriptor("Name", 10, rdb::STRING) |  //
-                           rdb::Descriptor("TLen", rdb::INTEGER)};
+                           rdb::Descriptor("TLen", 4, rdb::INTEGER)};
   auto dataDescriptorDiff2{rdb::Descriptor("Name", 11, rdb::STRING) |  //
-                           rdb::Descriptor("Control", rdb::BYTE) |     //
-                           rdb::Descriptor("TLen", rdb::INTEGER)};
+                           rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+                           rdb::Descriptor("TLen", 4, rdb::INTEGER)};
   ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
 TEST(xrdb, test_ref_storage) {
-  auto storageDescriptor{rdb::Descriptor("dane", rdb::INTEGER) |       //
-                         rdb::Descriptor("datafile1.txt", rdb::REF) |  //
-                         rdb::Descriptor("TEXTSOURCE", rdb::TYPE)};
+  auto storageDescriptor{rdb::Descriptor("dane", 4, rdb::INTEGER) |       //
+                         rdb::Descriptor("datafile1.txt", 0, rdb::REF) |  //
+                         rdb::Descriptor("TEXTSOURCE", 0, rdb::TYPE)};
   std::unique_ptr<rdb::storageAccessor> storage;
 
   storage = std::make_unique<rdb::storageAccessor>("datafile1" /* descriptorName (.desc auto-attach) */);
@@ -335,8 +336,8 @@ TEST(crdb, posixPrmBinaryFileAccessor_char) {
 
 TEST(crdb, payload_assign_operator) {
   auto data1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
-             rdb::Descriptor("Control", rdb::BYTE) |     //
-             rdb::Descriptor("TLen", rdb::INTEGER)};
+             rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+             rdb::Descriptor("TLen", 4, rdb::INTEGER)};
   rdb::Descriptor data2;
   data2 = data1;
   ASSERT_TRUE(data2.position("Control") == data1.position("Control"));
@@ -346,8 +347,8 @@ TEST(crdb, payload_assign_operator) {
 
 TEST(crdb, payload_copy_constructor) {
   auto data1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
-             rdb::Descriptor("Control", rdb::BYTE) |     //
-             rdb::Descriptor("TLen", rdb::INTEGER)};
+             rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+             rdb::Descriptor("TLen", 4, rdb::INTEGER)};
   rdb::Descriptor data2{data1};
   ASSERT_TRUE(data2.position("Control") == data1.position("Control"));
   ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
@@ -356,9 +357,9 @@ TEST(crdb, payload_copy_constructor) {
 
 TEST(crdb, payload_add_operator) {
   auto data1{rdb::Descriptor("Name", 10, rdb::STRING) |  //
-             rdb::Descriptor("Control", rdb::BYTE) |     //
-             rdb::Descriptor("ll", rdb::INTEGER) |       //
-             rdb::Descriptor("TLen", rdb::INTEGER)};
+             rdb::Descriptor("Control", 1, rdb::BYTE) |  //
+             rdb::Descriptor("ll", 4, rdb::INTEGER) |    //
+             rdb::Descriptor("TLen", 4, rdb::INTEGER)};
 
   union dataPayload {
     uint8_t ptr[19];
@@ -370,7 +371,7 @@ TEST(crdb, payload_add_operator) {
     };
   };
 
-  auto data2{rdb::Descriptor("TLen2", rdb::INTEGER)};
+  auto data2{rdb::Descriptor("TLen2", 4, rdb::INTEGER)};
 
   rdb::payload data1Payload(data1);
   rdb::payload data2Payload(data2);

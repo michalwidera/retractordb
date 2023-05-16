@@ -27,7 +27,7 @@ class Descriptor : public std::vector<rField> {
 
   Descriptor(std::initializer_list<rField> l);
   Descriptor(std::string n, int l, rdb::descFld t);
-  Descriptor(std::string n, rdb::descFld t);
+
   Descriptor() = default;
   Descriptor(const Descriptor &init);
 
