@@ -53,10 +53,9 @@ class field {
   field();
   field(std::string sFieldName,     //
         std::list<token> lProgram,  //
-        rdb::descFld fieldType,     //
-        std::string fieldText);
+        rdb::descFld fieldType);
 
-  std::string getFieldText();
+  // std::string getFieldText();
   token getFirstFieldToken();
 
   friend std::ostream &operator<<(std::ostream &os, const rdb::descFld &s);
