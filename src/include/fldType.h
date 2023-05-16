@@ -8,6 +8,7 @@
 
 #include <boost/rational.hpp>  // boost::rational
 #include <string>              // std::string
+#include <tuple>               //
 #include <utility>             // std::pair
 #include <vector>              // std::vector
 
@@ -50,12 +51,7 @@
   ;                                                       \
   typedef std::tuple<std::string, int, ENUM_NAME> rfield; \
   std::string GetString##ENUM_NAME(enum ENUM_NAME index);
-
-#include <string>
-#include <tuple>
-
 #include "internal/fldList.h"
-
 #endif
 
 // Support for std::visit over std::variant

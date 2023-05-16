@@ -48,6 +48,8 @@ class field {
   std::string fieldName;
   rdb::descFld fieldType;
 
+  rdb::rfield fieldDesc;  // TODO
+
   field();
   field(std::string sFieldName,     //
         std::list<token> lProgram,  //

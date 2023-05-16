@@ -165,24 +165,14 @@ void Descriptor::cleanRef() {
                });
 }
 
-void Descriptor::createHash(const std::string name, const Descriptor &lhs, const Descriptor &rhs) {
-  auto refCount1 = std::count_if(lhs.begin(), lhs.end(),                          //
-                                 [](const rfield &i) {                            //
-                                   return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                          std::get<rdb::rtype>(i) == rdb::TYPE;
-                                 });
-  auto refCount2 = std::count_if(rhs.begin(), rhs.end(),                          //
-                                 [](const rfield &i) {                            //
-                                   return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                          std::get<rdb::rtype>(i) == rdb::TYPE;
-                                 });
-  assert(lhs.size() - refCount1 == rhs.size() - refCount2);
+void Descriptor::createHash(const std::string name, Descriptor lhs, Descriptor rhs) {
+  lhs.cleanRef();
+  rhs.cleanRef();
+  assert(lhs.size() == rhs.size());
 
   clear();
   auto i{0};
   for (auto const &looper : lhs) {
-    if (std::get<rdb::rlen>(lhs[i]) == 0) break;
-    if (std::get<rdb::rlen>(rhs[i]) == 0) break;
     auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
     auto maxRlen = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
     push_back(rfield(name + "_" + std::to_string(i), maxRlen, maxRtype));
