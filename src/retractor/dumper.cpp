@@ -66,8 +66,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
         std::string name(f.fieldName);
         std::replace(name.begin(), name.end(), '{', '/');
         std::replace(name.begin(), name.end(), '}', '/');
-        // std::string fieldText(f.getFieldText());
-        // xout << fieldText;
+        xout << name;
         std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
       }
       xout << "}";

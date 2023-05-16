@@ -198,8 +198,6 @@ field::field(std::string sFieldName,     //
              rdb::descFld dFieldType)
     : lProgram(lProgram), fieldType(dFieldType), fieldName(sFieldName) {}
 
-// std::string field::getFieldText() { return fieldText; }
-
 token field::getFirstFieldToken() {
   assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
   return *lProgram.begin();
@@ -402,7 +400,6 @@ std::ostream &operator<<(std::ostream &os, const field &s) {
   os << "FLD/";
   os << "name:" << s.fieldName << ",";
   os << "type:" << s.fieldType << ",";
-  os << "text:" << s.fieldText << ",";
   os << "prog:";
   for (auto &i : s.lProgram) os << i << ",";
   return os;

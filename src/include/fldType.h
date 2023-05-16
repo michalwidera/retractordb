@@ -49,7 +49,7 @@
 #define END_E_GEN_T(ENUM_NAME)                            \
   }                                                       \
   ;                                                       \
-  typedef std::tuple<std::string, int, ENUM_NAME> rfield; \
+  typedef std::tuple<std::string, int, ENUM_NAME> rField; \
   std::string GetString##ENUM_NAME(enum ENUM_NAME index);
 #include "internal/fldList.h"
 #endif

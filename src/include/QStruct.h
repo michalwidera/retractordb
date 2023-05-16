@@ -38,24 +38,18 @@ class token {
   friend std::ostream &operator<<(std::ostream &os, const token &rhs);
 };
 
-class field {
- private:
-  std::string fieldText;
-
- public:
+struct field {
   std::list<token> lProgram;
 
   std::string fieldName;
   rdb::descFld fieldType;
-
-  rdb::rfield fieldDesc;  // TODO
+  int fieldLen;
 
   field();
   field(std::string sFieldName,     //
         std::list<token> lProgram,  //
         rdb::descFld fieldType);
 
-  // std::string getFieldText();
   token getFirstFieldToken();
 
   friend std::ostream &operator<<(std::ostream &os, const rdb::descFld &s);

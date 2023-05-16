@@ -79,7 +79,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
 
   auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
   for (auto i = 0; i < length; i++) {
-    rdb::rfield x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
+    rdb::rField x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
                                   maxLen,                                  //
                                   maxType)};
     descriptor | rdb::Descriptor{x};
@@ -115,7 +115,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd) {
   rdb::Descriptor descriptor;
 
   auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
-  rdb::rfield x{std::make_tuple(storage->getStorageName() + "_0",  //
+  rdb::rField x{std::make_tuple(storage->getStorageName() + "_0",  //
                                 maxLen,                            //
                                 maxType)};
   descriptor | rdb::Descriptor{x};

@@ -21,17 +21,17 @@ constexpr int error_desc_location = -1;
 
 extern bool flatOutput;
 
-class Descriptor : public std::vector<rfield> {
+class Descriptor : public std::vector<rField> {
  public:
   bool isEmpty() const;
 
-  Descriptor(std::initializer_list<rfield> l);
+  Descriptor(std::initializer_list<rField> l);
   Descriptor(std::string n, int l, rdb::descFld t);
   Descriptor(std::string n, rdb::descFld t);
   Descriptor() = default;
   Descriptor(const Descriptor &init);
 
-  void append(std::initializer_list<rfield> l);
+  void append(std::initializer_list<rField> l);
 
   Descriptor &operator|(const Descriptor &rhs);
   Descriptor &operator=(const Descriptor &rhs);

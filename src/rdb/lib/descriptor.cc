@@ -95,21 +95,21 @@ int GetFieldLenFromType(rdb::descFld ft) {
   return 0;
 }
 
-Descriptor::Descriptor(std::initializer_list<rfield> l) : std::vector<rfield>(l) {}
+Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
 Descriptor::Descriptor(std::string n, int l, rdb::descFld t) {  //
-  push_back(rfield(n, l, t));                                   //
+  push_back(rField(n, l, t));                                   //
 }
 
 Descriptor::Descriptor(std::string n, rdb::descFld t) {
   assert((t != rdb::STRING || t != rdb::BYTEARRAY || t != rdb::INTARRAY) &&
          "This method does not work for Stings and Bytearrays.");
-  push_back(rfield(n, GetFieldLenFromType(t), t));
+  push_back(rField(n, GetFieldLenFromType(t), t));
 }
 
 bool Descriptor::isEmpty() const { return this->size() == 0; }
 
-void Descriptor::append(std::initializer_list<rfield> l) { insert(end(), l.begin(), l.end()); }
+void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
 
 Descriptor &Descriptor::operator|(const Descriptor &rhs) {
   if (this != &rhs)
@@ -136,14 +136,14 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) {
   auto refCount = std::count_if(rhs.begin(), rhs.end(),                          //
-                                [](const rfield &i) {                            //
+                                [](const rField &i) {                            //
                                   return std::get<rdb::rtype>(i) == rdb::REF ||  //
                                          std::get<rdb::rtype>(i) == rdb::TYPE;
                                 });
 
   if (size() == rhs.size() - refCount) {
     auto i{0};
-    for (rfield &f : *this)
+    for (rField &f : *this)
       if (std::get<rdb::rlen>(f) < std::get<rdb::rlen>(rhs[i]) ||  //
           std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
         return false;
@@ -159,7 +159,7 @@ void Descriptor::cleanRef() {
   clear();
   std::copy_if(rhs.begin(), rhs.end(),                          //
                std::back_inserter(*this),                       //
-               [](const rfield &i) {                            //
+               [](const rField &i) {                            //
                  return std::get<rdb::rtype>(i) != rdb::REF &&  //
                         std::get<rdb::rtype>(i) != rdb::TYPE;
                });
@@ -175,7 +175,7 @@ void Descriptor::createHash(const std::string name, Descriptor lhs, Descriptor r
   for (auto const &looper : lhs) {
     auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
     auto maxRlen = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
-    push_back(rfield(name + "_" + std::to_string(i), maxRlen, maxRtype));
+    push_back(rField(name + "_" + std::to_string(i), maxRlen, maxRtype));
     i++;
   }
 }
