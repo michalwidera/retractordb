@@ -45,11 +45,17 @@
 #define DECL_T(elementName, elementType) elementName,
 #define DECL_E(elementName, elementType) elementName
 #define DECL_F(elementName) , elementName
-#define END_E_GEN_T(ENUM_NAME) \
-  }                            \
-  ;                            \
+#define END_E_GEN_T(ENUM_NAME)                            \
+  }                                                       \
+  ;                                                       \
+  typedef std::tuple<std::string, int, ENUM_NAME> rfield; \
   std::string GetString##ENUM_NAME(enum ENUM_NAME index);
+
+#include <string>
+#include <tuple>
+
 #include "internal/fldList.h"
+
 #endif
 
 // Support for std::visit over std::variant

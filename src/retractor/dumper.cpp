@@ -95,8 +95,10 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
         }
         for (token t : q.lProgram) {
           xout << t.getStrCommandID() << " ";
-          if (t.getStrCommandID() != "STREAM_HASH" && t.getStrCommandID() != "STREAM_ADD" &&
-              t.getStrCommandID() != "STREAM_DEHASH_DIV" && t.getStrCommandID() != "STREAM_DEHASH_MOD")
+          if (t.getStrCommandID() != "STREAM_HASH"           //
+              && t.getStrCommandID() != "STREAM_ADD"         //
+              && t.getStrCommandID() != "STREAM_DEHASH_DIV"  //
+              && t.getStrCommandID() != "STREAM_DEHASH_MOD")
             xout << t.getStr_();
           xout << "\\n";
         }

@@ -185,8 +185,8 @@ TEST_F(xschema, check_construct_payload) {
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
 
-    std::cerr << "t " << coutstring2.str() << std::endl;
-    std::cerr << "t " << coutstring1.str() << std::endl;
+    // std::cerr << "t " << coutstring2.str() << std::endl;
+    // std::cerr << "t " << coutstring1.str() << std::endl;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
@@ -219,8 +219,8 @@ TEST_F(xschema, check_construct_payload_mirror) {
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
 
-    std::cerr << "t " << coutstring2.str() << std::endl;
-    std::cerr << "t " << coutstring1.str() << std::endl;
+    // std::cerr << "t " << coutstring2.str() << std::endl;
+    // std::cerr << "t " << coutstring1.str() << std::endl;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());
@@ -256,8 +256,8 @@ TEST_F(xschema, check_sum) {
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << payload;
 
-    std::cerr << "t " << coutstring2.str() << std::endl;
-    std::cerr << "t " << coutstring1.str() << std::endl;
+    // std::cerr << "t " << coutstring2.str() << std::endl;
+    // std::cerr << "t " << coutstring1.str() << std::endl;
 
     ASSERT_TRUE(expectedOutData == coutstring2.str());
     ASSERT_TRUE(expectedOutDesc == coutstring1.str());

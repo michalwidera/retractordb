@@ -142,10 +142,10 @@ bool Descriptor::operator==(const Descriptor &rhs) {
                                 });
 
   if (size() == rhs.size() - refCount) {
-    auto i = 0;
+    auto i{0};
     for (rfield &f : *this)
       if (std::get<rdb::rlen>(f) < std::get<rdb::rlen>(rhs[i]) ||  //
-          std::get<rdb::rtype>(f) > std::get<rdb::rtype>(rhs[i]))
+          std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
         return false;
       else
         i++;
@@ -154,10 +154,46 @@ bool Descriptor::operator==(const Descriptor &rhs) {
   return false;
 }
 
+void Descriptor::cleanRef() {
+  Descriptor rhs(*this);
+  clear();
+  std::copy_if(rhs.begin(), rhs.end(),                          //
+               std::back_inserter(*this),                       //
+               [](const rfield &i) {                            //
+                 return std::get<rdb::rtype>(i) != rdb::REF &&  //
+                        std::get<rdb::rtype>(i) != rdb::TYPE;
+               });
+}
+
+void Descriptor::createHash(const std::string name, const Descriptor &lhs, const Descriptor &rhs) {
+  auto refCount1 = std::count_if(lhs.begin(), lhs.end(),                          //
+                                 [](const rfield &i) {                            //
+                                   return std::get<rdb::rtype>(i) == rdb::REF ||  //
+                                          std::get<rdb::rtype>(i) == rdb::TYPE;
+                                 });
+  auto refCount2 = std::count_if(rhs.begin(), rhs.end(),                          //
+                                 [](const rfield &i) {                            //
+                                   return std::get<rdb::rtype>(i) == rdb::REF ||  //
+                                          std::get<rdb::rtype>(i) == rdb::TYPE;
+                                 });
+  assert(lhs.size() - refCount1 == rhs.size() - refCount2);
+
+  clear();
+  auto i{0};
+  for (auto const &looper : lhs) {
+    if (std::get<rdb::rlen>(lhs[i]) == 0) break;
+    if (std::get<rdb::rlen>(rhs[i]) == 0) break;
+    auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
+    auto maxRlen = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
+    push_back(rfield(name + "_" + std::to_string(i), maxRlen, maxRtype));
+    i++;
+  }
+}
+
 Descriptor::Descriptor(const Descriptor &init) { *this | init; }
 
 int Descriptor::getSizeInBytes() const {
-  int size = 0;
+  auto size{0};
   for (auto const i : *this) size += std::get<rlen>(i);
   return size;
 }
@@ -186,7 +222,7 @@ int Descriptor::len(const std::string name) {      //
 }
 
 int Descriptor::offset(const std::string name) {
-  auto offset = 0;
+  auto offset{0};
   for (auto const field : *this) {
     if (name == std::get<rname>(field)) return offset;
     offset += std::get<rlen>(field);
@@ -196,8 +232,8 @@ int Descriptor::offset(const std::string name) {
 }
 
 int Descriptor::offset(const int position) {
-  auto offset = 0;
-  int i = 0;
+  auto offset{0};
+  auto i{0};
   for (auto const field : *this) {
     if (position == i) return offset;
     i++;
@@ -211,7 +247,7 @@ std::string Descriptor::type(const std::string name) { return GetFieldType(std::
 
 std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   rdb::descFld retVal{rdb::BYTE};
-  int size{1};
+  auto size{1};
   for (auto const field : *this) {
     if (retVal <= std::get<rtype>(field)) {
       retVal = std::get<rtype>(field);

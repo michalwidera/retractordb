@@ -115,8 +115,8 @@ rdb::payload streamInstance::constructAggregate(command_id cmd) {
   rdb::Descriptor descriptor;
 
   auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
-  rdb::rfield x{std::make_tuple(storage->getStorageName() + "_0" ,  //
-                                maxLen,                             //
+  rdb::rfield x{std::make_tuple(storage->getStorageName() + "_0",  //
+                                maxLen,                            //
                                 maxType)};
   descriptor | rdb::Descriptor{x};
 
@@ -202,7 +202,7 @@ void dataModel::computeInstance(std::string instance) {
     } break;
     case STREAM_TIMEMOVE: {
       // 	:- PUSH_STREAM(core0)
-	    //  :- STREAM_TIMEMOVE(1)
+      //  :- STREAM_TIMEMOVE(1)
       const auto nameSrc = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
@@ -210,20 +210,21 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
       //  :- PUSH_STREAM(core0)
-	    //  :- PUSH_VAL(2/1)
-	    //  :- STREAM_DEHASH_MOD
+      //  :- PUSH_VAL(2/1)
+      //  :- STREAM_DEHASH_MOD
       const auto nameSrc = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
 
       assert(rationalArgument > 0);
- 
+
       int timeOffset = -1;  // catch on assert(false);
       if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
       if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
       assert(timeOffset >= 0);
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
     } break;
+    case STREAM_SUM:
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX: {
@@ -239,8 +240,6 @@ void dataModel::computeInstance(std::string instance) {
       const auto timeOffset = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
     } break;
-    case STREAM_SUM:
-      assert(false && "TODO");
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)
       //  :- PUSH_STREAM(core1)

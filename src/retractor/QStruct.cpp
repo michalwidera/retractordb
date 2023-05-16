@@ -342,9 +342,12 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_MIN:
     case STREAM_SUM: {
       auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
-      retVal | rdb::Descriptor(id + "_0" , maxLen , maxType);
+      retVal | rdb::Descriptor(id + "_0", maxLen, maxType);
     } break;
-    case STREAM_HASH:
+    case STREAM_HASH: {
+      retVal.createHash(id, getQuery(arg1).descriptorStorage(), getQuery(arg2).descriptorStorage());
+      retVal.cleanRef();
+    } break;
     case STREAM_DEHASH_DIV:
     case STREAM_DEHASH_MOD:
     case STREAM_SUBSTRACT:
