@@ -326,6 +326,7 @@ rdb::Descriptor query::descriptorStorage() {
   return retVal;
 }
 
+// TODO: remove Descriptor(a,b) and use Descriptor(a,b,c) here - strings are broken if not fix
 rdb::Descriptor query::descriptorFrom() {
   SPDLOG_INFO("call query::descriptorFrom()");
   rdb::Descriptor retVal{};
@@ -336,6 +337,13 @@ rdb::Descriptor query::descriptorFrom() {
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};
   auto i{0};
   switch (cmd.getCommandID()) {
+    case STREAM_AVG:
+    case STREAM_MAX:
+    case STREAM_MIN:
+    case STREAM_SUM: {
+      auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
+      retVal | rdb::Descriptor(id + "_0" , maxLen , maxType);
+    } break;
     case STREAM_HASH:
     case STREAM_DEHASH_DIV:
     case STREAM_DEHASH_MOD:

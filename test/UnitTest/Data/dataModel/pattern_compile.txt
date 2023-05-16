@@ -33,6 +33,11 @@ str6(1/1)
 	:- STREAM_SUBSTRACT(1/2)
 	str6_0: INTEGER
 		PUSH_ID(str6[0])
+str7(1/1)
+	:- PUSH_STREAM(core0)
+	:- STREAM_MAX
+	str7_0: INTEGER
+		PUSH_ID(str7[0])
 core0(1/1)	datafile1.txt
 	a: INTEGER
 	b: BYTE

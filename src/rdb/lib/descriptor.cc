@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <locale>
+#include <utility>
 
 namespace rdb {
 // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
@@ -208,12 +209,16 @@ int Descriptor::offset(const int position) {
 
 std::string Descriptor::type(const std::string name) { return GetFieldType(std::get<rtype>((*this)[position(name)])); }
 
-rdb::descFld Descriptor::getMaxType() {
+std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   rdb::descFld retVal{rdb::BYTE};
+  int size{1};
   for (auto const field : *this) {
-    if (retVal < std::get<rtype>(field)) retVal = std::get<rtype>(field);
+    if (retVal <= std::get<rtype>(field)) {
+      retVal = std::get<rtype>(field);
+      if (size < std::get<rlen>(field)) size = std::get<rlen>(field);
+    }
   }
-  return retVal;
+  return std::make_pair(retVal, size);
 }
 
 std::ostream &flat(std::ostream &os) {

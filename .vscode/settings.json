@@ -82,5 +82,15 @@
     },
     "cSpell.words": [
       "iarchive"
-    ]
+    ],
+    "editor.suggest.preview": true,
+    "workbench.editor.enablePreviewFromCodeNavigation": true,
+    "workbench.editor.enablePreviewFromQuickOpen": true,
+    "editor.fontSize": 16,
+    "editor.formatOnSaveMode": "modifications",
+    "diffEditor.codeLens": true,
+    "diffEditor.diffAlgorithm": "advanced",
+    "editor.accessibilityPageSize": 16,
+    "editor.fontFamily": "'JetBrainsMono NF', Consolas, 'Courier New', monospace",
+    "editor.fontLigatures": true
 }

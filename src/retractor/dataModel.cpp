@@ -11,8 +11,6 @@
 #include "convertTypes.h"
 #include "iostream"
 
-// extern "C" qTree coreInstance;
-
 // ctest -R '^ut-dataModel' -V
 
 enum { noHexFormat = false, HexFormat = true };
@@ -68,8 +66,7 @@ streamInstance::streamInstance(query& qry)
   SPDLOG_INFO("streamInstance <- qry");
 };
 
-// TODO: TEST THIS FREAKING CODE ... ASAP
-// ! Work in progress
+// TODO: Cover this with detailed test
 // https://en.cppreference.com/w/cpp/numeric/math/div
 rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   assert(offset > 0);
@@ -80,9 +77,8 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   auto descriptorVecSize = storage->getDescriptor().size();
   std::string storage_name = storage->getStorageName();
 
-  auto maxType = storage->getDescriptor().getMaxType();
-  auto maxLen = GetFieldLenFromType(maxType);
-  for (auto i = offset; i < offset + length; i++) {
+  auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
+  for (auto i = 0; i < length; i++) {
     rdb::rfield x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
                                   maxLen,                                  //
                                   maxType)};
@@ -92,16 +88,13 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   // Second construct payload
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
-  // std::cerr << "DESC:" << descriptor << std::endl;
-  // for (auto i : descriptor) std::cout << rdb::GetStringdescFld(std::get<rdb::rtype>(i)) << std::endl;
-  // 3rd - fill payload with data from storage
   auto prevQuot{-1};
   for (auto i = 0; i < length; i++) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
       storage->readReverse(dv.quot);
-      // TODO: fix non existing data
+      // TODO: fix non existing data?
     }
 
     auto locSrc = descriptorVecSize - dv.rem - 1;
@@ -112,6 +105,44 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
     std::any value = storage->getPayload()->getItem(locSrc);
     localPayload->setItem(locDst, value);
   }
+
+  return *(localPayload.get());
+}
+
+// TODO: Implement switch (cmd) body.
+rdb::payload streamInstance::constructAggregate(command_id cmd) {
+  // First construct descriptor
+  rdb::Descriptor descriptor;
+
+  auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
+  rdb::rfield x{std::make_tuple(storage->getStorageName() + "_0" ,  //
+                                maxLen,                             //
+                                maxType)};
+  descriptor | rdb::Descriptor{x};
+
+  // Second construct payload
+  std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
+
+  std::any value;
+
+  switch (cmd) {
+    case STREAM_AVG: {
+      break;
+    }
+    case STREAM_MAX: {
+      break;
+    }
+    case STREAM_MIN: {
+      break;
+    }
+    case STREAM_SUM: {
+      break;
+    }
+    default:
+      assert(false && "Unsupported cmd id in constructAggregate");
+  }
+
+  localPayload->setItem(0, value);
 
   return *(localPayload.get());
 }
@@ -170,28 +201,27 @@ void dataModel::computeInstance(std::string instance) {
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc);
     } break;
     case STREAM_TIMEMOVE: {
-      // store in internal payload data from argument payload
+      // 	:- PUSH_STREAM(core0)
+	    //  :- STREAM_TIMEMOVE(1)
       const auto nameSrc = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
-      // invocation of payload &payload::operator=(payload &other) from payload.cc
-      // TODO: Add check if storagePayload is empty or argumentQueryName exist?
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
+      //  :- PUSH_STREAM(core0)
+	    //  :- PUSH_VAL(2/1)
+	    //  :- STREAM_DEHASH_MOD
       const auto nameSrc = arg[0].getStr_();
-      assert(nameSrc != "");
       const auto rationalArgument = arg[1].getRI();
+      const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
+
       assert(rationalArgument > 0);
-      // q.id - name of output stream
-      // size[q.id] - count of record in output stream
-      // q.rInterval - delta of output stream (rational) - contains
-      // deltaDivMod( core0.delta , rationalArgument ) rationalArgument -
-      // (2/3) argument of operation (rational)
+ 
       int timeOffset = -1;  // catch on assert(false);
-      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, 0);
-      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, 0);
-      if (timeOffset < 0) assert(false);
+      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
+      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
+      assert(timeOffset >= 0);
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_AVG:
@@ -218,8 +248,7 @@ void dataModel::computeInstance(std::string instance) {
       //
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
-      // operator + from payload payload::operator+(payload &other) step into
-      // action here
+      // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
