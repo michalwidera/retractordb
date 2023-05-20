@@ -66,7 +66,6 @@ streamInstance::streamInstance(query& qry)
   SPDLOG_INFO("streamInstance <- qry");
 };
 
-// TODO: Cover this with detailed test
 // https://en.cppreference.com/w/cpp/numeric/math/div
 rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   assert(offset > 0);
@@ -166,10 +165,8 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
     op = maxop;
   else if (cmd == STREAM_MIN)
     op = minop;
-  else if (cmd == STREAM_SUM)
-    op = sumop;
-  else if (cmd == STREAM_AVG)
-    op = sumop;  // <- this is not an error
+  else if (cmd == STREAM_SUM || cmd == STREAM_AVG)
+    op = sumop;  // <- STREAM_AVG: this is not an error
   else
     assert(false);
 

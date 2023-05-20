@@ -86,6 +86,9 @@ class xschema : public ::testing::Test {
 
     dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 333);
     dataArea->qSet["str2"]->storage->write();
+
+    for (auto i : coreInstance)
+      if (!i.isDeclaration()) dataArea->computeInstance(i.id);
   }
 
   virtual ~xschema() override {}
@@ -259,9 +262,7 @@ TEST_F(xschema, check_sum) {
 }
 
 TEST_F(xschema, compute_instance_1) {
-  for (auto i : coreInstance)
-    if (!i.isDeclaration()) dataArea->computeInstance(i.id);
-
+ 
   auto payload = *(dataArea->qSet["str7"]->fromPayload);
 
   // SELECT str7[0] STREAM str7 FROM core0.max
