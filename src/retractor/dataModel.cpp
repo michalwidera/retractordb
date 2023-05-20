@@ -109,7 +109,31 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   return *(localPayload.get());
 }
 
-// TODO: Implement switch (cmd) body.
+enum opType { maxop, minop, sumop, avgop };
+
+template <typename T>
+void fnOp(opType op, std::any value, std::any& valueRet) {
+  T val1 = std::any_cast<T>(valueRet);
+  T val2 = std::any_cast<T>(value);
+  switch (op) {
+    case maxop:
+      if (val1 < val2) valueRet = value;
+      break;
+    case minop:
+      if (val1 > val2) valueRet = value;
+      break;
+    case sumop:
+      valueRet = val1 + val2;
+      break;
+    case avgop:
+      valueRet = val1 / val2;
+      break;
+    default:
+      SPDLOG_ERROR("non supported opType");
+      assert(false);
+  }
+}
+
 rdb::payload streamInstance::constructAggregate(command_id cmd) {
   // First construct descriptor
   rdb::Descriptor descriptor;
@@ -123,26 +147,88 @@ rdb::payload streamInstance::constructAggregate(command_id cmd) {
   // Second construct payload
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
-  std::any value;
-
-  switch (cmd) {
-    case STREAM_AVG: {
-      break;
-    }
-    case STREAM_MAX: {
-      break;
-    }
-    case STREAM_MIN: {
-      break;
-    }
-    case STREAM_SUM: {
-      break;
-    }
-    default:
-      assert(false && "Unsupported cmd id in constructAggregate");
+  if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
+    SPDLOG_INFO("Not supported aggregation on type");
+    assert(false);
+    return *(localPayload.get());  // uninitialized payload
   }
 
-  localPayload->setItem(0, value);
+  // choose aggregate operation
+  cast<std::any> castAny;
+  std::any valueRet = castAny(0, maxType);
+
+  opType op;
+
+  if (cmd == STREAM_MAX)
+    op = maxop;
+  else if (cmd == STREAM_MIN)
+    op = minop;
+  else if (cmd == STREAM_SUM)
+    op = sumop;
+  else if (cmd == STREAM_AVG)
+    op = sumop;  // <- this is not an error
+  else
+    assert(false);
+
+  auto i{0};
+  for (auto const it : storage->getDescriptor()) {
+    std::any value = castAny(storage->getPayload()->getItem(i++), maxType);
+    switch (maxType) {
+      case rdb::BYTE:
+        fnOp<uint8_t>(op, value, valueRet);
+        break;
+      case rdb::INTEGER:
+        fnOp<int>(op, value, valueRet);
+        break;
+      case rdb::UINT:
+        fnOp<unsigned>(op, value, valueRet);
+        break;
+      case rdb::FLOAT:
+        fnOp<float>(op, value, valueRet);
+        break;
+      case rdb::DOUBLE:
+        fnOp<double>(op, value, valueRet);
+        break;
+      case rdb::RATIONAL:
+        fnOp<boost::rational<int>>(op, value, valueRet);
+        break;
+      default:
+        SPDLOG_ERROR("Not supported aggregation type");
+        assert(false);
+        break;
+    }
+  }
+
+  if (cmd == STREAM_AVG) {
+    std::any value = castAny(storage->getPayload()->getDescriptor().size(), maxType);
+    switch (maxType) {
+      case rdb::BYTE:
+        fnOp<uint8_t>(avgop, value, valueRet);  // <- valueRet/value
+        break;
+      case rdb::INTEGER:
+        fnOp<int>(avgop, value, valueRet);
+        break;
+      case rdb::UINT:
+        fnOp<unsigned>(avgop, value, valueRet);
+        break;
+      case rdb::FLOAT:
+        fnOp<float>(avgop, value, valueRet);
+        break;
+      case rdb::DOUBLE:
+        fnOp<double>(avgop, value, valueRet);
+        break;
+      case rdb::RATIONAL:
+        fnOp<boost::rational<int>>(avgop, value, valueRet);
+        break;
+      default:
+        SPDLOG_ERROR("Not supported aggregation type");
+        assert(false);
+        break;
+    }
+  }
+
+  auto postion{0};
+  localPayload->setItem(postion, valueRet);
 
   return *(localPayload.get());
 }
