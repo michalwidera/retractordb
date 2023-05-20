@@ -178,8 +178,6 @@ TEST_F(xschema, check_construct_payload) {
   // @(-4,1) 12,13,14,15
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1));
-    std::string expectedOutDesc = "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }";
-    std::string expectedOutData = "{ str1_0:15 str1_1:14 str1_2:13 str1_3:12 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
@@ -188,8 +186,8 @@ TEST_F(xschema, check_construct_payload) {
     // std::cerr << "t " << coutstring2.str() << std::endl;
     // std::cerr << "t " << coutstring1.str() << std::endl;
 
-    ASSERT_TRUE(expectedOutData == coutstring2.str());
-    ASSERT_TRUE(expectedOutDesc == coutstring1.str());
+    ASSERT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:14 str1_2:13 str1_3:12 }");
+    ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
 
@@ -212,8 +210,6 @@ TEST_F(xschema, check_construct_payload_mirror) {
   // @(-4,1) 12,13,14,15
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1));
-    std::string expectedOutDesc = "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }";
-    std::string expectedOutData = "{ str1_0:12 str1_1:13 str1_2:14 str1_3:15 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
@@ -222,8 +218,8 @@ TEST_F(xschema, check_construct_payload_mirror) {
     // std::cerr << "t " << coutstring2.str() << std::endl;
     // std::cerr << "t " << coutstring1.str() << std::endl;
 
-    ASSERT_TRUE(expectedOutData == coutstring2.str());
-    ASSERT_TRUE(expectedOutDesc == coutstring1.str());
+    ASSERT_TRUE(coutstring2.str() == "{ str1_0:12 str1_1:13 str1_2:14 str1_3:15 }");
+    ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
 
@@ -249,8 +245,6 @@ TEST_F(xschema, check_sum) {
   // 44
   {
     auto payload = *(dataStr1.storage->getPayload()) + *(dataStr2.storage->getPayload());
-    std::string expectedOutDesc = "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }";
-    std::string expectedOutData = "{ str1_0:11 str1_1:12 str2_0:111 }";
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.getDescriptor();
     std::stringstream coutstring2;
@@ -259,8 +253,8 @@ TEST_F(xschema, check_sum) {
     // std::cerr << "t " << coutstring2.str() << std::endl;
     // std::cerr << "t " << coutstring1.str() << std::endl;
 
-    ASSERT_TRUE(expectedOutData == coutstring2.str());
-    ASSERT_TRUE(expectedOutDesc == coutstring1.str());
+    ASSERT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:12 str2_0:111 }");
+    ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }
 
