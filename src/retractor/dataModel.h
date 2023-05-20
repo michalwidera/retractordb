@@ -31,7 +31,7 @@ struct streamInstance {
   streamInstance(query &qry);
 
   rdb::payload constructAgsePayload(int length, int offset);
-  rdb::payload constructAggregate(command_id cmd);
+  rdb::payload constructAggregate(command_id cmd, std::string name);
 };
 
 class dataModel {

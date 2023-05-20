@@ -265,12 +265,23 @@ TEST_F(xschema, check_sum) {
 }
 
 TEST_F(xschema, compute_instance_1) {
-  { dataArea->computeInstance("str1"); }
-  { dataArea->computeInstance("str2"); }
-  { dataArea->computeInstance("str3"); }
-  { dataArea->computeInstance("str4"); }
-  { dataArea->computeInstance("str5"); }
-  { dataArea->computeInstance("str6"); }
+  for (auto i : coreInstance)
+    if (!i.isDeclaration()) dataArea->computeInstance(i.id);
+
+  auto payload = *(dataArea->qSet["str7"]->fromPayload);
+
+  // SELECT str7[0] STREAM str7 FROM core0.max
+
+  // datafile1.txt
+  // 20 31
+  // 21 32
+  // 22 33
+
+  std::stringstream coutstring7;
+  coutstring7 << rdb::flat << payload;
+  std::cerr << "t " << coutstring7.str() << std::endl;
+
+  ASSERT_TRUE("{ str7_0:31 }" == coutstring7.str());
 }
 
 }  // namespace

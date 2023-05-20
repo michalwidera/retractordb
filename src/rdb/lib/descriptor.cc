@@ -233,6 +233,8 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   rdb::descFld retVal{rdb::BYTE};
   auto size{1};
   for (auto const field : *this) {
+    if (std::get<rtype>(field) == rdb::REF) continue;
+    if (std::get<rtype>(field) == rdb::TYPE) continue;
     if (retVal <= std::get<rtype>(field)) {
       retVal = std::get<rtype>(field);
       if (size < std::get<rlen>(field)) size = std::get<rlen>(field);

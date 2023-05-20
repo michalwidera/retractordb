@@ -74,6 +74,9 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   rdb::Descriptor descriptor;
   bool flip = (length < 0);
   length = abs(length);
+
+  storage->readReverse(0);
+
   auto descriptorVecSize = storage->getDescriptor().size();
   std::string storage_name = storage->getStorageName();
 
@@ -134,14 +137,14 @@ void fnOp(opType op, std::any value, std::any& valueRet) {
   }
 }
 
-rdb::payload streamInstance::constructAggregate(command_id cmd) {
+rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name) {
   // First construct descriptor
   rdb::Descriptor descriptor;
 
+  storage->readReverse(0);
+
   auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
-  rdb::rField x{std::make_tuple(storage->getStorageName() + "_0",  //
-                                maxLen,                            //
-                                maxType)};
+  rdb::rField x{std::make_tuple(name, maxLen, maxType)};
   descriptor | rdb::Descriptor{x};
 
   // Second construct payload
@@ -172,6 +175,9 @@ rdb::payload streamInstance::constructAggregate(command_id cmd) {
 
   auto i{0};
   for (auto const it : storage->getDescriptor()) {
+    if (std::get<rdb::rtype>(it) == rdb::REF) continue;
+    if (std::get<rdb::rtype>(it) == rdb::TYPE) continue;
+
     std::any value = castAny(storage->getPayload()->getItem(i++), maxType);
     switch (maxType) {
       case rdb::BYTE:
@@ -314,8 +320,8 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX: {
-      assert(false && "TODO");
-      *(qSet[instance]->fromPayload) = *getPayload(arg[0].getStr_());
+      const auto nameSrc = arg[0].getStr_();
+      *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAggregate(cmd, instance + "_0");
     } break;
     case STREAM_SUBSTRACT: {
       //  :- PUSH_STREAM(core0)
