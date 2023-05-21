@@ -262,7 +262,6 @@ TEST_F(xschema, check_sum) {
 }
 
 TEST_F(xschema, compute_instance_1) {
- 
   auto payload = *(dataArea->qSet["str7"]->fromPayload);
 
   // SELECT str7[0] STREAM str7 FROM core0.max

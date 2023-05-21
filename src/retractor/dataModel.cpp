@@ -286,14 +286,20 @@ void dataModel::computeInstance(std::string instance) {
   switch (cmd) {
     case PUSH_STREAM: {
       // 	:- PUSH_STREAM(core0)
+      assert(arg.size() == 1);
+
       const auto nameSrc = operation.getStr_();
+
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc);
     } break;
     case STREAM_TIMEMOVE: {
       // 	:- PUSH_STREAM(core0)
       //  :- STREAM_TIMEMOVE(1)
+      assert(arg.size() == 2);
+
       const auto nameSrc = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
+
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_DEHASH_MOD:
@@ -301,6 +307,8 @@ void dataModel::computeInstance(std::string instance) {
       //  :- PUSH_STREAM(core0)
       //  :- PUSH_VAL(2/1)
       //  :- STREAM_DEHASH_MOD
+      assert(arg.size() == 3);
+
       const auto nameSrc = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
@@ -318,15 +326,19 @@ void dataModel::computeInstance(std::string instance) {
     case STREAM_MIN:
     case STREAM_MAX: {
       const auto nameSrc = arg[0].getStr_();
+
       *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAggregate(cmd, instance + "_0");
     } break;
     case STREAM_SUBSTRACT: {
       //  :- PUSH_STREAM(core0)
       //  :- STREAM_SUBSTRACT(1/2)
+      assert(arg.size() == 2);
+
       const auto nameSrc = arg[0].getStr_();
-      auto rationalArgument = arg[1].getRI();
+      const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
       const auto timeOffset = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+
       *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_ADD: {
@@ -334,8 +346,11 @@ void dataModel::computeInstance(std::string instance) {
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_ADD
       //
+      assert(arg.size() == 3);
+
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
+
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
@@ -345,6 +360,7 @@ void dataModel::computeInstance(std::string instance) {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
       assert(arg.size() == 2);
+
       const auto nameSrc = arg[0].getStr_();
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
@@ -356,6 +372,7 @@ void dataModel::computeInstance(std::string instance) {
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
       assert(arg.size() == 3);
+
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
       const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
