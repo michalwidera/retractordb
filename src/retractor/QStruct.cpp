@@ -361,13 +361,16 @@ rdb::Descriptor query::descriptorFrom() {
       };
     } break;
     case STREAM_AGSE: {
-      // TODO - check - sync with dataModel.cpp
-      auto r = std::get<std::pair<int, int>>(cmd.getVT());
-      int windowSize = abs(r.second);
-      auto firstFieldType = getQuery(arg1).lSchema.front().fieldType;
-      auto firstFieldLen = getQuery(arg1).lSchema.front().fieldLen;
-      for (int i = 0; i < windowSize; i++) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), firstFieldLen, firstFieldType);
+      // * INFO - sync with dataModel.cpp
+
+      // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
+      //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
+
+      auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
+      assert(step >= 0);
+      auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
+      for (int i = 0; i < abs(length); i++) {
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), maxLen, maxType);
       }
     } break;
     default:

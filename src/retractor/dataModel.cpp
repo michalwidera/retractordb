@@ -137,14 +137,16 @@ void fnOp(opType op, std::any value, std::any& valueRet) {
 }
 
 rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name) {
-  // First construct descriptor
-  rdb::Descriptor descriptor;
 
+  assert( cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG );
+
+  // First construct descriptor
   storage->readReverse(0);
 
   auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
   rdb::rField x{std::make_tuple(name, maxLen, maxType)};
-  descriptor | rdb::Descriptor{x};
+  rdb::Descriptor descriptor{x};
+  // same as core[name].descriptorFrom()
 
   // Second construct payload
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
@@ -361,7 +363,7 @@ void dataModel::computeInstance(std::string instance) {
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
       assert(arg.size() == 2);
 
-      const auto nameSrc = arg[0].getStr_();
+      const auto nameSrc = arg[0].getStr_();    // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
 
