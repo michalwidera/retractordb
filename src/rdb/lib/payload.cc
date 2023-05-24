@@ -54,7 +54,8 @@ payload &payload::operator=(const Descriptor &other) {
     payloadData = std::make_unique<uint8_t[]>(other.getSizeInBytes());
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
-      descriptor = other;       // Just change field names - descriptor remains the same, payload remains the same
+      // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
+      // pass
     } else
       assert(false && "Descriptor should be empty before this assign.");
   }

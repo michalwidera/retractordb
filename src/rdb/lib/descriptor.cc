@@ -148,7 +148,7 @@ bool Descriptor::operator==(const Descriptor &rhs) {
   return false;
 }
 
-void Descriptor::cleanRef() {
+Descriptor &Descriptor::cleanRef() {
   Descriptor rhs(*this);
   clear();
   std::copy_if(rhs.begin(), rhs.end(),                          //
@@ -157,9 +157,10 @@ void Descriptor::cleanRef() {
                  return std::get<rdb::rtype>(i) != rdb::REF &&  //
                         std::get<rdb::rtype>(i) != rdb::TYPE;
                });
+  return *this;
 }
 
-void Descriptor::createHash(const std::string name, Descriptor lhs, Descriptor rhs) {
+Descriptor &Descriptor::createHash(const std::string name, Descriptor lhs, Descriptor rhs) {
   lhs.cleanRef();
   rhs.cleanRef();
   assert(lhs.size() == rhs.size());
@@ -172,6 +173,7 @@ void Descriptor::createHash(const std::string name, Descriptor lhs, Descriptor r
     push_back(rField(name + "_" + std::to_string(i), maxRlen, maxRtype));
     i++;
   }
+  return *this;
 }
 
 Descriptor::Descriptor(const Descriptor &init) { *this | init; }

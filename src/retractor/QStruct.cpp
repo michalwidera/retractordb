@@ -344,19 +344,23 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_SUBSTRACT:
     case STREAM_TIMEMOVE: {
       for (auto &f : getQuery(arg1).lSchema) {
+        if (f.fieldLen == 0) continue;
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
     } break;
     case PUSH_STREAM: {
       for (auto &f : getQuery(cmd.getStr_()).lSchema) {
+        if (f.fieldLen == 0) continue;
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
     } break;
     case STREAM_ADD: {
       for (auto &f : getQuery(arg1).lSchema) {
+        if (f.fieldLen == 0) continue;
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
       for (auto &f : getQuery(arg2).lSchema) {
+        if (f.fieldLen == 0) continue;
         retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
       };
     } break;

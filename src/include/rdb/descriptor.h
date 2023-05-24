@@ -37,8 +37,8 @@ class Descriptor : public std::vector<rField> {
   Descriptor &operator=(const Descriptor &rhs);
   bool operator==(const Descriptor &rhs);
 
-  void createHash(const std::string name, Descriptor lhs, Descriptor rhs);
-  void cleanRef();
+  Descriptor &createHash(const std::string name, Descriptor lhs, Descriptor rhs);
+  Descriptor &cleanRef();
 
   int getSizeInBytes() const;
   int position(std::string name);
