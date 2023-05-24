@@ -1,5 +1,5 @@
 
-// Generated from RQL.g4 by ANTLR 4.12.0
+// Generated from RQL.g4 by ANTLR 4.13.0
 
 
 #include "RQLLexer.h"
@@ -42,10 +42,19 @@ struct RQLLexerStaticData final {
 };
 
 ::antlr4::internal::OnceFlag rqllexerLexerOnceFlag;
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+static thread_local
+#endif
 RQLLexerStaticData *rqllexerLexerStaticData = nullptr;
 
 void rqllexerLexerInitialize() {
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+  if (rqllexerLexerStaticData != nullptr) {
+    return;
+  }
+#else
   assert(rqllexerLexerStaticData == nullptr);
+#endif
   auto staticData = std::make_unique<RQLLexerStaticData>(
     std::vector<std::string>{
       "T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "T__6", "T__7", "T__8", 
@@ -361,5 +370,9 @@ const atn::ATN& RQLLexer::getATN() const {
 
 
 void RQLLexer::initialize() {
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+  rqllexerLexerInitialize();
+#else
   ::antlr4::internal::call_once(rqllexerLexerOnceFlag, rqllexerLexerInitialize);
+#endif
 }

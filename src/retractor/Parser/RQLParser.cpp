@@ -1,5 +1,5 @@
 
-// Generated from RQL.g4 by ANTLR 4.12.0
+// Generated from RQL.g4 by ANTLR 4.13.0
 
 
 #include "RQLListener.h"
@@ -37,10 +37,19 @@ struct RQLParserStaticData final {
 };
 
 ::antlr4::internal::OnceFlag rqlParserOnceFlag;
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+static thread_local
+#endif
 RQLParserStaticData *rqlParserStaticData = nullptr;
 
 void rqlParserInitialize() {
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+  if (rqlParserStaticData != nullptr) {
+    return;
+  }
+#else
   assert(rqlParserStaticData == nullptr);
+#endif
   auto staticData = std::make_unique<RQLParserStaticData>(
     std::vector<std::string>{
       "prog", "storage_statement", "select_statement", "rational_se", "fraction", 
@@ -3092,5 +3101,9 @@ bool RQLParser::termSempred(TermContext *_localctx, size_t predicateIndex) {
 }
 
 void RQLParser::initialize() {
+#if ANTLR4_USE_THREAD_LOCAL_CACHE
+  rqlParserInitialize();
+#else
   ::antlr4::internal::call_once(rqlParserOnceFlag, rqlParserInitialize);
+#endif
 }

@@ -137,8 +137,7 @@ void fnOp(opType op, std::any value, std::any& valueRet) {
 }
 
 rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name) {
-
-  assert( cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG );
+  assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor
   storage->readReverse(0);
@@ -363,7 +362,7 @@ void dataModel::computeInstance(std::string instance) {
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
       assert(arg.size() == 2);
 
-      const auto nameSrc = arg[0].getStr_();    // * INFO Sync with QStruct.cpp
+      const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
 
