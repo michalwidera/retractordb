@@ -20,7 +20,7 @@ esac
 echo "Note: Current folder is << $foldername >> and will start build in << $build_folder >>"
 
 PS3='Build RetractorDB, please enter your choice: '
-options=("Release" "Debug" "Relase (build only)" "Debug (build only)" "Relase (make)" "Debug (make)" "Quit")
+options=("Release" "Debug" "Relase (build only)" "Debug (build only)" "Relase (make)" "Debug (make)" "Reset (clean)" "Quit")
 select opt in "${options[@]}"
 do
     case $opt in
@@ -50,6 +50,10 @@ do
             ;;
         "Debug (make)")
             cd $build_folder/build/Debug && make
+            break
+            ;;
+        "Reset (clean)")
+            cd ~/.local/bin && rm -f -- antlr-* xdisplay xqry xretractor xtrdb plotblock.py plothistgram.py antlr4call.sh
             break
             ;;
         "Quit")
