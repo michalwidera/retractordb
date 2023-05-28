@@ -9,6 +9,7 @@
 #include "QStruct.h"  // coreInstance
 #include "SOperations.h"
 #include "convertTypes.h"
+#include "expressionEvaluator.h"
 #include "iostream"
 
 // ctest -R '^ut-dataModel' -V
@@ -237,6 +238,19 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
   return *(localPayload.get());
 }
 
+// TODO: work area
+void streamInstance::constructStoragePayload(const std::list<field>& fields) {
+  auto i{0};
+  for (auto program : fields) {
+    expressionEvaluator test;
+    rdb::descFldVT result = test.eval(program.lProgram, fromPayload.get());
+
+    // cast<std::any> castAny;
+    // std::any value = castAny(result, program.fieldType);
+    // storage->getPayload()->setItem(i++,value);
+  }
+}
+
 dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
   //
   // Special parameters support in query set
@@ -268,15 +282,24 @@ void dataModel::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Declarations are not need to process
-    computeInstance(q.id);
+
+    constructFromPayload(q.id);
+    qSet[q.id]->constructStoragePayload(q.lSchema);
+    storeInstance(q.id);
   }
 }
 
-void dataModel::computeInstance(std::string instance) {
+// TODO: work area
+void dataModel::storeInstance(std::string instance) {
+  auto qry = coreInstance[instance];
+  auto recordsCount{qSet[instance]->storage->getRecordsCount()};
+}
+
+void dataModel::constructFromPayload(std::string instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
-  assert(qry.lProgram.size() > 0 && "all stream are not declarations");
+  assert(qry.lProgram.size() > 0 && "constructFromPayload does not process declarations");
 
   std::vector<token> arg;
   for (auto tk : qry.lProgram) arg.push_back(tk);

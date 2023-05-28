@@ -1,5 +1,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <rdb/payload.h>
 #include <spdlog/spdlog.h>
 
 #include "retractor/expressionEvaluator.h"

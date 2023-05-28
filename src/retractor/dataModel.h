@@ -32,6 +32,9 @@ struct streamInstance {
 
   rdb::payload constructAgsePayload(int length, int offset);
   rdb::payload constructAggregate(command_id cmd, std::string name);
+
+  // constructStoragePayload uses only data from fromPayload
+  void constructStoragePayload(const std::list<field> &fields);
 };
 
 class dataModel {
@@ -49,7 +52,9 @@ class dataModel {
 
   std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int revOffset = 0);
 
-  void computeInstance(std::string instance);
+  // constructFromPayload function need to be here because it access different streams from qSet
+  void constructFromPayload(std::string instance);
 
+  void storeInstance(std::string instance);
   void processRows(std::set<std::string> inSet);
 };

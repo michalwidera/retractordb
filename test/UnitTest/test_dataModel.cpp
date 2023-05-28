@@ -88,7 +88,7 @@ class xschema : public ::testing::Test {
     dataArea->qSet["str2"]->storage->write();
 
     for (auto i : coreInstance)
-      if (!i.isDeclaration()) dataArea->computeInstance(i.id);
+      if (!i.isDeclaration()) dataArea->constructFromPayload(i.id);
   }
 
   virtual ~xschema() override {}
@@ -276,6 +276,11 @@ TEST_F(xschema, compute_instance_1) {
   std::cerr << "t " << coutstring7.str() << std::endl;
 
   ASSERT_TRUE("{ str7_0:31 }" == coutstring7.str());
+}
+
+TEST_F(xschema, process_rows_1) {
+  std::set<std::string> rowSet = {"str1", "str2"};
+  dataArea->processRows(rowSet);
 }
 
 }  // namespace

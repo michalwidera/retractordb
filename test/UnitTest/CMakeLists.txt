@@ -25,6 +25,7 @@ set(SOURCES_RDB_TEST test_rdb.cpp main.cpp)
 
 set(SOURCES_DATAMODEL_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp

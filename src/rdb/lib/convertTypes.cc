@@ -2,12 +2,13 @@
 
 #include <spdlog/spdlog.h>
 
-#include <any>
 #include <iostream>
 #include <istream>
+#include <optional>
 #include <stack>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 
 template <typename T, typename K>
 void visit_descFld(const K& inVar, K& retVal) {
@@ -345,6 +346,21 @@ boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6
   err1 = std::abs(rational_cast<double>(result1) - inValue);
   err2 = std::abs(rational_cast<double>(result2) - inValue);
   return err1 > err2 ? result2 : result1;
+}
+
+// based: https://stackoverflow.com/questions/61182946/convert-stdany-to-stdvariant
+rdb::descFldVT any_to_variant_cast(std::any a) {
+  if (!a.has_value()) throw std::bad_any_cast();
+
+  if (a.type() == typeid(std::string)) return std::any_cast<std::string>(a);
+  if (a.type() == typeid(int)) return std::any_cast<int>(a);
+  if (a.type() == typeid(uint8_t)) return std::any_cast<uint8_t>(a);
+  if (a.type() == typeid(unsigned)) return std::any_cast<unsigned>(a);
+  if (a.type() == typeid(double)) return std::any_cast<double>(a);
+  if (a.type() == typeid(float)) return std::any_cast<float>(a);
+  if (a.type() == typeid(boost::rational<int>)) return std::any_cast<boost::rational<int>>(a);
+  throw std::bad_any_cast();
+  return rdb::descFldVT(0);  // Proforma
 }
 
 template struct cast<rdb::descFldVT>;

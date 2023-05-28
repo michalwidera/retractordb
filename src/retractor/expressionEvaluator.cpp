@@ -1,12 +1,14 @@
 #include "expressionEvaluator.h"
 
 #include <assert.h>
+#include <rdb/payload.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cmath>       // sqrt
 #include <functional>  // std::function
 #include <iostream>
+#include <regex>
 #include <stack>
 #include <string>
 #include <typeinfo>  // operator typeid
@@ -212,7 +214,7 @@ rdb::descFldVT callFun(rdb::descFldVT& inVar, std::function<double(double)> fnNa
   return inVar;
 }
 
-rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
+rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload* payload) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;
 
@@ -274,6 +276,27 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program) {
         break;
       case PUSH_ID:
         /* TODO */
+        assert(false);
+        break;
+      case PUSH_ID2: { /* TODO */
+        assert(payload != NULL);
+        std::regex r("(\\w*)\\[(\\d*)\\]");
+        std::smatch what;
+        std::regex_search(tkStr, what, r);  // something[1]
+        assert(what.size() == 3);
+        // const std::string schema(what[1]);
+        const std::string sOffset1(what[2]);
+        const int offset1(atoi(sOffset1.c_str()));
+
+        const auto anyValue = payload->getItem(offset1);
+        // auto rdbtype = std::get<rdb::rtype>(payload->getDescriptor()[offset1]);
+
+        rdb::descFldVT val = any_to_variant_cast(anyValue);
+        rStack.push(val);
+      } break;
+      default:
+        /* UNDEFINED */
+        assert(false);
         break;
     }
   };
