@@ -276,6 +276,11 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
         break;
       case PUSH_ID:
         /* TODO */
+        assert(payload != NULL);
+        assert(false);
+        break;
+      case PUSH_IDX:
+        /* TODO */
         assert(false);
         break;
       case PUSH_ID2: { /* TODO */

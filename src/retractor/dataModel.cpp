@@ -238,7 +238,6 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
   return *(localPayload.get());
 }
 
-// TODO: work area
 void streamInstance::constructStoragePayload(const std::list<field>& fields) {
   auto i{0};
   for (auto program : fields) {
@@ -291,8 +290,9 @@ void dataModel::processRows(std::set<std::string> inSet) {
 
 // TODO: work area
 void dataModel::storeInstance(std::string instance) {
-  auto qry = coreInstance[instance];
-  auto recordsCount{qSet[instance]->storage->getRecordsCount()};
+  // auto qry = coreInstance[instance];
+  // auto recordsCount{qSet[instance]->storage->getRecordsCount()};
+  qSet[instance]->storage->write();
 }
 
 void dataModel::constructFromPayload(std::string instance) {

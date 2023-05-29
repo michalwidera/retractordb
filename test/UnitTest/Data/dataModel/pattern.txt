@@ -19,12 +19,12 @@
 .{	INTEGER str1_0
 	INTEGER str1_1
 }
-.3 Record(s)
+.4 Record(s)
 8 Byte(s) per record.
 .ok
 .{	INTEGER str2_0
 }
-.3 Record(s)
+.4 Record(s)
 4 Byte(s) per record.
 .ok
 .{	INTEGER str3_0
