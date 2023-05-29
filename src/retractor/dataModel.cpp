@@ -242,12 +242,12 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
 void streamInstance::constructStoragePayload(const std::list<field>& fields) {
   auto i{0};
   for (auto program : fields) {
-    expressionEvaluator test;
-    rdb::descFldVT result = test.eval(program.lProgram, fromPayload.get());
+    expressionEvaluator expression;
+    rdb::descFldVT result = expression.eval(program.lProgram, fromPayload.get());
 
-    // cast<std::any> castAny;
-    // std::any value = castAny(result, program.fieldType);
-    // storage->getPayload()->setItem(i++,value);
+    cast<std::any> castAny;
+    std::any value = castAny(result, program.fieldType);
+    storage->getPayload()->setItem(i++,value);
   }
 }
 
