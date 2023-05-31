@@ -242,11 +242,25 @@ void streamInstance::constructStoragePayload(const std::list<field>& fields) {
   auto i{0};
   for (auto program : fields) {
     expressionEvaluator expression;
-    rdb::descFldVT result = expression.eval(program.lProgram, fromPayload.get());
+    rdb::descFldVT retVal = expression.eval(program.lProgram, fromPayload.get());
 
-    cast<std::any> castAny;
-    std::any value = castAny(result, program.fieldType);
-    storage->getPayload()->setItem(i++,value);
+    std::any result;
+    std::visit(Overload{[&result](uint8_t a) { result = static_cast<uint8_t>(a); },                            //
+                        [&result](int a) { result = static_cast<int>(a); },                                    //
+                        [&result](unsigned a) { result = static_cast<unsigned>(a); },                          //
+                        [&result](boost::rational<int> a) { result = static_cast<boost::rational<int>>(a); },  //
+                        [&result](float a) { result = static_cast<float>(a); },                                //
+                        [&result](double a) { result = static_cast<double>(a); },                              //
+                        [&result](std::vector<uint8_t> a) { assert(false && "TODO"); },                        //
+                        [&result](std::vector<int> a) { assert(false && "TODO"); },                            //
+                        [&result](std::pair<int, int> a) { assert(false && "TODO"); },                         //
+                        [&result](std::pair<std::string, int> a) { assert(false && "TODO"); },                 //
+                        [&result](std::string a) { result = static_cast<std::string>(a); }},
+               retVal);
+
+    assert(result.has_value());
+
+    storage->getPayload()->setItem(i++, result);
   }
 }
 
@@ -284,15 +298,8 @@ void dataModel::processRows(std::set<std::string> inSet) {
 
     constructFromPayload(q.id);
     qSet[q.id]->constructStoragePayload(q.lSchema);
-    storeInstance(q.id);
+    qSet[q.id]->storage->write();
   }
-}
-
-// TODO: work area
-void dataModel::storeInstance(std::string instance) {
-  // auto qry = coreInstance[instance];
-  // auto recordsCount{qSet[instance]->storage->getRecordsCount()};
-  qSet[instance]->storage->write();
 }
 
 void dataModel::constructFromPayload(std::string instance) {

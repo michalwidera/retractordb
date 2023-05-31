@@ -55,6 +55,5 @@ class dataModel {
   // constructFromPayload function need to be here because it access different streams from qSet
   void constructFromPayload(std::string instance);
 
-  void storeInstance(std::string instance);
   void processRows(std::set<std::string> inSet);
 };

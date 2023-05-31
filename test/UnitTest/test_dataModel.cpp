@@ -273,7 +273,7 @@ TEST_F(xschema, compute_instance_1) {
 
   std::stringstream coutstring7;
   coutstring7 << rdb::flat << payload;
-  std::cerr << "t " << coutstring7.str() << std::endl;
+  // std::cerr << "t " << coutstring7.str() << std::endl;
 
   ASSERT_TRUE("{ str7_0:31 }" == coutstring7.str());
 }
@@ -281,6 +281,28 @@ TEST_F(xschema, compute_instance_1) {
 TEST_F(xschema, process_rows_1) {
   std::set<std::string> rowSet = {"str1", "str2"};
   dataArea->processRows(rowSet);
+
+  dataArea->qSet["str2"]->storage->readReverse(0);
+
+  {
+    auto payload = *(dataArea->qSet["str2"]->fromPayload);
+
+    std::stringstream coutstring;
+    coutstring << rdb::flat << payload;
+    // std::cerr << "yyy " << coutstring.str() << std::endl;
+
+    ASSERT_TRUE("{ str2_0:22 str2_1:33 }" == coutstring.str());
+  }
+
+  {
+    auto payload = *(dataArea->qSet["str2"]->storage->getPayload());
+
+    std::stringstream coutstring;
+    coutstring << rdb::flat << payload;
+    // std::cerr << "xxx " << coutstring.str() << std::endl;
+
+    ASSERT_TRUE("{ str2_0:27 }" == coutstring.str());  // str1[0]+5 => 22 + 5 => 27
+  }
 }
 
 }  // namespace
