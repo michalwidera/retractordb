@@ -248,7 +248,14 @@ void streamInstance::constructStoragePayload(const std::list<field>& fields) {
 
     assert(result.has_value());
 
-    storage->getPayload()->setItem(i++, result);
+    assert(program.fieldType == std::get<rdb::rtype>(storage->getDescriptor()[i]));
+
+    cast<std::any> castAny;
+    std::any value = castAny(result, std::get<rdb::rtype>(storage->getDescriptor()[i]));
+
+    storage->getPayload()->setItem(i, value);
+
+    i++;
   }
 }
 
