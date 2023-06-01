@@ -244,19 +244,7 @@ void streamInstance::constructStoragePayload(const std::list<field>& fields) {
     expressionEvaluator expression;
     rdb::descFldVT retVal = expression.eval(program.lProgram, fromPayload.get());
 
-    std::any result;
-    std::visit(Overload{[&result](uint8_t a) { result = static_cast<uint8_t>(a); },                            //
-                        [&result](int a) { result = static_cast<int>(a); },                                    //
-                        [&result](unsigned a) { result = static_cast<unsigned>(a); },                          //
-                        [&result](boost::rational<int> a) { result = static_cast<boost::rational<int>>(a); },  //
-                        [&result](float a) { result = static_cast<float>(a); },                                //
-                        [&result](double a) { result = static_cast<double>(a); },                              //
-                        [&result](std::vector<uint8_t> a) { assert(false && "TODO"); },                        //
-                        [&result](std::vector<int> a) { assert(false && "TODO"); },                            //
-                        [&result](std::pair<int, int> a) { assert(false && "TODO"); },                         //
-                        [&result](std::pair<std::string, int> a) { assert(false && "TODO"); },                 //
-                        [&result](std::string a) { result = static_cast<std::string>(a); }},
-               retVal);
+    std::any result = std::visit([](auto&& arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
 
     assert(result.has_value());
 
