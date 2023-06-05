@@ -123,6 +123,7 @@ int main(int argc, char* argv[]) {
       std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";
       std::cout << "print|printt \t\t\t show payload\n";
+      std::cout << "list|rlist [value] \t\t print value records\n";
       std::cout << "input [[field][value]] \t\t fill payload\n";
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
@@ -235,6 +236,27 @@ int main(int argc, char* argv[]) {
       continue;
     } else if (cmd == "printt") {
       std::cout << ORANGE << rdb::flat << *(dacc->getPayload()) << RESET << std::endl;
+      continue;
+    } else if (cmd == "list" || cmd == "rlist") {
+      int record;
+      std::cin >> record;
+      for (auto i = 0 ; i < record ; i++ ) {
+        if ( i >= dacc->getRecordsCount()) {
+          std::cout << RED << "record out of range\n" << RESET;
+          continue;
+        }
+        auto returnStatus = (cmd == "list") ? dacc->read(i) : dacc->read(dacc->getRecordsCount() - i - 1) ;
+        if (returnStatus)
+          payloadStatus = fetched;
+        else
+          payloadStatus = error;
+
+        if (payloadStatus == error) {
+          std::cout << RED << "fetch error\n" << RESET;
+          continue;
+        }
+        std::cout << ORANGE << rdb::flat << *(dacc->getPayload()) << RESET << std::endl;
+      }
       continue;
     } else if (cmd == "input") {
       for (auto i : dacc->getDescriptor()) std::cin >> *(dacc->getPayload());

@@ -7,25 +7,11 @@ desc
 size
 open str1
 desc
-read 0
-printt
-read 1
-printt
-read 2
-printt
-read 3
-printt
+list 4
 size
 open str2
 desc
-read 0
-printt
-read 1
-printt
-read 2
-printt
-read 3
-printt
+list 4
 size
 open str3
 desc
