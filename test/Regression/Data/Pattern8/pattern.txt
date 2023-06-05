@@ -1,20 +1,11 @@
-.ok
-.ok
-.ok
 .{	INTEGER dane
 	STRING name[5]
 	REF "data_source.txt"
 	TYPE TEXTSOURCE
 }
-.1 Record(s)
+1 Record(s)
 9 Byte(s) per record.
-.ok
-.{ dane:1 name:test1 }
-.ok
-.{ dane:2 name:test2 }
-.ok
-.{ dane:1 name:test1 }
-.ok
-.{ dane:2 name:test2 }
-.ok
-.
+{ dane:1 name:test1 }
+{ dane:2 name:test2 }
+{ dane:1 name:test1 }
+{ dane:2 name:test2 }

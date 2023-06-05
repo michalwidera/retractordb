@@ -44,10 +44,12 @@ int main(int argc, char* argv[]) {
   bool reverse = false;
   bool rox = true;
   bool mono = false;
+  std::string prompt = ".";
+  std::string ok = "ok\n";
   std::string cmd;
   std::string wasteComment;
   do {
-    if (cmd != "#") std::cout << ".";
+    if (cmd != "#") std::cout << prompt;
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {
@@ -59,17 +61,21 @@ int main(int argc, char* argv[]) {
       // turn of some functionality and do not change the output pattern is script
       // btw - I'm either surprised by two kinds of comments ...
       std::getline(std::cin, wasteComment);
-      if (cmd == "rem") std::cout << "ok\n";
+      if (cmd == "rem") std::cout << ok;
       continue;
     }
-    if (cmd == "mono") {
+    if (cmd == "mono" || cmd == "noprompt") {
+      if ( cmd == "noprompt" ) {
+        prompt = "";
+        ok = "";
+      }
       GREEN = "";
       RED = "";
       ORANGE = "";
       BLUE = "";
       YELLOW = "";
       RESET = "";
-      std::cout << "ok\n";
+      std::cout << ok;
       continue;
     }
     if (cmd == "quitdrop" || cmd == "qd") {
@@ -314,7 +320,7 @@ int main(int argc, char* argv[]) {
       std::cout << RED << "?\n" << RESET;
       continue;
     }
-    std::cout << "ok\n";
+    std::cout << ok ;
   } while (true);
   // use '$xxd datafile-11' to check
   return 0;
