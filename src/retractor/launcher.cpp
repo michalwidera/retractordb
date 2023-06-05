@@ -49,13 +49,13 @@ int main(int argc, char* argv[]) {
   po::variables_map vm;
   try {
     po::options_description desc("Available options:");
-    desc.add_options()                                                                                  //
-        ("help,h", "Show program options")                                                              //
-        ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                          //
-        ("outfile,o", po::value<std::string>(&sOutputFile)->default_value("query.qry"), "output file")  //
-        ("dumpcross,d", "dump diagnostic cross compilation forms")                                      //
-        ("waterfall,f", "show waterfall mode")                      //                                                //
-        ("verbose,v", "Dump diagnostic info on screen while work")  //
+    desc.add_options()                                                                                       //
+        ("help,h", "Show program options")                                                                   //
+        ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                               //
+        ("outfile,o", po::value<std::string>(&sOutputFile)->default_value("query.qry"), "output file")       //
+        ("dumpcross,d", "dump diagnostic cross compilation forms")                                           //
+        ("waterfall,f", "show waterfall mode")                                                               //
+        ("verbose,v", "Dump diagnostic info on screen while work")                                           //
         ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0), "query limit, 0 - no limit")  //
         ("onlycompile,c", "compile only mode");
     po::positional_options_description p;  // Assume that infile is the first option
