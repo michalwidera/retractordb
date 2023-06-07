@@ -9,11 +9,11 @@
 #include <sstream>
 #include <string>
 
-#include "QStruct.h"  // coreInstance
 #include "config.h"
 #include "rdb/fainterface.h"
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
+#include "retractor/QStruct.h"  // coreInstance
 #include "retractor/dataModel.h"
 
 // ctest -R '^ut-dataModel' -V

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QStruct.h>         // query
 #include <rdb/descriptor.h>  // rdb::Descriptor
 #include <rdb/payload.h>     // rdb::payload
 #include <rdb/storageacc.h>  // rdb::storageAccessor
@@ -10,6 +9,8 @@
 #include <memory>  // unique_ptr
 #include <string>
 #include <vector>
+
+#include "QStruct.h"  // query
 
 struct streamInstance {
   std::unique_ptr<rdb::storageAccessor> storage;  // here is payload that will be stored - select clause

@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
       continue;
     }
     if (cmd == "mono" || cmd == "noprompt") {
-      if ( cmd == "noprompt" ) {
+      if (cmd == "noprompt") {
         prompt = "";
         ok = "";
       }
@@ -246,12 +246,12 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "list" || cmd == "rlist") {
       int record;
       std::cin >> record;
-      for (auto i = 0 ; i < record ; i++ ) {
-        if ( i >= dacc->getRecordsCount()) {
+      for (auto i = 0; i < record; i++) {
+        if (i >= dacc->getRecordsCount()) {
           std::cout << RED << "record out of range\n" << RESET;
           continue;
         }
-        auto returnStatus = (cmd == "list") ? dacc->read(i) : dacc->read(dacc->getRecordsCount() - i - 1) ;
+        auto returnStatus = (cmd == "list") ? dacc->read(i) : dacc->read(dacc->getRecordsCount() - i - 1);
         if (returnStatus)
           payloadStatus = fetched;
         else
@@ -320,7 +320,7 @@ int main(int argc, char* argv[]) {
       std::cout << RED << "?\n" << RESET;
       continue;
     }
-    std::cout << ok ;
+    std::cout << ok;
   } while (true);
   // use '$xxd datafile-11' to check
   return 0;

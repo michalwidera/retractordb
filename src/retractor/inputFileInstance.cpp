@@ -1,5 +1,6 @@
+#include "inputFileInstance.h"
+
 #include <ctype.h>  // for tolower
-#include <inputFileInstance.h>
 
 #include <algorithm>                               // for transform
 #include <boost/algorithm/string/trim.hpp>         // for trim_right
