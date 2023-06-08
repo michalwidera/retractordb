@@ -14,6 +14,7 @@
 #include <stack>                     // for stack
 #include <stdexcept>                 // for logic_error
 #include <type_traits>
+#include <rdb/convertTypes.h>
 
 using namespace boost;
 using namespace boost::lambda;
@@ -22,7 +23,6 @@ using namespace boost::lambda;
 #include "fldType.h"
 #define CMDID_H_CREATE_DEFINITION_CMDI
 #include "cmdID.h"
-#include "convertTypes.h"
 
 extern "C" {
 qTree coreInstance;

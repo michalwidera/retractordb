@@ -12,9 +12,9 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>  // for out_of_range
+#include <rdb/convertTypes.h>
 
 #include "QStruct.h"  // for field, BAD
-#include "convertTypes.h"
 
 using namespace boost;
 

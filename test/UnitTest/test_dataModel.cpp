@@ -279,8 +279,16 @@ TEST_F(xschema, compute_instance_1) {
 }
 
 TEST_F(xschema, process_rows_1) {
+  // This creates 4 records in str1 and str2 - checked here & in Data/dataModel/pattern.txt
+
+  ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 3);
+  ASSERT_TRUE(dataArea->qSet["str2"]->storage->getRecordsCount() == 3);
+
   std::set<std::string> rowSet = {"str1", "str2"};
   dataArea->processRows(rowSet);
+
+  ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 4);
+  ASSERT_TRUE(dataArea->qSet["str2"]->storage->getRecordsCount() == 4);
 
   dataArea->qSet["str2"]->storage->readReverse(0);
 

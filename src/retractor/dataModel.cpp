@@ -1,6 +1,7 @@
 #include "dataModel.h"
 
 #include <spdlog/spdlog.h>
+#include <rdb/convertTypes.h>
 
 #include <cassert>
 #include <cstdlib>  // std::div
@@ -8,7 +9,6 @@
 
 #include "QStruct.h"  // coreInstance
 #include "SOperations.h"
-#include "convertTypes.h"
 #include "expressionEvaluator.h"
 #include "iostream"
 

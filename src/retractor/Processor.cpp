@@ -19,10 +19,10 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/stacktrace.hpp>
+#include <rdb/convertTypes.h>
 
 #include "QStruct.h"
 #include "SOperations.h"
-#include "convertTypes.h"
 #include "inputFileInstance.h"
 
 extern "C" qTree coreInstance;

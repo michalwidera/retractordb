@@ -2,6 +2,8 @@
 
 #include <assert.h>
 #include <rdb/payload.h>
+#include <rdb/convertTypes.h>
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -13,8 +15,6 @@
 #include <string>
 #include <typeinfo>  // operator typeid
 #include <variant>
-
-#include "convertTypes.h"
 
 cast<rdb::descFldVT> castFldVT;
 
