@@ -1,5 +1,6 @@
 #include "QStruct.h"
 
+#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
 #include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
@@ -14,7 +15,6 @@
 #include <stack>                     // for stack
 #include <stdexcept>                 // for logic_error
 #include <type_traits>
-#include <rdb/convertTypes.h>
 
 using namespace boost;
 using namespace boost::lambda;

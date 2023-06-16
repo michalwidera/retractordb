@@ -66,29 +66,29 @@ class xschema : public ::testing::Test {
     auto compiled = parserFile("ut_example_schema.rql");
     dataArea = std::make_unique<dataModel>(coreInstance);
 
-    dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 11);
-    dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 12);
-    dataArea->qSet["str1"]->storage->write();
+    dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
+    dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);
+    dataArea->qSet["str1"]->outputPayload->write();
 
-    dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 13);
-    dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 14);
-    dataArea->qSet["str1"]->storage->write();
+    dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 13);
+    dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 14);
+    dataArea->qSet["str1"]->outputPayload->write();
 
-    dataArea->qSet["str1"]->storage->getPayload()->setItem(0, 15);
-    dataArea->qSet["str1"]->storage->getPayload()->setItem(1, 16);
-    dataArea->qSet["str1"]->storage->write();
+    dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 15);
+    dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 16);
+    dataArea->qSet["str1"]->outputPayload->write();
 
-    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 111);
-    dataArea->qSet["str2"]->storage->write();
+    dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 111);
+    dataArea->qSet["str2"]->outputPayload->write();
 
-    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 222);
-    dataArea->qSet["str2"]->storage->write();
+    dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 222);
+    dataArea->qSet["str2"]->outputPayload->write();
 
-    dataArea->qSet["str2"]->storage->getPayload()->setItem(0, 333);
-    dataArea->qSet["str2"]->storage->write();
+    dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 333);
+    dataArea->qSet["str2"]->outputPayload->write();
 
     for (auto i : coreInstance)
-      if (!i.isDeclaration()) dataArea->constructFromPayload(i.id);
+      if (!i.isDeclaration()) dataArea->constructInputPayload(i.id);
   }
 
   virtual ~xschema() override {}
@@ -113,38 +113,38 @@ TEST_F(xschema, check_test0) {
   {
     streamInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDescriptor};
 
-    data.fromPayload->setItem(0, 123);
-    data.fromPayload->setItem(1, 345);
+    data.inputPayload->setItem(0, 123);
+    data.inputPayload->setItem(1, 345);
 
-    auto v1 = data.fromPayload->getItem(0);
+    auto v1 = data.inputPayload->getItem(0);
 
-    data.storage->getPayload()->setItem(0, 234);
-    data.storage->getPayload()->setItem(1, 456);
-    data.storage->write();
+    data.outputPayload->getPayload()->setItem(0, 234);
+    data.outputPayload->getPayload()->setItem(1, 456);
+    data.outputPayload->write();
 
-    ASSERT_TRUE(data.storage->getRecordsCount() == 1);
+    ASSERT_TRUE(data.outputPayload->getRecordsCount() == 1);
   }
 
   {
     streamInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDescriptor};
 
-    data.fromPayload->setItem(0, 123);
-    data.fromPayload->setItem(1, 345);
+    data.inputPayload->setItem(0, 123);
+    data.inputPayload->setItem(1, 345);
 
-    auto v1 = data.fromPayload->getItem(0);
+    auto v1 = data.inputPayload->getItem(0);
 
-    data.storage->getPayload()->setItem(0, 234);
-    data.storage->getPayload()->setItem(1, 456);
-    data.storage->write();
+    data.outputPayload->getPayload()->setItem(0, 234);
+    data.outputPayload->getPayload()->setItem(1, 456);
+    data.outputPayload->write();
 
-    ASSERT_TRUE(data.storage->getRecordsCount() == 1);
+    ASSERT_TRUE(data.outputPayload->getRecordsCount() == 1);
   }
 }
 
 TEST_F(xschema, check_test_check_constructor) {
-  SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->storage->getRecordsCount());
+  SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->outputPayload->getRecordsCount());
 
-  ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 3);
+  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 3);
 
   ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
 }
@@ -159,17 +159,17 @@ TEST_F(xschema, create_struct_local_str1a) {
                    dataDescriptor,  //
                    dataDescriptor);
 
-  q.storage->getPayload()->setItem(0, 2);
-  q.storage->getPayload()->setItem(1, atoi(build_id));
-  q.storage->write();
-  q.storage->setRemoveOnExit(false);
+  q.outputPayload->getPayload()->setItem(0, 2);
+  q.outputPayload->getPayload()->setItem(1, atoi(build_id));
+  q.outputPayload->write();
+  q.outputPayload->setRemoveOnExit(false);
 
-  ASSERT_TRUE(q.storage->getRecordsCount() == 1);
+  ASSERT_TRUE(q.outputPayload->getRecordsCount() == 1);
 }
 
 TEST_F(xschema, check_construct_payload) {
   streamInstance data{coreInstance["str1"]};
-  data.storage->setRemoveOnExit(false);
+  data.outputPayload->setRemoveOnExit(false);
 
   // str1
   // [0] [1]
@@ -201,7 +201,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
   };
 
   streamInstance data{coreInstance["str1"]};
-  data.storage->setRemoveOnExit(false);
+  data.outputPayload->setRemoveOnExit(false);
 
   // str1
   // [0] [1]
@@ -228,12 +228,12 @@ TEST_F(xschema, check_construct_payload_mirror) {
 
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance["str1"]};
-  dataStr1.storage->setRemoveOnExit(false);
-  dataStr1.storage->read(0);
+  dataStr1.outputPayload->setRemoveOnExit(false);
+  dataStr1.outputPayload->read(0);
 
   streamInstance dataStr2{coreInstance["str2"]};
-  dataStr2.storage->setRemoveOnExit(false);
-  dataStr2.storage->read(0);
+  dataStr2.outputPayload->setRemoveOnExit(false);
+  dataStr2.outputPayload->read(0);
 
   // str1
   // [0] [1]
@@ -247,7 +247,7 @@ TEST_F(xschema, check_sum) {
   // 33
   // 44
   {
-    auto payload = *(dataStr1.storage->getPayload()) + *(dataStr2.storage->getPayload());
+    auto payload = *(dataStr1.outputPayload->getPayload()) + *(dataStr2.outputPayload->getPayload());
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.getDescriptor();
     std::stringstream coutstring2;
@@ -262,7 +262,7 @@ TEST_F(xschema, check_sum) {
 }
 
 TEST_F(xschema, compute_instance_1) {
-  auto payload = *(dataArea->qSet["str7"]->fromPayload);
+  auto payload = *(dataArea->qSet["str7"]->inputPayload);
 
   // SELECT str7[0] STREAM str7 FROM core0.max
 
@@ -281,19 +281,19 @@ TEST_F(xschema, compute_instance_1) {
 TEST_F(xschema, process_rows_1) {
   // This creates 4 records in str1 and str2 - checked here & in Data/dataModel/pattern.txt
 
-  ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 3);
-  ASSERT_TRUE(dataArea->qSet["str2"]->storage->getRecordsCount() == 3);
+  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 3);
+  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 3);
 
   std::set<std::string> rowSet = {"str1", "str2"};
   dataArea->processRows(rowSet);
 
-  ASSERT_TRUE(dataArea->qSet["str1"]->storage->getRecordsCount() == 4);
-  ASSERT_TRUE(dataArea->qSet["str2"]->storage->getRecordsCount() == 4);
+  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 4);
+  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 4);
 
-  dataArea->qSet["str2"]->storage->readReverse(0);
+  dataArea->qSet["str2"]->outputPayload->readReverse(0);
 
   {
-    auto payload = *(dataArea->qSet["str2"]->fromPayload);
+    auto payload = *(dataArea->qSet["str2"]->inputPayload);
 
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
@@ -303,7 +303,7 @@ TEST_F(xschema, process_rows_1) {
   }
 
   {
-    auto payload = *(dataArea->qSet["str2"]->storage->getPayload());
+    auto payload = *(dataArea->qSet["str2"]->outputPayload->getPayload());
 
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;

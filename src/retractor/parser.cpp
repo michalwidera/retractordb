@@ -1,3 +1,5 @@
+#include <rdb/convertTypes.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
 #include <boost/json.hpp>
@@ -7,14 +9,11 @@
 #include <iostream>
 #include <string>
 
-#include <rdb/convertTypes.h>
-
 #include "Parser/RQLBaseListener.h"
 #include "Parser/RQLLexer.h"
 #include "Parser/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
-
 
 extern qTree coreInstance;
 

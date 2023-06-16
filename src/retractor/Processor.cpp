@@ -10,6 +10,7 @@
 // remove this is boost will clean up on own side.
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
+#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
 #include <boost/crc.hpp>
@@ -19,7 +20,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/stacktrace.hpp>
-#include <rdb/convertTypes.h>
 
 #include "QStruct.h"
 #include "SOperations.h"

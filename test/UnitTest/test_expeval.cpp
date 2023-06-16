@@ -235,5 +235,5 @@ TEST(xExpressionEval, long_program) {
   rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(result.index() == rdb::DOUBLE);
-  ASSERT_TRUE(std::get<double>(result) == 4);  // ceil ( (1 + 2) * 1.25 ) == ceil( 3.75 ) == 4 
+  ASSERT_TRUE(std::get<double>(result) == 4);  // ceil ( (1 + 2) * 1.25 ) == ceil( 3.75 ) == 4
 }

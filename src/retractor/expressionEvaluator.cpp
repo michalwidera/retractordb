@@ -1,9 +1,8 @@
 #include "expressionEvaluator.h"
 
 #include <assert.h>
-#include <rdb/payload.h>
 #include <rdb/convertTypes.h>
-
+#include <rdb/payload.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>

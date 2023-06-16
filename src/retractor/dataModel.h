@@ -13,9 +13,9 @@
 #include "QStruct.h"  // query
 
 struct streamInstance {
-  std::unique_ptr<rdb::storageAccessor> storage;  // here is payload that will be stored - select clause
-  std::unique_ptr<rdb::payload> fromPayload;      // payload used for computation in select
-                                                  // clause - created by from clause.
+  std::unique_ptr<rdb::storageAccessor> outputPayload;  // here is payload that will be stored - select clause
+  std::unique_ptr<rdb::payload> inputPayload;           // payload used for computation in select
+                                                        // clause - created by from clause.
 
   // This constructor cover issue when storage name is different from descriptor name
   streamInstance(const std::string descriptorName,           //
@@ -34,8 +34,12 @@ struct streamInstance {
   rdb::payload constructAgsePayload(int length, int offset);
   rdb::payload constructAggregate(command_id cmd, std::string name);
 
-  // constructStoragePayload uses only data from fromPayload
-  void constructStoragePayload(const std::list<field> &fields);
+  /*
+   * This function will create OutputPayload based on all field from query
+   * constructOutputPayload uses only data from inputPayload
+   * inputPayload need to be filled first before this constructOutputPayload will be called.
+   */
+  void constructOutputPayload(const std::list<field> &fields);
 };
 
 class dataModel {
@@ -53,8 +57,11 @@ class dataModel {
 
   std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int revOffset = 0);
 
-  // constructFromPayload function need to be here because it access different streams from qSet
-  void constructFromPayload(std::string instance);
+  /*
+   * This function creates Input payload for ConstructOutputPayload data source
+   * function need to be here because it access different streams from qSet
+   */
+  void constructInputPayload(std::string instance);
 
   void processRows(std::set<std::string> inSet);
 };

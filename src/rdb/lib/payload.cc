@@ -1,5 +1,4 @@
 #include "rdb/payload.h"
-#include "rdb/convertTypes.h"
 
 #include <spdlog/spdlog.h>
 
@@ -11,7 +10,7 @@
 #include <iostream>
 #include <numeric>  // itoa
 
-
+#include "rdb/convertTypes.h"
 
 namespace rdb {
 

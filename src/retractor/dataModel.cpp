@@ -1,7 +1,7 @@
 #include "dataModel.h"
 
-#include <spdlog/spdlog.h>
 #include <rdb/convertTypes.h>
+#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cstdlib>  // std::div
@@ -29,19 +29,19 @@ streamInstance::streamInstance(               //
   // only objects with REF has storageNameParam filled.
   const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
   SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
-  fromPayload = std::make_unique<rdb::payload>(internalDescriptor);
+  inputPayload = std::make_unique<rdb::payload>(internalDescriptor);
 
-  storage = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
-  storage->attachDescriptor(&storageDescriptor);
+  outputPayload = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
+  outputPayload->attachDescriptor(&storageDescriptor);
 
   {
     std::stringstream strStream;
-    strStream << rdb::flat << storage->getDescriptor();
+    strStream << rdb::flat << outputPayload->getDescriptor();
     SPDLOG_INFO("storage/external descriptor: {}", strStream.str());
   }
   {
     std::stringstream strStream;
-    strStream << rdb::flat << fromPayload->getDescriptor();
+    strStream << rdb::flat << inputPayload->getDescriptor();
     SPDLOG_INFO("image/internal descriptor: {}", strStream.str());
   }
 };
@@ -75,12 +75,12 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   bool flip = (length < 0);
   length = abs(length);
 
-  storage->readReverse(0);
+  outputPayload->readReverse(0);
 
-  auto descriptorVecSize = storage->getDescriptor().size();
-  std::string storage_name = storage->getStorageName();
+  auto descriptorVecSize = outputPayload->getDescriptor().size();
+  std::string storage_name = outputPayload->getStorageName();
 
-  auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
+  auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
   for (auto i = 0; i < length; i++) {
     rdb::rField x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
                                   maxLen,                                  //
@@ -96,7 +96,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
-      storage->readReverse(dv.quot);
+      outputPayload->readReverse(dv.quot);
       // TODO: fix non existing data?
     }
 
@@ -105,7 +105,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
 
     assert(i < descriptor.size());
 
-    std::any value = storage->getPayload()->getItem(locSrc);
+    std::any value = outputPayload->getPayload()->getItem(locSrc);
     localPayload->setItem(locDst, value);
   }
 
@@ -141,9 +141,9 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
   assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor
-  storage->readReverse(0);
+  outputPayload->readReverse(0);
 
-  auto [maxType, maxLen] = storage->getDescriptor().getMaxType();
+  auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
   rdb::rField x{std::make_tuple(name, maxLen, maxType)};
   rdb::Descriptor descriptor{x};
   // same as core[name].descriptorFrom()
@@ -173,11 +173,11 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
     assert(false);
 
   auto i{0};
-  for (auto const it : storage->getDescriptor()) {
+  for (auto const it : outputPayload->getDescriptor()) {
     if (std::get<rdb::rtype>(it) == rdb::REF) continue;
     if (std::get<rdb::rtype>(it) == rdb::TYPE) continue;
 
-    std::any value = castAny(storage->getPayload()->getItem(i++), maxType);
+    std::any value = castAny(outputPayload->getPayload()->getItem(i++), maxType);
     switch (maxType) {
       case rdb::BYTE:
         fnOp<uint8_t>(op, value, valueRet);
@@ -205,7 +205,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
   }
 
   if (cmd == STREAM_AVG) {
-    std::any value = castAny(storage->getPayload()->getDescriptor().size(), maxType);
+    std::any value = castAny(outputPayload->getPayload()->getDescriptor().size(), maxType);
     switch (maxType) {
       case rdb::BYTE:
         fnOp<uint8_t>(avgop, value, valueRet);  // <- valueRet/value
@@ -238,22 +238,22 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name
   return *(localPayload.get());
 }
 
-void streamInstance::constructStoragePayload(const std::list<field>& fields) {
+void streamInstance::constructOutputPayload(const std::list<field>& fields) {
   auto i{0};
   for (auto program : fields) {
     expressionEvaluator expression;
-    rdb::descFldVT retVal = expression.eval(program.lProgram, fromPayload.get());
+    rdb::descFldVT retVal = expression.eval(program.lProgram, inputPayload.get());
 
     std::any result = std::visit([](auto&& arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
 
     assert(result.has_value());
 
-    assert(program.fieldType == std::get<rdb::rtype>(storage->getDescriptor()[i]));
+    assert(program.fieldType == std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
 
     cast<std::any> castAny;
-    std::any value = castAny(result, std::get<rdb::rtype>(storage->getDescriptor()[i]));
+    std::any value = castAny(result, std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
 
-    storage->getPayload()->setItem(i, value);
+    outputPayload->getPayload()->setItem(i, value);
 
     i++;
   }
@@ -275,14 +275,14 @@ dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
   SPDLOG_INFO("Create struct on CORE INSTANCE");
 
   for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
-  for (auto const& [key, val] : qSet) val->storage->setRemoveOnExit(false);
+  for (auto const& [key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
 }
 
 dataModel::~dataModel() {}
 
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, int revOffset) {
-  qSet[instance]->storage->readReverse(revOffset);
-  return qSet[instance]->storage->getPayload();
+  qSet[instance]->outputPayload->readReverse(revOffset);
+  return qSet[instance]->outputPayload->getPayload();
 }
 
 // TODO: work area
@@ -291,17 +291,17 @@ void dataModel::processRows(std::set<std::string> inSet) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Declarations are not need to process
 
-    constructFromPayload(q.id);
-    qSet[q.id]->constructStoragePayload(q.lSchema);
-    qSet[q.id]->storage->write();
+    constructInputPayload(q.id);
+    qSet[q.id]->constructOutputPayload(q.lSchema);
+    qSet[q.id]->outputPayload->write();
   }
 }
 
-void dataModel::constructFromPayload(std::string instance) {
+void dataModel::constructInputPayload(std::string instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
-  assert(qry.lProgram.size() > 0 && "constructFromPayload does not process declarations");
+  assert(qry.lProgram.size() > 0 && "constructInputPayload does not process declarations");
 
   std::vector<token> arg;
   for (auto tk : qry.lProgram) arg.push_back(tk);
@@ -312,32 +312,35 @@ void dataModel::constructFromPayload(std::string instance) {
   switch (cmd) {
     case PUSH_STREAM: {
       // 	:- PUSH_STREAM(core0)
+      //
       assert(arg.size() == 1);
 
       const auto nameSrc = operation.getStr_();
 
-      *(qSet[instance]->fromPayload) = *getPayload(nameSrc);
+      *(qSet[instance]->inputPayload) = *getPayload(nameSrc);
     } break;
     case STREAM_TIMEMOVE: {
       // 	:- PUSH_STREAM(core0)
       //  :- STREAM_TIMEMOVE(1)
+      //
       assert(arg.size() == 2);
 
       const auto nameSrc = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
 
-      *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
       //  :- PUSH_STREAM(core0)
       //  :- PUSH_VAL(2/1)
       //  :- STREAM_DEHASH_MOD
+      //
       assert(arg.size() == 3);
 
       const auto nameSrc = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
+      const auto lengthOfSrc = qSet[nameSrc]->outputPayload->getRecordsCount();
 
       assert(rationalArgument > 0);
 
@@ -345,7 +348,7 @@ void dataModel::constructFromPayload(std::string instance) {
       if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
       if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
       assert(timeOffset >= 0);
-      *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_SUM:
     case STREAM_AVG:
@@ -353,19 +356,20 @@ void dataModel::constructFromPayload(std::string instance) {
     case STREAM_MAX: {
       const auto nameSrc = arg[0].getStr_();
 
-      *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAggregate(cmd, instance + "_0");
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAggregate(cmd, instance + "_0");
     } break;
     case STREAM_SUBSTRACT: {
       //  :- PUSH_STREAM(core0)
       //  :- STREAM_SUBSTRACT(1/2)
+      //
       assert(arg.size() == 2);
 
       const auto nameSrc = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto lengthOfSrc = qSet[nameSrc]->storage->getRecordsCount();
+      const auto lengthOfSrc = qSet[nameSrc]->outputPayload->getRecordsCount();
       const auto timeOffset = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
 
-      *(qSet[instance]->fromPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)
@@ -380,23 +384,25 @@ void dataModel::constructFromPayload(std::string instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
-      *(qSet[instance]->fromPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
+      *(qSet[instance]->inputPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
     } break;
     case STREAM_AGSE: {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
+      //
       assert(arg.size() == 2);
 
       const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
 
-      *(qSet[instance]->fromPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
+      //
       assert(arg.size() == 3);
 
       const auto nameSrc1 = arg[0].getStr_();
@@ -404,15 +410,15 @@ void dataModel::constructFromPayload(std::string instance) {
       const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = qSet[instance]->storage->getRecordsCount();
+      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount();
 
       int retPos;
       if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
-        qSet[nameSrc1]->storage->read(retPos);
-        *(qSet[instance]->fromPayload) = *getPayload(nameSrc1);
+        qSet[nameSrc1]->outputPayload->read(retPos);
+        *(qSet[instance]->inputPayload) = *getPayload(nameSrc1);
       } else {
-        qSet[nameSrc2]->storage->read(retPos);
-        *(qSet[instance]->fromPayload) = *getPayload(nameSrc2);
+        qSet[nameSrc2]->outputPayload->read(retPos);
+        *(qSet[instance]->inputPayload) = *getPayload(nameSrc2);
       }
     } break;
     default:
