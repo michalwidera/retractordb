@@ -114,7 +114,7 @@ class ParserListener : public RQLBaseListener {
   void exitStreamAvg(RQLParser::StreamAvgContext* ctx) { recpToken(STREAM_AVG); }
   void exitStreamSum(RQLParser::StreamSumContext* ctx) { recpToken(STREAM_SUM); }
   void exitSExpPlus(RQLParser::SExpPlusContext* ctx) { recpToken(STREAM_ADD); }
-  void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBSTRACT, rationalResult); }
+  void exitSExpMinus(RQLParser::SExpMinusContext* ctx) { recpToken(STREAM_SUBTRACT, rationalResult); }
 
   void exitSExpAgse(RQLParser::SExpAgseContext* ctx) {
     int window{0}, step{0};

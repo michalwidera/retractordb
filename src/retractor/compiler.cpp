@@ -94,7 +94,7 @@ std::string intervalCounter() {
             throw std::out_of_range("You cannot make faster mod from slower source");
           }
         } break;
-        case STREAM_SUBSTRACT: {
+        case STREAM_SUBTRACT: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -179,7 +179,7 @@ std::string simplifyLProgram() {
     if ((*it).isReductionRequired()) {
       for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
         if ((*it2).getStrCommandID() == "STREAM_TIMEMOVE" ||  //
-            (*it2).getStrCommandID() == "STREAM_SUBSTRACT") {
+            (*it2).getStrCommandID() == "STREAM_SUBTRACT") {
           query newQuery;
           std::string arg1;  //< Name of argument operation
           command_id cmd;
@@ -287,7 +287,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
       lRetVal.push_back(intf);
     }
     return lRetVal;
-  } else if (cmd == STREAM_SUBSTRACT)
+  } else if (cmd == STREAM_SUBTRACT)
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_TIMEMOVE)
     lRetVal = getQuery(sName1).lSchema;

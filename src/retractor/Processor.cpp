@@ -120,7 +120,7 @@ number getValueOfRollup(const query &q, int offset) {
         if (newTimeOffset < 0) assert(false);
         return getValueProc(streamNameArg, newTimeOffset, offset);
       }
-    case STREAM_SUBSTRACT:
+    case STREAM_SUBTRACT:
       // TODO: Check
       return getValueProc(arg[0].getStr_(), 0, offset);
     case STREAM_AVG:
@@ -455,9 +455,9 @@ void Processor::processRows(std::set<std::string> inSet) {
             assert(gDataMap[q.id].row.size() == rowValues.size());
           }
           break;
-        case STREAM_SUBSTRACT:
+        case STREAM_SUBTRACT:
           // PUSH_STREAM core
-          // STREAM_SUBSTRACT 3_2
+          // STREAM_SUBTRACT 3_2
           // This need to be checked - I was tired when I wrote this
           assert(q.lProgram.size() == 2);
           argument1 = *(it++);

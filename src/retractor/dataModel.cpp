@@ -358,9 +358,9 @@ void dataModel::constructInputPayload(std::string instance) {
 
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAggregate(cmd, instance + "_0");
     } break;
-    case STREAM_SUBSTRACT: {
+    case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)
-      //  :- STREAM_SUBSTRACT(1/2)
+      //  :- STREAM_SUBTRACT(1/2)
       //
       assert(arg.size() == 2);
 

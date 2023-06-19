@@ -276,7 +276,7 @@ bool query::isReductionRequired() {
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
       case STREAM_ADD:
-      case STREAM_SUBSTRACT:
+      case STREAM_SUBTRACT:
       case STREAM_TIMEMOVE:
       case STREAM_AGSE:
         ++streamOperatorCount;
@@ -341,7 +341,7 @@ rdb::Descriptor query::descriptorFrom() {
     } break;
     case STREAM_DEHASH_DIV:
     case STREAM_DEHASH_MOD:
-    case STREAM_SUBSTRACT:
+    case STREAM_SUBTRACT:
     case STREAM_TIMEMOVE: {
       for (auto &f : getQuery(arg1).lSchema) {
         if (f.fieldLen == 0) continue;
