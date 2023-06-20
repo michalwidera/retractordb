@@ -41,14 +41,10 @@ class token {
 struct field {
   std::list<token> lProgram;
 
-  std::string fieldName;
-  rdb::descFld fieldType;
-  int fieldLen;
+  rdb::rField field_;
 
-  field();
-  field(std::string sFieldName,     //
-        std::list<token> lProgram,  //
-        rdb::descFld fieldType, int fieldLen);
+  field(rdb::rField field_, token lToken);
+  field(rdb::rField field_, std::list<token> lProgram);
 
   token getFirstFieldToken();
 
@@ -73,8 +69,6 @@ class query {
   bool isReductionRequired();
   bool isGenerated();
   bool is(command_id command);
-
-  field &getField(const std::string &sField);
 
   std::vector<std::string> getDepStream();
 

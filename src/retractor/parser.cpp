@@ -161,7 +161,8 @@ class ParserListener : public RQLBaseListener {
   void exitSelect(RQLParser::SelectContext* ctx) {
     // this loop creates field names in streamName + "_" + counter++
     for (auto& i : qry.lSchema) {
-      if (i.fieldName.substr(0, 1) == "_") i.fieldName = ctx->ID()->getText() + i.fieldName;
+      if (std::get<rdb::rname>(i.field_).substr(0, 1) == "_")
+        std::get<rdb::rname>(i.field_) = ctx->ID()->getText() + std::get<rdb::rname>(i.field_);
     }
 
     qry.id = ctx->ID()->getText();
@@ -199,12 +200,14 @@ class ParserListener : public RQLBaseListener {
 
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx) {
     recpToken(PUSH_TSCAN, ctx->getText());
-    qry.lSchema.push_back(field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, 4));
+    qry.lSchema.push_back(
+        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, rdb::INTEGER), program));
     program.clear();
   }
 
   void exitExpression(RQLParser::ExpressionContext* ctx) {
-    qry.lSchema.push_back(field(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), program, rdb::INTEGER, 4));
+    qry.lSchema.push_back(
+        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, rdb::INTEGER), program));
     program.clear();
   }
 
@@ -248,12 +251,8 @@ class ParserListener : public RQLBaseListener {
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx) {
     std::list<token> emptyProgram;
-    if (fTypeSizeArray == 1)
-      qry.lSchema.push_back(field(ctx->ID()->getText(), emptyProgram, fType, fTypeSize));
-    else {
-      std::string fieldName = ctx->ID()->getText();
-      qry.lSchema.push_back(field(fieldName, emptyProgram, fType, fTypeSizeArray));
-    }
+    qry.lSchema.push_back(
+        field(rdb::rField(ctx->ID()->getText(), fTypeSizeArray == 1 ? fTypeSize : fTypeSizeArray, fType), emptyProgram));
     fType = rdb::BYTE;
     fTypeSizeArray = 1;
   }

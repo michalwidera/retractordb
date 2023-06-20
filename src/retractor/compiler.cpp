@@ -204,7 +204,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE, 1));
+          newQuery.lSchema.push_back(field(rdb::rField("*", 1, rdb::BYTE), lTempProgram));
           newQuery.id = generateStreamName(arg1, "", cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);  // After this instruction it loses context
@@ -244,7 +244,7 @@ std::string simplifyLProgram() {
           ++it2;
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field("*", lTempProgram, rdb::BYTE, 1));
+          newQuery.lSchema.push_back(field(rdb::rField("*", 1, rdb::BYTE), lTempProgram));
           newQuery.id = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
@@ -274,16 +274,16 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     int fieldCount = 0;
     int i = 0;
     for (auto f : getQuery(sName1).lSchema) {
-      field intf;
-      intf.fieldName = /*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCount++);
-      intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName1, i++)));
+      field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCount++),
+                             sizeof(boost::rational<int>), rdb::RATIONAL),
+                 token(PUSH_ID, std::pair<std::string, int>(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
-      field intf;
-      intf.fieldName = /*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCount++);
-      intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName2, i++)));
+      field intf(rdb::rField(/*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCount++),
+                             sizeof(boost::rational<int>), rdb::RATIONAL),
+                 token(PUSH_ID, std::pair<std::string, int>(sName2, i++)));
       lRetVal.push_back(intf);
     }
     return lRetVal;
@@ -292,31 +292,23 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
   else if (cmd == STREAM_TIMEMOVE)
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_AVG) {
-    field intf;
-    intf.fieldName = "avg";
-    intf.fieldType = rdb::RATIONAL;
-    intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+    field intf(rdb::rField("avg", sizeof(boost::rational<int>), rdb::RATIONAL),
+               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
-    field intf;
-    intf.fieldName = "min";
-    intf.fieldType = rdb::RATIONAL;
-    intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+    field intf(rdb::rField("min", sizeof(boost::rational<int>), rdb::RATIONAL),
+               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
-    field intf;
-    intf.fieldName = "max";
-    intf.fieldType = rdb::RATIONAL;
-    intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+    field intf(rdb::rField("max", sizeof(boost::rational<int>), rdb::RATIONAL),
+               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
-    field intf;
-    intf.fieldName = "sum";
-    intf.fieldType = rdb::RATIONAL;
-    intf.lProgram.push_front(token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+    field intf(rdb::rField("sum", sizeof(boost::rational<int>), rdb::RATIONAL),
+               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_AGSE) {
@@ -325,19 +317,20 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     auto r = std::get<std::pair<int, int>>(cmd_token.getVT());
     int windowSize = abs(r.second);
     // If winows is negative - reverted schema
+
+    // TODO - need to inherit BYTE or
+    // INTEGER from BYTEARRAY or INTARRAY
     if (r.second > 0) {
       for (int i = 0; i < windowSize; i++) {
-        field intf;
-        intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
-        intf.fieldType = rdb::INTEGER;  // TODO - need to inherit BYTE or
-        // INTEGER from BYTEARRAY or INTARRAY
+        field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), 4, rdb::INTEGER),
+                   token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
         schema.push_back(intf);
       }
     } else {
       for (int i = windowSize - 1; i >= 0; i--) {
-        field intf;
-        intf.fieldName = sName1 + "_" + lexical_cast<std::string>(i);
-        intf.fieldName = rdb::INTEGER;  // TODO - need to inherit BYTE or
+        // TODO - need to inherit BYTE or
+        field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), 4, rdb::INTEGER),
+                   token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
         // INTEGER from BYTEARRAY or INTARRAY
         schema.push_back(intf);
       }
@@ -402,7 +395,7 @@ std::string prepareFields() {
               std::list<token> lTempProgram;
               lTempProgram.push_back(token(PUSH_ID, std::pair<std::string, int>(nameOfscanningTable, filedPosition++)));
               std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCount++);
-              q.lSchema.push_back(field(name, lTempProgram, rdb::INTEGER, 4));
+              q.lSchema.push_back(field(rdb::rField(name, 4, rdb::INTEGER), lTempProgram));
             }
             break;
           }
@@ -466,7 +459,9 @@ std::string replicateIDX() {
           }
           // std::string toReplace = oldField.getFieldText();
           // replaceAll(toReplace, "_", lexical_cast<std::string>(i));
-          field newField(schemaName + "_" + lexical_cast<std::string>(i), lTempProgram, oldField.fieldType, oldField.fieldLen);
+          field newField(rdb::rField(schemaName + "_" + lexical_cast<std::string>(i), std::get<rdb::rlen>(oldField.field_),
+                                     std::get<rdb::rtype>(oldField.field_)),
+                         lTempProgram);
           q.lSchema.push_back(newField);
         }
         assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());
@@ -510,7 +505,7 @@ std::string convertReferences() {
                 if (q1.id == schema) {
                   int offset1(0);
                   for (auto &f1 : q1.lSchema) {
-                    if (f1.fieldName == field) {
+                    if (std::get<rdb::rname>(f1.field_) == field) {
                       t = token(PUSH_ID, std::pair<std::string, int>(schema, offset1));
                       break;
                     } else
@@ -560,7 +555,7 @@ std::string convertReferences() {
               if (pQ1 != nullptr) {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
-                  if (f1.fieldName == field) {
+                  if (std::get<rdb::rname>(f1.field_) == field) {
                     t = token(PUSH_ID, std::pair<std::string, int>(schema1, offset1));
                     bFieldFound = true;
                   }
@@ -570,7 +565,7 @@ std::string convertReferences() {
               if (pQ2 != nullptr && !bFieldFound) {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
-                  if (f2.fieldName == field) {
+                  if (std::get<rdb::rname>(f2.field_) == field) {
                     t = token(PUSH_ID, std::pair<std::string, int>(schema2, offset1));
                     bFieldFound = true;
                   }

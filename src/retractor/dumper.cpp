@@ -63,11 +63,11 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
         // Patch on gramma problem -
         // dot program is using { as important sign - we need to convert { to <
         //
-        std::string name(f.fieldName);
+        std::string name(std::get<rdb::rname>(f.field_));
         std::replace(name.begin(), name.end(), '{', '/');
         std::replace(name.begin(), name.end(), '}', '/');
         xout << name;
-        std::cout << "(" << GetStringdescFld(f.fieldType) << ")";
+        std::cout << "(" << GetStringdescFld(std::get<rdb::rtype>(f.field_)) << ")";
       }
       xout << "}";
     }  // if ( bShowFileds ) - end of fields in stream
@@ -130,7 +130,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
                   "label=\"";
         else
           xout << "[shape=record,label=\"";
-        std::string sFieldName(f.fieldName);
+        std::string sFieldName(std::get<rdb::rname>(f.field_));
         std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
         std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
         xout << sFieldName;
@@ -191,7 +191,7 @@ void dumpQFieldsProgram() {
     for (auto f : q.lSchema) {
       for (auto t : f.lProgram) {
         std::cout << q.id << "\t";
-        std::cout << f.fieldName << "\t";
+        std::cout << std::get<rdb::rname>(f.field_) << "\t";
         std::cout << t.getStrCommandID() << "\t";
         std::cout << t.getStr_();
         if (t.getStrCommandID() == "PUSH_ID") std::cout << "[" << t.getRI() << "]";
@@ -209,7 +209,7 @@ void dumpQFields() {
     for (auto f : q.lSchema) {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
-      std::cout << f.fieldName << "\t";
+      std::cout << std::get<rdb::rname>(f.field_) << "\t";
       std::cout << std::endl;
     }
   }
@@ -249,18 +249,18 @@ void dumpRawTextFile() {
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
-      if (t.getStrCommandID() == "PUSH_ID" ||           //
-          t.getStrCommandID() == "PUSH_STREAM" ||       //
-          t.getStrCommandID() == "PUSH_VAL" ||          //
+      if (t.getStrCommandID() == "PUSH_ID" ||          //
+          t.getStrCommandID() == "PUSH_STREAM" ||      //
+          t.getStrCommandID() == "PUSH_VAL" ||         //
           t.getStrCommandID() == "STREAM_SUBTRACT" ||  //
-          t.getStrCommandID() == "STREAM_AGSE" ||       //
+          t.getStrCommandID() == "STREAM_AGSE" ||      //
           t.getStrCommandID() == "STREAM_TIMEMOVE")
         std::cout << "\t:- " << t << std::endl;
       else
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
     for (auto f : q.lSchema) {
       std::cout << "\t";
-      std::cout << f.fieldName << ": " << GetStringdescFld(f.fieldType);
+      std::cout << std::get<rdb::rname>(f.field_) << ": " << GetStringdescFld(std::get<rdb::rtype>(f.field_));
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {

@@ -72,14 +72,6 @@ command_id token::getCommandID() { return command; }
 
 std::string token::getStrCommandID() { return GetStringcommand_id(command); }
 
-field &query::getField(const std::string &sField) {
-  for (auto &f : lSchema) {
-    if (f.fieldName == sField) return f;
-  }
-  throw std::logic_error("No such field in schema");
-  return *new field();
-}
-
 void query::reset() {
   id.clear();
   filename.clear();
@@ -191,13 +183,12 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 /** Construktor set */
 
-field::field() {}
+field::field(rdb::rField field_, token lToken) : field_(field_) { lProgram.push_back(lToken); }
 
-field::field(std::string sFieldName,     //
-             std::list<token> lProgram,  //
-             rdb::descFld dFieldType,    //
-             int fieldLen)
-    : lProgram(lProgram), fieldType(dFieldType), fieldName(sFieldName), fieldLen(fieldLen) {}
+field::field(rdb::rField field_,  //
+             std::list<token> lProgram)
+    : lProgram(lProgram),  //
+      field_(field_) {}
 
 token field::getFirstFieldToken() {
   assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
@@ -259,11 +250,11 @@ query::query() {}
 int query::getFieldIndex(field f_arg) {
   int idx(0);
   for (auto f : lSchema) {
-    if (f.fieldName == f_arg.fieldName)  // Todo
+    if (std::get<rdb::rname>(f.field_) == std::get<rdb::rname>(f_arg.field_))  // Todo
       return idx;
     idx++;
   }
-  SPDLOG_ERROR("Field not found in query - {}", f_arg.fieldName);
+  SPDLOG_ERROR("Field not found in query - {}", std::get<rdb::rname>(f_arg.field_));
   throw std::logic_error("Field not found in query");
   return -1;  // not found
 }
@@ -302,7 +293,8 @@ std::vector<std::string> query::getDepStream() {
 
 rdb::Descriptor query::descriptorStorage() {
   rdb::Descriptor retVal{};
-  for (auto &f : lSchema) retVal | rdb::Descriptor(f.fieldName, f.fieldLen, f.fieldType);
+  for (auto &f : lSchema)
+    retVal | rdb::Descriptor(std::get<rdb::rname>(f.field_), std::get<rdb::rlen>(f.field_), std::get<rdb::rtype>(f.field_));
 
   if (isDeclaration()) {
     retVal | rdb::Descriptor(filename, 0, rdb::REF);
@@ -344,24 +336,24 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_SUBTRACT:
     case STREAM_TIMEMOVE: {
       for (auto &f : getQuery(arg1).lSchema) {
-        if (f.fieldLen == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
+        if (std::get<rdb::rlen>(f.field_) == 0) continue;
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), std::get<rdb::rlen>(f.field_), std::get<rdb::rtype>(f.field_));
       };
     } break;
     case PUSH_STREAM: {
       for (auto &f : getQuery(cmd.getStr_()).lSchema) {
-        if (f.fieldLen == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
+        if (std::get<rdb::rlen>(f.field_) == 0) continue;
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), std::get<rdb::rlen>(f.field_), std::get<rdb::rtype>(f.field_));
       };
     } break;
     case STREAM_ADD: {
       for (auto &f : getQuery(arg1).lSchema) {
-        if (f.fieldLen == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
+        if (std::get<rdb::rlen>(f.field_) == 0) continue;
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), std::get<rdb::rlen>(f.field_), std::get<rdb::rtype>(f.field_));
       };
       for (auto &f : getQuery(arg2).lSchema) {
-        if (f.fieldLen == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), f.fieldLen, f.fieldType);
+        if (std::get<rdb::rlen>(f.field_) == 0) continue;
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), std::get<rdb::rlen>(f.field_), std::get<rdb::rtype>(f.field_));
       };
     } break;
     case STREAM_AGSE: {
@@ -401,8 +393,8 @@ std::ostream &operator<<(std::ostream &os, rdb::descFld &s) { return os << rdb::
 
 std::ostream &operator<<(std::ostream &os, const field &s) {
   os << "FLD/";
-  os << "name:" << s.fieldName << ",";
-  os << "type:" << s.fieldType << ",";
+  os << "name:" << std::get<rdb::rname>(s.field_) << ",";
+  os << "type:" << std::get<rdb::rtype>(s.field_) << ",";
   os << "prog:";
   for (auto &i : s.lProgram) os << i << ",";
   return os;

@@ -77,7 +77,7 @@ std::vector<number> inputDF::getFileRow() {
   std::vector<number> result;
   for (auto &f : lSchema) {
     boost::rational<int> val;
-    switch (f.fieldType) {
+    switch (std::get<rdb::rtype>(f.field_)) {
       case rdb::BYTE:
         val = readFromFile<uint8_t>();
         break;
@@ -91,7 +91,7 @@ std::vector<number> inputDF::getFileRow() {
         val = readFromFile<boost::rational<int>>();
         break;
       default:
-        std::cerr << "field:" << f.fieldType << std::endl;
+        std::cerr << "field:" << std::get<rdb::rtype>(f.field_) << std::endl;
         throw std::out_of_range("processRow/undefined type");
         break;  // proforma
     }

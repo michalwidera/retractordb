@@ -248,7 +248,7 @@ void streamInstance::constructOutputPayload(const std::list<field>& fields) {
 
     assert(result.has_value());
 
-    assert(program.fieldType == std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
+    assert(std::get<rdb::rtype>(program.field_) == std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
 
     cast<std::any> castAny;
     std::any value = castAny(result, std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
