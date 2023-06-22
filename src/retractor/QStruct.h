@@ -92,16 +92,15 @@ bool isExist(const std::string &query_name);
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
 class qTree : public std::vector<query> {
- public:
-  query &operator[](const std::string &query_name) { return getQuery(query_name); };
-
-  void sort() { std::sort(begin(), end()); };
-
-  /** Topological sort*/
+  /* Topological sort vars */
   std::map<std::string, bool> visited;
   std::map<std::string, vector<std::string>> adj;  // adjacency list of graph
   vector<std::string> ans;
 
+ public:
+  query &operator[](const std::string &query_name) { return getQuery(query_name); };
+
+  void sort() { std::sort(begin(), end()); };
   void tsort();
   void dfs(std::string v);
 
