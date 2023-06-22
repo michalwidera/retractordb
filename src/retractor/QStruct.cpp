@@ -183,11 +183,16 @@ bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
 /** Construktor set */
 
-field::field(rdb::rField field_, token lToken) : field_(field_) { lProgram.push_back(lToken); }
+field::field(rdb::rField field_, token lToken)
+    :                 //
+      field_(field_)  //
+{
+  lProgram.push_back(lToken);
+}
 
-field::field(rdb::rField field_,  //
-             std::list<token> lProgram)
-    : lProgram(lProgram),  //
+field::field(rdb::rField field_, std::list<token> lProgram)
+    :                      //
+      lProgram(lProgram),  //
       field_(field_) {}
 
 token field::getFirstFieldToken() {
