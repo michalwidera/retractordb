@@ -97,13 +97,13 @@ class qTree : public std::vector<query> {
   std::map<std::string, vector<std::string>> adj;  // adjacency list of graph
   vector<std::string> ans;
 
-  void dfs(const std::string v); // Depth First Traversal
+  void dfs(const std::string v);  // Depth First Traversal
 
  public:
   query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   void sort() { std::sort(begin(), end()); };
-  void tsort(); // Topological sort
+  void tsort();  // Topological sort
 
   boost::rational<int> getDelta(const std::string &query_name);
 };

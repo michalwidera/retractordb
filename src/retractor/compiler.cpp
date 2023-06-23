@@ -5,6 +5,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
+#include <boost/rational.hpp>
 #include <boost/regex.hpp>
 #include <boost/system/error_code.hpp>
 #include <fstream>
@@ -22,7 +23,24 @@ extern int fieldCount;
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance;
 
-/** This procedure computes time delays (delata) for generated streams */
+boost::rational<int> deltaDivMod(const boost::rational<int> &arg1, const boost::rational<int> &arg2) {
+  assert(arg1 != arg2);
+  if (arg1 == arg2) throw std::out_of_range("Delta are equal in DehashDiv - undefinied.");
+  return (arg1 * arg2) / abs(arg1 - arg2);
+}
+
+boost::rational<int> deltaSubtract(const boost::rational<int> &arg1) { return arg1; }
+
+boost::rational<int> deltaAdd(const boost::rational<int> &arg1, const boost::rational<int> &arg2) {
+  return std::min(arg1, arg2);
+}
+
+boost::rational<int> deltaHash(const boost::rational<int> &arg1, const boost::rational<int> &arg2) {
+  assert(arg1 + arg2 != 0);
+  return (arg1 * arg2) / (arg1 + arg2);
+}
+
+/** This procedure computes time delays (delta) for generated streams */
 std::string intervalCounter() {
   while (true) {
     bool bOnceAgain(false);
@@ -122,7 +140,7 @@ std::string intervalCounter() {
             bOnceAgain = true;
             continue;
           }
-          delta = deltaTimemove(delta1, 0);
+          delta = delta1;
         } break;
         case STREAM_AGSE: {
           // ->>> check need
@@ -175,7 +193,7 @@ TODO: Stream_MAX,MIN,AVG...
 std::string simplifyLProgram() {
   coreInstance.sort();
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
-    // Otimization phase 2
+    // Optimization phase 2
     if ((*it).isReductionRequired()) {
       for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
         if ((*it2).getStrCommandID() == "STREAM_TIMEMOVE" ||  //
@@ -368,7 +386,6 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
 // unfortunately algorithm if broken - because does not search backward but next
 // by next and some * can be process which have arguments appear as two asterisk
 // In such case unroll does not appear and algorithm gets shitin-shitout
-
 std::string prepareFields() {
   int fieldCount = 0;
   coreInstance.tsort();
@@ -414,16 +431,6 @@ std::string prepareFields() {
   return std::string("OK");
 }
 
-void replaceAll(std::string &str, const std::string &from, const std::string &to) {
-  if (from.empty()) return;
-  size_t start_pos = 0;
-  while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
-    str.replace(start_pos, from.length(), to);
-    start_pos += to.length();  // In case 'to' contains 'from', like replacing
-                               // 'x' with 'yx'
-  }
-}
-
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
 std::string replicateIDX() {
   for (auto &q : coreInstance) {  // for each query
@@ -457,8 +464,6 @@ std::string replicateIDX() {
             else
               lTempProgram.push_back(token(t.getCommandID(), t.getVT()));
           }
-          // std::string toReplace = oldField.getFieldText();
-          // replaceAll(toReplace, "_", lexical_cast<std::string>(i));
           field newField(rdb::rField(schemaName + "_" + lexical_cast<std::string>(i), std::get<rdb::rlen>(oldField.field_),
                                      std::get<rdb::rtype>(oldField.field_)),
                          lTempProgram);
