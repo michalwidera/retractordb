@@ -82,14 +82,14 @@ void query::reset() {
 }
 
 bool isThere(const std::vector<query> &v, const std::string query_name) {
-  for (auto &q : v) {
+  for (const auto &q : v) {
     if (q.id == "") continue;
     if (q.id == query_name) return true;
   }
   return false;
 }
 
-void qTree::dfs(std::string v) {
+void qTree::dfs(const std::string v) {
   visited[v] = true;
   for (auto u : adj[v]) {
     if (!visited[u]) dfs(u);
@@ -156,11 +156,8 @@ bool isExist(const std::string &query_name) {
   return false;
 }
 
-// boost::rational<int> token::getRI() { return numericValue; }
-
-cast<rdb::descFldVT> castRI;
-
 boost::rational<int> token::getRI() {
+  cast<rdb::descFldVT> castRI;
   auto ret = castRI(valueVT, rdb::RATIONAL);
   return std::get<boost::rational<int>>(ret);
 }
@@ -206,45 +203,6 @@ token::token(command_id id, rdb::descFldVT value)
     :  //
       command(id),
       valueVT(value) {}
-
-std::ostream &operator<<(std::ostream &os, const token &rhs) {
-  os << GetStringcommand_id(rhs.command) << "(";
-  switch (rhs.valueVT.index()) {
-    case rdb::STRING:
-      os << std::get<std::string>(rhs.valueVT);
-      break;
-    case rdb::FLOAT:
-      os << std::get<float>(rhs.valueVT);
-      break;
-    case rdb::DOUBLE:
-      os << std::get<double>(rhs.valueVT);
-      break;
-    case rdb::INTEGER:
-      os << std::get<int>(rhs.valueVT);
-      break;
-    case rdb::UINT:
-      os << std::get<unsigned>(rhs.valueVT);
-      break;
-    case rdb::BYTE:
-      os << std::get<uint8_t>(rhs.valueVT);
-      break;
-    case rdb::RATIONAL:
-      os << std::get<number>(rhs.valueVT);
-      break;
-    case rdb::INTPAIR: {
-      auto r = std::get<std::pair<int, int>>(rhs.valueVT);
-      os << r.first << "," << r.second;
-    } break;
-    case rdb::IDXPAIR: {
-      auto r = std::get<std::pair<std::string, int>>(rhs.valueVT);
-      os << r.first << "[" << r.second << "]";
-    } break;
-    default:
-      os << "not supported";
-  }
-  os << ")";
-  return os;
-}
 
 /** Construktor set */
 
@@ -414,5 +372,44 @@ std::ostream &operator<<(std::ostream &os, const query &s) {
   for (auto &i : s.lSchema) os << i << ",";
   os << "lProgram:";
   for (auto &i : s.lProgram) os << i << ",";
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const token &rhs) {
+  os << GetStringcommand_id(rhs.command) << "(";
+  switch (rhs.valueVT.index()) {
+    case rdb::STRING:
+      os << std::get<std::string>(rhs.valueVT);
+      break;
+    case rdb::FLOAT:
+      os << std::get<float>(rhs.valueVT);
+      break;
+    case rdb::DOUBLE:
+      os << std::get<double>(rhs.valueVT);
+      break;
+    case rdb::INTEGER:
+      os << std::get<int>(rhs.valueVT);
+      break;
+    case rdb::UINT:
+      os << std::get<unsigned>(rhs.valueVT);
+      break;
+    case rdb::BYTE:
+      os << std::get<uint8_t>(rhs.valueVT);
+      break;
+    case rdb::RATIONAL:
+      os << std::get<number>(rhs.valueVT);
+      break;
+    case rdb::INTPAIR: {
+      auto r = std::get<std::pair<int, int>>(rhs.valueVT);
+      os << r.first << "," << r.second;
+    } break;
+    case rdb::IDXPAIR: {
+      auto r = std::get<std::pair<std::string, int>>(rhs.valueVT);
+      os << r.first << "[" << r.second << "]";
+    } break;
+    default:
+      os << "not supported";
+  }
+  os << ")";
   return os;
 }
