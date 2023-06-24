@@ -426,3 +426,22 @@ void dataModel::constructInputPayload(std::string instance) {
       abort();
   }
 }
+
+// TODO - use this func in printRowValue/executorsm.cpp 281
+// TODO - and use std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) from QStruct.cpp
+// TODO - Workarea - Please cover with test
+std::vector<rdb::descFldVT> dataModel::getRow(std::string instance, int timeOffset, bool revOffset) {
+  std::vector<rdb::descFldVT> retVal;
+
+  getPayload(instance, revOffset);
+  auto i{0};
+  for (auto f : qSet[instance]->outputPayload->getDescriptor()) {
+    std::any anyValue = qSet[instance]->outputPayload->getPayload()->getItem(i++);
+
+    assert(anyValue.has_value());
+    assert(anyValue.type() == typeid(rdb::descFldVT));
+
+    retVal.push_back(std::any_cast<rdb::descFldVT>(std::move(anyValue)));
+  }
+  return retVal;
+}

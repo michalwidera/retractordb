@@ -375,41 +375,37 @@ std::ostream &operator<<(std::ostream &os, const query &s) {
   return os;
 }
 
+std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
+  switch (rhs.index()) {
+    case rdb::STRING:
+      return os << std::get<std::string>(rhs);
+    case rdb::FLOAT:
+      return os << std::get<float>(rhs);
+    case rdb::DOUBLE:
+      return os << std::get<double>(rhs);
+    case rdb::INTEGER:
+      return os << std::get<int>(rhs);
+    case rdb::UINT:
+      return os << std::get<unsigned>(rhs);
+    case rdb::BYTE:
+      return os << std::get<uint8_t>(rhs);
+    case rdb::RATIONAL:
+      return os << std::get<number>(rhs);
+    case rdb::INTPAIR: {
+      auto r = std::get<std::pair<int, int>>(rhs);
+      return os << r.first << "," << r.second;
+    }
+    case rdb::IDXPAIR: {
+      auto r = std::get<std::pair<std::string, int>>(rhs);
+      return os << r.first << "[" << r.second << "]";
+    }
+  }
+  return os << "not supported";
+}
+
 std::ostream &operator<<(std::ostream &os, const token &rhs) {
   os << GetStringcommand_id(rhs.command) << "(";
-  switch (rhs.valueVT.index()) {
-    case rdb::STRING:
-      os << std::get<std::string>(rhs.valueVT);
-      break;
-    case rdb::FLOAT:
-      os << std::get<float>(rhs.valueVT);
-      break;
-    case rdb::DOUBLE:
-      os << std::get<double>(rhs.valueVT);
-      break;
-    case rdb::INTEGER:
-      os << std::get<int>(rhs.valueVT);
-      break;
-    case rdb::UINT:
-      os << std::get<unsigned>(rhs.valueVT);
-      break;
-    case rdb::BYTE:
-      os << std::get<uint8_t>(rhs.valueVT);
-      break;
-    case rdb::RATIONAL:
-      os << std::get<number>(rhs.valueVT);
-      break;
-    case rdb::INTPAIR: {
-      auto r = std::get<std::pair<int, int>>(rhs.valueVT);
-      os << r.first << "," << r.second;
-    } break;
-    case rdb::IDXPAIR: {
-      auto r = std::get<std::pair<std::string, int>>(rhs.valueVT);
-      os << r.first << "[" << r.second << "]";
-    } break;
-    default:
-      os << "not supported";
-  }
+  os << rhs.valueVT;
   os << ")";
   return os;
 }

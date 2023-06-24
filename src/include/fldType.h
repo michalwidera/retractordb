@@ -36,7 +36,7 @@
 #define END_E_GEN_T(ENUM_NAME) \
   }                            \
   ;                            \
-  std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
+  std::string GetString##ENUM_NAME(const enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
 #include "internal/fldList.h"
 #endif
 
@@ -50,7 +50,7 @@
   }                                                       \
   ;                                                       \
   typedef std::tuple<std::string, int, ENUM_NAME> rField; \
-  std::string GetString##ENUM_NAME(enum ENUM_NAME index);
+  std::string GetString##ENUM_NAME(const enum ENUM_NAME index);
 #include "internal/fldList.h"
 #endif
 
