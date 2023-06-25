@@ -41,11 +41,15 @@ set(SOURCES_EXPEVAL_TEST
     test_expeval.cpp
     main.cpp)
 
+set(SOURCES_SOPERATIONS_TEST ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
+                             test_soperations.cpp main.cpp)
+
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
 add_executable(test_dataModel ${SOURCES_DATAMODEL_TEST})
 add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 add_executable(test_compiler ${SOURCES_COMPILER_TEST})
+add_executable(test_soperations ${SOURCES_SOPERATIONS_TEST})
 
 set(LIBRARY_TEST_SET boost::boost gtest::gtest spdlog::spdlog_header_only rdb)
 
@@ -54,6 +58,7 @@ target_link_libraries(test_xtrdb ${LIBRARY_TEST_SET})
 target_link_libraries(test_dataModel ${LIBRARY_TEST_SET} antlr4_static parser)
 target_link_libraries(test_expeval ${LIBRARY_TEST_SET} antlr4_static parser)
 target_link_libraries(test_compiler ${LIBRARY_TEST_SET} antlr4_static parser)
+target_link_libraries(test_soperations ${LIBRARY_TEST_SET})
 
 add_test(
   NAME ut-xqry
@@ -81,6 +86,11 @@ add_test(
   NAME ut-expeval
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
+
+add_test(
+  NAME ut-soperations
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_soperations)
 
 add_test(
   NAME ut-expeval-vg
@@ -125,4 +135,4 @@ add_test(
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 set_tests_properties(ut-xtrdb ut-xqry ut-dataModel ut-dataModel-comp
-                     PROPERTIES RUN_SERIAL TRUE)
+                     ut-soperations PROPERTIES RUN_SERIAL TRUE)

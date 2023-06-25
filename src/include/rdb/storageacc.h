@@ -24,8 +24,8 @@ class storageAccessor {
   bool removeOnExit = true;
   bool removeDescriptorOnExit = false;
   size_t recordsCount = 0;
-  std::string descriptorFile;
-  std::string storageFile;
+  std::string descriptorFile = "";
+  std::string storageFile = "";
   std::string storageType = "DEFAULT";
   void moveRef();
   void attachStorage();
@@ -54,6 +54,11 @@ class storageAccessor {
   bool peekDescriptor();
 
   std::string getStorageName();
+
+  bool isDeclared();
+
+  // technical function - for unit tests
+  void reset();
 };
 }  // namespace rdb
 

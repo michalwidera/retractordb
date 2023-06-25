@@ -5,12 +5,13 @@
 
 #include <cassert>
 #include <cstdlib>  // std::div
+#include <iostream>
 #include <regex>
 
 #include "QStruct.h"  // coreInstance
 #include "SOperations.h"
 #include "expressionEvaluator.h"
-#include "iostream"
+#include "rdb/convertTypes.h"
 
 // ctest -R '^ut-dataModel' -V
 
@@ -68,12 +69,12 @@ streamInstance::streamInstance(query& qry)
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
+rdb::payload streamInstance::constructAgsePayload(const int length, const int offset) {
   assert(offset > 0);
   // First construct descriptor
   rdb::Descriptor descriptor;
   bool flip = (length < 0);
-  length = abs(length);
+  auto lengthAbs = abs(length);
 
   outputPayload->readReverse(0);
 
@@ -81,7 +82,7 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   std::string storage_name = outputPayload->getStorageName();
 
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
-  for (auto i = 0; i < length; i++) {
+  for (auto i = 0; i < lengthAbs; i++) {
     rdb::rField x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
                                   maxLen,                                  //
                                   maxType)};
@@ -92,16 +93,16 @@ rdb::payload streamInstance::constructAgsePayload(int length, int offset) {
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
   auto prevQuot{-1};
-  for (auto i = 0; i < length; i++) {
+  for (auto i = 0; i < lengthAbs; i++) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
       outputPayload->readReverse(dv.quot);
-      // TODO: fix non existing data?
+      // TODO: check&fix non existing data?
     }
 
     auto locSrc = descriptorVecSize - dv.rem - 1;
-    auto locDst = (!flip) ? i : length - i - 1;  // * Flipping is here
+    auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
     assert(i < descriptor.size());
 
@@ -280,8 +281,12 @@ dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
 
 dataModel::~dataModel() {}
 
-std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, int revOffset) {
-  qSet[instance]->outputPayload->readReverse(revOffset);
+std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, const int revOffset) {
+  auto revOffsetMutable(revOffset);
+  if (qSet[instance]->outputPayload->isDeclared())
+    revOffsetMutable = 0;
+  auto success = qSet[instance]->outputPayload->readReverse(revOffsetMutable);
+  assert(success);
   return qSet[instance]->outputPayload->getPayload();
 }
 
@@ -414,11 +419,9 @@ void dataModel::constructInputPayload(std::string instance) {
 
       int retPos;
       if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
-        qSet[nameSrc1]->outputPayload->read(retPos);
-        *(qSet[instance]->inputPayload) = *getPayload(nameSrc1);
+        *(qSet[instance]->inputPayload) = *getPayload(nameSrc2, retPos);
       } else {
-        qSet[nameSrc2]->outputPayload->read(retPos);
-        *(qSet[instance]->inputPayload) = *getPayload(nameSrc2);
+        *(qSet[instance]->inputPayload) = *getPayload(nameSrc1, retPos);
       }
     } break;
     default:
@@ -430,18 +433,14 @@ void dataModel::constructInputPayload(std::string instance) {
 // TODO - use this func in printRowValue/executorsm.cpp 281
 // TODO - and use std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) from QStruct.cpp
 // TODO - Workarea - Please cover with test
-std::vector<rdb::descFldVT> dataModel::getRow(std::string instance, int timeOffset, bool revOffset) {
+std::vector<rdb::descFldVT> dataModel::getRow(std::string instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
-  getPayload(instance, revOffset);
+  auto payload = getPayload(instance, timeOffset);
   auto i{0};
-  for (auto f : qSet[instance]->outputPayload->getDescriptor()) {
-    std::any anyValue = qSet[instance]->outputPayload->getPayload()->getItem(i++);
-
-    assert(anyValue.has_value());
-    assert(anyValue.type() == typeid(rdb::descFldVT));
-
-    retVal.push_back(std::any_cast<rdb::descFldVT>(std::move(anyValue)));
+  for (auto f : payload->getDescriptor()) {
+    if (std::get<rdb::rlen>(f) == 0) continue;
+    retVal.push_back(any_to_variant_cast(payload->getItem(i++)));
   }
   return retVal;
 }

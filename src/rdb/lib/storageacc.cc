@@ -120,9 +120,7 @@ void storageAccessor::attachStorage() {
     abort();
   }
 
-  bool readOnlyStorage = (storageType == "DEVICE") || (storageType == "TEXTSOURCE");
-
-  if (readOnlyStorage) {
+  if (isDeclared()) {
     recordsCount = 1;
     SPDLOG_INFO("records source on {}", storageFile);
     dataFileStatus = storageState::openExisting;
@@ -151,6 +149,42 @@ storageAccessor::~storageAccessor() {
     if (peekDescriptor()) remove(descriptorFile.c_str());
     SPDLOG_INFO("drop descriptor");
   }
+}
+
+bool storageAccessor::isDeclared() {
+  return (storageType == "DEVICE") || (storageType == "TEXTSOURCE");
+}
+
+void storageAccessor::reset() {
+  assert(storageFile != "");
+
+  if (!accessor) return;  // no accessor initialized - no need to reset.
+
+  auto resourceAlreadyExist = std::filesystem::exists(storageFile);
+  if (resourceAlreadyExist)
+    if (!isDeclared()) remove(storageFile.c_str());
+
+  if (storageType == "DEFAULT") {
+    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<uint8_t>>(storageFile);
+  } else if (storageType == "GENERIC") {
+    accessor = std::make_unique<rdb::genericBinaryFileAccessor<uint8_t>>(storageFile);
+  } else if (storageType == "POSIX") {
+    accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
+  } else if (storageType == "DEVICE") {
+    accessor = std::make_unique<rdb::binaryDeviceAccessor<uint8_t>>(storageFile);
+  } else if (storageType == "TEXTSOURCE") {
+    accessor = std::make_unique<rdb::textSourceAccessor<uint8_t>>(storageFile);
+    accessor->fctrl(&descriptor, 0);
+  } else {
+    SPDLOG_INFO("Unsupported storage type {}", storageType);
+    abort();
+  }
+
+  if (isDeclared() ) 
+    recordsCount = 1;
+  else
+    recordsCount = 0;
+  SPDLOG_INFO("reset - drop & recreate storage.");
 }
 
 Descriptor& storageAccessor::getDescriptor() { return descriptor; }
@@ -191,7 +225,7 @@ bool storageAccessor::read(const size_t recordIndex) {
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-  if (recordsCount > 0 && recordIndex < recordsCount) {
+  if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(static_cast<uint8_t*>(storagePayload->get()), size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("read fn from pos:{} limit:{}", recordIndexRv, recordsCount);

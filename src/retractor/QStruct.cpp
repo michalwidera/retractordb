@@ -388,15 +388,15 @@ std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
     case rdb::UINT:
       return os << std::get<unsigned>(rhs);
     case rdb::BYTE:
-      return os << std::get<uint8_t>(rhs);
+      return os << unsigned(std::get<uint8_t>(rhs));
     case rdb::RATIONAL:
-      return os << std::get<number>(rhs);
+      return os << std::get<boost::rational<int>>(rhs);
     case rdb::INTPAIR: {
-      auto r = std::get<std::pair<int, int>>(rhs);
+      auto r = get<std::pair<int, int>>(rhs);
       return os << r.first << "," << r.second;
     }
     case rdb::IDXPAIR: {
-      auto r = std::get<std::pair<std::string, int>>(rhs);
+      auto r = get<std::pair<std::string, int>>(rhs);
       return os << r.first << "[" << r.second << "]";
     }
   }

@@ -26,10 +26,15 @@ extern "C" qTree coreInstance;
 /*
 file path: test/UnitTest/Data/dataModel/ut_example_schema.rql
 
-DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'
-DECLARE c INTEGER,d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
+DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE 'datafile1.txt'
+DECLARE c INTEGER,d INTEGER STREAM core1, 0.5 FILE 'datafile2.txt'
 SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
-SELECT str1[0]+5 STREAM str2 FROM core0
+SELECT str2[0]+5 STREAM str2 FROM core0
+SELECT str3[0] STREAM str3 FROM core0+core1
+SELECT str4[0] STREAM str4 FROM core0%2
+SELECT str5[0] STREAM str5 FROM core0>1
+SELECT str6[0] STREAM str6 FROM core0-1/2
+SELECT str7[0] STREAM str7 FROM core0.max
 */
 namespace {
 
@@ -263,8 +268,8 @@ TEST_F(xschema, compute_instance_1) {
     auto payload = *(dataArea->qSet["str7"]->inputPayload);
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
-
-    ASSERT_TRUE("{ str7_0:31 }" == coutstring.str());
+    std::cerr << coutstring.str() << std::endl;
+    ASSERT_TRUE("{ str7_0:33 }" == coutstring.str());
   }
   std::set<std::string> rowSet = {"str7"};
   dataArea->processRows(rowSet);
@@ -272,40 +277,108 @@ TEST_F(xschema, compute_instance_1) {
     auto payload = *(dataArea->qSet["str7"]->inputPayload);
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
-
-    ASSERT_TRUE("{ str7_0:32 }" == coutstring.str());
+    std::cerr << coutstring.str() << std::endl;
+    ASSERT_TRUE("{ str7_0:31 }" == coutstring.str());
   }
 }
 
 TEST_F(xschema, process_rows_1) {
   // This creates 4 records in str1 and str2 - checked here & in Data/dataModel/pattern.txt
 
-  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 3);
-  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 3);
+  dataArea->qSet["str1"]->outputPayload->reset();
+  dataArea->qSet["str2"]->outputPayload->reset();
+  dataArea->qSet["core0"]->outputPayload->reset();
+  dataArea->qSet["core1"]->outputPayload->reset();
+
+  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 0);
+  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 0);
 
   std::set<std::string> rowSet = {"str1", "str2"};
   dataArea->processRows(rowSet);
 
-  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 4);
-  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 4);
-
-  dataArea->qSet["str2"]->outputPayload->readReverse(0);
+  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 1);
+  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 1);
 
   {
     auto payload = *(dataArea->qSet["str2"]->inputPayload);
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
-
-    ASSERT_TRUE("{ str2_0:22 str2_1:33 }" == coutstring.str());
+    std::cerr << coutstring.str() << std::endl;
+    ASSERT_TRUE("{ str2_0:20 str2_1:31 }" == coutstring.str());
   }
 
   {
     auto payload = *(dataArea->qSet["str2"]->outputPayload->getPayload());
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
-
-    ASSERT_TRUE("{ str2_0:27 }" == coutstring.str());  // str1[0]+5 => 22 + 5 => 27
+    std::cerr << coutstring.str() << std::endl;
+    ASSERT_TRUE("{ str2_0:25 }" == coutstring.str());  // str1[0]+5 => 20 + 5 => 25 (?)
   }
+
+  {
+    auto payload = *(dataArea->qSet["str1"]->inputPayload);
+    std::stringstream coutstring;
+    coutstring << rdb::flat << payload;
+    std::cerr << coutstring.str() << std::endl;
+    ASSERT_TRUE("{ str1_0:10 str1_1:20 }" == coutstring.str());
+  }
+
+  {
+    auto payload = *(dataArea->qSet["str1"]->outputPayload->getPayload());
+    std::stringstream coutstring;
+    coutstring << rdb::flat << payload;
+    std::cerr << coutstring.str() << std::endl;
+    ASSERT_TRUE("{ str1_0:10 str1_1:20 }" == coutstring.str());
+  }
+
+  dataArea->processRows(rowSet);
+  dataArea->processRows(rowSet);
+  dataArea->processRows(rowSet);
+
+  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 4);
+  ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 4);
 }
+
+std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
+  switch (rhs.index()) {
+    case rdb::STRING:
+      return os << std::get<std::string>(rhs);
+    case rdb::FLOAT:
+      return os << std::get<float>(rhs);
+    case rdb::DOUBLE:
+      return os << std::get<double>(rhs);
+    case rdb::INTEGER:
+      return os << std::get<int>(rhs);
+    case rdb::UINT:
+      return os << std::get<unsigned>(rhs);
+    case rdb::BYTE:
+      return os << unsigned(std::get<uint8_t>(rhs));
+    case rdb::RATIONAL:
+      return os << std::get<boost::rational<int>>(rhs);
+    case rdb::INTPAIR: {
+      auto r = get<std::pair<int, int>>(rhs);
+      return os << r.first << "," << r.second;
+    }
+    case rdb::IDXPAIR: {
+      auto r = get<std::pair<std::string, int>>(rhs);
+      return os << r.first << "[" << r.second << "]";
+    }
+  }
+  return os << "not supported";
+}
+/*
+TEST_F(xschema, getRow_1) {
+  auto row = dataArea->getRow("core0", 0);
+
+  std::string res("{ ");
+  for (auto &v : row) {
+    std::stringstream coutstring;
+    coutstring << v << " " ;
+    res.append( coutstring.str() ) ;
+  }
+  res.append("}");
+  ASSERT_TRUE("{ 21 32 }" == res);
+}
+*/
 
 }  // namespace

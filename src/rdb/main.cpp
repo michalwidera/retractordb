@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
       int record;
       std::cin >> record;
       if (record >= dacc->getRecordsCount()) {
-        std::cout << RED << "record out of range\n" << RESET;
+        std::cout << RED << "record out of range - read command\n" << RESET;
         continue;
       }
       auto returnStatus = dacc->read(record);
@@ -248,7 +248,7 @@ int main(int argc, char* argv[]) {
       std::cin >> record;
       for (auto i = 0; i < record; i++) {
         if (i >= dacc->getRecordsCount()) {
-          std::cout << RED << "record out of range\n" << RESET;
+          std::cout << RED << "record out of range - list command\n" << RESET;
           continue;
         }
         auto returnStatus = (cmd == "list") ? dacc->read(i) : dacc->read(dacc->getRecordsCount() - i - 1);

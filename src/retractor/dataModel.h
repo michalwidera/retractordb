@@ -31,7 +31,7 @@ struct streamInstance {
   // This constructor will create data based on QStruct query
   streamInstance(query &qry);
 
-  rdb::payload constructAgsePayload(int length, int offset);
+  rdb::payload constructAgsePayload(const int length, const int offset);
   rdb::payload constructAggregate(command_id cmd, std::string name);
 
   /*
@@ -55,7 +55,7 @@ class dataModel {
 
   dataModel() = delete;
 
-  std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, int revOffset = 0);
+  std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, const int revOffset = 0);
 
   /*
    * This function creates Input payload for ConstructOutputPayload data source
@@ -65,5 +65,5 @@ class dataModel {
 
   void processRows(std::set<std::string> inSet);
 
-  std::vector<rdb::descFldVT> getRow(std::string instance, int timeOffset, bool revOffset = 0);
+  std::vector<rdb::descFldVT> getRow(std::string instance, const int timeOffset);
 };
