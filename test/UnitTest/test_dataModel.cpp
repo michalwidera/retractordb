@@ -289,21 +289,19 @@ TEST_F(xschema, getRow_1) {
   for (auto &v : row) {
     std::stringstream coutstring;
 
-    if (v.index() == rdb::STRING) coutstring << std::get<std::string>(v);
-    if (v.index() == rdb::FLOAT) coutstring << std::get<float>(v);
-    if (v.index() == rdb::DOUBLE) coutstring << std::get<double>(v);
-    if (v.index() == rdb::INTEGER) coutstring << std::get<int>(v);
-    if (v.index() == rdb::UINT) coutstring << std::get<unsigned>(v);
-    if (v.index() == rdb::BYTE) coutstring << (unsigned)std::get<uint8_t>(v);  // not an error
-    if (v.index() == rdb::RATIONAL) coutstring << std::get<boost::rational<int>>(v);
-    if (v.index() == rdb::INTPAIR) {
-      auto r = get<std::pair<int, int>>(v);
-      coutstring << r.first << "," << r.second;
-    };
-    if (v.index() == rdb::IDXPAIR) {
-      auto r = get<std::pair<std::string, int>>(v);
-      coutstring << r.first << "[" << r.second << "]";
-    };
+    std::visit(Overload{                                                                                                    //
+                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
+                        [&coutstring](int a) { coutstring << a; },                                                          //
+                        [&coutstring](unsigned a) { coutstring << a; },                                                     //
+                        [&coutstring](float a) { coutstring << a; },                                                        //
+                        [&coutstring](double a) { coutstring << a; },                                                       //
+                        [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
+                        [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                        [&coutstring](std::string a) { coutstring << a; },                                                  //
+                        [&coutstring](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                         //
+                        [&coutstring](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                          //
+                        [&coutstring](boost::rational<int> a) { coutstring << a; }},
+               v);
 
     coutstring << " ";
     res.append(coutstring.str());
