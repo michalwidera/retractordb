@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdlib>  // std::div
 #include <iostream>
+#include <memory>  // unique_ptr
 #include <regex>
 
 #include "QStruct.h"  // coreInstance
@@ -281,13 +282,19 @@ dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
 
 dataModel::~dataModel() {}
 
-std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance, const int revOffset) {
+std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance,  //
+                                                             const int revOffset) {
   auto revOffsetMutable(revOffset);
-  if (qSet[instance]->outputPayload->isDeclared())
-    revOffsetMutable = 0;
+  if (qSet[instance]->outputPayload->isDeclared()) revOffsetMutable = 0;
   auto success = qSet[instance]->outputPayload->readReverse(revOffsetMutable);
   assert(success);
   return qSet[instance]->outputPayload->getPayload();
+}
+
+bool dataModel::fetchPayload(std::string instance,                            //
+                             std::unique_ptr<rdb::payload>::pointer payload,  //
+                             const int revOffset) {
+  return qSet[instance]->outputPayload->readReverse(revOffset, payload->get());
 }
 
 // TODO: work area
@@ -436,7 +443,11 @@ void dataModel::constructInputPayload(std::string instance) {
 std::vector<rdb::descFldVT> dataModel::getRow(std::string instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
-  auto payload = getPayload(instance, timeOffset);
+  auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
+
+  auto success = fetchPayload(instance, payload.get(), timeOffset);
+  assert(success);
+
   auto i{0};
   for (auto f : payload->getDescriptor()) {
     if (std::get<rdb::rlen>(f) == 0) continue;

@@ -55,8 +55,12 @@ class dataModel {
 
   dataModel() = delete;
 
-  std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance, const int revOffset = 0);
+  std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance,  //
+                                                    const int revOffset = 0);
 
+  bool fetchPayload(std::string instance,                            //
+                    std::unique_ptr<rdb::payload>::pointer payload,  //
+                    const int revOffset = 0);
   /*
    * This function creates Input payload for ConstructOutputPayload data source
    * function need to be here because it access different streams from qSet

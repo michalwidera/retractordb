@@ -151,9 +151,7 @@ storageAccessor::~storageAccessor() {
   }
 }
 
-bool storageAccessor::isDeclared() {
-  return (storageType == "DEVICE") || (storageType == "TEXTSOURCE");
-}
+bool storageAccessor::isDeclared() { return (storageType == "DEVICE") || (storageType == "TEXTSOURCE"); }
 
 void storageAccessor::reset() {
   assert(storageFile != "");
@@ -180,7 +178,7 @@ void storageAccessor::reset() {
     abort();
   }
 
-  if (isDeclared() ) 
+  if (isDeclared())
     recordsCount = 1;
   else
     recordsCount = 0;
@@ -209,7 +207,7 @@ const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
 std::string storageAccessor::getStorageName() { return storageFile; }
 
-bool storageAccessor::read(const size_t recordIndex) {
+bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
   if (descriptor.isEmpty()) {
     SPDLOG_ERROR("descriptor is Empty");
     abort();
@@ -222,24 +220,27 @@ bool storageAccessor::read(const size_t recordIndex) {
     SPDLOG_ERROR("no payload attached");
     abort();  // no payload attached
   }
+  destination = (destination == nullptr)                            //
+                    ? static_cast<uint8_t*>(storagePayload->get())  //
+                    : destination;                                  //
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
-    result = accessor->read(static_cast<uint8_t*>(storagePayload->get()), size, recordIndexRv * size);
+    result = accessor->read(destination, size, recordIndexRv * size);
     assert(result == 0);
     SPDLOG_INFO("read fn from pos:{} limit:{}", recordIndexRv, recordsCount);
   } else {
-    std::memset(storagePayload->get(), 0, size);
+    std::memset(destination, 0, size);
     SPDLOG_WARN("read fn - non existing data from pos:{} limit:{}", recordIndexRv, recordsCount);
   }
   return result == 0;
 }
 
-bool storageAccessor::readReverse(const size_t recordIndex) {
+bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
   auto reversePrevValue = reverse;
   reverse = true;
-  auto return_value = read(recordIndex);
+  auto return_value = read(recordIndex, destination);
   reverse = reversePrevValue;
   return return_value;
 }

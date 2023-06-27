@@ -282,6 +282,38 @@ TEST_F(xschema, compute_instance_1) {
   }
 }
 
+TEST_F(xschema, getRow_1) {
+  auto row = dataArea->getRow("core0", 0);
+
+  std::string res("{ ");
+  for (auto &v : row) {
+    std::stringstream coutstring;
+
+    if (v.index() == rdb::STRING) coutstring << std::get<std::string>(v);
+    if (v.index() == rdb::FLOAT) coutstring << std::get<float>(v);
+    if (v.index() == rdb::DOUBLE) coutstring << std::get<double>(v);
+    if (v.index() == rdb::INTEGER) coutstring << std::get<int>(v);
+    if (v.index() == rdb::UINT) coutstring << std::get<unsigned>(v);
+    if (v.index() == rdb::BYTE) coutstring << (unsigned)std::get<uint8_t>(v);  // not an error
+    if (v.index() == rdb::RATIONAL) coutstring << std::get<boost::rational<int>>(v);
+    if (v.index() == rdb::INTPAIR) {
+      auto r = get<std::pair<int, int>>(v);
+      coutstring << r.first << "," << r.second;
+    };
+    if (v.index() == rdb::IDXPAIR) {
+      auto r = get<std::pair<std::string, int>>(v);
+      coutstring << r.first << "[" << r.second << "]";
+    };
+
+    coutstring << " ";
+    res.append(coutstring.str());
+  }
+  res.append("}");
+
+  std::cerr << res << std::endl;
+  ASSERT_TRUE("{ 20 31 }" == res);
+}
+
 TEST_F(xschema, process_rows_1) {
   // This creates 4 records in str1 and str2 - checked here & in Data/dataModel/pattern.txt
 
@@ -338,47 +370,5 @@ TEST_F(xschema, process_rows_1) {
   ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 4);
   ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 4);
 }
-
-std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
-  switch (rhs.index()) {
-    case rdb::STRING:
-      return os << std::get<std::string>(rhs);
-    case rdb::FLOAT:
-      return os << std::get<float>(rhs);
-    case rdb::DOUBLE:
-      return os << std::get<double>(rhs);
-    case rdb::INTEGER:
-      return os << std::get<int>(rhs);
-    case rdb::UINT:
-      return os << std::get<unsigned>(rhs);
-    case rdb::BYTE:
-      return os << unsigned(std::get<uint8_t>(rhs));
-    case rdb::RATIONAL:
-      return os << std::get<boost::rational<int>>(rhs);
-    case rdb::INTPAIR: {
-      auto r = get<std::pair<int, int>>(rhs);
-      return os << r.first << "," << r.second;
-    }
-    case rdb::IDXPAIR: {
-      auto r = get<std::pair<std::string, int>>(rhs);
-      return os << r.first << "[" << r.second << "]";
-    }
-  }
-  return os << "not supported";
-}
-/*
-TEST_F(xschema, getRow_1) {
-  auto row = dataArea->getRow("core0", 0);
-
-  std::string res("{ ");
-  for (auto &v : row) {
-    std::stringstream coutstring;
-    coutstring << v << " " ;
-    res.append( coutstring.str() ) ;
-  }
-  res.append("}");
-  ASSERT_TRUE("{ 21 32 }" == res);
-}
-*/
 
 }  // namespace

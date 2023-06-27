@@ -93,6 +93,12 @@ add_test(
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_soperations)
 
 add_test(
+  NAME ut-soperations-vg
+  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_soperations)
+
+add_test(
   NAME ut-expeval-vg
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full
