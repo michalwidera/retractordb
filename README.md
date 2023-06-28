@@ -1,6 +1,11 @@
 RetractorDB
 -----------------------------------------------------------------------
-![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
+
+This branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb/tree/issue_17.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb/?branch=issue_17)
+
+[comment]: # (move this to master before merge to upstream)
+
+(https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
@@ -21,14 +26,24 @@ How to install
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind
 pip install conan
 conan profile detect
 git clone https://github.com/michalwidera/retractordb.git
-conan install .
-conan build .
-cd build/Release
+conan install . -s build_type=Debug --build missing
+conan build . -s build_type=Debug --build missing
+cd build/Debug
+make install
+```
+
+optional in build/Debug folder:
+```
 make test
+cmake .
+make
+make install
+make grammar
+make cformat
 ```
 
 Work with antl4 and .g4 files requires java - install it with:
@@ -39,11 +54,6 @@ sudo apt install default-jre
 If you want see graphic response, use gnuplot - install it with:
 ```
 sudo apt install gnuplot
-```
-
-Build and test in debug
-```
-conan install . -s build_type=Debug  --build missing
 ```
 
 After installation _xretractor_, _xqry_ ... etc will be installed in ~/.local/bin on path.
@@ -57,7 +67,6 @@ Allowed options:
   -t [ --detail ] arg         show details of this stream
   ...
 ```
-
 
 To get full functionality additional packages may be required like:
 ```
@@ -90,4 +99,3 @@ Author
 
 Project created in 2003-2023 by Michal Widera
 (michal@widera.com.pl)
-
