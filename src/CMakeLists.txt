@@ -10,12 +10,12 @@ add_subdirectory(retractor)
 add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-simple.sh
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
 
 add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-dsp.sh
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
 
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
