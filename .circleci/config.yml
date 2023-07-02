@@ -3,6 +3,8 @@ version: 2.1
 workflows:
 
   commit:
+    when:
+        equal : [ false , << pipeline.trigger_source  >> ]
     jobs:
       - build-2204-debug:
           filters:
