@@ -6,9 +6,11 @@ parameters:
     type: boolean
 
 workflows:
-  when: 
-    - equal: [ false , << pipeline.parameters.run_workflow_full_build >> ]
+
   commit:
+    when:
+      condition:
+        equal: [ false, << pipeline.parameters.run_workflow_full_build >> ]
     jobs:
       - build-2204-debug:
           filters:
@@ -24,8 +26,9 @@ workflows:
                  - /issue_.*/
 
   nightly:
-    when: 
-      - equal: [ false , << pipeline.parameters.run_workflow_full_build >> ]
+    when:
+      condition:
+        equal: [ false, << pipeline.parameters.run_workflow_full_build >> ]
     triggers:
       - schedule:
           # https://crontab.guru/#0_1_*_*_1,6
@@ -49,8 +52,7 @@ workflows:
             - build-2204-release
 
   full_build:
-    when: 
-      - equal: [ true , << pipeline.parameters.run_workflow_full_build >> ]
+    when: << pipeline.parameters.run_workflow_full_build >> 
     jobs:
       - build-2204-release
       - build-2204-conan20:
