@@ -284,7 +284,7 @@ std::string printRowValue(const std::string query_name) {
     // There is part of communication format - here data are formatted for
     // transmission via internal queue.
     //
-    std::stringstream retVal;
+    // std::stringstream retVal;
     // retVal << boost::rational_cast<double>(value); - now it's more complicated due types.
 
     std::stringstream coutstring;
@@ -303,7 +303,7 @@ std::string printRowValue(const std::string query_name) {
                         [&coutstring](boost::rational<int> a) { coutstring << a; }},
                value);
 
-    pt.put(boost::lexical_cast<std::string>(i++), retVal.str());
+    pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
   }
   std::stringstream strstream;
   // write_json(strstream, pt);
