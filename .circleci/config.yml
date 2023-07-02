@@ -1,5 +1,10 @@
 version: 2.1
 
+parameters:
+  run_workflow_full_build:
+    default: false
+    type: boolean
+
 workflows:
   commit:
     jobs:
@@ -27,6 +32,21 @@ workflows:
               only:
                 - master
                 - /issue_.*/
+    jobs:
+      - build-2204-release
+      - build-2204-conan20:
+          requires:
+            - build-2204-release
+      - build-2204-conan20-debug:
+          requires:
+            - build-2204-conan20
+      - build-2204-debug:
+          requires:
+            - build-2204-release
+
+  full_build:
+    build:
+      when << pipeline.run_workflow_full_build >>
     jobs:
       - build-2204-release
       - build-2204-conan20:
