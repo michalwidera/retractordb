@@ -298,8 +298,12 @@ TEST_F(xschema, getRow_1) {
                         [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
                         [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
                         [&coutstring](std::string a) { coutstring << a; },                                                  //
-                        [&coutstring](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                         //
-                        [&coutstring](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                          //
+                        [&coutstring](std::vector<uint8_t> a) {
+                          std::for_each(a.begin(), a.end(), [&coutstring](uint8_t &n) { coutstring << n << " "; });
+                        },  //
+                        [&coutstring](std::vector<int> a) {
+                          std::for_each(a.begin(), a.end(), [&coutstring](int &n) { coutstring << n << " "; });
+                        },  // TODO: cover UT
                         [&coutstring](boost::rational<int> a) { coutstring << a; }},
                v);
 

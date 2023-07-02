@@ -182,15 +182,15 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
   rdb::descFldVT retVal;
 
   std::visit(Overload{
-                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                                      // xor ?
-                 [&retVal](int a) { retVal = -a; },                                                                //
-                 [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                                    // xor ?
-                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<int>(-a); },                    //
-                 [&retVal](float a) { retVal = -a; },                                                              //
-                 [&retVal](double a) { retVal = -a; },                                                             //
-                 [&retVal](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                           //
-                 [&retVal](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                            //
-                 [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },               //
+                 [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                                           // xor ?
+                 [&retVal](int a) { retVal = -a; },                                                                     //
+                 [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                                         // xor ?
+                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<int>(-a); },                         //
+                 [&retVal](float a) { retVal = -a; },                                                                   //
+                 [&retVal](double a) { retVal = -a; },                                                                  //
+                 [&retVal](std::vector<uint8_t> a) { std::for_each(a.begin(), a.end(), [](uint8_t& n) { n = -n; }); },  //
+                 [&retVal](std::vector<int> a) { std::for_each(a.begin(), a.end(), [](int& n) { n = -n; }); },  // TODO: cover ut
+                 [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },            //
                  [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
                  [&retVal](std::string a) { /* define neg of string ? */ }                                         //
              },
@@ -274,7 +274,6 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
           rStack.push(callFun(b, trunc));
         break;
       case PUSH_ID: {
-        /* TODO */
         assert(payload != NULL);
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
         const auto anyValue = payload->getItem(instancePosition.second);
@@ -285,7 +284,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
         /* TODO */
         assert(false);
         break;
-      case PUSH_ID2: { /* TODO */
+      case PUSH_ID2: {
         assert(payload != NULL);
         std::regex r("(\\w*)\\[(\\d*)\\]");
         std::smatch what;
