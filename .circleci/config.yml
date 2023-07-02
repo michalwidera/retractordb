@@ -46,7 +46,7 @@ workflows:
 
   full_build:
     build:
-      when << pipeline.run_workflow_full_build >>
+      when: <<pipeline.run_workflow_full_build>>
     jobs:
       - build-2204-release
       - build-2204-conan20:
