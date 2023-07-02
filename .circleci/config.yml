@@ -3,8 +3,6 @@ version: 2.1
 workflows:
 
   commit:
-    when:
-        equal : [ false , << pipeline.trigger_source  >> ]
     jobs:
       - build-2204-debug:
           filters:
@@ -30,21 +28,6 @@ workflows:
               only:
                 - master
                 - /issue_.*/
-    jobs:
-      - build-2204-release
-      - build-2204-conan20:
-          requires:
-            - build-2204-release
-      - build-2204-conan20-debug:
-          requires:
-            - build-2204-conan20
-      - build-2204-debug:
-          requires:
-            - build-2204-release
-
-  api_build:
-    when:
-        equal: [ api, << pipeline.trigger_source  >> ]
     jobs:
       - build-2204-release
       - build-2204-conan20:
