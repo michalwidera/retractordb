@@ -8,7 +8,6 @@ parameters:
 workflows:
 
   commit:
-    when: ! << pipeline.parameters.run_workflow_full_build >> 
     jobs:
       - build-2204-debug:
           filters:
@@ -24,7 +23,6 @@ workflows:
                  - /issue_.*/
 
   nightly:
-    when: ! << pipeline.parameters.run_workflow_full_build >> 
     triggers:
       - schedule:
           # https://crontab.guru/#0_1_*_*_1,6
@@ -47,8 +45,9 @@ workflows:
           requires:
             - build-2204-release
 
-  full_build:
-    when: << pipeline.parameters.run_workflow_full_build >> 
+  api_build:
+    when:
+        equal: [ api, << pipeline.parameters.run_workflow_full_build >> ]
     jobs:
       - build-2204-release
       - build-2204-conan20:
