@@ -129,23 +129,33 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) {
-  auto refCount = std::count_if(rhs.begin(), rhs.end(),                          //
-                                [](const rField &i) {                            //
-                                  return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                         std::get<rdb::rtype>(i) == rdb::TYPE;
-                                });
+  auto refCountRhs = std::count_if(rhs.begin(), rhs.end(),                          //
+                                   [](const rField &i) {                            //
+                                     return std::get<rdb::rtype>(i) == rdb::REF ||  //
+                                            std::get<rdb::rtype>(i) == rdb::TYPE;
+                                   });
+  auto refCountThis = std::count_if(begin(), end(),                                  //
+                                    [](const rField &i) {                            //
+                                      return std::get<rdb::rtype>(i) == rdb::REF ||  //
+                                             std::get<rdb::rtype>(i) == rdb::TYPE;
+                                    });
 
-  if (size() == rhs.size() - refCount) {
-    auto i{0};
-    for (rField &f : *this)
-      if (std::get<rdb::rlen>(f) < std::get<rdb::rlen>(rhs[i]) ||  //
-          std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
-        return false;
-      else
-        i++;
-    return true;
+  auto i{0};
+  for (rField &f : *this) {
+    if (std::get<rdb::rtype>(f) == rdb::REF ||       //
+        std::get<rdb::rtype>(f) == rdb::TYPE ||      //
+        std::get<rdb::rtype>(rhs[i]) == rdb::REF ||  //
+        std::get<rdb::rtype>(rhs[i]) == rdb::TYPE) {
+      i++;
+      continue;
+    }
+    if (std::get<rdb::rlen>(f) < std::get<rdb::rlen>(rhs[i]) ||  //
+        std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
+      return false;
+
+    i++;
   }
-  return false;
+  return this->size() - refCountThis == rhs.size() - refCountRhs;
 }
 
 Descriptor &Descriptor::cleanRef() {

@@ -4,6 +4,30 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
+    {
+      "name": "(gdb) xretractor simple",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
+      "args": ["query-simple.rql"],
+      "stopAtEntry": false,
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/simple",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+          {
+              "description": "Włącz formatowanie kodu dla gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Ustaw wariant dezasemblacji na Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
   {
     "name": "(gdb) test_dataModel",
     "type": "cppdbg",

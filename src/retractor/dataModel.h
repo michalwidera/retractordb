@@ -70,4 +70,9 @@ class dataModel {
   void processRows(std::set<std::string> inSet);
 
   std::vector<rdb::descFldVT> getRow(std::string instance, const int timeOffset);
+
+  size_t streamStoredSize(const std::string &instance);
+
+  /** This function return length of data stream */
+  size_t getStreamCount(const std::string &instance);
 };

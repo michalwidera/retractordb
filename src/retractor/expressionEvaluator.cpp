@@ -273,11 +273,14 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
         else if (tkStr == "trunc")
           rStack.push(callFun(b, trunc));
         break;
-      case PUSH_ID:
+      case PUSH_ID: {
         /* TODO */
         assert(payload != NULL);
-        assert(false);
-        break;
+        auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
+        const auto anyValue = payload->getItem(instancePosition.second);
+        rdb::descFldVT val = any_to_variant_cast(anyValue);
+        rStack.push(val);
+      } break;
       case PUSH_IDX:
         /* TODO */
         assert(false);

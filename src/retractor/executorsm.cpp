@@ -7,9 +7,10 @@
 #include <memory>
 
 #include "CRSMath.h"
-#include "Processor.h"
+//#include "Processor.h"
 #include "QStruct.h"
 #include "config.h"  // Add an automatically generated configuration file
+#include "dataModel.h"
 
 // This defines is required to remove deprecation of boost/bind.hpp
 // some boost libraries still didn't remove dependency to boost bin
@@ -66,7 +67,7 @@ std::vector<IPC::message_queue> qset;
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance;
 
-extern Processor *pProc;
+extern dataModel *pProc;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
@@ -147,10 +148,10 @@ ptree commandProcessor(ptree ptInval) {
         ptRetval.put(std::string("db.stream.") + q.id, q.id);
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
         long recordsCount = -1;
-        if (!q.isDeclaration()) recordsCount = streamStoredSize(q.id);
+        if (!q.isDeclaration()) recordsCount = pProc->streamStoredSize(q.id);
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
-                     boost::lexical_cast<std::string>(getStreamCount(q.id)));
+                     boost::lexical_cast<std::string>(pProc->getStreamCount(q.id)));
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"), q.filename);
       }
     }
@@ -284,7 +285,24 @@ std::string printRowValue(const std::string query_name) {
     // transmission via internal queue.
     //
     std::stringstream retVal;
-    retVal << boost::rational_cast<double>(value);
+    // retVal << boost::rational_cast<double>(value); - now it's more complicated due types.
+
+    std::stringstream coutstring;
+
+    std::visit(Overload{                                                                                                    //
+                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
+                        [&coutstring](int a) { coutstring << a; },                                                          //
+                        [&coutstring](unsigned a) { coutstring << a; },                                                     //
+                        [&coutstring](float a) { coutstring << a; },                                                        //
+                        [&coutstring](double a) { coutstring << a; },                                                       //
+                        [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
+                        [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                        [&coutstring](std::string a) { coutstring << a; },                                                  //
+                        [&coutstring](std::vector<uint8_t> a) { SPDLOG_ERROR("TODO - vect8->T"); },                         //
+                        [&coutstring](std::vector<int> a) { SPDLOG_ERROR("TODO - vect-int->T"); },                          //
+                        [&coutstring](boost::rational<int> a) { coutstring << a; }},
+               value);
+
     pt.put(boost::lexical_cast<std::string>(i++), retVal.str());
   }
   std::stringstream strstream;
@@ -301,7 +319,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {
-    Processor proc;
+    dataModel proc(coreInstance);
     if (verbose) {
       std::cerr << "Objects:" << std::endl;
       dumpCore(std::cerr);
