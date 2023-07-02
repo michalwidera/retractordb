@@ -6,16 +6,16 @@ str1(1/10)
 	:- PUSH_STREAM(core1)
 	:- STREAM_ADD
 	str1_0: INTEGER
-		PUSH_ID(core0[0])
+		PUSH_ID(str1[0])
 		PUSH_VAL(10)
 		MULTIPLY
 	str1_1: INTEGER
-		PUSH_ID(core1[0])
+		PUSH_ID(str1[1])
 		PUSH_VAL(10)
 		MULTIPLY
 	str1_2: INTEGER
-		PUSH_ID(core0[0])
-		PUSH_ID(core1[0])
+		PUSH_ID(str1[1])
+		PUSH_ID(str1[0])
 		MULTIPLY
 		PUSH_VAL(20)
 		ADD
