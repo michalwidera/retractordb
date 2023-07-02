@@ -1,10 +1,5 @@
 version: 2.1
 
-parameters:
-  run_workflow_full_build:
-    default: false
-    type: boolean
-
 workflows:
 
   commit:
@@ -47,7 +42,7 @@ workflows:
 
   api_build:
     when:
-        equal: [ api, << pipeline.parameters.run_workflow_full_build >> ]
+        equal: [ api, << pipeline.trigger_source  >> ]
     jobs:
       - build-2204-release
       - build-2204-conan20:
