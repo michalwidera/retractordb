@@ -52,7 +52,9 @@ workflows:
             - build-2204-release
 
   full_build:
-    when: << pipeline.parameters.run_workflow_full_build >> 
+    when:
+      condition:
+        equal: [ true, << pipeline.parameters.run_workflow_full_build >> ]
     jobs:
       - build-2204-release
       - build-2204-conan20:
