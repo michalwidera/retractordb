@@ -46,10 +46,10 @@
 #define DECL_T(elementName, elementType) elementName,
 #define DECL_E(elementName, elementType) elementName
 #define DECL_F(elementName) , elementName
-#define END_E_GEN_T(ENUM_NAME)                            \
-  }                                                       \
-  ;                                                       \
-  typedef std::tuple<std::string, int, ENUM_NAME> rField; \
+#define END_E_GEN_T(ENUM_NAME)                                 \
+  }                                                            \
+  ;                                                            \
+  typedef std::tuple<std::string, int, int, ENUM_NAME> rField; \
   std::string GetString##ENUM_NAME(const enum ENUM_NAME index);
 #include "internal/fldList.h"
 #endif

@@ -15,7 +15,7 @@ namespace rdb {
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
-enum FieldColumn { rname = 0, rlen = 1, rtype = 2 };
+enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 
 constexpr int error_desc_location = -1;
 
@@ -26,7 +26,7 @@ class Descriptor : public std::vector<rField> {
   bool isEmpty() const;
 
   Descriptor(std::initializer_list<rField> l);
-  Descriptor(std::string n, int l, rdb::descFld t);
+  Descriptor(std::string n, int l, int a, rdb::descFld t);
 
   Descriptor() = default;
   Descriptor(const Descriptor &init);
@@ -44,9 +44,10 @@ class Descriptor : public std::vector<rField> {
   int position(std::string name);
   std::string fieldName(int fieldPosition);
   int len(const std::string name);
+  constexpr int len(const rdb::rField &field) const;
   int offset(const std::string name);
   int offset(int position);
-
+  int arraySize(const std::string name);
   std::string type(const std::string name);
 
   std::pair<rdb::descFld, int> getMaxType();

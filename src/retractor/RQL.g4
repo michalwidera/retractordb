@@ -24,26 +24,22 @@ rational_se         : fraction # RationalAsFraction_proforma
 fraction            : DECIMAL DIVIDE DECIMAL
                     ;
 
-declare_statement   : DECLARE declare_list
+declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
                     # Declare
                     ;
 
-declare_list        : field_declaration (COMMA field_declaration)*
-                    # DeclarationList
-                    ;
-
-field_declaration   : ID field_type
+field_declaration   : ID field_type ('[' type_size=DECIMAL ']')?
                     # SingleDeclaration
                     ;
 
-field_type          : (STRING_T | INTARRAY_T | BYTEARRAY_T) '[' type_size=DECIMAL ']' # typeArray
-                    | BYTE_T     # typeByte
+field_type          : BYTE_T     # typeByte
                     | INTEGER_T  # typeInt
                     | UNSIGNED_T # typeUnsigned
                     | FLOAT_T    # typeFloat
                     | DOUBLE_T   # typeDouble
+                    | STRING_T   # typeString
                     ;
 
 select_list         : asterisk                       # SelectListFullscan
@@ -129,10 +125,8 @@ function_call       : ( 'Sqrt'
 
 // sync types with: src/include/rdb/fldType.h
 
+BYTE_T:             'BYTE'|'Byte'|'CHAR'|'Char';
 STRING_T:           'STRING'|'String';
-BYTEARRAY_T:        'BYTEARRAY'|'Bytearray';
-INTARRAY_T:         'INTARRAY'|'Intarray';
-BYTE_T:             'BYTE'|'Byte';
 UNSIGNED_T:         'UINT'|'Uint';
 INTEGER_T:          'INTEGER'|'Integer';
 FLOAT_T:            'FLOAT'|'Float';

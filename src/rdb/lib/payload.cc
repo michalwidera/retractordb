@@ -81,11 +81,11 @@ payload payload::operator+(const payload &other) {
 // Member Functions
 
 template <typename T, typename K>
-void copyToMemory(std::istream &is, const K &rhs, const char *fieldName) {
+void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arroffset) {
   T data;
   is >> data;
   Descriptor desc(rhs.getDescriptor());
-  std::memcpy(rhs.get() + desc.offset(fieldName), &data, sizeof(T));
+  std::memcpy(rhs.get() + desc.offset(fieldName) + arroffset, &data, sizeof(T));
 }
 
 void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
@@ -114,19 +114,13 @@ void payload::setItem(const int position, std::any valueParam) {
       case rdb::STRING: {
         std::string data(std::any_cast<std::string>(value));
         std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(),
-                    std::min(len, static_cast<int>(data.length())));
+                    std::min(len * std::get<rarray>(descriptor[position]), static_cast<int>(data.length())));
       } break;
       case rdb::BYTE:
         setItemBy<uint8_t>(position, value);
         break;
-      case rdb::BYTEARRAY:
-        setItemBy<std::vector<uint8_t>>(position, value);
-        break;
       case rdb::INTEGER:
         setItemBy<int>(position, value);
-        break;
-      case rdb::INTARRAY:
-        setItemBy<std::vector<int>>(position, value);
         break;
       case rdb::UINT:
         setItemBy<unsigned>(position, value);
@@ -172,21 +166,9 @@ std::any payload::getItem(const int position) {
       SPDLOG_INFO("getItem {} string:{}", position, retval);
       return retval;
     }
-    case rdb::BYTEARRAY: {
-      std::vector<uint8_t> data;
-      for (auto i = 0; i < len; i++) data.push_back(getVal<uint8_t>(payloadData.get(), descriptor.offset(position) + i));
-      SPDLOG_INFO("getItem {} bytearray", position);
-      return data;
-    }
     case rdb::BYTE: {
       uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(position));
       SPDLOG_INFO("getItem {} byte:{}", position, data);
-      return data;
-    }
-    case rdb::INTARRAY: {
-      std::vector<int> data;
-      for (auto i = 0; i < len; i++) data.push_back(getVal<int>(payloadData.get(), descriptor.offset(position) + i));
-      SPDLOG_INFO("getItem {} intarray", position);
       return data;
     }
     case rdb::INTEGER: {
@@ -241,44 +223,35 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   else
     is >> std::dec;
   Descriptor desc(rhs.getDescriptor());
+
   if (desc.type(fieldName) == "STRING") {
     std::string record;
     // std::getline(is >> std::ws, record);
     is >> record;
     std::memset(rhs.get() + desc.offset(fieldName), 0, desc.len(fieldName));
     std::memcpy(rhs.get() + desc.offset(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
-  } else if (desc.type(fieldName) == "BYTEARRAY") {
-    for (auto i = 0; i < desc.len(fieldName); i++) {
-      int data;
-      is >> data;
-      uint8_t data8 = static_cast<uint8_t>(data);
-      std::memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(uint8_t), &data8, sizeof(uint8_t));
+  } else
+    for (auto i = 0; i < desc.arraySize(fieldName); i++) {
+      if (desc.type(fieldName) == "BYTE") {
+        int data;
+        is >> data;
+        uint8_t data8 = static_cast<uint8_t>(data);
+        std::memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(uint8_t), &data8, sizeof(uint8_t));
+      } else if (desc.type(fieldName) == "UINT")
+        copyToMemory<uint, payload>(is, rhs, fieldName.c_str(), i * sizeof(unsigned));
+      else if (desc.type(fieldName) == "INTEGER")
+        copyToMemory<int, payload>(is, rhs, fieldName.c_str(), i * sizeof(int));
+      else if (desc.type(fieldName) == "FLOAT")
+        copyToMemory<float, payload>(is, rhs, fieldName.c_str(), i * sizeof(float));
+      else if (desc.type(fieldName) == "DOUBLE")
+        copyToMemory<double, payload>(is, rhs, fieldName.c_str(), i * sizeof(double));
+      else if (desc.type(fieldName) == "REF")
+        SPDLOG_ERROR("REF store not supported by this operator.");
+      else if (desc.type(fieldName) == "TYPE")
+        SPDLOG_ERROR("TYPE store not supported by this operator.");
+      else
+        SPDLOG_ERROR("field {} not found", fieldName);
     }
-  } else if (desc.type(fieldName) == "INTARRAY") {
-    for (auto i = 0; i < desc.len(fieldName) / sizeof(int); i++) {
-      int data;
-      is >> data;
-      std::memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(int), &data, sizeof(int));
-    }
-  } else if (desc.type(fieldName) == "BYTE") {
-    int data;
-    is >> data;
-    uint8_t data8 = static_cast<uint8_t>(data);
-    std::memcpy(rhs.get() + desc.offset(fieldName), &data8, sizeof(uint8_t));
-  } else if (desc.type(fieldName) == "UINT")
-    copyToMemory<uint, payload>(is, rhs, fieldName.c_str());
-  else if (desc.type(fieldName) == "INTEGER")
-    copyToMemory<int, payload>(is, rhs, fieldName.c_str());
-  else if (desc.type(fieldName) == "FLOAT")
-    copyToMemory<float, payload>(is, rhs, fieldName.c_str());
-  else if (desc.type(fieldName) == "DOUBLE")
-    copyToMemory<double, payload>(is, rhs, fieldName.c_str());
-  else if (desc.type(fieldName) == "REF")
-    SPDLOG_ERROR("REF store not supported by this operator.");
-  else if (desc.type(fieldName) == "TYPE")
-    SPDLOG_ERROR("TYPE store not supported by this operator.");
-  else
-    SPDLOG_ERROR("field {} not found", fieldName);
   return is;
 }
 
@@ -314,63 +287,45 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     auto offset_ = desc.offset(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
       os << std::string(reinterpret_cast<char *>(rhs.get() + offset_), desc.len(std::get<rname>(r)));
-    } else if (std::get<rtype>(r) == rdb::BYTEARRAY) {
-      for (auto i = 0; i < std::get<rlen>(r); i++) {
-        uint8_t data{0};
-        std::memcpy(&data, rhs.get() + offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
-        if (rhs.hexFormat) {
-          os << std::setfill('0');
-          os << std::setw(2);
-        }
-        os << (int)data;
-        if (i + 1 != std::get<rlen>(r)) os << " ";
-      }
-    } else if (std::get<rtype>(r) == rdb::INTARRAY) {
-      for (auto i = 0; i < std::get<rlen>(r) / sizeof(int); i++) {
-        int data{0};
-        std::memcpy(&data, rhs.get() + offset_ + i * sizeof(int), sizeof(int));
-        if (rhs.hexFormat) {
-          os << std::setfill('0');
-          os << std::setw(8);
-        }
-        os << (int)data;
-        if (i + 1 != std::get<rlen>(r) / sizeof(int)) os << " ";
-      }
-    } else if (std::get<rtype>(r) == rdb::BYTE) {
-      uint8_t data{0};
-      std::memcpy(&data, rhs.get() + offset_, sizeof(uint8_t));
-      if (rhs.hexFormat) {
-        os << std::setfill('0');
-        os << std::setw(2);
-      }
-      os << (int)data;
-    } else if (std::get<rtype>(r) == rdb::INTEGER) {
-      int data{0};
-      std::memcpy(&data, rhs.get() + offset_, sizeof(int));
-      if (rhs.hexFormat) {
-        os << std::setfill('0');
-        os << std::setw(8);
-      }
-      os << data;
-    } else if (std::get<rtype>(r) == rdb::UINT) {
-      unsigned int data{0};
-      std::memcpy(&data, rhs.get() + offset_, sizeof(unsigned int));
-      if (rhs.hexFormat) {
-        os << std::setfill('0');
-        os << std::setw(8);
-      }
-      os << data;
-    } else if (std::get<rtype>(r) == rdb::FLOAT) {
-      float data{0};
-      std::memcpy(&data, rhs.get() + offset_, sizeof(float));
-      os << data;
-    } else if (std::get<rtype>(r) == rdb::DOUBLE) {
-      double data{0};
-      std::memcpy(&data, rhs.get() + offset_, sizeof(double));
-      os << data;
     } else
-      assert(false && "Unrecognized type");
+      for (auto i = 0; i < std::get<rarray>(r); i++) {
+        if (std::get<rtype>(r) == rdb::BYTE) {
+          uint8_t data{0};
+          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
+          if (rhs.hexFormat) {
+            os << std::setfill('0');
+            os << std::setw(2);
+          }
+          os << (int)data;
+        } else if (std::get<rtype>(r) == rdb::INTEGER) {
+          int data{0};
+          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(int), sizeof(int));
+          if (rhs.hexFormat) {
+            os << std::setfill('0');
+            os << std::setw(8);
+          }
+          os << data;
+        } else if (std::get<rtype>(r) == rdb::UINT) {
+          unsigned int data{0};
+          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(unsigned), sizeof(unsigned int));
+          if (rhs.hexFormat) {
+            os << std::setfill('0');
+            os << std::setw(8);
+          }
+          os << data;
+        } else if (std::get<rtype>(r) == rdb::FLOAT) {
+          float data{0};
+          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(float), sizeof(float));
+          os << data;
+        } else if (std::get<rtype>(r) == rdb::DOUBLE) {
+          double data{0};
+          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(double), sizeof(double));
+          os << data;
+        } else
+          assert(false && "Unrecognized type");
 
+        if (i < std::get<rarray>(r) - 1) os << " ";
+      }
     if (!flatOutput) os << std::endl;
   }
   if (rhs.getDescriptor().isEmpty()) {

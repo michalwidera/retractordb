@@ -40,14 +40,8 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
   virtual void exitDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
 
-  virtual void enterDeclarationList(RQLParser::DeclarationListContext * /*ctx*/) override { }
-  virtual void exitDeclarationList(RQLParser::DeclarationListContext * /*ctx*/) override { }
-
   virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext * /*ctx*/) override { }
   virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext * /*ctx*/) override { }
-
-  virtual void enterTypeArray(RQLParser::TypeArrayContext * /*ctx*/) override { }
-  virtual void exitTypeArray(RQLParser::TypeArrayContext * /*ctx*/) override { }
 
   virtual void enterTypeByte(RQLParser::TypeByteContext * /*ctx*/) override { }
   virtual void exitTypeByte(RQLParser::TypeByteContext * /*ctx*/) override { }
@@ -63,6 +57,9 @@ public:
 
   virtual void enterTypeDouble(RQLParser::TypeDoubleContext * /*ctx*/) override { }
   virtual void exitTypeDouble(RQLParser::TypeDoubleContext * /*ctx*/) override { }
+
+  virtual void enterTypeString(RQLParser::TypeStringContext * /*ctx*/) override { }
+  virtual void exitTypeString(RQLParser::TypeStringContext * /*ctx*/) override { }
 
   virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }
   virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext * /*ctx*/) override { }

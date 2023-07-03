@@ -38,14 +38,8 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
   virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
 
-  virtual void enterDeclarationList(RQLParser::DeclarationListContext *ctx) = 0;
-  virtual void exitDeclarationList(RQLParser::DeclarationListContext *ctx) = 0;
-
   virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
   virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
-
-  virtual void enterTypeArray(RQLParser::TypeArrayContext *ctx) = 0;
-  virtual void exitTypeArray(RQLParser::TypeArrayContext *ctx) = 0;
 
   virtual void enterTypeByte(RQLParser::TypeByteContext *ctx) = 0;
   virtual void exitTypeByte(RQLParser::TypeByteContext *ctx) = 0;
@@ -61,6 +55,9 @@ public:
 
   virtual void enterTypeDouble(RQLParser::TypeDoubleContext *ctx) = 0;
   virtual void exitTypeDouble(RQLParser::TypeDoubleContext *ctx) = 0;
+
+  virtual void enterTypeString(RQLParser::TypeStringContext *ctx) = 0;
+  virtual void exitTypeString(RQLParser::TypeStringContext *ctx) = 0;
 
   virtual void enterSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) = 0;
   virtual void exitSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) = 0;

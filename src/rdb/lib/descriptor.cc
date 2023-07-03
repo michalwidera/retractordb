@@ -41,8 +41,6 @@ rdb::descFld GetFieldType(std::string name) {
   rtrim(name);
   std::map<std::string, rdb::descFld> typeDictionary  //
       = {{"STRING", rdb::STRING},                     //
-         {"BYTEARRAY", rdb::BYTEARRAY},               //
-         {"INTARRAY", rdb::INTARRAY},                 //
          {"UINT", rdb::UINT},                         //
          {"BYTE", rdb::BYTE},                         //
          {"INTEGER", rdb::INTEGER},                   //
@@ -56,8 +54,6 @@ rdb::descFld GetFieldType(std::string name) {
 std::string GetFieldType(rdb::descFld e) {
   std::map<rdb::descFld, std::string> typeDictionary  //
       = {{rdb::STRING, "STRING"},                     //
-         {rdb::BYTEARRAY, "BYTEARRAY"},               //
-         {rdb::INTARRAY, "INTARRAY"},                 //
          {rdb::UINT, "UINT"},                         //
          {rdb::BYTE, "BYTE"},                         //
          {rdb::INTEGER, "INTEGER"},                   //
@@ -80,14 +76,11 @@ int GetFieldLenFromType(rdb::descFld ft) {
       return sizeof(double);
     case rdb::BYTE:
       return 1;
+    case rdb::STRING:
+      return 1;
     case rdb::REF:
     case rdb::TYPE:
       return 0;
-    case rdb::STRING:
-    case rdb::BYTEARRAY:
-    case rdb::INTARRAY:
-      assert(false && "This type has other method of len-type id");
-      break;
     default:
       SPDLOG_ERROR("Undefined type rdb->int:{}", (int)ft);
       assert(false && "Undefined type");
@@ -97,8 +90,8 @@ int GetFieldLenFromType(rdb::descFld ft) {
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
-Descriptor::Descriptor(std::string n, int l, rdb::descFld t) {  //
-  push_back(rField(n, l, t));                                   //
+Descriptor::Descriptor(std::string n, int l, int a, rdb::descFld t) {  //
+  push_back(rField(n, l, a, t));                                       //
 }
 
 bool Descriptor::isEmpty() const { return this->size() == 0; }
@@ -180,7 +173,7 @@ Descriptor &Descriptor::createHash(const std::string name, Descriptor lhs, Descr
   for (auto const &looper : lhs) {
     auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
     auto maxRlen = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
-    push_back(rField(name + "_" + std::to_string(i), maxRlen, maxRtype));
+    push_back(rField(name + "_" + std::to_string(i), maxRlen, 1, maxRtype));
     i++;
   }
   return *this;
@@ -188,9 +181,13 @@ Descriptor &Descriptor::createHash(const std::string name, Descriptor lhs, Descr
 
 Descriptor::Descriptor(const Descriptor &init) { *this | init; }
 
+constexpr int Descriptor::len(const rdb::rField &field) const {  //
+  return std::get<rlen>(field) * std::get<rarray>(field);        //
+}
+
 int Descriptor::getSizeInBytes() const {
   auto size{0};
-  for (auto const i : *this) size += std::get<rlen>(i);
+  for (auto const i : *this) size += len(i);
   return size;
 }
 
@@ -213,15 +210,17 @@ std::string Descriptor::fieldName(int fieldPosition) {  //
   return std::get<rname>((*this)[fieldPosition]);       //
 }
 
-int Descriptor::len(const std::string name) {      //
-  return std::get<rlen>((*this)[position(name)]);  //
+int Descriptor::len(const std::string name) { return len((*this)[position(name)]); }
+
+int Descriptor::arraySize(const std::string name) {  //
+  return std::get<rarray>((*this)[position(name)]);  //
 }
 
 int Descriptor::offset(const std::string name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == std::get<rname>(field)) return offset;
-    offset += std::get<rlen>(field);
+    offset += len(field);
   }
   assert(false && "field not found with that name");
   return error_desc_location;
@@ -233,13 +232,15 @@ int Descriptor::offset(const int position) {
   for (auto const field : *this) {
     if (position == i) return offset;
     i++;
-    offset += std::get<rlen>(field);
+    offset += len(field);
   }
   assert(false && "field not found with that postion");
   return error_desc_location;
 }
 
-std::string Descriptor::type(const std::string name) { return GetFieldType(std::get<rtype>((*this)[position(name)])); }
+std::string Descriptor::type(const std::string name) {            //
+  return GetFieldType(std::get<rtype>((*this)[position(name)]));  //
+}
 
 std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   rdb::descFld retVal{rdb::BYTE};
@@ -249,7 +250,7 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
     if (std::get<rtype>(field) == rdb::TYPE) continue;
     if (retVal <= std::get<rtype>(field)) {
       retVal = std::get<rtype>(field);
-      if (size < std::get<rlen>(field)) size = std::get<rlen>(field);
+      if (size < len(field)) size = len(field);
     }
   }
   return std::make_pair(retVal, size);
@@ -272,10 +273,10 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "\"" << std::get<rname>(r) << "\"";
     else
       os << std::get<rname>(r);
-    if (std::get<rtype>(r) == rdb::STRING || std::get<rtype>(r) == rdb::BYTEARRAY)
-      os << "[" << std::to_string(std::get<rlen>(r)) << "]";
-    else if (std::get<rtype>(r) == rdb::INTARRAY)
-      os << "[" << std::to_string(std::get<rlen>(r) / sizeof(int)) << "]";
+    if (std::get<rarray>(r) > 1)
+      os << "[" << std::get<rarray>(r) << "]";
+    else if (std::get<rtype>(r) == rdb::STRING)
+      os << "[" << std::get<rlen>(r) << "]";
     if (!flatOutput) os << std::endl;
   }
   if (rhs.isEmpty())
@@ -321,15 +322,17 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
       rtrim(name);
     }
 
-    if (ft == rdb::STRING || ft == rdb::BYTEARRAY)
-      is >> len;
-    else if (ft == rdb::INTARRAY) {
-      is >> len;
-      len *= sizeof(int);
-    } else
-      len = GetFieldLenFromType(ft);
+    auto arrayLen = 1;
+    char c = is.peek();  // peek character
+    if (c == '[') {
+      while (is.get(c) && c != '[')
+        ;
+      is >> arrayLen;
+      while (is.get(c) && c != ']')
+        ;
+    }
 
-    rhs | Descriptor(name, len, ft);
+    rhs | Descriptor(name, GetFieldLenFromType(ft), arrayLen, ft);
   } while (!is.eof());
   is.imbue(origLocale);
   return is;

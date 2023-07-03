@@ -223,6 +223,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
   destination = (destination == nullptr)                            //
                     ? static_cast<uint8_t*>(storagePayload->get())  //
                     : destination;                                  //
+  assert(destination != nullptr);
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;

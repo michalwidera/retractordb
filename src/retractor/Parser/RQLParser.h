@@ -15,24 +15,23 @@ public:
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
     T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
-    STRING_T = 21, BYTEARRAY_T = 22, INTARRAY_T = 23, BYTE_T = 24, UNSIGNED_T = 25, 
-    INTEGER_T = 26, FLOAT_T = 27, DOUBLE_T = 28, SELECT = 29, STREAM = 30, 
-    FROM = 31, DECLARE = 32, FILE = 33, STORAGE = 34, MIN = 35, MAX = 36, 
-    AVG = 37, SUMC = 38, ID = 39, STRING = 40, FLOAT = 41, DECIMAL = 42, 
-    REAL = 43, EQUAL = 44, GREATER = 45, LESS = 46, EXCLAMATION = 47, DOUBLE_BAR = 48, 
-    DOT = 49, UNDERLINE = 50, AT = 51, SHARP = 52, AND = 53, MOD = 54, DOLLAR = 55, 
-    COMMA = 56, SEMI = 57, COLON = 58, DOUBLE_COLON = 59, STAR = 60, DIVIDE = 61, 
-    PLUS = 62, MINUS = 63, BIT_NOT = 64, BIT_OR = 65, BIT_XOR = 66, SPACE = 67, 
-    COMMENT = 68, LINE_COMMENT = 69
+    BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
+    DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, FILE = 31, 
+    STORAGE = 32, MIN = 33, MAX = 34, AVG = 35, SUMC = 36, ID = 37, STRING = 38, 
+    FLOAT = 39, DECIMAL = 40, REAL = 41, EQUAL = 42, GREATER = 43, LESS = 44, 
+    EXCLAMATION = 45, DOUBLE_BAR = 46, DOT = 47, UNDERLINE = 48, AT = 49, 
+    SHARP = 50, AND = 51, MOD = 52, DOLLAR = 53, COMMA = 54, SEMI = 55, 
+    COLON = 56, DOUBLE_COLON = 57, STAR = 58, DIVIDE = 59, PLUS = 60, MINUS = 61, 
+    BIT_NOT = 62, BIT_OR = 63, BIT_XOR = 64, SPACE = 65, COMMENT = 66, LINE_COMMENT = 67
   };
 
   enum {
     RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleRational_se = 3, 
-    RuleFraction = 4, RuleDeclare_statement = 5, RuleDeclare_list = 6, RuleField_declaration = 7, 
-    RuleField_type = 8, RuleSelect_list = 9, RuleField_id = 10, RuleUnary_op_expression = 11, 
-    RuleAsterisk = 12, RuleExpression = 13, RuleExpression_factor = 14, 
-    RuleTerm = 15, RuleStream_expression = 16, RuleStream_term = 17, RuleStream_factor = 18, 
-    RuleAgregator = 19, RuleFunction_call = 20
+    RuleFraction = 4, RuleDeclare_statement = 5, RuleField_declaration = 6, 
+    RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
+    RuleAsterisk = 11, RuleExpression = 12, RuleExpression_factor = 13, 
+    RuleTerm = 14, RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
+    RuleAgregator = 18, RuleFunction_call = 19
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -58,7 +57,6 @@ public:
   class Rational_seContext;
   class FractionContext;
   class Declare_statementContext;
-  class Declare_listContext;
   class Field_declarationContext;
   class Field_typeContext;
   class Select_listContext;
@@ -225,9 +223,11 @@ public:
     antlr4::Token *stream_name = nullptr;
     antlr4::Token *file_name = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
-    Declare_listContext *declare_list();
+    std::vector<Field_declarationContext *> field_declaration();
+    Field_declarationContext* field_declaration(size_t i);
     antlr4::tree::TerminalNode *STREAM();
-    antlr4::tree::TerminalNode *COMMA();
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
     Rational_seContext *rational_se();
     antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *ID();
@@ -237,33 +237,6 @@ public:
   };
 
   Declare_statementContext* declare_statement();
-
-  class  Declare_listContext : public antlr4::ParserRuleContext {
-  public:
-    Declare_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Declare_listContext() = default;
-    void copyFrom(Declare_listContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  DeclarationListContext : public Declare_listContext {
-  public:
-    DeclarationListContext(Declare_listContext *ctx);
-
-    std::vector<Field_declarationContext *> field_declaration();
-    Field_declarationContext* field_declaration(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode* COMMA(size_t i);
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Declare_listContext* declare_list();
 
   class  Field_declarationContext : public antlr4::ParserRuleContext {
   public:
@@ -282,8 +255,10 @@ public:
   public:
     SingleDeclarationContext(Field_declarationContext *ctx);
 
+    antlr4::Token *type_size = nullptr;
     antlr4::tree::TerminalNode *ID();
     Field_typeContext *field_type();
+    antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -312,19 +287,6 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  TypeArrayContext : public Field_typeContext {
-  public:
-    TypeArrayContext(Field_typeContext *ctx);
-
-    antlr4::Token *type_size = nullptr;
-    antlr4::tree::TerminalNode *STRING_T();
-    antlr4::tree::TerminalNode *INTARRAY_T();
-    antlr4::tree::TerminalNode *BYTEARRAY_T();
-    antlr4::tree::TerminalNode *DECIMAL();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
   class  TypeIntContext : public Field_typeContext {
   public:
     TypeIntContext(Field_typeContext *ctx);
@@ -339,6 +301,15 @@ public:
     TypeFloatContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT_T();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  TypeStringContext : public Field_typeContext {
+  public:
+    TypeStringContext(Field_typeContext *ctx);
+
+    antlr4::tree::TerminalNode *STRING_T();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

@@ -201,31 +201,19 @@ class ParserListener : public RQLBaseListener {
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext* ctx) {
     recpToken(PUSH_TSCAN, ctx->getText());
     qry.lSchema.push_back(
-        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, rdb::INTEGER), program));
+        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, 1, rdb::INTEGER), program));
     program.clear();
   }
 
   void exitExpression(RQLParser::ExpressionContext* ctx) {
     qry.lSchema.push_back(
-        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, rdb::INTEGER), program));
+        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, 1, rdb::INTEGER), program));
     program.clear();
   }
 
-  void exitTypeArray(RQLParser::TypeArrayContext* ctx) {
-    std::string name = ctx->children[0]->getText();
-    boost::to_upper(name);
-    if (name == "STRING") {
-      fType = rdb::STRING;
-      fTypeSize = sizeof(uint8_t);
-    } else if (name == "BYTEARRAY") {
-      fType = rdb::BYTEARRAY;
-      fTypeSize = sizeof(uint8_t);
-    } else if (name == "INTARRAY") {
-      fType = rdb::INTARRAY;
-      fTypeSize = sizeof(int);
-    } else
-      abort();
-    fTypeSizeArray = std::stoi(ctx->type_size->getText());
+  void exitTypeString(RQLParser::TypeStringContext* ctx) {
+    fType = rdb::STRING;
+    fTypeSize = sizeof(uint8_t);
   }
 
   void exitTypeByte(RQLParser::TypeByteContext* ctx) {
@@ -250,9 +238,10 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext* ctx) {
+    auto fTypeSizeArray = 1;  // Default:1
+    if (ctx->type_size) fTypeSizeArray = std::stoi(ctx->type_size->getText());
     std::list<token> emptyProgram;
-    qry.lSchema.push_back(
-        field(rdb::rField(ctx->ID()->getText(), fTypeSizeArray == 1 ? fTypeSize : fTypeSizeArray, fType), emptyProgram));
+    qry.lSchema.push_back(field(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram));
     fType = rdb::BYTE;
     fTypeSizeArray = 1;
   }

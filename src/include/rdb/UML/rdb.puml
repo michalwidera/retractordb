@@ -85,7 +85,6 @@ class storageAccessor {
 
 enum rdb::descFld {
     STRING
-    BYTEARRAY
     UINT
     BYTE
     INTEGER

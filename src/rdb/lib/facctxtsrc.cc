@@ -82,7 +82,7 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
         payload->setItem(i, static_cast<uint8_t>(var));
       } else if (std::get<rtype>(item) == rdb::STRING) {
         std::string var;
-        auto strLen = std::get<rlen>(item);
+        auto strLen = std::get<rlen>(item) * std::get<rarray>(item);
         char c;
         while (myFile.get(c) && c != '"')
           ;
@@ -97,9 +97,6 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
       }
 
       // rdb::RATIONAL - deprecate ?
-
-      // DECL(BYTEARRAY),  // TODO
-      // DECL(INTARRAY),   //
       i++;
     }
   }

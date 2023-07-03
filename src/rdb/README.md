@@ -18,8 +18,6 @@ Storage supports data of following types:
 |INTEGER   | 4 |-2147483648 to 2147483647|C++ Integer|
 |UINT  | 4 |0 to 4294967295|Unsigned int|
 |STRING|[declared]|Array of Bytes|Array of bytes dedicated for strings|
-|BYTEARRAY|[declared]|Array of Bytes|Array of bytes dedicated for binary payloads|
-|INTARRAY|[declared]|Array of Integers|Array of integers dedicated for integer array payloads|
 |FLOAT | 4 | ... | Floating point value|
 |DOUBLE| 8 | ... | Floating point value (double size)|
 
@@ -61,11 +59,11 @@ ok
 
 ```
 $ xtrdb
-.create testfile { STRING name[5] BYTEARRAY data[3] BYTE control INTEGER intdata FLOAT measurement }
+.open testfile { STRING name[5] BYTE data[3] BYTE control INTEGER intdata FLOAT measurement }
 ok
 .desc
 {       STRING name[5]
-        BYTEARRAY data[3]
+        BYTE data[3]
         BYTE control
         INTEGER intdata
         FLOAT measurement
@@ -82,7 +80,7 @@ File testfile will contain only binary data - testfile.desc will contain data de
 ok
 .desc
 {       STRING name[5]
-        BYTEARRAY data[3]
+        BYTE data[3]
         BYTE control
         INTEGER intdata
         FLOAT measurement

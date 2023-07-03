@@ -105,14 +105,14 @@ class xschema : public ::testing::Test {
 
 TEST_F(xschema, check_test0) {
   auto dataInternalDescriptor{
-      rdb::Descriptor("A[1]", 4, rdb::INTEGER) |  //
-      rdb::Descriptor("A[2]", 4, rdb::INTEGER) |  //
-      rdb::Descriptor("A[3]", 4, rdb::INTEGER)    //
+      rdb::Descriptor("A[1]", 4, 1, rdb::INTEGER) |  //
+      rdb::Descriptor("A[2]", 4, 1, rdb::INTEGER) |  //
+      rdb::Descriptor("A[3]", 4, 1, rdb::INTEGER)    //
   };
 
   auto dataStorageDescriptor{
-      rdb::Descriptor("A[1]", 4, rdb::INTEGER) |  //
-      rdb::Descriptor("A[2]", 4, rdb::INTEGER)    //
+      rdb::Descriptor("A[1]", 4, 1, rdb::INTEGER) |  //
+      rdb::Descriptor("A[2]", 4, 1, rdb::INTEGER)    //
   };
 
   {
@@ -157,8 +157,8 @@ TEST_F(xschema, check_test_check_constructor) {
 TEST_F(xschema, create_struct_local_str1a) {
   SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
 
-  auto dataDescriptor{rdb::Descriptor("A", 4, rdb::INTEGER) |  //
-                      rdb::Descriptor("B", 4, rdb::INTEGER)};
+  auto dataDescriptor{rdb::Descriptor("A", 4, 1, rdb::INTEGER) |  //
+                      rdb::Descriptor("B", 4, 1, rdb::INTEGER)};
 
   streamInstance q("str1a",         // storage and descriptor are the same name
                    dataDescriptor,  //
@@ -198,8 +198,8 @@ TEST_F(xschema, check_construct_payload) {
 
 TEST_F(xschema, check_construct_payload_mirror) {
   auto dataDescriptor{
-      rdb::Descriptor("str1_0", 4, rdb::INTEGER) |  //
-      rdb::Descriptor("str1_1", 1, rdb::BYTE)       //
+      rdb::Descriptor("str1_0", 4, 1, rdb::INTEGER) |  //
+      rdb::Descriptor("str1_1", 1, 1, rdb::BYTE)       //
   };
 
   streamInstance data{coreInstance["str1"]};
@@ -298,12 +298,6 @@ TEST_F(xschema, getRow_1) {
                         [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
                         [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
                         [&coutstring](std::string a) { coutstring << a; },                                                  //
-                        [&coutstring](std::vector<uint8_t> a) {
-                          std::for_each(a.begin(), a.end(), [&coutstring](uint8_t &n) { coutstring << n << " "; });
-                        },  //
-                        [&coutstring](std::vector<int> a) {
-                          std::for_each(a.begin(), a.end(), [&coutstring](int &n) { coutstring << n << " "; });
-                        },  // TODO: cover UT
                         [&coutstring](boost::rational<int> a) { coutstring << a; }},
                v);
 
