@@ -101,7 +101,6 @@ void payload::setItemBy(const int position, std::any value) {
 }
 
 void payload::setItem(const int position, std::any valueParam) {
-  auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size() - 1) abort();
 
   auto requestedType = std::get<rtype>(descriptor[position]);
@@ -112,6 +111,7 @@ void payload::setItem(const int position, std::any valueParam) {
   try {
     switch (requestedType) {
       case rdb::STRING: {
+        const auto len = std::get<rlen>(descriptor[position]);
         std::string data(std::any_cast<std::string>(value));
         std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(),
                     std::min(len * std::get<rarray>(descriptor[position]), static_cast<int>(data.length())));
@@ -156,12 +156,12 @@ T getVal(void *ptr, int offset) {
 }
 
 std::any payload::getItem(const int position) {
-  auto len = std::get<rlen>(descriptor[position]);
   if (position > descriptor.size()) abort();
 
   switch (std::get<rtype>(descriptor[position])) {
     case rdb::STRING: {
       std::string retval;
+      const auto len = std::get<rlen>(descriptor[position]);
       retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position), len);
       SPDLOG_INFO("getItem {} string:{}", position, retval);
       return retval;

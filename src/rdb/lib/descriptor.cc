@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <locale>
+#include <typeinfo>
 #include <utility>
 
 namespace rdb {
@@ -32,6 +33,35 @@ static inline void rtrim(std::string &s) {
                    )
           .base(),
       s.end());
+}
+
+// TODO: Work area - funkcja konwertująca pozycje
+// pair<int,int> -> int : <poz,arridx> -> poz_seq_elementu
+// int -> pair<int,int> : poz_seq_elementu -> <poz,arridx>
+// * WORKAREA
+
+// example:
+// 0: byte a
+// 1: byte b[3]
+// 2: integer c
+
+// <poz,arrid> : b[2] == 1,2
+// poz_seq_elementu : b[2] == 3
+
+template <typename RT, typename AR>
+RT Descriptor::convert(AR position) {
+  RT retval;
+  int clen{0};
+  for (auto fld : *this) clen += (std::get<rtype>(fld) == rdb::STRING) ? std::get<rlen>(fld) : len(fld);
+  if constexpr (typeid(RT) == typeid(std::pair<int, int>) &&  //
+                typeid(AR) == typeid(int)) {
+    // Code here
+  } else if constexpr (typeid(RT) == typeid(int) &&  //
+                       typeid(AR) == typeid(std::pair<int, int>)) {
+    // Code here
+  } else
+    abort();  // unsupported/
+  return retval;
 }
 
 bool flatOutput = false;
@@ -142,7 +172,7 @@ bool Descriptor::operator==(const Descriptor &rhs) {
       i++;
       continue;
     }
-    if (std::get<rdb::rlen>(f) < std::get<rdb::rlen>(rhs[i]) ||  //
+    if (len(f) < len(rhs[i]) ||  //
         std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
       return false;
 

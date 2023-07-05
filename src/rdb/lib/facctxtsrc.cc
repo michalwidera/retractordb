@@ -65,22 +65,7 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
   auto i = 0;
   for (auto item : descriptor) {
     if (std::get<rlen>(item) != 0) {
-      if (std::get<rtype>(item) == rdb::INTEGER) {
-        auto var = readFromFstream<int>(myFile);
-        payload->setItem(i, var);
-      } else if (std::get<rtype>(item) == rdb::UINT) {
-        auto var = readFromFstream<unsigned>(myFile);
-        payload->setItem(i, var);
-      } else if (std::get<rtype>(item) == rdb::FLOAT) {
-        auto var = readFromFstream<float>(myFile);
-        payload->setItem(i, var);
-      } else if (std::get<rtype>(item) == rdb::DOUBLE) {
-        auto var = readFromFstream<double>(myFile);
-        payload->setItem(i, var);
-      } else if (std::get<rtype>(item) == rdb::BYTE) {  // This is different!
-        auto var = readFromFstream<unsigned>(myFile);
-        payload->setItem(i, static_cast<uint8_t>(var));
-      } else if (std::get<rtype>(item) == rdb::STRING) {
+      if (std::get<rtype>(item) == rdb::STRING) {
         std::string var;
         auto strLen = std::get<rlen>(item) * std::get<rarray>(item);
         char c;
@@ -91,10 +76,28 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
         var.resize(strLen);
         SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
         payload->setItem(i, var);
-      } else {
-        SPDLOG_ERROR("Unsupported type in text data source: {}", std::get<rtype>(item));
-        abort();
-      }
+      } else
+        for (auto j = 0; j < std::get<rarray>(item); j++) {
+          if (std::get<rtype>(item) == rdb::INTEGER) {
+            auto var = readFromFstream<int>(myFile);
+            payload->setItem(i + j, var);
+          } else if (std::get<rtype>(item) == rdb::UINT) {
+            auto var = readFromFstream<unsigned>(myFile);
+            payload->setItem(i + j, var);
+          } else if (std::get<rtype>(item) == rdb::FLOAT) {
+            auto var = readFromFstream<float>(myFile);
+            payload->setItem(i + j, var);
+          } else if (std::get<rtype>(item) == rdb::DOUBLE) {
+            auto var = readFromFstream<double>(myFile);
+            payload->setItem(i + j, var);
+          } else if (std::get<rtype>(item) == rdb::BYTE) {  // This is different!
+            auto var = readFromFstream<unsigned>(myFile);
+            payload->setItem(i + j, static_cast<uint8_t>(var));
+          } else {
+            SPDLOG_ERROR("Unsupported type in text data source: {}", std::get<rtype>(item));
+            abort();
+          }
+        }
 
       // rdb::RATIONAL - deprecate ?
       i++;

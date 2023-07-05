@@ -52,6 +52,9 @@ class Descriptor : public std::vector<rField> {
 
   std::pair<rdb::descFld, int> getMaxType();
 
+  template <typename T = std::pair<int, int>, typename K = int>
+  T convert(K position);
+
   template <typename T>
   std::string toString(const std::string name, T *ptr) {
     return std::string(reinterpret_cast<char *>(ptr + offset(name)), len(name));

@@ -97,15 +97,15 @@ bool test_3() {
 }
 
 bool test_descriptor() {
-  rdb::Descriptor data1{rdb::rField("Name3", 10, 1, rdb::STRING), rdb::rField("Name4", 10, 1, rdb::STRING)};
+  rdb::Descriptor data1{rdb::rField("Name3", 1, 10, rdb::STRING), rdb::rField("Name4", 10, 1, rdb::STRING)};
 
-  data1.append({rdb::rField("Name5z", 10, 1, rdb::STRING)});
-  data1.append({rdb::rField("Name6z", 10, 1, rdb::STRING)});
+  data1.append({rdb::rField("Name5z", 1, 10, rdb::STRING)});
+  data1.append({rdb::rField("Name6z", 1, 10, rdb::STRING)});
 
-  data1.push_back(rdb::rField("Name", 10, 1, rdb::STRING));
+  data1.push_back(rdb::rField("Name", 1, 10, rdb::STRING));
   data1.push_back(rdb::rField("TLen", sizeof(uint), 1, rdb::UINT));
 
-  data1 | rdb::Descriptor("Name2", 10, 1, rdb::STRING) |  //
+  data1 | rdb::Descriptor("Name2", 1, 10, rdb::STRING) |  //
       rdb::Descriptor("Control", 1, 1, rdb::BYTE) |       //
       rdb::Descriptor("Len3", 4, 1, rdb::UINT);
   {
@@ -118,7 +118,7 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  rdb::Descriptor data2 = rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  rdb::Descriptor data2 = rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
                           rdb::Descriptor("Len3", 4, 1, rdb::UINT) |     //
                           rdb::Descriptor("Control", 1, 1, rdb::BYTE);
   {
@@ -192,7 +192,7 @@ TEST(xrdb, test_storage) {
 
   static_assert(sizeof(dataPayload) == 15);
 
-  auto dataDescriptor{rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  auto dataDescriptor{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
                       rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
                       rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
 
@@ -246,16 +246,16 @@ TEST(xrdb, test_storage) {
 }
 
 TEST(xrdb, test_descriptor_compare) {
-  auto dataDescriptor1{rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  auto dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
                        rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
                        rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  auto dataDescriptor2{rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  auto dataDescriptor2{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
                        rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
                        rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   auto dataDescriptorDiff1{rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
-                           rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+                           rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
                            rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  auto dataDescriptorDiff2{rdb::Descriptor("Name", 11, 1, rdb::STRING) |  //
+  auto dataDescriptorDiff2{rdb::Descriptor("Name", 1, 11, rdb::STRING) |  //
                            rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
                            rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
@@ -338,7 +338,7 @@ TEST(crdb, posixPrmBinaryFileAccessor_char) {
 }
 
 TEST(crdb, payload_assign_operator) {
-  auto data1{rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2;
@@ -349,7 +349,7 @@ TEST(crdb, payload_assign_operator) {
 }
 
 TEST(crdb, payload_copy_constructor) {
-  auto data1{rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2{data1};
@@ -359,7 +359,7 @@ TEST(crdb, payload_copy_constructor) {
 }
 
 TEST(crdb, payload_add_operator) {
-  auto data1{rdb::Descriptor("Name", 10, 1, rdb::STRING) |  //
+  auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
              rdb::Descriptor("ll", 4, 1, rdb::INTEGER) |    //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
