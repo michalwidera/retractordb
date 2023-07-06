@@ -96,14 +96,16 @@ Descriptor payload::getDescriptor() const { return descriptor; }
 uint8_t *payload::get() const { return payloadData.get(); }
 
 template <typename T>
-void payload::setItemBy(const int position, std::any value) {
+void payload::setItemBy(const int positionFlat, std::any value) {
   T data = std::any_cast<T>(value);
-  std::memcpy(payloadData.get() + descriptor.offset(position), &data, std::get<rlen>(descriptor[position]));
+  auto position = descriptor.convert(positionFlat).value().first;
+  std::memcpy(payloadData.get() + descriptor.offset(positionFlat), &data, std::get<rlen>(descriptor[position]));
 }
 
-void payload::setItem(const int position, std::any valueParam) {
-  if (position > descriptor.sizeRel() - 1) abort();
+void payload::setItem(const int positionFlat, std::any valueParam) {
+  if (positionFlat > descriptor.sizeFlat() - 1) abort();
 
+  auto position = descriptor.convert(positionFlat).value().first;
   auto requestedType = std::get<rtype>(descriptor[position]);
 
   cast<std::any> castAny;
@@ -114,26 +116,26 @@ void payload::setItem(const int position, std::any valueParam) {
       case rdb::STRING: {
         const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
         std::string data(std::any_cast<std::string>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(),
+        std::memcpy(payloadData.get() + descriptor.offset(positionFlat), data.c_str(),
                     std::min(len, static_cast<int>(data.length())));
       } break;
       case rdb::BYTE:
-        setItemBy<uint8_t>(position, value);
+        setItemBy<uint8_t>(positionFlat, value);
         break;
       case rdb::INTEGER:
-        setItemBy<int>(position, value);
+        setItemBy<int>(positionFlat, value);
         break;
       case rdb::UINT:
-        setItemBy<unsigned>(position, value);
+        setItemBy<unsigned>(positionFlat, value);
         break;
       case rdb::DOUBLE:
-        setItemBy<double>(position, value);
+        setItemBy<double>(positionFlat, value);
         break;
       case rdb::FLOAT:
-        setItemBy<float>(position, value);
+        setItemBy<float>(positionFlat, value);
         break;
       case rdb::RATIONAL:
-        setItemBy<boost::rational<int>>(position, value);
+        setItemBy<boost::rational<int>>(positionFlat, value);
         break;
       case rdb::REF: {
         SPDLOG_INFO("Skip REF");
@@ -156,45 +158,40 @@ T getVal(void *ptr, int offset) {
   return *(reinterpret_cast<T *>(static_cast<uint8_t *>(ptr) + offset));
 }
 
-std::any payload::getItem(const int position) {
-  if (position > descriptor.sizeRel() - 1) abort();
+std::any payload::getItem(const int positionFlat) {
+  if (positionFlat > descriptor.sizeFlat() - 1) abort();
+
+  auto position = descriptor.convert(positionFlat).value().first;
 
   switch (std::get<rtype>(descriptor[position])) {
     case rdb::STRING: {
       std::string retval;
       const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
-      retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position), len);
-      SPDLOG_INFO("getItem {} string:{}", position, retval);
+      retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat), len);
       return retval;
     }
     case rdb::BYTE: {
-      uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(position));
-      SPDLOG_INFO("getItem {} byte:{}", position, data);
+      uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::INTEGER: {
-      int data = getVal<int>(payloadData.get(), descriptor.offset(position));
-      SPDLOG_INFO("getItem {} int:{} offset:{}", position, data, descriptor.offset(position));
+      int data = getVal<int>(payloadData.get(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::UINT: {
-      uint data = getVal<uint>(payloadData.get(), descriptor.offset(position));
-      SPDLOG_INFO("getItem {} uint:{}", position, data);
+      uint data = getVal<uint>(payloadData.get(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::DOUBLE: {
-      double data = getVal<double>(payloadData.get(), descriptor.offset(position));
-      SPDLOG_INFO("getItem {} double:{}", position, data);
+      double data = getVal<double>(payloadData.get(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::FLOAT: {
-      float data = getVal<float>(payloadData.get(), descriptor.offset(position));
-      SPDLOG_INFO("getItem {} float:{}", position, data);
+      float data = getVal<float>(payloadData.get(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::RATIONAL: {
-      boost::rational<int> data = getVal<boost::rational<int>>(payloadData.get(), descriptor.offset(position));
-      SPDLOG_INFO("getItem {} rational:{}", position, data);
+      boost::rational<int> data = getVal<boost::rational<int>>(payloadData.get(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::REF: {

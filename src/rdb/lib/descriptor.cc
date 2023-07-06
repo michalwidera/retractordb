@@ -161,7 +161,7 @@ std::optional<int> Descriptor::convert(std::pair<int, int> position) {
 
 bool Descriptor::isEmpty() const { return this->size() == 0; }
 
-int Descriptor::sizeRel() {
+int Descriptor::sizeFlat() {
   updateConvMaps();
   return clen;
 };

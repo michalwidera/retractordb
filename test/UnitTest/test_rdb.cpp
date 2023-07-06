@@ -435,3 +435,26 @@ TEST(crdb, position_conversion_test2) {
   ASSERT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
   ASSERT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
 }
+
+TEST(crdb, position_conversion_test3) {
+  auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) |    //
+             rdb::Descriptor("Control", 1, 3, rdb::BYTE) |  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER) |  //
+             rdb::Descriptor("Name", 1, 10, rdb::STRING)};
+
+  rdb::payload payload(desc1);
+
+  payload.setItem(0, 145);  // ! "test" without std::string claims exception
+  payload.setItem(1, static_cast<uint8_t>(24));
+  payload.setItem(2, static_cast<uint8_t>(25));
+  payload.setItem(3, static_cast<uint8_t>(26));
+  payload.setItem(4, 2000);
+  payload.setItem(5, std::string("test"));
+
+  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(0)) == 145);
+  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(1)) == 24);
+  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
+  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
+  ASSERT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
+  ASSERT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
+}

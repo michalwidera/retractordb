@@ -57,7 +57,7 @@ class Descriptor : public std::vector<rField> {
   int offset(int position);
   int arraySize(const std::string name);
   std::string type(const std::string name);
-  int sizeRel();
+  int sizeFlat();
 
   std::pair<rdb::descFld, int> getMaxType();
 
