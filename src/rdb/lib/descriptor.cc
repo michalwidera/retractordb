@@ -35,35 +35,6 @@ static inline void rtrim(std::string &s) {
       s.end());
 }
 
-// TODO: Work area - funkcja konwertująca pozycje
-// pair<int,int> -> int : <poz,arridx> -> poz_seq_elementu
-// int -> pair<int,int> : poz_seq_elementu -> <poz,arridx>
-// * WORKAREA
-
-// example:
-// 0: byte a
-// 1: byte b[3]
-// 2: integer c
-
-// <poz,arrid> : b[2] == 1,2
-// poz_seq_elementu : b[2] == 3
-
-template <typename RT, typename AR>
-RT Descriptor::convert(AR position) {
-  RT retval;
-  int clen{0};
-  for (auto fld : *this) clen += (std::get<rtype>(fld) == rdb::STRING) ? std::get<rlen>(fld) : len(fld);
-  if constexpr (typeid(RT) == typeid(std::pair<int, int>) &&  //
-                typeid(AR) == typeid(int)) {
-    // Code here
-  } else if constexpr (typeid(RT) == typeid(int) &&  //
-                       typeid(AR) == typeid(std::pair<int, int>)) {
-    // Code here
-  } else
-    abort();  // unsupported/
-  return retval;
-}
-
 bool flatOutput = false;
 
 rdb::descFld GetFieldType(std::string name) {
@@ -124,7 +95,76 @@ Descriptor::Descriptor(std::string n, int l, int a, rdb::descFld t) {  //
   push_back(rField(n, l, a, t));                                       //
 }
 
+void Descriptor::updateConvMaps() {
+  if (!dirtyMap) return;
+
+  convMap.clear();
+  convReMap.clear();
+  offsetMap.clear();
+
+  clen = 0;
+  for (auto it : *this) clen += (std::get<rtype>(it) == rdb::STRING) ? 1 : std::get<rarray>(it);
+
+  std::vector<rField>::iterator it = this->begin();
+  int fieldCounter{0};
+  int backCounterArray{0};
+  int counterArray{std::get<rarray>(*it)};
+  int offset{0};
+  for (int i = 0; i < clen; i++) {
+    if (std::get<rtype>(*it) == rdb::TYPE || std::get<rtype>(*it) == rdb::REF) {
+      it++;
+      continue;
+    }
+
+    if (std::get<rtype>(*it) == rdb::STRING) {
+      counterArray = 1;
+      backCounterArray = 0;
+    }
+
+    if (counterArray > 0) {
+      convMap.push_back(std::make_pair(fieldCounter, backCounterArray));
+      convReMap[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
+
+      offsetMap.push_back(offset);
+      offset += len(*it);
+    }
+
+    counterArray--;
+    backCounterArray++;
+
+    if (counterArray == 0) {
+      it++;
+      if (it == this->end()) break;
+      backCounterArray = 0;
+      fieldCounter++;
+      counterArray = std::get<rarray>(*it);
+    }
+  }
+  dirtyMap = false;
+}
+
+std::optional<std::pair<int, int>> Descriptor::convert(int position) {
+  updateConvMaps();
+  if (position < clen) {
+    return convMap[position];
+  } else
+    return {};
+}
+
+std::optional<int> Descriptor::convert(std::pair<int, int> position) {
+  updateConvMaps();
+  if (convReMap.find(position) != convReMap.end())
+    return convReMap[position];
+  else
+    return {};
+}
+
 bool Descriptor::isEmpty() const { return this->size() == 0; }
+
+int Descriptor::sizeRel() {
+  updateConvMaps();
+  return clen;
+};
 
 void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
 
@@ -138,12 +178,16 @@ Descriptor &Descriptor::operator|(const Descriptor &rhs) {
     // can't do safe: data | data
     // due one name policy
   }
+
+  dirtyMap = true;
   return *this;
 }
 
 Descriptor &Descriptor::operator=(const Descriptor &rhs) {
   clear();
   insert(end(), rhs.begin(), rhs.end());
+
+  dirtyMap = true;
   return *this;
 }
 
@@ -190,6 +234,8 @@ Descriptor &Descriptor::cleanRef() {
                  return std::get<rdb::rtype>(i) != rdb::REF &&  //
                         std::get<rdb::rtype>(i) != rdb::TYPE;
                });
+
+  dirtyMap = true;
   return *this;
 }
 
@@ -206,6 +252,8 @@ Descriptor &Descriptor::createHash(const std::string name, Descriptor lhs, Descr
     push_back(rField(name + "_" + std::to_string(i), maxRlen, 1, maxRtype));
     i++;
   }
+
+  dirtyMap = true;
   return *this;
 }
 
@@ -246,7 +294,7 @@ int Descriptor::arraySize(const std::string name) {  //
   return std::get<rarray>((*this)[position(name)]);  //
 }
 
-int Descriptor::offset(const std::string name) {
+int Descriptor::offsetBegArr(const std::string name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == std::get<rname>(field)) return offset;
@@ -258,14 +306,8 @@ int Descriptor::offset(const std::string name) {
 
 int Descriptor::offset(const int position) {
   auto offset{0};
-  auto i{0};
-  for (auto const field : *this) {
-    if (position == i) return offset;
-    i++;
-    offset += len(field);
-  }
-  assert(false && "field not found with that postion");
-  return error_desc_location;
+  updateConvMaps();
+  return offsetMap[position];
 }
 
 std::string Descriptor::type(const std::string name) {            //
@@ -315,6 +357,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
     os << " ";
   os << "}";
   flatOutput = false;
+
   return os;
 }
 
@@ -365,6 +408,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     rhs | Descriptor(name, GetFieldLenFromType(ft), arrayLen, ft);
   } while (!is.eof());
   is.imbue(origLocale);
+
   return is;
 }
 

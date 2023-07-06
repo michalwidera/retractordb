@@ -3,6 +3,7 @@
 
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -22,7 +23,14 @@ constexpr int error_desc_location = -1;
 extern bool flatOutput;
 
 class Descriptor : public std::vector<rField> {
+  std::vector<std::pair<int, int>> convMap;
+  std::map<std::pair<int, int>, int> convReMap;
+  std::vector<int> offsetMap;
+  int clen = 0;
+  void updateConvMaps();
+
  public:
+  bool dirtyMap{true};
   bool isEmpty() const;
 
   Descriptor(std::initializer_list<rField> l);
@@ -45,19 +53,20 @@ class Descriptor : public std::vector<rField> {
   std::string fieldName(int fieldPosition);
   int len(const std::string name);
   constexpr int len(const rdb::rField &field) const;
-  int offset(const std::string name);
+  int offsetBegArr(const std::string name);
   int offset(int position);
   int arraySize(const std::string name);
   std::string type(const std::string name);
+  int sizeRel();
 
   std::pair<rdb::descFld, int> getMaxType();
 
-  template <typename T = std::pair<int, int>, typename K = int>
-  T convert(K position);
+  std::optional<std::pair<int, int>> convert(int position);
+  std::optional<int> convert(std::pair<int, int> position);
 
   template <typename T>
   std::string toString(const std::string name, T *ptr) {
-    return std::string(reinterpret_cast<char *>(ptr + offset(name)), len(name));
+    return std::string(reinterpret_cast<char *>(ptr + offsetBegArr(name)), len(name));
   }
 
   /**
@@ -71,7 +80,7 @@ class Descriptor : public std::vector<rField> {
    */
   template <typename T, typename K>
   auto cast(const std::string name, K *ptr) {
-    return *(reinterpret_cast<T *>(ptr + offset(name)));
+    return *(reinterpret_cast<T *>(ptr + offsetBegArr(name)));
   };
 
   // Operators that enables read and write Descriptor to file/screen i Human

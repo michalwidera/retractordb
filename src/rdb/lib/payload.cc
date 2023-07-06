@@ -75,6 +75,7 @@ payload payload::operator+(const payload &other) {
               result.getDescriptor().getSizeInBytes());
   std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
   std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
+  descSum.dirtyMap = true;
   return result;
 }
 
@@ -85,7 +86,7 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arr
   T data;
   is >> data;
   Descriptor desc(rhs.getDescriptor());
-  std::memcpy(rhs.get() + desc.offset(fieldName) + arroffset, &data, sizeof(T));
+  std::memcpy(rhs.get() + desc.offsetBegArr(fieldName) + arroffset, &data, sizeof(T));
 }
 
 void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
@@ -101,7 +102,7 @@ void payload::setItemBy(const int position, std::any value) {
 }
 
 void payload::setItem(const int position, std::any valueParam) {
-  if (position > descriptor.size() - 1) abort();
+  if (position > descriptor.sizeRel() - 1) abort();
 
   auto requestedType = std::get<rtype>(descriptor[position]);
 
@@ -111,10 +112,10 @@ void payload::setItem(const int position, std::any valueParam) {
   try {
     switch (requestedType) {
       case rdb::STRING: {
-        const auto len = std::get<rlen>(descriptor[position]);
+        const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
         std::string data(std::any_cast<std::string>(value));
         std::memcpy(payloadData.get() + descriptor.offset(position), data.c_str(),
-                    std::min(len * std::get<rarray>(descriptor[position]), static_cast<int>(data.length())));
+                    std::min(len, static_cast<int>(data.length())));
       } break;
       case rdb::BYTE:
         setItemBy<uint8_t>(position, value);
@@ -156,12 +157,12 @@ T getVal(void *ptr, int offset) {
 }
 
 std::any payload::getItem(const int position) {
-  if (position > descriptor.size()) abort();
+  if (position > descriptor.sizeRel() - 1) abort();
 
   switch (std::get<rtype>(descriptor[position])) {
     case rdb::STRING: {
       std::string retval;
-      const auto len = std::get<rlen>(descriptor[position]);
+      const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
       retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(position), len);
       SPDLOG_INFO("getItem {} string:{}", position, retval);
       return retval;
@@ -228,15 +229,15 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
     std::string record;
     // std::getline(is >> std::ws, record);
     is >> record;
-    std::memset(rhs.get() + desc.offset(fieldName), 0, desc.len(fieldName));
-    std::memcpy(rhs.get() + desc.offset(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
+    std::memset(rhs.get() + desc.offsetBegArr(fieldName), 0, desc.len(fieldName));
+    std::memcpy(rhs.get() + desc.offsetBegArr(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
   } else
     for (auto i = 0; i < desc.arraySize(fieldName); i++) {
       if (desc.type(fieldName) == "BYTE") {
         int data;
         is >> data;
         uint8_t data8 = static_cast<uint8_t>(data);
-        std::memcpy(rhs.get() + desc.offset(fieldName) + i * sizeof(uint8_t), &data8, sizeof(uint8_t));
+        std::memcpy(rhs.get() + desc.offsetBegArr(fieldName) + i * sizeof(uint8_t), &data8, sizeof(uint8_t));
       } else if (desc.type(fieldName) == "UINT")
         copyToMemory<uint, payload>(is, rhs, fieldName.c_str(), i * sizeof(unsigned));
       else if (desc.type(fieldName) == "INTEGER")
@@ -284,7 +285,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << std::get<rname>(r);
     os << ":";
     auto desc = rhs.getDescriptor();
-    auto offset_ = desc.offset(std::get<rname>(r));
+    auto offset_ = desc.offsetBegArr(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
       os << std::string(reinterpret_cast<char *>(rhs.get() + offset_), desc.len(std::get<rname>(r)));
     } else

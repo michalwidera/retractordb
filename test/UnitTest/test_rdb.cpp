@@ -131,7 +131,7 @@ bool test_descriptor() {
   if (data2.position("Control") != 2) return false;
   if (data2.len("Control") != 1) return false;
   if (strcmp(data2.type("Control").c_str(), "BYTE") != 0) return false;
-  if (data2.offset("Control") != 14) return false;
+  if (data2.offsetBegArr("Control") != 14) return false;
 
   return true;
 }
@@ -377,7 +377,6 @@ TEST(crdb, payload_add_operator) {
   auto data2{rdb::Descriptor("TLen2", 4, 1, rdb::INTEGER)};
 
   rdb::payload data1Payload(data1);
-  rdb::payload data2Payload(data2);
 
   data1Payload.setItem(0, std::string("test"));  // ! "test" without std::string claims exception
   data1Payload.setItem(1, static_cast<uint8_t>(24));
@@ -396,6 +395,7 @@ TEST(crdb, payload_add_operator) {
   ASSERT_TRUE(var.ll == std::any_cast<int>(ll_));
   ASSERT_TRUE(var.TLen == std::any_cast<int>(TLen_));
 
+  rdb::payload data2Payload(data2);
   data2Payload.setItem(0, 4004);
 
   ASSERT_TRUE(std::any_cast<int>(data1Payload.getItem(2)) == 2000);
@@ -408,5 +408,30 @@ TEST(crdb, payload_add_operator) {
   ASSERT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
   ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
   ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
+  auto testData = data3Payload.getItem(4);
   ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
+}
+
+TEST(crdb, position_conversion_test1) {
+  auto desc1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
+             rdb::Descriptor("Control", 1, 3, rdb::BYTE) |  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+
+  ASSERT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
+  ASSERT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
+  ASSERT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
+  ASSERT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
+  ASSERT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+}
+
+TEST(crdb, position_conversion_test2) {
+  auto desc1{rdb::Descriptor("Name", 1, 1, rdb::BYTE) |     //
+             rdb::Descriptor("Control", 1, 3, rdb::BYTE) |  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+
+  ASSERT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
+  ASSERT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
+  ASSERT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
+  ASSERT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
+  ASSERT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
 }
