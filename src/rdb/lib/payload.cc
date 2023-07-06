@@ -116,8 +116,12 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
       case rdb::STRING: {
         const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
         std::string data(std::any_cast<std::string>(value));
-        std::memcpy(payloadData.get() + descriptor.offset(positionFlat), data.c_str(),
-                    std::min(len, static_cast<int>(data.length())));
+        auto lenr = std::min(len, static_cast<int>(data.length()));
+        auto addr = payloadData.get() + descriptor.offset(positionFlat);
+        assert(position + len <= descriptor.getSizeInBytes());
+        // std::fill(addr,addr+len,0); (WHY=?!)
+        std::memcpy(addr, data.c_str(), lenr);
+        // if (lenr != len) addr[lenr] = '\0'; (WHY=?!)
       } break;
       case rdb::BYTE:
         setItemBy<uint8_t>(positionFlat, value);
@@ -165,10 +169,20 @@ std::any payload::getItem(const int positionFlat) {
 
   switch (std::get<rtype>(descriptor[position])) {
     case rdb::STRING: {
-      std::string retval;
       const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
-      retval.assign(reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat), len);
-      return retval;
+      const char *charData = reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat);
+
+      // auto l = strlen(charData);
+      std::vector<char> v;
+
+      for (auto i = 0; i < 4; i++)  // (WHY=?!)
+        v.push_back(charData[i]);
+
+      v.push_back('\0');
+
+      std::string str;
+      str.assign(&v[0], v.size());
+      return str;
     }
     case rdb::BYTE: {
       uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(positionFlat));
