@@ -126,7 +126,10 @@ void Descriptor::updateConvMaps() {
       convReMap[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
 
       offsetMap.push_back(offset);
-      offset += len(*it);
+      if (std::get<rtype>(*it) == rdb::STRING)
+        offset += len(*it);
+      else
+        offset += std::get<rlen>(*it);
     }
 
     counterArray--;

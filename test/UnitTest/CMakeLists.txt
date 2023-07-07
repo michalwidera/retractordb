@@ -61,7 +61,7 @@ target_link_libraries(test_compiler ${LIBRARY_TEST_SET} antlr4_static parser)
 target_link_libraries(test_soperations ${LIBRARY_TEST_SET})
 
 add_test(
-  NAME ut-xqry
+  NAME ut-xqry-ut
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
@@ -72,7 +72,7 @@ add_test(
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
-  NAME ut-xtrdb
+  NAME ut-xtrdb-ut
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
@@ -116,7 +116,7 @@ add_test(
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
 
 add_test(
-  NAME ut-dataModel
+  NAME ut-dataModel-ut
   WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
   COMMAND bash -c "set -e ; \
     ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
@@ -140,5 +140,5 @@ add_test(
   COMMAND bash -c "set -e ; xtrdb < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(ut-xtrdb ut-xqry ut-dataModel ut-dataModel-comp
+set_tests_properties(ut-xtrdb-ut ut-xqry-ut ut-dataModel-ut ut-dataModel-comp
                      ut-soperations PROPERTIES RUN_SERIAL TRUE)

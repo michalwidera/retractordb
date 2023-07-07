@@ -378,15 +378,15 @@ TEST(crdb, payload_add_operator) {
 
   rdb::payload data1Payload(data1);
 
-  data1Payload.setItem(0, std::string("test"));  // ! "test" without std::string claims exception
+  data1Payload.setItem(0, std::string("test"));
   data1Payload.setItem(1, static_cast<uint8_t>(24));
   data1Payload.setItem(2, 2000);
   data1Payload.setItem(3, 3333);
 
-  auto Name_ = data1Payload.getItem(0);
-  auto Control_ = data1Payload.getItem(1);
-  auto ll_ = data1Payload.getItem(2);
-  auto TLen_ = data1Payload.getItem(3);
+  std::any Name_ = data1Payload.getItem(0);
+  std::any Control_ = data1Payload.getItem(1);
+  std::any ll_ = data1Payload.getItem(2);
+  std::any TLen_ = data1Payload.getItem(3);
 
   dataPayload var;
 
@@ -404,11 +404,10 @@ TEST(crdb, payload_add_operator) {
 
   data3Payload = data1Payload + data2Payload;
 
-  // ASSERT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
+  ASSERT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
   ASSERT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
   ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
   ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
-  auto testData = data3Payload.getItem(4);
   ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
 }
 
@@ -444,7 +443,7 @@ TEST(crdb, position_conversion_test3) {
 
   rdb::payload payload(desc1);
 
-  payload.setItem(0, 145);  // ! "test" without std::string claims exception
+  payload.setItem(0, 145);
   payload.setItem(1, static_cast<uint8_t>(24));
   payload.setItem(2, static_cast<uint8_t>(25));
   payload.setItem(3, static_cast<uint8_t>(26));
@@ -456,6 +455,5 @@ TEST(crdb, position_conversion_test3) {
   ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
   ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
   ASSERT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
-  auto v = payload.getItem(5);
-  // ASSERT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
+  ASSERT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
 }

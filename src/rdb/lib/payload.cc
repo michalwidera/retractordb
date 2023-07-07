@@ -99,7 +99,8 @@ template <typename T>
 void payload::setItemBy(const int positionFlat, std::any value) {
   T data = std::any_cast<T>(value);
   auto position = descriptor.convert(positionFlat).value().first;
-  std::memcpy(payloadData.get() + descriptor.offset(positionFlat), &data, std::get<rlen>(descriptor[position]));
+  auto offsetFlat = descriptor.offset(positionFlat);
+  std::memcpy(payloadData.get() + offsetFlat, &data, std::get<rlen>(descriptor[position]));
 }
 
 void payload::setItem(const int positionFlat, std::any valueParam) {
@@ -117,11 +118,11 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
         const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
         std::string data(std::any_cast<std::string>(value));
         auto lenr = std::min(len, static_cast<int>(data.length()));
-        auto addr = payloadData.get() + descriptor.offset(positionFlat);
+        auto destOffset = descriptor.offset(positionFlat);
+        auto addr = payloadData.get() + destOffset;
         assert(position + len <= descriptor.getSizeInBytes());
-        // std::fill(addr,addr+len,0); (WHY=?!)
         std::memcpy(addr, data.c_str(), lenr);
-        // if (lenr != len) addr[lenr] = '\0'; (WHY=?!)
+        if (lenr != len) addr[lenr] = '\0';
       } break;
       case rdb::BYTE:
         setItemBy<uint8_t>(positionFlat, value);
@@ -167,22 +168,24 @@ std::any payload::getItem(const int positionFlat) {
 
   auto position = descriptor.convert(positionFlat).value().first;
 
+  // The aim of this procedure is : get raw data from descriptor and return as std::any
+
   switch (std::get<rtype>(descriptor[position])) {
     case rdb::STRING: {
-      const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
-      const char *charData = reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat);
+      auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
+      char *charData = reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat);
 
-      // auto l = strlen(charData);
-      std::vector<char> v;
+      auto descLen = descriptor.getSizeInBytes();
+      auto startPos = descriptor.offset(positionFlat);
+      assert(startPos + len <= descLen);
+      for (auto i = 0; i < len; i++)
+        if (charData[i] == 0) {
+          len = i;
+          break;
+        }
+      std::string s(charData, len);
 
-      for (auto i = 0; i < 4; i++)  // (WHY=?!)
-        v.push_back(charData[i]);
-
-      v.push_back('\0');
-
-      std::string str;
-      str.assign(&v[0], v.size());
-      return str;
+      return s;
     }
     case rdb::BYTE: {
       uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(positionFlat));
