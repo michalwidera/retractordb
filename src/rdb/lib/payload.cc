@@ -301,7 +301,15 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     auto desc = rhs.getDescriptor();
     auto offset_ = desc.offsetBegArr(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
-      os << std::string(reinterpret_cast<char *>(rhs.get() + offset_), desc.len(std::get<rname>(r)));
+      char *charData = reinterpret_cast<char *>(rhs.get() + offset_);
+      auto len = desc.len(std::get<rname>(r));
+      for (auto i = 0; i < len; i++)
+        if (charData[i] == 0) {
+          len = i;
+          break;
+        }
+
+      os << std::string(charData, len);
     } else
       for (auto i = 0; i < std::get<rarray>(r); i++) {
         if (std::get<rtype>(r) == rdb::BYTE) {

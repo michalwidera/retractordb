@@ -308,7 +308,6 @@ int Descriptor::offsetBegArr(const std::string name) {
 }
 
 int Descriptor::offset(const int position) {
-  auto offset{0};
   updateConvMaps();
   return offsetMap[position];
 }
