@@ -1,0 +1,83 @@
+Input file:query.rql
+Compile result:OK
+:STORAGE(0/1)	temp/
+signalRow(1/50)
+	:- PUSH_STREAM(source)
+	:- STREAM_AGSE(1,25)
+	source_0: INTEGER
+		PUSH_ID(source[0])
+	source_1: INTEGER
+		PUSH_ID(source[1])
+	source_2: INTEGER
+		PUSH_ID(source[2])
+	source_3: INTEGER
+		PUSH_ID(source[3])
+	source_4: INTEGER
+		PUSH_ID(source[4])
+	source_5: INTEGER
+		PUSH_ID(source[5])
+	source_6: INTEGER
+		PUSH_ID(source[6])
+	source_7: INTEGER
+		PUSH_ID(source[7])
+	source_8: INTEGER
+		PUSH_ID(source[8])
+	source_9: INTEGER
+		PUSH_ID(source[9])
+	source_10: INTEGER
+		PUSH_ID(source[10])
+	source_11: INTEGER
+		PUSH_ID(source[11])
+	source_12: INTEGER
+		PUSH_ID(source[12])
+	source_13: INTEGER
+		PUSH_ID(source[13])
+	source_14: INTEGER
+		PUSH_ID(source[14])
+	source_15: INTEGER
+		PUSH_ID(source[15])
+	source_16: INTEGER
+		PUSH_ID(source[16])
+	source_17: INTEGER
+		PUSH_ID(source[17])
+	source_18: INTEGER
+		PUSH_ID(source[18])
+	source_19: INTEGER
+		PUSH_ID(source[19])
+	source_20: INTEGER
+		PUSH_ID(source[20])
+	source_21: INTEGER
+		PUSH_ID(source[21])
+	source_22: INTEGER
+		PUSH_ID(source[22])
+	source_23: INTEGER
+		PUSH_ID(source[23])
+	source_24: INTEGER
+		PUSH_ID(source[24])
+accRow(1/50)
+	:- PUSH_STREAM(signalRow)
+	:- PUSH_STREAM(filter)
+	:- STREAM_ADD
+	filter_0: INTEGER
+		PUSH_ID(signalRow[0])
+		PUSH_ID(filter[0])
+		MULTIPLY
+output(1/50)
+	:- PUSH_STREAM(accRow)
+	:- STREAM_SUM
+	output_0: INTEGER
+		PUSH_ID(accRow[0])
+outputAll(1/50)
+	:- PUSH_STREAM(output)
+	:- PUSH_STREAM(source)
+	:- STREAM_ADD
+	outputAll_0: INTEGER
+		PUSH_ID(output[0])
+		PUSH_VAL(25)
+		DIVIDE
+	outputAll_1: INTEGER
+		PUSH_ID(source[0])
+source(1/50)	/dev/urandom
+	data: BYTE
+filter(1/1)	filterremez.txt
+	coef: INTEGER
