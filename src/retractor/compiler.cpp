@@ -435,28 +435,24 @@ std::string prepareFields() {
 std::string replicateIDX() {
   for (auto &q : coreInstance) {  // for each query
     for (auto &f : q.lSchema) {   // for each field in query
-      std::string schemaName = "";
-      bool found(false);
-      for (auto &t : f.lProgram) {  // for each token in query field
-        if (t.getCommandID() == PUSH_IDX) {
-          if (found) {
-            if (q.lSchema.size() != 1) {
-              // if _ exist then only one filed can be in query
-              throw std::out_of_range("Only one _ attribute can be in query");
-            }
-          }
-          found = true;
-          schemaName = t.getStr_();
+      std::vector<std::string> usedSchemaX;
+      for (auto &t : f.lProgram)  // for each token in query field
+        if (t.getCommandID() == PUSH_IDX)
+          usedSchemaX.push_back(get<std::pair<std::string, int>>(t.getVT()).first);  // .second is always 0
+      if (usedSchemaX.size() != 0) {
+        int minSizeFlat{std::numeric_limits<int>::max()};
+        for (auto schema : usedSchemaX) {
+          auto size = getQuery(schema).descriptorStorage().sizeFlat();
+          if (size < minSizeFlat) minSizeFlat = size;
         }
-      }
-      if (found) {
-        const int fieldSize = getQuery(schemaName).lSchema.size();
-        assert(fieldSize > 0);
+        assert(minSizeFlat != std::numeric_limits<int>::max());
+
+        assert(minSizeFlat > 0);
         std::list<field> oldFieldSet = q.lSchema;
         assert(oldFieldSet.size() == 1);
         field oldField = *q.lSchema.begin();
         q.lSchema.clear();
-        for (int i = 0; i < fieldSize; i++) {
+        for (int i = 0; i < minSizeFlat; i++) {
           std::list<token> lTempProgram;
           for (auto &t : oldField.lProgram) {
             if (t.getCommandID() == PUSH_IDX)
@@ -464,14 +460,13 @@ std::string replicateIDX() {
             else
               lTempProgram.push_back(token(t.getCommandID(), t.getVT()));
           }
-          field newField(rdb::rField(schemaName + "_" + lexical_cast<std::string>(i),  //
-                                     std::get<rdb::rlen>(oldField.field_),             //
-                                     std::get<rdb::rarray>(oldField.field_),           //
+          field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
+                                     std::get<rdb::rlen>(oldField.field_),       //
+                                     1,                                          // (expanded)
                                      std::get<rdb::rtype>(oldField.field_)),
                          lTempProgram);
           q.lSchema.push_back(newField);
         }
-        assert(q.lSchema.size() == getQuery(schemaName).lSchema.size());
         break;
       }
     }

@@ -247,8 +247,8 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
         rStack.push(val);
       } break;
       case PUSH_IDX:
-        /* TODO */
-        assert(false);
+        SPDLOG_ERROR("There should not appear PUSH_IDX here.");
+        abort();
         break;
       case PUSH_ID2: {
         assert(payload != NULL);

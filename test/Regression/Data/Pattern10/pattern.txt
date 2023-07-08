@@ -58,9 +58,105 @@ accRow(1/50)
 	:- PUSH_STREAM(signalRow)
 	:- PUSH_STREAM(filter)
 	:- STREAM_ADD
-	filter_0: INTEGER
+	accRow_0: INTEGER
 		PUSH_ID(signalRow[0])
 		PUSH_ID(filter[0])
+		MULTIPLY
+	accRow_1: INTEGER
+		PUSH_ID(signalRow[1])
+		PUSH_ID(filter[1])
+		MULTIPLY
+	accRow_2: INTEGER
+		PUSH_ID(signalRow[2])
+		PUSH_ID(filter[2])
+		MULTIPLY
+	accRow_3: INTEGER
+		PUSH_ID(signalRow[3])
+		PUSH_ID(filter[3])
+		MULTIPLY
+	accRow_4: INTEGER
+		PUSH_ID(signalRow[4])
+		PUSH_ID(filter[4])
+		MULTIPLY
+	accRow_5: INTEGER
+		PUSH_ID(signalRow[5])
+		PUSH_ID(filter[5])
+		MULTIPLY
+	accRow_6: INTEGER
+		PUSH_ID(signalRow[6])
+		PUSH_ID(filter[6])
+		MULTIPLY
+	accRow_7: INTEGER
+		PUSH_ID(signalRow[7])
+		PUSH_ID(filter[7])
+		MULTIPLY
+	accRow_8: INTEGER
+		PUSH_ID(signalRow[8])
+		PUSH_ID(filter[8])
+		MULTIPLY
+	accRow_9: INTEGER
+		PUSH_ID(signalRow[9])
+		PUSH_ID(filter[9])
+		MULTIPLY
+	accRow_10: INTEGER
+		PUSH_ID(signalRow[10])
+		PUSH_ID(filter[10])
+		MULTIPLY
+	accRow_11: INTEGER
+		PUSH_ID(signalRow[11])
+		PUSH_ID(filter[11])
+		MULTIPLY
+	accRow_12: INTEGER
+		PUSH_ID(signalRow[12])
+		PUSH_ID(filter[12])
+		MULTIPLY
+	accRow_13: INTEGER
+		PUSH_ID(signalRow[13])
+		PUSH_ID(filter[13])
+		MULTIPLY
+	accRow_14: INTEGER
+		PUSH_ID(signalRow[14])
+		PUSH_ID(filter[14])
+		MULTIPLY
+	accRow_15: INTEGER
+		PUSH_ID(signalRow[15])
+		PUSH_ID(filter[15])
+		MULTIPLY
+	accRow_16: INTEGER
+		PUSH_ID(signalRow[16])
+		PUSH_ID(filter[16])
+		MULTIPLY
+	accRow_17: INTEGER
+		PUSH_ID(signalRow[17])
+		PUSH_ID(filter[17])
+		MULTIPLY
+	accRow_18: INTEGER
+		PUSH_ID(signalRow[18])
+		PUSH_ID(filter[18])
+		MULTIPLY
+	accRow_19: INTEGER
+		PUSH_ID(signalRow[19])
+		PUSH_ID(filter[19])
+		MULTIPLY
+	accRow_20: INTEGER
+		PUSH_ID(signalRow[20])
+		PUSH_ID(filter[20])
+		MULTIPLY
+	accRow_21: INTEGER
+		PUSH_ID(signalRow[21])
+		PUSH_ID(filter[21])
+		MULTIPLY
+	accRow_22: INTEGER
+		PUSH_ID(signalRow[22])
+		PUSH_ID(filter[22])
+		MULTIPLY
+	accRow_23: INTEGER
+		PUSH_ID(signalRow[23])
+		PUSH_ID(filter[23])
+		MULTIPLY
+	accRow_24: INTEGER
+		PUSH_ID(signalRow[24])
+		PUSH_ID(filter[24])
 		MULTIPLY
 output(1/50)
 	:- PUSH_STREAM(accRow)

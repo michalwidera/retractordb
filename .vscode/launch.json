@@ -5,6 +5,30 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "(gdb) xretractor dsp",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
+      "args": ["-c","query.rql"],
+      "stopAtEntry": false,
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/Pattern10",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+          {
+              "description": "Włącz formatowanie kodu dla gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Ustaw wariant dezasemblacji na Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
+    {
       "name": "(gdb) ut-xtrdb",
       "type": "cppdbg",
       "request": "launch",
