@@ -110,6 +110,15 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
+  NAME rg-xtrdb_on_text_data_2
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern7
+  COMMAND bash -c "set -e ; \
+    xretractor query.rql -c > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+
+# -----------------------------------------------------------------------------------------------
+
+add_test(
   NAME rg-xtrdb_on_text_data
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
   COMMAND bash -c "set -e ; \

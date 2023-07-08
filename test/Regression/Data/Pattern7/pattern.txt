@@ -1,30 +1,32 @@
-:STORAGE(0/1)	/home/michal/test/
+Input file:query.rql
+Compile result:OK
+:STORAGE(0/1)	temp/
 str1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_ADD
-	Field_0:(INTEGER)
-		PUSH_ID(str1[0/1])
+	str1_0: INTEGER
+		PUSH_ID(str1[0])
 		PUSH_VAL(10)
 		MULTIPLY
-	Field_1:(INTEGER)
-		PUSH_ID(str1[0/1])
+	str1_1: INTEGER
+		PUSH_ID(str1[0])
 		PUSH_VAL(10)
 		MULTIPLY
 core0(1/10)	datafile2.dat
-	a:(INTEGER)
+	a: INTEGER
 core1(1/5)	datafile3.dat
-	b:(INTEGER)
+	b: INTEGER
 str2(1/1)
 	:- PUSH_STREAM(coreAB)
-	Field_2:(INTEGER)
-		PUSH_ID(str2[0/1])
+	str2_0: INTEGER
+		PUSH_ID(str2[0])
 		PUSH_VAL(10)
 		ADD
-	Field_3:(INTEGER)
-		PUSH_ID(str2[1/1])
+	str2_1: INTEGER
+		PUSH_ID(str2[1])
 		PUSH_VAL(1)
 		ADD
 coreAB(1/1)	/dev/urandom
-	a:(BYTE)
-	b:(BYTE)
+	a: BYTE
+	b: BYTE
