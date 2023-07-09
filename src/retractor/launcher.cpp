@@ -6,6 +6,7 @@
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 #include <boost/system/error_code.hpp>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -72,6 +73,10 @@ int main(int argc, char* argv[]) {
     }
     if (!vm.count("queryfile")) {
       std::cout << argv[0] << ": fatal error: no input file" << std::endl;
+      return EPERM;  // ERROR defined in errno-base.h
+    }
+    if (!std::filesystem::exists(sInputFile)) {
+      std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << std::endl;
       return EPERM;  // ERROR defined in errno-base.h
     }
     auto parseOut = parserFile(sInputFile);

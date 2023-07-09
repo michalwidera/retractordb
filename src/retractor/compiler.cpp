@@ -293,23 +293,19 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
   else if (cmd == STREAM_TIMEMOVE)
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_AVG) {
-    field intf(rdb::rField("avg", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::make_pair(sName1, 0)));
+    field intf(rdb::rField("avg", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
-    field intf(rdb::rField("min", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::make_pair(sName1, 0)));
+    field intf(rdb::rField("min", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
-    field intf(rdb::rField("max", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::make_pair(sName1, 0)));
+    field intf(rdb::rField("max", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
-    field intf(rdb::rField("sum", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::make_pair(sName1, 0)));
+    field intf(rdb::rField("sum", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_AGSE) {
@@ -593,14 +589,17 @@ std::string convertRemotes() {
   std::map<std::string, std::map<STRINT>> offsetMap;
 
   // This loop fill&create OffsetMap structure.
-  for (auto &q : coreInstance) {            // for each query
-    assert(!q.isReductionRequired());       // that has at least two arguments
-    auto offset{0};                         //
-    std::map<STRINT> offsetItem;  //
-    for (auto &f : q.lProgram) {            // for each token in stream program
+  for (auto &q : coreInstance) {       // for each query
+    assert(!q.isReductionRequired());  // that has at least two arguments
+    auto offset{0};                    //
+    std::map<STRINT> offsetItem;       //
+    for (auto &f : q.lProgram) {       // for each token in stream program
       if (f.getCommandID() == PUSH_STREAM) {
         offsetItem[f.getStr_()] = offset;
         offset += coreInstance[f.getStr_()].descriptorStorage().sizeFlat();
+      }
+      if (f.getCommandID() == STREAM_HASH) {
+        for (auto &i : offsetItem) i.second = 0;
       }
     }
     offsetMap[q.id] = offsetItem;
@@ -615,9 +614,8 @@ std::string convertRemotes() {
     for (auto &f : q.lSchema) {             // for each field in query and
       for (auto &t : f.lProgram) {          // for each token in query field - do:
         if (t.getCommandID() == PUSH_ID) {  // fix only PUSH_ID tokens
-          auto [ schema, offset ] = std::get<std::pair<STRINT>>( t.getVT() );
-          if (schema != q.id)
-            t = token( PUSH_ID , std::make_pair(q.id,offsetMap[q.id][schema]+offset));
+          auto [schema, offset] = std::get<std::pair<STRINT>>(t.getVT());
+          if (schema != q.id) t = token(PUSH_ID, std::make_pair(q.id, offsetMap[q.id][schema] + offset));
         }
       }
     }

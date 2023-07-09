@@ -104,7 +104,7 @@ void payload::setItemBy(const int positionFlat, std::any value) {
 }
 
 void payload::setItem(const int positionFlat, std::any valueParam) {
-  if (positionFlat > descriptor.sizeFlat() - 1) abort();
+  if (positionFlat > descriptor.sizeFlat()) abort();
 
   auto position = descriptor.convert(positionFlat).value().first;
   auto requestedType = std::get<rtype>(descriptor[position]);
@@ -164,7 +164,7 @@ T getVal(void *ptr, int offset) {
 }
 
 std::any payload::getItem(const int positionFlat) {
-  if (positionFlat > descriptor.sizeFlat() - 1) abort();
+  if (positionFlat > descriptor.sizeFlat()) abort();
 
   auto position = descriptor.convert(positionFlat).value().first;
 

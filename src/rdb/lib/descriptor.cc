@@ -150,16 +150,20 @@ std::optional<std::pair<int, int>> Descriptor::convert(int position) {
   updateConvMaps();
   if (position < clen) {
     return convMap[position];
-  } else
+  } else {
+    assert(false);
     return {};
+  }
 }
 
 std::optional<int> Descriptor::convert(std::pair<int, int> position) {
   updateConvMaps();
   if (convReMap.find(position) != convReMap.end())
     return convReMap[position];
-  else
+  else {
+    assert(false);
     return {};
+  }
 }
 
 bool Descriptor::isEmpty() const { return this->size() == 0; }

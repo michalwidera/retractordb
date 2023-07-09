@@ -9,7 +9,7 @@
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
-      "args": ["-c","query.rql"],
+      "args": ["query.rql"],
       "stopAtEntry": false,
       "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/dsp",
       "environment": [],
