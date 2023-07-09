@@ -11,7 +11,7 @@
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
       "args": ["-c","query.rql"],
       "stopAtEntry": false,
-      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/Pattern10",
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/dsp",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",

@@ -15,7 +15,7 @@ add_custom_target(
 add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-dsp.sh
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
 
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/

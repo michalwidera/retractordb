@@ -137,7 +137,7 @@ add_test(
 
 add_test(
   NAME rg-dsp
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern10
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/dsp
   COMMAND bash -c "set -e ; \
     xretractor query.rql -c > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
