@@ -23,23 +23,6 @@ extern int fieldCount;
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance;
 
-boost::rational<int> deltaDivMod(const boost::rational<int> &arg1, const boost::rational<int> &arg2) {
-  assert(arg1 != arg2);
-  if (arg1 == arg2) throw std::out_of_range("Delta are equal in DehashDiv - undefinied.");
-  return (arg1 * arg2) / abs(arg1 - arg2);
-}
-
-boost::rational<int> deltaSubtract(const boost::rational<int> &arg1) { return arg1; }
-
-boost::rational<int> deltaAdd(const boost::rational<int> &arg1, const boost::rational<int> &arg2) {
-  return std::min(arg1, arg2);
-}
-
-boost::rational<int> deltaHash(const boost::rational<int> &arg1, const boost::rational<int> &arg2) {
-  assert(arg1 + arg2 != 0);
-  return (arg1 * arg2) / (arg1 + arg2);
-}
-
 /** This procedure computes time delays (delta) for generated streams */
 std::string intervalCounter() {
   while (true) {
@@ -73,7 +56,7 @@ std::string intervalCounter() {
             bOnceAgain = true;
             continue;
           } else
-            delta = deltaHash(delta1, delta2);
+            delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -87,7 +70,7 @@ std::string intervalCounter() {
             //           D_c * D_b
             //   D_a = --------------
             //         abs(D_c - D_b)
-            delta = deltaDivMod(delta1, delta2);
+            delta = (delta1 * delta2) / abs(delta1 - delta2);  // deltaDivMod(delta1, delta2);
           }
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
@@ -105,7 +88,7 @@ std::string intervalCounter() {
             //           D_c * D_a
             //   D_b = --------------
             //         abs(D_c - D_a)
-            delta = deltaDivMod(delta2, delta1);
+            delta = (delta2 * delta1) / abs(delta2 - delta1);  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
           }
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
@@ -118,7 +101,7 @@ std::string intervalCounter() {
             bOnceAgain = true;
             continue;
           } else
-            delta = deltaSubtract(delta1);
+            delta = delta1;  // deltaSubtract(delta1);
         } break;
         case STREAM_ADD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -127,7 +110,7 @@ std::string intervalCounter() {
             bOnceAgain = true;
             continue;
           } else
-            delta = deltaAdd(delta1, delta2);
+            delta = std::min(delta1, delta2);  // deltaAdd(delta1, delta2);
         } break;
         case STREAM_AVG:
         case STREAM_MIN:
@@ -294,14 +277,14 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     for (auto f : getQuery(sName1).lSchema) {
       field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCount++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-                 token(PUSH_ID, std::pair<std::string, int>(sName1, i++)));
+                 token(PUSH_ID, std::make_pair(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
       field intf(rdb::rField(/*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCount++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-                 token(PUSH_ID, std::pair<std::string, int>(sName2, i++)));
+                 token(PUSH_ID, std::make_pair(sName2, i++)));
       lRetVal.push_back(intf);
     }
     return lRetVal;
@@ -311,22 +294,22 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_AVG) {
     field intf(rdb::rField("avg", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+               token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MIN) {
     field intf(rdb::rField("min", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+               token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_MAX) {
     field intf(rdb::rField("max", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+               token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_SUM) {
     field intf(rdb::rField("sum", sizeof(boost::rational<int>), 1, rdb::RATIONAL),
-               token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+               token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_AGSE) {
@@ -341,14 +324,14 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     if (r.second > 0) {
       for (int i = 0; i < windowSize; i++) {
         field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), 4, 1, rdb::INTEGER),
-                   token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+                   token(PUSH_ID, std::make_pair(sName1, 0)));
         schema.push_back(intf);
       }
     } else {
       for (int i = windowSize - 1; i >= 0; i--) {
         // TODO - need to inherit BYTE or
         field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), 4, 1, rdb::INTEGER),
-                   token(PUSH_ID, std::pair<std::string, int>(sName1, 0)));
+                   token(PUSH_ID, std::make_pair(sName1, 0)));
         // INTEGER from BYTEARRAY or INTARRAY
         schema.push_back(intf);
       }
@@ -377,7 +360,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     s << offset++;
     s << "]";
     if (f.lProgram.size() > 0) f.lProgram.pop_front();
-    f.lProgram.push_front(token(PUSH_ID2, std::pair<std::string, int>(s.str(), 0)));
+    f.lProgram.push_front(token(PUSH_ID2, std::make_pair(s.str(), 0)));
   }
   return lRetVal;
 }
@@ -410,7 +393,7 @@ std::string prepareFields() {
             int filedPosition = 0;
             for (auto s : getQuery(t.getStr_()).lSchema) {
               std::list<token> lTempProgram;
-              lTempProgram.push_back(token(PUSH_ID, std::pair<std::string, int>(nameOfscanningTable, filedPosition++)));
+              lTempProgram.push_back(token(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++)));
               std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCount++);
               q.lSchema.push_back(field(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram));
             }
@@ -433,30 +416,30 @@ std::string prepareFields() {
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
 std::string replicateIDX() {
-  for (auto &q : coreInstance) {  // for each query
-    for (auto &f : q.lSchema) {   // for each field in query
-      std::vector<std::string> usedSchemaX;
-      for (auto &t : f.lProgram)  // for each token in query field
+  for (auto &q : coreInstance) {             // for each query
+    for (auto &f : q.lSchema) {              // for each field in query
+      std::vector<std::string> usedSchemaX;  //
+      for (auto &t : f.lProgram)             // for each token in query field
         if (t.getCommandID() == PUSH_IDX)
-          usedSchemaX.push_back(get<std::pair<std::string, int>>(t.getVT()).first);  // .second is always 0
+          usedSchemaX.push_back(get<std::pair<std::string, int>>(t.getVT()).first);  // .second arg is always 0
       if (usedSchemaX.size() != 0) {
         int minSizeFlat{std::numeric_limits<int>::max()};
         for (auto schema : usedSchemaX) {
           auto size = getQuery(schema).descriptorStorage().sizeFlat();
           if (size < minSizeFlat) minSizeFlat = size;
         }
-        assert(minSizeFlat != std::numeric_limits<int>::max());
 
+        assert(minSizeFlat != std::numeric_limits<int>::max());
         assert(minSizeFlat > 0);
-        std::list<field> oldFieldSet = q.lSchema;
-        assert(oldFieldSet.size() == 1);
+        assert(q.lSchema.size() == 1);
+
         field oldField = *q.lSchema.begin();
         q.lSchema.clear();
         for (int i = 0; i < minSizeFlat; i++) {
           std::list<token> lTempProgram;
           for (auto &t : oldField.lProgram) {
             if (t.getCommandID() == PUSH_IDX)
-              lTempProgram.push_back(token(PUSH_ID, std::pair<std::string, int>(t.getStr_(), i)));
+              lTempProgram.push_back(token(PUSH_ID, std::make_pair(t.getStr_(), i)));
             else
               lTempProgram.push_back(token(t.getCommandID(), t.getVT()));
           }
@@ -508,7 +491,7 @@ std::string convertReferences() {
                   int offset1(0);
                   for (auto &f1 : q1.lSchema) {
                     if (std::get<rdb::rname>(f1.field_) == field) {
-                      t = token(PUSH_ID, std::pair<std::string, int>(schema, offset1));
+                      t = token(PUSH_ID, std::make_pair(schema, offset1));
                       break;
                     } else
                       ++offset1;
@@ -528,7 +511,7 @@ std::string convertReferences() {
             if (regex_search(text.c_str(), what, xprFieldIdX)) {
               assert(what.size() == 2);
               const std::string schema(what[1]);
-              t = token(PUSH_IDX, std::pair<std::string, int>(schema, 0));
+              t = token(PUSH_IDX, std::make_pair(schema, 0));
             } else
               throw std::out_of_range("No mach on type conversion IDX");
             break;
@@ -538,7 +521,7 @@ std::string convertReferences() {
               const std::string schema(what[1]);
               const std::string sOffset1(what[2]);
               const int offset1(atoi(sOffset1.c_str()));
-              t = token(PUSH_ID, std::pair<std::string, int>(schema, offset1));
+              t = token(PUSH_ID, std::make_pair(schema, offset1));
             } else {
               SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
               throw std::out_of_range("No mach on type conversion");
@@ -558,7 +541,7 @@ std::string convertReferences() {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
                   if (std::get<rdb::rname>(f1.field_) == field) {
-                    t = token(PUSH_ID, std::pair<std::string, int>(schema1, offset1));
+                    t = token(PUSH_ID, std::make_pair(schema1, offset1));
                     bFieldFound = true;
                   }
                   ++offset1;
@@ -568,7 +551,7 @@ std::string convertReferences() {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
                   if (std::get<rdb::rname>(f2.field_) == field) {
-                    t = token(PUSH_ID, std::pair<std::string, int>(schema2, offset1));
+                    t = token(PUSH_ID, std::make_pair(schema2, offset1));
                     bFieldFound = true;
                   }
                   ++offset1;
@@ -595,10 +578,46 @@ std::string convertReferences() {
                 }
               }
               if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
-              t = token(PUSH_ID, std::pair<std::string, int>(schema, offset1 + offset2 * q.lSchema.size()));
+              t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));
             } else
               throw std::out_of_range("No mach on type conversion ID4");
             break;
+        }
+      }
+    }
+  }
+  return std::string("OK");
+}
+
+std::string convertRemotes() {
+  std::map<std::string, std::map<STRINT>> offsetMap;
+
+  // This loop fill&create OffsetMap structure.
+  for (auto &q : coreInstance) {            // for each query
+    assert(!q.isReductionRequired());       // that has at least two arguments
+    auto offset{0};                         //
+    std::map<STRINT> offsetItem;  //
+    for (auto &f : q.lProgram) {            // for each token in stream program
+      if (f.getCommandID() == PUSH_STREAM) {
+        offsetItem[f.getStr_()] = offset;
+        offset += coreInstance[f.getStr_()].descriptorStorage().sizeFlat();
+      }
+    }
+    offsetMap[q.id] = offsetItem;
+  }
+
+  for (auto i : offsetMap)
+    for (auto j : i.second) std::cerr << i.first << " " << j.first << " " << j.second << std::endl;
+
+  // This loop converts with help of offsetMap
+  for (auto &q : coreInstance) {            // for each query
+    assert(!q.isReductionRequired());       // that has at least two arguments and
+    for (auto &f : q.lSchema) {             // for each field in query and
+      for (auto &t : f.lProgram) {          // for each token in query field - do:
+        if (t.getCommandID() == PUSH_ID) {  // fix only PUSH_ID tokens
+          auto [ schema, offset ] = std::get<std::pair<STRINT>>( t.getVT() );
+          if (schema != q.id)
+            t = token( PUSH_ID , std::make_pair(q.id,offsetMap[q.id][schema]+offset));
         }
       }
     }

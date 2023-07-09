@@ -168,7 +168,7 @@ std::string token::getStr_() {
   if (valueVT.index() == rdb::STRING)
     return std::get<std::string>(valueVT);
   else if (valueVT.index() == rdb::IDXPAIR) {
-    auto r = std::get<std::pair<std::string, int>>(valueVT);
+    auto r = std::get<std::pair<STRINT>>(valueVT);
     return r.first;
   } else
     return "Error";

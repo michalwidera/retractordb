@@ -3,9 +3,9 @@ Compile result:OK
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
 	out1_0: INTEGER
-		PUSH_ID(datasrc[0])
+		PUSH_ID(out1[0])
 	out1_1: INTEGER
-		PUSH_ID(datasrc[1])
+		PUSH_ID(out1[1])
 	out1_2: INTEGER
 		PUSH_VAL(16)
 		PUSH_VAL(1234)
@@ -13,9 +13,9 @@ out1(1/2)
 out2(1/2)
 	:- PUSH_STREAM(datasrc)
 	out2_0: INTEGER
-		PUSH_ID(datasrc[0])
+		PUSH_ID(out2[0])
 	out2_1: INTEGER
-		PUSH_ID(datasrc[1])
+		PUSH_ID(out2[1])
 	out2_2: INTEGER
 		PUSH_VAL(8)
 		PUSH_VAL(12)

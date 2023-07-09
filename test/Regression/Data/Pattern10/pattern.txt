@@ -5,174 +5,174 @@ signalRow(1/50)
 	:- PUSH_STREAM(source)
 	:- STREAM_AGSE(1,25)
 	source_0: INTEGER
-		PUSH_ID(source[0])
+		PUSH_ID(signalRow[0])
 	source_1: INTEGER
-		PUSH_ID(source[1])
+		PUSH_ID(signalRow[1])
 	source_2: INTEGER
-		PUSH_ID(source[2])
+		PUSH_ID(signalRow[2])
 	source_3: INTEGER
-		PUSH_ID(source[3])
+		PUSH_ID(signalRow[3])
 	source_4: INTEGER
-		PUSH_ID(source[4])
+		PUSH_ID(signalRow[4])
 	source_5: INTEGER
-		PUSH_ID(source[5])
+		PUSH_ID(signalRow[5])
 	source_6: INTEGER
-		PUSH_ID(source[6])
+		PUSH_ID(signalRow[6])
 	source_7: INTEGER
-		PUSH_ID(source[7])
+		PUSH_ID(signalRow[7])
 	source_8: INTEGER
-		PUSH_ID(source[8])
+		PUSH_ID(signalRow[8])
 	source_9: INTEGER
-		PUSH_ID(source[9])
+		PUSH_ID(signalRow[9])
 	source_10: INTEGER
-		PUSH_ID(source[10])
+		PUSH_ID(signalRow[10])
 	source_11: INTEGER
-		PUSH_ID(source[11])
+		PUSH_ID(signalRow[11])
 	source_12: INTEGER
-		PUSH_ID(source[12])
+		PUSH_ID(signalRow[12])
 	source_13: INTEGER
-		PUSH_ID(source[13])
+		PUSH_ID(signalRow[13])
 	source_14: INTEGER
-		PUSH_ID(source[14])
+		PUSH_ID(signalRow[14])
 	source_15: INTEGER
-		PUSH_ID(source[15])
+		PUSH_ID(signalRow[15])
 	source_16: INTEGER
-		PUSH_ID(source[16])
+		PUSH_ID(signalRow[16])
 	source_17: INTEGER
-		PUSH_ID(source[17])
+		PUSH_ID(signalRow[17])
 	source_18: INTEGER
-		PUSH_ID(source[18])
+		PUSH_ID(signalRow[18])
 	source_19: INTEGER
-		PUSH_ID(source[19])
+		PUSH_ID(signalRow[19])
 	source_20: INTEGER
-		PUSH_ID(source[20])
+		PUSH_ID(signalRow[20])
 	source_21: INTEGER
-		PUSH_ID(source[21])
+		PUSH_ID(signalRow[21])
 	source_22: INTEGER
-		PUSH_ID(source[22])
+		PUSH_ID(signalRow[22])
 	source_23: INTEGER
-		PUSH_ID(source[23])
+		PUSH_ID(signalRow[23])
 	source_24: INTEGER
-		PUSH_ID(source[24])
+		PUSH_ID(signalRow[24])
 accRow(1/50)
 	:- PUSH_STREAM(signalRow)
 	:- PUSH_STREAM(filter)
 	:- STREAM_ADD
 	accRow_0: INTEGER
-		PUSH_ID(signalRow[0])
-		PUSH_ID(filter[0])
+		PUSH_ID(accRow[0])
+		PUSH_ID(accRow[25])
 		MULTIPLY
 	accRow_1: INTEGER
-		PUSH_ID(signalRow[1])
-		PUSH_ID(filter[1])
+		PUSH_ID(accRow[1])
+		PUSH_ID(accRow[26])
 		MULTIPLY
 	accRow_2: INTEGER
-		PUSH_ID(signalRow[2])
-		PUSH_ID(filter[2])
+		PUSH_ID(accRow[2])
+		PUSH_ID(accRow[27])
 		MULTIPLY
 	accRow_3: INTEGER
-		PUSH_ID(signalRow[3])
-		PUSH_ID(filter[3])
+		PUSH_ID(accRow[3])
+		PUSH_ID(accRow[28])
 		MULTIPLY
 	accRow_4: INTEGER
-		PUSH_ID(signalRow[4])
-		PUSH_ID(filter[4])
+		PUSH_ID(accRow[4])
+		PUSH_ID(accRow[29])
 		MULTIPLY
 	accRow_5: INTEGER
-		PUSH_ID(signalRow[5])
-		PUSH_ID(filter[5])
+		PUSH_ID(accRow[5])
+		PUSH_ID(accRow[30])
 		MULTIPLY
 	accRow_6: INTEGER
-		PUSH_ID(signalRow[6])
-		PUSH_ID(filter[6])
+		PUSH_ID(accRow[6])
+		PUSH_ID(accRow[31])
 		MULTIPLY
 	accRow_7: INTEGER
-		PUSH_ID(signalRow[7])
-		PUSH_ID(filter[7])
+		PUSH_ID(accRow[7])
+		PUSH_ID(accRow[32])
 		MULTIPLY
 	accRow_8: INTEGER
-		PUSH_ID(signalRow[8])
-		PUSH_ID(filter[8])
+		PUSH_ID(accRow[8])
+		PUSH_ID(accRow[33])
 		MULTIPLY
 	accRow_9: INTEGER
-		PUSH_ID(signalRow[9])
-		PUSH_ID(filter[9])
+		PUSH_ID(accRow[9])
+		PUSH_ID(accRow[34])
 		MULTIPLY
 	accRow_10: INTEGER
-		PUSH_ID(signalRow[10])
-		PUSH_ID(filter[10])
+		PUSH_ID(accRow[10])
+		PUSH_ID(accRow[35])
 		MULTIPLY
 	accRow_11: INTEGER
-		PUSH_ID(signalRow[11])
-		PUSH_ID(filter[11])
+		PUSH_ID(accRow[11])
+		PUSH_ID(accRow[36])
 		MULTIPLY
 	accRow_12: INTEGER
-		PUSH_ID(signalRow[12])
-		PUSH_ID(filter[12])
+		PUSH_ID(accRow[12])
+		PUSH_ID(accRow[37])
 		MULTIPLY
 	accRow_13: INTEGER
-		PUSH_ID(signalRow[13])
-		PUSH_ID(filter[13])
+		PUSH_ID(accRow[13])
+		PUSH_ID(accRow[38])
 		MULTIPLY
 	accRow_14: INTEGER
-		PUSH_ID(signalRow[14])
-		PUSH_ID(filter[14])
+		PUSH_ID(accRow[14])
+		PUSH_ID(accRow[39])
 		MULTIPLY
 	accRow_15: INTEGER
-		PUSH_ID(signalRow[15])
-		PUSH_ID(filter[15])
+		PUSH_ID(accRow[15])
+		PUSH_ID(accRow[40])
 		MULTIPLY
 	accRow_16: INTEGER
-		PUSH_ID(signalRow[16])
-		PUSH_ID(filter[16])
+		PUSH_ID(accRow[16])
+		PUSH_ID(accRow[41])
 		MULTIPLY
 	accRow_17: INTEGER
-		PUSH_ID(signalRow[17])
-		PUSH_ID(filter[17])
+		PUSH_ID(accRow[17])
+		PUSH_ID(accRow[42])
 		MULTIPLY
 	accRow_18: INTEGER
-		PUSH_ID(signalRow[18])
-		PUSH_ID(filter[18])
+		PUSH_ID(accRow[18])
+		PUSH_ID(accRow[43])
 		MULTIPLY
 	accRow_19: INTEGER
-		PUSH_ID(signalRow[19])
-		PUSH_ID(filter[19])
+		PUSH_ID(accRow[19])
+		PUSH_ID(accRow[44])
 		MULTIPLY
 	accRow_20: INTEGER
-		PUSH_ID(signalRow[20])
-		PUSH_ID(filter[20])
+		PUSH_ID(accRow[20])
+		PUSH_ID(accRow[45])
 		MULTIPLY
 	accRow_21: INTEGER
-		PUSH_ID(signalRow[21])
-		PUSH_ID(filter[21])
+		PUSH_ID(accRow[21])
+		PUSH_ID(accRow[46])
 		MULTIPLY
 	accRow_22: INTEGER
-		PUSH_ID(signalRow[22])
-		PUSH_ID(filter[22])
+		PUSH_ID(accRow[22])
+		PUSH_ID(accRow[47])
 		MULTIPLY
 	accRow_23: INTEGER
-		PUSH_ID(signalRow[23])
-		PUSH_ID(filter[23])
+		PUSH_ID(accRow[23])
+		PUSH_ID(accRow[48])
 		MULTIPLY
 	accRow_24: INTEGER
-		PUSH_ID(signalRow[24])
-		PUSH_ID(filter[24])
+		PUSH_ID(accRow[24])
+		PUSH_ID(accRow[49])
 		MULTIPLY
 output(1/50)
 	:- PUSH_STREAM(accRow)
 	:- STREAM_SUM
 	output_0: INTEGER
-		PUSH_ID(accRow[0])
+		PUSH_ID(output[0])
 outputAll(1/50)
 	:- PUSH_STREAM(output)
 	:- PUSH_STREAM(source)
 	:- STREAM_ADD
 	outputAll_0: INTEGER
-		PUSH_ID(output[0])
+		PUSH_ID(outputAll[0])
 		PUSH_VAL(25)
 		DIVIDE
 	outputAll_1: INTEGER
-		PUSH_ID(source[0])
+		PUSH_ID(outputAll[1])
 source(1/50)	/dev/urandom
 	data: BYTE
 filter(1/1)	filterremez.txt

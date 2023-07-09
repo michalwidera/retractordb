@@ -3,17 +3,17 @@ Compile result:OK
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
 	datasrc_0: INTEGER
-		PUSH_ID(datasrc[0])
+		PUSH_ID(out1[0])
 	datasrc_1: INTEGER
-		PUSH_ID(datasrc[1])
+		PUSH_ID(out1[1])
 out2(1/2)
 	:- PUSH_STREAM(datasrc)
 	out2_0: INTEGER
 		PUSH_VAL(1)
 	out2_1: INTEGER
-		PUSH_ID(datasrc[0])
+		PUSH_ID(out2[0])
 	out2_2: INTEGER
-		PUSH_ID(datasrc[1])
+		PUSH_ID(out2[1])
 datasrc(1/2)	datafile2.dat
 	a: INTEGER
 	b: INTEGER

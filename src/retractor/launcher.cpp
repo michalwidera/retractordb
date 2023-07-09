@@ -92,6 +92,8 @@ int main(int argc, char* argv[]) {
     assert(response == "OK");
     response = replicateIDX();
     assert(response == "OK");
+    response = convertRemotes();
+    assert(response == "OK");
 
     if (vm.count("onlycompile")) {
       std::cout << "Input file:" << sInputFile << std::endl;
