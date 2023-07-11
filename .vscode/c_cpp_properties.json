@@ -2,12 +2,12 @@
     "configurations": [
         {
             "name": "Linux",
-            "defines": [],
+            "defines": [ "${default}" ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
             "cppStandard": "c++20",
             "intelliSenseMode": "linux-gcc-x64",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "compileCommands": "${workspaceFolder}/build/Debug/compile_commands.json",
             "configurationProvider": "ms-vscode.cmake-tools",
             "includePath": [
                 "${default}",

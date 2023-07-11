@@ -11,12 +11,10 @@ control_c()
 
 STREAM=str1
 
-if ! xcompiler -q query-simple.rql ; then exit 1 ; fi
-
 if ! which gnuplot ; then echo "install gnuplot!" ; exit 1 ; fi
 
-rm nohup.out
-nohup xretractor &
+\rm -f nohup.out
+nohup xretractor query-simple.rql &
 
 sleep 2
 

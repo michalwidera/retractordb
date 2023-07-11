@@ -1,26 +1,30 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
-// Checking redefinded namespace sanity
+// Checking redefined namespace sanity
 #if defined(DECL_T) || defined(DECL_F) || defined(DECL_E) || defined(BEGIN_E_GEN_T) || defined(END_E_GEN_T)
-#error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conficts with inner fldType.h declaration.
+#error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conflicts with inner fldType.h declaration.
 #endif
 
-#include <string>
+#include <boost/rational.hpp>  // boost::rational
+#include <string>              // std::string
+#include <tuple>               //
+#include <utility>             // std::pair
+#include <vector>              // std::vector
 
-#ifdef FLDTYPE_H_CREATE_VARIANT_T
-#include <boost/rational.hpp>
-#include <vector>
+#ifndef FLDTYPE_H_CREATE_VARIANT_T
+#define FLDTYPE_H_CREATE_VARIANT_T
+#include <variant>
 #define BEGIN_E_GEN_T(ENUM_NAME) typedef std::variant <
 #define DECL_T(elementName, elementType) elementType,
 #define DECL_E(elementName, elementType) elementType
 #define DECL_F(elementName)
 #define END_E_GEN_T(ENUM_NAME) > ENUM_NAME##VT;
-#undef FLDTYPE_H_DECLARATION_DONE_FLDT
-#undef FLDTYPE_H_CREATE_VARIANT_T
+#include "internal/fldList.h"
 #endif
 
 #ifdef FLDTYPE_H_CREATE_DEFINITION_FLDT
+#undef FLDTYPE_H_CREATE_DEFINITION_FLDT
 // Part responsible for Definition & Initialization of map structure
 #include <map>
 #define DECL_T(elementName, elementType) {elementName, #elementName},
@@ -32,48 +36,31 @@
 #define END_E_GEN_T(ENUM_NAME) \
   }                            \
   ;                            \
-  std::string GetString##ENUM_NAME(enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
-// This undef will force to BEGIN_E_GEN_T(...) - END_E_GEN_T(...) will appear once
-// again with new set of BEGIN_E_GEN_T/END_E_GEN_T definitions and will goto to
-// BEGIN_E_GEN_T sections
-#undef FLDTYPE_H_DECLARATION_DONE_FLDT
+  std::string GetString##ENUM_NAME(const enum ENUM_NAME index) { return tg_##ENUM_NAME[index]; };
+#include "internal/fldList.h"
 #endif
 
 #ifndef FLDTYPE_H_DECLARATION_DONE_FLDT
-#ifndef BEGIN_E_GEN_T
+#define FLDTYPE_H_DECLARATION_DONE_FLDT
 #define BEGIN_E_GEN_T(ENUM_NAME) enum ENUM_NAME {
 #define DECL_T(elementName, elementType) elementName,
 #define DECL_E(elementName, elementType) elementName
 #define DECL_F(elementName) , elementName
-#define END_E_GEN_T(ENUM_NAME) \
-  }                            \
-  ;                            \
-  std::string GetString##ENUM_NAME(enum ENUM_NAME index);
+#define END_E_GEN_T(ENUM_NAME)                                 \
+  }                                                            \
+  ;                                                            \
+  typedef std::tuple<std::string, int, int, ENUM_NAME> rField; \
+  std::string GetString##ENUM_NAME(const enum ENUM_NAME index);
+#include "internal/fldList.h"
 #endif
 
-// This declaration goes into ::rdb namespace
-namespace rdb {
-BEGIN_E_GEN_T(descFld)
-DECL_T(BAD, std::monostate)
-DECL_T(BYTE, uint8_t)
-DECL_T(INTEGER, int)
-DECL_T(UINT, unsigned)
-DECL_T(RATIONAL, boost::rational<int>)
-DECL_T(FLOAT, float)
-DECL_T(DOUBLE, double)
-DECL_T(BYTEARRAY, std::vector<uint8_t>)
-DECL_T(INTARRAY, std::vector<int>)
-DECL_E(STRING, std::string)
-DECL_F(TYPE)
-DECL_F(REF)
-END_E_GEN_T(descFld)
-}  // namespace rdb
-
-#undef BEGIN_E_GEN_T
-#undef END_E_GEN_T
-#undef DECL_T
-#undef DECL_E
-#undef DECL_F
-#define FLDTYPE_H_DECLARATION_DONE_FLDT
-
-#endif  // FLDTYPE_H_DECLARATION_DONE_FLDT
+// Support for std::visit over std::variant
+#ifndef FLDTYPE_H_DECLARATION_OVERLOAD
+#define FLDTYPE_H_DECLARATION_OVERLOAD
+template <typename... Ts>
+struct Overload : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts>
+Overload(Ts...) -> Overload<Ts...>;
+#endif

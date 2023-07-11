@@ -1,7 +1,7 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
-// Checking redefinded namespace sanity
+// Checking redefined namespace sanity
 #if defined(DECL) || defined(BEGIN_E_GEN) || defined(END_E_GEN) || defined(LAST)
 #error DECL, LAST, BEGIN_E_GEN, END_E_GEN conficts with inner cmdID.h declaration.
 #endif
@@ -25,7 +25,7 @@
 #endif
 
 #ifndef CMDID_H_DECLARATION_DONE_CMDI
-// Part resposible for declaration
+// Part responsible for declaration
 #ifndef BEGIN_E_GEN
 #include <string>
 #define BEGIN_E_GEN(ENUM_NAME) enum ENUM_NAME {
@@ -39,7 +39,7 @@
 
 //
 // Clarification: This structure in default mode will create: enum XXX {
-// void_command, void_value, ... } and GetStringXXX function will be decared as
+// void_command, void_value, ... } and GetStringXXX function will be declared as
 // existing somewhere. When, before including this header macro
 // CMDID_H_CREATE_DEFINITION will be defined this structure will
 // create&initialize following map: std::map<XXX, std::string> = { {
@@ -86,7 +86,7 @@ DECL(STREAM_HASH)
 DECL(STREAM_DEHASH_DIV)
 DECL(STREAM_DEHASH_MOD)
 DECL(STREAM_ADD)
-DECL(STREAM_SUBSTRACT)
+DECL(STREAM_SUBTRACT)
 DECL(STREAM_TIMEMOVE)
 DECL(STREAM_AGSE)
 DECL(COUNT)

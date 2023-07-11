@@ -2,51 +2,49 @@ Input file:query.rql
 Compile result:OK
 test_1(1/1)
 	:- PUSH_STREAM(core)
-	:- PUSH_VAL(1)
-	:- STREAM_AGSE(10)
-	core_0:
-		PUSH_ID(core[0/1])
-	core_1:
-		PUSH_ID(core[1/1])
-	core_2:
-		PUSH_ID(core[2/1])
-	core_3:
-		PUSH_ID(core[3/1])
-	core_4:
-		PUSH_ID(core[4/1])
-	core_5:
-		PUSH_ID(core[5/1])
-	core_6:
-		PUSH_ID(core[6/1])
-	core_7:
-		PUSH_ID(core[7/1])
-	core_8:
-		PUSH_ID(core[8/1])
-	core_9:
-		PUSH_ID(core[9/1])
-core(1/1)	/dev/urandom
-	b:
-test_2(10/1)
+	:- STREAM_AGSE(1,10)
+	core_0: INTEGER
+		PUSH_ID(test_1[0])
+	core_1: INTEGER
+		PUSH_ID(test_1[1])
+	core_2: INTEGER
+		PUSH_ID(test_1[2])
+	core_3: INTEGER
+		PUSH_ID(test_1[3])
+	core_4: INTEGER
+		PUSH_ID(test_1[4])
+	core_5: INTEGER
+		PUSH_ID(test_1[5])
+	core_6: INTEGER
+		PUSH_ID(test_1[6])
+	core_7: INTEGER
+		PUSH_ID(test_1[7])
+	core_8: INTEGER
+		PUSH_ID(test_1[8])
+	core_9: INTEGER
+		PUSH_ID(test_1[9])
+test_2(1/1)
 	:- PUSH_STREAM(core)
-	:- PUSH_VAL(-1)
-	:- STREAM_AGSE(10)
-	core_0:
-		PUSH_ID(core[0/1])
-	core_1:
-		PUSH_ID(core[1/1])
-	core_2:
-		PUSH_ID(core[2/1])
-	core_3:
-		PUSH_ID(core[3/1])
-	core_4:
-		PUSH_ID(core[4/1])
-	core_5:
-		PUSH_ID(core[5/1])
-	core_6:
-		PUSH_ID(core[6/1])
-	core_7:
-		PUSH_ID(core[7/1])
-	core_8:
-		PUSH_ID(core[8/1])
-	core_9:
-		PUSH_ID(core[9/1])
+	:- STREAM_AGSE(-1,10)
+	core_0: INTEGER
+		PUSH_ID(test_2[0])
+	core_1: INTEGER
+		PUSH_ID(test_2[1])
+	core_2: INTEGER
+		PUSH_ID(test_2[2])
+	core_3: INTEGER
+		PUSH_ID(test_2[3])
+	core_4: INTEGER
+		PUSH_ID(test_2[4])
+	core_5: INTEGER
+		PUSH_ID(test_2[5])
+	core_6: INTEGER
+		PUSH_ID(test_2[6])
+	core_7: INTEGER
+		PUSH_ID(test_2[7])
+	core_8: INTEGER
+		PUSH_ID(test_2[8])
+	core_9: INTEGER
+		PUSH_ID(test_2[9])
+core(1/1)	/dev/urandom
+	b: BYTE

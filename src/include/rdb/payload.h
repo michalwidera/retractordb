@@ -2,8 +2,7 @@
 #define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
 
 #include <any>
-#include <cstddef>  // std::byte
-#include <memory>   // std::unique_ptr
+#include <memory>  // std::unique_ptr
 
 #include "descriptor.h"
 
@@ -14,38 +13,48 @@ class payload {
   Descriptor descriptor;
 
   /// @brief Payload memory area
-  std::unique_ptr<std::byte[]> payloadData;
+  std::unique_ptr<uint8_t[]> payloadData;
 
   /// @brief Type of dumped or read numeric formats
-  bool hexFormat;
+  bool hexFormat = false;
+
+  template <typename T>
+  void setItemBy(const int position, std::any value);
 
  public:
+  /// @brief binary dump
+  bool specialDebug = false;
+
   /// @brief Accessor to descriptor object
   /// @return Descriptor
   Descriptor getDescriptor() const;
 
   /// @brief Accessor to pointer to payload
   /// @return  T* pointer to payload
-  std::byte *get() const;
+  uint8_t *get() const;
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
-  payload(Descriptor descriptor);
+  payload(const Descriptor descriptor);
 
-  /// @brief Default constructor is dissalowed
-  payload() = delete;
+  /// @brief Copy constructor
+  /// @param from destructor
+  payload(const payload &other);
 
-  /// @brief Dirrect setter
+  /// @brief Default constructor is allowed - creates uninitialized object, ready to assign
+  payload() = default;
+
+  /// @brief Direct setter
   /// @param position position according to descriptor
-  /// @param value value of given type according to desciptor that will be set
+  /// @param valueParam value of given type according to descriptor that will be set
   /// in payload
-  void setItem(int position, std::any value);
+  void setItem(const int position, std::any valueParam);
 
-  /// @brief Dirrect getter
+  /// @brief Direct getter
   /// @param position position according to descriptor
-  /// @return address of begining memory that contains data descibed by
+  /// @return address of beginning memory that contains data described by
   /// descriptor
-  std::any getItem(int position);
+  std::any getItem(const int position);
 
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
@@ -53,6 +62,10 @@ class payload {
 
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
+
+  payload &operator=(const Descriptor &other);
+  payload &operator=(const payload &other);
+  payload operator+(const payload &other);
 };
 }  // namespace rdb
 

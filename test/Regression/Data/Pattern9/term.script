@@ -3,32 +3,32 @@
 # reads datafile99.dat file and gets
 # sequential results in loop
 # notice: last $96 byte in overleaing intentionaly
-mono
+noprompt
 dropfile { data_source.desc }
 open data_source { INTEGER dane REF "datafile99.dat" TYPE DEVICE }
 desc
 size
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 dropfile { data_source.desc }
 quit

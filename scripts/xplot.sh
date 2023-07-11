@@ -46,9 +46,9 @@ echo 'STREAM:' $STREAM
 echo 'XDIM:' $XDIM
 echo 'YDIM:' $YDIM
 
-if ! xcompiler -q $FILE ; then exit 1 ; fi
+if ! xretractor $FILE -c; then exit 1 ; fi
 
-nohup xretractor &
+nohup xretractor $FILE  &
 
 sleep 2
 

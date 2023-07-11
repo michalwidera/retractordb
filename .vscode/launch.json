@@ -1,0 +1,128 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "(gdb) xretractor dsp",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
+      "args": ["query.rql"],
+      "stopAtEntry": false,
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/dsp",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+          {
+              "description": "Włącz formatowanie kodu dla gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Ustaw wariant dezasemblacji na Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
+    {
+      "name": "(gdb) ut-xtrdb",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_xtrdb",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/rdb",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+          {
+              "description": "Włącz formatowanie kodu dla gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Ustaw wariant dezasemblacji na Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
+    {
+      "name": "(gdb) xtrdb",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/michal/GitHub/retractordb/build/Debug/src/rdb/xtrdb",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/Pattern8",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+          {
+              "description": "Włącz formatowanie kodu dla gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Ustaw wariant dezasemblacji na Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
+    {
+      "name": "(gdb) xretractor simple",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
+      "args": ["query-simple.rql"],
+      "stopAtEntry": false,
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/simple",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+          {
+              "description": "Włącz formatowanie kodu dla gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+          },
+          {
+              "description": "Ustaw wariant dezasemblacji na Intel",
+              "text": "-gdb-set disassembly-flavor intel",
+              "ignoreFailures": true
+          }
+      ]
+    },
+  {
+    "name": "(gdb) test_dataModel",
+    "type": "cppdbg",
+    "request": "launch",
+    "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_dataModel",
+    "args": [""],
+    "stopAtEntry": false,
+    "cwd":     "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/dataModel",
+    "environment": [],
+    "externalConsole": false,
+    "MIMode": "gdb",
+    "setupCommands": [
+        {
+            "description": "Włącz formatowanie kodu dla gdb",
+            "text": "-enable-pretty-printing",
+            "ignoreFailures": true
+        },
+        {
+            "description": "Ustaw wariant dezasemblacji na Intel",
+            "text": "-gdb-set disassembly-flavor intel",
+            "ignoreFailures": true
+        }
+    ]
+  }
+  ]
+}

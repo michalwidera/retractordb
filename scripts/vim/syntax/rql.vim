@@ -26,7 +26,7 @@ syn match rqlNumber         "\<[0-9]*\/[0-9]*\>"
 syn match rqlNumber         "\<0x[abcdef0-9]*\>"
 
 " Types
-syn keyword rqlType         BYTE Byte UINT Unsigned FLOAT Float INTEGER Integer INTARRAY Intarray BYTEARRAY Bytearray STRING String
+syn keyword rqlType         BYTE Byte CHAR Char UINT Unsigned FLOAT Float INTEGER Integer STRING String
 
 hi def link rqlNumber       Number
 hi def link rqlString       String

@@ -2,18 +2,18 @@
 # testing text data source as stream input
 # reads data_souce.txt file and gets
 # sequential results in loop from txt file
-mono
+noprompt
 dropfile { data_source.desc }
 open data_source { INTEGER dane STRING name[5] REF "data_source.txt" TYPE TEXTSOURCE }
 desc
 size
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 read 0
-print
+printt
 dropfile { data_source.desc }
 quit

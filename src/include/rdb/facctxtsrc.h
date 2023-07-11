@@ -12,7 +12,7 @@ namespace rdb {
  * @brief Object that implements data source interface via fstream
  */
 template <typename T>
-class textSrouceAccessor : public FileAccessorInterface<T> {
+class textSourceAccessor : public FileAccessorInterface<T> {
   std::string fileNameStr;
 
   Descriptor descriptor;  // filled by fctrl method
@@ -22,9 +22,9 @@ class textSrouceAccessor : public FileAccessorInterface<T> {
   std::fstream myFile;
 
  public:
-  ~textSrouceAccessor();
+  ~textSourceAccessor();
 
-  textSrouceAccessor(std::string fileName);
+  textSourceAccessor(std::string fileName);
 
   int read(T *ptrData, const size_t size, const size_t position) override;
   int write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;

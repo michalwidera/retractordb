@@ -27,8 +27,9 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB time series database"
     homepage = "https://retractordb.com"
-    requires = "boost/1.81.0", "gtest/1.13.0" , "antlr4-cppruntime/4.11.1" , "spdlog/1.10.0"
-    generators = "CMakeDeps" , "CMakeToolchain"
+    antlr_version = "4.13.0"
+    requires = "boost/1.82.0", "gtest/1.13.0" , "antlr4-cppruntime/" + antlr_version, "spdlog/1.10.0"
+    generators = "CMakeToolchain"
     testing = []
     package_type = "application"
 
@@ -47,12 +48,18 @@ class Retractor(ConanFile):
 
     def package_info(self):
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
+        self.cpp_info.compiler = "20"
 
     def requirements(self):
         # Auto-generation of antlr4call.sh script
         antlr4_version_file = open("scripts/antlr4call.sh","w")
-        antlr4_version_file.write(script.replace('VERSION',str("4.11.1")))
+        antlr4_version_file.write(script.replace('VERSION',self.antlr_version))
         antlr4_version_file.close()
+
+    def generate(self):
+        deps = CMakeDeps(self)
+        deps.check_components_exist = True
+        deps.generate()
 
     def build(self):
         cmake = CMake(self)

@@ -13,7 +13,7 @@ using std::map;
 using std::set;
 
 /**
- * This class is designed to time management and sheduling task
+ * This class is designed to time management and scheduling task
  * Note: This is complicated
  */
 class TimeLine : private boost::noncopyable {

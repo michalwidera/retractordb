@@ -18,9 +18,9 @@ fi
 
 echo "Type ctrl+c to stop."
 
-if ! xcompiler -q query-histogram.rql ; then exit 1 ; fi
+if ! xretractor query-histogram.rql -c; then exit 1 ; fi
 
-nohup xretractor &
+nohup xretractor query-histogram.rql &
 
 sleep 4
 if [ -z "$DISPLAY" ]

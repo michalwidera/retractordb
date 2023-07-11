@@ -1,6 +1,13 @@
 RetractorDB
 -----------------------------------------------------------------------
-![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=shield&circle-token=b1aed4cd0fd95f82927fce06972f5bdb4456a5a3)
+
+This branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb/tree/issue_17.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb/?branch=issue_17)
+
+[comment]: # (move this to master before merge to upstream)
+
+(https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
+
+[comment]: # (VSCode view: Ctrl+k,v)
 
 These are sources of RetractorDB Time Series Database System prototype. This is work in progress.
 
@@ -12,8 +19,6 @@ Commands
 -----------------------------------------------------------------------
 
 * _xqry_: database client
-* _xdumper_: query plan dumper
-* _xcompiler_: query compiler
 * _xretractor_: database main process
 * _xdisplay_: query plan presentation script
 
@@ -21,14 +26,25 @@ How to install
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake make build-essential python3 python3-pip
+sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind clang-format
 pip install conan
 conan profile detect
 git clone https://github.com/michalwidera/retractordb.git
-conan install .
-conan build .
-cd build/Release
+cd retractordb
+conan install . -s build_type=Debug --build missing
+conan build . -s build_type=Debug --build missing
+cd build/Debug
+make install
+```
+
+optional in build/Debug folder:
+```
 make test
+cmake .
+make
+make install
+make grammar
+make cformat
 ```
 
 Work with antl4 and .g4 files requires java - install it with:
@@ -52,7 +68,6 @@ Allowed options:
   -t [ --detail ] arg         show details of this stream
   ...
 ```
-
 
 To get full functionality additional packages may be required like:
 ```
@@ -85,4 +100,3 @@ Author
 
 Project created in 2003-2023 by Michal Widera
 (michal@widera.com.pl)
-

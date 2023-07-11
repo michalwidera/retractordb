@@ -2,28 +2,28 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
 project(retractordb)
 
-enable_testing()
-
-# set(CONAN_DISABLE_CHECK_COMPILER TRUE)
+add_definitions(-DSPDLOG_FMT_EXTERNAL)
+add_definitions(-DFMT_HEADER_ONLY)
+add_definitions(-Wno-deprecated-declarations)
 
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 find_package(GTest REQUIRED)
 
-message("Boost_INCLUDE_DIR: ${Boost_INCLUDE_DIR}")
-message("spdlog_INCLUDE_DIR: ${spdlog_INCLUDE_DIR}")
-message("antlr4-runtime_INCLUDE_DIR: ${antlr4-runtime_INCLUDE_DIR}")
-message("GTest_INCLUDE_DIR: ${GTest_INCLUDE_DIR}")
+find_program(PROG valgrind REQUIRED)
+message(STATUS "Required tool: ${PROG}")
+
+enable_testing()
 
 include_directories(
-  ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR} ${antlr4-runtime_INCLUDE_DIR}
-  ${GTest_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/src/include
-  ${CMAKE_SOURCE_DIR}/src/share)
+  ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR} ${fmt_INCLUDE_DIR}
+  ${antlr4-runtime_INCLUDE_DIR} src/include)
 
 set(CMAKE_CXX_STANDARD 20)
-
-# include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake) conan_basic_setup()
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compileCommands req. from
+                                      # .vsccode/c_cpp_properties.json
 
 add_subdirectory(src)
 add_subdirectory(scripts)

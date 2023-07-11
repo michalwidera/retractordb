@@ -1,0 +1,21 @@
+noprompt
+open core0
+desc
+size
+open core1
+desc
+size
+open str1
+desc
+list 4
+size
+open str2
+desc
+list 4
+size
+open str3
+desc
+open str4
+desc
+rem dropfile { core0.desc core1.desc str1 str1.desc str2 str2.desc str3 str3.desc str4 str4.desc str5 str5.desc}
+quit

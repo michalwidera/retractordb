@@ -4,7 +4,7 @@ CTestTestfile.cmake
 CMakeLists.txt.user
 cmake_install.cmake
 src/include/config.h
-src/compiler/.antlr
+src/retractor/.antlr
 examples/generator/CMakeFiles
 examples/generator/xgenerator
 examples/temp/
