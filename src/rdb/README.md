@@ -138,8 +138,9 @@ ok
 
 ## UML Sequence Diagram of :Rdb communication process
 
-![Class Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/issue_17/src/rdb/UML/rdb-comunication.puml)
+![Class Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/rdb/UML/rdb-comunication.puml)
+
 
 ## UML Storage Accessor - Activty Diagram
 
-![Class Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/issue_17/src/rdb/UML/rdb-storageaccessor.puml)
+![Class Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/rdb/UML/rdb-storageaccessor.puml)

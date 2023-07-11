@@ -3,10 +3,6 @@ RetractorDB
 
 This branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
 
-[comment]: # (move this to master before merge to upstream)
-
-(https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
-
 [comment]: # (VSCode view: Ctrl+k,v)
 
 These are sources of RetractorDB Time Series Database System prototype. This is work in progress.
