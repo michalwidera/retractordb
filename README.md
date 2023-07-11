@@ -1,7 +1,7 @@
 RetractorDB
 -----------------------------------------------------------------------
 
-This branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb/tree/issue_17.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb/?branch=issue_17)
+This branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
 
 [comment]: # (move this to master before merge to upstream)
 
