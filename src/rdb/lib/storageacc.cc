@@ -226,7 +226,10 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
   assert(destination != nullptr);
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
-  auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
+
+  auto recordIndexRv{0};
+  if (storageType != "DEVICE") recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
+
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
     assert(result == 0);

@@ -169,7 +169,7 @@ outputAll(1/50)
 	:- STREAM_ADD
 	outputAll_0: INTEGER
 		PUSH_ID(outputAll[0])
-		PUSH_VAL(25)
+		PUSH_VAL(25000)
 		DIVIDE
 	outputAll_1: INTEGER
 		PUSH_ID(outputAll[1])

@@ -81,7 +81,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int of
 
   outputPayload->readReverse(0);
 
-  auto descriptorVecSize = outputPayload->getDescriptor().size();
+  auto descriptorVecSize = outputPayload->getDescriptor().sizeFlat();
   std::string storage_name = outputPayload->getStorageName();
 
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
@@ -413,7 +413,7 @@ void dataModel::constructInputPayload(std::string instance) {
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
 
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(step, length);
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)

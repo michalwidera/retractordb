@@ -211,7 +211,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
         rStack.push(a * b);
         break;
       case DIVIDE:
-        rStack.push(a / b);
+        rStack.push(b / a);
         break;
       case NEGATE:
         rStack.push(neg(b));

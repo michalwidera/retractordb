@@ -44,6 +44,9 @@ add_custom_target(
 # $make clear_cache
 add_custom_target(clear_cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
 
+add_custom_target(patchcreate COMMAND git diff --patch > ${PROJECT_SOURCE_DIR}/my.patch)
+add_custom_target(patchapply COMMAND git apply ${PROJECT_SOURCE_DIR}/mypatch.patch)
+
 find_package(Git QUIET)
 
 string(TIMESTAMP GIT_CURRENT_BUILDTIME "%y%m%d%H%M")

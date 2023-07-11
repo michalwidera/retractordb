@@ -605,9 +605,6 @@ std::string convertRemotes() {
     offsetMap[q.id] = offsetItem;
   }
 
-  for (auto i : offsetMap)
-    for (auto j : i.second) std::cerr << i.first << " " << j.first << " " << j.second << std::endl;
-
   // This loop converts with help of offsetMap
   for (auto &q : coreInstance) {            // for each query
     assert(!q.isReductionRequired());       // that has at least two arguments and

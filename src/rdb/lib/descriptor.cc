@@ -110,9 +110,11 @@ void Descriptor::updateConvMaps() {
   int backCounterArray{0};
   int counterArray{std::get<rarray>(*it)};
   int offset{0};
+  int clen_alignment{0};
   for (int i = 0; i < clen; i++) {
     if (std::get<rtype>(*it) == rdb::TYPE || std::get<rtype>(*it) == rdb::REF) {
       it++;
+      clen_alignment++;
       continue;
     }
 
@@ -143,6 +145,7 @@ void Descriptor::updateConvMaps() {
       counterArray = std::get<rarray>(*it);
     }
   }
+  clen -= clen_alignment;
   dirtyMap = false;
 }
 

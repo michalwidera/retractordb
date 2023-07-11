@@ -344,7 +344,7 @@ rdb::Descriptor query::descriptorFrom() {
       assert(step >= 0);
       auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
       for (int i = 0; i < abs(length); i++) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++), maxLen, 1, maxType);
+        retVal | rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
       }
     } break;
     default:

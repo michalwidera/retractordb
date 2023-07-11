@@ -26,10 +26,11 @@ How to install
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind
+sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind clang-format
 pip install conan
 conan profile detect
 git clone https://github.com/michalwidera/retractordb.git
+cd retractordb
 conan install . -s build_type=Debug --build missing
 conan build . -s build_type=Debug --build missing
 cd build/Debug

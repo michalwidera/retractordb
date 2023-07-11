@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "CRSMath.h"
-//#include "Processor.h"
 #include "QStruct.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"

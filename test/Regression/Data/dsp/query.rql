@@ -9,4 +9,4 @@ DECLARE data BYTE STREAM source, 0.02 FILE '/dev/urandom'
 SELECT * STREAM signalRow FROM source@(1,25)
 SELECT signalRow[_] * filter[_] STREAM accRow FROM signalRow+filter
 SELECT accRow[0] STREAM output FROM accRow.sumc
-SELECT output[0]/25,source[0] STREAM outputAll FROM output+source
+SELECT output[0]/25000,source[0] STREAM outputAll FROM output+source

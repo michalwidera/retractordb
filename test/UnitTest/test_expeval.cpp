@@ -151,7 +151,7 @@ TEST(xExpressionEval, mul_int_dobule) {
 TEST(xExpressionEval, div_int_dobule) {
   std::list<token> program;
   program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 2.1));
+  program.push_back(token(PUSH_VAL, 2.5));
   program.push_back(token(DIVIDE));
 
   expressionEvaluator test;
@@ -159,7 +159,7 @@ TEST(xExpressionEval, div_int_dobule) {
 
   ASSERT_TRUE(result.index() == rdb::DOUBLE);
   // std::cerr << std::get<double>(result) << std::endl;
-  ASSERT_TRUE(std::get<double>(result) == 1.05);
+  ASSERT_TRUE(std::get<double>(result) == 0.8);  // 2 / 2.5 = 0.8
 }
 
 TEST(xExpressionEval, neg_dobule) {
