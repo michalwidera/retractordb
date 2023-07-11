@@ -44,7 +44,8 @@ setpos [position][number value]  set payload field number value
 status                           show status of payload
 flip                             flip reverse iterator
 rox                              remove on exit flip
-print                            show payload
+print|printt                     show payload
+list|rlist [value]               print value records
 input [[field][value]]           fill payload
 hex|dec                          type of input/output of byte/number fields
 size                             show database size in records
