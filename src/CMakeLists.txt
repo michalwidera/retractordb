@@ -42,10 +42,9 @@ add_custom_target(
 # incompatible format - conan build .. complains : CMake Error: Error: generator
 # : Unix Makefiles Does not match the generator used previously: Ninja just use:
 # $make clear_cache
-add_custom_target(clear_cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-
-add_custom_target(patchcreate COMMAND git diff --patch > ${PROJECT_SOURCE_DIR}/my.patch)
-add_custom_target(patchapply COMMAND git apply ${PROJECT_SOURCE_DIR}/mypatch.patch)
+add_custom_target(clear-cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+add_custom_target(patch COMMAND git diff --patch > ${CMAKE_BINARY_DIR}/my.patch)
+add_custom_target(apply COMMAND git apply ${CMAKE_BINARY_DIR}/my.patch)
 
 find_package(Git QUIET)
 
