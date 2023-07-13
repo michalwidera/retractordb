@@ -84,6 +84,10 @@ int main(int argc, char* argv[]) {
     }
     if (cmd == "open" || cmd == "ropen" || cmd == "openx" || cmd == "ropenx") {
       std::cin >> file;
+      if (file.find('{') != std::string::npos) {
+        std::cout << RED << "unrecognized or missing file:" << file << "\n" << RESET;
+        continue;
+      }
       if (cmd == "open" || cmd == "ropen")
         dacc = std::make_unique<rdb::storageAccessor>(file, file);
       else {
