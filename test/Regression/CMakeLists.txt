@@ -89,19 +89,17 @@ add_test(
 add_test(
   NAME rg-xcompiler-simple
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
-  COMMAND
-    bash -c "set -e ; \
+  COMMAND bash -c "set -e ; \
     xretractor query-simple.rql -c > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 add_test(
   NAME rg-xcompiler-dot
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
-  COMMAND
-    bash -c "set -e ; \
+  COMMAND bash -c "set -e ; \
     xretractor query-simple.rql -c -d -f -t -s > out.dot ; \
     ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out.dot")
-    
+
 add_test(
   NAME rg-xcompiler-simple-vg-1
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple

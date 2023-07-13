@@ -149,12 +149,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
             std::string sTokenName(t.getStrCommandID());
             std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
             std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
-            xout << t ;
-            // Token PUSH_ something has always some value on something
-            //std::basic_string<char>::size_type idx = sTokenName.find("PUSH_");
-            //if (idx != std::string::npos) {
-            //  xout << t;
-            //}
+            xout << t;
           }
         xout << "}";
         xout << "\"";
@@ -193,9 +188,12 @@ void dumpQFieldsProgram() {
       for (auto t : f.lProgram) {
         std::cout << q.id << "\t";
         std::cout << std::get<rdb::rname>(f.field_) << "\t";
-        std::cout << t.getStrCommandID() << "\t";
-        std::cout << t.getStr_();
-        if (t.getStrCommandID() == "PUSH_ID") std::cout << "[" << t.getRI() << "]";
+
+        if (t.getStrCommandID() == "PUSH_ID")
+          std::cout << t;
+        else
+          std::cout << t.getStrCommandID();
+
         std::cout << std::endl;
       }
     }
@@ -276,43 +274,19 @@ void dumpRawTextFile() {
 
 int dumper(boost::program_options::variables_map &vm) {
   try {
-    //
-    // Main algorithm
-    //
-    //
-    // Check if we put depended parameters
-    //
     if (vm.count("tags") != 0 && vm.count("fields") == 0) {
-      std::cerr << "Conflicting parameters" << std::endl;
-      std::cerr << "Tags are referencing fields - when you set tags, leve "
-                   "field in dots"
-                << std::endl;
+      std::cerr << "Conflicting parameters." << std::endl;
+      std::cerr << "Tags are referencing fields - when you set tags, leave field in dots" << std::endl;
       return system::errc::invalid_argument;
     }
-    if (vm.count("view")) {
-      const std::string sTempDotFile("temp_$$$.dot");
-      const std::string sTempPngFile("temp_$$$.png");
-      {
-        std::ofstream ofs(sTempDotFile.c_str());
-        dumpGraphiz(ofs, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0);
-      }
-      auto ret = std::system(std::string("dot -Tpng " + sTempDotFile + " -o " + sTempPngFile).c_str());
-      if (ret < 0)
-        std::cout << "Dot Error: " << strerror(errno) << '\n';
-      else if (!WIFEXITED(ret))
-        std::cout << "Program Dot exited abnormaly\n";
-      if (!vm.count("leavedot")) std::remove(sTempDotFile.c_str());
-      std::cerr << "type: start " << sTempPngFile << std::endl;
-    } else if (vm.count("dot")) {
+    if (vm.count("dot")) {
       dumpGraphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0);
     } else if (vm.count("csv")) {
-      std::cerr << "Core count:" << (int)coreInstance.size() << std::endl;
       dumpQSet();
       dumpQPrograms();
       dumpQFields();
       dumpQFieldsProgram();
     } else {
-      // Default
       dumpRawTextFile();
     }
   } catch (std::exception &e) {

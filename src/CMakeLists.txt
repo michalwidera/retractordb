@@ -19,13 +19,14 @@ add_custom_target(
 
 add_custom_target(
   simple-view
-  COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o out.png && feh out.png
+  COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
+          out.dot -o out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
-
 
 add_custom_target(
   dsp-view
-  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o out.png && feh out.png
+  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
+          out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
 
 # sudo apt install clang-format ; sudo pip install cmakelang

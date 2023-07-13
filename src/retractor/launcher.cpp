@@ -57,28 +57,25 @@ int main(int argc, char* argv[]) {
 
   try {
     if (onlyCompile) {
-      desc.add_options()                                           //
-          ("queryfile,q", po::value<std::string>(&sInputFile),     //
-           "query set file")                                       //
-          ("help,h", "show help options")                          //
-          ("verbose,r", "verbose mode")                            //
-          ("dot,d", "create dot file")                             //
-          ("csv,m", "create csv file")                             // c->m
-          ("view,v", "create dot file and then call dot process")  //
-          ("fields,f", "show fields in dot file")                  //
-          ("tags,t", "show tags in dot file")                      //
-          ("streamprogs,s", "show stream programs in dot file")    //
-          ("sdump,p", "take as input file executor dump")          //
-          ("leavedot,e", "dont delete temporary dot file")         //
-          ("onlycompile,c", "compile only mode");                  // linking inheritance from launcher
+      desc.add_options()                                                          //
+          ("help,h", "show help options")                                         //
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
+          ("quiet,r", "no output on screen, skip dumper")                         //
+          ("dot,d", "create dot output")                                          //
+          ("csv,m", "create csv output")                                          // c->m
+          ("fields,f", "show fields in dot file")                                 //
+          ("tags,t", "show tags in dot file")                                     //
+          ("streamprogs,s", "show stream programs in dot file")                   //
+          ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
     } else {
       desc.add_options()                                                          //
           ("help,h", "Show program options")                                      //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
+          ("verbose,r", "verbose mode")                                           //
           ("waterfall,f", "show waterfall mode")                                  //
-          ("verbose,v", "Dump diagnostic info on screen while work")              //
           ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0),  //
-           "query limit, 0 - no limit");                                          //
+           "query limit, 0 - no limit")                                           //
+          ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
     }
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
@@ -130,7 +127,7 @@ int main(int argc, char* argv[]) {
                 << "Compile result:" << parseOut << std::endl;
 
     if (onlyCompile) {
-      dumper(vm);
+      if (!vm.count("quiet")) dumper(vm);
       return system::errc::success;
     }
 

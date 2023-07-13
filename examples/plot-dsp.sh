@@ -6,17 +6,19 @@ control_c()
 {
     xqry -k
     pkill plotblock
+    pkill gnuplot
     stty sane
 }
 
 STREAM=outputAll
+QUERY=query.rql
 
-if ! xretractor -q query.rql -c ; then exit 1 ; fi
+if ! xretractor $QUERY -c -r ; then exit 1 ; fi
 
-if ! which gnuplot ; then echo "install gnuplot!" ; exit 1 ; fi
+if ! which gnuplot > /dev/null ; then echo "install gnuplot!" ; exit 1 ; fi
 
-\rm nohup.out
-nohup xretractor -q query.rql &
+\rm -f nohup.out
+nohup xretractor $QUERY </dev/null >/dev/null 2>&1 &
 
 sleep 2
 
