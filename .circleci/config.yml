@@ -63,7 +63,7 @@ commands:
           name: Prep env
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind graphviz
+            sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind
             pip3 install --upgrade pip
             pip3 install conan==1.59
             conan profile new default --detect
@@ -78,7 +78,7 @@ commands:
           name: Prep env
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind graphviz
+            sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind
             pip3 install --upgrade pip
             pip3 install conan
             conan profile detect
@@ -120,15 +120,6 @@ commands:
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h
             cd build/<<parameters.build_type>>/test/Regression && ctest -V
-      - run:
-          name: Collect artifacts
-          command: |
-            mkdir -p /tmp/test_dumps
-            cp build/<<parameters.build_type>>/test/UnitTest/*.log /tmp/test_dumps
-            cp build/<<parameters.build_type>>/test/Regression/Testing/Temporary/* /tmp/test_dumps
-          # when: on_fail
-      - store_artifacts:
-          path: /tmp/test_dumps
 
 jobs:
   build-2204-debug:
