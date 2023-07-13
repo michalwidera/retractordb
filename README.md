@@ -1,7 +1,7 @@
 RetractorDB
 -----------------------------------------------------------------------
 
-This branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
+Master branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
@@ -86,7 +86,7 @@ from junction_of_input_streams
 
 Example:
 ```
-select core1[0]/2+1,a
+select core1[0]/2+1,core0
 stream str2
 from core1+core0
 ```

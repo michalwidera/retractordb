@@ -17,6 +17,17 @@ add_custom_target(
   COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-dsp.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
 
+add_custom_target(
+  simple-view
+  COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o out.png && feh out.png
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
+
+
+add_custom_target(
+  dsp-view
+  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o out.png && feh out.png
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
+
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
 add_custom_target(
@@ -44,7 +55,6 @@ add_custom_target(
 # $make clear_cache
 add_custom_target(clear-cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
 add_custom_target(patch COMMAND git diff --patch > ${CMAKE_BINARY_DIR}/my.patch)
-add_custom_target(apply COMMAND git apply ${CMAKE_BINARY_DIR}/my.patch)
 
 find_package(Git QUIET)
 

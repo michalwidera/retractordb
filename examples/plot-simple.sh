@@ -6,6 +6,7 @@ control_c()
 {
     xqry -k
     pkill plotblock
+    pkill gnuplot
     stty sane
 }
 
