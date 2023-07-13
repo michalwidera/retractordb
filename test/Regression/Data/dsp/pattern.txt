@@ -1,5 +1,3 @@
-Input file:query.rql
-Compile result:OK
 :STORAGE(0/1)	temp/
 signalRow(1/50)
 	:- PUSH_STREAM(source)

@@ -27,6 +27,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
   xout << "";
   std::set<std::string> planStreamRelationsSet;
   for (auto q : coreInstance) {
+    if (q.id == ":STORAGE") continue;
     //
     // Stream presentation
     //
@@ -148,12 +149,12 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
             std::string sTokenName(t.getStrCommandID());
             std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
             std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
-            xout << sTokenName;
+            xout << t ;
             // Token PUSH_ something has always some value on something
-            std::basic_string<char>::size_type idx = sTokenName.find("PUSH_");
-            if (idx != std::string::npos) {
-              xout << t;
-            }
+            //std::basic_string<char>::size_type idx = sTokenName.find("PUSH_");
+            //if (idx != std::string::npos) {
+            //  xout << t;
+            //}
           }
         xout << "}";
         xout << "\"";
@@ -273,37 +274,8 @@ void dumpRawTextFile() {
   }
 }
 
-int dumper(int argc, char *argv[]) {
+int dumper(boost::program_options::variables_map &vm) {
   try {
-    namespace po = boost::program_options;
-    std::string sInputFile;
-    po::options_description desc("Avaiable options");
-    desc.add_options()                                           //
-        ("help,h", "show help options")                          //
-        ("verbose,r", "verbose mode")                            //
-        ("dot,d", "create dot file")                             //
-        ("csv,m", "create csv file")                             // c->m
-        ("view,v", "create dot file and then call dot process")  //
-        ("fields,f", "show fields in dot file")                  //
-        ("tags,t", "show tags in dot file")                      //
-        ("streamprogs,s", "show stream programs in dot file")    //
-        ("sdump,p", "take as input file executor dump")          //
-        ("leavedot,e", "dont delete temporary dot file")         //
-        ("onlycompile,c", "compile only mode");                  // linking inheritance from launcher
-
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-    po::notify(vm);
-
-    assert(vm.count("onlycompile"));  // we can call this function only from main
-
-    if (vm.count("verbose") || vm.count("help")) std::cerr << argv[0] << " - qry file decoder.\n";
-    if (vm.count("help")) {
-      std::cout << desc;
-      std::cout << config_line << std::endl;
-      std::cout << warranty << std::endl;
-      return system::errc::success;
-    }
     //
     // Main algorithm
     //

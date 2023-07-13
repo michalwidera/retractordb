@@ -99,7 +99,7 @@ void qTree::dfs(const std::string v) {
 
 // https://en.wikipedia.org/wiki/Topological_sorting
 //
-void qTree::tsort() {
+void qTree::topologicalSort() {
   // https://cp-algorithms.com/graph/topological-sort.html#implementation
 
   ans.clear();

@@ -1,5 +1,3 @@
-Input file:query.rql
-Compile result:OK
 test_1(1/1)
 	:- PUSH_STREAM(core)
 	:- STREAM_AGSE(1,10)

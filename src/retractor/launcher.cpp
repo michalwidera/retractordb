@@ -22,7 +22,7 @@ using boost::lexical_cast;
 
 extern std::string parserFile(std::string sInputFile);
 extern int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam);
-extern int dumper(int argc, char* argv[]);
+extern int dumper(boost::program_options::variables_map& vm);
 
 int iTimeLimitCntParam{0};
 
@@ -44,26 +44,49 @@ int main(int argc, char* argv[]) {
   spdlog::set_default_logger(filelog);
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
-  std::string sOutputFile;
   std::string sInputFile;
   namespace po = boost::program_options;
   po::variables_map vm;
+
+  po::options_description desc("Available options");
+
+  bool onlyCompile{false};
+  for (int i = 0; i < argc; i++) {
+    if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--onlycompile") == 0) onlyCompile = true;
+  }
+
   try {
-    po::options_description desc("Available options:");
-    desc.add_options()                                                                                       //
-        ("help,h", "Show program options")                                                                   //
-        ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                               //
-        ("outfile,o", po::value<std::string>(&sOutputFile)->default_value("query.qry"), "output file")       //
-        ("dumpcross,d", "dump diagnostic cross compilation forms")                                           //
-        ("waterfall,f", "show waterfall mode")                                                               //
-        ("verbose,v", "Dump diagnostic info on screen while work")                                           //
-        ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0), "query limit, 0 - no limit")  //
-        ("onlycompile,c", "compile only mode");
+    if (onlyCompile) {
+      desc.add_options()                                           //
+          ("queryfile,q", po::value<std::string>(&sInputFile),     //
+           "query set file")                                       //
+          ("help,h", "show help options")                          //
+          ("verbose,r", "verbose mode")                            //
+          ("dot,d", "create dot file")                             //
+          ("csv,m", "create csv file")                             // c->m
+          ("view,v", "create dot file and then call dot process")  //
+          ("fields,f", "show fields in dot file")                  //
+          ("tags,t", "show tags in dot file")                      //
+          ("streamprogs,s", "show stream programs in dot file")    //
+          ("sdump,p", "take as input file executor dump")          //
+          ("leavedot,e", "dont delete temporary dot file")         //
+          ("onlycompile,c", "compile only mode");                  // linking inheritance from launcher
+    } else {
+      desc.add_options()                                                          //
+          ("help,h", "Show program options")                                      //
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
+          ("waterfall,f", "show waterfall mode")                                  //
+          ("verbose,v", "Dump diagnostic info on screen while work")              //
+          ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0),  //
+           "query limit, 0 - no limit");                                          //
+    }
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+
     po::notify(vm);
-    if (vm.count("help") && !vm.count("onlycompile")) {
+
+    if (vm.count("help")) {
       std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
       std::cout << "Usage: " << argv[0] << " queryfile [option]" << std::endl << std::endl;
       std::cout << desc;
@@ -71,6 +94,7 @@ int main(int argc, char* argv[]) {
       std::cout << warranty << std::endl;
       return system::errc::success;
     }
+
     if (!vm.count("queryfile")) {
       std::cout << argv[0] << ": fatal error: no input file" << std::endl;
       return EPERM;  // ERROR defined in errno-base.h
@@ -79,6 +103,7 @@ int main(int argc, char* argv[]) {
       std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << std::endl;
       return EPERM;  // ERROR defined in errno-base.h
     }
+
     auto parseOut = parserFile(sInputFile);
 
     //
@@ -100,12 +125,15 @@ int main(int argc, char* argv[]) {
     response = convertRemotes();
     assert(response == "OK");
 
-    if (vm.count("onlycompile")) {
-      std::cout << "Input file:" << sInputFile << std::endl;
-      std::cout << "Compile result:" << parseOut << std::endl;
-      dumper(argc, argv);
+    if (parseOut != "OK")
+      std::cerr << "Input file:" << sInputFile << std::endl  //
+                << "Compile result:" << parseOut << std::endl;
+
+    if (onlyCompile) {
+      dumper(vm);
       return system::errc::success;
     }
+
   } catch (std::exception& e) {
     std::cerr << e.what() << "\n";
     return system::errc::interrupted;

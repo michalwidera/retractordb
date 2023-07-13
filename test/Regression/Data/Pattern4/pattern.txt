@@ -1,5 +1,3 @@
-Input file:query-crc.rql
-Compile result:OK
 out1(1/2)
 	:- PUSH_STREAM(datasrc)
 	out1_0: INTEGER

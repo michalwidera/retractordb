@@ -1,0 +1,16 @@
+digraph structs {
+ node	[shape=record];
+ str1	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str1\ninterval=1/10|{<tag0>str1_0(INTEGER)|<tag1>str1_1(INTEGER)|<tag2>str1_2(INTEGER)}"]
+ prg_str1	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core0\nPUSH_STREAM core1\nSTREAM_ADD \n"]
+ core0	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core0\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
+ core1	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core1\ninterval=1/5\nDeclaration|{<tag0>b(INTEGER)}"]
+str1 -> prg_str1
+ str1_tag0	[shape=record,label="str1_0|{PUSH_ID(str1[0])|PUSH_VAL(10)|MULTIPLY(0)}"]
+ str1_tag1	[shape=record,label="str1_1|{PUSH_ID(str1[1])|PUSH_VAL(10)|MULTIPLY(0)}"]
+ str1_tag2	[shape=record,label="str1_2|{PUSH_ID(str1[1])|PUSH_ID(str1[0])|MULTIPLY(0)|PUSH_VAL(20)|ADD(0)}"]
+prg_str1 -> core0
+prg_str1 -> core1
+str1:tag0 -> str1_tag0 [style=dotted]
+str1:tag1 -> str1_tag1 [style=dotted]
+str1:tag2 -> str1_tag2 [style=dotted]
+}

@@ -103,7 +103,7 @@ class qTree : public std::vector<query> {
   query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   void sort() { std::sort(begin(), end()); };
-  void tsort();  // Topological sort
+  void topologicalSort();
 
   boost::rational<int> getDelta(const std::string &query_name);
 };

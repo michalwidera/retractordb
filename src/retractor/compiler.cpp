@@ -367,7 +367,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
 // In such case unroll does not appear and algorithm gets shitin-shitout
 std::string prepareFields() {
   int fieldCount = 0;
-  coreInstance.tsort();
+  coreInstance.topologicalSort();
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
       assert(q.lProgram.size() < 4);
