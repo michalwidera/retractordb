@@ -233,10 +233,10 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
     assert(result == 0);
-    SPDLOG_INFO("read fn from pos:{} limit:{}", recordIndexRv, recordsCount);
+    SPDLOG_INFO("read fn {} from pos:{} limit:{}", accessor->fileName(), recordIndexRv, recordsCount);
   } else {
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read fn - non existing data from pos:{} limit:{}", recordIndexRv, recordsCount);
+    SPDLOG_WARN("read fn {} - non existing data from pos:{} limit:{}", accessor->fileName(), recordIndexRv, recordsCount);
   }
   return result == 0;
 }

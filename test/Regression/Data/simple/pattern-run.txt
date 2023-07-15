@@ -4,12 +4,12 @@
 	INTEGER str1_1
 	INTEGER str1_2
 }
-{ str1_0:100 str1_1:10 str1_2:30 }
-{ str1_0:120 str1_1:20 str1_2:44 }
-{ str1_0:140 str1_1:40 str1_2:76 }
-{ str1_0:160 str1_1:50 str1_2:100 }
-{ str1_0:100 str1_1:70 str1_2:90 }
-{ str1_0:120 str1_1:80 str1_2:116 }
+{ str1_0:100 str1_1:0 str1_2:20 }
+{ str1_0:110 str1_1:10 str1_2:31 }
+{ str1_0:120 str1_1:10 str1_2:32 }
+{ str1_0:130 str1_1:20 str1_2:46 }
 { str1_0:140 str1_1:20 str1_2:48 }
+{ str1_0:150 str1_1:30 str1_2:65 }
 { str1_0:160 str1_1:30 str1_2:68 }
-{ str1_0:100 str1_1:50 str1_2:70 }
+{ str1_0:170 str1_1:40 str1_2:88 }
+{ str1_0:100 str1_1:40 str1_2:60 }

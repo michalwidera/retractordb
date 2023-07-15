@@ -15,18 +15,18 @@
 {	INTEGER str1_0
 	INTEGER str1_1
 }
-{ str1_0:10 str1_1:20 }
-{ str1_0:11 str1_1:21 }
-{ str1_0:22 str1_1:33 }
-{ str1_0:12 str1_1:22 }
+{ str1_0:0 str1_1:0 }
+{ str1_0:0 str1_1:0 }
+{ str1_0:20 str1_1:31 }
+{ str1_0:0 str1_1:0 }
 4 Record(s)
 8 Byte(s) per record.
 {	INTEGER str2_0
 }
 { str2_0:25 }
-{ str2_0:26 }
 { str2_0:25 }
-{ str2_0:26 }
+{ str2_0:25 }
+{ str2_0:25 }
 4 Record(s)
 4 Byte(s) per record.
 {	INTEGER str3_0

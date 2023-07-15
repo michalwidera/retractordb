@@ -67,6 +67,8 @@ class dataModel {
    */
   void constructInputPayload(std::string instance);
 
+  void fetchDeclaredPayload(std::string instance);
+
   void processRows(std::set<std::string> inSet);
 
   std::vector<rdb::descFldVT> getRow(std::string instance, const int timeOffset);

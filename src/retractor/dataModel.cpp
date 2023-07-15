@@ -289,10 +289,13 @@ dataModel::~dataModel() {}
 
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance,  //
                                                              const int revOffset) {
-  auto revOffsetMutable(revOffset);
-  if (qSet[instance]->outputPayload->isDeclared()) revOffsetMutable = 0;
-  auto success = qSet[instance]->outputPayload->readReverse(revOffsetMutable);
-  assert(success);
+  if (!qSet[instance]->outputPayload->isDeclared()) {
+    auto revOffsetMutable(revOffset);
+    auto success = qSet[instance]->outputPayload->readReverse(revOffsetMutable);
+    assert(success);
+  }
+  // else
+  // This data should be in outputPayload after dataModel::fetchDeclaredPayload call already
   return qSet[instance]->outputPayload->getPayload();
 }
 
@@ -305,13 +308,30 @@ bool dataModel::fetchPayload(std::string instance,                            //
 // TODO: work area
 void dataModel::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) continue;                // Declarations are not need to process
-
-    constructInputPayload(q.id);
-    qSet[q.id]->constructOutputPayload(q.lSchema);
-    qSet[q.id]->outputPayload->write();
+    if (inSet.find(q.id) == inSet.end()) continue;      // Drop off rows that not computed now
+    if (q.isDeclaration()) fetchDeclaredPayload(q.id);  // Declarations need to process in separate&first
   }
+  SPDLOG_INFO("fetch decl. stop");
+  for (auto q : coreInstance) {
+    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
+    if (q.isDeclaration()) continue;                //
+
+    constructInputPayload(q.id);                    // That will create 'from' clause data set
+    qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
+    qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
+  }
+}
+
+void dataModel::fetchDeclaredPayload(std::string instance) {
+  auto qry = coreInstance[instance];
+
+  assert(qry.isDeclaration());  // lProgram is empty()
+
+  auto success = qSet[instance]->outputPayload->read(0);
+  SPDLOG_INFO("fetch decl. {}", instance);
+  assert(success);
+
+  *(qSet[instance]->inputPayload) = *(qSet[instance]->outputPayload->getPayload());
 }
 
 void dataModel::constructInputPayload(std::string instance) {
@@ -450,9 +470,12 @@ std::vector<rdb::descFldVT> dataModel::getRow(std::string instance, const int ti
 
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
 
-  auto success = fetchPayload(instance, payload.get(), timeOffset);
-  assert(success);
-
+  if (!qSet[instance]->outputPayload->isDeclared()) {
+    auto success = fetchPayload(instance, payload.get(), timeOffset);
+    assert(success);
+  } else {
+    *payload = *(qSet[instance]->outputPayload->getPayload());
+  }
   auto i{0};
   for (auto f : payload->getDescriptor()) {
     if (std::get<rdb::rlen>(f) == 0) continue;
