@@ -264,7 +264,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
   command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
-    if (getQuery(sName1).lSchema.size() != getQuery(sName2).lSchema.size())
+    if (getQuery(sName1).descriptorStorage().sizeFlat() != getQuery(sName2).descriptorStorage().sizeFlat())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
     lRetVal = getQuery(sName1).lSchema;
   } else if (cmd == STREAM_DEHASH_DIV)
@@ -615,6 +615,25 @@ std::string convertRemotes() {
           if (schema != q.id) t = token(PUSH_ID, std::make_pair(q.id, offsetMap[q.id][schema] + offset));
         }
       }
+    }
+  }
+  return std::string("OK");
+}
+
+std::string applyConstraints() {
+  for (auto &q : coreInstance) {       // for each query
+    if (q.isDeclaration()) continue;   // do not check declaration in constraints.
+    assert(!q.isReductionRequired());  // process data only with two or less arguments
+    auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
+    auto i{0};
+    switch (cmd.getCommandID()) {
+      case STREAM_HASH: {
+        SPDLOG_ERROR("Hash operations need to work on two schemas with the same size.");
+        if (getQuery(arg1).descriptorStorage().sizeFlat() != getQuery(arg2).descriptorStorage().sizeFlat())
+          return std::string("hash failed on " + q.id);
+      } break;
+      default:
+        break;
     }
   }
   return std::string("OK");

@@ -103,6 +103,12 @@ int main(int argc, char* argv[]) {
 
     auto parseOut = parserFile(sInputFile);
 
+    if (parseOut != "OK") {
+      std::cerr << "Input file:" << sInputFile << std::endl  //
+                << "Parse result:" << parseOut << std::endl;
+      return system::errc::protocol_error;
+    }
+
     //
     // Compile part
     //
@@ -122,9 +128,12 @@ int main(int argc, char* argv[]) {
     response = convertRemotes();
     assert(response == "OK");
 
-    if (parseOut != "OK")
+    response = applyConstraints();
+    if (response != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //
-                << "Compile result:" << parseOut << std::endl;
+                << "Check result:" << response << std::endl;
+      return system::errc::protocol_error;
+    }
 
     if (onlyCompile) {
       if (!vm.count("quiet")) dumper(vm);
