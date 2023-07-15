@@ -22,6 +22,10 @@ constexpr int error_desc_location = -1;
 
 extern bool flatOutput;
 
+//
+// Creates ability to create descriptions of binary frames using types and arrays
+//
+
 class Descriptor : public std::vector<rField> {
   std::vector<std::pair<int, int>> convMap;
   std::map<std::pair<int, int>, int> convReMap;

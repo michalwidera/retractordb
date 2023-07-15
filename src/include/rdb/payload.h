@@ -8,6 +8,7 @@
 
 namespace rdb {
 /// @brief This class define accessing method to payload (memory area)
+/// This is accessor for payload memory area that supports applying descriptor type over memory area.
 class payload {
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;

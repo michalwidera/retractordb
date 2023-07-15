@@ -8,6 +8,10 @@ namespace rdb {
 /**
  * @brief This is interface for accessor interface.
  *
+ * File Accessor Interface.
+ * This is used as pattern for: faccposix, facposixprm and faccfs types.
+ * All these types need to support this interface
+ * 
  * There is only 3 operations over file/object/blob aka storage
  * append data at the end of storage
  * Read data from the storage
