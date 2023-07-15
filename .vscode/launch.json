@@ -5,13 +5,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "(gdb) xretractor dsp",
+      "name": "(gdb) xretractor compile",
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
-      "args": ["query.rql"],
+      "args": ["-c","query.rql"],
       "stopAtEntry": false,
-      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/dsp",
+      "cwd": "/home/michal/GitHub/retractordb/examples/issue-set/expression",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",

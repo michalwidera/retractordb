@@ -1,0 +1,15 @@
+# There is a problem that I have no idea how to fix or should I fix.
+# this SELECT clause will be changed to 1/4
+# but with natural way of operators is should be source[0]/25000 
+# but 25/100 is recognized as fraction ... then?
+# how I should distinguish between fraction and operations ?
+# have no idea for now.
+# options 
+# 1 - crate new fraction operator
+# 2 - crate other divide operator
+# 3 - you should know what are you doing.
+# ... for now 3 looks reasonable.
+
+DECLARE data1 BYTE, data2 BYTE STREAM source, 0.02 FILE '/dev/urandom'
+
+SELECT source[0]/25/100 STREAM output FROM source 

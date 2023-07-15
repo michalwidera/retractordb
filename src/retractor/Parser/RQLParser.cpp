@@ -52,7 +52,7 @@ void rqlParserInitialize() {
 #endif
   auto staticData = std::make_unique<RQLParserStaticData>(
     std::vector<std::string>{
-      "prog", "storage_statement", "select_statement", "rational_se", "fraction", 
+      "prog", "storage_statement", "select_statement", "rational_se", "fraction_rule", 
       "declare_statement", "field_declaration", "field_type", "select_list", 
       "field_id", "unary_op_expression", "asterisk", "expression", "expression_factor", 
       "term", "stream_expression", "stream_term", "stream_factor", "agregator", 
@@ -532,8 +532,8 @@ void RQLParser::RationalAsFloatContext::exitRule(tree::ParseTreeListener *listen
 }
 //----------------- RationalAsFraction_proformaContext ------------------------------------------------------------------
 
-RQLParser::FractionContext* RQLParser::RationalAsFraction_proformaContext::fraction() {
-  return getRuleContext<RQLParser::FractionContext>(0);
+RQLParser::Fraction_ruleContext* RQLParser::RationalAsFraction_proformaContext::fraction_rule() {
+  return getRuleContext<RQLParser::Fraction_ruleContext>(0);
 }
 
 RQLParser::RationalAsFraction_proformaContext::RationalAsFraction_proformaContext(Rational_seContext *ctx) { copyFrom(ctx); }
@@ -567,7 +567,7 @@ RQLParser::Rational_seContext* RQLParser::rational_se() {
       _localctx = _tracker.createInstance<RQLParser::RationalAsFraction_proformaContext>(_localctx);
       enterOuterAlt(_localctx, 1);
       setState(59);
-      fraction();
+      fraction_rule();
       break;
     }
 
@@ -601,11 +601,22 @@ RQLParser::Rational_seContext* RQLParser::rational_se() {
   return _localctx;
 }
 
-//----------------- FractionContext ------------------------------------------------------------------
+//----------------- Fraction_ruleContext ------------------------------------------------------------------
 
-RQLParser::FractionContext::FractionContext(ParserRuleContext *parent, size_t invokingState)
+RQLParser::Fraction_ruleContext::Fraction_ruleContext(ParserRuleContext *parent, size_t invokingState)
   : ParserRuleContext(parent, invokingState) {
 }
+
+
+size_t RQLParser::Fraction_ruleContext::getRuleIndex() const {
+  return RQLParser::RuleFraction_rule;
+}
+
+void RQLParser::Fraction_ruleContext::copyFrom(Fraction_ruleContext *ctx) {
+  ParserRuleContext::copyFrom(ctx);
+}
+
+//----------------- FractionContext ------------------------------------------------------------------
 
 std::vector<tree::TerminalNode *> RQLParser::FractionContext::DECIMAL() {
   return getTokens(RQLParser::DECIMAL);
@@ -619,26 +630,21 @@ tree::TerminalNode* RQLParser::FractionContext::DIVIDE() {
   return getToken(RQLParser::DIVIDE, 0);
 }
 
-
-size_t RQLParser::FractionContext::getRuleIndex() const {
-  return RQLParser::RuleFraction;
-}
+RQLParser::FractionContext::FractionContext(Fraction_ruleContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::FractionContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFraction(this);
 }
-
 void RQLParser::FractionContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFraction(this);
 }
-
-RQLParser::FractionContext* RQLParser::fraction() {
-  FractionContext *_localctx = _tracker.createInstance<FractionContext>(_ctx, getState());
-  enterRule(_localctx, 8, RQLParser::RuleFraction);
+RQLParser::Fraction_ruleContext* RQLParser::fraction_rule() {
+  Fraction_ruleContext *_localctx = _tracker.createInstance<Fraction_ruleContext>(_ctx, getState());
+  enterRule(_localctx, 8, RQLParser::RuleFraction_rule);
 
 #if __cplusplus > 201703L
   auto onExit = finally([=, this] {
@@ -648,6 +654,7 @@ RQLParser::FractionContext* RQLParser::fraction() {
     exitRule();
   });
   try {
+    _localctx = _tracker.createInstance<RQLParser::FractionContext>(_localctx);
     enterOuterAlt(_localctx, 1);
     setState(64);
     match(RQLParser::DECIMAL);
@@ -1805,8 +1812,8 @@ void RQLParser::ExpInContext::exitRule(tree::ParseTreeListener *listener) {
 }
 //----------------- ExpRationalContext ------------------------------------------------------------------
 
-RQLParser::FractionContext* RQLParser::ExpRationalContext::fraction() {
-  return getRuleContext<RQLParser::FractionContext>(0);
+RQLParser::Fraction_ruleContext* RQLParser::ExpRationalContext::fraction_rule() {
+  return getRuleContext<RQLParser::Fraction_ruleContext>(0);
 }
 
 RQLParser::ExpRationalContext::ExpRationalContext(TermContext *ctx) { copyFrom(ctx); }
@@ -2042,7 +2049,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
       previousContext = _localctx;
 
       setState(153);
-      fraction();
+      fraction_rule();
       break;
     }
 

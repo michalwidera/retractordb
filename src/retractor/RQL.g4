@@ -16,12 +16,13 @@ select_statement    : SELECT select_list
                     # Select
                     ;
 
-rational_se         : fraction # RationalAsFraction_proforma
-                    | FLOAT    # RationalAsFloat
-                    | DECIMAL  # RationalAsDecimal
+rational_se         : fraction_rule # RationalAsFraction_proforma
+                    | FLOAT         # RationalAsFloat
+                    | DECIMAL       # RationalAsDecimal
                     ;
 
-fraction            : DECIMAL DIVIDE DECIMAL
+fraction_rule       : DECIMAL DIVIDE DECIMAL
+                    # Fraction
                     ;
 
 declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
@@ -70,7 +71,7 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
 term
                     : term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
-                    | fraction                     # ExpRational
+                    | fraction_rule                # ExpRational
                     | '(' expression_factor ')'    # ExpIn
                     | '-'? FLOAT                   # ExpFloat
                     | '-'? DECIMAL                 # ExpDec

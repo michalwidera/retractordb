@@ -27,7 +27,7 @@ public:
 
   enum {
     RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleRational_se = 3, 
-    RuleFraction = 4, RuleDeclare_statement = 5, RuleField_declaration = 6, 
+    RuleFraction_rule = 4, RuleDeclare_statement = 5, RuleField_declaration = 6, 
     RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
     RuleAsterisk = 11, RuleExpression = 12, RuleExpression_factor = 13, 
     RuleTerm = 14, RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
@@ -55,7 +55,7 @@ public:
   class Storage_statementContext;
   class Select_statementContext;
   class Rational_seContext;
-  class FractionContext;
+  class Fraction_ruleContext;
   class Declare_statementContext;
   class Field_declarationContext;
   class Field_typeContext;
@@ -181,27 +181,38 @@ public:
   public:
     RationalAsFraction_proformaContext(Rational_seContext *ctx);
 
-    FractionContext *fraction();
+    Fraction_ruleContext *fraction_rule();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Rational_seContext* rational_se();
 
-  class  FractionContext : public antlr4::ParserRuleContext {
+  class  Fraction_ruleContext : public antlr4::ParserRuleContext {
   public:
-    FractionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode* DECIMAL(size_t i);
-    antlr4::tree::TerminalNode *DIVIDE();
+    Fraction_ruleContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Fraction_ruleContext() = default;
+    void copyFrom(Fraction_ruleContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual size_t getRuleIndex() const override;
+
    
   };
 
-  FractionContext* fraction();
+  class  FractionContext : public Fraction_ruleContext {
+  public:
+    FractionContext(Fraction_ruleContext *ctx);
+
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    antlr4::tree::TerminalNode *DIVIDE();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Fraction_ruleContext* fraction_rule();
 
   class  Declare_statementContext : public antlr4::ParserRuleContext {
   public:
@@ -548,7 +559,7 @@ public:
   public:
     ExpRationalContext(TermContext *ctx);
 
-    FractionContext *fraction();
+    Fraction_ruleContext *fraction_rule();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
