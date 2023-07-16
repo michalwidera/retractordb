@@ -283,6 +283,16 @@ TEST_F(xschema, compute_instance_1) {
 }
 
 TEST_F(xschema, getRow_1) {
+  /* datafile1.txt contents:
+  20 31
+  21 32
+  22 33
+  */
+  dataArea->qSet["core0"]->outputPayload->reset();
+
+  std::set<std::string> rowSet = {"core0"};
+  dataArea->processRows(rowSet);
+
   auto row = dataArea->getRow("core0", 0);
 
   std::string res("{ ");
@@ -308,6 +318,8 @@ TEST_F(xschema, getRow_1) {
 
   std::cerr << res << std::endl;
   ASSERT_TRUE("{ 20 31 }" == res);
+
+  dataArea->qSet["core0"]->outputPayload->reset();
 }
 
 TEST_F(xschema, process_rows_1) {
@@ -321,7 +333,7 @@ TEST_F(xschema, process_rows_1) {
   ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 0);
   ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 0);
 
-  std::set<std::string> rowSet = {"str1", "str2"};
+  std::set<std::string> rowSet = {"str1", "str2", "core0", "core1"};
   dataArea->processRows(rowSet);
 
   ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 1);
@@ -332,7 +344,7 @@ TEST_F(xschema, process_rows_1) {
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
     std::cerr << coutstring.str() << std::endl;
-    ASSERT_TRUE("{ str2_0:20 str2_1:31 }" == coutstring.str());
+    ASSERT_TRUE("{ str2_0:20 str2_1:31 }" == coutstring.str());  // core0 == {20 31}, str2 => {20,31}
   }
 
   {
@@ -340,7 +352,7 @@ TEST_F(xschema, process_rows_1) {
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
     std::cerr << coutstring.str() << std::endl;
-    ASSERT_TRUE("{ str2_0:25 }" == coutstring.str());  // str1[0]+5 => 20 + 5 => 25 (?)
+    ASSERT_TRUE("{ str2_0:25 }" == coutstring.str());  // str1[0]+5 => 20 + 5 => 25
   }
 
   {
@@ -348,7 +360,7 @@ TEST_F(xschema, process_rows_1) {
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
     std::cerr << coutstring.str() << std::endl;
-    ASSERT_TRUE("{ str1_0:0 str1_1:0 }" == coutstring.str());  // Todo check
+    ASSERT_TRUE("{ str1_0:10 str1_1:20 }" == coutstring.str());
   }
 
   {
@@ -356,7 +368,7 @@ TEST_F(xschema, process_rows_1) {
     std::stringstream coutstring;
     coutstring << rdb::flat << payload;
     std::cerr << coutstring.str() << std::endl;
-    ASSERT_TRUE("{ str1_0:0 str1_1:0 }" == coutstring.str());  // Todo check
+    ASSERT_TRUE("{ str1_0:10 str1_1:20 }" == coutstring.str());
   }
 
   dataArea->processRows(rowSet);
@@ -365,6 +377,11 @@ TEST_F(xschema, process_rows_1) {
 
   ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 4);
   ASSERT_TRUE(dataArea->qSet["str2"]->outputPayload->getRecordsCount() == 4);
+
+  dataArea->qSet["str1"]->outputPayload->reset();
+  dataArea->qSet["str2"]->outputPayload->reset();
+  dataArea->qSet["core0"]->outputPayload->reset();
+  dataArea->qSet["core1"]->outputPayload->reset();
 }
 
 }  // namespace

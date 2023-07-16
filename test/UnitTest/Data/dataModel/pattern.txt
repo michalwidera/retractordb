@@ -15,19 +15,11 @@
 {	INTEGER str1_0
 	INTEGER str1_1
 }
-{ str1_0:0 str1_1:0 }
-{ str1_0:0 str1_1:0 }
-{ str1_0:20 str1_1:31 }
-{ str1_0:0 str1_1:0 }
-4 Record(s)
+0 Record(s)
 8 Byte(s) per record.
 {	INTEGER str2_0
 }
-{ str2_0:25 }
-{ str2_0:25 }
-{ str2_0:25 }
-{ str2_0:25 }
-4 Record(s)
+0 Record(s)
 4 Byte(s) per record.
 {	INTEGER str3_0
 }
