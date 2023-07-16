@@ -121,6 +121,16 @@ add_test(
   xretractor query-simple.rql -m 10 ; \
   xtrdb < term.script > out.txt ;  \
   ${CMAKE_COMMAND} -E compare_files pattern-run.txt out.txt")
+# -----------------------------------------------------------------------------------------------
+
+add_test(
+  NAME rg-agse
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/agse
+  COMMAND
+    bash -c "set -e ; \
+    xretractor query.rql -m 5 ; \
+    xtrdb < term.script > out.txt ;  \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 # -----------------------------------------------------------------------------------------------
 

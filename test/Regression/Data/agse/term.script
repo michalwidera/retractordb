@@ -1,0 +1,8 @@
+noprompt
+open signalRow
+size
+desc
+list 4
+quit
+rem dropfile { core0.desc signalRow signalRow.desc }
+quit

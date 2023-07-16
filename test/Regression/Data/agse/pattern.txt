@@ -1,0 +1,12 @@
+.4 Record(s)
+20 Byte(s) per record.
+{	INTEGER core0_0
+	INTEGER core0_1
+	INTEGER core0_2
+	INTEGER core0_3
+	INTEGER core0_4
+}
+{ core0_0:12 core0_1:13 core0_2:14 core0_3:15 core0_4:16 }
+{ core0_0:11 core0_1:12 core0_2:13 core0_3:14 core0_4:15 }
+{ core0_0:10 core0_1:11 core0_2:12 core0_3:13 core0_4:14 }
+{ core0_0:17 core0_1:10 core0_2:11 core0_3:12 core0_4:13 }
