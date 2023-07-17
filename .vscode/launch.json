@@ -5,13 +5,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "(gdb) xretractor compile",
+      "name": "(gdb) xretractor",
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
-      "args": ["-c","query.rql"],
+      "args": ["query.rql" , "-m" , "5"],
       "stopAtEntry": false,
-      "cwd": "/home/michal/GitHub/retractordb/examples/issue-set/expression",
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/agse",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",

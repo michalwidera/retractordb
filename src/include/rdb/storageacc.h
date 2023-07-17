@@ -39,7 +39,9 @@ class storageAccessor {
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
-  // If destination is nullptr - read stores data in storagePayload otherwise it goes to destianation
+  // Read data from storage described as accessor
+  // if var:reverse is set read file backwards
+  // if var:destination is null read into storageAccessor payload
   bool read(const size_t recordIndex, uint8_t *destination = nullptr);
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
   bool readReverse(const size_t recordIndex, uint8_t *destination = nullptr);
@@ -47,7 +49,6 @@ class storageAccessor {
   Descriptor &getDescriptor();
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
-  void setReverse(bool value);
   void setRemoveOnExit(bool value);
   void setRemoveDescriptorOnExit(bool value);
   const size_t getRecordsCount();

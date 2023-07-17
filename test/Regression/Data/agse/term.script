@@ -3,6 +3,9 @@ open signalRow
 size
 desc
 list 4
-quit
-rem dropfile { core0.desc signalRow signalRow.desc }
+open signalText
+size
+desc
+list 4
+dropfile { core0.desc core1.desc signalRow signalRow.desc signalText signalText.desc }
 quit

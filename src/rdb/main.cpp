@@ -22,6 +22,7 @@ std::string ORANGE = "\x1B[33m";
 std::string BLUE = "\x1B[34m";
 std::string YELLOW = "\x1B[93m";
 std::string RESET = "\033[0m";
+std::string BLINK = "\x1b[5m";
 
 constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
 
@@ -75,12 +76,18 @@ int main(int argc, char* argv[]) {
       BLUE = "";
       YELLOW = "";
       RESET = "";
+      BLINK = "";
       std::cout << ok;
       continue;
     }
     if (cmd == "quitdrop" || cmd == "qd") {
       if (dacc) dacc->setRemoveOnExit(true);
       break;
+    }
+    if (cmd == "echo") {
+      std::getline(std::cin, wasteComment);
+      std::cout << BLINK << wasteComment << std::endl << RESET ;
+      continue;
     }
     if (cmd == "open" || cmd == "ropen" || cmd == "openx" || cmd == "ropenx") {
       std::cin >> file;
@@ -113,7 +120,7 @@ int main(int argc, char* argv[]) {
         scheamStringStream >> desc;
         dacc->attachDescriptor(&desc);
       }
-      dacc->setReverse(cmd == "ropen" || cmd == "ropenx");
+      reverse = (cmd == "ropen" || cmd == "ropenx");
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
@@ -139,6 +146,7 @@ int main(int argc, char* argv[]) {
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
+      std::cout << "echo \t\t\t\t print message on terminal\n";
       std::cout << "fetch [amount] \t\t\t fetch and print amount of data from database\n";
       std::cout << RESET;
     } else if (cmd == "dropfile") {
@@ -166,7 +174,8 @@ int main(int argc, char* argv[]) {
         std::cout << RED << "record out of range - read command\n" << RESET;
         continue;
       }
-      auto returnStatus = dacc->read(record);
+      auto readIdx = reverse ? dacc->getRecordsCount() - record - 1 : record;
+      auto returnStatus = dacc->read(readIdx);
       if (returnStatus)
         payloadStatus = fetched;
       else
@@ -221,7 +230,6 @@ int main(int argc, char* argv[]) {
       }
     } else if (cmd == "flip") {
       reverse = !reverse;
-      dacc->setReverse(reverse);
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
@@ -231,7 +239,8 @@ int main(int argc, char* argv[]) {
       wantFetchRecords = std::min(wantFetchRecords, dacc->getRecordsCount());
       for (auto i = 0; i < wantFetchRecords; i++) {
         // read part
-        auto returnStatus = dacc->read(i);
+        auto readIdx = reverse ? dacc->getRecordsCount() - i - 1 : i;
+        auto returnStatus = dacc->read(readIdx);
         if (returnStatus)
           payloadStatus = fetched;
         else
@@ -255,7 +264,8 @@ int main(int argc, char* argv[]) {
           std::cout << RED << "record out of range - list command\n" << RESET;
           continue;
         }
-        auto returnStatus = (cmd == "list") ? dacc->read(i) : dacc->read(dacc->getRecordsCount() - i - 1);
+        auto readIdx = (cmd == "rlist") ? dacc->getRecordsCount() - i - 1 : i;
+        auto returnStatus = dacc->read(readIdx);
         if (returnStatus)
           payloadStatus = fetched;
         else

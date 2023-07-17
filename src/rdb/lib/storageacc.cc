@@ -197,8 +197,6 @@ std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
 
 bool storageAccessor::peekDescriptor() { return std::filesystem::exists(descriptorFile); }
 
-void storageAccessor::setReverse(bool value) { reverse = value; }
-
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
 void storageAccessor::setRemoveDescriptorOnExit(bool value) { removeDescriptorOnExit = value; }
@@ -213,22 +211,26 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
     abort();
   }
   if (!isOpen(dataFileStatus)) {
-    SPDLOG_ERROR("store is not open");
-    abort();  // data file is not opened
+    SPDLOG_ERROR("data file is not opened");
+    abort();
   }
   if (!storagePayload) {
     SPDLOG_ERROR("no payload attached");
-    abort();  // no payload attached
+    abort();
   }
   destination = (destination == nullptr)                            //
                     ? static_cast<uint8_t*>(storagePayload->get())  //
-                    : destination;                                  //
+                    : destination;
+
   assert(destination != nullptr);
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
 
   auto recordIndexRv{0};
-  if (storageType != "DEVICE") recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
+  if (storageType != "DEVICE")
+    recordIndexRv = reverse                                 //
+                        ? (recordsCount - 1) - recordIndex  //
+                        : recordIndex;
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);

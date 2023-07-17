@@ -1,3 +1,7 @@
-DECLARE a INTEGER STREAM core0, 1 FILE 'datafile.dat'
+# ctest -R '^rg-agse' -V
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile.dat'
+DECLARE a INTEGER STREAM core1, 0.1 FILE 'datafile.txt'
 
 SELECT * STREAM signalRow FROM core0@(1,5)
+SELECT * STREAM signalText FROM core1@(1,5)
