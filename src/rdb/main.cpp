@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
     }
     if (cmd == "echo") {
       std::getline(std::cin, wasteComment);
-      std::cout << BLINK << wasteComment << std::endl << RESET ;
+      std::cout << BLINK << wasteComment << std::endl << RESET;
       continue;
     }
     if (cmd == "open" || cmd == "ropen" || cmd == "openx" || cmd == "ropenx") {
@@ -129,10 +129,10 @@ int main(int argc, char* argv[]) {
       std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
       std::cout << "open|ropen file [schema] \t open or create database with schema (r-reverse iterator)\n";
       std::cout << "openx|ropenx desc file [schema] \n";
-      std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] } \n";
+      std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] }\n";
       std::cout << "desc|descc \t\t\t show schema\n";
       std::cout << "read [n] \t\t\t read record from database into payload\n";
-      std::cout << "write [n] \t\t\t send record to database from payload\n";
+      std::cout << "write [n] \t\t\t from payload send record to database\n";
       std::cout << "append \t\t\t\t append payload to database\n";
       std::cout << "set [field][value] \t\t set payload field value\n";
       std::cout << "setpos [position][number value]\t set payload field number value\n";

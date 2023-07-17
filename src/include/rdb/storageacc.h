@@ -20,7 +20,6 @@ class storageAccessor {
   std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
   std::unique_ptr<rdb::payload> storagePayload;
   Descriptor descriptor;
-  bool reverse = false;
   bool removeOnExit = true;
   bool removeDescriptorOnExit = false;
   size_t recordsCount = 0;

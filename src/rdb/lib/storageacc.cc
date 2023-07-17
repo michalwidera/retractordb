@@ -227,10 +227,8 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
   auto result = 0;
 
   auto recordIndexRv{0};
-  if (storageType != "DEVICE")
-    recordIndexRv = reverse                                 //
-                        ? (recordsCount - 1) - recordIndex  //
-                        : recordIndex;
+  if (storageType != "DEVICE" && storageType != "TEXTSOURCE")
+    recordIndexRv = recordIndex;  // In case of device type - is works only on first record.
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
@@ -244,11 +242,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 }
 
 bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
-  auto reversePrevValue = reverse;
-  reverse = true;
-  auto return_value = read(recordIndex, destination);
-  reverse = reversePrevValue;
-  return return_value;
+  return read(getRecordsCount() - recordIndex - 1, destination);
 }
 
 bool storageAccessor::write(const size_t recordIndex) {
@@ -276,10 +270,9 @@ bool storageAccessor::write(const size_t recordIndex) {
   }
 
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    auto recordIndexRv = reverse ? (recordsCount - 1) - recordIndex : recordIndex;
-    result = accessor->write(static_cast<uint8_t*>(storagePayload->get()), size, recordIndexRv * size);
+    result = accessor->write(static_cast<uint8_t*>(storagePayload->get()), size, recordIndex * size);
     assert(result == 0);
-    SPDLOG_INFO("write {}", recordIndexRv);
+    SPDLOG_INFO("write {}", recordIndex);
   }
   return result == 0;
 };
