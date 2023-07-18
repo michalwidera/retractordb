@@ -42,7 +42,6 @@ int main(int argc, char* argv[]) {
 
   std::unique_ptr<rdb::storageAccessor> dacc;
   std::string file;
-  bool reverse = false;
   bool rox = true;
   bool mono = false;
   std::string prompt = ".";
@@ -89,19 +88,14 @@ int main(int argc, char* argv[]) {
       std::cout << BLINK << wasteComment << std::endl << RESET;
       continue;
     }
-    if (cmd == "open" || cmd == "ropen" || cmd == "openx" || cmd == "ropenx") {
+    if (cmd == "open") {
       std::cin >> file;
       if (file.find('{') != std::string::npos) {
         std::cout << RED << "unrecognized or missing file:" << file << "\n" << RESET;
         continue;
       }
-      if (cmd == "open" || cmd == "ropen")
-        dacc = std::make_unique<rdb::storageAccessor>(file, file);
-      else {
-        std::string descFile;
-        std::cin >> descFile;
-        dacc = std::make_unique<rdb::storageAccessor>(descFile, file);
-      }
+      dacc = std::make_unique<rdb::storageAccessor>(file, file);
+
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
       } else {
@@ -120,34 +114,31 @@ int main(int argc, char* argv[]) {
         scheamStringStream >> desc;
         dacc->attachDescriptor(&desc);
       }
-      reverse = (cmd == "ropen" || cmd == "ropenx");
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
       std::cout << "exit|quit|q \t\t\t exit\n";
       std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
-      std::cout << "open|ropen file [schema] \t open or create database with schema (r-reverse iterator)\n";
-      std::cout << "openx|ropenx desc file [schema] \n";
+      std::cout << "open file [schema] \t\t open or create database with schema\n";
       std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] }\n";
       std::cout << "desc|descc \t\t\t show schema\n";
-      std::cout << "read [n] \t\t\t read record from database into payload\n";
+      std::cout << "read|rread [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t from payload send record to database\n";
       std::cout << "append \t\t\t\t append payload to database\n";
       std::cout << "set [field][value] \t\t set payload field value\n";
       std::cout << "setpos [position][number value]\t set payload field number value\n";
       std::cout << "status \t\t\t\t show status of payload\n";
-      std::cout << "flip \t\t\t\t flip reverse iterator\n";
       std::cout << "rox \t\t\t\t remove on exit flip\n";
       std::cout << "print|printt \t\t\t show payload\n";
       std::cout << "list|rlist [value] \t\t print value records\n";
       std::cout << "input [[field][value]] \t\t fill payload\n";
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
+      std::cout << "cap [value]\t\t\t set device stream backread capacity\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
       std::cout << "echo \t\t\t\t print message on terminal\n";
-      std::cout << "fetch [amount] \t\t\t fetch and print amount of data from database\n";
       std::cout << RESET;
     } else if (cmd == "dropfile") {
       std::string object;
@@ -167,19 +158,17 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "descc") {
       std::cout << YELLOW << rdb::flat << dacc->getDescriptor() << RESET << std::endl;
       continue;
-    } else if (cmd == "read") {
+    } else if (cmd == "read" || cmd == "rread") {
       int record;
       std::cin >> record;
       if (record >= dacc->getRecordsCount()) {
         std::cout << RED << "record out of range - read command\n" << RESET;
         continue;
       }
-      auto readIdx = reverse ? dacc->getRecordsCount() - record - 1 : record;
-      auto returnStatus = dacc->read(readIdx);
-      if (returnStatus)
-        payloadStatus = fetched;
-      else
-        payloadStatus = error;
+
+      auto returnStatus = (cmd == "read") ? dacc->read(record) : dacc->readReverse(record);
+      payloadStatus = returnStatus ? fetched : error;
+
     } else if (cmd == "set") {
       std::cin >> *(dacc->getPayload());
       payloadStatus = changed;
@@ -228,28 +217,13 @@ int main(int argc, char* argv[]) {
       if (value.type() == typeid(double)) {
         std::cout << std::any_cast<double>(value) << std::endl;
       }
-    } else if (cmd == "flip") {
-      reverse = !reverse;
+    } else if (cmd == "cap") {
+      int backCapacityValue;
+      std::cin >> backCapacityValue;
+      dacc->setCapacity(backCapacityValue);
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
-    } else if (cmd == "fetch") {
-      size_t wantFetchRecords;
-      std::cin >> wantFetchRecords;
-      wantFetchRecords = std::min(wantFetchRecords, dacc->getRecordsCount());
-      for (auto i = 0; i < wantFetchRecords; i++) {
-        // read part
-        auto readIdx = reverse ? dacc->getRecordsCount() - i - 1 : i;
-        auto returnStatus = dacc->read(readIdx);
-        if (returnStatus)
-          payloadStatus = fetched;
-        else
-          payloadStatus = error;
-        // print part
-
-        if (returnStatus) std::cout << ORANGE << *(dacc->getPayload()) << RESET;
-      }
-      continue;
     } else if (cmd == "print") {
       std::cout << ORANGE << *(dacc->getPayload()) << RESET;
       continue;
@@ -265,10 +239,7 @@ int main(int argc, char* argv[]) {
           continue;
         }
         auto returnStatus = (cmd == "rlist") ? dacc->readReverse(i) : dacc->read(i);
-        if (returnStatus)
-          payloadStatus = fetched;
-        else
-          payloadStatus = error;
+        payloadStatus = returnStatus ? fetched : error;
 
         if (payloadStatus == error) {
           std::cout << RED << "fetch error\n" << RESET;

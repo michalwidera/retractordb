@@ -7,5 +7,17 @@
 9 Byte(s) per record.
 { dane:1 name:test1 }
 { dane:2 name:test2 }
-{ dane:1 name:test1 }
+{ dane:3 name:test3 }
+{ dane:4 name:test4 }
+ rlist 3
+{ dane:4 name:test4 }
+{ dane:3 name:test3 }
 { dane:2 name:test2 }
+ rlist 3
+{ dane:1 name:test1 }
+{ dane:4 name:test4 }
+{ dane:3 name:test3 }
+ rlist 3
+{ dane:2 name:test2 }
+{ dane:1 name:test1 }
+{ dane:4 name:test4 }

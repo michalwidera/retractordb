@@ -15,3 +15,15 @@
 { dane:10 }
 { dane:11 }
 { dane:12 }
+ rlist 3
+{ dane:16 }
+{ dane:15 }
+{ dane:14 }
+ rlist 3
+{ dane:17 }
+{ dane:16 }
+{ dane:15 }
+ rlist 3
+{ dane:10 }
+{ dane:17 }
+{ dane:16 }

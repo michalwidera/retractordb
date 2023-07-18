@@ -59,7 +59,7 @@
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/rdb/xtrdb",
       "args": [],
       "stopAtEntry": false,
-      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/Pattern8",
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",

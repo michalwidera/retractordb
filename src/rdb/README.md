@@ -32,26 +32,26 @@ type h for help
 .help
 exit|quit|q                      exit
 quitdrop|qd                      exit & drop artifacts
-open|ropen file [schema]         open or create database with schema (r-reverse iterator)
-openx|ropenx desc file [schema]
+open file [schema]               open or create database with schema
+openx desc file [schema]
                                  example: .open test_db { INTEGER dane STRING name[3] }
 desc|descc                       show schema
 read [n]                         read record from database into payload
-write [n]                        send record to database from payload
+write [n]                        from payload send record to database
 append                           append payload to database
 set [field][value]               set payload field value
 setpos [position][number value]  set payload field number value
 status                           show status of payload
-flip                             flip reverse iterator
 rox                              remove on exit flip
 print|printt                     show payload
 list|rlist [value]               print value records
 input [[field][value]]           fill payload
 hex|dec                          type of input/output of byte/number fields
 size                             show database size in records
+cap [value]                              set device stream backread capacity
 dump                             show payload memory
 mono                             no color mode
-fetch [amount]                   fetch and print amount of data from database
+echo                             print message on terminal
 ok
 .
 ```

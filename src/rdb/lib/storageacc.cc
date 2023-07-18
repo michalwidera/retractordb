@@ -195,11 +195,16 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
-const size_t storageAccessor::getRecordsCount() { return recordsCount; }
+const size_t storageAccessor::getRecordsCount() {
+  if (isDeclared())
+    return circularBuffer.size() == 0 ? 1 : circularBuffer.size();
+  else
+    return recordsCount;
+}
 
 std::string storageAccessor::getStorageName() { return storageFile; }
 
-bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
+void storageAccessor::abortIfStorageNotPrepared() {
   if (descriptor.isEmpty()) {
     SPDLOG_ERROR("descriptor is Empty");
     abort();
@@ -212,6 +217,10 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
     SPDLOG_ERROR("no payload attached");
     abort();
   }
+}
+
+bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
+  abortIfStorageNotPrepared();
   destination = (destination == nullptr)                            //
                     ? static_cast<uint8_t*>(storagePayload->get())  //
                     : destination;
@@ -226,6 +235,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
+    if (circularBuffer.capacity() > 0) circularBuffer.push_front(*storagePayload.get());
     assert(result == 0);
     SPDLOG_INFO("read fn {} from pos:{} limit:{}", accessor->fileName(), recordIndexRv, recordsCount);
   } else {
@@ -236,22 +246,48 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 }
 
 bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
-  return read(getRecordsCount() - recordIndex - 1, destination);
+  if (storageType != "DEVICE" && storageType != "TEXTSOURCE") return read(getRecordsCount() - recordIndex - 1, destination);
+
+  if (circularBuffer.capacity() == 0) return read(0, destination);
+  if (recordIndex == 0) return read(0, destination);
+  // TODO working here
+
+  assert(circularBuffer.capacity() > 0);
+  assert(recordIndex >= 0);
+
+  // Read data from Circular Buffer instead of data source
+
+  assert((recordIndex <= circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
+  assert((recordIndex <= circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
+
+  /* zeros as uninitialized ?
+  if (recordIndex > circularBuffer.capacity()) {
+    std::memset(destination, 0, size);
+    return false;
+  }
+  */
+
+  destination = (destination == nullptr)                            //
+                    ? static_cast<uint8_t*>(storagePayload->get())  //
+                    : destination;
+  assert(destination != nullptr);
+  auto size = descriptor.getSizeInBytes();
+
+  *(storagePayload.get()) = circularBuffer[recordIndex];
+  return true;
+}
+
+void storageAccessor::setCapacity(const int capacity) {
+  assert(storageType == "DEVICE" || storageType == "TEXTSOURCE");
+  circularBuffer.clear();
+  assert(circularBuffer.size() == 0);
+  assert(circularBuffer.empty());
+  circularBuffer.set_capacity(capacity);
 }
 
 bool storageAccessor::write(const size_t recordIndex) {
-  if (descriptor.isEmpty()) {
-    SPDLOG_ERROR("descriptor is Empty");
-    abort();
-  }
-  if (!isOpen(dataFileStatus)) {
-    SPDLOG_ERROR("store is not open");
-    abort();  // data file is not opened
-  }
-  if (!storagePayload) {
-    SPDLOG_ERROR("no payload attached");
-    abort();  // no payload attached
-  }
+  abortIfStorageNotPrepared();
+
   auto size = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {

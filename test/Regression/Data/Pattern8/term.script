@@ -15,5 +15,15 @@ read 0
 printt
 read 0
 printt
+cap 3
+read 0
+read 0
+read 0
+echo rlist 3
+rlist 3
+echo rlist 3
+rlist 3
+echo rlist 3
+rlist 3
 dropfile { data_source.desc }
 quit

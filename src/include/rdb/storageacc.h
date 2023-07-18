@@ -1,6 +1,7 @@
 #ifndef STORAGE_RDB_INCLUDE_DACC_H_
 #define STORAGE_RDB_INCLUDE_DACC_H_
 
+#include <boost/circular_buffer.hpp>
 #include <memory>  // std::unique_ptr
 #include <string>
 
@@ -28,6 +29,10 @@ class storageAccessor {
   void moveRef();
   void attachStorage();
 
+  boost::circular_buffer<rdb::payload> circularBuffer{0};
+
+  void abortIfStorageNotPrepared();
+
  public:
   storageAccessor() = delete;
   storageAccessor(std::string fileNameDesc, std::string fileName = "");
@@ -53,6 +58,8 @@ class storageAccessor {
   std::string getStorageName();
 
   bool isDeclared();
+
+  void setCapacity(const int capacity);
 
   // technical function - for unit tests
   void reset();
