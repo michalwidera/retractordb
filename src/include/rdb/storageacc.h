@@ -16,6 +16,7 @@
 
 namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
+enum class policyState { noFreeze, freeze };
 
 class storageAccessor {
   std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
@@ -29,7 +30,6 @@ class storageAccessor {
   void moveRef();
   void attachStorage();
 
-  bool bufferIsFreezed{false};
   boost::circular_buffer<rdb::payload> circularBuffer{0};
 
   void abortIfStorageNotPrepared();
@@ -40,6 +40,7 @@ class storageAccessor {
   ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
+  policyState bufferPolicy = policyState::noFreeze;
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
@@ -61,7 +62,6 @@ class storageAccessor {
   bool isDeclared();
 
   void setCapacity(const int capacity);
-  void setFreeze(const bool freezeState);
 
   // technical function - for unit tests
   void reset();

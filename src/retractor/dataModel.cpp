@@ -72,7 +72,7 @@ streamInstance::streamInstance(query& qry)
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructAgsePayload(const int length, const int offset) {
+rdb::payload streamInstance::constructAgsePayload(const int length, const int offset, std::string storage_name) {
   assert(offset > 0);
   // First construct descriptor
   rdb::Descriptor descriptor;
@@ -82,8 +82,6 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int of
   outputPayload->readReverse(0);
 
   auto descriptorVecSize = outputPayload->getDescriptor().sizeFlat();
-  std::string storage_name = outputPayload->getStorageName();
-
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
   for (auto i = 0; i < lengthAbs; i++) {
     rdb::rField x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
@@ -433,7 +431,7 @@ void dataModel::constructInputPayload(std::string instance) {
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
 
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step);
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
