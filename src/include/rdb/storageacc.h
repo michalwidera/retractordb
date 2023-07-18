@@ -38,7 +38,6 @@ class storageAccessor {
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
   // Read data from storage described as accessor
-  // if var:reverse is set read file backwards
   // if var:destination is null read into storageAccessor payload
   bool read(const size_t recordIndex, uint8_t *destination = nullptr);
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
@@ -49,7 +48,7 @@ class storageAccessor {
 
   void setRemoveOnExit(bool value);
   const size_t getRecordsCount();
-  bool desciptorFileExist();
+  bool descriptorFileExist();
 
   std::string getStorageName();
 

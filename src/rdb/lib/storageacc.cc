@@ -21,7 +21,7 @@ storageAccessor::storageAccessor(std::string fileNameDesc, std::string fileName)
 }
 
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
-  if (desciptorFileExist()) {
+  if (descriptorFileExist()) {
     std::fstream myFile;
     myFile.rdbuf()->pubsetbuf(0, 0);
     myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
@@ -142,7 +142,7 @@ void storageAccessor::attachStorage() {
 storageAccessor::~storageAccessor() {
   if (removeOnExit) {
     if (storageFile != "") auto statusRemove1 = remove(storageFile.c_str());
-    if (desciptorFileExist()) remove(descriptorFile.c_str());
+    if (descriptorFileExist()) remove(descriptorFile.c_str());
     SPDLOG_INFO("drop storage, drop descriptor");
   }
 }
@@ -191,7 +191,7 @@ std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
   return storagePayload.get();
 }
 
-bool storageAccessor::desciptorFileExist() { return std::filesystem::exists(descriptorFile); }
+bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(descriptorFile); }
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
