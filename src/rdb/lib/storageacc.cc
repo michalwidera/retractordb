@@ -230,8 +230,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
   auto result = 0;
 
   auto recordIndexRv{0};
-  if (storageType != "DEVICE" && storageType != "TEXTSOURCE")
-    recordIndexRv = recordIndex;  // In case of device type - is works only on first record.
+  if (!isDeclared()) recordIndexRv = recordIndex;  // In case of device type - is works only on first record.
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
@@ -246,7 +245,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 }
 
 bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
-  if (storageType != "DEVICE" && storageType != "TEXTSOURCE") return read(getRecordsCount() - recordIndex - 1, destination);
+  if (!isDeclared()) return read(getRecordsCount() - recordIndex - 1, destination);
 
   if (circularBuffer.capacity() == 0) return read(0, destination);
   if (recordIndex == 0 && !bufferIsFreezed) return read(0, destination);
@@ -259,13 +258,6 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
   assert((recordIndex <= circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
   assert((recordIndex <= circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
 
-  /* zeros as uninitialized ?
-  if (recordIndex > circularBuffer.capacity()) {
-    std::memset(destination, 0, size);
-    return false;
-  }
-  */
-
   destination = (destination == nullptr)                            //
                     ? static_cast<uint8_t*>(storagePayload->get())  //
                     : destination;
@@ -277,12 +269,12 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
 }
 
 void storageAccessor::setCapacity(const int capacity) {
-  assert(storageType == "DEVICE" || storageType == "TEXTSOURCE");
+  assert(isDeclared());
   circularBuffer.set_capacity(capacity);
 }
 
 void storageAccessor::setFreeze(const bool freezeState) {
-  assert(storageType == "DEVICE" || storageType == "TEXTSOURCE");
+  assert(isDeclared());
   bufferIsFreezed = freezeState;
 }
 
