@@ -25,5 +25,13 @@ echo rlist 3
 rlist 3
 echo rlist 3
 rlist 3
+echo freeze - rlist 3
+freeze
+rlist 3
+echo freeze - rlist 3
+rlist 3
+echo unfreeze - rlist 3
+unfreeze
+rlist 3
 dropfile { data_source.desc }
 quit

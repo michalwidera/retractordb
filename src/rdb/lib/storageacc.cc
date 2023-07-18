@@ -249,8 +249,7 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
   if (storageType != "DEVICE" && storageType != "TEXTSOURCE") return read(getRecordsCount() - recordIndex - 1, destination);
 
   if (circularBuffer.capacity() == 0) return read(0, destination);
-  if (recordIndex == 0) return read(0, destination);
-  // TODO working here
+  if (recordIndex == 0 && !bufferIsFreezed) return read(0, destination);
 
   assert(circularBuffer.capacity() > 0);
   assert(recordIndex >= 0);
@@ -280,6 +279,11 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
 void storageAccessor::setCapacity(const int capacity) {
   assert(storageType == "DEVICE" || storageType == "TEXTSOURCE");
   circularBuffer.set_capacity(capacity);
+}
+
+void storageAccessor::setFreeze(const bool freezeState) {
+  assert(storageType == "DEVICE" || storageType == "TEXTSOURCE");
+  bufferIsFreezed = freezeState;
 }
 
 bool storageAccessor::write(const size_t recordIndex) {

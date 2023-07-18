@@ -29,6 +29,7 @@ class storageAccessor {
   void moveRef();
   void attachStorage();
 
+  bool bufferIsFreezed{false};
   boost::circular_buffer<rdb::payload> circularBuffer{0};
 
   void abortIfStorageNotPrepared();
@@ -60,6 +61,7 @@ class storageAccessor {
   bool isDeclared();
 
   void setCapacity(const int capacity);
+  void setFreeze(const bool freezeState);
 
   // technical function - for unit tests
   void reset();
