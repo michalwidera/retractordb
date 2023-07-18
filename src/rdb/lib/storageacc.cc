@@ -279,9 +279,6 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
 
 void storageAccessor::setCapacity(const int capacity) {
   assert(storageType == "DEVICE" || storageType == "TEXTSOURCE");
-  circularBuffer.clear();
-  assert(circularBuffer.size() == 0);
-  assert(circularBuffer.empty());
   circularBuffer.set_capacity(capacity);
 }
 
