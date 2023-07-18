@@ -21,7 +21,7 @@ storageAccessor::storageAccessor(std::string fileNameDesc, std::string fileName)
 }
 
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
-  if (peekDescriptor()) {
+  if (desciptorFileExist()) {
     std::fstream myFile;
     myFile.rdbuf()->pubsetbuf(0, 0);
     myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
@@ -142,12 +142,8 @@ void storageAccessor::attachStorage() {
 storageAccessor::~storageAccessor() {
   if (removeOnExit) {
     if (storageFile != "") auto statusRemove1 = remove(storageFile.c_str());
-    if (peekDescriptor()) remove(descriptorFile.c_str());
+    if (desciptorFileExist()) remove(descriptorFile.c_str());
     SPDLOG_INFO("drop storage, drop descriptor");
-  }
-  if (removeDescriptorOnExit) {
-    if (peekDescriptor()) remove(descriptorFile.c_str());
-    SPDLOG_INFO("drop descriptor");
   }
 }
 
@@ -195,11 +191,9 @@ std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
   return storagePayload.get();
 }
 
-bool storageAccessor::peekDescriptor() { return std::filesystem::exists(descriptorFile); }
+bool storageAccessor::desciptorFileExist() { return std::filesystem::exists(descriptorFile); }
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
-
-void storageAccessor::setRemoveDescriptorOnExit(bool value) { removeDescriptorOnExit = value; }
 
 const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
@@ -276,9 +270,5 @@ bool storageAccessor::write(const size_t recordIndex) {
   }
   return result == 0;
 };
-
-bool storageAccessor::peekStorage() {  //
-  return dataFileStatus == storageState::openExisting;
-}
 
 }  // namespace rdb

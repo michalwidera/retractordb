@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
         std::cin >> descFile;
         dacc = std::make_unique<rdb::storageAccessor>(descFile, file);
       }
-      if (dacc->peekDescriptor()) {
+      if (dacc->desciptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
       } else {
         //

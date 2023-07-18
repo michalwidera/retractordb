@@ -21,7 +21,6 @@ class storageAccessor {
   std::unique_ptr<rdb::payload> storagePayload;
   Descriptor descriptor;
   bool removeOnExit = true;
-  bool removeDescriptorOnExit = false;
   size_t recordsCount = 0;
   std::string descriptorFile = "";
   std::string storageFile = "";
@@ -49,10 +48,8 @@ class storageAccessor {
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setRemoveOnExit(bool value);
-  void setRemoveDescriptorOnExit(bool value);
   const size_t getRecordsCount();
-  bool peekStorage();
-  bool peekDescriptor();
+  bool desciptorFileExist();
 
   std::string getStorageName();
 

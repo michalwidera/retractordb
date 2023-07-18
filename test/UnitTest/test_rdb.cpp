@@ -272,7 +272,6 @@ TEST(xrdb, test_ref_storage) {
   storage = std::make_unique<rdb::storageAccessor>("datafile1" /* descriptorName (.desc auto-attach) */);
   storage->attachDescriptor(&storageDescriptor);
   storage->setRemoveOnExit(false);
-  storage->setRemoveDescriptorOnExit(true);
 
   storage->read(0);
 
