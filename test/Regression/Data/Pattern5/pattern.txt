@@ -11,11 +11,12 @@
  list reverse
 { name:test2 data:3 4 5 bt:4 5 6 Control:3 m1:3.14 m2:5567 }
 { name:test1 data:1 2 3 bt:1 2 3 Control:2 m1:1.23 m2:234 }
-{	STRING name[5]
-	INTEGER data[3]
-	BYTE bt[3]
-	BYTE Control
-	FLOAT m1
-	INTEGER m2
-}
+ add record
+ list forward
+{ name:test1 data:1 2 3 bt:1 2 3 Control:2 m1:1.23 m2:234 }
+{ name:test2 data:3 4 5 bt:4 5 6 Control:3 m1:3.14 m2:5567 }
+ list reverse
+{ name:test3 data:6 6 7 bt:7 7 8 Control:4 m1:2.71 m2:987 }
+{ name:test2 data:3 4 5 bt:4 5 6 Control:3 m1:3.14 m2:5567 }
+ test of input command
 { name:test_ data:6 9 3 bt:1 3 3 Control:2 m1:2.333 m2:264 }

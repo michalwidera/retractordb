@@ -264,8 +264,7 @@ int main(int argc, char* argv[]) {
           std::cout << RED << "record out of range - list command\n" << RESET;
           continue;
         }
-        auto readIdx = (cmd == "rlist") ? dacc->getRecordsCount() - i - 1 : i;
-        auto returnStatus = dacc->read(readIdx);
+        auto returnStatus = (cmd == "rlist") ? dacc->readReverse(i) : dacc->read(i);
         if (returnStatus)
           payloadStatus = fetched;
         else
