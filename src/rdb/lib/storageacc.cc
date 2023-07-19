@@ -248,7 +248,7 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
   if (!isDeclared()) return read(getRecordsCount() - recordIndex - 1, destination);
 
   if (circularBuffer.capacity() == 0) return read(0, destination);
-  if (recordIndex == 0 && bufferPolicy == policyState::noFreeze ) return read(0, destination);
+  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read(0, destination);
 
   assert(circularBuffer.capacity() > 0);
   assert(recordIndex >= 0);

@@ -306,9 +306,13 @@ bool dataModel::fetchPayload(std::string instance,                            //
 // TODO: work area
 void dataModel::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;      // Drop off rows that not computed now
-    if (q.isDeclaration()) fetchDeclaredPayload(q.id);  // Declarations need to process in separate&first
+    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
+    if (q.isDeclaration()) {                        //
+      fetchDeclaredPayload(q.id);                   // Declarations need to process in separate&first
+      ctrlDataSourceFlow(q.id, rdb::policyState::freeze);
+    }
   }
+
   SPDLOG_INFO("fetch decl. stop");
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
@@ -318,6 +322,18 @@ void dataModel::processRows(std::set<std::string> inSet) {
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
   }
+
+  for (auto q : coreInstance) {
+    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
+    if (q.isDeclaration()) {                        //
+      ctrlDataSourceFlow(q.id, rdb::policyState::flux);
+    }
+  }
+}
+
+void dataModel::ctrlDataSourceFlow(std::string instance, rdb::policyState state) {
+  assert(coreInstance[instance].isDeclaration());  // ctrl of flow in only for declarations
+  qSet[instance]->outputPayload->bufferPolicy = state;
 }
 
 void dataModel::fetchDeclaredPayload(std::string instance) {

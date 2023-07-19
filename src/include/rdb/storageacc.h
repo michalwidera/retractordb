@@ -16,7 +16,7 @@
 
 namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
-enum class policyState { noFreeze, freeze };
+enum class policyState { flux, freeze };
 
 class storageAccessor {
   std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
@@ -40,7 +40,7 @@ class storageAccessor {
   ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
-  policyState bufferPolicy = policyState::noFreeze;
+  policyState bufferPolicy = policyState::flux;
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 

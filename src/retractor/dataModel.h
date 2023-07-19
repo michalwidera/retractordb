@@ -69,6 +69,8 @@ class dataModel {
 
   void fetchDeclaredPayload(std::string instance);
 
+  void ctrlDataSourceFlow(std::string instance, rdb::policyState state);
+
   void processRows(std::set<std::string> inSet);
 
   std::vector<rdb::descFldVT> getRow(std::string instance, const int timeOffset);

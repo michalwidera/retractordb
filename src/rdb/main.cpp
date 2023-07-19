@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "freeze") {
       dacc->bufferPolicy = rdb::policyState::freeze;
     } else if (cmd == "unfreeze") {
-      dacc->bufferPolicy = rdb::policyState::noFreeze;
+      dacc->bufferPolicy = rdb::policyState::flux;
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setRemoveOnExit(rox);
