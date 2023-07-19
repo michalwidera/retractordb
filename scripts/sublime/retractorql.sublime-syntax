@@ -1,0 +1,45 @@
+%YAML 1.2
+---
+# http://www.sublimetext.com/docs/3/syntax.html
+
+# https://github.com/sharkdp/bat#adding-new-syntaxes--language-definitions
+# mkdir -p "$(bat --config-dir)/syntaxes"
+# cd "$(bat --config-dir)/syntaxes"
+# cp thisfilefolder/retractorql.sublime-syntax .
+# bat cache --build
+# bat cache --clear
+
+name: RetractorQL
+file_extensions:
+  - rql
+  - desc
+scope: source.rql
+
+contexts:
+  main:
+    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|STORAGE|storage|FILE|file)\b
+      scope: keyword.control.rql
+    - match: "'"
+      push: string
+    - include: comments
+    - include: types
+    - include: functions
+
+  string:
+    - meta_scope: string.quoted.single.rql
+    - match: \\.
+      scope: constant.character.escape.rql
+    - match: "'"
+      pop: true
+
+  comments:
+    - match: ^#.*
+      scope: comment.line.rql
+
+  types:
+    - match: \b(INTEGER|Integer|BYTE|Byte|CHAR|Char|UINT|Uint|STRING|String|FLOAT|Float|DOUBLE|Double)\b
+      scope: storage.type.rql
+  
+  functions:
+    - match: \b(MIN|min|MAX|max|AVG|avg|SUMC|sumc|Sqrt|Ceil|Abs|Floor|Sign|Chr|Length|ToNumber|ToTimeStamp|FloatCast|IntCast|Count|Crt|IsZero|IsNonZero|Sum)\b
+      scope: constant.language.rql

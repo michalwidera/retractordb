@@ -14,7 +14,7 @@ null
 'ToNumber'
 'ToTimeStamp'
 'FloatCast'
-'InstCast'
+'IntCast'
 'Count'
 'Crc'
 'Sum'
