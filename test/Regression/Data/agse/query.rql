@@ -5,3 +5,6 @@ DECLARE a INTEGER STREAM core1, 0.1 FILE 'datafile.txt'
 
 SELECT * STREAM signalRow FROM core0@(1,5)
 SELECT * STREAM signalText FROM core1@(1,5)
+
+SELECT * STREAM signalRowR FROM core0@(1,-5)
+SELECT * STREAM signalTextR FROM core1@(1,-5)

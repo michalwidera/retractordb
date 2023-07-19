@@ -7,5 +7,15 @@ open signalText
 size
 desc
 list 4
-dropfile { core0.desc core1.desc signalRow signalRow.desc signalText signalText.desc }
+open signalRowR
+size
+desc
+list 4
+open signalTextR
+size
+desc
+list 4
+dropfile { core0.desc core1.desc }
+dropfile { signalRow signalRow.desc signalRowR signalRowR.desc }
+dropfile { signalText signalText.desc signalTextR signalTextR.desc }
 quit

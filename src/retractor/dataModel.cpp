@@ -443,7 +443,6 @@ void dataModel::constructInputPayload(std::string instance) {
       const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
-      length = abs(length);
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance);
     } break;
     case STREAM_HASH: {
