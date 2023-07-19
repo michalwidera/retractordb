@@ -114,13 +114,13 @@ class ParserListener : public RQLBaseListener {
 
   void exitSExpAgse(RQLParser::SExpAgseContext* ctx) {
     int window{0}, step{0};
-    if (ctx->children[3]->getText() == "-")
+    if (ctx->children[5]->getText() == "-")
       window = -std::stoi(ctx->window->getText());
     else
       window = std::stoi(ctx->window->getText());
     step = std::stoi(ctx->step->getText());
 
-    program.push_back(token(STREAM_AGSE, std::make_pair(window, step)));
+    program.push_back(token(STREAM_AGSE, std::make_pair(step, window)));
   }
 
   void exitFunction_call(RQLParser::Function_callContext* ctx) { recpToken(CALL, ctx->children[0]->getText()); }

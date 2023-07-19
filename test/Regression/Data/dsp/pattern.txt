@@ -2,55 +2,55 @@
 signalRow(1/50)
 	:- PUSH_STREAM(source)
 	:- STREAM_AGSE(1,25)
-	source_0: INTEGER
+	source_0: BYTE
 		PUSH_ID(signalRow[0])
-	source_1: INTEGER
+	source_1: BYTE
 		PUSH_ID(signalRow[1])
-	source_2: INTEGER
+	source_2: BYTE
 		PUSH_ID(signalRow[2])
-	source_3: INTEGER
+	source_3: BYTE
 		PUSH_ID(signalRow[3])
-	source_4: INTEGER
+	source_4: BYTE
 		PUSH_ID(signalRow[4])
-	source_5: INTEGER
+	source_5: BYTE
 		PUSH_ID(signalRow[5])
-	source_6: INTEGER
+	source_6: BYTE
 		PUSH_ID(signalRow[6])
-	source_7: INTEGER
+	source_7: BYTE
 		PUSH_ID(signalRow[7])
-	source_8: INTEGER
+	source_8: BYTE
 		PUSH_ID(signalRow[8])
-	source_9: INTEGER
+	source_9: BYTE
 		PUSH_ID(signalRow[9])
-	source_10: INTEGER
+	source_10: BYTE
 		PUSH_ID(signalRow[10])
-	source_11: INTEGER
+	source_11: BYTE
 		PUSH_ID(signalRow[11])
-	source_12: INTEGER
+	source_12: BYTE
 		PUSH_ID(signalRow[12])
-	source_13: INTEGER
+	source_13: BYTE
 		PUSH_ID(signalRow[13])
-	source_14: INTEGER
+	source_14: BYTE
 		PUSH_ID(signalRow[14])
-	source_15: INTEGER
+	source_15: BYTE
 		PUSH_ID(signalRow[15])
-	source_16: INTEGER
+	source_16: BYTE
 		PUSH_ID(signalRow[16])
-	source_17: INTEGER
+	source_17: BYTE
 		PUSH_ID(signalRow[17])
-	source_18: INTEGER
+	source_18: BYTE
 		PUSH_ID(signalRow[18])
-	source_19: INTEGER
+	source_19: BYTE
 		PUSH_ID(signalRow[19])
-	source_20: INTEGER
+	source_20: BYTE
 		PUSH_ID(signalRow[20])
-	source_21: INTEGER
+	source_21: BYTE
 		PUSH_ID(signalRow[21])
-	source_22: INTEGER
+	source_22: BYTE
 		PUSH_ID(signalRow[22])
-	source_23: INTEGER
+	source_23: BYTE
 		PUSH_ID(signalRow[23])
-	source_24: INTEGER
+	source_24: BYTE
 		PUSH_ID(signalRow[24])
 accRow(1/50)
 	:- PUSH_STREAM(signalRow)

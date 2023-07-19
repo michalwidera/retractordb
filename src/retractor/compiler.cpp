@@ -129,22 +129,17 @@ std::string intervalCounter() {
           // ->>> check need
           // core1@(5,3) ->
           // push_stream core0 -> deltaSrc
-          // stream agse <5,3> -> size_of_window,step_of_window
+          // stream agse <5,3> -> step_of_window,size_of_window
           boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> schemaSizeSrc = getQuery(t1.getStr_()).lSchema.size();
-          assert(op.getCommandID() == STREAM_AGSE);
-          auto arg = std::get<std::pair<int, int>>(op.getVT());
-          int step = abs(arg.first);
-          int windowSize = abs(arg.second);
-          assert(windowSize > 0);
+          auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
           assert(step > 0);
-          if (arg.second < 0) {  // windowSize < 0
-            delta = deltaSrc;
-            delta /= schemaSizeSrc;
-            delta *= windowSize;
-            delta /= step;
-          } else
-            delta = (deltaSrc / schemaSizeSrc) * step;
+          // if (windowSize < 0) {  // windowSize < 0  (need to double-check and UT cover)
+          //   delta = deltaSrc / schemaSizeSrc;
+          //   delta *= abs(windowSize);
+          //   delta /= step;
+          // } else
+          delta = (deltaSrc / schemaSizeSrc) * step;
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.getRI(), op.getStr_());
@@ -310,28 +305,15 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
     return lRetVal;
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
+    auto [step, windowSize] = std::get<std::pair<int, int>>(cmd_token.getVT());
+    auto [maxType, maxLen] = coreInstance[sName1].descriptorStorage().getMaxType();
     std::list<field> schema;
-    auto r = std::get<std::pair<int, int>>(cmd_token.getVT());
-    int windowSize = abs(r.second);
-    // If winows is negative - reverted schema
-
-    // TODO - need to inherit BYTE or
-    // INTEGER from BYTEARRAY or INTARRAY
-    if (r.second > 0) {
-      for (int i = 0; i < windowSize; i++) {
-        field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), 4, 1, rdb::INTEGER),
-                   token(PUSH_ID, std::make_pair(sName1, 0)));
-        schema.push_back(intf);
-      }
-    } else {
-      for (int i = windowSize - 1; i >= 0; i--) {
-        // TODO - need to inherit BYTE or
-        field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), 4, 1, rdb::INTEGER),
-                   token(PUSH_ID, std::make_pair(sName1, 0)));
-        // INTEGER from BYTEARRAY or INTARRAY
-        schema.push_back(intf);
-      }
+    for (int i = 0; i < abs(windowSize); i++) {
+      field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), maxLen, 1, maxType),
+                 token(PUSH_ID, std::make_pair(sName1, 0)));
+      schema.push_back(intf);
     }
+
     lRetVal = schema;
   } else {
     SPDLOG_ERROR("Undefined: str:{} cmd:{}", cmd_token.getStr_(), cmd_token.getStrCommandID());
@@ -458,8 +440,7 @@ to form schema_name[postion, time_offset]
 Command method of presentation aims simple data processing
 Aim of this procedure is change all of push_idXXX to push_id
 note that push_id is closest to push_id4
-push_idXXX is searched in all stream program after reduction
-*/
+push_idXXX is searched in all stream program after reduction */
 std::string convertReferences() {
   boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
   boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
@@ -585,6 +566,8 @@ std::string convertReferences() {
   return std::string("OK");
 }
 
+/* This function will convert fields list where stream a from b#c
+clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
 std::string convertRemotes() {
   std::map<std::string, std::map<STRINT>> offsetMap;
 
@@ -630,11 +613,51 @@ std::string applyConstraints() {
       case STREAM_HASH: {
         SPDLOG_ERROR("Hash operations need to work on two schemas with the same size.");
         if (getQuery(arg1).descriptorStorage().sizeFlat() != getQuery(arg2).descriptorStorage().sizeFlat())
-          return std::string("hash failed on " + q.id);
+          return std::string("HASH operation constraint failed on " + q.id);
       } break;
       default:
         break;
     }
   }
   return std::string("OK");
+}
+
+std::map<std::string, int> countBuffersCapacity() {
+  std::map<std::string, int> maxCapacityFound;  // <- This var goes to qTree class instance
+
+  for (auto &q : coreInstance) {       // for each query
+    if (q.isDeclaration()) continue;   // that is declaration
+    assert(!q.isReductionRequired());  // process data only with two or less arguments
+    auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
+    switch (cmd.getCommandID()) {
+      case STREAM_TIMEMOVE: {
+        // 	:- PUSH_STREAM(core0)
+        //  :- STREAM_TIMEMOVE(1)
+        //
+        assert(q.lProgram.size() == 2);
+
+        const auto nameSrc = arg1;
+        const auto timeOffset = std::get<int>(cmd.getVT());
+        maxCapacityFound[nameSrc] = std::max(maxCapacityFound[nameSrc], timeOffset);
+      } break;
+      case STREAM_AGSE: {
+        // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
+        //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
+        //
+        assert(q.lProgram.size() == 2);
+
+        const auto nameSrc = arg1;
+        auto [step, length] = get<std::pair<int, int>>(cmd.getVT());
+        assert(step >= 0);
+        length = abs(length);
+        const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().sizeFlat();
+        const auto timeOffset = step + int(ceil(length / lengthOfSrc));
+
+        maxCapacityFound[nameSrc] = std::max(maxCapacityFound[nameSrc], timeOffset);
+      } break;
+      default:
+        break;
+    }
+  }
+  return maxCapacityFound;
 }

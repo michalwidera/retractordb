@@ -769,8 +769,8 @@ public:
   public:
     SExpAgseContext(Stream_termContext *ctx);
 
-    antlr4::Token *window = nullptr;
     antlr4::Token *step = nullptr;
+    antlr4::Token *window = nullptr;
     Stream_factorContext *stream_factor();
     antlr4::tree::TerminalNode *AT();
     antlr4::tree::TerminalNode *COMMA();

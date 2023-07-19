@@ -34,7 +34,7 @@ bool check_compile_function() {
 // DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'
 // DECLARE c INTEGER,d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
 // SELECT core0[0],core0[1] STREAM str1 FROM core0#core1
-// SELECT * STREAM test1 FROM core@(-1,10)
+// SELECT * STREAM test1 FROM core@(1,-10)
 // SELECT * STREAM test2 FROM core@(1,10)
 
 TEST(xparser, check_compile) { ASSERT_TRUE(check_compile_function()); }

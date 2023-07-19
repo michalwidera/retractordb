@@ -1,48 +1,48 @@
 test_1(1/1)
 	:- PUSH_STREAM(core)
 	:- STREAM_AGSE(1,10)
-	core_0: INTEGER
+	core_0: BYTE
 		PUSH_ID(test_1[0])
-	core_1: INTEGER
+	core_1: BYTE
 		PUSH_ID(test_1[1])
-	core_2: INTEGER
+	core_2: BYTE
 		PUSH_ID(test_1[2])
-	core_3: INTEGER
+	core_3: BYTE
 		PUSH_ID(test_1[3])
-	core_4: INTEGER
+	core_4: BYTE
 		PUSH_ID(test_1[4])
-	core_5: INTEGER
+	core_5: BYTE
 		PUSH_ID(test_1[5])
-	core_6: INTEGER
+	core_6: BYTE
 		PUSH_ID(test_1[6])
-	core_7: INTEGER
+	core_7: BYTE
 		PUSH_ID(test_1[7])
-	core_8: INTEGER
+	core_8: BYTE
 		PUSH_ID(test_1[8])
-	core_9: INTEGER
+	core_9: BYTE
 		PUSH_ID(test_1[9])
 test_2(1/1)
 	:- PUSH_STREAM(core)
-	:- STREAM_AGSE(-1,10)
-	core_0: INTEGER
+	:- STREAM_AGSE(1,-10)
+	core_0: BYTE
 		PUSH_ID(test_2[0])
-	core_1: INTEGER
+	core_1: BYTE
 		PUSH_ID(test_2[1])
-	core_2: INTEGER
+	core_2: BYTE
 		PUSH_ID(test_2[2])
-	core_3: INTEGER
+	core_3: BYTE
 		PUSH_ID(test_2[3])
-	core_4: INTEGER
+	core_4: BYTE
 		PUSH_ID(test_2[4])
-	core_5: INTEGER
+	core_5: BYTE
 		PUSH_ID(test_2[5])
-	core_6: INTEGER
+	core_6: BYTE
 		PUSH_ID(test_2[6])
-	core_7: INTEGER
+	core_7: BYTE
 		PUSH_ID(test_2[7])
-	core_8: INTEGER
+	core_8: BYTE
 		PUSH_ID(test_2[8])
-	core_9: INTEGER
+	core_9: BYTE
 		PUSH_ID(test_2[9])
 core(1/1)	/dev/urandom
 	b: BYTE

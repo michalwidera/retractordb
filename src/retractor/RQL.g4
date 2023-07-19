@@ -91,7 +91,7 @@ stream_expression   : stream_term GREATER DECIMAL   # SExpTimeMove
 stream_term         : stream_factor SHARP stream_factor # SExpHash
                     | stream_factor AND rational_se     # SExpAnd
                     | stream_factor MOD rational_se     # SExpMod
-                    | stream_factor AT '(' '-'? window=DECIMAL COMMA step=DECIMAL ')' # SExpAgse
+                    | stream_factor AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
                     | stream_factor DOT agregator       # SExpAgregate_proforma
                     | stream_factor                     # SExpFactor
                     ;

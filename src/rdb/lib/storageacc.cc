@@ -245,24 +245,23 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 }
 
 bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
-  if (!isDeclared()) return read(getRecordsCount() - recordIndex - 1, destination);
+  const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
 
-  if (circularBuffer.capacity() == 0) return read(0, destination);
-  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read(0, destination);
+  if (!isDeclared()) return read(recordPositionFromBack, destination);
+  if (circularBuffer.capacity() == 0) return read(recordPositionFromBack, destination);
+  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read(recordPositionFromBack, destination);
 
   assert(circularBuffer.capacity() > 0);
   assert(recordIndex >= 0);
 
   // Read data from Circular Buffer instead of data source
+  // - only for declared data sources
+  // - only for data sources that have buffer declared
+  // - only for recordIndex > 0 if policyState::flux
+  // - also for recordIndex == 0 if policyState::freeze
 
   assert((recordIndex <= circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
   assert((recordIndex <= circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
-
-  destination = (destination == nullptr)                            //
-                    ? static_cast<uint8_t*>(storagePayload->get())  //
-                    : destination;
-  assert(destination != nullptr);
-  auto size = descriptor.getSizeInBytes();
 
   *(storagePayload.get()) = circularBuffer[recordIndex];
   return true;

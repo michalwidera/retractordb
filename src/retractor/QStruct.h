@@ -106,4 +106,6 @@ class qTree : public std::vector<query> {
   void topologicalSort();
 
   boost::rational<int> getDelta(const std::string &query_name);
+
+  std::map<std::string, int> maxCapacityFound;
 };

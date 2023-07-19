@@ -306,10 +306,10 @@ bool dataModel::fetchPayload(std::string instance,                            //
 // TODO: work area
 void dataModel::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;       // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                    // Skip non declarations.
-    fetchDeclaredPayload(q.id);                          // Declarations need to process in separate&first
-    ctrlDataSourceFlow(q.id, rdb::policyState::freeze);  // freeze data sources
+    if (inSet.find(q.id) == inSet.end()) continue;                       // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;                                    // Skip non declarations.
+    fetchDeclaredPayload(q.id);                                          // Declarations need to process in separate&first
+    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::freeze;  // freeze data sources
   }
   SPDLOG_INFO("fetch decl. stop");
 
@@ -322,15 +322,10 @@ void dataModel::processRows(std::set<std::string> inSet) {
   }
 
   for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;     // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                  // Skip non declarations.
-    ctrlDataSourceFlow(q.id, rdb::policyState::flux);  // Unfreeze data sources
+    if (inSet.find(q.id) == inSet.end()) continue;                     // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;                                  // Skip non declarations.
+    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;  // Unfreeze data sources
   }
-}
-
-void dataModel::ctrlDataSourceFlow(std::string instance, rdb::policyState state) {
-  assert(coreInstance[instance].isDeclaration());  // ctrl of flow in only for declarations
-  qSet[instance]->outputPayload->bufferPolicy = state;
 }
 
 void dataModel::fetchDeclaredPayload(std::string instance) {
@@ -436,14 +431,14 @@ void dataModel::constructInputPayload(std::string instance) {
     } break;
     case STREAM_AGSE: {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
-      //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
+      //  :- STREAM_AGSE 2,3 -> window_step, window_length  (arg[1])
       //
       assert(arg.size() == 2);
 
       const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
-
+      length = abs(length);
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance);
     } break;
     case STREAM_HASH: {

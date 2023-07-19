@@ -128,6 +128,8 @@ int main(int argc, char* argv[]) {
     response = convertRemotes();
     assert(response == "OK");
 
+    coreInstance.maxCapacityFound = countBuffersCapacity();
+
     response = applyConstraints();
     if (response != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //
