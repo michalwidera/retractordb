@@ -31,8 +31,8 @@ struct streamInstance {
   // This constructor will create data based on QStruct query
   streamInstance(query &qry);
 
-  rdb::payload constructAgsePayload(const int length, const int offset, std::string storage_name);
-  rdb::payload constructAggregate(command_id cmd, std::string name);
+  rdb::payload constructAgsePayload(const int length, const int offset, std::string instance);
+  rdb::payload constructAggregate(command_id cmd, std::string instance);
 
   /*
    * This function will create OutputPayload based on all field from query

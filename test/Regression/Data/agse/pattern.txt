@@ -6,10 +6,10 @@
 	INTEGER core0_3
 	INTEGER core0_4
 }
-{ core0_0:12 core0_1:13 core0_2:14 core0_3:15 core0_4:16 }
-{ core0_0:11 core0_1:12 core0_2:13 core0_3:14 core0_4:15 }
-{ core0_0:10 core0_1:11 core0_2:12 core0_3:13 core0_4:14 }
-{ core0_0:17 core0_1:10 core0_2:11 core0_3:12 core0_4:13 }
+{ core0_0:0 core0_1:0 core0_2:0 core0_3:0 core0_4:0 }
+{ core0_0:10 core0_1:0 core0_2:0 core0_3:0 core0_4:0 }
+{ core0_0:11 core0_1:10 core0_2:0 core0_3:0 core0_4:0 }
+{ core0_0:12 core0_1:11 core0_2:10 core0_3:0 core0_4:0 }
 4 Record(s)
 20 Byte(s) per record.
 {	INTEGER core1_0
@@ -18,7 +18,7 @@
 	INTEGER core1_3
 	INTEGER core1_4
 }
-{ core1_0:12 core1_1:13 core1_2:14 core1_3:15 core1_4:16 }
-{ core1_0:11 core1_1:12 core1_2:13 core1_3:14 core1_4:15 }
-{ core1_0:10 core1_1:11 core1_2:12 core1_3:13 core1_4:14 }
-{ core1_0:17 core1_1:10 core1_2:11 core1_3:12 core1_4:13 }
+{ core1_0:0 core1_1:0 core1_2:0 core1_3:0 core1_4:0 }
+{ core1_0:10 core1_1:0 core1_2:0 core1_3:0 core1_4:0 }
+{ core1_0:11 core1_1:10 core1_2:0 core1_3:0 core1_4:0 }
+{ core1_0:12 core1_1:11 core1_2:10 core1_3:0 core1_4:0 }

@@ -623,7 +623,7 @@ std::string applyConstraints() {
 }
 
 std::map<std::string, int> countBuffersCapacity() {
-  std::map<std::string, int> maxCapacityFound;  // <- This var goes to qTree class instance
+  std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
   for (auto &q : coreInstance) {       // for each query
     if (q.isDeclaration()) continue;   // that is declaration
@@ -638,7 +638,7 @@ std::map<std::string, int> countBuffersCapacity() {
 
         const auto nameSrc = arg1;
         const auto timeOffset = std::get<int>(cmd.getVT());
-        maxCapacityFound[nameSrc] = std::max(maxCapacityFound[nameSrc], timeOffset);
+        capMap[nameSrc] = std::max(capMap[nameSrc], timeOffset);
       } break;
       case STREAM_AGSE: {
         // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -653,11 +653,11 @@ std::map<std::string, int> countBuffersCapacity() {
         const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().sizeFlat();
         const auto timeOffset = step + int(ceil(length / lengthOfSrc));
 
-        maxCapacityFound[nameSrc] = std::max(maxCapacityFound[nameSrc], timeOffset);
+        capMap[nameSrc] = std::max(capMap[nameSrc], timeOffset);
       } break;
       default:
         break;
     }
   }
-  return maxCapacityFound;
+  return capMap;
 }

@@ -16,6 +16,8 @@
 
 // ctest -R '^ut-dataModel' -V
 
+extern "C" qTree coreInstance;
+
 enum { noHexFormat = false, HexFormat = true };
 
 dataModel* pProc = nullptr;
@@ -26,8 +28,8 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 */
 
 streamInstance::streamInstance(               //
-    const std::string descriptorName,         //
-    const std::string storageNameParam,       //
+    const std::string descriptorName,         // q.id
+    const std::string storageNameParam,       // filename
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
   // only objects with REF has storageNameParam filled.
@@ -37,6 +39,9 @@ streamInstance::streamInstance(               //
 
   outputPayload = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
   outputPayload->attachDescriptor(&storageDescriptor);
+
+  auto requestedCapacity = coreInstance.maxCapacity[descriptorName];
+  outputPayload->setCapacity(requestedCapacity);
 
   {
     std::stringstream strStream;
@@ -51,7 +56,7 @@ streamInstance::streamInstance(               //
 };
 
 streamInstance::streamInstance(                //
-    const std::string idAndStorageName,        //
+    const std::string idAndStorageName,        // q.id = filename
     const rdb::Descriptor storageDescriptor,   //
     const rdb::Descriptor internalDescriptor)  //
     : streamInstance(idAndStorageName,         // descriptor file
@@ -63,8 +68,8 @@ streamInstance::streamInstance(                //
 }
 
 streamInstance::streamInstance(query& qry)
-    : streamInstance(qry.id,                   // descriptor file
-                     qry.filename,             // storage file
+    : streamInstance(qry.id,                   // descriptor file (q.id)
+                     qry.filename,             // storage file (filename)
                      qry.descriptorStorage(),  //
                      qry.descriptorFrom()      //
       ) {
@@ -72,7 +77,7 @@ streamInstance::streamInstance(query& qry)
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructAgsePayload(const int length, const int offset, std::string storage_name) {
+rdb::payload streamInstance::constructAgsePayload(const int length, const int offset, std::string instance) {
   assert(offset > 0);
   // First construct descriptor
   rdb::Descriptor descriptor;
@@ -84,9 +89,9 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int of
   auto descriptorVecSize = outputPayload->getDescriptor().sizeFlat();
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
   for (auto i = 0; i < lengthAbs; i++) {
-    rdb::rField x{std::make_tuple(storage_name + "_" + std::to_string(i),  //
-                                  maxLen,                                  //
-                                  1,                                       // TODO: Check
+    rdb::rField x{std::make_tuple(instance + "_" + std::to_string(i),  //
+                                  maxLen,                              //
+                                  1,                                   // TODO: Check
                                   maxType)};
     descriptor | rdb::Descriptor{x};
   }
@@ -140,16 +145,16 @@ void fnOp(opType op, std::any value, std::any& valueRet) {
   }
 }
 
-rdb::payload streamInstance::constructAggregate(command_id cmd, std::string name) {
+rdb::payload streamInstance::constructAggregate(command_id cmd, std::string instance) {
   assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor
   outputPayload->readReverse(0);
 
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
-  rdb::rField x{std::make_tuple(name, maxLen, 1, maxType)};  // TODO - Check 1
+  rdb::rField x{std::make_tuple(instance, maxLen, 1, maxType)};  // TODO - Check 1
   rdb::Descriptor descriptor{x};
-  // same as core[name].descriptorFrom()
+  // same as core[instance].descriptorFrom()
 
   // Second construct payload
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);

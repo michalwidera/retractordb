@@ -260,16 +260,32 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
   // - only for recordIndex > 0 if policyState::flux
   // - also for recordIndex == 0 if policyState::freeze
 
-  assert((recordIndex <= circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
-  assert((recordIndex <= circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
+  assert((recordIndex < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
+
+  // in case of accessing buffer that has no data yet - zeros are returned
+
+  if (recordIndex >= circularBuffer.size()) {
+    destination = (destination == nullptr)                            //
+                      ? static_cast<uint8_t*>(storagePayload->get())  //
+                      : destination;
+
+    assert(destination != nullptr);
+    auto size = descriptor.getSizeInBytes();
+    std::memset(destination, 0, size);
+    SPDLOG_WARN("read buffer fn {} - non existing data from pos:{} capacity:{}", accessor->fileName(), recordIndex,
+                circularBuffer.capacity());
+    return true;
+  }
+
+  assert((recordIndex < circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
 
   *(storagePayload.get()) = circularBuffer[recordIndex];
   return true;
 }
 
 void storageAccessor::setCapacity(const int capacity) {
-  assert(isDeclared());
-  circularBuffer.set_capacity(capacity);
+  // assert(isDeclared());
+  if (isDeclared()) circularBuffer.set_capacity(capacity);
 }
 
 bool storageAccessor::write(const size_t recordIndex) {

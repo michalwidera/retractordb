@@ -107,5 +107,5 @@ class qTree : public std::vector<query> {
 
   boost::rational<int> getDelta(const std::string &query_name);
 
-  std::map<std::string, int> maxCapacityFound;
+  std::map<std::string, int> maxCapacity;
 };

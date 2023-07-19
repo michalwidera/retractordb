@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
     response = convertRemotes();
     assert(response == "OK");
 
-    coreInstance.maxCapacityFound = countBuffersCapacity();
+    coreInstance.maxCapacity = countBuffersCapacity();
 
     response = applyConstraints();
     if (response != "OK") {
