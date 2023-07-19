@@ -21,15 +21,20 @@ contexts:
       scope: keyword.control.rql
     - match: "'"
       push: string
+    - match: '"'
+      push: string
     - include: comments
     - include: types
     - include: functions
+    - include: desc
 
   string:
     - meta_scope: string.quoted.single.rql
     - match: \\.
       scope: constant.character.escape.rql
     - match: "'"
+      pop: true
+    - match: '"'
       pop: true
 
   comments:
@@ -40,6 +45,10 @@ contexts:
     - match: \b(INTEGER|Integer|BYTE|Byte|CHAR|Char|UINT|Uint|STRING|String|FLOAT|Float|DOUBLE|Double)\b
       scope: storage.type.rql
   
+  desc:
+    - match: \b(REF|TYPE)\b
+      scope: constant.other.rql
+
   functions:
     - match: \b(MIN|min|MAX|max|AVG|avg|SUMC|sumc|Sqrt|Ceil|Abs|Floor|Sign|Chr|Length|ToNumber|ToTimeStamp|FloatCast|IntCast|Count|Crt|IsZero|IsNonZero|Sum)\b
       scope: constant.language.rql
