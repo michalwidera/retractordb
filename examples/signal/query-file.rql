@@ -1,6 +1,0 @@
-declare a INTEGER stream core0, 1 FILE datafile2.dat
-declare b INTEGER stream core1, 1 FILE datafile3.dat
-
-select a,b stream str1 from core0+core1
-select a,b stream str1a from core0#core1
-select core0[0],core1[0] stream str2 from core0#core1

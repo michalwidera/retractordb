@@ -9,12 +9,12 @@ add_subdirectory(retractor)
 
 add_custom_target(
   simple
-  COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-simple.sh
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
 
 add_custom_target(
   dsp
-  COMMAND ${CMAKE_SOURCE_DIR}/examples/plot-dsp.sh
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-dsp.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
 
 add_custom_target(

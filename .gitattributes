@@ -5,4 +5,3 @@
 *.png           binary
 *.py            text eol=lf
 *.vim           text eol=lf
-xdisplay        test eol=lf

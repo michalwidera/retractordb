@@ -53,7 +53,7 @@ do
             break
             ;;
         "Reset (clean)")
-            cd ~/.local/bin && rm -f -- antlr-* xdisplay xqry xretractor xtrdb plotblock.py plothistgram.py antlr4call.sh
+            cd ~/.local/bin && rm -f -- antlr-* xqry xretractor xtrdb plotblock.py plothistgram.py antlr4call.sh
             break
             ;;
         "Quit")

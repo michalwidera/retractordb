@@ -1,8 +1,0 @@
-declare a BYTE stream source, 1 file /dev/urandom
-select * stream signalRow from source@(1,25)
-
-# Both select should give (almost) same result.
-# Based on signalRow we should see count on schema
-# based on source we should see count over time
-select count(0,50), count(50,100) stream countHistoS from signalRow
-select count(0,50,25), count(50,100,25), a stream countHistoT from source

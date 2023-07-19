@@ -1,5 +1,0 @@
-declare a,b INTEGER stream core0, 1
-declare c,d INTEGER stream core1, 0.5
-
-select (core0[0,1]*core1[1,0])/2 as test stream hash from core0#(core1>1)
-select c+a,b+d stream sum from core0+core1
