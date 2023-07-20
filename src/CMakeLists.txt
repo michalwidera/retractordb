@@ -56,6 +56,12 @@ add_custom_target(
 # $make clear_cache
 add_custom_target(clear-cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
 add_custom_target(patch COMMAND git diff --patch > ${CMAKE_BINARY_DIR}/my.patch)
+add_custom_target(
+  cppcheck
+  COMMAND cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
+  COMMAND
+    cppcheck --inline-suppr --project=${CMAKE_BINARY_DIR}/compile_commands.json
+    -i${CMAKE_SOURCE_DIR}/test --suppress=*:*.conan2/*)
 
 find_package(Git QUIET)
 

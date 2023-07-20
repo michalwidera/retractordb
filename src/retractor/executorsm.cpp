@@ -209,8 +209,6 @@ ptree commandProcessor(ptree ptInval) {
       ptRetval.put(std::string("db"), std::string("world"));
       using boost::property_tree::ptree;
       std::stringstream strstream;
-      // write_json(strstream, ptRetval) ;
-      // write_xml(strstream, ptRetval);
       write_info(strstream, ptRetval);
       SPDLOG_DEBUG("reply: {}", strstream.str());
     }
@@ -251,18 +249,15 @@ void commandProcessorLoop() {
         strstream << message;
         memset(message, 0, 1000);
         ptree pt;
-        // read_json(strstream, pt) ;
-        // read_xml(strstream, pt);
         read_info(strstream, pt);
         ptree pt_retval = commandProcessor(pt);
         int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
         // Sending answer
         std::stringstream response_stream;
-        // write_json(response_stream, pt_retval) ;
-        // write_xml(response_stream, pt_retval);
         write_info(response_stream, pt_retval);
         IPCString ipcResponse(allocatorShmemMapInstance);
         ipcResponse = response_stream.str().c_str();
+        // cppcheck-suppress danglingTemporaryLifetime
         mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
       }
       boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
@@ -303,8 +298,6 @@ std::string printRowValue(const std::string query_name) {
     pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
   }
   std::stringstream strstream;
-  // write_json(strstream, pt);
-  // write_xml(strstream, pt);
   write_info(strstream, pt);
   return strstream.str();
 }
