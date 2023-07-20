@@ -1,0 +1,13 @@
+# This is consistency test
+# This test checks if data read from two different streams reading one data source
+# gets the same value in time.
+# This test checks if datafile1.txt fulfill one read policy
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.txt'
+
+SELECT core[0]+100 STREAM str1 FROM core0
+SELECT core[0]+200 STREAM str2 FROM core0
+
+# str3 should be all equal 100 - otherwise read from core0 is not consistent
+
+SELECT str2[0]-str1[0] STREAM str3 FROM str1+str2

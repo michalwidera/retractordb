@@ -1,0 +1,22 @@
+str1(1/10)
+	:- PUSH_STREAM(core0)
+	str1_0: INTEGER
+		PUSH_ID(str1[0])
+		PUSH_VAL(100)
+		ADD
+str2(1/10)
+	:- PUSH_STREAM(core0)
+	str2_0: INTEGER
+		PUSH_ID(str2[0])
+		PUSH_VAL(200)
+		ADD
+str3(1/10)
+	:- PUSH_STREAM(str1)
+	:- PUSH_STREAM(str2)
+	:- STREAM_ADD
+	str3_0: INTEGER
+		PUSH_ID(str3[1])
+		PUSH_ID(str3[0])
+		SUBTRACT
+core0(1/10)	datafile1.txt
+	a: INTEGER

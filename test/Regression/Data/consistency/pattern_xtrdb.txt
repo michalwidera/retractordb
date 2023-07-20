@@ -1,0 +1,24 @@
+. str1 - stream dump
+{ INTEGER str1_0 }
+4 Record(s)
+4 Byte(s) per record.
+{ str1_0:160 }
+{ str1_0:161 }
+{ str1_0:162 }
+{ str1_0:163 }
+ str2 - stream dump
+{ INTEGER str2_0 }
+4 Record(s)
+4 Byte(s) per record.
+{ str2_0:260 }
+{ str2_0:261 }
+{ str2_0:262 }
+{ str2_0:263 }
+ str3 - stream dump - expected all the same
+{ INTEGER str3_0 }
+4 Record(s)
+4 Byte(s) per record.
+{ str3_0:100 }
+{ str3_0:100 }
+{ str3_0:100 }
+{ str3_0:100 }

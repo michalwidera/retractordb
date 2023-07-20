@@ -1,0 +1,25 @@
+# _Test description_
+# 
+# Purpose of this test is to check consistency of stored data streams
+# and cleanup of run artifacts
+noprompt
+echo str1 - stream dump
+open str1
+descc
+size
+list 4
+echo str2 - stream dump
+open str2
+descc
+size
+list 4
+echo str3 - stream dump - expected all the same
+open str3
+descc
+size
+list 4
+dropfile { core0.desc }
+dropfile { str1 str1.desc }
+dropfile { str2 str2.desc }
+dropfile { str3 str3.desc }
+quit

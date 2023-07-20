@@ -175,6 +175,20 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND sh -c "xretractor query-lnx.rql -c")
 
+# -----------------------------------------------------------------------------------------------
+
+add_test(
+  NAME rg-data-consitency
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/consistency
+  COMMAND sh -c "set -e ; \
+  xretractor -c query.rql > out_compile.txt ; \
+  xretractor query.rql -m 5 ; \
+  xtrdb < term.script > out_xtrdb.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt ; \
+  ${CMAKE_COMMAND} -E compare_files pattern_xtrdb.txt out_xtrdb.txt")
+
+# -----------------------------------------------------------------------------------------------
+
 set_tests_properties(rg-dumper-test PROPERTIES DEPENDS
                                                rg-compiler-test-on-query)
 
