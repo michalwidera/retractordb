@@ -16,7 +16,7 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-clang-debug:
+      - build-2204-conan20-clang-debug:
           filters:
             branches:
               only:
@@ -63,7 +63,7 @@ executors:
     resource_class: arm.large
 
 commands:
-  prep-env-159:
+  prep-env-160:
     steps:
       - run:
           name: Prep env
@@ -71,8 +71,9 @@ commands:
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind
             pip3 install --upgrade pip
-            pip3 install conan==1.59
+            pip3 install conan==1.60
             conan profile new default --detect
+            conan profile update settings.compiler.version=14 default
             conan profile update settings.compiler.libcxx=libstdc++11 default
   prep-env-200:
     parameters:
@@ -129,34 +130,24 @@ commands:
 
 jobs:
 
-  build-2204-clang-debug:
+  build-2204-conan20-clang-debug:
     working_directory: ~/retractordb
-    executor: ubuntu2204machine
+    executor: ubuntu2204docker
     steps:
       - checkout
-      - prep-env-159
+      - prep-env-200
       - conan-build:
-          build_type: Debug
-          build_param: -s compiler=clang compiler.version=14
+          build_type: Debug -s compiler=clang
+          build_param: --build missing
       - run-test:
           build_type: Debug
-
-  build-2204-clang-release:
-    working_directory: ~/retractordb
-    executor: ubuntu2204machine
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-build:
-          build_param: -s compiler=clang compiler.version=14
-      - run-test
 
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
     steps:
       - checkout
-      - prep-env-159
+      - prep-env-160
       - conan-build:
           build_type: Debug
       - run-test:
@@ -167,7 +158,7 @@ jobs:
     executor: ubuntu2204machine
     steps:
       - checkout
-      - prep-env-159
+      - prep-env-160
       - conan-build
       - run-test
 
