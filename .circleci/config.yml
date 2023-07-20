@@ -16,12 +16,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-conan20-clang-debug:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
 
   nightly:
     triggers:
@@ -129,18 +123,6 @@ commands:
             cd build/<<parameters.build_type>>/test/Regression && ctest -V
 
 jobs:
-
-  build-2204-conan20-clang-debug:
-    working_directory: ~/retractordb
-    executor: ubuntu2204docker
-    steps:
-      - checkout
-      - prep-env-200
-      - conan-build:
-          build_type: Debug -s compiler=clang
-          build_param: --build missing
-      - run-test:
-          build_type: Debug
 
   build-2204-debug:
     working_directory: ~/retractordb
