@@ -147,7 +147,7 @@ jobs:
     steps:
       - checkout
       - prep-env-159
-      - conan-build
+      - conan-build:
           build_param: -s compiler=clang
       - run-test
 
