@@ -313,6 +313,7 @@ void dataModel::processRows(std::set<std::string> inSet) {
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;                       // Drop off rows that not computed now
     if (!q.isDeclaration()) continue;                                    // Skip non declarations.
+    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;    // Unfreeze data sources
     fetchDeclaredPayload(q.id);                                          // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::freeze;  // freeze data sources
   }
@@ -324,12 +325,6 @@ void dataModel::processRows(std::set<std::string> inSet) {
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
-  }
-
-  for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;                     // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                                  // Skip non declarations.
-    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;  // Unfreeze data sources
   }
 }
 

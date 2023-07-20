@@ -234,7 +234,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
-    if (circularBuffer.capacity() > 0) circularBuffer.push_front(*storagePayload.get());
+    if (circularBuffer.capacity() > 0) circularBuffer.push_front(*storagePayload.get());  // only one place when buffer is feed.
     assert(result == 0);
     SPDLOG_INFO("read fn {} from pos:{} limit:{}", accessor->fileName(), recordIndexRv, recordsCount);
   } else {
@@ -248,10 +248,14 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
   const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
 
   if (!isDeclared()) return read(recordPositionFromBack, destination);
-  if (circularBuffer.capacity() == 0) return read(recordPositionFromBack, destination);
-  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read(recordPositionFromBack, destination);
+
+  // For all _DECLARED_ data sources buffer capacity at least _MUST_ be 1
+  // In order to maintain the consistency of declared data sources,
+  // it is necessary to maintain a buffer of at least 1
 
   assert(circularBuffer.capacity() > 0);
+
+  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read(recordPositionFromBack, destination);
   assert(recordIndex >= 0);
 
   // Read data from Circular Buffer instead of data source
@@ -284,8 +288,7 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
 }
 
 void storageAccessor::setCapacity(const int capacity) {
-  // assert(isDeclared());
-  if (isDeclared()) circularBuffer.set_capacity(capacity);
+  if (isDeclared()) circularBuffer.set_capacity(capacity == 0 ? 1 : capacity);
 }
 
 bool storageAccessor::write(const size_t recordIndex) {
