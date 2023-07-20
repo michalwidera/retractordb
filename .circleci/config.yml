@@ -57,7 +57,7 @@ executors:
     resource_class: arm.large
 
 commands:
-  prep-env-160:
+  prep-env-159:
     steps:
       - run:
           name: Prep env
@@ -65,9 +65,8 @@ commands:
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind
             pip3 install --upgrade pip
-            pip3 install conan==1.60
+            pip3 install conan==1.59
             conan profile new default --detect
-            conan profile update settings.compiler.version=14 default
             conan profile update settings.compiler.libcxx=libstdc++11 default
   prep-env-200:
     parameters:
@@ -123,13 +122,12 @@ commands:
             cd build/<<parameters.build_type>>/test/Regression && ctest -V
 
 jobs:
-
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
     steps:
       - checkout
-      - prep-env-160
+      - prep-env-159
       - conan-build:
           build_type: Debug
       - run-test:
@@ -140,7 +138,7 @@ jobs:
     executor: ubuntu2204machine
     steps:
       - checkout
-      - prep-env-160
+      - prep-env-159
       - conan-build
       - run-test
 
