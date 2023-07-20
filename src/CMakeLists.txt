@@ -61,7 +61,7 @@ add_custom_target(
   COMMAND cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
   COMMAND
     cppcheck --inline-suppr --project=${CMAKE_BINARY_DIR}/compile_commands.json
-    -i${CMAKE_SOURCE_DIR}/test --suppress=*:*.conan2/*)
+    -i${CMAKE_SOURCE_DIR}/test --suppress=*:*.conan*)
 
 find_package(Git QUIET)
 
