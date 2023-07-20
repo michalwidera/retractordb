@@ -60,7 +60,7 @@ commands:
   prep-env-159:
     steps:
       - run:
-          name: Prep env
+          name: Install toolchain - conan 1.59
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind cppcheck
@@ -75,7 +75,7 @@ commands:
         default: "gcc"
     steps:
       - run:
-          name: Prep env
+          name: Install toolchain - conan 2.0
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update && sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind cppcheck
@@ -92,7 +92,7 @@ commands:
         default: ""
     steps:
       - run:
-          name: Conan build
+          name: Conan install and build; make install
           command: |
             conan source .
             conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
@@ -105,17 +105,17 @@ commands:
         default: "Release"
     steps:
       - run:
-          name: Smoke
+          name: Smoke test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h
       - run:
-          name: UnitTest
+          name: Unit test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>>/test/UnitTest && ctest -V
       - run:
-          name: Regression
+          name: Regression test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h
@@ -127,7 +127,7 @@ commands:
         default: "Release"
     steps:
       - run:
-          name: static analysis
+          name: Static analysis
           command: |
             cd build/<<parameters.build_type>> && make cppcheck
 
