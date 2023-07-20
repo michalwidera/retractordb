@@ -1,6 +1,6 @@
 # declaration of input time series
-declare a BYTE , b BYTE stream core0, 1 file '/dev/urandom'
-declare c BYTE stream core1, 0.5 file '/dev/urandom'
+DECLARE a BYTE , b BYTE STREAM core0, 1 FILE '/dev/urandom'
+DECLARE c BYTE STREAM core1, 0.5 FILE '/dev/urandom'
 
-select core0[0],b stream str1 from core0#core1
-select core1[0]/2+1,a,a+1,b stream str2 from core1+core0
+SELECT core0[0],b STREAM str1 FROM core0#core1
+SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0

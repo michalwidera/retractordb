@@ -1,7 +1,7 @@
-declare a INTEGER stream core0, 0.5 file datafile3.dat
+DECLARE a INTEGER STREAM core0, 0.5 FILE datafile3.dat
 
-select * stream str1 from core0@(2,3)
-select * stream str2 from core0@(2,-3)
+SELECT * STREAM str1 FROM core0@(2,3)
+SELECT * STREAM str2 FROM core0@(2,-3)
 
-select * stream str3 from core0@(1,2)
-select * stream str4 from core0@(1,-2)
+SELECT * STREAM str3 FROM core0@(1,2)
+SELECT * STREAM str4 FROM core0@(1,-2)

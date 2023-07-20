@@ -8,12 +8,12 @@
 # probably addiational layer of file management (ex. file.dat access)
 # should appear in system to cover such issue.
 
-declare a INTEGER stream datacrc,1/5 file datacrc.dat
-declare e INTEGER stream datadat,1/4 file datanocrc.dat
-declare b INTEGER stream adata,0.2 file file.dat
-declare d INTEGER stream bdata,1 file file.dat
+DECLARE a INTEGER STREAM datacrc,1/5 FILE 'datacrc.dat'
+DECLARE e INTEGER STREAM datadat,1/4 FILE 'datanocrc.dat'
+DECLARE b INTEGER STREAM adata,0.2 FILE 'file.dat'
+DECLARE d INTEGER STREAM bdata,1 FILE 'file.dat'
 
-select 77 stream d0 from bdata 
-select adata[0] stream d1 from adata#d0
-select d1[0] stream d2 from d1&1
-select d1[0] stream d3 from d1%1
+SELECT 77 STREAM d0 FROM bdata 
+SELECT adata[0] STREAM d1 FROM adata#d0
+SELECT d1[0] STREAM d2 FROM d1&1
+SELECT d1[0] STREAM d3 FROM d1%1

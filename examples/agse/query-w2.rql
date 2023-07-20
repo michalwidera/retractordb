@@ -1,4 +1,0 @@
-declare a INTEGER stream core, 0.5 file datafile3.dat
-
-select * stream agregacja from core@(2,2)
-select * stream agregacjaSerializacja from core@(1,2)
