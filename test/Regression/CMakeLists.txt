@@ -90,15 +90,13 @@ add_test(
   NAME rg-xcompiler-simple
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
   COMMAND bash -c "set -e ; \
-    xretractor query-simple.rql -c > out.txt ; \
-    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
-
-add_test(
-  NAME rg-xcompiler-dot
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
-  COMMAND bash -c "set -e ; \
-    xretractor query-simple.rql -c -d -f -t -s > out.dot ; \
-    ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out.dot")
+    xretractor query-simple.rql -c > out-compile.txt ; \
+    xretractor query-simple.rql -m 10 ; \
+    xretractor query-simple.rql -c -d -f -t -s > out-dot.dot ; \
+    xtrdb < term.script > out-run.txt ;  \
+    ${CMAKE_COMMAND} -E compare_files pattern-run.txt out-run.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out-dot.dot ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out-compile.txt" )
 
 add_test(
   NAME rg-xcompiler-simple-vg-1
@@ -112,15 +110,6 @@ add_test(
   COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor
           query-simple.rql -m 5)
 
-add_test(
-  NAME rg-xcompiler-simple-run
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
-  COMMAND
-    bash -c "set -e ; \
-  rm str1 str1.desc ; \
-  xretractor query-simple.rql -m 10 ; \
-  xtrdb < term.script > out.txt ;  \
-  ${CMAKE_COMMAND} -E compare_files pattern-run.txt out.txt")
 # -----------------------------------------------------------------------------------------------
 
 add_test(
