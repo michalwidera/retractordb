@@ -16,6 +16,12 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-2204-clang-debug:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
 
   nightly:
     triggers:
@@ -122,6 +128,29 @@ commands:
             cd build/<<parameters.build_type>>/test/Regression && ctest -V
 
 jobs:
+
+  build-2204-clang-debug:
+    working_directory: ~/retractordb
+    executor: ubuntu2204machine
+    steps:
+      - checkout
+      - prep-env-159
+      - conan-build:
+          build_type: Debug
+          build_param: -s compiler=clang
+      - run-test:
+          build_type: Debug
+
+  build-2204-clang-release:
+    working_directory: ~/retractordb
+    executor: ubuntu2204machine
+    steps:
+      - checkout
+      - prep-env-159
+      - conan-build
+          build_param: -s compiler=clang
+      - run-test
+
   build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204machine
