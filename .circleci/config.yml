@@ -137,7 +137,7 @@ jobs:
       - prep-env-159
       - conan-build:
           build_type: Debug
-          build_param: -s compiler=clang
+          build_param: -s compiler=clang compiler.version=14
       - run-test:
           build_type: Debug
 
@@ -148,7 +148,7 @@ jobs:
       - checkout
       - prep-env-159
       - conan-build:
-          build_param: -s compiler=clang
+          build_param: -s compiler=clang compiler.version=14
       - run-test
 
   build-2204-debug:
