@@ -21,7 +21,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME rg-compiler-test-on-query
+  NAME rg-compiler-on-query
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND xretractor -q query-lnx.rql -c)
 
@@ -171,7 +171,7 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME rg-dumper-test
+  NAME rg-dumper
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND sh -c "xretractor query-lnx.rql -c")
 
@@ -180,7 +180,8 @@ add_test(
 add_test(
   NAME rg-data-consitency
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/consistency
-  COMMAND sh -c "set -e ; \
+  COMMAND
+    sh -c "set -e ; \
   xretractor -c query.rql > out_compile.txt ; \
   xretractor query.rql -m 5 ; \
   xtrdb < term.script > out_xtrdb.txt ; \
@@ -189,8 +190,7 @@ add_test(
 
 # -----------------------------------------------------------------------------------------------
 
-set_tests_properties(rg-dumper-test PROPERTIES DEPENDS
-                                               rg-compiler-test-on-query)
+set_tests_properties(rg-dumper PROPERTIES DEPENDS rg-compiler-on-query)
 
 add_test(
   NAME rg-retractor-waterfall
@@ -198,7 +198,7 @@ add_test(
   COMMAND sh -c "xretractor query-lnx.rql -m 20 --waterfall")
 
 add_test(
-  NAME rg-workflow-test
+  NAME rg-workflow
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-workflow.sh query-lnx.rql)
 
@@ -207,5 +207,5 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}
   COMMAND test-all-operators.sh query-all.rql)
 
-set_tests_properties(rg-retractor-waterfall rg-workflow-test
+set_tests_properties(rg-retractor-waterfall rg-workflow
                      rg-workflow-all-operators PROPERTIES RUN_SERIAL TRUE)
