@@ -1,0 +1,41 @@
+version: 1
+
+# Please visit https://embold.readme.io/docs/configuration-using-a-yaml-file 
+#  to know more about configurations available
+
+sources:
+  #Files or Directories to be Excluded are mentioned in exclusions
+  exclusions:
+    - 'test'
+    - 'generated'
+    - 'mock'
+    - 'thirdparty'
+    - 'third-party'
+    - '3rd-party'
+    - '3rdparty'
+    - 'external'
+    - 'build'
+    - 'node_modules'
+    - 'assets'
+    - 'gulp'
+    - 'grunt'
+    - 'library'
+    - '.git'
+    - 'Parser'
+    - 'examples'
+    
+    
+# Specify the languages you would like to Scan. Default is all Detected
+languages: 'Python,CPP'
+
+
+# Define modules one would like to run or disable. This is enough for Basic Users
+# Get List of Modules (Which are Default Enabled/Disabled) at the documentation link above
+#modules:
+#  - name: pmd
+#    enabled: true
+#  - name: gamma_cxx
+#    enabled: false
+#  - name: jshint
+#    enabled: true
+
