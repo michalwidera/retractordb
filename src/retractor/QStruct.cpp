@@ -275,6 +275,18 @@ rdb::Descriptor query::descriptorStorage() {
   return retVal;
 }
 
+// * Result of Embold code clone elimination
+void query::fillDescriptor(std::list<field> &lSchemaVar, rdb::Descriptor &val, std::string id) {
+  auto i{0};
+  for (auto &f : lSchemaVar) {
+    if (std::get<rdb::rlen>(f.field_) == 0) continue;
+    val | rdb::Descriptor(id + "_" + std::to_string(i++),   //
+                          std::get<rdb::rlen>(f.field_),    //
+                          std::get<rdb::rarray>(f.field_),  //
+                          std::get<rdb::rtype>(f.field_));
+  };
+}
+
 // TODO: remove Descriptor(a,b) and use Descriptor(a,b,c) here - strings are broken if not fix
 rdb::Descriptor query::descriptorFrom() {
   SPDLOG_INFO("call query::descriptorFrom()");
@@ -284,7 +296,6 @@ rdb::Descriptor query::descriptorFrom() {
     return retVal;
   }
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};
-  auto i{0};
   switch (cmd.getCommandID()) {
     case STREAM_AVG:
     case STREAM_MAX:
@@ -301,38 +312,14 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_DEHASH_MOD:
     case STREAM_SUBTRACT:
     case STREAM_TIMEMOVE: {
-      for (auto &f : getQuery(arg1).lSchema) {
-        if (std::get<rdb::rlen>(f.field_) == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++),   //
-                                 std::get<rdb::rlen>(f.field_),    //
-                                 std::get<rdb::rarray>(f.field_),  //
-                                 std::get<rdb::rtype>(f.field_));
-      };
+      fillDescriptor(getQuery(arg1).lSchema, retVal, id);
     } break;
     case PUSH_STREAM: {
-      for (auto &f : getQuery(cmd.getStr_()).lSchema) {
-        if (std::get<rdb::rlen>(f.field_) == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++),   //
-                                 std::get<rdb::rlen>(f.field_),    //
-                                 std::get<rdb::rarray>(f.field_),  //
-                                 std::get<rdb::rtype>(f.field_));
-      };
+      fillDescriptor(getQuery(cmd.getStr_()).lSchema, retVal, id);
     } break;
     case STREAM_ADD: {
-      for (auto &f : getQuery(arg1).lSchema) {
-        if (std::get<rdb::rlen>(f.field_) == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++),   //
-                                 std::get<rdb::rlen>(f.field_),    //
-                                 std::get<rdb::rarray>(f.field_),  //
-                                 std::get<rdb::rtype>(f.field_));
-      };
-      for (auto &f : getQuery(arg2).lSchema) {
-        if (std::get<rdb::rlen>(f.field_) == 0) continue;
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i++),   //
-                                 std::get<rdb::rlen>(f.field_),    //
-                                 std::get<rdb::rarray>(f.field_),  //
-                                 std::get<rdb::rtype>(f.field_));
-      };
+      fillDescriptor(getQuery(arg1).lSchema, retVal, id);
+      fillDescriptor(getQuery(arg2).lSchema, retVal, id);
     } break;
     case STREAM_AGSE: {
       // * INFO - sync with dataModel.cpp

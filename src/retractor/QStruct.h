@@ -53,6 +53,8 @@ struct field {
 };
 
 class query {
+  void fillDescriptor(std::list<field> &lSchemaVar, rdb::Descriptor &val, std::string id);
+
  public:
   query(boost::rational<int> rInterval, const std::string &id);
   query();
