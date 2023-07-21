@@ -33,6 +33,7 @@ class storageAccessor {
   boost::circular_buffer<rdb::payload> circularBuffer{0};
 
   void abortIfStorageNotPrepared();
+  void initializeAccessor();
 
  public:
   storageAccessor() = delete;

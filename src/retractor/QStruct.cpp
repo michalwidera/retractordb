@@ -135,7 +135,7 @@ int getSeqNr(const std::string &query_name) {
     if (query_name == q.id)
       return cnt;
     else
-      cnt++;
+      ++cnt;
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
   throw std::logic_error("No such stream in set - getSeqNr");
@@ -215,7 +215,7 @@ int query::getFieldIndex(field f_arg) {
   for (auto f : lSchema) {
     if (std::get<rdb::rname>(f.field_) == std::get<rdb::rname>(f_arg.field_))  // Todo
       return idx;
-    idx++;
+    ++idx;
   }
   SPDLOG_ERROR("Field not found in query - {}", std::get<rdb::rname>(f_arg.field_));
   throw std::logic_error("Field not found in query");

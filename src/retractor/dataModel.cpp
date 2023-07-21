@@ -88,7 +88,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int of
 
   auto descriptorVecSize = outputPayload->getDescriptor().sizeFlat();
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
-  for (auto i = 0; i < lengthAbs; i++) {
+  for (auto i = 0; i < lengthAbs; ++i) {
     rdb::rField x{std::make_tuple(instance + "_" + std::to_string(i),  //
                                   maxLen,                              //
                                   1,                                   // TODO: Check
@@ -100,7 +100,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int of
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
   auto prevQuot{-1};
-  for (auto i = 0; i < lengthAbs; i++) {
+  for (auto i = 0; i < lengthAbs; ++i) {
     auto dv = std::div(i + offset, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;

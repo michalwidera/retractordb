@@ -111,10 +111,10 @@ void Descriptor::updateConvMaps() {
   int counterArray{std::get<rarray>(*it)};
   int offset{0};
   int clen_alignment{0};
-  for (int i = 0; i < clen; i++) {
+  for (int i = 0; i < clen; ++i) {
     if (std::get<rtype>(*it) == rdb::TYPE || std::get<rtype>(*it) == rdb::REF) {
-      it++;
-      clen_alignment++;
+      ++it;
+      ++clen_alignment;
       continue;
     }
 
@@ -134,14 +134,14 @@ void Descriptor::updateConvMaps() {
         offset += std::get<rlen>(*it);
     }
 
-    counterArray--;
-    backCounterArray++;
+    --counterArray;
+    ++backCounterArray;
 
     if (counterArray == 0) {
-      it++;
+      ++it;
       if (it == this->end()) break;
       backCounterArray = 0;
-      fieldCounter++;
+      ++fieldCounter;
       counterArray = std::get<rarray>(*it);
     }
   }
@@ -223,14 +223,14 @@ bool Descriptor::operator==(const Descriptor &rhs) {
         std::get<rdb::rtype>(f) == rdb::TYPE ||      //
         std::get<rdb::rtype>(rhs[i]) == rdb::REF ||  //
         std::get<rdb::rtype>(rhs[i]) == rdb::TYPE) {
-      i++;
+      ++i;
       continue;
     }
     if (len(f) < len(rhs[i]) ||  //
         std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
       return false;
 
-    i++;
+    ++i;
   }
   return this->size() - refCountThis == rhs.size() - refCountRhs;
 }
@@ -260,7 +260,7 @@ Descriptor &Descriptor::createHash(const std::string name, Descriptor lhs, Descr
     auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
     auto maxRlen = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
     push_back(rField(name + "_" + std::to_string(i), maxRlen, 1, maxRtype));
-    i++;
+    ++i;
   }
 
   dirtyMap = true;

@@ -18,8 +18,6 @@
 
 using boost::lexical_cast;
 
-extern int fieldCount;
-
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance;
 
@@ -267,17 +265,17 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
   else if (cmd == STREAM_DEHASH_MOD)
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_ADD) {
-    int fieldCount = 0;
+    int fieldCountSh = 0;
     int i = 0;
     for (auto f : getQuery(sName1).lSchema) {
-      field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCount++),
+      field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
                  token(PUSH_ID, std::make_pair(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : getQuery(sName2).lSchema) {
-      field intf(rdb::rField(/*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCount++),
+      field intf(rdb::rField(/*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
                  token(PUSH_ID, std::make_pair(sName2, i++)));
       lRetVal.push_back(intf);
@@ -348,7 +346,7 @@ std::list<field> combine(std::string sName1, std::string sName2, token &cmd_toke
 // by next and some * can be process which have arguments appear as two asterisk
 // In such case unroll does not appear and algorithm gets shitin-shitout
 std::string prepareFields() {
-  int fieldCount = 0;
+  int fieldCountSh = 0;
   coreInstance.topologicalSort();
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
@@ -372,7 +370,7 @@ std::string prepareFields() {
             for (auto s : getQuery(t.getStr_()).lSchema) {
               std::list<token> lTempProgram;
               lTempProgram.push_back(token(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++)));
-              std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCount++);
+              std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCountSh++);
               q.lSchema.push_back(field(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram));
             }
             break;
@@ -383,7 +381,7 @@ std::string prepareFields() {
             break;
           }
         }
-        it++;
+        ++it;
       }
       for (auto eraseIt : eraseList) q.lSchema.erase(eraseIt);
     }

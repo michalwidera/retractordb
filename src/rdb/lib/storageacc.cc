@@ -92,6 +92,8 @@ void storageAccessor::moveRef() {
 }
 
 void storageAccessor::attachStorage() {
+  assert(storageFile != "");
+
   auto resourceAlreadyExist = std::filesystem::exists(storageFile);
 
   auto it = std::find_if(descriptor.begin(),
@@ -104,21 +106,7 @@ void storageAccessor::attachStorage() {
     SPDLOG_INFO("Storage type from descriptor {}", storageType);
   }
 
-  if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<uint8_t>>(storageFile);
-  } else if (storageType == "GENERIC") {
-    accessor = std::make_unique<rdb::genericBinaryFileAccessor<uint8_t>>(storageFile);
-  } else if (storageType == "POSIX") {
-    accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
-  } else if (storageType == "DEVICE") {
-    accessor = std::make_unique<rdb::binaryDeviceAccessor<uint8_t>>(storageFile);
-  } else if (storageType == "TEXTSOURCE") {
-    accessor = std::make_unique<rdb::textSourceAccessor<uint8_t>>(storageFile);
-    accessor->fctrl(&descriptor, 0);
-  } else {
-    SPDLOG_INFO("Unsupported storage type {}", storageType);
-    abort();
-  }
+  initializeAccessor();
 
   if (isDeclared()) {
     recordsCount = 1;
@@ -149,14 +137,9 @@ storageAccessor::~storageAccessor() {
 
 bool storageAccessor::isDeclared() { return (storageType == "DEVICE") || (storageType == "TEXTSOURCE"); }
 
-void storageAccessor::reset() {
+void storageAccessor::initializeAccessor() {
   assert(storageFile != "");
-
-  if (!accessor) return;  // no accessor initialized - no need to reset.
-
-  auto resourceAlreadyExist = std::filesystem::exists(storageFile);
-  if (resourceAlreadyExist)
-    if (!isDeclared()) remove(storageFile.c_str());
+  assert(storageType != "");
 
   if (storageType == "DEFAULT") {
     accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<uint8_t>>(storageFile);
@@ -173,6 +156,18 @@ void storageAccessor::reset() {
     SPDLOG_INFO("Unsupported storage type {}", storageType);
     abort();
   }
+}
+
+void storageAccessor::reset() {
+  assert(storageFile != "");
+
+  if (!accessor) return;  // no accessor initialized - no need to reset.
+
+  auto resourceAlreadyExist = std::filesystem::exists(storageFile);
+  if (resourceAlreadyExist)
+    if (!isDeclared()) remove(storageFile.c_str());
+
+  initializeAccessor();
 
   if (isDeclared())
     recordsCount = 1;

@@ -1,3 +1,4 @@
+"""Module required for conan build system."""
 from curses import keyname
 
 from conan import ConanFile, Version, __version__ as conan_version

@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+"""Module that prepares data for plot program."""
 import sys
 import argparse
 import collections

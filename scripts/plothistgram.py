@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+"""Module that goes probably to legacy."""
 import sys
 import argparse
 import collections
