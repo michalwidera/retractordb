@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cctype>
 #include <iostream>
@@ -91,8 +92,8 @@ int GetFieldLenFromType(rdb::descFld ft) {
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
-Descriptor::Descriptor(std::string n, int l, int a, rdb::descFld t) {  //
-  push_back(rField(n, l, a, t));                                       //
+Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
+  push_back(rField(n, l, a, t));                                              //
 }
 
 void Descriptor::updateConvMaps() {
@@ -194,9 +195,10 @@ Descriptor &Descriptor::operator|(const Descriptor &rhs) {
 }
 
 Descriptor &Descriptor::operator=(const Descriptor &rhs) {
+  if (this == &rhs) return *this;
+
   clear();
   insert(end(), rhs.begin(), rhs.end());
-
   dirtyMap = true;
   return *this;
 }
@@ -249,7 +251,7 @@ Descriptor &Descriptor::cleanRef() {
   return *this;
 }
 
-Descriptor &Descriptor::createHash(const std::string name, Descriptor lhs, Descriptor rhs) {
+Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Descriptor rhs) {
   lhs.cleanRef();
   rhs.cleanRef();
   assert(lhs.size() == rhs.size());
@@ -279,7 +281,7 @@ int Descriptor::getSizeInBytes() const {
   return size;
 }
 
-int Descriptor::position(std::string name) {
+int Descriptor::position(const std::string &name) {
   auto it = std::find_if(begin(), end(),                          //
                          [name](const auto &item) {               //
                            return std::get<rname>(item) == name;  //
@@ -298,13 +300,13 @@ std::string Descriptor::fieldName(int fieldPosition) {  //
   return std::get<rname>((*this)[fieldPosition]);       //
 }
 
-int Descriptor::len(const std::string name) { return len((*this)[position(name)]); }
+int Descriptor::len(const std::string &name) { return len((*this)[position(name)]); }
 
-int Descriptor::arraySize(const std::string name) {  //
-  return std::get<rarray>((*this)[position(name)]);  //
+int Descriptor::arraySize(const std::string &name) {  //
+  return std::get<rarray>((*this)[position(name)]);   //
 }
 
-int Descriptor::offsetBegArr(const std::string name) {
+int Descriptor::offsetBegArr(const std::string &name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == std::get<rname>(field)) return offset;
@@ -319,7 +321,7 @@ int Descriptor::offset(const int position) {
   return offsetMap[position];
 }
 
-std::string Descriptor::type(const std::string name) {            //
+std::string Descriptor::type(const std::string &name) {           //
   return GetFieldType(std::get<rtype>((*this)[position(name)]));  //
 }
 
@@ -375,7 +377,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
 struct synsugar_is_space : std::ctype<char> {
   synsugar_is_space() : ctype<char>(get_table()) {}
   static mask const *get_table() {
-    static mask rc[table_size];
+    static std::array<mask, table_size> rc;
     rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = std::ctype_base::space;
     return &rc[0];
   }

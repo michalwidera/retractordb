@@ -365,8 +365,8 @@ bool detailShow() {
     if (sInputStream == v.second.get<std::string>("")) found = true;
   }
   if (found) {
-    ptree pt = netClient("detail", sInputStream);
-    for (const auto &v : pt.get_child("db.field"))
+    ptree ptsh = netClient("detail", sInputStream);
+    for (const auto &v : ptsh.get_child("db.field"))
       printf("%s.%s\n", sInputStream.c_str(), v.second.get<std::string>("").c_str());
   } else
     std::cerr << "not found" << std::endl;

@@ -546,8 +546,8 @@ std::string convertReferences() {
               const int offset1(atoi(sOffset1.c_str()));
               const int offset2(atoi(sOffset2.c_str()));
               bool foundSchema(false);
-              for (auto &q : coreInstance) {
-                if (q.id == schema) {
+              for (auto &qry : coreInstance) {
+                if (qry.id == schema) {
                   foundSchema = true;
                   break;
                 }

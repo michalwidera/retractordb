@@ -1,6 +1,8 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
+// NOLINTBEGIN(cert-err58-cpp)
+
 // Checking redefined namespace sanity
 #if defined(DECL_T) || defined(DECL_F) || defined(DECL_E) || defined(BEGIN_E_GEN_T) || defined(END_E_GEN_T)
 #error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conflicts with inner fldType.h declaration.
@@ -64,3 +66,5 @@ struct Overload : Ts... {
 template <class... Ts>
 Overload(Ts...) -> Overload<Ts...>;
 #endif
+
+// NOLINTEND(cert-err58-cpp)

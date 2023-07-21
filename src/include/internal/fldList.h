@@ -4,6 +4,8 @@
 // * Be careful here - there is something non c++ classic
 // ! Pragma once or #indef barrier should not appear here!
 
+// NOLINTBEGIN(cert-err58-cpp)
+
 // This declaration goes into ::rdb namespace
 #define INTINT int, int
 #define STRINT std::string, int
@@ -27,3 +29,5 @@ END_E_GEN_T(descFld)
 #undef DECL_T
 #undef DECL_E
 #undef DECL_F
+
+// NOLINTEND(cert-err58-cpp)

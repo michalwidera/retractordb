@@ -34,10 +34,10 @@ payload::payload(const payload &other) {
 // Copy & assignment operator
 
 payload &payload::operator=(const payload &other) {
-  if (this != &other) {             // assure not a self-assignment
-    *this = other.getDescriptor();  // call operator=(const Descriptor
-    std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
-  }
+  if (this == &other) return *this;  // assure not a self-assignment
+
+  *this = other.getDescriptor();  // call operator=(const Descriptor
+  std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   return *this;
 }
 

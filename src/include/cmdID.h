@@ -1,6 +1,8 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
+// NOLINTBEGIN(cert-err58-cpp)
+
 // Checking redefined namespace sanity
 #if defined(DECL) || defined(BEGIN_E_GEN) || defined(END_E_GEN) || defined(LAST)
 #error DECL, LAST, BEGIN_E_GEN, END_E_GEN conficts with inner cmdID.h declaration.
@@ -99,3 +101,5 @@ END_E_GEN(command_id)
 #define CMDID_H_DECLARATION_DONE_CMDI
 
 #endif  // CMDID_H_DECLARATION_DONE_CMDI
+
+// NOLINTEND(cert-err58-cpp)
