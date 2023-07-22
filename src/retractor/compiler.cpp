@@ -173,44 +173,14 @@ std::string simplifyLProgram() {
     // Optimization phase 2
     if ((*it).isReductionRequired()) {
       for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
-        if ((*it2).getStrCommandID() == "STREAM_TIMEMOVE" ||  //
-            (*it2).getStrCommandID() == "STREAM_SUBTRACT") {
+        if (                                              //
+            (*it2).getStrCommandID() != "PUSH_STREAM" &&  //
+            (*it2).getStrCommandID() != "PUSH_VAL") {
           query newQuery;
-          std::string arg1;  //< Name of argument operation
+          std::string arg1 = "";
+          std::string arg2 = "";
           command_id cmd;
-          std::string affectedField;
-          {
-            token newVal(*it2);
-            newQuery.lProgram.push_front(newVal);
-            cmd = (*it2).getCommandID();
-            it2 = (*it).lProgram.erase(it2);
-            --it2;
-          }
-          {
-            token newVal(*it2);
-            newQuery.lProgram.push_front(newVal);
-            std::stringstream s;
-            s << (*it2).getStr_();
-            arg1 = std::string(s.str());
-            affectedField = (*it2).getStr_();
-            it2 = (*it).lProgram.erase(it2);
-            --it2;
-          }
-          ++it2;
-          std::list<token> lTempProgram;
-          lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
-          newQuery.id = generateStreamName(arg1, "", cmd);
-          (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
-          coreInstance.push_back(newQuery);  // After this instruction it loses context
-          it = coreInstance.begin();
-          break;
-        } else if ((*it2).getStrCommandID() != "PUSH_STREAM" &&  //
-                   (*it2).getStrCommandID() != "PUSH_VAL") {
-          query newQuery;
-          std::string arg1,  //< Name of first operation argument
-              arg2;          //< Name of second operation argument
-          command_id cmd;
+
           {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
@@ -227,7 +197,9 @@ std::string simplifyLProgram() {
             it2 = (*it).lProgram.erase(it2);
             --it2;
           }
-          {
+          if (                                                  //
+              (*it2).getStrCommandID() != "STREAM_TIMEMOVE" &&  //
+              (*it2).getStrCommandID() != "STREAM_SUBTRACT") {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
             std::stringstream s;
@@ -237,6 +209,7 @@ std::string simplifyLProgram() {
             --it2;
           }
           ++it2;
+
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
           newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
@@ -244,7 +217,9 @@ std::string simplifyLProgram() {
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           it = coreInstance.begin();
+
           break;
+
         }  // Endif
       }    // Endfor
     }      // Endif
