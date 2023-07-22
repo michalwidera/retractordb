@@ -178,6 +178,13 @@ add_test(
     xretractor query.rql -c > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
+add_test(
+  NAME rg-subquery-dot
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/subquery
+  COMMAND bash -c "set -e ; \
+    xretractor query.rql -c -d -f -t -s > out.dot ; \
+    ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out.dot")
+
 # -----------------------------------------------------------------------------------------------
 
 add_test(

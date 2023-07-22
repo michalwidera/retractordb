@@ -179,15 +179,14 @@ std::string simplifyLProgram() {
           query newQuery;
           std::string arg1 = "";
           std::string arg2 = "";
-          command_id cmd;
 
-          {
-            token newVal(*it2);
-            newQuery.lProgram.push_front(newVal);
-            cmd = (*it2).getCommandID();
-            it2 = (*it).lProgram.erase(it2);
-            --it2;
-          }
+          token newVal(*it2);
+          newQuery.lProgram.push_front(newVal);
+          command_id cmd = (*it2).getCommandID();
+
+          it2 = (*it).lProgram.erase(it2);
+          --it2;
+
           {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
@@ -197,9 +196,7 @@ std::string simplifyLProgram() {
             it2 = (*it).lProgram.erase(it2);
             --it2;
           }
-          if (                                                  //
-              (*it2).getStrCommandID() != "STREAM_TIMEMOVE" &&  //
-              (*it2).getStrCommandID() != "STREAM_SUBTRACT") {
+          if (cmd != STREAM_TIMEMOVE && cmd != STREAM_SUBTRACT) {
             token newVal(*it2);
             newQuery.lProgram.push_front(newVal);
             std::stringstream s;
@@ -220,7 +217,7 @@ std::string simplifyLProgram() {
 
           break;
 
-        }  // Endif
+        }  // Endif PUSH_STREAM, PUSH_VAL
       }    // Endfor
     }      // Endif
   }        // Endfor

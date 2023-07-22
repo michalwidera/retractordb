@@ -9,6 +9,17 @@ str1(1/20)
 	:- STREAM_TIMEMOVE(1)
 	a: INTEGER
 		PUSH_ID(str1[0])
+str2(1/20)
+	:- PUSH_STREAM(STREAM_TIMEMOVE_core1)
+	:- PUSH_STREAM(core2)
+	:- STREAM_HASH
+	a: INTEGER
+		PUSH_ID(str2[0])
+STREAM_TIMEMOVE_core1(1/10)
+	:- PUSH_STREAM(core1)
+	:- STREAM_TIMEMOVE(1)
+	a: INTEGER
+		PUSH_ID(STREAM_TIMEMOVE_core1[0])
 core1(1/10)	datafile1.txt
 	a: INTEGER
 core2(1/10)	datafile2.txt

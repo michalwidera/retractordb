@@ -120,7 +120,8 @@ boost::rational<int> qTree::getDelta(const std::string &query_name) { return get
 
 query &getQuery(const std::string &query_name) {
   assert(query_name != "");
-  for (auto &q : coreInstance) if (q.id == query_name) return q;
+  for (auto &q : coreInstance)
+    if (q.id == query_name) return q;
   SPDLOG_ERROR("Missing - {}", query_name);
   throw std::logic_error("No such stream in set - getQuery");
   static query void_query;
