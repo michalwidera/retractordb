@@ -10,6 +10,7 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "qry.hpp"
+#include "uxSysTermTools.h"
 
 using namespace boost;
 using boost::property_tree::ptree;
@@ -17,22 +18,13 @@ using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
 int main(int argc, char *argv[]) {
-  // Clarification: When gcc has been upgraded to 9.x version some tests fails.
-  // Bug appear when data are passing to program via script .sh
-  // additional 13 (\r) character was append - this code normalize argv list.
-  // C99: The parameters argc and argv and the strings pointed to by the argv
-  // array shall be modifiable by the program, and retain their last-stored
-  // values between program startup and program termination.
-  for (int i = 0; i < argc; i++) {
-    auto len = strlen(argv[i]);
-    if (len > 0)
-      if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
-  }
+  fixArgcv(argc, argv);
+
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
-  SPDLOG_INFO("{} start  [-------------------]", argv[0]);
+
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
