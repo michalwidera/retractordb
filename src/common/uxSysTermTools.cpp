@@ -1,6 +1,7 @@
+#include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <fcntl.h>
+
 #include <cstdio>
 
 int _kbhit(void) {

@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
@@ -537,7 +538,7 @@ std::string convertReferences() {
               throw std::out_of_range("No mach on type conversion ID3");
             break;
           case PUSH_ID4:
-          case PUSH_ID5:
+          case PUSH_ID5: {
             if (regex_search(text.c_str(), what, xprFieldId4) || regex_search(text.c_str(), what, xprFieldId5)) {
               assert(what.size() == 4);
               const std::string schema(what[1]);
@@ -545,18 +546,17 @@ std::string convertReferences() {
               const std::string sOffset2(what[3]);
               const int offset1(atoi(sOffset1.c_str()));
               const int offset2(atoi(sOffset2.c_str()));
-              bool foundSchema(false);
-              for (auto &qry : coreInstance) {
-                if (qry.id == schema) {
-                  foundSchema = true;
-                  break;
-                }
-              }
+
+              namespace ranges = std::ranges;
+              bool foundSchema =
+                  ranges::find_if(coreInstance, [schema](auto &qry) { return qry.id == schema; }) != coreInstance.end();
+
               if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
               t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));
             } else
               throw std::out_of_range("No mach on type conversion ID4");
             break;
+          }
         }
       }
     }

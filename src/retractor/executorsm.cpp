@@ -6,7 +6,6 @@
 #include "QStruct.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
-
 #include "uxSysTermTools.h"
 
 // This defines is required to remove deprecation of boost/bind.hpp
