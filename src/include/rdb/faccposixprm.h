@@ -19,7 +19,7 @@ class posixPrmBinaryFileAccessor : public FileAccessorInterface<T> {
   /**
    * @brief Posix File Descriptor
    */
-  ssize_t fd;
+  int fd;
 
  public:
   ~posixPrmBinaryFileAccessor();
