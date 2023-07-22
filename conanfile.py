@@ -22,8 +22,8 @@ if [ $1 ] ; then
 fi
 """
 
-"""This class is required for conan file build system."""
 class Retractor(ConanFile):
+    '''This class is required for conan file build system.'''
     settings = "os", "compiler", "build_type", "arch"
     license = "MIT"
     author = "Michal Widera"
@@ -45,30 +45,29 @@ class Retractor(ConanFile):
                        "boost/*:without_filesystem" : False ,
                        "spdlog/*:header_only" : True }
 
-    """Choose cmake_layout output."""
     def layout(self):
+        '''Choose cmake_layout output.'''
         cmake_layout(self)
 
-    """Set libraries required for compile and execute."""
     def package_info(self):
+        '''Set libraries required for compile and execute.'''
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
         self.cpp_info.compiler = "20"
 
-    """Creates antlr4call.sh script that calls antlr."""
     def requirements(self):
-        # Auto-generation of antlr4call.sh script
+        '''Auto-generation of antlr4call.sh script'''
         antlr4_version_file = open("scripts/antlr4call.sh","w")
         antlr4_version_file.write(script.replace('VERSION',self.antlr_version))
         antlr4_version_file.close()
 
-    """Generate."""
     def generate(self):
+        '''Generate.'''
         deps = CMakeDeps(self)
         deps.check_components_exist = True
         deps.generate()
 
-    """Build."""
     def build(self):
+        '''Build.'''
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
