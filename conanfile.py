@@ -22,52 +22,61 @@ if [ $1 ] ; then
 fi
 """
 
+
 class Retractor(ConanFile):
-    '''This class is required for conan file build system.'''
+    """This class is required for conan file build system."""
+
     settings = "os", "compiler", "build_type", "arch"
     license = "MIT"
     author = "Michal Widera"
     description = "RetractorDB - time series database and data processing engine"
     homepage = "https://retractordb.com"
     antlr_version = "4.13.0"
-    requires = "boost/1.82.0", "gtest/1.13.0" , "antlr4-cppruntime/" + antlr_version, "spdlog/1.10.0"
+    requires = (
+        "boost/1.82.0",
+        "gtest/1.13.0",
+        "antlr4-cppruntime/" + antlr_version,
+        "spdlog/1.10.0",
+    )
     generators = "CMakeToolchain"
     testing = []
     package_type = "application"
 
-    default_options = {"boost/*:shared": False,
-                       "boost/*:without_serialization": False,
-                       "boost/*:without_thread" : False,
-                       "boost/*:without_program_options" : False,
-                       "boost/*:without_test" : False,
-                       "boost/*:multithreading" : True,
-                       "boost/*:without_system" : False,
-                       "boost/*:without_filesystem" : False ,
-                       "spdlog/*:header_only" : True }
+    default_options = {
+        "boost/*:shared": False,
+        "boost/*:without_serialization": False,
+        "boost/*:without_thread": False,
+        "boost/*:without_program_options": False,
+        "boost/*:without_test": False,
+        "boost/*:multithreading": True,
+        "boost/*:without_system": False,
+        "boost/*:without_filesystem": False,
+        "spdlog/*:header_only": True,
+    }
 
     def layout(self):
-        '''Choose cmake_layout output.'''
+        """Choose cmake_layout output."""
         cmake_layout(self)
 
     def package_info(self):
-        '''Set libraries required for compile and execute.'''
+        """Set libraries required for compile and execute."""
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
         self.cpp_info.compiler = "20"
 
     def requirements(self):
-        '''Auto-generation of antlr4call.sh script'''
-        antlr4_version_file = open("scripts/antlr4call.sh","w")
-        antlr4_version_file.write(script.replace('VERSION',self.antlr_version))
+        """Auto-generation of antlr4call.sh script"""
+        antlr4_version_file = open("scripts/antlr4call.sh", "w")
+        antlr4_version_file.write(script.replace("VERSION", self.antlr_version))
         antlr4_version_file.close()
 
     def generate(self):
-        '''Generate.'''
+        """Generate."""
         deps = CMakeDeps(self)
         deps.check_components_exist = True
         deps.generate()
 
     def build(self):
-        '''Build.'''
+        """Build."""
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
