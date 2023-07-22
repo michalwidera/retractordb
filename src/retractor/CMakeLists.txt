@@ -7,8 +7,9 @@ add_subdirectory(Parser)
 find_package(antlr4-runtime REQUIRED)
 
 file(GLOB BUILDSRCS_CPP "*.cpp")
+file(GLOB BUILDCOMMON_CPP "../common/*.cpp" )
 
-set(SOURCES_RETRACTOR ${BUILDSRCS_CPP})
+set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDCOMMON_CPP})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 

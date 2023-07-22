@@ -1,7 +1,3 @@
-#include <fcntl.h>
-#include <termios.h>
-#include <unistd.h>
-
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -10,6 +6,8 @@
 #include "QStruct.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
+
+#include "uxSysTermTools.h"
 
 // This defines is required to remove deprecation of boost/bind.hpp
 // some boost libraries still didn't remove dependency to boost bin
@@ -77,28 +75,6 @@ typedef boost::property_tree::ptree ptree;
 extern int iTest();
 
 std::map<std::string, ptree> streamTable;
-
-int _kbhit(void) {
-  struct termios oldt, newt;
-  int ch;
-  int oldf;
-  tcgetattr(STDIN_FILENO, &oldt);
-  newt = oldt;
-  newt.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-  oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-  fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-  ch = getchar();
-  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-  fcntl(STDIN_FILENO, F_SETFL, oldf);
-  if (ch != EOF) {
-    ungetc(ch, stdin);
-    return 1;
-  }
-  return 0;
-}
-
-int _getch() { return getchar(); }
 
 std::set<boost::rational<int>> getListFromCore() {
   std::set<boost::rational<int>> lstTimeIntervals;

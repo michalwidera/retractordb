@@ -11,7 +11,11 @@ set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
                     ${CMAKE_SOURCE_DIR}/src)
 
-set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
+set(SOURCES_QRY_TEST
+    ${CMAKE_SOURCE_DIR}/src/common/uxSysTermTools.cpp
+    ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp
+    test_qry.cpp
+    main.cpp)
 
 set(SOURCES_COMPILER_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
