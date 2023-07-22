@@ -23,7 +23,7 @@ std::string genericBinaryFileAccessor<T>::fileName() {
 }
 
 template <class T>
-int genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   if (position == std::numeric_limits<size_t>::max()) {
@@ -47,7 +47,7 @@ int genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, con
 }
 
 template <class T>
-int genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(0, 0);
   myFile.open(fileName(), std::ios::in | std::ios::binary);

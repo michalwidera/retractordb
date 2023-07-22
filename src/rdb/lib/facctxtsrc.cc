@@ -43,13 +43,13 @@ std::string textSourceAccessor<T>::fileName() {
 }
 
 template <typename T>
-int textSourceAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
 template <typename T>
-int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   assert(position == 0);
 
   // myFile.seekg(position);
@@ -110,7 +110,7 @@ int textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t posi
 }
 
 template <typename T>
-int textSourceAccessor<T>::fctrl(void* ptrData, const size_t size) {
+ssize_t textSourceAccessor<T>::fctrl(void* ptrData, const size_t size) {
   descriptor = *(reinterpret_cast<rdb::Descriptor*>(ptrData));
   payload = std::make_unique<rdb::payload>(descriptor);
   return EXIT_SUCCESS;

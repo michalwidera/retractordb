@@ -26,9 +26,9 @@ class textSourceAccessor : public FileAccessorInterface<T> {
 
   explicit textSourceAccessor(std::string fileName);
 
-  int read(T *ptrData, const size_t size, const size_t position) override;
-  int write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
-  int fctrl(void *ptrData, const size_t size) override;
+  ssize_t read(T *ptrData, const size_t size, const size_t position) override;
+  ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t fctrl(void *ptrData, const size_t size) override;
   std::string fileName() override;
 };
 }  // namespace rdb

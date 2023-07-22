@@ -14,15 +14,15 @@ class binaryDeviceAccessor : public FileAccessorInterface<T> {
   /**
    * @brief Posix File Descriptor
    */
-  int fd;
+  ssize_t fd;
 
  public:
   ~binaryDeviceAccessor();
 
   explicit binaryDeviceAccessor(std::string fileName);
 
-  int read(T *ptrData, const size_t size, const size_t position) override;
-  int write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t read(T *ptrData, const size_t size, const size_t position) override;
+  ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
   std::string fileName() override;
 };
 }  // namespace rdb
