@@ -87,6 +87,33 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
+  NAME rg-xtrdb_on_text_data_2
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern7
+  COMMAND bash -c "set -e ; \
+    xretractor query.rql -c > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+
+# -----------------------------------------------------------------------------------------------
+
+add_test(
+  NAME rg-xtrdb_on_text_data
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
+  COMMAND bash -c "set -e ; \
+    xtrdb < term.script > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+
+# -----------------------------------------------------------------------------------------------
+
+add_test(
+  NAME rg-xtrdb_on_bin_data
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern9
+  COMMAND bash -c "set -e ; \
+    xtrdb < term.script > out.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+
+# -----------------------------------------------------------------------------------------------
+
+add_test(
   NAME rg-xcompiler-simple
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/simple
   COMMAND bash -c "set -e ; \
@@ -121,6 +148,7 @@ add_test(
   xretractor query-simple.rql -m 10 ; \
   xtrdb < term.script > out.txt ;  \
   ${CMAKE_COMMAND} -E compare_files pattern-run.txt out.txt")
+
 # -----------------------------------------------------------------------------------------------
 
 add_test(
@@ -135,8 +163,8 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME rg-xtrdb_on_text_data_2
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern7
+  NAME rg-dsp
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/dsp
   COMMAND bash -c "set -e ; \
     xretractor query.rql -c > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
@@ -144,26 +172,8 @@ add_test(
 # -----------------------------------------------------------------------------------------------
 
 add_test(
-  NAME rg-xtrdb_on_text_data
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern8
-  COMMAND bash -c "set -e ; \
-    xtrdb < term.script > out.txt ; \
-    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
-
-# -----------------------------------------------------------------------------------------------
-
-add_test(
-  NAME rg-xtrdb_on_bin_data
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/Pattern9
-  COMMAND bash -c "set -e ; \
-    xtrdb < term.script > out.txt ; \
-    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
-
-# -----------------------------------------------------------------------------------------------
-
-add_test(
-  NAME rg-dsp
-  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/dsp
+  NAME rg-subquery
+  WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/subquery
   COMMAND bash -c "set -e ; \
     xretractor query.rql -c > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
