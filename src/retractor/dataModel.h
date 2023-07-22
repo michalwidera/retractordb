@@ -18,21 +18,21 @@ struct streamInstance {
                                                         // clause - created by from clause.
 
   // This constructor cover issue when storage name is different from descriptor name
-  streamInstance(const std::string descriptorName,           //
-                 const std::string storageName,              // <- query %% filename
-                 const rdb::Descriptor storageDescriptor,    // <- query %% descriptorStorage()
-                 const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  explicit streamInstance(const std::string &descriptorName,          //
+                          const std::string &storageName,             // <- query %% filename
+                          const rdb::Descriptor storageDescriptor,    // <- query %% descriptorStorage()
+                          const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
   // This constructor cover same name for storage and descriptor file name (+.desc)
-  streamInstance(const std::string idAndStorageName,         // <- query %% filename
-                 const rdb::Descriptor storageDescriptor,    // <- query %% descriptorStorage()
-                 const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  explicit streamInstance(const std::string &idAndStorageName,        // <- query %% filename
+                          const rdb::Descriptor storageDescriptor,    // <- query %% descriptorStorage()
+                          const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
 
   // This constructor will create data based on QStruct query
-  streamInstance(query &qry);
+  explicit streamInstance(query &qry);
 
-  rdb::payload constructAgsePayload(const int length, const int offset, std::string instance);
-  rdb::payload constructAggregate(command_id cmd, std::string instance);
+  rdb::payload constructAgsePayload(const int length, const int offset, const std::string &instance);
+  rdb::payload constructAggregate(command_id cmd, const std::string &instance);
 
   /*
    * This function will create OutputPayload based on all field from query
@@ -55,23 +55,23 @@ class dataModel {
 
   dataModel() = delete;
 
-  std::unique_ptr<rdb::payload>::pointer getPayload(std::string instance,  //
+  std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
                                                     const int revOffset = 0);
 
-  bool fetchPayload(std::string instance,                            //
+  bool fetchPayload(const std::string &instance,                     //
                     std::unique_ptr<rdb::payload>::pointer payload,  //
                     const int revOffset = 0);
   /*
    * This function creates Input payload for ConstructOutputPayload data source
    * function need to be here because it access different streams from qSet
    */
-  void constructInputPayload(std::string instance);
+  void constructInputPayload(const std::string &instance);
 
-  void fetchDeclaredPayload(std::string instance);
+  void fetchDeclaredPayload(const std::string &instance);
 
   void processRows(std::set<std::string> inSet);
 
-  std::vector<rdb::descFldVT> getRow(std::string instance, const int timeOffset);
+  std::vector<rdb::descFldVT> getRow(const std::string &instance, const int timeOffset);
 
   size_t streamStoredSize(const std::string &instance);
 

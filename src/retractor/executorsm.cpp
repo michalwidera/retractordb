@@ -1,3 +1,4 @@
+#include <array>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -214,15 +215,15 @@ void commandProcessorLoop() {
     //
     // This need to be clean up - There are some mess.
     //
-    char message[1000];
+    std::array<char, 1000> message;
     unsigned int priority;
     IPC::message_queue::size_type recvd_size;
     while (true) {
-      while (mq.try_receive(message, 1000, recvd_size, priority)) {
+      while (mq.try_receive(message.data(), 1000, recvd_size, priority)) {
         message[recvd_size] = 0;
         std::stringstream strstream;
-        strstream << message;
-        memset(message, 0, 1000);
+        strstream << message.data();
+        memset(message.data(), 0, 1000);
         ptree pt;
         read_info(strstream, pt);
         ptree pt_retval = commandProcessor(pt);

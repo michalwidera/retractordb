@@ -28,8 +28,8 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 */
 
 streamInstance::streamInstance(               //
-    const std::string descriptorName,         // q.id
-    const std::string storageNameParam,       // filename
+    const std::string& descriptorName,        // q.id
+    const std::string& storageNameParam,      // filename
     const rdb::Descriptor storageDescriptor,  //
     const rdb::Descriptor internalDescriptor) {
   // only objects with REF has storageNameParam filled.
@@ -56,7 +56,7 @@ streamInstance::streamInstance(               //
 };
 
 streamInstance::streamInstance(                //
-    const std::string idAndStorageName,        // q.id = filename
+    const std::string& idAndStorageName,       // q.id = filename
     const rdb::Descriptor storageDescriptor,   //
     const rdb::Descriptor internalDescriptor)  //
     : streamInstance(idAndStorageName,         // descriptor file
@@ -77,7 +77,7 @@ streamInstance::streamInstance(query& qry)
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructAgsePayload(const int length, const int offset, std::string instance) {
+rdb::payload streamInstance::constructAgsePayload(const int length, const int offset, const std::string& instance) {
   assert(offset > 0);
   // First construct descriptor
   rdb::Descriptor descriptor;
@@ -145,7 +145,7 @@ void fnOp(opType op, std::any value, std::any& valueRet) {
   }
 }
 
-rdb::payload streamInstance::constructAggregate(command_id cmd, std::string instance) {
+rdb::payload streamInstance::constructAggregate(command_id cmd, const std::string& instance) {
   assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor
@@ -290,7 +290,7 @@ dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
 
 dataModel::~dataModel() {}
 
-std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instance,  //
+std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string& instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto revOffsetMutable(revOffset);
@@ -302,7 +302,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(std::string instanc
   return qSet[instance]->outputPayload->getPayload();
 }
 
-bool dataModel::fetchPayload(std::string instance,                            //
+bool dataModel::fetchPayload(const std::string& instance,                     //
                              std::unique_ptr<rdb::payload>::pointer payload,  //
                              const int revOffset) {
   return qSet[instance]->outputPayload->readReverse(revOffset, payload->get());
@@ -328,7 +328,7 @@ void dataModel::processRows(std::set<std::string> inSet) {
   }
 }
 
-void dataModel::fetchDeclaredPayload(std::string instance) {
+void dataModel::fetchDeclaredPayload(const std::string& instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.isDeclaration());  // lProgram is empty()
@@ -340,7 +340,7 @@ void dataModel::fetchDeclaredPayload(std::string instance) {
   *(qSet[instance]->inputPayload) = *(qSet[instance]->outputPayload->getPayload());
 }
 
-void dataModel::constructInputPayload(std::string instance) {
+void dataModel::constructInputPayload(const std::string& instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
@@ -470,7 +470,7 @@ void dataModel::constructInputPayload(std::string instance) {
 // TODO - use this func in printRowValue/executorsm.cpp 281
 // TODO - and use std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) from QStruct.cpp
 // TODO - Workarea - Please cover with test
-std::vector<rdb::descFldVT> dataModel::getRow(std::string instance, const int timeOffset) {
+std::vector<rdb::descFldVT> dataModel::getRow(const std::string& instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
