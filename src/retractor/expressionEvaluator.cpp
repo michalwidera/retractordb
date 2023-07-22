@@ -45,7 +45,7 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                            //
                  [&retVal](int a, int b) { retVal = a + b; },                                    //
                  [&retVal](unsigned a, unsigned b) { retVal = a + b; },                          //
-                 [&retVal](std::string a, std::string b) { retVal = a + b; },                    //
+                 [&retVal](const std::string& a, const std::string& b) { retVal = a + b; },      //
                  [&retVal](double a, double b) { retVal = a + b; },                              //
                  [&retVal](float a, float b) { retVal = a + b; },                                //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a + b; },  //
@@ -70,13 +70,13 @@ rdb::descFldVT operator-(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                            //
-                 [&retVal](int a, int b) { retVal = a - b; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = a - b; },                          //
-                 [&retVal](std::string a, std::string b) { /* define string-minus-string */ },   //
-                 [&retVal](double a, double b) { retVal = a - b; },                              //
-                 [&retVal](float a, float b) { retVal = a - b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a - b; },  //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                                         //
+                 [&retVal](int a, int b) { retVal = a - b; },                                                 //
+                 [&retVal](unsigned a, unsigned b) { retVal = a - b; },                                       //
+                 [&retVal](const std::string& a, const std::string& b) { /* define string-minus-string */ },  //
+                 [&retVal](double a, double b) { retVal = a - b; },                                           //
+                 [&retVal](float a, float b) { retVal = a - b; },                                             //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a - b; },               //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first - b.first, a.second - b.second);
                  },
@@ -98,13 +98,13 @@ rdb::descFldVT operator*(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                            //
-                 [&retVal](int a, int b) { retVal = a * b; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = a * b; },                          //
-                 [&retVal](std::string a, std::string b) { /* define string-mult-string */ },    //
-                 [&retVal](double a, double b) { retVal = a * b; },                              //
-                 [&retVal](float a, float b) { retVal = a * b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a * b; },  //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                                        //
+                 [&retVal](int a, int b) { retVal = a * b; },                                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = a * b; },                                      //
+                 [&retVal](const std::string& a, const std::string& b) { /* define string-mult-string */ },  //
+                 [&retVal](double a, double b) { retVal = a * b; },                                          //
+                 [&retVal](float a, float b) { retVal = a * b; },                                            //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a * b; },              //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first * b.first, a.second * b.second);
                  },
@@ -126,13 +126,13 @@ rdb::descFldVT operator/(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                            //
-                 [&retVal](int a, int b) { retVal = a / b; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = a / b; },                          //
-                 [&retVal](std::string a, std::string b) { /* define string-div-string */ },     //
-                 [&retVal](double a, double b) { retVal = a / b; },                              //
-                 [&retVal](float a, float b) { retVal = a / b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a / b; },  //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                                       //
+                 [&retVal](int a, int b) { retVal = a / b; },                                               //
+                 [&retVal](unsigned a, unsigned b) { retVal = a / b; },                                     //
+                 [&retVal](const std::string& a, const std::string& b) { /* define string-div-string */ },  //
+                 [&retVal](double a, double b) { retVal = a / b; },                                         //
+                 [&retVal](float a, float b) { retVal = a / b; },                                           //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a / b; },             //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first / b.first, a.second / b.second);
                  },  //
@@ -158,7 +158,7 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
                  [&retVal](double a) { retVal = -a; },                                                             //
                  [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },               //
                  [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
-                 [&retVal](std::string a) { /* define neg of string ? */ }                                         //
+                 [&retVal](const std::string& a) { /* define neg of string ? */ }                                  //
              },
              inVar);
 

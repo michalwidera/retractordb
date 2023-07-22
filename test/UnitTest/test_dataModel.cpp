@@ -307,7 +307,7 @@ TEST_F(xschema, getRow_1) {
                         [&coutstring](double a) { coutstring << a; },                                                       //
                         [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
                         [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                        [&coutstring](std::string a) { coutstring << a; },                                                  //
+                        [&coutstring](const std::string &a) { coutstring << a; },                                           //
                         [&coutstring](boost::rational<int> a) { coutstring << a; }},
                v);
 

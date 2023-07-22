@@ -43,7 +43,6 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<rdb::storageAccessor> dacc;
   std::string file;
   bool rox = true;
-  bool mono = false;
   std::string prompt = ".";
   std::string ok = "ok\n";
   std::string cmd;
@@ -175,23 +174,23 @@ int main(int argc, char* argv[]) {
       payloadStatus = changed;
       continue;
     } else if (cmd == "setpos") {
-      int position;
+      int position{0};
       std::cin >> position;
       auto fieldName = dacc->getDescriptor().fieldName(position);
       if (dacc->getDescriptor().type(fieldName) == "INTEGER") {
-        int value;
+        int value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldName) == "DOUBLE") {
-        double value;
+        double value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldName) == "BYTE") {
-        uint8_t value;
+        uint8_t value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
       } else if (dacc->getDescriptor().type(fieldName) == "STRING") {
-        std::string record;
+        std::string record{""};
         std::cin >> record;
         dacc->getPayload()->setItem(position, record);
       } else
@@ -236,7 +235,7 @@ int main(int argc, char* argv[]) {
       std::cout << ORANGE << rdb::flat << *(dacc->getPayload()) << RESET << std::endl;
       continue;
     } else if (cmd == "list" || cmd == "rlist") {
-      int record;
+      int record{0};
       std::cin >> record;
       for (auto i = 0; i < record; i++) {
         if (i >= dacc->getRecordsCount()) {
@@ -257,7 +256,7 @@ int main(int argc, char* argv[]) {
       for (auto i : dacc->getDescriptor()) std::cin >> *(dacc->getPayload());
       continue;
     } else if (cmd == "write") {
-      size_t record;
+      size_t record{0};
       std::cin >> record;
       if (record >= dacc->getRecordsCount()) {
         std::cout << RED << "record out of range - Check append command.\n" << RESET;

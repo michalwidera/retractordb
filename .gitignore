@@ -9,6 +9,7 @@ examples/generator/CMakeFiles
 examples/generator/xgenerator
 examples/temp/
 .idea/*
+.embold/*
 cmake-build-debug/*
 Makefile
 *.cbp

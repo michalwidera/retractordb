@@ -27,7 +27,7 @@ void visit_descFld(const K& inVar, K& retVal) {
                    [&retVal](double a) { retVal = static_cast<T>(a); },                                  //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },             //
                    [&retVal](std::pair<std::string, int> a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
-                   [&retVal](std::string a) {
+                   [&retVal](const std::string& a) {
                      try {
                        retVal = static_cast<T>(std::stoi(a));
                      } catch (std::exception& err) {
@@ -121,7 +121,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                      },                                                                                                       //
                      [&retVal](std::pair<int, int> a) { retVal = a; },                                                        //
                      [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair(atoi(a.first.c_str()), a.second); },  //
-                     [&retVal](std::string a) {
+                     [&retVal](const std::string& a) {
                        std::istringstream in(a);
                        int first{0}, second{1};
                        in >> first >> expect<','> >> second;
@@ -171,7 +171,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                             [&retVal](std::pair<std::string, int> a) {
                               retVal = boost::rational<int>(a.second, 1);
                             },  //  first is skipped
-                            [&retVal](std::string a) {
+                            [&retVal](const std::string& a) {
                               std::istringstream in(a);
                               int nom{0}, den{1};
                               in >> nom >> expect<'/'> >> den;
@@ -217,7 +217,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                      [&retVal](double a) { retVal = std::to_string(a); },                                                      //
                      [&retVal](std::pair<int, int> a) { retVal = std::to_string(a.first) + "," + std::to_string(a.second); },  //
                      [&retVal](std::pair<std::string, int> a) { retVal = a.first + "," + std::to_string(a.second); },          //
-                     [&retVal](std::string a) { retVal = a; },                                                                 //
+                     [&retVal](const std::string& a) { retVal = a; },                                                          //
                      [&retVal](boost::rational<int> a) {
                        std::stringstream ss;
                        ss << a;
