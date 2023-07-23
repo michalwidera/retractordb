@@ -274,10 +274,9 @@ rdb::Descriptor query::descriptorStorage() {
   return retVal;
 }
 
-// * Result of Embold code clone elimination
-void query::fillDescriptor(std::list<field> &lSchemaVar, rdb::Descriptor &val, std::string id) {
+void query::fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id) {
   auto i{0};
-  for (auto &f : lSchemaVar) {
+  for (const auto &f : lSchemaVar) {
     if (std::get<rdb::rlen>(f.field_) == 0) continue;
     val | rdb::Descriptor(id + "_" + std::to_string(i++),   //
                           std::get<rdb::rlen>(f.field_),    //

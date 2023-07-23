@@ -243,7 +243,7 @@ void commandProcessorLoop() {
   }
 }
 
-std::string printRowValue(const std::string query_name) {
+std::string printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   ptree pt;
   pt.put("stream", query_name);

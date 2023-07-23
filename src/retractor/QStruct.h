@@ -30,7 +30,7 @@ class token {
   boost::rational<int> getRI();
   rdb::descFldVT getVT();
 
-  token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0);
+  explicit token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0);
 
   std::string getStrCommandID();
   command_id getCommandID();
@@ -43,8 +43,8 @@ struct field {
 
   rdb::rField field_;
 
-  field(rdb::rField field_, token lToken);
-  field(rdb::rField field_, std::list<token> lProgram);
+  explicit field(rdb::rField field_, token lToken);
+  explicit field(rdb::rField field_, std::list<token> lProgram);
 
   token getFirstFieldToken();
 
@@ -53,10 +53,10 @@ struct field {
 };
 
 class query {
-  void fillDescriptor(std::list<field> &lSchemaVar, rdb::Descriptor &val, std::string id);
+  void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
  public:
-  query(boost::rational<int> rInterval, const std::string &id);
+  explicit query(boost::rational<int> rInterval, const std::string &id);
   query();
 
   std::list<std::string> getFieldNamesList();

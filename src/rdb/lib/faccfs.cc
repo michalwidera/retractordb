@@ -25,7 +25,7 @@ std::string genericBinaryFileAccessor<T>::fileName() {
 template <class T>
 ssize_t genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(0, 0);
+  myFile.rdbuf()->pubsetbuf(nullptr, 0);
   if (position == std::numeric_limits<size_t>::max()) {
     myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
@@ -49,7 +49,7 @@ ssize_t genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
 template <class T>
 ssize_t genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(0, 0);
+  myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName(), std::ios::in | std::ios::binary);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;

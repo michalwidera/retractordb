@@ -11,7 +11,6 @@
 #include <ratio>
 
 namespace rdb {
-constexpr const int kOpenBaseFlags = O_CLOEXEC;
 
 template <typename K>
 K readFromFstream(std::fstream& myFile) {
@@ -27,7 +26,7 @@ K readFromFstream(std::fstream& myFile) {
 
 template <typename T>
 textSourceAccessor<T>::textSourceAccessor(std::string fileName) : fileNameStr(fileName) {
-  myFile.rdbuf()->pubsetbuf(0, 0);
+  myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 }

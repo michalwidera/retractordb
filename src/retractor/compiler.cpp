@@ -188,8 +188,8 @@ std::string simplifyLProgram() {
           --it2;
 
           {
-            token newVal(*it2);
-            newQuery.lProgram.push_front(newVal);
+            token newValSh1(*it2);
+            newQuery.lProgram.push_front(newValSh1);
             std::stringstream s;
             s << (*it2).getStr_();
             arg1 = std::string(s.str());
@@ -197,8 +197,8 @@ std::string simplifyLProgram() {
             --it2;
           }
           if (cmd != STREAM_TIMEMOVE && cmd != STREAM_SUBTRACT) {
-            token newVal(*it2);
-            newQuery.lProgram.push_front(newVal);
+            token newValSh2(*it2);
+            newQuery.lProgram.push_front(newValSh2);
             std::stringstream s;
             s << (*it2).getStr_();
             arg2 = std::string(s.str());
@@ -521,7 +521,7 @@ std::string convertReferences() {
 
               namespace ranges = std::ranges;
               const bool foundSchema =
-                  ranges::find_if(coreInstance, [schema](auto &qry) { return qry.id == schema; }) != coreInstance.end();
+                  ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
 
               if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
               t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));

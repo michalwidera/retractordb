@@ -16,7 +16,7 @@ namespace rdb {
 
 // default constructor
 
-payload::payload(const Descriptor descriptor)
+payload::payload(const Descriptor &descriptor)
     : descriptor(descriptor),  //
       hexFormat(false) {
   payloadData = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());

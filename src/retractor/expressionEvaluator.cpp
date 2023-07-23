@@ -1,11 +1,11 @@
 #include "expressionEvaluator.h"
 
-#include <assert.h>
 #include <rdb/convertTypes.h>
 #include <rdb/payload.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>       // sqrt
 #include <functional>  // std::function
 #include <iostream>

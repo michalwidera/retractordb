@@ -50,7 +50,7 @@ class dataModel {
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
-  dataModel(qTree &coreInstance);
+  explicit dataModel(qTree &coreInstance);
   ~dataModel();
 
   dataModel() = delete;

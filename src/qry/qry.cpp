@@ -8,6 +8,7 @@ How xqry terminal works
 5. End of process
 */
 
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
@@ -159,20 +160,20 @@ void producer() {
   try {
     std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(boost::this_process::get_id());
     IPC::message_queue mq(IPC::open_only, queueName.c_str());
-    char message[1024];
+    std::array<char, 1024> message;
     unsigned int priority;
     IPC::message_queue::size_type recvd_size = 1024;
     while (!done) {
       bool messageReceived = false;
       while (!messageReceived && !done) {
-        messageReceived = mq.try_receive(message, 1024, recvd_size, priority);
+        messageReceived = mq.try_receive(message.data(), 1024, recvd_size, priority);
         boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
       }
       if (done) continue;
       message[recvd_size] = 0;
       std::stringstream strstream;
-      strstream << message;
-      memset(message, 0, 1000);
+      strstream << message.data();
+      memset(message.data(), 0, 1000);
       ptree pt;
       // read_json(strstream, pt) ;
       // read_xml(strstream, pt);

@@ -13,7 +13,7 @@ namespace rdb {
 
 bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
 
-storageAccessor::storageAccessor(std::string fileNameDesc, std::string fileName)
+storageAccessor::storageAccessor(std::string fileNameDesc, const std::string fileName)
     :  //
       descriptorFile(fileNameDesc + ".desc"),
       storageFile(fileName) {
@@ -23,7 +23,7 @@ storageAccessor::storageAccessor(std::string fileNameDesc, std::string fileName)
 void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
   if (descriptorFileExist()) {
     std::fstream myFile;
-    myFile.rdbuf()->pubsetbuf(0, 0);
+    myFile.rdbuf()->pubsetbuf(nullptr, 0);
     myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
     if (myFile.good()) myFile >> descriptor;
     myFile.close();
@@ -56,7 +56,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
   // Create descriptor file instance
   std::fstream descFile;
-  descFile.rdbuf()->pubsetbuf(0, 0);
+  descFile.rdbuf()->pubsetbuf(nullptr, 0);
   descFile.open(descriptorFile, std::ios::out);
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile << descriptor;

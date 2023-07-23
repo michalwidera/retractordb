@@ -36,7 +36,7 @@ class payload {
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
-  payload(const Descriptor descriptor);
+  explicit payload(const Descriptor &descriptor);
 
   /// @brief Copy constructor
   /// @param from destructor

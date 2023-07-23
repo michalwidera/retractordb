@@ -467,9 +467,6 @@ void dataModel::constructInputPayload(const std::string& instance) {
   }
 }
 
-// TODO - use this func in printRowValue/executorsm.cpp 281
-// TODO - and use std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) from QStruct.cpp
-// TODO - Workarea - Please cover with test
 std::vector<rdb::descFldVT> dataModel::getRow(const std::string& instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
