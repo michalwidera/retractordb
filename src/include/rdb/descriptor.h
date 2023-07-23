@@ -69,7 +69,7 @@ class Descriptor : public std::vector<rField> {
   std::optional<int> convert(std::pair<int, int> position);
 
   template <typename T>
-  std::string toString(const std::string name, T *ptr) {
+  std::string toString(const std::string &name, T *ptr) {
     return std::string(reinterpret_cast<char *>(ptr + offsetBegArr(name)), len(name));
   }
 
@@ -83,7 +83,7 @@ class Descriptor : public std::vector<rField> {
    * container
    */
   template <typename T, typename K>
-  auto cast(const std::string name, K *ptr) {
+  auto cast(const std::string &name, K *ptr) {
     return *(reinterpret_cast<T *>(ptr + offsetBegArr(name)));
   };
 

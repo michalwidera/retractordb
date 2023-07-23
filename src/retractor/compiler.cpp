@@ -156,12 +156,11 @@ std::string intervalCounter() {
   return std::string("OK");
 }
 
-std::string generateStreamName(std::string sName1, std::string sName2, command_id cmd) {
-  std::string sOperation = GetStringcommand_id(cmd);
+std::string generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
   if (sName2 == "")
-    return sOperation + std::string("_") + sName1;
+    return GetStringcommand_id(cmd) + std::string("_") + sName1;
   else
-    return sOperation + std::string("_") + sName2 + std::string("_") + sName1;
+    return GetStringcommand_id(cmd) + std::string("_") + sName2 + std::string("_") + sName1;
 }
 
 /* Goal of this procedure is to provide stream to canonical form
@@ -225,9 +224,9 @@ std::string simplifyLProgram() {
 }
 
 // Goal of this procedure is to unroll schema based of given command
-std::list<field> combine(std::string sName1, std::string sName2, token &cmd_token) {
+std::list<field> combine(const std::string &sName1,const  std::string &sName2, token &cmd_token) {
   std::list<field> lRetVal;
-  command_id cmd = cmd_token.getCommandID();
+  const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
     if (getQuery(sName1).descriptorStorage().sizeFlat() != getQuery(sName2).descriptorStorage().sizeFlat())
