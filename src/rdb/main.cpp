@@ -16,27 +16,26 @@
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
 
-std::string GREEN = "\x1B[32m";
-std::string RED = "\x1B[31m";
-std::string ORANGE = "\x1B[33m";
-std::string BLUE = "\x1B[34m";
-std::string YELLOW = "\x1B[93m";
-std::string RESET = "\033[0m";
-std::string BLINK = "\x1b[5m";
-
-constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
-
 /*
  * This code creates xtrdb executable file.
  */
 
 enum payloadStatusType { fetched, clean, stored, changed, error };
 
-payloadStatusType payloadStatus(clean);
-
 int main(int argc, char* argv[]) {
+  payloadStatusType payloadStatus{clean};
+
+  std::string GREEN = "\x1B[32m";
+  std::string RED = "\x1B[31m";
+  std::string ORANGE = "\x1B[33m";
+  std::string BLUE = "\x1B[34m";
+  std::string YELLOW = "\x1B[93m";
+  std::string RESET = "\033[0m";
+  std::string BLINK = "\x1b[5m";
+
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
+  constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
 

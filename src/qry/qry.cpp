@@ -80,24 +80,20 @@ typedef std::pair<const int, IPCString> ValueType;
 typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
 typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
 
-// When server works under valgrid - must be 10 probes x 10ms
-constexpr int maxAcceptableFails = 10;
-
 boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
-
-int producer_count = 0;
 
 boost::atomic<bool> done(false);
 
-std::map<std::string, ptree> streamTable;
+static std::map<std::string, ptree> streamTable;
 
-int iTimeLimitCnt;  // testing purposes - time limit query (-m)
+static int timeLimitCntQry{0};  // testing purposes - time limit query (-m)
 
 enum outputFormatMode { RAW, GRAPHITE, INFLUXDB } outputFormatMode(RAW);
 
 // Graphite embedded schema in format "path.to.data value timestamp"
-ptree schema;
-std::string sInputStream;
+static ptree schema;
+
+static std::string sInputStream{""};
 
 void setmode(std::string const &mode) {
   if (mode == "RAW")
@@ -151,7 +147,7 @@ void consumer() {
             printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
           }
           // This part is time limited (-m) resposbile
-          if (iTimeLimitCnt > 1) --iTimeLimitCnt;
+          if (timeLimitCntQry > 1) --timeLimitCntQry;
         }
     }
     boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
@@ -192,7 +188,7 @@ void producer() {
   }
 }
 
-ptree netClient(std::string netCommand, std::string netArgument) {
+ptree netClient(std::string netCommand, const std::string &netArgument) {
   ptree pt_response;
   ptree pt_request;
   try {
@@ -223,6 +219,10 @@ ptree netClient(std::string netCommand, std::string netArgument) {
     assert(mymap);
     int processId = boost::this_process::get_id();
     auto it = mymap->find(processId);
+
+    // When server works under valgrid - must be 10 probes x 10ms
+    constexpr int maxAcceptableFails = 10;
+
     int cntr(maxAcceptableFails);
     while (it == mymap->end() && cntr) {
       boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
@@ -255,8 +255,10 @@ ptree netClient(std::string netCommand, std::string netArgument) {
   return pt_response;
 }
 
-bool select(bool noneedctrlc) {
+bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   bool found(false);
+  timeLimitCntQry = iTimeLimit;  // set value from Launcher.
+  sInputStream = input;          // this is required for consumer process.
   ptree pt = netClient("get", "");
   for (const auto &v : pt.get_child("db.stream")) {
     if (sInputStream == v.second.get<std::string>("")) {
@@ -285,10 +287,10 @@ bool select(bool noneedctrlc) {
       if (_kbhit()) break;
     }
     if (done) break;
-    if (iTimeLimitCnt == 1) break;
+    if (timeLimitCntQry == 1) break;
     boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
   } while (true);
-  if (iTimeLimitCnt != 1 && !done) {
+  if (timeLimitCntQry != 1 && !done) {
     _getch();  // no wait ... feed key from kbhit
   }
   done = true;
@@ -337,17 +339,16 @@ void dir() {
   }
 }
 
-bool detailShow() {
+bool detailShow(const std::string &input) {
   bool found(false);
   ptree pt = netClient("get", "");
   std::cerr << "got answer" << std::endl;
   for (const auto &v : pt.get_child("db.stream")) {
-    if (sInputStream == v.second.get<std::string>("")) found = true;
+    if (input == v.second.get<std::string>("")) found = true;
   }
   if (found) {
-    ptree ptsh = netClient("detail", sInputStream);
-    for (const auto &v : ptsh.get_child("db.field"))
-      printf("%s.%s\n", sInputStream.c_str(), v.second.get<std::string>("").c_str());
+    ptree ptsh = netClient("detail", input);
+    for (const auto &v : ptsh.get_child("db.field")) printf("%s.%s\n", input.c_str(), v.second.get<std::string>("").c_str());
   } else
     std::cerr << "not found" << std::endl;
   return found;

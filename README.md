@@ -1,7 +1,7 @@
 RetractorDB
 -----------------------------------------------------------------------
 
-Master branch: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
+CI Build Status: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.svg?style=svg)](https://circleci.com/gh/michalwidera/retractordb)
 
 [comment]: # (VSCode view: Ctrl+k,v)
 

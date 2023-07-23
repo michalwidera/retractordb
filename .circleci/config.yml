@@ -20,9 +20,9 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_1_*_*_1,4,6
-          # At 01:00 on Monday, Thursday, and Saturday.
-          cron: "0 1 * * 1,4,6"
+          # https://crontab.guru/#0_1_*_*_1
+          # At 01:00 on Monday.
+          cron: "0 1 * * 1"
           filters:
             branches:
               only:

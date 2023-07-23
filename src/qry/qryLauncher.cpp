@@ -18,27 +18,30 @@ using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
 int main(int argc, char *argv[]) {
-  fixArgcv(argc, argv);
+  if (argc > 0 && argv != nullptr) fixArgcv(argc, argv);
 
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
+  constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
 
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
-    desc.add_options()                                                                                        //
-        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                               //
-        ("detail,t", po::value<std::string>(&sInputStream), "show details of this stream")                    //
-        ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(0), "limit of elements, 0 - no limit")  //
-        ("hello,l", "diagnostic - hello db world")                                                            //
-        ("kill,k", "kill xretractor server")                                                                  //
-        ("dir,d", "list of queries")                                                                          //
-        ("graphite,g", "graphite output mode")                                                                //
-        ("influxdb,f", "influxDB output mode")                                                                //
-        ("raw,r", "raw mode (default)")                                                                       //
-        ("help,h", "show options")                                                                            //
+    int timeLimit{0};
+    std::string sInputStream{""};
+    desc.add_options()                                                                                    //
+        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
+        ("detail,t", po::value<std::string>(&sInputStream), "show details of this stream")                //
+        ("tlimitqry,m", po::value<int>(&timeLimit)->default_value(0), "limit of elements, 0 - no limit")  //
+        ("hello,l", "diagnostic - hello db world")                                                        //
+        ("kill,k", "kill xretractor server")                                                              //
+        ("dir,d", "list of queries")                                                                      //
+        ("graphite,g", "graphite output mode")                                                            //
+        ("influxdb,f", "influxDB output mode")                                                            //
+        ("raw,r", "raw mode (default)")                                                                   //
+        ("help,h", "show options")                                                                        //
         ("needctrlc,c", "force ctl+c for stop this tool");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
@@ -65,9 +68,9 @@ int main(int argc, char *argv[]) {
     } else if (vm.count("dir"))
       dir();
     else if (vm.count("detail")) {
-      if (!detailShow()) return system::errc::no_such_file_or_directory;
+      if (!detailShow(sInputStream)) return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
-      if (!select(vm.count("needctrlc"))) return system::errc::no_such_file_or_directory;
+      if (!select(vm.count("needctrlc"), timeLimit, sInputStream)) return system::errc::no_such_file_or_directory;
     } else {
       std::cout << argv[0] << ": fatal error: no argument" << std::endl;
       SPDLOG_ERROR("stop - error, no argument.");

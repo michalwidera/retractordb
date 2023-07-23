@@ -520,7 +520,7 @@ std::string convertReferences() {
               const int offset2(atoi(sOffset2.c_str()));
 
               namespace ranges = std::ranges;
-              bool foundSchema =
+              const bool foundSchema =
                   ranges::find_if(coreInstance, [schema](auto &qry) { return qry.id == schema; }) != coreInstance.end();
 
               if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
