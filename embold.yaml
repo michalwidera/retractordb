@@ -34,11 +34,32 @@ languages: 'Python,CPP'
 
 # Define modules one would like to run or disable. This is enough for Basic Users
 # Get List of Modules (Which are Default Enabled/Disabled) at the documentation link above
+# EMB-CPP-440 - global variables
+#      - key: 'EMB-CPP-440'
+#        enabled: false  
+# https://rules.embold.io/2.0.8.0/cpp/CPPCHECK-CPP-391 - no, I will not use stl alg.
+# https://rules.embold.io/2.0.8.0/cpp/CPPCHECK-CPP-345 - this is fake shmem issue
+# 
 modules:
   - name: gamma_cxx
     enabled: true
     rules:
       - key: 'EMB-CPP-327'
+        enabled: false
+  - name: Cppcheck
+    enabled: true
+    rules:
+      - key: 'CPPCHECK-CPP-391'
+        enabled: false
+  - name: Cppcheck
+    enabled: true
+    rules:
+      - key: 'CPPCHECK-CPP-345'
+        enabled: false
+  - name: Pylint
+    enabled: true
+    rules:
+      - key: 'E0401-unableToImportModule'
         enabled: false
 
 #  - name: gamma_cxx
