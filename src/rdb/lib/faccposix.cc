@@ -63,7 +63,7 @@ ssize_t posixBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const si
   if (fd < 0) {
     return fd;  // <- Error status
   }
-  ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
+  ::pread(fd, ptrData, size, static_cast<off_t>(position));
   ::close(fd);
   return EXIT_SUCCESS;
 }

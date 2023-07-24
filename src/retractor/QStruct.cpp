@@ -108,11 +108,8 @@ void qTree::topologicalSort() {
   for (auto q : coreInstance)
     if (!visited[q.id]) dfs(q.id);
 
-  // reverse(ans.begin(), ans.end());
-
   qTree tempInstance;
   for (auto qname : ans) tempInstance.push_back(coreInstance[qname]);
-  coreInstance.clear();
   coreInstance = tempInstance;
 }
 
@@ -123,7 +120,6 @@ query &getQuery(const std::string &query_name) {
   for (auto &q : coreInstance)
     if (q.id == query_name) return q;
   SPDLOG_ERROR("Missing - {}", query_name);
-  throw std::logic_error("No such stream in set - getQuery");
   static query void_query;
   return (void_query);  // proforma
 }
@@ -137,7 +133,6 @@ int getSeqNr(const std::string &query_name) {
       ++cnt;
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
-  throw std::logic_error("No such stream in set - getSeqNr");
   return -1;  // INVALID QUERY_NR
 }
 

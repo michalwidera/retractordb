@@ -6,7 +6,8 @@
 #include <cstring>
 
 int _kbhit(void) {
-  struct termios oldt, newt;
+  struct termios oldt;
+  struct termios newt;
   int ch;
   int oldf;
   tcgetattr(STDIN_FILENO, &oldt);

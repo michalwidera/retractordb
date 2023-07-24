@@ -164,7 +164,7 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
 
 template <typename T>
 T getVal(void *ptr, int offset) {
-  return *(reinterpret_cast<T *>(static_cast<uint8_t *>(ptr) + offset));
+  return *(reinterpret_cast<T *>(reinterpret_cast<std::uint8_t *>(ptr) + offset));
 }
 
 std::any payload::getItem(const int positionFlat) {

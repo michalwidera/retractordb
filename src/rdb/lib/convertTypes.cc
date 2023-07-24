@@ -123,7 +123,8 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                      [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair(atoi(a.first.c_str()), a.second); },  //
                      [&retVal](const std::string& a) {
                        std::istringstream in(a);
-                       int first{0}, second{1};
+                       int first{0};
+                       int second{1};
                        in >> first >> expect<','> >> second;
                        retVal = std::make_pair(first, second);
                      }},
@@ -148,7 +149,8 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
           retVal = std::any_cast<std::pair<int, int>>(inVar);
         } else if (inVar.type() == typeid(std::string)) {
           std::istringstream in(std::any_cast<std::string>(inVar));
-          int first{0}, second{1};
+          int first{0};
+          int second{1};
           in >> first >> expect<','> >> second;
           retVal = std::make_pair(first, second);
         }

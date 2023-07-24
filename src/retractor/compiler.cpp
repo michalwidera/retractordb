@@ -224,7 +224,7 @@ std::string simplifyLProgram() {
 }
 
 // Goal of this procedure is to unroll schema based of given command
-std::list<field> combine(const std::string &sName1,const  std::string &sName2, token &cmd_token) {
+std::list<field> combine(const std::string &sName1, const std::string &sName2, token &cmd_token) {
   std::list<field> lRetVal;
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type

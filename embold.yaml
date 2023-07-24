@@ -34,9 +34,13 @@ languages: 'Python,CPP'
 
 # Define modules one would like to run or disable. This is enough for Basic Users
 # Get List of Modules (Which are Default Enabled/Disabled) at the documentation link above
-#modules:
-#  - name: pmd
-#    enabled: true
+modules:
+  - name: gamma_cxx
+    enabled: true
+    rules:
+      - key: 'EMB-CPP-327'
+        enabled: false
+
 #  - name: gamma_cxx
 #    enabled: false
 #  - name: jshint
