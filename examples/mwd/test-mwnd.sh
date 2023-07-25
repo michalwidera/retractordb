@@ -8,6 +8,8 @@ fi
 
 if ! xretractor $FILE -c ; then exit 1 ; fi
 
+echo 'file:' $FILE
+
 if [ "$2" == "x" ]; then exit 1 ; fi
 
 tmux has-session -t dev
@@ -38,7 +40,7 @@ then
     # Therefore sleep 5 here.
     sleep 5
 
-    tmux send-keys -t dev:0.0 'xretractor $FILE -v ' Enter
+    tmux send-keys -t dev:0.0 'xretractor ' $FILE Enter
     sleep 1
     tmux send-keys -t dev:0.1 'clear; xqry -s core' Enter
     sleep 1

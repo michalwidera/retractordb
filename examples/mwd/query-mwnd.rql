@@ -1,9 +1,9 @@
-DECLARE a INTEGER STREAM core, 0.5 FILE 'datafile3.dat'
+DECLARE a INTEGER STREAM core, 0.5 FILE 'datafile.txt'
 
 SELECT * STREAM agregation FROM core@(2,2)
-SELECT * STREAM agregationSerialization FROM core@(1,2)
+# SELECT * STREAM agregationSerialization FROM core@(1,2)
 
-SELECT * STREAM agregationMirror FROM core@(2,-2)
-SELECT * STREAM agregationSelective FROM core@(3,-2)
+# SELECT * STREAM agregationMirror FROM core@(2,-2)
+# SELECT * STREAM agregationSelective FROM core@(3,-2)
 
-SELECT * STREAM serialization FROM agregationMirror@(1,1)
+# SELECT * STREAM serialization FROM agregationMirror@(1,1)

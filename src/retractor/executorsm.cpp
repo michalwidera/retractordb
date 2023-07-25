@@ -128,6 +128,7 @@ ptree commandProcessor(ptree ptInval) {
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
                      boost::lexical_cast<std::string>(pProc->getStreamCount(q.id)));
         ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"), q.filename);
+        ptRetval.put(std::string("db.stream.") + q.id + std::string(".cap"), coreInstance.maxCapacity[q.id]);
       }
     }
     //

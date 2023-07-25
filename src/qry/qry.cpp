@@ -321,7 +321,7 @@ int hello() {
 
 void dir() {
   ptree pt = netClient("get", "");
-  std::vector<std::string> vcols = {"", "duration", "size", "count", "location"};
+  std::vector<std::string> vcols = {"", "duration", "size", "count", "location", "cap"};
   std::stringstream ss;
   for (auto nName : vcols) {
     int maxSize = 0;
@@ -336,7 +336,7 @@ void dir() {
   for (const auto &v : pt.get_child("db.stream")) {
     printf(ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
            v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
-           v.second.get<std::string>("location").c_str());
+           v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
   }
 }
 
