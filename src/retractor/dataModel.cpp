@@ -46,12 +46,12 @@ streamInstance::streamInstance(               //
   {
     std::stringstream strStream;
     strStream << rdb::flat << outputPayload->getDescriptor();
-    SPDLOG_INFO("storage/external descriptor: {}", strStream.str());
+    SPDLOG_INFO("storage/external descriptor: id:{} desc:{}", descriptorName, strStream.str());
   }
   {
     std::stringstream strStream;
     strStream << rdb::flat << inputPayload->getDescriptor();
-    SPDLOG_INFO("image/internal descriptor: {}", strStream.str());
+    SPDLOG_INFO("image/internal descriptor: filename:{} desc:{}", storageNameParam, strStream.str());
   }
 };
 
@@ -310,22 +310,26 @@ bool dataModel::fetchPayload(const std::string& instance,                     //
 
 // TODO: work area
 void dataModel::processRows(std::set<std::string> inSet) {
+  std::stringstream s;
   for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;                       // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                                    // Skip non declarations.
-    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;    // Unfreeze data sources
+    if (inSet.find(q.id) == inSet.end()) continue;                     // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;                                  // Skip non declarations.
+    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;  // Unfreeze data sources
+    s << "decl:{" << q.id << "}";
     fetchDeclaredPayload(q.id);                                          // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::freeze;  // freeze data sources
   }
-  SPDLOG_INFO("fetch decl. stop");
 
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Skip declarations.
     constructInputPayload(q.id);                    // That will create 'from' clause data set
+    s << "qry:[" << q.id << "]";
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
   }
+
+  SPDLOG_INFO("proc.step: {}", s.str());
 }
 
 void dataModel::fetchDeclaredPayload(const std::string& instance) {
@@ -333,8 +337,7 @@ void dataModel::fetchDeclaredPayload(const std::string& instance) {
 
   assert(qry.isDeclaration());  // lProgram is empty()
 
-  auto success = qSet[instance]->outputPayload->read(0);
-  SPDLOG_INFO("fetch decl. {}", instance);
+  auto success = qSet[instance]->outputPayload->readReverse(0);
   assert(success);
 
   *(qSet[instance]->inputPayload) = *(qSet[instance]->outputPayload->getPayload());

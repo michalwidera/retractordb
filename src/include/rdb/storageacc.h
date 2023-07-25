@@ -47,7 +47,7 @@ class storageAccessor {
 
   // Read data from storage described as accessor
   // if var:destination is null read into storageAccessor payload
-  bool read(const size_t recordIndex, uint8_t *destination = nullptr);
+  bool read_(const size_t recordIndex, uint8_t *destination = nullptr);
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
   bool readReverse(const size_t recordIndex, uint8_t *destination = nullptr);
 

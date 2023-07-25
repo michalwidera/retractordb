@@ -214,7 +214,7 @@ void storageAccessor::abortIfStorageNotPrepared() {
   }
 }
 
-bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
+bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   abortIfStorageNotPrepared();
   destination = (destination == nullptr)                            //
                     ? static_cast<uint8_t*>(storagePayload->get())  //
@@ -242,7 +242,7 @@ bool storageAccessor::read(const size_t recordIndex, uint8_t* destination) {
 bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
   const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
 
-  if (!isDeclared()) return read(recordPositionFromBack, destination);
+  if (!isDeclared()) return read_(recordPositionFromBack, destination);
 
   // For all _DECLARED_ data sources buffer capacity at least _MUST_ be 1
   // In order to maintain the consistency of declared data sources,
@@ -250,7 +250,7 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
 
   assert(circularBuffer.capacity() > 0);
 
-  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read(recordPositionFromBack, destination);
+  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read_(recordPositionFromBack, destination);
   assert(recordIndex >= 0);
 
   // Read data from Circular Buffer instead of data source

@@ -228,31 +228,35 @@ TEST_F(xschema, check_construct_payload_mirror) {
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance["str1"]};
   dataStr1.outputPayload->setRemoveOnExit(false);
-  dataStr1.outputPayload->read(0);
+  dataStr1.outputPayload->readReverse(0);
 
   streamInstance dataStr2{coreInstance["str2"]};
   dataStr2.outputPayload->setRemoveOnExit(false);
-  dataStr2.outputPayload->read(0);
+  dataStr2.outputPayload->readReverse(0);
 
   // str1
   // [0] [1]
   //  11, 12
   //  13, 14
-  //  15, 16
+  //  15, 16 <-
 
   // str2
   // 11
   // 22
-  // 33
+  // 33 <-
   // 44
   {
     auto payload = *(dataStr1.outputPayload->getPayload()) + *(dataStr2.outputPayload->getPayload());
+
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.getDescriptor();
+    std::cout << coutstring1.str() << std::endl;
+
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << payload;
+    std::cout << "!" << coutstring2.str() << std::endl;
 
-    ASSERT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:12 str2_0:111 }");
+    ASSERT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:16 str2_0:333 }");
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }

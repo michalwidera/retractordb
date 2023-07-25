@@ -222,7 +222,7 @@ TEST(xrdb, test_storage) {
 
   dAcc2.write(1);
 
-  dAcc2.read(1);
+  dAcc2.read_(1);
   {
     std::stringstream coutstring;
     coutstring << dAcc2.getDescriptor().toString("Name", payload1->ptr);
@@ -273,11 +273,11 @@ TEST(xrdb, test_ref_storage) {
   storage->attachDescriptor(&storageDescriptor);
   storage->setRemoveOnExit(false);
 
-  storage->read(0);
+  storage->read_(0);
 
   ASSERT_TRUE(std::any_cast<int>(storage->getPayload()->getItem(0)) == 60);
 
-  storage->read(0);
+  storage->read_(0);
 
   ASSERT_TRUE(std::any_cast<int>(storage->getPayload()->getItem(0)) == 61);
 }
