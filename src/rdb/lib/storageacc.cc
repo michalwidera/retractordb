@@ -231,10 +231,10 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
     result = accessor->read(destination, size, recordIndexRv * size);
     if (circularBuffer.capacity() > 0) circularBuffer.push_front(*storagePayload.get());  // only one place when buffer is feed.
     assert(result == 0);
-    SPDLOG_INFO("read fn {} from pos:{} limit:{}", accessor->fileName(), recordIndexRv, recordsCount);
+    SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor->fileName(), recordIndexRv, recordsCount);
   } else {
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read fn {} - non existing data from pos:{} limit:{}", accessor->fileName(), recordIndexRv, recordsCount);
+    SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor->fileName(), recordIndexRv, recordsCount);
   }
   return result == 0;
 }
@@ -252,6 +252,8 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
 
   if (recordIndex == 0 && bufferPolicy == policyState::flux) return read_(recordPositionFromBack, destination);
   assert(recordIndex >= 0);
+
+  SPDLOG_INFO("readReverse from buffer {} pos:{}", accessor->fileName(), recordPositionFromBack);
 
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources

@@ -77,35 +77,34 @@ streamInstance::streamInstance(query& qry)
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
-rdb::payload streamInstance::constructAgsePayload(const int length, const int offset, const std::string& instance) {
-  assert(offset > 0);
-  // First construct descriptor
+rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance) {
+  assert(step > 0);
+
+  // 1. Descriptor construction process
   rdb::Descriptor descriptor;
   bool flip = (length < 0);
   auto lengthAbs = abs(length);
-
-  outputPayload->readReverse(0);
 
   auto descriptorVecSize = outputPayload->getDescriptor().sizeFlat();
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
   for (auto i = 0; i < lengthAbs; ++i) {
     rdb::rField x{std::make_tuple(instance + "_" + std::to_string(i),  //
                                   maxLen,                              //
-                                  1,                                   // TODO: Check
+                                  1,                                   //
                                   maxType)};
     descriptor | rdb::Descriptor{x};
   }
 
-  // Second construct payload
+  // 2. Construct payload
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
   auto prevQuot{-1};
   for (auto i = 0; i < lengthAbs; ++i) {
-    auto dv = std::div(i + offset, descriptorVecSize);
+    auto dv = std::div(i + step, descriptorVecSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
       outputPayload->readReverse(dv.quot);
-      // TODO: check&fix non existing data?
+      SPDLOG_INFO("constructAgse read:/{}/", dv.quot);
     }
 
     auto locSrc = descriptorVecSize - dv.rem - 1;
@@ -115,8 +114,13 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int of
 
     std::any value = outputPayload->getPayload()->getItem(locSrc);
     localPayload->setItem(locDst, value);
+    SPDLOG_INFO("constructAgse {} -> {}", locSrc, locDst);
   }
 
+  // 3. Cleanup source after processing
+  outputPayload->readReverse(0);  // Reset source
+
+  // 4. Return constructed object.
   return *(localPayload.get());
 }
 
@@ -310,12 +314,18 @@ bool dataModel::fetchPayload(const std::string& instance,                     //
 
 // TODO: work area
 void dataModel::processRows(std::set<std::string> inSet) {
+  {
+    std::stringstream s;
+    for (auto i : inSet) s << i << ":";
+    SPDLOG_INFO("PROCESS:{}", s.str());
+  }
+
   std::stringstream s;
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;                     // Drop off rows that not computed now
     if (!q.isDeclaration()) continue;                                  // Skip non declarations.
     qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;  // Unfreeze data sources
-    s << "decl:{" << q.id << "}";
+    s << " DECL:{" << q.id << "}";
     fetchDeclaredPayload(q.id);                                          // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::freeze;  // freeze data sources
   }
@@ -324,12 +334,12 @@ void dataModel::processRows(std::set<std::string> inSet) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Skip declarations.
     constructInputPayload(q.id);                    // That will create 'from' clause data set
-    s << "qry:[" << q.id << "]";
+    s << " QRY:[" << q.id << "]";
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
   }
 
-  SPDLOG_INFO("proc.step: {}", s.str());
+  SPDLOG_INFO("END PROCESS: {}", s.str());
 }
 
 void dataModel::fetchDeclaredPayload(const std::string& instance) {
