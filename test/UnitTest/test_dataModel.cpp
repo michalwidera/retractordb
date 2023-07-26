@@ -228,11 +228,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance["str1"]};
   dataStr1.outputPayload->setRemoveOnExit(false);
-  dataStr1.outputPayload->readReverse(0);
+  dataStr1.outputPayload->revRead(0);
 
   streamInstance dataStr2{coreInstance["str2"]};
   dataStr2.outputPayload->setRemoveOnExit(false);
-  dataStr2.outputPayload->readReverse(0);
+  dataStr2.outputPayload->revRead(0);
 
   // str1
   // [0] [1]

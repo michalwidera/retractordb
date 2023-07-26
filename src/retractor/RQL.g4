@@ -177,7 +177,9 @@ BIT_XOR:            '^';
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
-LINE_COMMENT:       '# ' ~[\r\n]* -> channel(HIDDEN);
+// note: there must be space after the hash - otherwise a#b is recognized as a #comment.
+LINE_COMMENT1:      '# ' ~[\r\n]* -> channel(HIDDEN);
+LINE_COMMENT2:      '//' ~[\r\n]* -> channel(HIDDEN);
 
 fragment LETTER:    [A-Z_];
 fragment DEC_DOT_DEC: (DEC_DIGIT+ '.' DEC_DIGIT+ |  DEC_DIGIT+ '.' | '.' DEC_DIGIT+);

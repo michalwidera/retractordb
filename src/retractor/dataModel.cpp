@@ -77,16 +77,21 @@ streamInstance::streamInstance(query& qry)
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
+// RQL.G4: stream_factor AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
+// core@(step == 3, window|length == -2)
 rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance) {
   assert(step > 0);
+
+  // temporary alias for variable - for better understand what is happening here.
+  const auto& source = outputPayload;
 
   // 1. Descriptor construction process
   rdb::Descriptor descriptor;
   bool flip = (length < 0);
   auto lengthAbs = abs(length);
 
-  auto descriptorVecSize = outputPayload->getDescriptor().sizeFlat();
-  auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
+  auto descriptorSrcSize = source->getDescriptor().sizeFlat();
+  auto [maxType, maxLen] = source->getDescriptor().getMaxType();
   for (auto i = 0; i < lengthAbs; ++i) {
     rdb::rField x{std::make_tuple(instance + "_" + std::to_string(i),  //
                                   maxLen,                              //
@@ -96,32 +101,32 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   }
 
   // 2. Construct payload
-  std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
+  std::unique_ptr<rdb::payload> result = std::make_unique<rdb::payload>(descriptor);
 
   auto prevQuot{-1};
   for (auto i = 0; i < lengthAbs; ++i) {
-    auto dv = std::div(i + step, descriptorVecSize);
+    auto dv = std::div(i + step, descriptorSrcSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
-      outputPayload->readReverse(dv.quot);
-      SPDLOG_INFO("constructAgse read:/{}/", dv.quot);
+      source->revRead(dv.quot);
+      SPDLOG_INFO("constructAgse from {} rev-read:/{}/", source->getStorageName(), dv.quot);
     }
 
-    auto locSrc = descriptorVecSize - dv.rem - 1;
+    auto locSrc = descriptorSrcSize - dv.rem - 1;
     auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
     assert(i < descriptor.size());
 
-    std::any value = outputPayload->getPayload()->getItem(locSrc);
-    localPayload->setItem(locDst, value);
-    SPDLOG_INFO("constructAgse {} -> {}", locSrc, locDst);
+    std::any value = source->getPayload()->getItem(locSrc);
+    result->setItem(locDst, value);
+    SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
   }
 
   // 3. Cleanup source after processing
-  outputPayload->readReverse(0);  // Reset source
+  source->revRead(0);  // Reset source
 
   // 4. Return constructed object.
-  return *(localPayload.get());
+  return *(result.get());
 }
 
 enum opType { maxop, minop, sumop, avgop };
@@ -153,7 +158,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor
-  outputPayload->readReverse(0);
+  outputPayload->revRead(0);
 
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
   rdb::rField x{std::make_tuple(instance, maxLen, 1, maxType)};  // TODO - Check 1
@@ -298,7 +303,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string& 
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto revOffsetMutable(revOffset);
-    auto success = qSet[instance]->outputPayload->readReverse(revOffsetMutable);
+    auto success = qSet[instance]->outputPayload->revRead(revOffsetMutable);
     assert(success);
   }
   // else
@@ -309,7 +314,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string& 
 bool dataModel::fetchPayload(const std::string& instance,                     //
                              std::unique_ptr<rdb::payload>::pointer payload,  //
                              const int revOffset) {
-  return qSet[instance]->outputPayload->readReverse(revOffset, payload->get());
+  return qSet[instance]->outputPayload->revRead(revOffset, payload->get());
 }
 
 // TODO: work area
@@ -347,7 +352,7 @@ void dataModel::fetchDeclaredPayload(const std::string& instance) {
 
   assert(qry.isDeclaration());  // lProgram is empty()
 
-  auto success = qSet[instance]->outputPayload->readReverse(0);
+  auto success = qSet[instance]->outputPayload->revRead(0);
   assert(success);
 
   *(qSet[instance]->inputPayload) = *(qSet[instance]->outputPayload->getPayload());

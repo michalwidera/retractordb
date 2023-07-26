@@ -239,7 +239,7 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   return result == 0;
 }
 
-bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination) {
+bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
   const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
 
   if (!isDeclared()) return read_(recordPositionFromBack, destination);
@@ -253,7 +253,7 @@ bool storageAccessor::readReverse(const size_t recordIndex, uint8_t* destination
   if (recordIndex == 0 && bufferPolicy == policyState::flux) return read_(recordPositionFromBack, destination);
   assert(recordIndex >= 0);
 
-  SPDLOG_INFO("readReverse from buffer {} pos:{}", accessor->fileName(), recordPositionFromBack);
+  SPDLOG_INFO("revRead from buffer {} pos:{}", accessor->fileName(), recordPositionFromBack);
 
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources
