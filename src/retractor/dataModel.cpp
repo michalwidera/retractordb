@@ -79,6 +79,21 @@ streamInstance::streamInstance(query& qry)
 // https://en.cppreference.com/w/cpp/numeric/math/div
 // RQL.G4: stream_factor AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
 // core@(step == 3, window|length == -2)
+// core:  core@(1,1) core@(2,1)  core@(1,2)   core@(2,2)  core@(2,-2)
+// 10     10         40          50 40        40 30       10 20
+// 20     20         60          60 50        60 50       30 40
+// 30     30         80          70 60        80 70       50 60
+// 40     40         10          80 70        10 90       70 80
+//
+// Issue:
+// DECLARE a INTEGER STREAM core, 1 FILE 'datafile.txt'
+// SELECT * STREAM str1 FROM core@(2,-2)
+// SELECT * STREAM str2 FROM str1@(1,1)
+// str2  expected
+// 10    20
+// 30    30
+// 30    40
+// 50    50
 rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance) {
   assert(step > 0);
 

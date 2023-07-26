@@ -1,0 +1,6 @@
+DECLARE a INTEGER STREAM core, 1 FILE 'datafile.txt'
+
+SELECT * STREAM str1 FROM core@(2,-2)
+
+SELECT * STREAM str2 FROM str1@(1,1)
+
