@@ -288,6 +288,7 @@ std::list<field> combine(const std::string &sName1, const std::string &sName2, t
   } else {
     SPDLOG_ERROR("Undefined: str:{} cmd:{}", cmd_token.getStr_(), cmd_token.getStrCommandID());
     // throw std::invalid_argument("Command stack hits undefined operation");
+    assert(false && "Undefined stream token command in combine function.");
     abort();
   }
   // Here are added to fields execution methods

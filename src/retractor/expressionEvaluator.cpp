@@ -248,6 +248,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");
+        assert(false && "::eval - PUSH_IDX should be translated to other PUSH_");
         abort();
         break;
       case PUSH_ID2: {

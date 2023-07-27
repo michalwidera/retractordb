@@ -30,11 +30,13 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
     if (descriptor.getSizeInBytes() == 0) {
       SPDLOG_ERROR("Empty descriptor in file.");
+      assert(false && "Empty descriptor in file.");
       abort();
     }
 
     if (descriptorParam != nullptr && *descriptorParam != descriptor) {
-      SPDLOG_ERROR("Descriptors not match.");
+      SPDLOG_ERROR("Descriptors do not match.");
+      assert(false && "Descriptors dont match - previous one have different schema? remove&restart.");
       abort();
     }
 
@@ -49,6 +51,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
   if (descriptorParam == nullptr) {
     SPDLOG_ERROR("No descriptor file found, no descriptor provided.");
+    assert(false && "No descriptor found");
     abort();
   }
 
@@ -87,6 +90,7 @@ void storageAccessor::moveRef() {
   // stop immediately.
   if (storageFile == "") {
     SPDLOG_ERROR("Storage file was not set in descriptor.");
+    assert(false && "Storage file was not set in descriptor.");
     abort();
   }
 }
@@ -154,6 +158,7 @@ void storageAccessor::initializeAccessor() {
     accessor->fctrl(&descriptor, 0);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType);
+    assert(false && "Unsupported storage type");
     abort();
   }
 }
@@ -181,7 +186,8 @@ Descriptor& storageAccessor::getDescriptor() { return descriptor; }
 std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
   if (!storagePayload) {
     SPDLOG_ERROR("no payload attached");
-    abort();  // no payload attached
+    assert(false && "no payload attached");
+    abort();
   }
   return storagePayload.get();
 }
@@ -202,14 +208,17 @@ std::string storageAccessor::getStorageName() { return storageFile; }
 void storageAccessor::abortIfStorageNotPrepared() {
   if (descriptor.isEmpty()) {
     SPDLOG_ERROR("descriptor is Empty");
+    assert(false && "Empty descriptor");
     abort();
   }
   if (!isOpen(dataFileStatus)) {
     SPDLOG_ERROR("data file is not opened");
+    assert(false && "data file didn't opened");
     abort();
   }
   if (!storagePayload) {
     SPDLOG_ERROR("no payload attached");
+    assert(false && "payload not attached");
     abort();
   }
 }

@@ -105,8 +105,8 @@ void payload::setItemBy(const int positionFlat, std::any value) {
 
 void payload::setItem(const int positionFlat, std::any valueParam) {
   if (positionFlat > descriptor.sizeFlat() - 1) {
-    SPDLOG_ERROR("Write out of descriptor req:{} available len: {}", positionFlat, descriptor.sizeFlat());
-    assert(false);
+    SPDLOG_ERROR("Write out of descriptor - req:{} available len: {}", positionFlat, descriptor.sizeFlat());
+    assert(false && "setItem - Write out of descriptor");
     abort();
   }
 
@@ -154,6 +154,7 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
       } break;
       default: {
         SPDLOG_ERROR("Type not supported.");
+        assert(false && "setItem - Type not supported.");
         abort();
       }
     }
@@ -170,7 +171,7 @@ T getVal(void *ptr, int offset) {
 std::any payload::getItem(const int positionFlat) {
   if (positionFlat > descriptor.sizeFlat() - 1) {
     SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, descriptor.sizeFlat());
-    assert(false);
+    assert(false && "getItem - Read out of descriptor");
     abort();
   }
 

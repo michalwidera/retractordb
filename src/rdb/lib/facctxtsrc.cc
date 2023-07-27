@@ -94,6 +94,7 @@ ssize_t textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t 
             payload->setItem(i + j, static_cast<uint8_t>(var));
           } else {
             SPDLOG_ERROR("Unsupported type in text data source: {}", std::get<rtype>(item));
+            assert(false && "read - Unsupported type in text data source");
             abort();
           }
         }

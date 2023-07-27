@@ -1,4 +1,4 @@
 DECLARE a INTEGER, b INTEGER STREAM core, 1 FILE 'datafile2.txt'
 
-SELECT * STREAM str2 FROM core@(1,1)
+SELECT * STREAM str4 FROM core@(1,1)
 
