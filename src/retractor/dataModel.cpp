@@ -120,7 +120,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
   auto prevQuot{-1};
   for (auto i = 0; i < lengthAbs; ++i) {
-    auto dv = std::div(i + step * descriptorSrcSize, descriptorSrcSize);
+    auto dv = std::div(i + step, descriptorSrcSize);
     if (prevQuot != dv.quot) {
       prevQuot = dv.quot;
       source->revRead(dv.quot);
