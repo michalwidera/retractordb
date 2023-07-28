@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
       desc.add_options()                                                          //
           ("help,h", "Show program options")                                      //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
-          ("verbose,r", "verbose mode")                                           //
+          ("verbose,v", "verbose mode (show stream params)")                      //
           ("waterfall,f", "show waterfall mode")                                  //
           ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0),  //
            "query limit, 0 - no limit")                                           //

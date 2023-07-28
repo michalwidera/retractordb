@@ -86,10 +86,11 @@ std::set<boost::rational<int>> getListFromCore() {
 }
 
 void dumpCore(std::ostream &xout) {
-  xout << "Sequence\tItrval\tQuery id" << std::endl;
+  xout << "Idx.\tDelta\tCap\tName" << std::endl;
   for (const auto &it : coreInstance) {
     xout << getSeqNr(it.id) << "\t";
     xout << it.rInterval << "\t";
+    xout << coreInstance.maxCapacity[it.id] << "\t";
     xout << it.id;
     xout << std::endl;
   }
@@ -110,6 +111,23 @@ void showAwaitedStreams(TimeLine &tl) {
   for (const auto &str : getAwaitedStreamsSet(tl)) std::cout << "-" << getSeqNr(str) << "-";
 }
 
+ptree collectStreamsParameters() {
+  ptree ptRetval;
+  SPDLOG_DEBUG("get cmd rcv.");
+  for (auto &q : coreInstance) {
+    ptRetval.put(std::string("db.stream.") + q.id, q.id);
+    ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
+    long recordsCount = -1;
+    if (!q.isDeclaration()) recordsCount = pProc->streamStoredSize(q.id);
+    ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
+    ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
+                 boost::lexical_cast<std::string>(pProc->getStreamCount(q.id)));
+    ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"), q.filename);
+    ptRetval.put(std::string("db.stream.") + q.id + std::string(".cap"), coreInstance.maxCapacity[q.id]);
+  }
+  return ptRetval;
+}
+
 ptree commandProcessor(ptree ptInval) {
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
@@ -117,20 +135,8 @@ ptree commandProcessor(ptree ptInval) {
     //
     // This command return stream identifiers
     //
-    if (command == "get" && pProc != nullptr) {
-      SPDLOG_DEBUG("get cmd rcv.");
-      for (auto &q : coreInstance) {
-        ptRetval.put(std::string("db.stream.") + q.id, q.id);
-        ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
-        long recordsCount = -1;
-        if (!q.isDeclaration()) recordsCount = pProc->streamStoredSize(q.id);
-        ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
-        ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
-                     boost::lexical_cast<std::string>(pProc->getStreamCount(q.id)));
-        ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"), q.filename);
-        ptRetval.put(std::string("db.stream.") + q.id + std::string(".cap"), coreInstance.maxCapacity[q.id]);
-      }
-    }
+    if (command == "get" && pProc != nullptr) ptRetval = collectStreamsParameters();
+
     //
     // This command return what stream contains of
     //
@@ -287,10 +293,8 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {
     dataModel proc(coreInstance);
-    if (verbose) {
-      std::cerr << "Objects:" << std::endl;
-      dumpCore(std::cerr);
-    }
+
+    if (verbose) dumpCore(std::cerr);
 
     // This code goes here temporary - removes :STORAGE from coreInstance - this functionality
     // will appear and will be supported in DataModel version
@@ -306,9 +310,8 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (verbose) {
-      std::cout << ((iTimeLimitCnt == 0) ? "Press any key to stop." : "Query limit (-m) waiting for fullfil") << std::endl;
-    }
+    if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
+
     boost::rational<int> prev_interval(0);
     while (!_kbhit() && iTimeLimitCnt != 1) {
       if (iTimeLimitCnt != 0) {
@@ -366,7 +369,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
         //
         for (const auto &element : eraseList) {
           id2StreamName_Relation.erase(element);
-          if (verbose) std::cout << "queue erased on timeout, procId=" << element << std::endl;
+          SPDLOG_WARN("queue erased on timeout, procId={}", element);
         }
       }
       //
@@ -380,11 +383,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
     //
     // End of main processing loop
     //
-    if (iTimeLimitCnt != 1) {
-      _getch();  // no wait ... feed key from kbhit
-    } else {
-      if (verbose) std::cout << "Query limit (-m) waiting for fullfil" << std::endl;
-    }
+    if (iTimeLimitCnt != 1) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;
     retVal = system::errc::no_child_process;
