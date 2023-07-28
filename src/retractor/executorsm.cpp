@@ -86,14 +86,47 @@ std::set<boost::rational<int>> getListFromCore() {
 }
 
 void dumpCore(std::ostream &xout) {
-  xout << "Idx.\tDelta\tCap\tName" << std::endl;
-  for (const auto &it : coreInstance) {
-    xout << getSeqNr(it.id) << "\t";
-    xout << it.rInterval << "\t";
-    xout << coreInstance.maxCapacity[it.id] << "\t";
-    xout << it.id;
-    xout << std::endl;
+  std::vector<std::string> vcols = {"Idx", "Delta", "Cap", "Name"};
+  std::stringstream ss;
+  std::stringstream sp;
+
+  for (const auto nName : vcols) {
+    int maxSize = nName.length();
+    int size{0};
+    for (const auto &it : coreInstance) {
+      if (nName == vcols[0])
+        size = std::to_string(getSeqNr(it.id)).length();
+      else if (nName == vcols[1])
+        size = (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length();
+      else if (nName == vcols[2])
+        size = std::to_string(coreInstance.maxCapacity[it.id]).length();
+      else if (nName == vcols[3])
+        size = it.id.length();
+      else {
+        assert(false && "wrong caption in dumpCore");
+        abort();
+      }
+      if (maxSize < size) maxSize = size;
+    }
+    ss << "|%";
+    ss << maxSize;
+    ss << "s";
+
+    sp << "|";
+    for (auto i = 0; i < maxSize; ++i) sp << "_";
   }
+  ss << "|\n";
+  sp << "|\n";
+
+  printf(ss.str().c_str(), vcols[0].c_str(), vcols[1].c_str(), vcols[2].c_str(), vcols[3].c_str());
+  printf(sp.str().c_str());
+
+  for (const auto &it : coreInstance)
+    printf(ss.str().c_str(),                                                                                       //
+           std::to_string(getSeqNr(it.id)).c_str(),                                                                //
+           (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).c_str(),  //
+           std::to_string(coreInstance.maxCapacity[it.id]).c_str(),                                                //
+           it.id.c_str());                                                                                         //
 }
 
 std::set<std::string> getAwaitedStreamsSet(TimeLine &tl) {
@@ -294,7 +327,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   try {
     dataModel proc(coreInstance);
 
-    if (verbose) dumpCore(std::cerr);
+    if (verbose) dumpCore(std::cout);
 
     // This code goes here temporary - removes :STORAGE from coreInstance - this functionality
     // will appear and will be supported in DataModel version

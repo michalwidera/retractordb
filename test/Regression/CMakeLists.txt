@@ -156,7 +156,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_REGRESSION_DATA_DIR}/agse
   COMMAND
     bash -c "set -e ; \
-    xretractor query.rql -m 15 ; \
+    xretractor query.rql -m 15 -v > verbose.txt ; \
     xtrdb < term.script > out.txt ;  \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
@@ -200,7 +200,7 @@ add_test(
   COMMAND
     sh -c "set -e ; \
   xretractor -c query.rql > out_compile.txt ; \
-  xretractor query.rql -m 5 ; \
+  xretractor query.rql -m 5 -v > verbose.txt ; \
   xtrdb < term.script > out_xtrdb.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt ; \
   ${CMAKE_COMMAND} -E compare_files pattern_xtrdb.txt out_xtrdb.txt")
