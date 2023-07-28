@@ -1,21 +1,50 @@
 noprompt
 open signalRow
 size
-desc
-list 4
+descc
+list 6
 open signalText
 size
-desc
-list 4
+descc
+list 6
 open signalRowR
 size
-desc
-list 4
+descc
+list 6
 open signalTextR
 size
-desc
-list 4
+descc
+list 6
+open signalText1
+size
+descc
+list 6
+open signalText2
+size
+descc
+list 6
+open signalText3
+size
+descc
+list 6
+open signalText4
+size
+descc
+list 6
+echo this is test area 1
+open signalText5
+size
+descc
+list 10
+echo this is test area 2
+open signalText6
+size
+descc
+list 10
 dropfile { core0.desc core1.desc }
 dropfile { signalRow signalRow.desc signalRowR signalRowR.desc }
 dropfile { signalText signalText.desc signalTextR signalTextR.desc }
+dropfile { signalText1 signalText1.desc signalText2 signalText2.desc }
+dropfile { signalText3 signalText3.desc signalText4 signalText4.desc }
+dropfile { signalText5 signalText5.desc signalText6 signalText6.desc }
 quit

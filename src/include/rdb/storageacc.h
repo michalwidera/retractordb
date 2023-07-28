@@ -24,6 +24,7 @@ class storageAccessor {
   Descriptor descriptor;
   bool removeOnExit = true;
   size_t recordsCount = 0;
+  size_t recordsSequence = 0;
   std::string descriptorFile = "";
   std::string storageFile = "";
   std::string storageType = "DEFAULT";
@@ -56,6 +57,7 @@ class storageAccessor {
 
   void setRemoveOnExit(bool value);
   const size_t getRecordsCount();
+  size_t getRecordsSequence();
   bool descriptorFileExist();
 
   std::string getStorageName();

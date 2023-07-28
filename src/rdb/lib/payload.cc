@@ -153,7 +153,7 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
         SPDLOG_INFO("Skip TYPE");
       } break;
       default: {
-        SPDLOG_ERROR("Type not supported.");
+        SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
         assert(false && "setItem - Type not supported.");
         abort();
       }
@@ -176,6 +176,12 @@ std::any payload::getItem(const int positionFlat) {
   }
 
   auto position = descriptor.convert(positionFlat).value().first;
+
+  if (position > descriptor.sizeFlat() - 1) {
+    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", position, descriptor.sizeFlat());
+    assert(false && "getItem - Read out of descriptor");
+    abort();
+  }
 
   // The aim of this procedure is : get raw data from descriptor and return as std::any
 
@@ -229,7 +235,7 @@ std::any payload::getItem(const int positionFlat) {
       return 0xdead;
     }
   };
-  SPDLOG_ERROR("Type not supported.");
+  SPDLOG_ERROR("Type not supported. {}", int(std::get<rtype>(descriptor[position])));
   assert(false && "type not supported on getter.");
   return 0xdead;
 }

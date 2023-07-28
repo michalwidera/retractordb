@@ -203,6 +203,8 @@ const size_t storageAccessor::getRecordsCount() {
     return recordsCount;
 }
 
+size_t storageAccessor::getRecordsSequence() { return recordsSequence; }
+
 std::string storageAccessor::getStorageName() { return storageFile; }
 
 void storageAccessor::abortIfStorageNotPrepared() {
@@ -239,6 +241,7 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
     if (circularBuffer.capacity() > 0) circularBuffer.push_front(*storagePayload.get());  // only one place when buffer is feed.
+    recordsSequence++;
     assert(result == 0);
     SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor->fileName(), recordIndexRv, recordsCount);
   } else {

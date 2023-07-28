@@ -217,8 +217,10 @@ TEST_F(xschema, check_construct_payload_mirror) {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1"));
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
+
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
+    std::cout << rdb::flat << *(payload.get()) << std::endl;
 
     ASSERT_TRUE(coutstring2.str() == "{ str1_0:12 str1_1:13 str1_2:14 str1_3:15 }");
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
