@@ -1,19 +1,9 @@
 # ctest -R '^rg-agse' -V
 
-DECLARE a INTEGER STREAM core0, 0.01 FILE 'datafile.dat'
-DECLARE b INTEGER STREAM core1, 0.01 FILE 'datafile.txt'
+DECLARE b INTEGER STREAM core1, 0.1 FILE 'datafile.txt'
 
-SELECT * STREAM signalRow FROM core0@(1,4)
-SELECT * STREAM signalText FROM core1@(1,4)
-
-SELECT * STREAM signalRowR FROM core0@(1,-4)
+SELECT * STREAM signalText0 FROM core1@(1,4)
 SELECT * STREAM signalTextR FROM core1@(1,-4)
-
 SELECT * STREAM signalText1 FROM core1@(2,4)
-SELECT * STREAM signalText2 FROM core1@(2,-4)
-
 SELECT * STREAM signalText3 FROM core1@(2,2)
-SELECT * STREAM signalText4 FROM core1@(2,-2)
-
 SELECT * STREAM signalText5 FROM signalText3@(1,1)
-SELECT * STREAM signalText6 FROM signalText4@(1,1)

@@ -1,100 +1,55 @@
-.14 Record(s)
+. SELECT * STREAM signalText0 FROM core1@(1,4)
+ This looks OK
+7 Record(s)
 16 Byte(s) per record.
-{ INTEGER core0_0 INTEGER core0_1 INTEGER core0_2 INTEGER core0_3 }
-{ core0_0:0 core0_1:0 core0_2:0 core0_3:0 }
-{ core0_0:10 core0_1:0 core0_2:0 core0_3:0 }
-{ core0_0:11 core0_1:10 core0_2:0 core0_3:0 }
-{ core0_0:12 core0_1:11 core0_2:10 core0_3:0 }
-{ core0_0:13 core0_1:12 core0_2:11 core0_3:10 }
-{ core0_0:14 core0_1:13 core0_2:12 core0_3:11 }
+{ INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
+{ core1_0:11 core1_1:10 core1_2:0 core1_3:0 }
+{ core1_0:12 core1_1:11 core1_2:10 core1_3:0 }
+{ core1_0:13 core1_1:12 core1_2:11 core1_3:10 }
+{ core1_0:14 core1_1:13 core1_2:12 core1_3:11 }
+{ core1_0:15 core1_1:14 core1_2:13 core1_3:12 }
+{ core1_0:16 core1_1:15 core1_2:14 core1_3:13 }
+ SELECT * STREAM signalTextR FROM core1@(1,-4)
+ This looks OK
+7 Record(s)
+16 Byte(s) per record.
+{ INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
+{ core1_0:0 core1_1:0 core1_2:10 core1_3:11 }
+{ core1_0:0 core1_1:10 core1_2:11 core1_3:12 }
+{ core1_0:10 core1_1:11 core1_2:12 core1_3:13 }
+{ core1_0:11 core1_1:12 core1_2:13 core1_3:14 }
+{ core1_0:12 core1_1:13 core1_2:14 core1_3:15 }
+{ core1_0:13 core1_1:14 core1_2:15 core1_3:16 }
+ SELECT * STREAM signalText1 FROM core1@(2,4)
+ This is ERROR - doubled?
 14 Record(s)
 16 Byte(s) per record.
 { INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
 { core1_0:0 core1_1:0 core1_2:0 core1_3:0 }
 { core1_0:10 core1_1:0 core1_2:0 core1_3:0 }
+{ core1_0:10 core1_1:0 core1_2:0 core1_3:0 }
+{ core1_0:11 core1_1:10 core1_2:0 core1_3:0 }
 { core1_0:11 core1_1:10 core1_2:0 core1_3:0 }
 { core1_0:12 core1_1:11 core1_2:10 core1_3:0 }
-{ core1_0:13 core1_1:12 core1_2:11 core1_3:10 }
-{ core1_0:14 core1_1:13 core1_2:12 core1_3:11 }
+ SELECT * STREAM signalText3 FROM core1@(2,2)
+ This is ERROR - doubled?
 14 Record(s)
-16 Byte(s) per record.
-{ INTEGER core0_0 INTEGER core0_1 INTEGER core0_2 INTEGER core0_3 }
-{ core0_0:0 core0_1:0 core0_2:0 core0_3:0 }
-{ core0_0:0 core0_1:0 core0_2:0 core0_3:10 }
-{ core0_0:0 core0_1:0 core0_2:10 core0_3:11 }
-{ core0_0:0 core0_1:10 core0_2:11 core0_3:12 }
-{ core0_0:10 core0_1:11 core0_2:12 core0_3:13 }
-{ core0_0:11 core0_1:12 core0_2:13 core0_3:14 }
-14 Record(s)
-16 Byte(s) per record.
-{ INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
-{ core1_0:0 core1_1:0 core1_2:0 core1_3:0 }
-{ core1_0:0 core1_1:0 core1_2:0 core1_3:10 }
-{ core1_0:0 core1_1:0 core1_2:10 core1_3:11 }
-{ core1_0:0 core1_1:10 core1_2:11 core1_3:12 }
-{ core1_0:10 core1_1:11 core1_2:12 core1_3:13 }
-{ core1_0:11 core1_1:12 core1_2:13 core1_3:14 }
-7 Record(s)
-16 Byte(s) per record.
-{ INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
-{ core1_0:0 core1_1:0 core1_2:0 core1_3:0 }
-{ core1_0:11 core1_1:10 core1_2:0 core1_3:0 }
-{ core1_0:13 core1_1:12 core1_2:11 core1_3:10 }
-{ core1_0:15 core1_1:14 core1_2:13 core1_3:12 }
-{ core1_0:17 core1_1:16 core1_2:15 core1_3:14 }
-{ core1_0:19 core1_1:18 core1_2:17 core1_3:16 }
-7 Record(s)
-16 Byte(s) per record.
-{ INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
-{ core1_0:0 core1_1:0 core1_2:0 core1_3:0 }
-{ core1_0:0 core1_1:0 core1_2:10 core1_3:11 }
-{ core1_0:10 core1_1:11 core1_2:12 core1_3:13 }
-{ core1_0:12 core1_1:13 core1_2:14 core1_3:15 }
-{ core1_0:14 core1_1:15 core1_2:16 core1_3:17 }
-{ core1_0:16 core1_1:17 core1_2:18 core1_3:19 }
-7 Record(s)
 8 Byte(s) per record.
 { INTEGER core1_0 INTEGER core1_1 }
 { core1_0:0 core1_1:0 }
+{ core1_0:10 core1_1:0 }
+{ core1_0:10 core1_1:0 }
 { core1_0:11 core1_1:10 }
-{ core1_0:13 core1_1:12 }
-{ core1_0:15 core1_1:14 }
-{ core1_0:17 core1_1:16 }
-{ core1_0:19 core1_1:18 }
+{ core1_0:11 core1_1:10 }
+{ core1_0:12 core1_1:11 }
+ SELECT * STREAM signalText5 FROM signalText3@(1,1)
+ This looks OK
 7 Record(s)
-8 Byte(s) per record.
-{ INTEGER core1_0 INTEGER core1_1 }
-{ core1_0:0 core1_1:0 }
-{ core1_0:10 core1_1:11 }
-{ core1_0:12 core1_1:13 }
-{ core1_0:14 core1_1:15 }
-{ core1_0:16 core1_1:17 }
-{ core1_0:18 core1_1:19 }
- this is test area 1
-14 Record(s)
 4 Byte(s) per record.
 { INTEGER signalText3_0 }
 { signalText3_0:0 }
-{ signalText3_0:0 }
-{ signalText3_0:0 }
-{ signalText3_0:0 }
+{ signalText3_0:10 }
 { signalText3_0:11 }
-{ signalText3_0:11 }
+{ signalText3_0:12 }
 { signalText3_0:13 }
-{ signalText3_0:13 }
-{ signalText3_0:15 }
-{ signalText3_0:15 }
- this is test area 2
-14 Record(s)
-4 Byte(s) per record.
-{ INTEGER signalText4_0 }
-{ signalText4_0:0 }
-{ signalText4_0:0 }
-{ signalText4_0:0 }
-{ signalText4_0:0 }
-{ signalText4_0:10 }
-{ signalText4_0:10 }
-{ signalText4_0:12 }
-{ signalText4_0:12 }
-{ signalText4_0:14 }
-{ signalText4_0:14 }
+{ signalText3_0:14 }

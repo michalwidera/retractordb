@@ -130,15 +130,18 @@ std::string intervalCounter() {
           // push_stream core0 -> deltaSrc
           // stream agse <5,3> -> step_of_window,size_of_window
           boost::rational<int> deltaSrc = coreInstance.getDelta(t1.getStr_());
-          boost::rational<int> schemaSizeSrc = getQuery(t1.getStr_()).lSchema.size();
+          boost::rational<int> windowSizeSrc = getQuery(t1.getStr_()).lSchema.size();
           auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
           assert(step > 0);
+          windowSize = abs(windowSize);
           // if (windowSize < 0) {  // windowSize < 0  (need to double-check and UT cover)
-          //   delta = deltaSrc / schemaSizeSrc;
+          //   delta = deltaSrc / windowSizeSrc;
           //   delta *= abs(windowSize);
           //   delta /= step;
           // } else
-          delta = (deltaSrc / schemaSizeSrc) * step;
+          // delta = (deltaSrc / windowSizeSrc) * step;
+          auto deltaSrcPerTuple = deltaSrc * windowSizeSrc;
+          delta = deltaSrcPerTuple / step;
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.getRI(), op.getStr_());

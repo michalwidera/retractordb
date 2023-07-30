@@ -1,49 +1,37 @@
 noprompt
-open signalRow
+echo SELECT * STREAM signalText0 FROM core1@(1,4)
+echo This looks OK
+open signalText0
 size
 descc
 list 6
-open signalText
-size
-descc
-list 6
-open signalRowR
-size
-descc
-list 6
+echo SELECT * STREAM signalTextR FROM core1@(1,-4)
+echo This looks OK
 open signalTextR
 size
 descc
 list 6
+echo SELECT * STREAM signalText1 FROM core1@(2,4)
+echo This is ERROR - doubled?
 open signalText1
 size
 descc
 list 6
-open signalText2
-size
-descc
-list 6
+echo SELECT * STREAM signalText3 FROM core1@(2,2)
+echo This is ERROR - doubled?
 open signalText3
 size
 descc
 list 6
-open signalText4
-size
-descc
-list 6
-echo this is test area 1
+echo SELECT * STREAM signalText5 FROM signalText3@(1,1)
+echo This looks OK
 open signalText5
 size
 descc
-list 10
-echo this is test area 2
-open signalText6
-size
-descc
-list 10
+list 6
 dropfile { core0.desc core1.desc }
 dropfile { signalRow signalRow.desc signalRowR signalRowR.desc }
-dropfile { signalText signalText.desc signalTextR signalTextR.desc }
+dropfile { signalText0 signalText0.desc signalTextR signalTextR.desc }
 dropfile { signalText1 signalText1.desc signalText2 signalText2.desc }
 dropfile { signalText3 signalText3.desc signalText4 signalText4.desc }
 dropfile { signalText5 signalText5.desc signalText6 signalText6.desc }

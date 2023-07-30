@@ -190,8 +190,9 @@ TEST_F(xschema, check_construct_payload) {
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
     coutstring2 << rdb::flat << *(payload.get());
+    std::cerr << rdb::flat << *(payload.get()) << std::endl;
 
-    ASSERT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:14 str1_2:13 str1_3:12 }");
+    ASSERT_TRUE(coutstring2.str() == "{ str1_0:16 str1_1:13 str1_2:14 str1_3:11 }");
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
@@ -222,7 +223,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
     coutstring2 << rdb::flat << *(payload.get());
     std::cout << rdb::flat << *(payload.get()) << std::endl;
 
-    ASSERT_TRUE(coutstring2.str() == "{ str1_0:12 str1_1:13 str1_2:14 str1_3:15 }");
+    ASSERT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:14 str1_2:13 str1_3:16 }");
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }

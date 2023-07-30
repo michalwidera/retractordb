@@ -118,8 +118,8 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   // 2. Construct payload
   std::unique_ptr<rdb::payload> result = std::make_unique<rdb::payload>(descriptor);
 
-  auto storageSequence = source->getRecordsSequence();
   auto prevQuot{-1};
+
   for (auto i = 0; i < lengthAbs; ++i) {
     auto dv = std::div(i + step, descriptorSrcSize);
     if (prevQuot != dv.quot) {
@@ -128,8 +128,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
       source->revRead(dv.quot);
     }
 
-    auto locSrc = descriptorSrcSize - dv.rem - 1;
-    SPDLOG_INFO("test: {} - {} locSrc:{}", dv.rem, storageSequence % descriptorSrcSize, locSrc);
+    auto locSrc = dv.rem;
     auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
     assert(i < descriptor.size());
@@ -140,7 +139,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   }
 
   // 3. Cleanup source after processing
-  source->revRead(0);  // Reset source
+  if (prevQuot != 0) source->revRead(0);  // Reset source
 
   // 4. Return constructed object.
   return *(result.get());
