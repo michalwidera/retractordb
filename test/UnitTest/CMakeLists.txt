@@ -3,10 +3,6 @@ cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 # these set of 3 commands will copy artifacts from UnitTest/Data into
 # build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
 # then copy.
-file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/Data)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Data
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-set(CMAKE_UNITTEST_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 
 include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
                     ${CMAKE_SOURCE_DIR}/src)
@@ -63,81 +59,81 @@ target_link_libraries(test_soperations ${LIBRARY_TEST_SET})
 
 add_test(
   NAME ut-xqry
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
   NAME ut-xqry-vg
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
   NAME ut-xtrdb
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/rdb
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
 add_test(
   NAME ut-xtrdb-vg
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/rdb
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/rdb
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_xtrdb)
 
 add_test(
   NAME ut-expeval
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
 
 add_test(
   NAME ut-soperations
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_soperations)
 
 add_test(
   NAME ut-soperations-vg
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_soperations)
 
 add_test(
   NAME ut-expeval-vg
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_expeval)
 
 add_test(
   NAME ut-compiler
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/compiler
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/compiler
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
 
 add_test(
   NAME ut-compiler-vg
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/compiler
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/compiler
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_compiler)
 
 add_test(
   NAME ut-dataModel
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/dataModel
   COMMAND bash -c "set -e ; \
     ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel")
 
 add_test(
   NAME ut-dataModel-compile
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/dataModel
   COMMAND sh -c "set -e ; \
     xretractor ut_example_schema.rql -c > out_compile.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt")
 
 add_test(
   NAME ut-dataModel-vg
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/dataModel
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_dataModel)
 
 add_test(
   NAME ut-dataModel-comp
-  WORKING_DIRECTORY ${CMAKE_UNITTEST_DATA_DIR}/dataModel
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/dataModel
   COMMAND bash -c "set -e ; xtrdb < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 

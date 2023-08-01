@@ -1,0 +1,12 @@
+# ctest -R '^rg-agse2' -V
+
+DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
+
+SELECT * STREAM serial1 FROM core@(1,1)
+SELECT * STREAM serial2 FROM core@(2,2)
+SELECT * STREAM serial3 FROM core@(1,2)
+SELECT * STREAM serial4 FROM core@(3,2)
+SELECT * STREAM serial5 FROM core@(3,3)
+SELECT * STREAM serial6 FROM core@(3,-3)
+SELECT * STREAM serial7 FROM core@(2,3)
+SELECT * STREAM serial8 FROM core@(2,4)

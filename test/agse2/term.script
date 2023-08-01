@@ -1,0 +1,13 @@
+noprompt
+
+dropfile { core.desc }
+dropfile { serial1.desc serial1 }
+dropfile { serial2.desc serial2 }
+dropfile { serial3.desc serial3 }
+dropfile { serial4.desc serial4 }
+dropfile { serial5.desc serial5 }
+dropfile { serial6.desc serial6 }
+dropfile { serial7.desc serial7 }
+dropfile { serial8.desc serial8 }
+
+quit
