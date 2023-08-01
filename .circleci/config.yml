@@ -110,16 +110,10 @@ commands:
             export PATH="$HOME/.local/bin:$PATH"
             xretractor -h && xqry -h
       - run:
-          name: Unit test
+          name: Regression & Unit test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
-            cd build/<<parameters.build_type>>/test/UnitTest && ctest -V
-      - run:
-          name: Regression test
-          command: |
-            export PATH="$HOME/.local/bin:$PATH"
-            xretractor -h && xqry -h
-            cd build/<<parameters.build_type>>/test/Regression && ctest -V
+            cd build/<<parameters.build_type>>/test && ctest -V
   run-cppcheck:
     parameters:
       build_type:
