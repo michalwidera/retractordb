@@ -12,19 +12,19 @@ size
 descc
 list 6
 echo SELECT * STREAM signalText1 FROM core1@(2,4)
-echo This is ERROR - doubled?
+echo This looks OK
 open signalText1
 size
 descc
 list 6
 echo SELECT * STREAM signalText3 FROM core1@(2,2)
-echo This is ERROR - doubled?
+echo This looks OK
 open signalText3
 size
 descc
 list 6
 echo SELECT * STREAM signalText5 FROM signalText3@(1,1)
-echo This looks OK
+echo Investigation here
 open signalText5
 size
 descc

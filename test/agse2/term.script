@@ -1,5 +1,53 @@
 noprompt
 
+echo serial1
+open serial1
+size
+descc
+list 6
+
+echo serial2
+open serial2
+size
+descc
+list 6
+
+echo serial3
+open serial3
+size
+descc
+list 6
+
+echo serial4
+open serial4
+size
+descc
+list 6
+
+echo serial5
+open serial5
+size
+descc
+list 6
+
+echo serial6
+open serial6
+size
+descc
+list 6
+
+echo serial7
+open serial7
+size
+descc
+list 6
+
+echo serial8
+open serial8
+size
+descc
+list 6
+
 dropfile { core.desc }
 dropfile { serial1.desc serial1 }
 dropfile { serial2.desc serial2 }
