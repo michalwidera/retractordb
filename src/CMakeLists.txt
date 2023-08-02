@@ -10,24 +10,24 @@ add_subdirectory(retractor)
 add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-dsp.sh
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
 
 add_custom_target(
   simple-view
   COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
           out.dot -o out.png && feh out.png
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
   dsp-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/Regression/Data/dsp)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
 
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
