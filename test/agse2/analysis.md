@@ -1,9 +1,9 @@
-Analysis of data issue.
+# Analysis of data issue.
 
 1. Install draw.io integration for vscode
 2. Open agse-decomposition.drawio
 
-DATA SOURCE
+## DATA SOURCE
 ===
 
 ```
@@ -20,7 +20,7 @@ DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
 ```
 
 ---------------------------------------------------------------------------
-serial1
+## serial1 - __WRONG__
 ===
 ```
 SELECT * STREAM serial1 FROM core@(1,1)
@@ -33,37 +33,52 @@ SELECT * STREAM serial1 FROM core@(1,1)
 { core_0:20 }
 { core_0:23 }
 ```
-> THIS IS WRONG!
+### Analysis:
+
 > should look like:
 ```
 { core_0:11 }
 { core_0:12 }
 { core_0:13 }
 { core_0:14 }
+{ core_0:15 }
+{ core_0:16 }
 ```
 
 ---------------------------------------------------------------------------
 
-serial2
-===
+## serial2
+>> __WRONG !__
+
 ```
 SELECT * STREAM serial2 FROM core@(2,2)
 ```
+> Actual:
 ```
 { core_0:24 core_1:19 }
 { core_0:21 core_1:16 }
 { core_0:24 core_1:19 }
 { core_0:24 core_1:19 }
 { core_0:27 core_1:22 }
-{ core_0:30 core_1:25 }
-** THIS IS OK (?)
 ```
+> This should look like:
+```
+{ core_0:24 core_1:25 }
+{ core_0:26 core_1:27 }
+{ core_0:28 core_1:29 }
+{ core_0:30 core_1:10 }
+{ core_0:11 core_1:12 }
+```
+
 ---------------------------------------------------------------------------
-serial 3
-===
+### serial 3 
+
+>> __WRONG !__
+
 ```
 SELECT * STREAM serial3 FROM core@(1,2)
 ```
+> Actual:
 ```
 { core_0:14 core_1:15 }
 { core_0:20 core_1:21 }
@@ -72,11 +87,19 @@ SELECT * STREAM serial3 FROM core@(1,2)
 { core_0:20 core_1:21 }
 { core_0:23 core_1:24 }
 ```
-> THIS IS WRONG
+> This should look like:
+```
+{ core_0:14 core_1:15 }
+{ core_0:15 core_1:16 }
+{ core_0:16 core_1:17 }
+{ core_0:17 core_1:18 }
+{ core_0:18 core_1:19 }
+{ core_0:19 core_1:20 }
+```
 ---------------------------------------------------------------------------
 
-serial4
-===
+## serial4 - __OK__
+
 ```
 SELECT * STREAM serial4 FROM core@(3,2)
 ```
@@ -88,9 +111,10 @@ SELECT * STREAM serial4 FROM core@(3,2)
 record out of range - list command
 record out of range - list command
 ```
+
 ---------------------------------------------------------------------------
-serial5
-===
+## serial5 - __OK__
+
 ```
 SELECT * STREAM serial5 FROM core@(3,3)
 ```
@@ -103,8 +127,8 @@ record out of range - list command
 record out of range - list command
 ```
 ---------------------------------------------------------------------------
-serial6
-===
+## serial6 - __OK__
+
 ```
 SELECT * STREAM serial6 FROM core@(3,-3)
 ```
@@ -117,11 +141,13 @@ record out of range - list command
 record out of range - list command
 ```
 ---------------------------------------------------------------------------
-serial7
-===
+## serial7
+>> __WRONG !__
+
 ```
 SELECT * STREAM serial7 FROM core@(2,3)
 ```
+> Actual
 ```
 { core_0:30 core_1:25 core_2:26 }
 { core_0:21 core_1:16 core_2:17 }
@@ -130,9 +156,13 @@ SELECT * STREAM serial7 FROM core@(2,3)
 { core_0:27 core_1:22 core_2:23 }
 { core_0:30 core_1:25 core_2:26 }
 ```
----------------------------------------------------------------------------
-serial8
+
+how - todo.
 ===
+
+## serial8
+>> __WRONG !__
+
 ```
 SELECT * STREAM serial8 FROM core@(2,4)
 ```
@@ -144,4 +174,5 @@ SELECT * STREAM serial8 FROM core@(2,4)
 { core_0:27 core_1:22 core_2:23 core_3:24 }
 { core_0:30 core_1:25 core_2:26 core_3:27 }
 ```
----------------------------------------------------------------------------
+how - todo.
+===
