@@ -94,8 +94,8 @@ streamInstance::streamInstance(query& qry)
 // 30    30
 // 30    40
 // 50    50
-rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance) {
-  assert(step > 0);
+rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance, const int storedRecordCount) {
+  assert(step >= 0);
 
   // temporary alias for variable - for better understand what is happening here.
   const auto& source = outputPayload;
@@ -118,6 +118,9 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   // 2. Construct payload
   std::unique_ptr<rdb::payload> result = std::make_unique<rdb::payload>(descriptor);
 
+  auto fp = std::div(storedRecordCount, descriptorSrcSize);
+  SPDLOG_INFO("constructAgse fillPos /{}/{}/", fp.quot, fp.rem);
+
   auto prevQuot{-1};
 
   for (auto i = 0; i < lengthAbs; ++i) {
@@ -135,7 +138,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
     std::any value = source->getPayload()->getItem(locSrc);
     result->setItem(locDst, value);
-    SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
+    SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
   }
 
   // 3. Cleanup source after processing
@@ -472,7 +475,8 @@ void dataModel::constructInputPayload(const std::string& instance) {
       const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step >= 0);
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance);
+      const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance, storedRecordsInOutput);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
