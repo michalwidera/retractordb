@@ -94,8 +94,9 @@ streamInstance::streamInstance(query& qry)
 // 30    30
 // 30    40
 // 50    50
-rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance, const int storedRecordCount) {
-  assert(step >= 0);
+rdb::payload streamInstance::constructAgsePayload(const int length, const int step, const std::string& instance,
+                                                  const int storedRecordCount) {
+  assert(step > 0);
 
   // temporary alias for variable - for better understand what is happening here.
   const auto& source = outputPayload;
@@ -474,7 +475,7 @@ void dataModel::constructInputPayload(const std::string& instance) {
 
       const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
-      assert(step >= 0);
+      assert(step > 0);
       const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance, storedRecordsInOutput);
     } break;

@@ -321,7 +321,7 @@ rdb::Descriptor query::descriptorFrom() {
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
-      assert(step >= 0);
+      assert(step > 0);
       auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
       for (int i = 0; i < abs(length); i++) {
         retVal | rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);

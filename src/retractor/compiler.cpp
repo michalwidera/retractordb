@@ -140,8 +140,8 @@ std::string intervalCounter() {
           //   delta /= step;
           // } else
           // delta = (deltaSrc / windowSizeSrc) * step;
-          
-          delta = ( coreDelta * step ) / coreWindow ;
+
+          delta = (coreDelta * step) / coreWindow;
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.getRI(), op.getStr_());
@@ -621,10 +621,10 @@ std::map<std::string, int> countBuffersCapacity() {
 
         const auto nameSrc = arg1;
         auto [step, length] = get<std::pair<int, int>>(cmd.getVT());
-        assert(step >= 0);
+        assert(step > 0);
         length = abs(length);
         const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().sizeFlat();
-        const auto timeBufferSize = int(ceil((length + step)/ lengthOfSrc)) + 1 ;
+        const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 1;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;
