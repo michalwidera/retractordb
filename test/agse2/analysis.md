@@ -26,23 +26,14 @@ DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
 SELECT * STREAM serial1 FROM core@(1,1)
 ```
 ```
-{ core_0:11 }
-{ core_0:17 }
-{ core_0:20 }
-{ core_0:20 }
-{ core_0:20 }
-{ core_0:23 }
-```
-### Analysis:
-
-> should look like:
-```
-{ core_0:11 }
-{ core_0:12 }
-{ core_0:13 }
-{ core_0:14 }
-{ core_0:15 }
-{ core_0:16 }
+Actual        | Expected
+--------------|--------------
+{ core_0:11 } | { core_0:11 }
+{ core_0:17 } | { core_0:12 }
+{ core_0:20 } | { core_0:13 }
+{ core_0:20 } | { core_0:14 }
+{ core_0:20 } | { core_0:15 }
+{ core_0:23 } | { core_0:16 }
 ```
 
 ---------------------------------------------------------------------------
@@ -55,19 +46,13 @@ SELECT * STREAM serial2 FROM core@(2,2)
 ```
 > Actual:
 ```
-{ core_0:24 core_1:19 }
-{ core_0:21 core_1:16 }
-{ core_0:24 core_1:19 }
-{ core_0:24 core_1:19 }
-{ core_0:27 core_1:22 }
-```
-> This should look like:
-```
-{ core_0:24 core_1:25 }
-{ core_0:26 core_1:27 }
-{ core_0:28 core_1:29 }
-{ core_0:30 core_1:10 }
-{ core_0:11 core_1:12 }
+Actual                  | Expected
+-------------------------------------------------
+{ core_0:24 core_1:19 } | { core_0:24 core_1:25 }
+{ core_0:21 core_1:16 } | { core_0:26 core_1:27 }
+{ core_0:24 core_1:19 } | { core_0:28 core_1:29 }
+{ core_0:24 core_1:19 } | { core_0:30 core_1:10 }
+{ core_0:27 core_1:22 } | { core_0:11 core_1:12 }
 ```
 
 ---------------------------------------------------------------------------
@@ -80,21 +65,14 @@ SELECT * STREAM serial3 FROM core@(1,2)
 ```
 > Actual:
 ```
-{ core_0:14 core_1:15 }
-{ core_0:20 core_1:21 }
-{ core_0:20 core_1:21 }
-{ core_0:20 core_1:21 }
-{ core_0:20 core_1:21 }
-{ core_0:23 core_1:24 }
-```
-> This should look like:
-```
-{ core_0:14 core_1:15 }
-{ core_0:15 core_1:16 }
-{ core_0:16 core_1:17 }
-{ core_0:17 core_1:18 }
-{ core_0:18 core_1:19 }
-{ core_0:19 core_1:20 }
+Actual                  | Expected
+--------------------------------------------
+{ core_0:14 core_1:15 } | { core_0:14 core_1:15 }
+{ core_0:20 core_1:21 } | { core_0:15 core_1:16 }
+{ core_0:20 core_1:21 } | { core_0:16 core_1:17 }
+{ core_0:20 core_1:21 } | { core_0:17 core_1:18 }
+{ core_0:20 core_1:21 } | { core_0:18 core_1:19 }
+{ core_0:23 core_1:24 } | { core_0:19 core_1:20 }
 ```
 ---------------------------------------------------------------------------
 
