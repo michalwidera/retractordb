@@ -47,7 +47,7 @@ class Descriptor : public std::vector<rField> {
 
   Descriptor &operator|(const Descriptor &rhs);
   Descriptor &operator=(const Descriptor &rhs);
-  bool operator==(const Descriptor &rhs);
+  bool operator==(const Descriptor &rhs) const;
 
   Descriptor &createHash(const std::string &name, Descriptor lhs, Descriptor rhs);
   Descriptor &cleanRef();

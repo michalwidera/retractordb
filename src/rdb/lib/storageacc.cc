@@ -181,6 +181,14 @@ void storageAccessor::reset() {
   SPDLOG_INFO("reset - drop & recreate storage.");
 }
 
+void storageAccessor::cleanPayload(uint8_t* destination) {
+  destination = (destination == nullptr)                            //
+                    ? static_cast<uint8_t*>(storagePayload->get())  //
+                    : destination;
+  auto size = descriptor.getSizeInBytes();
+  std::memset(destination, 0, size);
+}
+
 Descriptor& storageAccessor::getDescriptor() { return descriptor; }
 
 std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
@@ -259,7 +267,10 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
 
   assert(circularBuffer.capacity() > 0);
 
-  if (recordIndex == 0 && bufferPolicy == policyState::flux) return read_(recordPositionFromBack, destination);
+  if (recordIndex == 0 && bufferPolicy == policyState::flux) {
+    SPDLOG_WARN("BOING! {}", accessor->fileName());
+    return read_(recordPositionFromBack, destination);
+  }
   assert(recordIndex >= 0);
 
   SPDLOG_INFO("revRead from buffer {} pos:{}", accessor->fileName(), recordPositionFromBack);

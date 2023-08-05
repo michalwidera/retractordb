@@ -246,18 +246,18 @@ TEST(xrdb, test_storage) {
 }
 
 TEST(xrdb, test_descriptor_compare) {
-  auto dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
-                       rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
-                       rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  auto dataDescriptor2{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
-                       rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
-                       rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  auto dataDescriptorDiff1{rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
-                           rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
-                           rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  auto dataDescriptorDiff2{rdb::Descriptor("Name", 1, 11, rdb::STRING) |  //
-                           rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
-                           rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
+                                  rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
+                                  rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptor2{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
+                                  rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
+                                  rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptorDiff1{rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
+                                      rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
+                                      rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptorDiff2{rdb::Descriptor("Name", 1, 11, rdb::STRING) |  //
+                                      rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //
+                                      rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);

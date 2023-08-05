@@ -119,28 +119,60 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   // 2. Construct payload
   std::unique_ptr<rdb::payload> result = std::make_unique<rdb::payload>(descriptor);
 
-  auto fp = std::div(storedRecordCount, descriptorSrcSize);
-  SPDLOG_INFO("constructAgse fillPos /{}/{}/", fp.quot, fp.rem);
+  auto deltaSrc = coreInstance[instance].rInterval;
+  auto deltaDst = boost::rational<int>(step) / descriptorSrcSize;
+
+  auto outFasterThanIn = deltaDst < deltaSrc;
 
   auto prevQuot{-1};
+//#define UNDER_DEVELOPMENT
+#ifdef UNDER_DEVELOPMENT
+  if (outFasterThanIn) {
+    // ---------------
+    auto fp = std::div(storedRecordCount, descriptorSrcSize);
 
-  for (auto i = 0; i < lengthAbs; ++i) {
-    auto dv = std::div(i + step, descriptorSrcSize);
-    if (prevQuot != dv.quot) {
-      prevQuot = dv.quot;
-      SPDLOG_INFO("constructAgse from {} rev-read:/{}/", source->getStorageName(), dv.quot);
-      source->revRead(dv.quot);
+    SPDLOG_INFO("test fillPos /{}/{}/  file:{} {}/{} {}/{} outFaster:{} descSrcSize:{}-{}", fp.quot, fp.rem,
+                source->getStorageName(), deltaSrc.numerator(), deltaSrc.denominator(), deltaDst.numerator(),
+                deltaDst.denominator(), outFasterThanIn, descriptorSrcSize, lengthAbs);
+
+    // ---------------
+    for (auto i = 0; i < lengthAbs; ++i) {
+      auto dv = std::div(i + step + fp.rem * lengthAbs, descriptorSrcSize);
+      if (prevQuot != dv.quot) {
+        prevQuot = dv.quot;
+        SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", i + step + fp.rem * lengthAbs, source->getStorageName(),
+                    dv.quot);
+        if (source->getRecordsCount() > dv.quot)
+          source->revRead(dv.quot);
+        else
+          source->cleanPayload();
+      }
+
+      auto locSrc = dv.rem;
+      auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
+
+      std::any value = source->getPayload()->getItem(locSrc);
+      result->setItem(locDst, value);
+      SPDLOG_INFO("test fast Agse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
     }
+    // ---------------
+  } else
+#endif
+    for (auto i = 0; i < lengthAbs; ++i) {
+      auto dv = std::div(i + step, descriptorSrcSize);
+      if (prevQuot != dv.quot) {
+        prevQuot = dv.quot;
+        SPDLOG_INFO("constructAgse from {} rev-read:/{}/", source->getStorageName(), dv.quot);
+        source->revRead(dv.quot);
+      }
 
-    auto locSrc = dv.rem;
-    auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
+      auto locSrc = dv.rem;
+      auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
-    assert(i < descriptor.size());
-
-    std::any value = source->getPayload()->getItem(locSrc);
-    result->setItem(locDst, value);
-    SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
-  }
+      std::any value = source->getPayload()->getItem(locSrc);
+      result->setItem(locDst, value);
+      SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
+    }
 
   // 3. Cleanup source after processing
   if (prevQuot != 0) source->revRead(0);  // Reset source
@@ -477,7 +509,7 @@ void dataModel::constructInputPayload(const std::string& instance) {
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step > 0);
       const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, instance, storedRecordsInOutput);
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)

@@ -21,7 +21,7 @@ DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
 
 ---------------------------------------------------------------------------
 ## serial1 - __WRONG__
-===
+
 ```
 SELECT * STREAM serial1 FROM core@(1,1)
 ```

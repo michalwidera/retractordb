@@ -1,4 +1,4 @@
-# ctest -R '^rg-agse2' -V
+# ctest -R '^agse2' -V
 
 DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
 

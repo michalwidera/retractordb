@@ -1,6 +1,8 @@
 #ifndef STORAGE_RDB_INCLUDE_FAINTERFACE_H_
 #define STORAGE_RDB_INCLUDE_FAINTERFACE_H_
 
+#include <stdint.h>  // uint8_t
+
 #include <limits>
 #include <string>
 

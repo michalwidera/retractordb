@@ -63,6 +63,7 @@ class storageAccessor {
   bool isDeclared();
 
   void setCapacity(const int capacity);
+  void cleanPayload(uint8_t *destination = nullptr);
 
   // technical function - for unit tests
   void reset();
