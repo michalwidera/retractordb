@@ -128,8 +128,14 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 //#define UNDER_DEVELOPMENT
 #ifdef UNDER_DEVELOPMENT
   if (outFasterThanIn) {
+    auto step_v{1};
+
     // ---------------
     auto fp = std::div(storedRecordCount, descriptorSrcSize);
+
+    if (fp.rem == 0) {
+      step_v = step;
+    }
 
     SPDLOG_INFO("test fillPos /{}/{}/  file:{} {}/{} {}/{} outFaster:{} descSrcSize:{}-{}", fp.quot, fp.rem,
                 source->getStorageName(), deltaSrc.numerator(), deltaSrc.denominator(), deltaDst.numerator(),
@@ -137,10 +143,11 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
     // ---------------
     for (auto i = 0; i < lengthAbs; ++i) {
-      auto dv = std::div(i + step + fp.rem * lengthAbs, descriptorSrcSize);
+      auto location = i + fp.rem * lengthAbs;
+      auto dv = std::div(location, descriptorSrcSize);
       if (prevQuot != dv.quot) {
         prevQuot = dv.quot;
-        SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", i + step + fp.rem * lengthAbs, source->getStorageName(),
+        SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", location, source->getStorageName(),
                     dv.quot);
         if (source->getRecordsCount() > dv.quot)
           source->revRead(dv.quot);
@@ -153,7 +160,11 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
       std::any value = source->getPayload()->getItem(locSrc);
       result->setItem(locDst, value);
-      SPDLOG_INFO("test fast Agse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
+
+      if (value.type() == typeid(int)) 
+        SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
+      else
+        SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
     }
     // ---------------
   } else
@@ -171,7 +182,11 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
       std::any value = source->getPayload()->getItem(locSrc);
       result->setItem(locDst, value);
-      SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
+
+      if (value.type() == typeid(int)) 
+        SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
+      else
+        SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
     }
 
   // 3. Cleanup source after processing

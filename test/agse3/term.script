@@ -1,0 +1,21 @@
+noprompt
+
+echo serial4
+open serial4
+size
+descc
+list 6
+
+echo serial5
+open serial5
+size
+descc
+list 6
+
+echo serial6
+open serial6
+size
+descc
+list 6
+
+quit

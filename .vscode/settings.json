@@ -81,7 +81,8 @@
       "cassert": "cpp",
       "numbers": "cpp",
       "span": "cpp",
-      "semaphore": "cpp"
+      "semaphore": "cpp",
+      "format": "cpp"
     },
     "cSpell.words": [
       "iarchive"

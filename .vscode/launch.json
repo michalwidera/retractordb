@@ -77,13 +77,13 @@
       ]
     },
     {
-      "name": "(gdb) xretractor simple",
+      "name": "(gdb) xretractor agse2",
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
-      "args": ["query-simple.rql"],
+      "args": ["query.rql", "-m" , "15",  "-v" ],
       "stopAtEntry": false,
-      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/Regression/Data/simple",
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/agse2",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
