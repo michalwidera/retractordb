@@ -140,7 +140,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
     // ---------------
     for (auto i = 0; i < lengthAbs; ++i) {
       auto vv = 0;
-      if (fp.rem == 0) vv = -1 ;
+      if (fp.rem == 0) vv = -1;
       auto location = i + step_v + vv + fp.rem * lengthAbs;
       auto dv = std::div(location, descriptorSrcSize);
       if (prevQuot != dv.quot) {

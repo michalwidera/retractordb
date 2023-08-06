@@ -64,31 +64,63 @@ class buffMgTest : public ::testing::Test {
     assert(response == "OK");
   }
 
-  virtual void TearDown() { coreInstance.clear(); }
+  virtual void TearDown() {
+    coreInstance.clear();
+    dataArea->qSet["serial1"]->outputPayload->reset();  // This removes artifacts
+  }
 };
 
 TEST_F(buffMgTest, Only_two_items_in_query) { ASSERT_TRUE(coreInstance.size() == 2); }
 
-TEST_F(buffMgTest, CanDoBaz) {
-  std::set<std::string> rowSet1 = {"core", "serial1"};
-  dataArea->processRows(rowSet1);
-  std::cout << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get()) << std::endl;
-  std::cout << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get()) << std::endl;
+TEST_F(buffMgTest, Sole_core_is_flowing) {
+  auto expectedResult =
+      "{ a:10 b:11 c:12 }"
+      "{ a:13 b:14 c:15 }"
+      "{ a:16 b:17 c:18 }"
+      "{ a:19 b:20 c:21 }"
+      "{ a:22 b:23 c:24 }"
+      "{ a:25 b:26 c:27 }"
+      "{ a:28 b:29 c:30 }"
+      "{ a:10 b:11 c:12 }"
+      "{ a:13 b:14 c:15 }"
+      "{ a:16 b:17 c:18 }";
 
-  std::set<std::string> rowSet2 = {"serial1"};
-  dataArea->processRows(rowSet2);
-  std::cout << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get()) << std::endl;
-  std::cout << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get()) << std::endl;
+  std::stringstream strstream;
 
-  std::set<std::string> rowSet3 = {"serial1"};
-  dataArea->processRows(rowSet3);
-  std::cout << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get()) << std::endl;
-  std::cout << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get()) << std::endl;
+  std::set<std::string> rowSet = {"core"};
+  for (auto i = 0; i < 10; i++) {
+    dataArea->processRows(rowSet);
+    strstream << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get());
+  }
 
-  std::set<std::string> rowSet4 = {"core", "serial1"};
-  dataArea->processRows(rowSet4);
-  std::cout << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get()) << std::endl;
-  std::cout << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get()) << std::endl;
+  ASSERT_TRUE(strstream.str() == expectedResult);
+}
+
+TEST_F(buffMgTest, Core_agse_1_1_is_correctly_picked) {
+  auto expectedResult =
+      "{ a:10 b:11 c:12 }"
+      "{ serial1_0:10 }"
+      "{ a:10 b:11 c:12 }"
+      "{ serial1_0:11 }"
+      "{ a:10 b:11 c:12 }"
+      "{ serial1_0:12 }"
+      "{ a:13 b:14 c:15 }"
+      "{ serial1_0:13 }";
+
+  std::stringstream strstream;
+
+  std::vector<std::set<std::string>> vRowSet = {{"core", "serial1"},  //
+                                                {"serial1"},          //
+                                                {"serial1"},          //
+                                                {"core", "serial1"}};
+
+  for (auto i : vRowSet) {
+    dataArea->processRows(i);
+    strstream << rdb::flat << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get());
+    strstream << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get());
+  }
+
+  ASSERT_TRUE(strstream.str() == expectedResult);
 }
 
 }  // Namespace
