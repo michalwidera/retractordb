@@ -85,7 +85,7 @@ TEST_F(buffMgTest, CanDoBaz) {
   std::cout << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get()) << std::endl;
   std::cout << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get()) << std::endl;
 
-  std::set<std::string> rowSet4 = {"serial1"};
+  std::set<std::string> rowSet4 = {"core", "serial1"};
   dataArea->processRows(rowSet4);
   std::cout << rdb::flat << *(dataArea->qSet["core"]->inputPayload.get()) << std::endl;
   std::cout << rdb::flat << *(dataArea->qSet["serial1"]->inputPayload.get()) << std::endl;

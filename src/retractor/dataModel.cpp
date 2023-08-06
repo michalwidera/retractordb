@@ -125,11 +125,11 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   auto outFasterThanIn = deltaDst < deltaSrc;
 
   auto prevQuot{-1};
-// #define UNDER_DEVELOPMENT
+#define UNDER_DEVELOPMENT
 #ifdef UNDER_DEVELOPMENT
   if (outFasterThanIn) {
     // ---------------
-    auto step_v{1};
+    auto step_v{0};
     auto fp = std::div(storedRecordCount, descriptorSrcSize);
     if (fp.rem == 0) step_v = step;
 
@@ -139,7 +139,9 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
     // ---------------
     for (auto i = 0; i < lengthAbs; ++i) {
-      auto location = i + step_v + fp.rem * lengthAbs;
+      auto vv = 0;
+      if (fp.rem == 0) vv = -1 ;
+      auto location = i + step_v + vv + fp.rem * lengthAbs;
       auto dv = std::div(location, descriptorSrcSize);
       if (prevQuot != dv.quot) {
         prevQuot = dv.quot;
@@ -150,7 +152,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
           source->cleanPayload();
       }
 
-      auto locSrc = (fp.rem == 0) ? dv.rem - 1 : dv.rem;
+      auto locSrc = dv.rem;
       auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
       std::any value = source->getPayload()->getItem(locSrc);
