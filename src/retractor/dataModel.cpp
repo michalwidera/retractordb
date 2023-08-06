@@ -125,17 +125,13 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
   auto outFasterThanIn = deltaDst < deltaSrc;
 
   auto prevQuot{-1};
-//#define UNDER_DEVELOPMENT
+// #define UNDER_DEVELOPMENT
 #ifdef UNDER_DEVELOPMENT
   if (outFasterThanIn) {
-    auto step_v{1};
-
     // ---------------
+    auto step_v{1};
     auto fp = std::div(storedRecordCount, descriptorSrcSize);
-
-    if (fp.rem == 0) {
-      step_v = step;
-    }
+    if (fp.rem == 0) step_v = step;
 
     SPDLOG_INFO("test fillPos /{}/{}/  file:{} {}/{} {}/{} outFaster:{} descSrcSize:{}-{}", fp.quot, fp.rem,
                 source->getStorageName(), deltaSrc.numerator(), deltaSrc.denominator(), deltaDst.numerator(),
@@ -143,25 +139,24 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
 
     // ---------------
     for (auto i = 0; i < lengthAbs; ++i) {
-      auto location = i + fp.rem * lengthAbs;
+      auto location = i + step_v + fp.rem * lengthAbs;
       auto dv = std::div(location, descriptorSrcSize);
       if (prevQuot != dv.quot) {
         prevQuot = dv.quot;
-        SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", location, source->getStorageName(),
-                    dv.quot);
+        SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", location, source->getStorageName(), dv.quot);
         if (source->getRecordsCount() > dv.quot)
           source->revRead(dv.quot);
         else
           source->cleanPayload();
       }
 
-      auto locSrc = dv.rem;
+      auto locSrc = (fp.rem == 0) ? dv.rem - 1 : dv.rem;
       auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
       std::any value = source->getPayload()->getItem(locSrc);
       result->setItem(locDst, value);
 
-      if (value.type() == typeid(int)) 
+      if (value.type() == typeid(int))
         SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
       else
         SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
@@ -183,7 +178,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length, const int st
       std::any value = source->getPayload()->getItem(locSrc);
       result->setItem(locDst, value);
 
-      if (value.type() == typeid(int)) 
+      if (value.type() == typeid(int))
         SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
       else
         SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);

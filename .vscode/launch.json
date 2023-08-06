@@ -101,10 +101,10 @@
       ]
     },
   {
-    "name": "(gdb) test_dataModel",
+    "name": "(gdb) test_buffMgm",
     "type": "cppdbg",
     "request": "launch",
-    "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_dataModel",
+    "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_buffManagement",
     "args": [""],
     "stopAtEntry": false,
     "cwd":     "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/dataModel",
