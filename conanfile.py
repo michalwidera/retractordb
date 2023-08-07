@@ -18,7 +18,7 @@ cd ~/.local/bin && [ ! -f "antlr-VERSION-complete.jar" ] && wget https://www.ant
 cd -
 
 if [ $1 ] ; then
-  java -jar ~/.local/bin/antlr-VERSION-complete.jar -o Parser -lib Parser -encoding UTF-8 -Dlanguage=Cpp -listener $1
+  java -jar ~/.local/bin/antlr-VERSION-complete.jar -o lib/Parser -lib lib/Parser -encoding UTF-8 -Dlanguage=Cpp -listener $1
 fi
 """
 
