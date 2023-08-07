@@ -18,19 +18,19 @@ bool compiled = false;
 
 bool check_compile_function() {
   // assure compile only once
-  std::ifstream infl("ut_example.rql");
+  std::ifstream infl("ut_compiler.rql");
   for (std::string line; std::getline(infl, line);) {
     SPDLOG_INFO("{}", line);
   }
 
   if (!compiled) {
     coreInstance.clear();
-    compiled = parserFile("ut_example.rql") == "OK";
+    compiled = parserFile("ut_compiler.rql") == "OK";
   }
   return compiled;
 }
 
-// ut_example.rql:
+// ut_compiler.rql:
 // DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'
 // DECLARE c INTEGER,d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
 // SELECT core0[0],core0[1] STREAM str1 FROM core0#core1

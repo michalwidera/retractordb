@@ -265,7 +265,7 @@ TEST(xrdb, test_descriptor_compare) {
 
 TEST(xrdb, test_ref_storage) {
   auto storageDescriptor{rdb::Descriptor("dane", 4, 1, rdb::INTEGER) |       //
-                         rdb::Descriptor("datafile1.txt", 0, 0, rdb::REF) |  //
+                         rdb::Descriptor("datafile_rdb.txt", 0, 0, rdb::REF) |  //
                          rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)};
   std::unique_ptr<rdb::storageAccessor> storage;
 

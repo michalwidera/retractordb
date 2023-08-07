@@ -1,8 +1,6 @@
-cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
 enable_testing()
-
-set(CMAKE_REGRESSION_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/Data)
 
 file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR})
 file(
