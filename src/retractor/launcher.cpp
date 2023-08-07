@@ -12,9 +12,9 @@
 #include <memory>
 #include <sstream>
 
-#include "QStruct.h"
-#include "compiler.hpp"
 #include "config.h"  // Add an automatically generated configuration file
+#include "lib/QStruct.h"
+#include "lib/compiler.hpp"
 #include "uxSysTermTools.h"
 
 using namespace boost;

@@ -13,8 +13,8 @@
 #include "rdb/fainterface.h"
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
-#include "retractor/QStruct.h"  // coreInstance
-#include "retractor/dataModel.h"
+#include "retractor/lib/QStruct.h"  // coreInstance
+#include "retractor/lib/dataModel.h"
 
 // ctest -R '^ut-dataModel' -V
 // ctest -R ut-dataModel

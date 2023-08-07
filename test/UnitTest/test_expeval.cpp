@@ -3,7 +3,7 @@
 #include <rdb/payload.h>
 #include <spdlog/spdlog.h>
 
-#include "retractor/expressionEvaluator.h"
+#include "retractor/lib/expressionEvaluator.h"
 
 // ctest -R '^ut-expeval' -V
 

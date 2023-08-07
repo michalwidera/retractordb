@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "retractor/QStruct.h"
-#include "retractor/compiler.hpp"
+#include "retractor/lib/QStruct.h"
+#include "retractor/lib/compiler.hpp"
 
 extern std::string parserFile(std::string sInputFile);
 extern std::string parserString(std::string sInputFile);

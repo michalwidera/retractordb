@@ -1,66 +1,15 @@
 cmake_minimum_required(VERSION 3.3 FATAL_ERROR)
 
-# these set of 3 commands will copy artifacts from UnitTest/Data into
-# build/Debug/test folder. First will cleanup this build/Debug/test/Data folder
-# then copy.
+include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src)
 
-include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
-                    ${CMAKE_SOURCE_DIR}/src)
-
-set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/common/uxSysTermTools.cpp
-                     ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
-
-set(SOURCES_COMPILER_TEST
-    ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
-    test_compiler.cpp
-    main.cpp)
-
+set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp main.cpp)
+set(SOURCES_COMPILER_TEST test_compiler.cpp main.cpp)
 set(SOURCES_RDB_TEST test_rdb.cpp main.cpp)
-
-set(SOURCES_DATAMODEL_TEST
-    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    test_dataModel.cpp
-    main.cpp)
-
-set(SOURCES_BUFFERMANAGEMENT_TEST
-    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
-    test_buffManagement.cpp
-    main.cpp)
-
-set(SOURCES_CRSMATH_TEST
-    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/CRSMath.cpp
-    test_crsMath.cpp
-    main.cpp)
-
-set(SOURCES_EXPEVAL_TEST
-    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
-    ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
-    test_expeval.cpp
-    main.cpp)
-
-set(SOURCES_SOPERATIONS_TEST ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
-                             test_soperations.cpp main.cpp)
+set(SOURCES_DATAMODEL_TEST test_dataModel.cpp main.cpp)
+set(SOURCES_BUFFERMANAGEMENT_TEST test_buffManagement.cpp main.cpp)
+set(SOURCES_CRSMATH_TEST test_crsMath.cpp main.cpp)
+set(SOURCES_EXPEVAL_TEST test_expeval.cpp main.cpp)
+set(SOURCES_SOPERATIONS_TEST test_soperations.cpp main.cpp)
 
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 add_executable(test_xtrdb ${SOURCES_RDB_TEST})
@@ -71,16 +20,16 @@ add_executable(test_soperations ${SOURCES_SOPERATIONS_TEST})
 add_executable(test_buffManagement ${SOURCES_BUFFERMANAGEMENT_TEST})
 add_executable(test_crsMath ${SOURCES_CRSMATH_TEST})
 
-set(LIBRARY_TEST_SET boost::boost gtest::gtest spdlog::spdlog_header_only rdb)
+set(LIBRARY_TEST_SET boost::boost gtest::gtest spdlog::spdlog_header_only antlr4_static retractor rdb parser)
 
-target_link_libraries(test_xqry ${LIBRARY_TEST_SET} antlr4_static)
-target_link_libraries(test_xtrdb ${LIBRARY_TEST_SET})
-target_link_libraries(test_dataModel ${LIBRARY_TEST_SET} antlr4_static parser)
-target_link_libraries(test_expeval ${LIBRARY_TEST_SET} antlr4_static parser)
-target_link_libraries(test_compiler ${LIBRARY_TEST_SET} antlr4_static parser)
-target_link_libraries(test_soperations ${LIBRARY_TEST_SET})
-target_link_libraries(test_buffManagement ${LIBRARY_TEST_SET} antlr4_static parser)
-target_link_libraries(test_crsMath ${LIBRARY_TEST_SET} antlr4_static parser)
+target_link_libraries(test_xqry PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_xtrdb PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_dataModel PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_expeval PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_compiler PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_soperations PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_buffManagement PRIVATE ${LIBRARY_TEST_SET})
+target_link_libraries(test_crsMath PRIVATE ${LIBRARY_TEST_SET})
 
 add_test(
   NAME ut-xqry

@@ -2,20 +2,22 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 project(xretractor LANGUAGES CXX)
 
-add_subdirectory(Parser)
+add_subdirectory(lib)
 
 find_package(antlr4-runtime REQUIRED)
 
-file(GLOB BUILDSRCS_CPP "*.cpp")
-file(GLOB BUILDCOMMON_CPP "../common/*.cpp")
-
 set(SOURCES_RETRACTOR ${BUILDSRCS_CPP} ${BUILDCOMMON_CPP})
 
-add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
+add_executable(${PROJECT_NAME} launcher.cpp)
 
 target_link_libraries(
-  ${PROJECT_NAME} PUBLIC boost::boost spdlog::spdlog_header_only antlr4_static
-                         rdb parser)
+  ${PROJECT_NAME}
+  boost::boost
+  spdlog::spdlog_header_only
+  antlr4_static
+  retractor
+  rdb
+  parser)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 
