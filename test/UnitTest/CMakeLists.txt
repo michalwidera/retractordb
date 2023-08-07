@@ -39,6 +39,17 @@ set(SOURCES_BUFFERMANAGEMENT_TEST
     test_buffManagement.cpp
     main.cpp)
 
+set(SOURCES_CRSMATH_TEST
+    ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/QStruct.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/SOperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/parser.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/compiler.cpp
+    ${CMAKE_SOURCE_DIR}/src/retractor/CRSMath.cpp
+    test_crsMath.cpp
+    main.cpp)
+
 set(SOURCES_EXPEVAL_TEST
     ${CMAKE_SOURCE_DIR}/src/retractor/dataModel.cpp
     ${CMAKE_SOURCE_DIR}/src/retractor/expressionEvaluator.cpp
@@ -58,6 +69,7 @@ add_executable(test_expeval ${SOURCES_EXPEVAL_TEST})
 add_executable(test_compiler ${SOURCES_COMPILER_TEST})
 add_executable(test_soperations ${SOURCES_SOPERATIONS_TEST})
 add_executable(test_buffManagement ${SOURCES_BUFFERMANAGEMENT_TEST})
+add_executable(test_crsMath ${SOURCES_CRSMATH_TEST})
 
 set(LIBRARY_TEST_SET boost::boost gtest::gtest spdlog::spdlog_header_only rdb)
 
@@ -67,8 +79,8 @@ target_link_libraries(test_dataModel ${LIBRARY_TEST_SET} antlr4_static parser)
 target_link_libraries(test_expeval ${LIBRARY_TEST_SET} antlr4_static parser)
 target_link_libraries(test_compiler ${LIBRARY_TEST_SET} antlr4_static parser)
 target_link_libraries(test_soperations ${LIBRARY_TEST_SET})
-target_link_libraries(test_buffManagement ${LIBRARY_TEST_SET} antlr4_static
-                      parser)
+target_link_libraries(test_buffManagement ${LIBRARY_TEST_SET} antlr4_static parser)
+target_link_libraries(test_crsMath ${LIBRARY_TEST_SET} antlr4_static parser)
 
 add_test(
   NAME ut-xqry
@@ -134,6 +146,11 @@ add_test(
   NAME ut-buffManagement
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/dataModel
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_buffManagement)
+
+add_test(
+  NAME ut-crsMath
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/Data/dataModel
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_crsMath)
 
 add_test(
   NAME ut-dataModel-compile
