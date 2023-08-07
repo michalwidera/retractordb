@@ -72,7 +72,7 @@ class crsMathTest : public ::testing::Test {
   }
 };
 
-TEST_F(crsMathTest, Only_two_items_in_query) {}
+TEST_F(crsMathTest, Only_two_items_in_query) { ASSERT_TRUE(coreInstance.size() == 13); }
 
 TEST_F(crsMathTest, test1) {}
 

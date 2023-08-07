@@ -382,7 +382,7 @@ bool dataModel::fetchPayload(const std::string& instance,                     //
 }
 
 // TODO: work area
-void dataModel::processRows(std::set<std::string> inSet) {
+void dataModel::processRows(const std::set<std::string>& inSet) {
   {
     std::stringstream s;
     for (auto i : inSet) s << i << ":";

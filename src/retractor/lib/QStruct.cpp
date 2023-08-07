@@ -115,6 +115,59 @@ void qTree::topologicalSort() {
 
 boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }
 
+void qTree::dumpCore() {
+  std::vector<std::string> vcols = {"Idx", "Delta", "Cap", "Name"};
+  std::stringstream ss;
+  std::stringstream sp;
+
+  for (const auto nName : vcols) {
+    int maxSize = nName.length();
+    int size{0};
+    for (const auto &it : *this) {
+      if (nName == vcols[0])
+        size = std::to_string(getSeqNr(it.id)).length();
+      else if (nName == vcols[1])
+        size = (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length();
+      else if (nName == vcols[2])
+        size = std::to_string(maxCapacity[it.id]).length();
+      else if (nName == vcols[3])
+        size = it.id.length();
+      else {
+        assert(false && "wrong caption in dumpCore");
+        abort();
+      }
+      if (maxSize < size) maxSize = size;
+    }
+    ss << "|%";
+    ss << maxSize;
+    ss << "s";
+
+    sp << "|";
+    for (auto i = 0; i < maxSize; ++i) sp << "_";
+  }
+  ss << "|\n";
+  sp << "|\n";
+
+  printf(ss.str().c_str(), vcols[0].c_str(), vcols[1].c_str(), vcols[2].c_str(), vcols[3].c_str());
+  printf(sp.str().c_str());
+
+  for (const auto &it : *this)
+    printf(ss.str().c_str(),                                                                                       //
+           std::to_string(getSeqNr(it.id)).c_str(),                                                                //
+           (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).c_str(),  //
+           std::to_string(maxCapacity[it.id]).c_str(),                                                             //
+           it.id.c_str());                                                                                         //
+}
+
+std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
+  std::set<boost::rational<int>> lstTimeIntervals;
+  for (const auto &it : *this) {
+    assert(it.rInterval != 0);  // :STORAGE has created ugly error here
+    lstTimeIntervals.insert(it.rInterval);
+  }
+  return lstTimeIntervals;
+}
+
 query &getQuery(const std::string &query_name) {
   assert(query_name != "");
   for (auto &q : coreInstance)

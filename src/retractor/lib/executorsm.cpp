@@ -76,72 +76,16 @@ extern int iTest();
 
 std::map<std::string, ptree> streamTable;
 
-std::set<boost::rational<int>> getListFromCore() {
-  std::set<boost::rational<int>> lstTimeIntervals;
-  for (const auto &it : coreInstance) {
-    assert(it.rInterval != 0);  // :STORAGE has created ugly error here
-    lstTimeIntervals.insert(it.rInterval);
-  }
-  return lstTimeIntervals;
-}
-
-void dumpCore(std::ostream &xout) {
-  std::vector<std::string> vcols = {"Idx", "Delta", "Cap", "Name"};
-  std::stringstream ss;
-  std::stringstream sp;
-
-  for (const auto nName : vcols) {
-    int maxSize = nName.length();
-    int size{0};
-    for (const auto &it : coreInstance) {
-      if (nName == vcols[0])
-        size = std::to_string(getSeqNr(it.id)).length();
-      else if (nName == vcols[1])
-        size = (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length();
-      else if (nName == vcols[2])
-        size = std::to_string(coreInstance.maxCapacity[it.id]).length();
-      else if (nName == vcols[3])
-        size = it.id.length();
-      else {
-        assert(false && "wrong caption in dumpCore");
-        abort();
-      }
-      if (maxSize < size) maxSize = size;
-    }
-    ss << "|%";
-    ss << maxSize;
-    ss << "s";
-
-    sp << "|";
-    for (auto i = 0; i < maxSize; ++i) sp << "_";
-  }
-  ss << "|\n";
-  sp << "|\n";
-
-  printf(ss.str().c_str(), vcols[0].c_str(), vcols[1].c_str(), vcols[2].c_str(), vcols[3].c_str());
-  printf(sp.str().c_str());
-
-  for (const auto &it : coreInstance)
-    printf(ss.str().c_str(),                                                                                       //
-           std::to_string(getSeqNr(it.id)).c_str(),                                                                //
-           (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).c_str(),  //
-           std::to_string(coreInstance.maxCapacity[it.id]).c_str(),                                                //
-           it.id.c_str());                                                                                         //
-}
-
 std::set<std::string> getAwaitedStreamsSet(TimeLine &tl) {
   std::set<std::string> retVal;
-  while (pProc == nullptr) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-  for (const auto &it : coreInstance) {
-    boost::rational<int> slot = it.rInterval;
-    if (!tl.isThisDeltaAwaitCurrentTimeSlot(slot)) continue;
-    retVal.insert(it.id);
-  }
+  for (const auto &it : coreInstance)
+    if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) retVal.insert(it.id);
+
   return retVal;
 }
 
-void showAwaitedStreams(TimeLine &tl) {
-  for (const auto &str : getAwaitedStreamsSet(tl)) std::cout << "-" << getSeqNr(str) << "-";
+void showAwaitedStreams(TimeLine &tl, std::ostream &output) {
+  for (const auto &str : getAwaitedStreamsSet(tl)) output << "-" << getSeqNr(str) << "-";
 }
 
 ptree collectStreamsParameters() {
@@ -327,7 +271,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   try {
     dataModel proc(coreInstance);
 
-    if (verbose) dumpCore(std::cout);
+    if (verbose) coreInstance.dumpCore();
 
     // This code goes here temporary - removes :STORAGE from coreInstance - this functionality
     // will appear and will be supported in DataModel version
@@ -337,7 +281,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
     coreInstance.erase(new_end, coreInstance.end());
     // * TEMP_END
 
-    TimeLine tl(getListFromCore());
+    TimeLine tl(coreInstance.getAvailableTimeIntervals());
     //
     // Main loop of data processing
     //
@@ -368,15 +312,18 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
       //
       if (waterfall) {
         std::cout << period << "\t";
-        showAwaitedStreams(tl);
+        showAwaitedStreams(tl, std::cout);
         std::cout << std::endl;
       }
-      std::set<std::string> inSet = getAwaitedStreamsSet(tl);
+
+      while (pProc == nullptr) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+
+      const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
       proc.processRows(inSet);
       //
       // Data broadcast - main loop
       //
-      for (auto queryName : getAwaitedStreamsSet(tl)) {
+      for (const auto queryName : inSet) {
         std::string row = printRowValue(queryName);
         std::list<int> eraseList;
         for (const auto &element : id2StreamName_Relation) {
