@@ -280,6 +280,16 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
     //
     if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
 
+    // Init step
+    /*
+        std::set<std::string> initSet;
+        for (const auto &it : coreInstance)
+          if (it.isDeclaration()) initSet.insert(it.id);
+
+        proc.processRows(initSet);
+    */
+    // End of Init Step
+
     boost::rational<int> prev_interval(0);
     while (!_kbhit() && iTimeLimitCnt != 1) {
       if (iTimeLimitCnt != 0) {
@@ -296,6 +306,11 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
       boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
       int period(rational_cast<int>(interval - prev_interval));  // miliseconds
       prev_interval = interval;
+
+      //
+      // Waiting given miliseconds time that is computed
+      //
+      boost::this_thread::sleep_for(boost::chrono::milliseconds(period));
 
       const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
 
@@ -345,10 +360,7 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
           SPDLOG_WARN("queue erased on timeout, procId={}", element);
         }
       }
-      //
-      // Waiting given miliseconds time that is computed
-      //
-      boost::this_thread::sleep_for(boost::chrono::milliseconds(period));
+
       //
       // End of loop while( ! _kbhit() )
       //

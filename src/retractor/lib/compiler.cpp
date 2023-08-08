@@ -598,8 +598,13 @@ std::string applyConstraints() {
 std::map<std::string, int> countBuffersCapacity() {
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
+  for (auto &q : coreInstance) {       // for each declaration
+    if (!q.isDeclaration()) continue;  // that is declaration
+    capMap[q.id] = 1;
+  }
+
   for (auto &q : coreInstance) {       // for each query
-    if (q.isDeclaration()) continue;   // that is declaration
+    if (q.isDeclaration()) continue;   // that is not declaration
     assert(!q.isReductionRequired());  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {

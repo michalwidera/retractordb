@@ -30,11 +30,6 @@ foreach(item ${V_GLOB})
     NAME ut-${OUTPUT_FILE_NOEXT}
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
-    COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
-  add_test(
-    NAME vg-${OUTPUT_FILE_NOEXT}
-    WORKING_DIRECTORY
-      ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND valgrind --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
 endforeach()
