@@ -67,7 +67,7 @@ class query {
   std::list<field> lSchema;
   std::list<token> lProgram;
 
-  bool isDeclaration();
+  bool isDeclaration() const;
   bool isReductionRequired();
   bool isGenerated();
   bool is(command_id command);

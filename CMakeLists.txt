@@ -7,7 +7,7 @@ add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
 add_definitions(-DHAS_BOOST)
 
-set (CMAKE_CXX_FLAGS "-fuse-ld=mold")
+set(CMAKE_CXX_FLAGS "-fuse-ld=mold")
 
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)

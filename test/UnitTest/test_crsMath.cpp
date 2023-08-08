@@ -23,6 +23,8 @@ extern std::string parserFile(std::string sInputFile);
 
 extern "C" qTree coreInstance;
 
+const int TEST_COUNT = 15;
+
 // std::unique_ptr<dataModel> dataArea;
 
 struct crsMathTestInit {
@@ -76,36 +78,80 @@ class crsMathTest : public ::testing::Test {
   }
 };
 
-TEST_F(crsMathTest, Only_two_items_in_query) { ASSERT_TRUE(coreInstance.size() == 13); }
+TEST_F(crsMathTest, Only_two_items_in_query) {
+  //  ASSERT_TRUE(coreInstance.size() == 13);
+}
 
-TEST_F(crsMathTest, test1) {}
+const std::vector<std::string> allStreams = {"cx", "s1x", "s2x", "s3x", "s4x", "s5x", "s6x", "s7x", "s8x"};
 
-// Work in progress
+TEST_F(crsMathTest, check_if_streams_sequence_is_correct) {
+  const auto expectedResult =
+      "Dlt: { 1/1}{ 1/3}{ 2/3}{ 1/3}{ 1/1}{ 1/1}{ 1/1}{ 2/3}{ 2/3}\n"
+      " 000:{  cx}{    }{    }{    }{    }{    }{    }{    }{    }\n"
+      " 333 {    }{ s1x}{    }{ s3x}{    }{    }{    }{    }{    }\n"
+      " 333 {    }{ s1x}{ s2x}{ s3x}{    }{    }{    }{ s7x}{ s8x}\n"
+      " 333 {  cx}{ s1x}{    }{ s3x}{ s4x}{ s5x}{ s6x}{    }{    }\n"
+      " 333 {    }{ s1x}{ s2x}{ s3x}{    }{    }{    }{ s7x}{ s8x}\n"
+      " 333 {    }{ s1x}{    }{ s3x}{    }{    }{    }{    }{    }\n"
+      " 333 {  cx}{ s1x}{ s2x}{ s3x}{ s4x}{ s5x}{ s6x}{ s7x}{ s8x}\n"
+      " 333 {    }{ s1x}{    }{ s3x}{    }{    }{    }{    }{    }\n"
+      " 333 {    }{ s1x}{ s2x}{ s3x}{    }{    }{    }{ s7x}{ s8x}\n"
+      " 333 {  cx}{ s1x}{    }{ s3x}{ s4x}{ s5x}{ s6x}{    }{    }\n"
+      " 333 {    }{ s1x}{ s2x}{ s3x}{    }{    }{    }{ s7x}{ s8x}\n"
+      " 333 {    }{ s1x}{    }{ s3x}{    }{    }{    }{    }{    }\n"
+      " 333 {  cx}{ s1x}{ s2x}{ s3x}{ s4x}{ s5x}{ s6x}{ s7x}{ s8x}\n"
+      " 333 {    }{ s1x}{    }{ s3x}{    }{    }{    }{    }{    }\n"
+      " 333 {    }{ s1x}{ s2x}{ s3x}{    }{    }{    }{ s7x}{ s8x}\n";
 
-TEST_F(crsMathTest, test2) {
+  std::stringstream strstream;
+
   dataModel proc(coreInstance);
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
   boost::rational<int> prev_interval(0);
 
-  auto queryCounter{15};
+  strstream << std::setw(4) << "Dlt: ";
+
+  // Delta presentation
+
+  for (const auto &x : allStreams) strstream << "{" << std::setw(4) << coreInstance.getDelta(x) << "}";
+  strstream << std::endl;
+
+  // Init row - process all declaration
+
+  std::set<std::string> initSet;
+  for (const auto &it : coreInstance)
+    if (it.isDeclaration()) initSet.insert(it.id);
+
+  proc.processRows(initSet);
+
+  strstream << std::setw(4) << " 000:";
+  for (const auto &x : allStreams) strstream << "{" << std::setw(4) << (initSet.contains(x) ? x : "") << "}";
+
+  strstream << std::endl;
+
+  // Process declarations and queries in time slots
+
+  auto queryCounter{TEST_COUNT};
   while (queryCounter-- != 1) {
     const int msInSec = 1000;
     boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
     int period(rational_cast<int>(interval - prev_interval));  // miliseconds
     prev_interval = interval;
 
-    std::set<std::string> inSet;
+    strstream << std::setw(4) << period << " ";
+
+    std::set<std::string> procSet;
     for (const auto &it : coreInstance)
-      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) inSet.insert(it.id);
+      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
 
-    std::cout << period << "\t";
-    for (const auto &str : inSet) {
-      std::cout << "{" << std::setw(4) << str << "}";
-    }
-    std::cout << std::endl;
+    for (const auto &x : allStreams) strstream << "{" << std::setw(4) << (procSet.contains(x) ? x : "") << "}";
 
-    proc.processRows(inSet);
+    strstream << std::endl;
+
+    proc.processRows(procSet);
   }
+
+  ASSERT_TRUE(strstream.str() == expectedResult);
 }
 
 }  // Namespace

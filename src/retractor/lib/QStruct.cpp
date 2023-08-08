@@ -227,7 +227,7 @@ std::string token::getStr_() {
     return "Error";
 }
 
-bool query::isDeclaration() { return lProgram.empty(); }
+bool query::isDeclaration() const { return lProgram.empty(); }
 
 bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
 
