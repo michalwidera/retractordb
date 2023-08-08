@@ -48,7 +48,7 @@ executors:
 
   ubuntu2204machine:
     machine:
-      image: ubuntu-2204:current
+      image: ubuntu-2204:edge
     resource_class: large
 
   ubuntu2004machine-arm:
