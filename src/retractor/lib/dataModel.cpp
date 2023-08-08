@@ -20,8 +20,6 @@ extern "C" qTree coreInstance;
 
 enum { noHexFormat = false, HexFormat = true };
 
-dataModel* pProc = nullptr;
-
 /*
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
@@ -357,8 +355,6 @@ dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
 
   for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
   for (auto const& [key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
-
-  pProc = this;
 }
 
 dataModel::~dataModel() {}

@@ -28,11 +28,11 @@ foreach(item ${V_GLOB})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   add_test(
     NAME ut-${OUTPUT_FILE_NOEXT}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
   add_test(
     NAME vg-${OUTPUT_FILE_NOEXT}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND valgrind --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
 endforeach()
@@ -43,21 +43,21 @@ add_executable(test_xqry ${SOURCES_QRY_TEST})
 target_link_libraries(test_xqry PRIVATE ${LIBRARY_TEST_SET})
 add_test(
   NAME ut-xqry
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 add_test(
   NAME ut-dataModel-compile
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
   COMMAND sh -c "set -e ; \
     xretractor ut_example_schema.rql -c > out_compile.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt")
 
 add_test(
-  NAME ut-dataModel-comp
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data
+  NAME ut-dataModel-compare
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
   COMMAND bash -c "set -e ; xtrdb < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(ut-test_rdb ut-xqry ut-test_dataModel ut-dataModel-comp
+set_tests_properties(ut-test_rdb ut-xqry ut-test_dataModel ut-dataModel-compile ut-dataModel-compare
                      ut-test_soperations PROPERTIES RUN_SERIAL TRUE)

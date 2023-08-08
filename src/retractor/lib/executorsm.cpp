@@ -59,12 +59,10 @@ using namespace CRationalStreamMath;
 // Map stores relations processId -> sended stream
 std::map<const int, std::string> id2StreamName_Relation;
 
-std::vector<IPC::message_queue> qset;
-
 // Object coreInstance in QStruct.cpp
 extern "C" qTree coreInstance;
 
-extern dataModel *pProc;
+static dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
@@ -84,12 +82,9 @@ std::set<std::string> getAwaitedStreamsSet(TimeLine &tl) {
   return retVal;
 }
 
-void showAwaitedStreams(TimeLine &tl, std::ostream &output) {
-  for (const auto &str : getAwaitedStreamsSet(tl)) output << "-" << getSeqNr(str) << "-";
-}
-
 ptree collectStreamsParameters() {
   ptree ptRetval;
+  assert(pProc != nullptr && "pProc must be checked before procedure call.");
   SPDLOG_DEBUG("get cmd rcv.");
   for (auto &q : coreInstance) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
@@ -229,6 +224,7 @@ void commandProcessorLoop() {
 
 std::string printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
+  if (pProc == nullptr) return "";
   ptree pt;
   pt.put("stream", query_name);
   pt.put("count", boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
@@ -270,16 +266,11 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {
     dataModel proc(coreInstance);
+    pProc = &proc;
 
     if (verbose) coreInstance.dumpCore();
 
-    // This code goes here temporary - removes :STORAGE from coreInstance - this functionality
-    // will appear and will be supported in DataModel version
-    // * TEMP_BEG
-    auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
-                                  [](const query &qry) { return qry.id[0] == ':'; });
-    coreInstance.erase(new_end, coreInstance.end());
-    // * TEMP_END
+    coreInstance.removeNonStreamItems(':');
 
     TimeLine tl(coreInstance.getAvailableTimeIntervals());
     //
@@ -305,6 +296,9 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
       boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
       int period(rational_cast<int>(interval - prev_interval));  // miliseconds
       prev_interval = interval;
+
+      const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
+
       //
       // When you add additional parameter -w numbers of queries appear on
       // screen if additional -w -s str2 (when -s means display) only given one
@@ -312,13 +306,12 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
       //
       if (waterfall) {
         std::cout << period << "\t";
-        showAwaitedStreams(tl, std::cout);
+        for (const auto &str : inSet) {
+          std::cout << "-" << getSeqNr(str) << "-";
+        }
         std::cout << std::endl;
       }
 
-      while (pProc == nullptr) boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-
-      const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
       proc.processRows(inSet);
       //
       // Data broadcast - main loop

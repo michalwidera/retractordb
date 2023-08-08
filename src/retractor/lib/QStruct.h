@@ -111,5 +111,8 @@ class qTree : public std::vector<query> {
   void dumpCore();
   std::set<boost::rational<int>> getAvailableTimeIntervals();
 
+  // This code removes :STORAGE from coreInstance
+  void removeNonStreamItems(const char leadingChar);
+
   std::map<std::string, int> maxCapacity;
 };

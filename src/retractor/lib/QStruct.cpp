@@ -168,6 +168,12 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   return lstTimeIntervals;
 }
 
+void qTree::removeNonStreamItems(const char leadingSign) {
+  auto new_end = std::remove_if(begin(), end(),  //
+                                [leadingSign](const query &qry) { return qry.id[0] == leadingSign; });
+  erase(new_end, end());
+}
+
 query &getQuery(const std::string &query_name) {
   assert(query_name != "");
   for (auto &q : coreInstance)
