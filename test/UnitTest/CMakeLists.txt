@@ -28,11 +28,13 @@ foreach(item ${V_GLOB})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   add_test(
     NAME ut-${OUTPUT_FILE_NOEXT}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
+    WORKING_DIRECTORY
+      ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
   add_test(
     NAME vg-${OUTPUT_FILE_NOEXT}
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
+    WORKING_DIRECTORY
+      ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND valgrind --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
 endforeach()
@@ -59,5 +61,6 @@ add_test(
   COMMAND bash -c "set -e ; xtrdb < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(ut-test_rdb ut-xqry ut-test_dataModel ut-dataModel-compile ut-dataModel-compare
-                     ut-test_soperations PROPERTIES RUN_SERIAL TRUE)
+set_tests_properties(
+  ut-test_rdb ut-xqry ut-test_dataModel ut-dataModel-compile
+  ut-dataModel-compare ut-test_soperations PROPERTIES RUN_SERIAL TRUE)

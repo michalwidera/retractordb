@@ -5,6 +5,30 @@
   "version": "0.2.0",
   "configurations": [
     {
+        "name": "(gdb) test_crsMath",
+        "type": "cppdbg",
+        "request": "launch",
+        "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_crsMath",
+        "args": [""],
+        "stopAtEntry": false,
+        "cwd":     "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/test_crsMath",
+        "environment": [],
+        "externalConsole": false,
+        "MIMode": "gdb",
+        "setupCommands": [
+            {
+                "description": "Włącz formatowanie kodu dla gdb",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+            },
+            {
+                "description": "Ustaw wariant dezasemblacji na Intel",
+                "text": "-gdb-set disassembly-flavor intel",
+                "ignoreFailures": true
+            }
+        ]
+    },
+    {
       "name": "(gdb) xretractor",
       "type": "cppdbg",
       "request": "launch",
