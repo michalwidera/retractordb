@@ -1,18 +1,18 @@
-DECLARE a INTEGER, b INTEGER, c INTEGER STREAM corex, 1 FILE 'datafile4.txt'
+DECLARE a INTEGER, b INTEGER, c INTEGER STREAM cx, 1 FILE 'datafile4.txt'
 
-# streams presented in agse2/agse-decomposition.drawio
+# streams presented in agse2/agse-decomposition.drawio 
 
-SELECT * STREAM serial1x FROM corex@(1,1)
-SELECT * STREAM serial2x FROM corex@(2,2)
-SELECT * STREAM serial3x FROM corex@(1,2)
-SELECT * STREAM serial4x FROM corex@(3,2)
-SELECT * STREAM serial5x FROM corex@(3,3)
-SELECT * STREAM serial6x FROM corex@(3,-3)
-SELECT * STREAM serial7x FROM corex@(2,3)
-SELECT * STREAM serial8x FROM corex@(2,4)
+SELECT * STREAM s1x FROM cx@(1,1)
+SELECT * STREAM s2x FROM cx@(2,2)
+SELECT * STREAM s3x FROM cx@(1,2)
+SELECT * STREAM s4x FROM cx@(3,2)
+SELECT * STREAM s5x FROM cx@(3,3)
+SELECT * STREAM s6x FROM cx@(3,-3)
+SELECT * STREAM s7x FROM cx@(2,3)
+SELECT * STREAM s8x FROM cx@(2,4)
 
-DECLARE a INTEGER STREAM roca, 1 FILE 'datafile3.txt'
+DECLARE a INTEGER STREAM cy, 1 FILE 'datafile3.txt'
 
-SELECT * STREAM serial11x FROM roca@(3,3)
-SELECT * STREAM serial12x FROM roca@(2,2)
-SELECT * STREAM serial13x FROM roca@(1,2)
+SELECT * STREAM s11x FROM cy@(3,3)
+SELECT * STREAM s12x FROM cy@(2,2)
+SELECT * STREAM s13x FROM cy@(1,2)

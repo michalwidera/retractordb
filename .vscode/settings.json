@@ -82,7 +82,8 @@
       "numbers": "cpp",
       "span": "cpp",
       "semaphore": "cpp",
-      "format": "cpp"
+      "format": "cpp",
+      "filesystem": "cpp"
     },
     "cSpell.words": [
       "iarchive"

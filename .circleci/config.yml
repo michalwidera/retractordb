@@ -43,12 +43,12 @@ workflows:
 executors:
   ubuntu2204docker:
     docker:
-      - image: cimg/base:edge-22.04
+      - image: cimg/base:current-22.04
     resource_class: large
 
   ubuntu2204machine:
     machine:
-      image: ubuntu-2204:edge
+      image: ubuntu-2204:current
     resource_class: large
 
   ubuntu2004machine-arm:
@@ -63,7 +63,7 @@ commands:
           name: Install toolchain - conan 1.59
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind cppcheck
+            sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind cppcheck mold
             pip3 install --upgrade pip
             pip3 install conan==1.59
             conan profile new default --detect
@@ -78,7 +78,7 @@ commands:
           name: Install toolchain - conan 2.0
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind cppcheck
+            sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind cppcheck mold
             pip3 install --upgrade pip
             pip3 install conan
             conan profile detect

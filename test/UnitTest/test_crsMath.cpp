@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
+#include <iomanip>
 
 #include "config.h"
 #include "rdb/fainterface.h"
@@ -99,7 +100,7 @@ TEST_F(crsMathTest, test2) {
 
     std::cout << period << "\t";
     for (const auto &str : inSet) {
-      std::cout << "-" << getSeqNr(str) << "-";
+      std::cout << "{" << std::setw(4) << str << "}";
     }
     std::cout << std::endl;
 

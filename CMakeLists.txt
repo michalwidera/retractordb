@@ -5,6 +5,9 @@ project(retractordb)
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
+add_definitions(-DHAS_BOOST)
+
+set (CMAKE_CXX_FLAGS "-fuse-ld=mold")
 
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
@@ -20,6 +23,8 @@ enable_testing()
 include_directories(
   ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR} ${fmt_INCLUDE_DIR}
   ${antlr4-runtime_INCLUDE_DIR} src/include)
+
+link_directories(${Boost_LIBRARY_DIRS})
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compileCommands req. from
