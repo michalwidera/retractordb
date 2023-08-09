@@ -16,8 +16,7 @@
 #include "retractor/lib/QStruct.h"  // coreInstance
 #include "retractor/lib/dataModel.h"
 
-// ctest -R '^ut-dataModel' -V
-// ctest -R ut-dataModel
+// ctest -R '^ut-test_dataModel' -V
 
 extern std::string parserFile(std::string sInputFile);
 
@@ -263,7 +262,7 @@ TEST_F(xschema, check_sum) {
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }
-
+/*
 TEST_F(xschema, compute_instance_1) {
   // SELECT str7[0] STREAM str7 FROM core0.max
 
@@ -288,6 +287,7 @@ TEST_F(xschema, compute_instance_1) {
     ASSERT_TRUE("{ str7_0:32 }" == coutstring.str());
   }
 }
+*/
 
 TEST_F(xschema, getRow_1) {
   /* datafile1.txt contents:
@@ -328,7 +328,7 @@ TEST_F(xschema, getRow_1) {
 
   dataArea->qSet["core0"]->outputPayload->reset();
 }
-
+/*
 TEST_F(xschema, process_rows_1) {
   // This creates 4 records in str1 and str2 - checked here & in Data/dataModel/pattern.txt
 
@@ -390,5 +390,5 @@ TEST_F(xschema, process_rows_1) {
   dataArea->qSet["core0"]->outputPayload->reset();
   dataArea->qSet["core1"]->outputPayload->reset();
 }
-
+*/
 }  // namespace

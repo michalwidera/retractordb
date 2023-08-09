@@ -379,17 +379,30 @@ bool dataModel::fetchPayload(const std::string& instance,                     //
 
 // TODO: work area
 void dataModel::processRows(const std::set<std::string>& inSet) {
+  bool zeroStep{false};
 
   // Move ALL armed device read to circular buffer. - no inSet dependent.
   for (auto q : coreInstance) {
     if (!q.isDeclaration()) continue;
-    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {
-      // move from fetched bucket to circle buffer.
-      // *(qSet[q.id]->inputPayload) = 
- 
-      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::freeze;
+    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
+      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+      fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
+      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
+      qSet[q.id]->outputPayload->fire();                                          // chamber -> outputPayload
+      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);   //
+
+      zeroStep = true;
+    }
+    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
+      qSet[q.id]->outputPayload->fire();                                      // chamber -> outputPayload
+      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
     }
   }
+
+  // If we find at least one empty state in declarations
+  // - we need fill only buffers and do not expect any streams in this moment
+
+  if (zeroStep) return;
 
   // Report all processed inSet
   {
@@ -398,22 +411,25 @@ void dataModel::processRows(const std::set<std::string>& inSet) {
     SPDLOG_INFO("PROCESS:{}", s.str());
   }
 
-  // Process expected declarations - if found - read from device and move to chamber 
+  //
+  // Process expected declarations - if found - read from device and move to chamber
+  //
   std::stringstream s;
   for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;                     // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                                  // Skip non declarations.
-    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unfreeze data sources - enable physical read from source
-    s << " DECL:{" << q.id << "}";
-    fetchDeclaredPayload(q.id);                                          // Declarations need to process in separate&first
-    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::armed;  // freeze data sources
+    if (inSet.find(q.id) == inSet.end()) continue;                             // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;                                          // Skip non declarations.
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+    s << " DECL:{" << q.id << "}";                                    //
+    fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
   }
 
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Skip declarations.
     constructInputPayload(q.id);                    // That will create 'from' clause data set
-    s << " QRY:[" << q.id << "]";
+    s << " QRY:[" << q.id << "]";                   //
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
   }
@@ -426,10 +442,12 @@ void dataModel::fetchDeclaredPayload(const std::string& instance) {
 
   assert(qry.isDeclaration());  // lProgram is empty()
 
+  assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::flux);
+
   auto success = qSet[instance]->outputPayload->revRead(0);
   assert(success);
 
-  *(qSet[instance]->inputPayload) = *(qSet[instance]->outputPayload->getPayload());
+  assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::armed);
 }
 
 void dataModel::constructInputPayload(const std::string& instance) {

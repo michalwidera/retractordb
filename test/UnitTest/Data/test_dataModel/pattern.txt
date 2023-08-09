@@ -15,11 +15,11 @@
 {	INTEGER str1_0
 	INTEGER str1_1
 }
-0 Record(s)
+3 Record(s)
 8 Byte(s) per record.
 {	INTEGER str2_0
 }
-0 Record(s)
+3 Record(s)
 4 Byte(s) per record.
 {	INTEGER str3_0
 }

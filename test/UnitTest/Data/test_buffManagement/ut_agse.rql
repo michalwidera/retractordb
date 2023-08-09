@@ -1,3 +1,0 @@
-DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile4.txt'
-
-SELECT * STREAM serial1 FROM core@(1,1)

@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "cap [value]\t\t\t set device stream backread capacity\n";
-      std::cout << "freeze|unfreeze \t\t (un)freeze cyrcular backread buffer\n";
+      std::cout << "lock|unlock \t\t (un)lock cyrcular backread buffer\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
       std::cout << "echo \t\t\t\t print message on terminal\n";
@@ -220,9 +220,9 @@ int main(int argc, char* argv[]) {
       int backCapacityValue;
       std::cin >> backCapacityValue;
       dacc->setCapacity(backCapacityValue);
-    } else if (cmd == "freeze") {
-      dacc->bufferState = rdb::sourceState::freeze;
-    } else if (cmd == "unfreeze") {
+    } else if (cmd == "lock") {
+      dacc->bufferState = rdb::sourceState::lock;
+    } else if (cmd == "unlock") {
       dacc->bufferState = rdb::sourceState::flux;
     } else if (cmd == "rox") {
       rox = !rox;

@@ -281,13 +281,13 @@ int main_retractor(bool verbose, int iTimeLimitCntParam) {
     if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
-    /*
+
     std::set<std::string> initSet;
     for (const auto &it : coreInstance)
       if (it.isDeclaration()) initSet.insert(it.id);
 
     proc.processRows(initSet);
-    */
+
     // End of ZERO-step
 
     // Loop of data processing

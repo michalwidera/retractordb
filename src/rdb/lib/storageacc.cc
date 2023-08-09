@@ -42,6 +42,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
     moveRef();
     storagePayload = std::make_unique<rdb::payload>(descriptor);
+    chamber = std::make_unique<rdb::payload>(descriptor);
 
     SPDLOG_INFO("Payload created, Descriptor from file used.");
 
@@ -68,6 +69,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
   moveRef();
   storagePayload = std::make_unique<rdb::payload>(descriptor);
+  chamber = std::make_unique<rdb::payload>(descriptor);
 
   SPDLOG_INFO("Payload & Descriptor created.");
   attachStorage();
@@ -231,16 +233,22 @@ void storageAccessor::abortIfStorageNotPrepared() {
   }
 }
 
-void storageAccessor::firePayload() {
-  assert(bufferState == sourceState::armed);
-  
+void storageAccessor::fire() {
+  assert(circularBuffer.capacity() > 0);
+  *storagePayload = *chamber;
+  circularBuffer.push_front(*storagePayload.get());  // only one place when buffer is feed.
+  bufferState = sourceState::lock;
 }
 
 bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   abortIfStorageNotPrepared();
-  destination = (destination == nullptr)                            //
-                    ? static_cast<uint8_t*>(storagePayload->get())  //
-                    : destination;
+
+  if (destination == nullptr) {
+    if (isDeclared())
+      destination = static_cast<uint8_t*>(chamber->get());
+    else
+      destination = static_cast<uint8_t*>(storagePayload->get());
+  }
 
   assert(destination != nullptr);
   auto size = descriptor.getSizeInBytes();
@@ -251,7 +259,6 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
-    if (circularBuffer.capacity() > 0) circularBuffer.push_front(*storagePayload.get());  // only one place when buffer is feed.
     assert(result == 0);
     SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor->fileName(), recordIndexRv, recordsCount);
   } else {
@@ -273,18 +280,20 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
   assert(circularBuffer.capacity() > 0);
 
   if (recordIndex == 0 && bufferState == sourceState::flux) {
-    SPDLOG_WARN("BOING! {}", accessor->fileName());
-    return read_(recordPositionFromBack, destination);
+    //
+    // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
+    //
+    auto result = read_(recordPositionFromBack, destination);
+    assert(result && "Failure during read.");
+    bufferState = sourceState::armed;
   }
   assert(recordIndex >= 0);
-
-  SPDLOG_INFO("revRead from buffer {} pos:{}", accessor->fileName(), recordPositionFromBack);
 
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources
   // - only for data sources that have buffer declared
   // - only for recordIndex > 0 if sourceState::flux
-  // - also for recordIndex == 0 if sourceState::freeze
+  // - also for recordIndex == 0 if sourceState::lock
 
   assert((recordIndex < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
 

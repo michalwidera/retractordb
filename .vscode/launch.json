@@ -131,7 +131,7 @@
     "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_buffManagement",
     "args": [""],
     "stopAtEntry": false,
-    "cwd":     "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/dataModel",
+    "cwd":     "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/test_buffManagement",
     "environment": [],
     "externalConsole": false,
     "MIMode": "gdb",
