@@ -16,11 +16,12 @@
 
 namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
-enum class policyState { flux, freeze };
+enum class sourceState { empty, flux, freeze, armed };
 
 class storageAccessor {
   std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
   std::unique_ptr<rdb::payload> storagePayload;
+  std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;
   bool removeOnExit = true;
   size_t recordsCount = 0;
@@ -41,7 +42,7 @@ class storageAccessor {
   ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
-  policyState bufferPolicy = policyState::flux;  // ? test freeze
+  sourceState bufferState = sourceState::empty;  // ? test freeze
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
@@ -65,6 +66,7 @@ class storageAccessor {
   void setCapacity(const int capacity);
   void cleanPayload(uint8_t *destination = nullptr);
 
+  void firePayload();
   // technical function - for unit tests
   void reset();
 };

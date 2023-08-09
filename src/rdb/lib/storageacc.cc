@@ -231,6 +231,11 @@ void storageAccessor::abortIfStorageNotPrepared() {
   }
 }
 
+void storageAccessor::firePayload() {
+  assert(bufferState == sourceState::armed);
+  
+}
+
 bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   abortIfStorageNotPrepared();
   destination = (destination == nullptr)                            //
@@ -267,7 +272,7 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
 
   assert(circularBuffer.capacity() > 0);
 
-  if (recordIndex == 0 && bufferPolicy == policyState::flux) {
+  if (recordIndex == 0 && bufferState == sourceState::flux) {
     SPDLOG_WARN("BOING! {}", accessor->fileName());
     return read_(recordPositionFromBack, destination);
   }
@@ -278,8 +283,8 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources
   // - only for data sources that have buffer declared
-  // - only for recordIndex > 0 if policyState::flux
-  // - also for recordIndex == 0 if policyState::freeze
+  // - only for recordIndex > 0 if sourceState::flux
+  // - also for recordIndex == 0 if sourceState::freeze
 
   assert((recordIndex < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
 

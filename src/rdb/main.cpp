@@ -221,9 +221,9 @@ int main(int argc, char* argv[]) {
       std::cin >> backCapacityValue;
       dacc->setCapacity(backCapacityValue);
     } else if (cmd == "freeze") {
-      dacc->bufferPolicy = rdb::policyState::freeze;
+      dacc->bufferState = rdb::sourceState::freeze;
     } else if (cmd == "unfreeze") {
-      dacc->bufferPolicy = rdb::policyState::flux;
+      dacc->bufferState = rdb::sourceState::flux;
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setRemoveOnExit(rox);

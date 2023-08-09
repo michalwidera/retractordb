@@ -379,20 +379,34 @@ bool dataModel::fetchPayload(const std::string& instance,                     //
 
 // TODO: work area
 void dataModel::processRows(const std::set<std::string>& inSet) {
+
+  // Move ALL armed device read to circular buffer. - no inSet dependent.
+  for (auto q : coreInstance) {
+    if (!q.isDeclaration()) continue;
+    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {
+      // move from fetched bucket to circle buffer.
+      // *(qSet[q.id]->inputPayload) = 
+ 
+      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::freeze;
+    }
+  }
+
+  // Report all processed inSet
   {
     std::stringstream s;
     for (auto i : inSet) s << i << ":";
     SPDLOG_INFO("PROCESS:{}", s.str());
   }
 
+  // Process expected declarations - if found - read from device and move to chamber 
   std::stringstream s;
   for (auto q : coreInstance) {
     if (inSet.find(q.id) == inSet.end()) continue;                     // Drop off rows that not computed now
     if (!q.isDeclaration()) continue;                                  // Skip non declarations.
-    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::flux;  // Unfreeze data sources
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unfreeze data sources - enable physical read from source
     s << " DECL:{" << q.id << "}";
     fetchDeclaredPayload(q.id);                                          // Declarations need to process in separate&first
-    qSet[q.id]->outputPayload->bufferPolicy = rdb::policyState::freeze;  // freeze data sources
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::armed;  // freeze data sources
   }
 
   for (auto q : coreInstance) {

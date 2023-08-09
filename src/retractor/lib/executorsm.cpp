@@ -279,7 +279,7 @@ int main_retractor(bool verbose, int iTimeLimitCntParam) {
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
     if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
-/*
+
     // ZERO-step
     
     std::set<std::string> initSet;
@@ -289,7 +289,7 @@ int main_retractor(bool verbose, int iTimeLimitCntParam) {
     proc.processRows(initSet);
     
     // End of ZERO-step
-*/
+
     // Loop of data processing
 
     boost::rational<int> prev_interval(0);
