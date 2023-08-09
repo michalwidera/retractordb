@@ -22,7 +22,7 @@ using namespace boost;
 using boost::lexical_cast;
 
 extern std::string parserFile(std::string sInputFile);
-extern int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam);
+extern int main_retractor(bool verbose, int iTimeLimitCntParam);
 extern int dumper(boost::program_options::variables_map& vm);
 
 int iTimeLimitCntParam{0};
@@ -65,7 +65,6 @@ int main(int argc, char* argv[]) {
           ("help,h", "Show program options")                                      //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("verbose,v", "verbose mode (show stream params)")                      //
-          ("waterfall,f", "show waterfall mode")                                  //
           ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0),  //
            "query limit, 0 - no limit")                                           //
           ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
@@ -140,5 +139,5 @@ int main(int argc, char* argv[]) {
     return system::errc::interrupted;
   }
 
-  return main_retractor(vm.count("verbose"), vm.count("waterfall"), iTimeLimitCntParam);
+  return main_retractor(vm.count("verbose"), iTimeLimitCntParam);
 }

@@ -258,7 +258,7 @@ std::string printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
+int main_retractor(bool verbose, int iTimeLimitCntParam) {
   iTimeLimitCnt = iTimeLimitCntParam;
   auto retVal = system::errc::success;
   thread bt(commandProcessorLoop);  // Sending service in thread
@@ -279,16 +279,18 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
     if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
+/*
+    // ZERO-step
+    
+    std::set<std::string> initSet;
+    for (const auto &it : coreInstance)
+      if (it.isDeclaration()) initSet.insert(it.id);
 
-    // Init step
-    /*
-        std::set<std::string> initSet;
-        for (const auto &it : coreInstance)
-          if (it.isDeclaration()) initSet.insert(it.id);
-
-        proc.processRows(initSet);
-    */
-    // End of Init Step
+    proc.processRows(initSet);
+    
+    // End of ZERO-step
+*/
+    // Loop of data processing
 
     boost::rational<int> prev_interval(0);
     while (!_kbhit() && iTimeLimitCnt != 1) {
@@ -314,20 +316,8 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
 
       const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
 
-      //
-      // When you add additional parameter -w numbers of queries appear on
-      // screen if additional -w -s str2 (when -s means display) only given one
-      // query will appear
-      //
-      if (waterfall) {
-        std::cout << period << "\t";
-        for (const auto &str : inSet) {
-          std::cout << "-" << getSeqNr(str) << "-";
-        }
-        std::cout << std::endl;
-      }
-
       proc.processRows(inSet);
+
       //
       // Data broadcast - main loop
       //
@@ -361,12 +351,10 @@ int main_retractor(bool verbose, bool waterfall, int iTimeLimitCntParam) {
         }
       }
 
-      //
       // End of loop while( ! _kbhit() )
-      //
     }
     //
-    // End of main processing loop
+    // End of data processing loop
     //
     if (iTimeLimitCnt != 1) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
