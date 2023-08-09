@@ -42,7 +42,7 @@ class storageAccessor {
   ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
-  sourceState bufferState = sourceState::empty;  // ? test freeze
+  sourceState bufferState = sourceState::flux;  // ? test freeze
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
