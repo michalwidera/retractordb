@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <iomanip>
+#include <variant>
 
 #include "config.h"
 #include "rdb/fainterface.h"
@@ -78,13 +79,12 @@ class crsMathTest : public ::testing::Test {
   }
 };
 
-TEST_F(crsMathTest, Only_two_items_in_query) {
-  //  ASSERT_TRUE(coreInstance.size() == 13);
-}
+TEST_F(crsMathTest, Only_nine_items_in_query) { ASSERT_TRUE(coreInstance.size() == 9); }
 
 const std::vector<std::string> allStreams = {"cx", "s1x", "s2x", "s3x", "s4x", "s5x", "s6x", "s7x", "s8x"};
 
-TEST_F(crsMathTest, check_if_streams_sequence_is_correct) {
+TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
+  const auto colSize = 4;
   const auto expectedResult =
       "Dlt: { 1/1}{ 1/3}{ 2/3}{ 1/3}{ 1/1}{ 1/1}{ 1/1}{ 2/3}{ 2/3}\n"
       " 000:{  cx}{    }{    }{    }{    }{    }{    }{    }{    }\n"
@@ -109,11 +109,11 @@ TEST_F(crsMathTest, check_if_streams_sequence_is_correct) {
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
   boost::rational<int> prev_interval(0);
 
-  strstream << std::setw(4) << "Dlt: ";
+  strstream << std::setw(colSize) << "Dlt: ";
 
   // Delta presentation
 
-  for (const auto &x : allStreams) strstream << "{" << std::setw(4) << coreInstance.getDelta(x) << "}";
+  for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << coreInstance.getDelta(x) << "}";
   strstream << std::endl;
 
   // Init row - process all declaration
@@ -124,8 +124,8 @@ TEST_F(crsMathTest, check_if_streams_sequence_is_correct) {
 
   proc.processRows(initSet);
 
-  strstream << std::setw(4) << " 000:";
-  for (const auto &x : allStreams) strstream << "{" << std::setw(4) << (initSet.contains(x) ? x : "") << "}";
+  strstream << std::setw(colSize) << " 000:";
+  for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << (initSet.contains(x) ? x : "") << "}";
 
   strstream << std::endl;
 
@@ -138,13 +138,13 @@ TEST_F(crsMathTest, check_if_streams_sequence_is_correct) {
     int period(rational_cast<int>(interval - prev_interval));  // miliseconds
     prev_interval = interval;
 
-    strstream << std::setw(4) << period << " ";
+    strstream << std::setw(colSize) << period << " ";
 
     std::set<std::string> procSet;
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
 
-    for (const auto &x : allStreams) strstream << "{" << std::setw(4) << (procSet.contains(x) ? x : "") << "}";
+    for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << (procSet.contains(x) ? x : "") << "}";
 
     strstream << std::endl;
 
@@ -152,6 +152,84 @@ TEST_F(crsMathTest, check_if_streams_sequence_is_correct) {
   }
 
   ASSERT_TRUE(strstream.str() == expectedResult);
+}
+
+std::string print(std::string query_name, dataModel &proc) {
+  std::stringstream coutstring;
+  auto cnt = proc.getPayload(query_name)->getDescriptor().sizeFlat();
+  for (auto value : proc.getRow(query_name, 0)) {
+    std::visit(Overload{                                                                                                    //
+                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
+                        [&coutstring](int a) { coutstring << a; },                                                          //
+                        [&coutstring](unsigned a) { coutstring << a; },                                                     //
+                        [&coutstring](float a) { coutstring << a; },                                                        //
+                        [&coutstring](double a) { coutstring << a; },                                                       //
+                        [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
+                        [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                        [&coutstring](const std::string &a) { coutstring << a; },                                           //
+                        [&coutstring](boost::rational<int> a) { coutstring << a; }},
+               value);
+    if (--cnt) coutstring << ",";
+  }  // endfor
+  return coutstring.str();
+}
+
+TEST_F(crsMathTest, check_if_streams_values_are_correct) {
+  const auto colSize = 8;
+  const auto expectedResult = "";
+
+  std::stringstream strstream;
+
+  dataModel proc(coreInstance);
+  TimeLine tl(coreInstance.getAvailableTimeIntervals());
+  boost::rational<int> prev_interval(0);
+
+  // Delta presentation
+  std::cout << std::setw(4) << " Dlt:";
+  for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << coreInstance.getDelta(x);
+  std::cout << "|" << std::endl;
+
+  // Names
+  std::cout << std::setw(4) << "Name:";
+  for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << x;
+  std::cout << "|" << std::endl;
+
+  // Init row - process all declaration
+
+  std::set<std::string> initSet;
+  for (const auto &it : coreInstance)
+    if (it.isDeclaration()) initSet.insert(it.id);
+
+  proc.processRows(initSet);
+
+  std::cout << std::setw(4) << " 000 ";
+  for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");
+
+  std::cout << "|" << std::endl;
+
+  // Process declarations and queries in time slots
+
+  auto queryCounter{TEST_COUNT};
+  while (queryCounter-- != 1) {
+    const int msInSec = 1000;
+    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
+    int period(rational_cast<int>(interval - prev_interval));  // miliseconds
+    prev_interval = interval;
+
+    std::cout << std::setw(4) << period << " ";
+
+    std::set<std::string> procSet;
+    for (const auto &it : coreInstance)
+      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
+
+    for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
+
+    std::cout << "|" << std::endl;
+
+    proc.processRows(procSet);
+  }
+
+  // ASSERT_TRUE(strstream.str() == expectedResult);
 }
 
 }  // Namespace
