@@ -123,30 +123,6 @@
               "ignoreFailures": true
           }
       ]
-    },
-  {
-    "name": "(gdb) test_buffMgm",
-    "type": "cppdbg",
-    "request": "launch",
-    "program": "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/test_buffManagement",
-    "args": [""],
-    "stopAtEntry": false,
-    "cwd":     "/home/michal/GitHub/retractordb/build/Debug/test/UnitTest/Data/test_buffManagement",
-    "environment": [],
-    "externalConsole": false,
-    "MIMode": "gdb",
-    "setupCommands": [
-        {
-            "description": "Włącz formatowanie kodu dla gdb",
-            "text": "-enable-pretty-printing",
-            "ignoreFailures": true
-        },
-        {
-            "description": "Ustaw wariant dezasemblacji na Intel",
-            "text": "-gdb-set disassembly-flavor intel",
-            "ignoreFailures": true
-        }
-    ]
-  }
+    }
   ]
 }

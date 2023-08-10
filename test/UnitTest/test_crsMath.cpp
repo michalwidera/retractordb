@@ -222,11 +222,10 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
 
-    for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
-
-    std::cout << "|" << std::endl;
-
     proc.processRows(procSet);
+
+    for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
+    std::cout << "|" << std::endl;
   }
 
   // ASSERT_TRUE(strstream.str() == expectedResult);
