@@ -1,0 +1,37 @@
+@startuml
+
+title Processing data sequence \n for Device one-stop-read
+[*] --> Storage
+
+state Storage as "Storage State Machine" {
+  state Empty
+  state Armed : data in chamber ready
+  state Flux : chamber moved to payload
+  state Lock : data in circural buffer 
+  Empty --> Flux
+  Flux --> Armed
+  Armed --> Lock
+  Lock --> Flux
+  
+  note right of Empty
+  chamber & payload is empty 
+  no data has been readed from source
+  end note
+  
+  note right of Flux
+  read from data source
+  fills the chamber
+  end note
+  
+  note right of Armed
+  data are in chamber
+  read from storage get from circural buffer
+  end note
+  
+  note right of Lock
+  data are in circual buffer
+  read from storage get from circural buffer
+  end note
+  }
+
+@enduml
