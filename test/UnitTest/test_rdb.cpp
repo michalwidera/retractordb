@@ -222,7 +222,7 @@ TEST(xrdb, test_storage) {
 
   dAcc2.write(1);
 
-  dAcc2.read_(1);
+  dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
   {
     std::stringstream coutstring;
     coutstring << dAcc2.getDescriptor().toString("Name", payload1->ptr);

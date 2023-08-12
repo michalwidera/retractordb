@@ -240,13 +240,22 @@ void storageAccessor::fire() {
   bufferState = sourceState::lock;
 }
 
+bool storageAccessor::read_() {
+  assert(isDeclared());
+  uint8_t* destination = static_cast<uint8_t*>(chamber->get());
+  recordsCount ++;
+
+  auto size = descriptor.getSizeInBytes();
+  auto result = accessor->read(destination, size, 0);
+  return result == 0;
+}
+
 bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
+
+  assert(!isDeclared());
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {
-    if (isDeclared())
-      destination = static_cast<uint8_t*>(chamber->get());
-    else
       destination = static_cast<uint8_t*>(storagePayload->get());
   }
 
@@ -255,7 +264,8 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   auto result = 0;
 
   auto recordIndexRv{0};
-  if (!isDeclared()) recordIndexRv = recordIndex;  // In case of device type - is works only on first record.
+
+  recordIndexRv = recordIndex;
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, size, recordIndexRv * size);
@@ -278,12 +288,13 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
   // it is necessary to maintain a buffer of at least 1
 
   assert(circularBuffer.capacity() > 0);
+  assert(isDeclared());
 
   if (recordIndex == 0 && bufferState == sourceState::flux) {
     //
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
-    auto result = read_(recordPositionFromBack, destination);
+    auto result = read_();
     assert(result && "Failure during read.");
     bufferState = sourceState::armed;
   }

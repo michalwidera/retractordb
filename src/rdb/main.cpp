@@ -165,7 +165,7 @@ int main(int argc, char* argv[]) {
         continue;
       }
 
-      auto returnStatus = (cmd == "read") ? dacc->read_(record) : dacc->revRead(record);
+      auto returnStatus = (cmd == "read") ? dacc->revRead(dacc->getRecordsCount() - record - 1) : dacc->revRead(record);
       payloadStatus = returnStatus ? fetched : error;
 
     } else if (cmd == "set") {
@@ -241,7 +241,7 @@ int main(int argc, char* argv[]) {
           std::cout << RED << "record out of range - list command\n" << RESET;
           continue;
         }
-        auto returnStatus = (cmd == "rlist") ? dacc->revRead(i) : dacc->read_(i);
+        auto returnStatus = (cmd == "rlist") ? dacc->revRead(i) : dacc->revRead(dacc->getRecordsCount() - i - 1);
         payloadStatus = returnStatus ? fetched : error;
 
         if (payloadStatus == error) {
