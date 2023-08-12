@@ -629,7 +629,7 @@ std::map<std::string, int> countBuffersCapacity() {
         assert(step > 0);
         length = abs(length);
         const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().sizeFlat();
-        const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 1;
+        const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 2;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;

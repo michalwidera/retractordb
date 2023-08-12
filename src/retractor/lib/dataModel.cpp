@@ -129,42 +129,42 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 #define UNDER_DEVELOPMENT
 #ifdef UNDER_DEVELOPMENT
   if (outFasterThanIn) {
-        // ---------------
-        auto step_v{0};
-        auto fp = std::div(storedRecordCountDst, descriptorSrcSize);
-        if (fp.rem == 0) step_v = step;
+    // ---------------
+    auto step_v{0};
+    auto fp = std::div(storedRecordCountDst, descriptorSrcSize);
+    if (fp.rem == 0) step_v = step;
 
-        SPDLOG_INFO("test fillPos /{}/{}/  file:{} {}/{} {}/{} outFaster:{} descSrcSize:{}-{}", fp.quot, fp.rem,
-                    source->getStorageName(), deltaSrc.numerator(), deltaSrc.denominator(), deltaDst.numerator(),
-                    deltaDst.denominator(), outFasterThanIn, descriptorSrcSize, lengthAbs);
+    SPDLOG_INFO("test fillPos /{}/{}/  file:{} {}/{} {}/{} outFaster:{} descSrcSize:{}-{}", fp.quot, fp.rem,
+                source->getStorageName(), deltaSrc.numerator(), deltaSrc.denominator(), deltaDst.numerator(),
+                deltaDst.denominator(), outFasterThanIn, descriptorSrcSize, lengthAbs);
 
-        // ---------------
-        for (auto i = 0; i < lengthAbs; ++i) {
-          auto vv = 0;
-          if (fp.rem == 0) vv = -1;
-          auto location = i + step_v + vv + fp.rem * lengthAbs;
-          auto dv = std::div(location, descriptorSrcSize);
-          if (prevQuot != dv.quot) {
-            prevQuot = dv.quot;
-            SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", location, source->getStorageName(), dv.quot);
-            if (source->getRecordsCount() > dv.quot)
-              source->revRead(dv.quot);
-            else
-              source->cleanPayload();
-          }
+    // ---------------
+    for (auto i = 0; i < lengthAbs; ++i) {
+      auto vv = 0;
+      if (fp.rem == 0) vv = -1;
+      auto location = i + step_v + vv + fp.rem * lengthAbs;
+      auto dv = std::div(location, descriptorSrcSize);
+      if (prevQuot != dv.quot) {
+        prevQuot = dv.quot;
+        SPDLOG_INFO("test fast Agse dv:{} from {} rev-read:/{}/", location, source->getStorageName(), dv.quot);
+        if (source->getRecordsCount() > dv.quot)
+          source->revRead(dv.quot);
+        else
+          source->cleanPayload();
+      }
 
-          auto locSrc = dv.rem;
-          auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
+      auto locSrc = dv.rem;
+      auto locDst = (!flip) ? i : lengthAbs - i - 1;  // * Flipping is here
 
-          std::any value = source->getPayload()->getItem(locSrc);
-          result->setItem(locDst, value);
+      std::any value = source->getPayload()->getItem(locSrc);
+      result->setItem(locDst, value);
 
-          if (value.type() == typeid(int))
-            SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
-          else
-            SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
-        }
-        // ---------------
+      if (value.type() == typeid(int))
+        SPDLOG_INFO("constructAgse item:/{}/ -> /{}/ val:{}", locSrc, locDst, std::any_cast<int>(value));
+      else
+        SPDLOG_INFO("constructAgse item:/{}/ -> /{}/", locSrc, locDst);
+    }
+    // ---------------
   } else
 #endif
     for (auto i = 0; i < lengthAbs; ++i) {

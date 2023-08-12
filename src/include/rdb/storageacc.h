@@ -33,13 +33,12 @@ class storageAccessor {
 
   boost::circular_buffer<rdb::payload> circularBuffer{0};
 
-
   void abortIfStorageNotPrepared();
   void initializeAccessor();
 
   // Read data from storage described as accessor
   // if var:destination is null read into storageAccessor payload
-  bool read_(); // read from device into chamber
+  bool read_();  // read from device into chamber
   bool read_(const size_t recordIndex, uint8_t *destination = nullptr);
 
  public:

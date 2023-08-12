@@ -115,7 +115,6 @@ void storageAccessor::attachStorage() {
   initializeAccessor();
 
   if (isDeclared()) {
-    recordsCount = 1;
     SPDLOG_INFO("records source on {}", storageFile);
     dataFileStatus = storageState::openExisting;
     return;
@@ -176,10 +175,7 @@ void storageAccessor::reset() {
 
   initializeAccessor();
 
-  if (isDeclared())
-    recordsCount = 1;
-  else
-    recordsCount = 0;
+  recordsCount = 0;
   SPDLOG_INFO("reset - drop & recreate storage.");
 }
 
@@ -206,12 +202,7 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
-const size_t storageAccessor::getRecordsCount() {
-  if (isDeclared())
-    return circularBuffer.size() == 0 ? 1 : circularBuffer.size();
-  else
-    return recordsCount;
-}
+const size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
 std::string storageAccessor::getStorageName() { return storageFile; }
 
@@ -243,7 +234,7 @@ void storageAccessor::fire() {
 bool storageAccessor::read_() {
   assert(isDeclared());
   uint8_t* destination = static_cast<uint8_t*>(chamber->get());
-  recordsCount ++;
+  recordsCount++;
 
   auto size = descriptor.getSizeInBytes();
   auto result = accessor->read(destination, size, 0);
@@ -251,12 +242,11 @@ bool storageAccessor::read_() {
 }
 
 bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
-
   assert(!isDeclared());
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {
-      destination = static_cast<uint8_t*>(storagePayload->get());
+    destination = static_cast<uint8_t*>(storagePayload->get());
   }
 
   assert(destination != nullptr);

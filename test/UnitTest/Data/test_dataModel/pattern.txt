@@ -3,14 +3,14 @@
 	REF "datafile1.txt"
 	TYPE TEXTSOURCE
 }
-1 Record(s)
+0 Record(s)
 5 Byte(s) per record.
 {	INTEGER c
 	INTEGER d
 	REF "datafile2.txt"
 	TYPE TEXTSOURCE
 }
-1 Record(s)
+0 Record(s)
 8 Byte(s) per record.
 {	INTEGER str1_0
 	INTEGER str1_1
