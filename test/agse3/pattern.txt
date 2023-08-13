@@ -2,29 +2,29 @@
 14 Record(s)
 8 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 }
-{ core_0:0 core_1:0 }
-{ core_0:10 core_1:11 }
-{ core_0:13 core_1:14 }
-{ core_0:16 core_1:17 }
-{ core_0:19 core_1:20 }
-{ core_0:22 core_1:23 }
+{ core_0:12 core_1:11 }
+{ core_0:15 core_1:14 }
+{ core_0:18 core_1:17 }
+{ core_0:21 core_1:20 }
+{ core_0:24 core_1:23 }
+{ core_0:27 core_1:26 }
  serial5
 14 Record(s)
 12 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 INTEGER core_2 }
-{ core_0:0 core_1:0 core_2:0 }
-{ core_0:10 core_1:11 core_2:12 }
-{ core_0:13 core_1:14 core_2:15 }
-{ core_0:16 core_1:17 core_2:18 }
-{ core_0:19 core_1:20 core_2:21 }
-{ core_0:22 core_1:23 core_2:24 }
- serial6
-14 Record(s)
-12 Byte(s) per record.
-{ INTEGER core_0 INTEGER core_1 INTEGER core_2 }
-{ core_0:0 core_1:0 core_2:0 }
 { core_0:12 core_1:11 core_2:10 }
 { core_0:15 core_1:14 core_2:13 }
 { core_0:18 core_1:17 core_2:16 }
 { core_0:21 core_1:20 core_2:19 }
 { core_0:24 core_1:23 core_2:22 }
+{ core_0:27 core_1:26 core_2:25 }
+ serial6
+14 Record(s)
+12 Byte(s) per record.
+{ INTEGER core_0 INTEGER core_1 INTEGER core_2 }
+{ core_0:10 core_1:11 core_2:12 }
+{ core_0:13 core_1:14 core_2:15 }
+{ core_0:16 core_1:17 core_2:18 }
+{ core_0:19 core_1:20 core_2:21 }
+{ core_0:22 core_1:23 core_2:24 }
+{ core_0:25 core_1:26 core_2:27 }

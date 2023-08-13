@@ -227,6 +227,7 @@ void storageAccessor::abortIfStorageNotPrepared() {
 void storageAccessor::fire() {
   assert(circularBuffer.capacity() > 0);
   *storagePayload = *chamber;
+  recordsCount++;
   circularBuffer.push_front(*storagePayload.get());  // only one place when buffer is feed.
   bufferState = sourceState::lock;
 }
@@ -234,7 +235,6 @@ void storageAccessor::fire() {
 bool storageAccessor::read_() {
   assert(isDeclared());
   uint8_t* destination = static_cast<uint8_t*>(chamber->get());
-  recordsCount++;
 
   auto size = descriptor.getSizeInBytes();
   auto result = accessor->read(destination, size, 0);
@@ -296,6 +296,7 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
   // - only for recordIndex > 0 if sourceState::flux
   // - also for recordIndex == 0 if sourceState::lock
 
+  SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer.capacity(), recordIndex, storageFile);
   assert((recordIndex < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
 
   // in case of accessing buffer that has no data yet - zeros are returned

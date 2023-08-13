@@ -175,9 +175,25 @@ std::string print(std::string query_name, dataModel &proc) {
 }
 
 TEST_F(crsMathTest, check_if_streams_values_are_correct) {
-  const auto colSize = 8;
-  const auto expectedResult = "";
-
+  const auto colSize = 9;
+  const auto expectedResult =
+      " Dlt:|      1/1|      1/3|      2/3|      1/3|      1/1|      1/1|      1/1|      2/3|      2/3|\n"
+      "Name:|       cx|      s1x|      s2x|      s3x|      s4x|      s5x|      s6x|      s7x|      s8x|\n"
+      " 000 |    1,2,3|         |         |         |         |         |         |         |         |\n"
+      " 333 |         |        1|         |     1,-1|         |         |         |         |         |\n"
+      " 333 |         |        2|      2,1|      2,1|         |         |         |   2,1,-1|2,1,-1,-1|\n"
+      " 333 |    1,2,3|        3|         |      3,2|      3,2|    3,2,1|    1,2,3|         |         |\n"
+      " 333 |         |        4|      4,3|      4,3|         |         |         |    4,3,2|  4,3,2,1|\n"
+      " 333 |         |        5|         |      5,4|         |         |         |         |         |\n"
+      " 333 |    4,5,6|        6|      6,5|      6,5|      6,5|    6,5,4|    4,5,6|    6,5,4|  6,5,4,3|\n"
+      " 333 |         |        7|         |      7,6|         |         |         |         |         |\n"
+      " 333 |         |        8|      8,7|      8,7|         |         |         |    8,7,6|  8,7,6,5|\n"
+      " 333 |    7,8,9|        9|         |      9,8|      9,8|    9,8,7|    7,8,9|         |         |\n"
+      " 333 |         |        1|      1,9|      1,9|         |         |         |    1,9,8|  1,9,8,7|\n"
+      " 333 |         |        2|         |      2,1|         |         |         |         |         |\n"
+      " 333 |    1,2,3|        3|      3,2|      3,2|      3,2|    3,2,1|    1,2,3|    3,2,1|  3,2,1,9|\n"
+      " 333 |         |        4|         |      4,3|         |         |         |         |         |\n"
+      " 333 |         |        5|      5,4|      5,4|         |         |         |    5,4,3|  5,4,3,2|\n";
   std::stringstream strstream;
 
   dataModel proc(coreInstance);
@@ -185,14 +201,14 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   boost::rational<int> prev_interval(0);
 
   // Delta presentation
-  std::cout << std::setw(4) << " Dlt:";
-  for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << coreInstance.getDelta(x);
-  std::cout << "|" << std::endl;
+  strstream << std::setw(4) << " Dlt:";
+  for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << coreInstance.getDelta(x);
+  strstream << "|" << std::endl;
 
   // Names
-  std::cout << std::setw(4) << "Name:";
-  for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << x;
-  std::cout << "|" << std::endl;
+  strstream << std::setw(4) << "Name:";
+  for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << x;
+  strstream << "|" << std::endl;
 
   // Init row - process all declaration
 
@@ -202,10 +218,10 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
   proc.processRows(initSet);
 
-  std::cout << std::setw(4) << " 000 ";
-  for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");
+  strstream << std::setw(4) << " 000 ";
+  for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");
 
-  std::cout << "|" << std::endl;
+  strstream << "|" << std::endl;
 
   // Process declarations and queries in time slots
 
@@ -216,7 +232,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
     int period(rational_cast<int>(interval - prev_interval));  // miliseconds
     prev_interval = interval;
 
-    std::cout << std::setw(4) << period << " ";
+    strstream << std::setw(4) << period << " ";
 
     std::set<std::string> procSet;
     for (const auto &it : coreInstance)
@@ -224,11 +240,13 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
     proc.processRows(procSet);
 
-    for (const auto &x : allStreams) std::cout << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
-    std::cout << "|" << std::endl;
+    for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
+    strstream << "|" << std::endl;
   }
 
-  // ASSERT_TRUE(strstream.str() == expectedResult);
+  std::cerr << strstream.str().c_str() << std::endl;
+  std::cerr << expectedResult << std::endl;
+  ASSERT_TRUE(strstream.str() == expectedResult);
 }
 
 }  // Namespace
