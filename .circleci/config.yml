@@ -51,7 +51,12 @@ executors:
       - image: cimg/base:current
     resource_class: large
 
-  ubuntu2204machine:
+  ubuntu2204machine-current:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large
+
+  ubuntu2204machine-edge:
     machine:
       image: ubuntu-2204:current
     resource_class: large
@@ -139,7 +144,7 @@ commands:
 jobs:
   build-2204-debug:
     working_directory: ~/retractordb
-    executor: ubuntu2204machine
+    executor: ubuntu2204machine-current
     steps:
       - checkout
       - prep-env-159
@@ -152,7 +157,7 @@ jobs:
 
   build-2204-release:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker-edge
+    executor: ubuntu2204docker-current
     steps:
       - checkout
       - prep-env-159
@@ -162,7 +167,7 @@ jobs:
 
   build-2204-conan20:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker-edge
+    executor: ubuntu2204machine-edge
     steps:
       - checkout
       - prep-env-200
