@@ -37,4 +37,5 @@ conaninfo.txt
 graph_info.json
 .cproject
 .project
+.cmake
 .settings/*
