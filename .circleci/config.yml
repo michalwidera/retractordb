@@ -124,7 +124,7 @@ commands:
           name: Smoke test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
-            cd build/Release && make showelf
+            cd build/<<parameters.build_type>> && make showelf
             xretractor -h && xqry -h
       - run:
           name: Regression & Unit test
