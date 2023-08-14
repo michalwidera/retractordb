@@ -46,6 +46,13 @@ add_custom_target(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_custom_target(
+  showelf
+  COMMAND readelf -p .comment retractor/xretractor
+  COMMAND readelf -p .comment rdb/xtrdb
+  COMMAND readelf -p .comment qry/xqry
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+add_custom_target(
   vim
   COMMAND [ ! -f ~/.vim ] && mkdir -p ~/.vim
   COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)
