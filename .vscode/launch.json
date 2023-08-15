@@ -101,13 +101,13 @@
       ]
     },
     {
-      "name": "(gdb) xretractor agse2",
+      "name": "(gdb) xretractor agse1",
       "type": "cppdbg",
       "request": "launch",
       "program": "/home/michal/GitHub/retractordb/build/Debug/src/retractor/xretractor",
       "args": ["query.rql", "-m" , "15",  "-v" ],
       "stopAtEntry": false,
-      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/agse2",
+      "cwd": "/home/michal/GitHub/retractordb/build/Debug/test/agse1",
       "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
