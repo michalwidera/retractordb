@@ -37,7 +37,7 @@ textSourceAccessor<T>::~textSourceAccessor() {
 }
 
 template <class T>
-std::string textSourceAccessor<T>::fileName() {
+const std::string textSourceAccessor<T>::fileName() {
   return fileNameStr;
 }
 

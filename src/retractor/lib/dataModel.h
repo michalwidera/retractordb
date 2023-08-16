@@ -18,15 +18,15 @@ struct streamInstance {
                                                         // clause - created by from clause.
 
   // This constructor cover issue when storage name is different from descriptor name
-  explicit streamInstance(const std::string &descriptorName,          //
-                          const std::string &storageName,             // <- query %% filename
-                          const rdb::Descriptor storageDescriptor,    // <- query %% descriptorStorage()
-                          const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  explicit streamInstance(const std::string &descriptorName,           //
+                          const std::string &storageName,              // <- query %% filename
+                          const rdb::Descriptor &storageDescriptor,    // <- query %% descriptorStorage()
+                          const rdb::Descriptor &internalDescriptor);  // <- query %% descriptorFrom()
 
   // This constructor cover same name for storage and descriptor file name (+.desc)
-  explicit streamInstance(const std::string &idAndStorageName,        // <- query %% filename
-                          const rdb::Descriptor storageDescriptor,    // <- query %% descriptorStorage()
-                          const rdb::Descriptor internalDescriptor);  // <- query %% descriptorFrom()
+  explicit streamInstance(const std::string &idAndStorageName,         // <- query %% filename
+                          const rdb::Descriptor &storageDescriptor,    // <- query %% descriptorStorage()
+                          const rdb::Descriptor &internalDescriptor);  // <- query %% descriptorFrom()
 
   // This constructor will create data based on QStruct query
   explicit streamInstance(query &qry);

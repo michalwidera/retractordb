@@ -25,11 +25,11 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 */
 
-streamInstance::streamInstance(               //
-    const std::string& descriptorName,        // q.id
-    const std::string& storageNameParam,      // filename
-    const rdb::Descriptor storageDescriptor,  //
-    const rdb::Descriptor internalDescriptor) {
+streamInstance::streamInstance(                //
+    const std::string& descriptorName,         // q.id
+    const std::string& storageNameParam,       // filename
+    const rdb::Descriptor& storageDescriptor,  //
+    const rdb::Descriptor& internalDescriptor) {
   // only objects with REF has storageNameParam filled.
   const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
   SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
@@ -53,14 +53,14 @@ streamInstance::streamInstance(               //
   }
 };
 
-streamInstance::streamInstance(                //
-    const std::string& idAndStorageName,       // q.id = filename
-    const rdb::Descriptor storageDescriptor,   //
-    const rdb::Descriptor internalDescriptor)  //
-    : streamInstance(idAndStorageName,         // descriptor file
-                     idAndStorageName,         // storage file
-                     storageDescriptor,        //
-                     internalDescriptor        //
+streamInstance::streamInstance(                 //
+    const std::string& idAndStorageName,        // q.id = filename
+    const rdb::Descriptor& storageDescriptor,   //
+    const rdb::Descriptor& internalDescriptor)  //
+    : streamInstance(idAndStorageName,          // descriptor file
+                     idAndStorageName,          // storage file
+                     storageDescriptor,         //
+                     internalDescriptor         //
       ) {
   SPDLOG_INFO("streamInstance - storage and id are the same");
 }

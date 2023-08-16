@@ -42,7 +42,7 @@ add_custom_target(
     "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style='{BasedOnStyle:
     Google, ColumnLimit: 129}'
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
-          --line-width=80
+          --line-width=129
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_custom_target(

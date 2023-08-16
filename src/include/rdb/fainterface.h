@@ -53,7 +53,7 @@ struct FileAccessorInterface {
    *
    * @return std::string filename
    */
-  virtual std::string fileName() = 0;
+  virtual const std::string fileName() = 0;
 
   /**
    * @brief Control method for data source

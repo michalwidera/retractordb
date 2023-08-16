@@ -18,7 +18,7 @@ template <class T>
 genericBinaryFileAccessor<T>::genericBinaryFileAccessor(const std::string fileName) : fileNameStr(fileName) {}
 
 template <class T>
-std::string genericBinaryFileAccessor<T>::fileName() {
+const std::string genericBinaryFileAccessor<T>::fileName() {
   return fileNameStr;
 }
 
