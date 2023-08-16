@@ -81,7 +81,7 @@ void query::reset() {
   return;
 }
 
-bool isThere(const std::vector<query> &v, const std::string query_name) {
+bool isThere(const std::vector<query> &v, const std::string &query_name) {
   for (const auto &q : v) {
     if (q.id == "") continue;
     if (q.id == query_name) return true;
