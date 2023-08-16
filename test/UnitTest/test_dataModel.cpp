@@ -184,7 +184,7 @@ TEST_F(xschema, check_construct_payload) {
   // @(4,1)  15,14,13,12
   // @(-4,1) 12,13,14,15
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 0));
+    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 2));
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
     std::stringstream coutstring2;
@@ -214,7 +214,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
   // @(4,1)  15,14,13,12
   // @(-4,1) 12,13,14,15
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 0));
+    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 2));
     std::stringstream coutstring1;
     coutstring1 << rdb::flat << payload.get()->getDescriptor();
 

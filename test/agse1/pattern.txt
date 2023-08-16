@@ -49,7 +49,7 @@
 { INTEGER signalText3_0 }
 { signalText3_0:-1 }
 { signalText3_0:-1 }
-{ signalText3_0:-1 }
-{ signalText3_0:-1 }
-{ signalText3_0:-1 }
-{ signalText3_0:-1 }
+{ signalText3_0:11 }
+{ signalText3_0:10 }
+{ signalText3_0:13 }
+{ signalText3_0:12 }

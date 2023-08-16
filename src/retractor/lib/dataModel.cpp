@@ -126,6 +126,12 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   auto outFasterThanIn = deltaDst < deltaSrc;
 
   auto storedRecordCountDst_{storedRecordCountDst};
+
+  // This fix look's like heuristic. More investigation need here.
+  // There is zerostep with prefetch on declared streams
+  // in case of the rest there are latency due missing zero step.
+  if (!source->isDeclared()) storedRecordCountDst_ -= descriptorSrcSize;
+
   storedRecordCountDst_ += 1;
   storedRecordCountDst_ *= descriptorSrcSize * deltaDst.numerator();
   storedRecordCountDst_ /= deltaDst.denominator();
