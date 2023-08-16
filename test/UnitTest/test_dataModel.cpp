@@ -68,7 +68,7 @@ class xschema : public ::testing::Test {
     // This simplified dataModel::load
     coreInstance.clear();
     auto compiled = parserFile("ut_example_schema.rql");
-    dataArea = std::make_unique<dataModel>(coreInstance);
+    dataArea      = std::make_unique<dataModel>(coreInstance);
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);

@@ -245,10 +245,10 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
           retVal = inVar;
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           std::pair pairVar = std::any_cast<std::pair<int, int>>(inVar);
-          retVal = std::to_string(pairVar.first) + "," + std::to_string(pairVar.second);
+          retVal            = std::to_string(pairVar.first) + "," + std::to_string(pairVar.second);
         } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
           std::pair pairVar = std::any_cast<std::pair<std::string, int>>(inVar);
-          retVal = pairVar.first + "," + std::to_string(pairVar.second);
+          retVal            = pairVar.first + "," + std::to_string(pairVar.second);
         } else {
           SPDLOG_ERROR("TODO - std::any->T");
         }
@@ -264,7 +264,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
 boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6*/, const int ttl_const /*=11*/) {
   std::stack<int> st;
   double startx = inValue, diff, err1, err2;
-  int ttl = ttl_const;
+  int ttl       = ttl_const;
   unsigned int val;
   for (;;) {
     val = static_cast<unsigned int>(startx);

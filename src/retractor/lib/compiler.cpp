@@ -38,7 +38,7 @@ std::string intervalCounter() {
       }
       assert(q.lProgram.size() == 3 || q.lProgram.size() == 2);
       // This is shit coded (these size2 i size3) and fast fixed
-      bool size3 = (q.lProgram.size() == 3);
+      bool size3           = (q.lProgram.size() == 3);
       std::list<token> loc = q.lProgram;
       token t1(*loc.begin());
       if (size3) loc.pop_front();
@@ -130,8 +130,8 @@ std::string intervalCounter() {
           // push_stream core0 -> deltaSrc
           // stream agse <5,3> -> step_of_window,size_of_window
           boost::rational<int> coreDelta = coreInstance.getDelta(t1.getStr_());
-          int coreWindow = getQuery(t1.getStr_()).lSchema.size();
-          auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
+          int coreWindow                 = getQuery(t1.getStr_()).lSchema.size();
+          auto [step, windowSize]        = std::get<std::pair<int, int>>(op.getVT());
           assert(step > 0);
           windowSize = abs(windowSize);
           // if (windowSize < 0) {  // windowSize < 0  (need to double-check and UT cover)
@@ -195,7 +195,7 @@ std::string simplifyLProgram() {
             std::stringstream s;
             s << (*it2).getStr_();
             arg1 = std::string(s.str());
-            it2 = (*it).lProgram.erase(it2);
+            it2  = (*it).lProgram.erase(it2);
             --it2;
           }
           if (cmd != STREAM_TIMEMOVE && cmd != STREAM_SUBTRACT) {
@@ -204,7 +204,7 @@ std::string simplifyLProgram() {
             std::stringstream s;
             s << (*it2).getStr_();
             arg2 = std::string(s.str());
-            it2 = (*it).lProgram.erase(it2);
+            it2  = (*it).lProgram.erase(it2);
             --it2;
           }
           ++it2;
@@ -241,7 +241,7 @@ std::list<field> combine(const std::string &sName1, const std::string &sName2, t
     lRetVal = getQuery(sName1).lSchema;
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
-    int i = 0;
+    int i            = 0;
     for (auto f : getQuery(sName1).lSchema) {
       field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
@@ -279,7 +279,7 @@ std::list<field> combine(const std::string &sName1, const std::string &sName2, t
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
     auto [step, windowSize] = std::get<std::pair<int, int>>(cmd_token.getVT());
-    auto [maxType, maxLen] = coreInstance[sName1].descriptorStorage().getMaxType();
+    auto [maxType, maxLen]  = coreInstance[sName1].descriptorStorage().getMaxType();
     std::list<field> schema;
     for (int i = 0; i < abs(windowSize); i++) {
       field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), maxLen, 1, maxType),
@@ -492,7 +492,7 @@ std::string convertReferences() {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
                   if (std::get<rdb::rname>(f1.field_) == field) {
-                    t = token(PUSH_ID, std::make_pair(schema1, offset1));
+                    t           = token(PUSH_ID, std::make_pair(schema1, offset1));
                     bFieldFound = true;
                   }
                   ++offset1;
@@ -502,7 +502,7 @@ std::string convertReferences() {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
                   if (std::get<rdb::rname>(f2.field_) == field) {
-                    t = token(PUSH_ID, std::make_pair(schema2, offset1));
+                    t           = token(PUSH_ID, std::make_pair(schema2, offset1));
                     bFieldFound = true;
                   }
                   ++offset1;
@@ -614,9 +614,9 @@ std::map<std::string, int> countBuffersCapacity() {
         //
         assert(q.lProgram.size() == 2);
 
-        const auto nameSrc = arg1;
+        const auto nameSrc    = arg1;
         const auto timeOffset = std::get<int>(cmd.getVT());
-        capMap[nameSrc] = std::max(capMap[nameSrc], timeOffset);
+        capMap[nameSrc]       = std::max(capMap[nameSrc], timeOffset);
       } break;
       case STREAM_AGSE: {
         // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -624,11 +624,11 @@ std::map<std::string, int> countBuffersCapacity() {
         //
         assert(q.lProgram.size() == 2);
 
-        const auto nameSrc = arg1;
+        const auto nameSrc  = arg1;
         auto [step, length] = get<std::pair<int, int>>(cmd.getVT());
         assert(step > 0);
-        length = abs(length);
-        const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().sizeFlat();
+        length                    = abs(length);
+        const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().sizeFlat();
         const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 2;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);

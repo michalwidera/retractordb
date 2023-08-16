@@ -36,11 +36,12 @@ add_custom_target(
   COMMAND
     find ${CMAKE_SOURCE_DIR}/src -iname "*.h" -o -iname "*.cpp" -o -iname
     "*.hpp" -o -iname "*.cc" | grep --invert-match 'Parser/' | xargs
-    clang-format -i --style='{BasedOnStyle: Google, ColumnLimit: 129}'
+    clang-format -i --style='{BasedOnStyle: Google, ColumnLimit: 129,
+    AlignConsecutiveAssignments: true}'
   COMMAND
     find ${CMAKE_SOURCE_DIR}/test -iname "*.h" -o -iname "*.cpp" -o -iname
     "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style='{BasedOnStyle:
-    Google, ColumnLimit: 129}'
+    Google, ColumnLimit: 129, AlignConsecutiveAssignments: true}'
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
           --line-width=129
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

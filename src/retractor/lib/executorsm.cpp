@@ -133,7 +133,7 @@ ptree commandProcessor(ptree ptInval) {
       // Testing purposes only - get it off after testing
       SPDLOG_DEBUG("got show {} rcv.", streamName);
       // Here we set that for process of given id we send appropriate data stream
-      int streamId = boost::lexical_cast<int>(ptInval.get("db.id", ""));
+      int streamId                     = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       id2StreamName_Relation[streamId] = streamName;
       // Create a message_queue
       std::string queueName = "brcdbr" + ptInval.get("db.id", "");
@@ -141,7 +141,7 @@ ptree commandProcessor(ptree ptInval) {
       // that means 10 elements are going in second
       // so - we need 10 elements for one second buffer
       int maxElements = boost::rational_cast<int>(1 / coreInstance[streamName].rInterval);
-      maxElements = (maxElements < 2) ? 2 : maxElements;
+      maxElements     = (maxElements < 2) ? 2 : maxElements;
       IPC::message_queue mq(IPC::open_or_create,  // open or crate
                             queueName.c_str(),    // name
                             maxElements,          // max message number
@@ -205,7 +205,7 @@ void commandProcessorLoop() {
         memset(message.data(), 0, 1000);
         ptree pt;
         read_info(strstream, pt);
-        ptree pt_retval = commandProcessor(pt);
+        ptree pt_retval     = commandProcessor(pt);
         int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
         // Sending answer
         std::stringstream response_stream;
@@ -260,7 +260,7 @@ std::string printRowValue(const std::string &query_name) {
 
 int main_retractor(bool verbose, int iTimeLimitCntParam) {
   iTimeLimitCnt = iTimeLimitCntParam;
-  auto retVal = system::errc::success;
+  auto retVal   = system::errc::success;
   thread bt(commandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));

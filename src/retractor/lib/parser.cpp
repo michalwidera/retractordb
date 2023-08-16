@@ -131,7 +131,7 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
-    qry.id = ctx->ID()->getText();
+    qry.id        = ctx->ID()->getText();
     qry.rInterval = rationalResult;
     coreInstance.push_back(qry);
     qry.reset();
@@ -161,7 +161,7 @@ class ParserListener : public RQLBaseListener {
         std::get<rdb::rname>(i.field_) = ctx->ID()->getText() + std::get<rdb::rname>(i.field_);
     }
 
-    qry.id = ctx->ID()->getText();
+    qry.id       = ctx->ID()->getText();
     qry.lProgram = program;
     coreInstance.push_back(qry);
     program.clear();
@@ -170,7 +170,7 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitStorage(RQLParser::StorageContext* ctx) {
-    qry.id = ":STORAGE";
+    qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
     // Remove ''
     qry.filename.erase(qry.filename.size() - 1);
@@ -208,28 +208,28 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitTypeString(RQLParser::TypeStringContext* ctx) {
-    fType = rdb::STRING;
+    fType     = rdb::STRING;
     fTypeSize = sizeof(uint8_t);
   }
 
   void exitTypeByte(RQLParser::TypeByteContext* ctx) {
-    fType = rdb::BYTE;
+    fType     = rdb::BYTE;
     fTypeSize = sizeof(uint8_t);
   }
   void exitTypeInt(RQLParser::TypeIntContext* ctx) {
-    fType = rdb::INTEGER;
+    fType     = rdb::INTEGER;
     fTypeSize = sizeof(int);
   }
   void exitTypeUnsigned(RQLParser::TypeUnsignedContext* ctx) {
-    fType = rdb::UINT;
+    fType     = rdb::UINT;
     fTypeSize = sizeof(unsigned);
   }
   void exitTypeFloat(RQLParser::TypeFloatContext* ctx) {
-    fType = rdb::FLOAT;
+    fType     = rdb::FLOAT;
     fTypeSize = sizeof(float);
   }
   void exitTypeDouble(RQLParser::TypeDoubleContext* ctx) {
-    fType = rdb::DOUBLE;
+    fType     = rdb::DOUBLE;
     fTypeSize = sizeof(double);
   }
 
@@ -238,7 +238,7 @@ class ParserListener : public RQLBaseListener {
     if (ctx->type_size) fTypeSizeArray = std::stoi(ctx->type_size->getText());
     std::list<token> emptyProgram;
     qry.lSchema.push_back(field(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram));
-    fType = rdb::BYTE;
+    fType          = rdb::BYTE;
     fTypeSizeArray = 1;
   }
 };

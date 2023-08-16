@@ -42,7 +42,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
     moveRef();
     storagePayload = std::make_unique<rdb::payload>(descriptor);
-    chamber = std::make_unique<rdb::payload>(descriptor);
+    chamber        = std::make_unique<rdb::payload>(descriptor);
 
     SPDLOG_INFO("Payload created, Descriptor from file used.");
 
@@ -69,7 +69,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 
   moveRef();
   storagePayload = std::make_unique<rdb::payload>(descriptor);
-  chamber = std::make_unique<rdb::payload>(descriptor);
+  chamber        = std::make_unique<rdb::payload>(descriptor);
 
   SPDLOG_INFO("Payload & Descriptor created.");
   attachStorage();
@@ -183,7 +183,7 @@ void storageAccessor::cleanPayload(uint8_t* destination) {
   destination = (destination == nullptr)                            //
                     ? static_cast<uint8_t*>(storagePayload->get())  //
                     : destination;
-  auto size = descriptor.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   std::memset(destination, 0, size);
 }
 
@@ -236,7 +236,7 @@ bool storageAccessor::read_() {
   assert(isDeclared());
   uint8_t* destination = static_cast<uint8_t*>(chamber->get());
 
-  auto size = descriptor.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   auto result = accessor->read(destination, size, 0);
   return result == 0;
 }
@@ -250,7 +250,7 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   }
 
   assert(destination != nullptr);
-  auto size = descriptor.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   auto result = 0;
 
   auto recordIndexRv{0};
@@ -327,7 +327,7 @@ void storageAccessor::setCapacity(const int capacity) {
 bool storageAccessor::write(const size_t recordIndex) {
   abortIfStorageNotPrepared();
 
-  auto size = descriptor.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
     result = accessor->write(static_cast<uint8_t*>(storagePayload->get()),

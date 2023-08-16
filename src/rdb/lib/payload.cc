@@ -27,7 +27,7 @@ payload::payload(const Descriptor &descriptor)
 
 payload::payload(const payload &other) {
   payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
-  descriptor = other.getDescriptor();
+  descriptor  = other.getDescriptor();
   std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
 }
 
@@ -50,7 +50,7 @@ payload &payload::operator=(const Descriptor &other) {
   // * if non empty - this goes strange
   if (descriptor.size() == 0) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
-    descriptor = other;
+    descriptor  = other;
     payloadData = std::make_unique<uint8_t[]>(other.getSizeInBytes());
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
@@ -97,8 +97,8 @@ uint8_t *payload::get() const { return payloadData.get(); }
 
 template <typename T>
 void payload::setItemBy(const int positionFlat, std::any value) {
-  T data = std::any_cast<T>(value);
-  auto position = descriptor.convert(positionFlat).value().first;
+  T data          = std::any_cast<T>(value);
+  auto position   = descriptor.convert(positionFlat).value().first;
   auto offsetFlat = descriptor.offset(positionFlat);
   std::memcpy(payloadData.get() + offsetFlat, &data, std::get<rlen>(descriptor[position]));
 }
@@ -110,7 +110,7 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
     abort();
   }
 
-  auto position = descriptor.convert(positionFlat).value().first;
+  auto position      = descriptor.convert(positionFlat).value().first;
   auto requestedType = std::get<rtype>(descriptor[position]);
 
   cast<std::any> castAny;
@@ -121,9 +121,9 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
       case rdb::STRING: {
         const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
         std::string data(std::any_cast<std::string>(value));
-        auto lenr = std::min(len, static_cast<int>(data.length()));
+        auto lenr       = std::min(len, static_cast<int>(data.length()));
         auto destOffset = descriptor.offset(positionFlat);
-        auto addr = payloadData.get() + destOffset;
+        auto addr       = payloadData.get() + destOffset;
         assert(position + len <= descriptor.getSizeInBytes());
         std::memcpy(addr, data.c_str(), lenr);
         if (lenr != len) addr[lenr] = '\0';
@@ -187,10 +187,10 @@ std::any payload::getItem(const int positionFlat) {
 
   switch (std::get<rtype>(descriptor[position])) {
     case rdb::STRING: {
-      auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
+      auto len       = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
       char *charData = reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat);
 
-      auto descLen = descriptor.getSizeInBytes();
+      auto descLen  = descriptor.getSizeInBytes();
       auto startPos = descriptor.offset(positionFlat);
       assert(startPos + len <= descLen);
       for (auto i = 0; i < len; i++)
@@ -313,11 +313,11 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << " ";
     os << std::get<rname>(r);
     os << ":";
-    auto desc = rhs.getDescriptor();
+    auto desc    = rhs.getDescriptor();
     auto offset_ = desc.offsetBegArr(std::get<rname>(r));
     if (std::get<rtype>(r) == STRING) {
       char *charData = reinterpret_cast<char *>(rhs.get() + offset_);
-      auto len = desc.len(std::get<rname>(r));
+      auto len       = desc.len(std::get<rname>(r));
       for (auto i = 0; i < len; i++)
         if (charData[i] == 0) {
           len = i;

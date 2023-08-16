@@ -242,8 +242,8 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload*
       case PUSH_ID: {
         assert(payload != NULL);
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
-        const auto anyValue = payload->getItem(instancePosition.second);
-        rdb::descFldVT val = any_to_variant_cast(anyValue);
+        const auto anyValue   = payload->getItem(instancePosition.second);
+        rdb::descFldVT val    = any_to_variant_cast(anyValue);
         rStack.push(val);
       } break;
       case PUSH_IDX:

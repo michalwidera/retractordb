@@ -20,7 +20,7 @@ bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i,
   assert(deltaA > 0);
   assert(deltaB > 0);
   const rational<int> delta = deltaB / (deltaA + deltaB);
-  bool ret = floorR(delta * i) == floorR(delta * (i + 1));
+  bool ret                  = floorR(delta * i) == floorR(delta * (i + 1));
   if (ret) {
     retPos = i - (floorR((i + 1) * delta));  // B
   } else {

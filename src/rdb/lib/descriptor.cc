@@ -120,7 +120,7 @@ void Descriptor::updateConvMaps() {
     }
 
     if (std::get<rtype>(*it) == rdb::STRING) {
-      counterArray = 1;
+      counterArray     = 1;
       backCounterArray = 0;
     }
 
@@ -208,8 +208,8 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs = std::count_if(rhs.begin(), rhs.end(),                          //
-                                   [](const rField &i) {                            //
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                          //
+                                    [](const rField &i) {                            //
                                      return std::get<rdb::rtype>(i) == rdb::REF ||  //
                                             std::get<rdb::rtype>(i) == rdb::TYPE;
                                    });
@@ -260,7 +260,7 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
   auto i{0};
   for (auto const &looper : lhs) {
     auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
-    auto maxRlen = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
+    auto maxRlen  = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
     push_back(rField(name + "_" + std::to_string(i), maxRlen, 1, maxRtype));
     ++i;
   }
@@ -407,7 +407,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     }
 
     auto arrayLen = 1;
-    char c = is.peek();  // peek character
+    char c        = is.peek();  // peek character
     if (c == '[') {
       while (is.get(c) && c != '[')
         ;

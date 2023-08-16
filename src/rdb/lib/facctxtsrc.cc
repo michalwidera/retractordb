@@ -112,7 +112,7 @@ ssize_t textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t 
 template <typename T>
 ssize_t textSourceAccessor<T>::fctrl(void* ptrData, const size_t size) {
   descriptor = *(reinterpret_cast<rdb::Descriptor*>(ptrData));
-  payload = std::make_unique<rdb::payload>(descriptor);
+  payload    = std::make_unique<rdb::payload>(descriptor);
   return EXIT_SUCCESS;
 }
 

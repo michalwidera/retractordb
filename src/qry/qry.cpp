@@ -216,10 +216,10 @@ ptree netClient(std::string netCommand, const std::string &netArgument) {
     // a maximum size to the streambuf constructor.
     // Check that response is OK.
     std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
-    IPCMap *mymap = ret.first;
+    IPCMap *mymap                        = ret.first;
     assert(mymap);
     int processId = boost::this_process::get_id();
-    auto it = mymap->find(processId);
+    auto it       = mymap->find(processId);
 
     // When server works under valgrid - must be 10 probes x 10ms
     constexpr int maxAcceptableFails = 10;
@@ -259,12 +259,12 @@ ptree netClient(std::string netCommand, const std::string &netArgument) {
 bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   bool found(false);
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
-  sInputStream = input;          // this is required for consumer process.
-  ptree pt = netClient("get", "");
+  sInputStream    = input;       // this is required for consumer process.
+  ptree pt        = netClient("get", "");
   for (const auto &v : pt.get_child("db.stream")) {
     if (sInputStream == v.second.get<std::string>("")) {
       streamTable[sInputStream] = netClient("show", sInputStream);
-      found = true;
+      found                     = true;
       break;
     }
   }
@@ -320,7 +320,7 @@ int hello() {
 }
 
 void dir() {
-  ptree pt = netClient("get", "");
+  ptree pt                       = netClient("get", "");
   std::vector<std::string> vcols = {"", "duration", "size", "count", "location", "cap"};
   std::stringstream ss;
   for (auto nName : vcols) {

@@ -58,7 +58,7 @@ ssize_t posixBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, c
 template <class T>
 ssize_t posixBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
   int fd = -1;
-  fd = ::open(fileNameStr.c_str(), O_RDONLY | O_CLOEXEC);
+  fd     = ::open(fileNameStr.c_str(), O_RDONLY | O_CLOEXEC);
   assert(fd >= 0);
   if (fd < 0) {
     return fd;  // <- Error status

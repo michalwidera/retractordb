@@ -207,7 +207,7 @@ TEST(xrdb, test_storage) {
   dataPayload *payload1 = reinterpret_cast<dataPayload *>(dAcc2.getPayload()->get());
 
   std::memcpy(payload1->Name, "test data", AREA_SIZE);
-  payload1->TLen = 0x66;
+  payload1->TLen    = 0x66;
   payload1->Control = 0x22;
 
   ASSERT_TRUE(payload1->TLen == dAcc2.getDescriptor().cast<int>("TLen", payload1->ptr));
@@ -217,7 +217,7 @@ TEST(xrdb, test_storage) {
   dAcc2.write();
 
   std::memcpy(payload1->Name, "xxxx xxxx", AREA_SIZE);
-  payload1->TLen = 0x67;
+  payload1->TLen    = 0x67;
   payload1->Control = 0x33;
 
   dAcc2.write(1);
@@ -382,10 +382,10 @@ TEST(crdb, payload_add_operator) {
   data1Payload.setItem(2, 2000);
   data1Payload.setItem(3, 3333);
 
-  std::any Name_ = data1Payload.getItem(0);
+  std::any Name_    = data1Payload.getItem(0);
   std::any Control_ = data1Payload.getItem(1);
-  std::any ll_ = data1Payload.getItem(2);
-  std::any TLen_ = data1Payload.getItem(3);
+  std::any ll_      = data1Payload.getItem(2);
+  std::any TLen_    = data1Payload.getItem(3);
 
   dataPayload var;
 

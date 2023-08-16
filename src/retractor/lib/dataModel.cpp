@@ -103,10 +103,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
   // 1. Descriptor construction process
   rdb::Descriptor descriptor;
-  bool flip = (length < 0);
+  bool flip      = (length < 0);
   auto lengthAbs = abs(length);
 
-  auto recordsCountSrc = source->getRecordsCount();
+  auto recordsCountSrc   = source->getRecordsCount();
   auto descriptorSrcSize = source->getDescriptor().sizeFlat();
   auto [maxType, maxLen] = source->getDescriptor().getMaxType();
   for (auto i = 0; i < lengthAbs; ++i) {
@@ -443,7 +443,7 @@ void dataModel::constructInputPayload(const std::string& instance) {
       //
       assert(arg.size() == 2);
 
-      const auto nameSrc = arg[0].getStr_();
+      const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
@@ -456,9 +456,9 @@ void dataModel::constructInputPayload(const std::string& instance) {
       //
       assert(arg.size() == 3);
 
-      const auto nameSrc = arg[0].getStr_();
+      const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto lengthOfSrc = qSet[nameSrc]->outputPayload->getRecordsCount();
+      const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
 
       assert(rationalArgument > 0);
 
@@ -482,10 +482,10 @@ void dataModel::constructInputPayload(const std::string& instance) {
       //
       assert(arg.size() == 2);
 
-      const auto nameSrc = arg[0].getStr_();
+      const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto lengthOfSrc = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
+      const auto timeOffset       = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -510,7 +510,7 @@ void dataModel::constructInputPayload(const std::string& instance) {
       //
       assert(arg.size() == 2);
 
-      const auto nameSrc = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
+      const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step > 0);
       const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
@@ -523,8 +523,8 @@ void dataModel::constructInputPayload(const std::string& instance) {
       //
       assert(arg.size() == 3);
 
-      const auto nameSrc1 = arg[0].getStr_();
-      const auto nameSrc2 = arg[1].getStr_();
+      const auto nameSrc1     = arg[0].getStr_();
+      const auto nameSrc2     = arg[1].getStr_();
       const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
 

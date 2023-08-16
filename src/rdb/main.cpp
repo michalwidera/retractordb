@@ -25,13 +25,13 @@ enum payloadStatusType { fetched, clean, stored, changed, error };
 int main(int argc, char* argv[]) {
   payloadStatusType payloadStatus{clean};
 
-  std::string GREEN = "\x1B[32m";
-  std::string RED = "\x1B[31m";
+  std::string GREEN  = "\x1B[32m";
+  std::string RED    = "\x1B[31m";
   std::string ORANGE = "\x1B[33m";
-  std::string BLUE = "\x1B[34m";
+  std::string BLUE   = "\x1B[34m";
   std::string YELLOW = "\x1B[93m";
-  std::string RESET = "\033[0m";
-  std::string BLINK = "\x1b[5m";
+  std::string RESET  = "\033[0m";
+  std::string BLINK  = "\x1b[5m";
 
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
@@ -41,9 +41,9 @@ int main(int argc, char* argv[]) {
 
   std::unique_ptr<rdb::storageAccessor> dacc;
   std::string file;
-  bool rox = true;
+  bool rox           = true;
   std::string prompt = ".";
-  std::string ok = "ok\n";
+  std::string ok     = "ok\n";
   std::string cmd;
   std::string wasteComment;
   do {
@@ -65,15 +65,15 @@ int main(int argc, char* argv[]) {
     if (cmd == "mono" || cmd == "noprompt") {
       if (cmd == "noprompt") {
         prompt = "";
-        ok = "";
+        ok     = "";
       }
-      GREEN = "";
-      RED = "";
+      GREEN  = "";
+      RED    = "";
       ORANGE = "";
-      BLUE = "";
+      BLUE   = "";
       YELLOW = "";
-      RESET = "";
-      BLINK = "";
+      RESET  = "";
+      BLINK  = "";
       std::cout << ok;
       continue;
     }
@@ -249,7 +249,7 @@ int main(int argc, char* argv[]) {
           continue;
         }
         auto returnStatus = (cmd == "rlist") ? dacc->revRead(i) : dacc->revRead(dacc->getRecordsCount() - i - 1);
-        payloadStatus = returnStatus ? fetched : error;
+        payloadStatus     = returnStatus ? fetched : error;
 
         if (payloadStatus == error) {
           std::cout << RED << "fetch error\n" << RESET;

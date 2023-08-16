@@ -23,11 +23,11 @@ class storageAccessor {
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;
-  bool removeOnExit = true;
-  size_t recordsCount = 0;
+  bool removeOnExit          = true;
+  size_t recordsCount        = 0;
   std::string descriptorFile = "";
-  std::string storageFile = "";
-  std::string storageType = "DEFAULT";
+  std::string storageFile    = "";
+  std::string storageType    = "DEFAULT";
   void moveRef();
   void attachStorage();
 
@@ -47,7 +47,7 @@ class storageAccessor {
   ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
-  sourceState bufferState = sourceState::empty;  // ? test lock
+  sourceState bufferState     = sourceState::empty;  // ? test lock
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
