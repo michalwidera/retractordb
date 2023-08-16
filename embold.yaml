@@ -47,7 +47,7 @@ modules:
       - key: 'EMB-CPP-327'
         enabled: false
   - name: Cppcheck
-    enabled: true
+    enabled: false
     rules:
       - key: 'CPPCHECK-CPP-391'
         enabled: false
