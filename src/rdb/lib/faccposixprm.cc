@@ -29,7 +29,7 @@ const std::string posixPrmBinaryFileAccessor<T>::fileName() {
 }
 
 template <class T>
-ssize_t posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+ssize_t posixPrmBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
     return errno;  // Error status
@@ -61,7 +61,7 @@ ssize_t posixPrmBinaryFileAccessor<T>::write(const T* ptrData, const size_t size
 }
 
 template <class T>
-ssize_t posixPrmBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+ssize_t posixPrmBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
   assert(fd >= 0);
   if (fd < 0) {
     return fd;  // <- Error status

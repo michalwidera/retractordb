@@ -24,13 +24,13 @@ const std::string binaryDeviceAccessor<T>::fileName() {
 }
 
 template <class T>
-ssize_t binaryDeviceAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+ssize_t binaryDeviceAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
 template <class T>
-ssize_t binaryDeviceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
   assert(position == 0);
   if (position != 0) {
     return EXIT_FAILURE;

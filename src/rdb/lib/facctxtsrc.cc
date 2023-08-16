@@ -13,7 +13,7 @@
 namespace rdb {
 
 template <typename K>
-K readFromFstream(std::fstream& myFile) {
+K readFromFstream(std::fstream &myFile) {
   K var;
   myFile >> var;
   if (myFile.eof()) {
@@ -42,13 +42,13 @@ const std::string textSourceAccessor<T>::fileName() {
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
   assert(position == 0);
 
   // myFile.seekg(position);
@@ -103,15 +103,15 @@ ssize_t textSourceAccessor<T>::read(T* ptrData, const size_t size, const size_t 
       i++;
     }
   }
-  std::memcpy(reinterpret_cast<char*>(ptrData), payload->get(), descriptor.getSizeInBytes());
+  std::memcpy(reinterpret_cast<char *>(ptrData), payload->get(), descriptor.getSizeInBytes());
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
   return EXIT_SUCCESS;
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::fctrl(void* ptrData, const size_t size) {
-  descriptor = *(reinterpret_cast<rdb::Descriptor*>(ptrData));
+ssize_t textSourceAccessor<T>::fctrl(void *ptrData, const size_t size) {
+  descriptor = *(reinterpret_cast<rdb::Descriptor *>(ptrData));
   payload    = std::make_unique<rdb::payload>(descriptor);
   return EXIT_SUCCESS;
 }

@@ -36,7 +36,7 @@ struct FileAccessorInterface {
    * @param position position from the beginning of file [unit: Bytes]
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual ssize_t read(T* ptrData, const size_t size, const size_t position) = 0;
+  virtual ssize_t read(T *ptrData, const size_t size, const size_t position) = 0;
 
   /**
    * @brief Updates or appends data in the storage
@@ -46,7 +46,7 @@ struct FileAccessorInterface {
    * @param position position from the beginning of file [unit: Bytes]. If max possible value - works as append.
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual ssize_t write(const T* ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
+  virtual ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
   /**
    * @brief gets name of storage (file name)
@@ -62,7 +62,7 @@ struct FileAccessorInterface {
    * @param size size of ptrData package
    * @return status of operation
    */
-  virtual ssize_t fctrl(void* ptrData, const size_t size) { return 0; };
+  virtual ssize_t fctrl(void *ptrData, const size_t size) { return 0; };
 
   virtual ~FileAccessorInterface(){};
 };

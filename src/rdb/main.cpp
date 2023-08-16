@@ -22,7 +22,7 @@
 
 enum payloadStatusType { fetched, clean, stored, changed, error };
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   payloadStatusType payloadStatus{clean};
 
   std::string GREEN  = "\x1B[32m";
@@ -300,7 +300,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "dec") {
       dacc->getPayload()->setHex(false);
     } else if (cmd == "dump") {
-      auto* ptr = reinterpret_cast<uint8_t*>(dacc->getPayload()->get());
+      auto *ptr = reinterpret_cast<uint8_t *>(dacc->getPayload()->get());
       for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');

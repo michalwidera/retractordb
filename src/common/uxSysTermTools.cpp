@@ -28,7 +28,7 @@ int _kbhit(void) {
 
 int _getch() { return getchar(); }
 
-void fixArgcv(int argc, char* argv[]) {
+void fixArgcv(int argc, char *argv[]) {
   // Clarification: When gcc has been upgraded to 9.x version some tests fails.
   // Bug appear when data are passing to program via script .sh
   // additional 13 (\r) character was append - this code normalize argv list.

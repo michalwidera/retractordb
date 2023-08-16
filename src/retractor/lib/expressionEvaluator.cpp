@@ -23,7 +23,7 @@ expressionEvaluator::~expressionEvaluator() {}
 
 typedef std::pair<rdb::descFldVT, rdb::descFldVT> pairVar;
 
-pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
+pairVar normalize(const rdb::descFldVT &a, const rdb::descFldVT &b) {
   if (a.index() == b.index()) return pairVar(a, b);
 
   pairVar retVal;
@@ -34,7 +34,7 @@ pairVar normalize(const rdb::descFldVT& a, const rdb::descFldVT& b) {
   }
 }
 
-rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
 
   auto [a, b] = normalize(aParam, bParam);
@@ -45,7 +45,7 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                            //
                  [&retVal](int a, int b) { retVal = a + b; },                                    //
                  [&retVal](unsigned a, unsigned b) { retVal = a + b; },                          //
-                 [&retVal](const std::string& a, const std::string& b) { retVal = a + b; },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = a + b; },      //
                  [&retVal](double a, double b) { retVal = a + b; },                              //
                  [&retVal](float a, float b) { retVal = a + b; },                                //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a + b; },  //
@@ -62,7 +62,7 @@ rdb::descFldVT operator+(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   return retVal;
 }
 
-rdb::descFldVT operator-(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
 
   auto [a, b] = normalize(aParam, bParam);
@@ -73,7 +73,7 @@ rdb::descFldVT operator-(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                                         //
                  [&retVal](int a, int b) { retVal = a - b; },                                                 //
                  [&retVal](unsigned a, unsigned b) { retVal = a - b; },                                       //
-                 [&retVal](const std::string& a, const std::string& b) { /* define string-minus-string */ },  //
+                 [&retVal](const std::string &a, const std::string &b) { /* define string-minus-string */ },  //
                  [&retVal](double a, double b) { retVal = a - b; },                                           //
                  [&retVal](float a, float b) { retVal = a - b; },                                             //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a - b; },               //
@@ -90,7 +90,7 @@ rdb::descFldVT operator-(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   return retVal;
 }
 
-rdb::descFldVT operator*(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
 
   auto [a, b] = normalize(aParam, bParam);
@@ -101,7 +101,7 @@ rdb::descFldVT operator*(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                                        //
                  [&retVal](int a, int b) { retVal = a * b; },                                                //
                  [&retVal](unsigned a, unsigned b) { retVal = a * b; },                                      //
-                 [&retVal](const std::string& a, const std::string& b) { /* define string-mult-string */ },  //
+                 [&retVal](const std::string &a, const std::string &b) { /* define string-mult-string */ },  //
                  [&retVal](double a, double b) { retVal = a * b; },                                          //
                  [&retVal](float a, float b) { retVal = a * b; },                                            //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a * b; },              //
@@ -118,7 +118,7 @@ rdb::descFldVT operator*(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   return retVal;
 }
 
-rdb::descFldVT operator/(const rdb::descFldVT& aParam, const rdb::descFldVT& bParam) {
+rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
 
   auto [a, b] = normalize(aParam, bParam);
@@ -129,7 +129,7 @@ rdb::descFldVT operator/(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                                       //
                  [&retVal](int a, int b) { retVal = a / b; },                                               //
                  [&retVal](unsigned a, unsigned b) { retVal = a / b; },                                     //
-                 [&retVal](const std::string& a, const std::string& b) { /* define string-div-string */ },  //
+                 [&retVal](const std::string &a, const std::string &b) { /* define string-div-string */ },  //
                  [&retVal](double a, double b) { retVal = a / b; },                                         //
                  [&retVal](float a, float b) { retVal = a / b; },                                           //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a / b; },             //
@@ -146,7 +146,7 @@ rdb::descFldVT operator/(const rdb::descFldVT& aParam, const rdb::descFldVT& bPa
   return retVal;
 }
 
-rdb::descFldVT neg(const rdb::descFldVT& inVar) {
+rdb::descFldVT neg(const rdb::descFldVT &inVar) {
   rdb::descFldVT retVal;
 
   std::visit(Overload{
@@ -158,14 +158,14 @@ rdb::descFldVT neg(const rdb::descFldVT& inVar) {
                  [&retVal](double a) { retVal = -a; },                                                             //
                  [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },               //
                  [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
-                 [&retVal](const std::string& a) { /* define neg of string ? */ }                                  //
+                 [&retVal](const std::string &a) { /* define neg of string ? */ }                                  //
              },
              inVar);
 
   return retVal;
 }
 
-rdb::descFldVT callFun(rdb::descFldVT& inVar, std::function<double(double)> fnName) {
+rdb::descFldVT callFun(rdb::descFldVT &inVar, std::function<double(double)> fnName) {
   auto backResultType = inVar.index();
   if (backResultType >= rdb::BYTE && backResultType <= rdb::DOUBLE) {
     rdb::descFldVT floValue{fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)))};
@@ -179,7 +179,7 @@ rdb::descFldVT callFun(rdb::descFldVT& inVar, std::function<double(double)> fnNa
   return inVar;
 }
 
-rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload* payload) {
+rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;
 

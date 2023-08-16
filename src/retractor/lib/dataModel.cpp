@@ -26,10 +26,10 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 */
 
 streamInstance::streamInstance(                //
-    const std::string& descriptorName,         // q.id
-    const std::string& storageNameParam,       // filename
-    const rdb::Descriptor& storageDescriptor,  //
-    const rdb::Descriptor& internalDescriptor) {
+    const std::string &descriptorName,         // q.id
+    const std::string &storageNameParam,       // filename
+    const rdb::Descriptor &storageDescriptor,  //
+    const rdb::Descriptor &internalDescriptor) {
   // only objects with REF has storageNameParam filled.
   const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
   SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
@@ -54,9 +54,9 @@ streamInstance::streamInstance(                //
 };
 
 streamInstance::streamInstance(                 //
-    const std::string& idAndStorageName,        // q.id = filename
-    const rdb::Descriptor& storageDescriptor,   //
-    const rdb::Descriptor& internalDescriptor)  //
+    const std::string &idAndStorageName,        // q.id = filename
+    const rdb::Descriptor &storageDescriptor,   //
+    const rdb::Descriptor &internalDescriptor)  //
     : streamInstance(idAndStorageName,          // descriptor file
                      idAndStorageName,          // storage file
                      storageDescriptor,         //
@@ -65,7 +65,7 @@ streamInstance::streamInstance(                 //
   SPDLOG_INFO("streamInstance - storage and id are the same");
 }
 
-streamInstance::streamInstance(query& qry)
+streamInstance::streamInstance(query &qry)
     : streamInstance(qry.id,                   // descriptor file (q.id)
                      qry.filename,             // storage file (filename)
                      qry.descriptorStorage(),  //
@@ -94,12 +94,12 @@ streamInstance::streamInstance(query& qry)
 // 50    50
 rdb::payload streamInstance::constructAgsePayload(const int length,             //
                                                   const int step,               //
-                                                  const std::string& instance,  //
+                                                  const std::string &instance,  //
                                                   const int storedRecordCountDst) {
   assert(step > 0);
 
   // temporary alias for variable - for better understand what is happening here.
-  const auto& source = outputPayload;
+  const auto &source = outputPayload;
 
   // 1. Descriptor construction process
   rdb::Descriptor descriptor;
@@ -159,7 +159,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 enum opType { maxop, minop, sumop, avgop };
 
 template <typename T>
-void fnOp(opType op, std::any value, std::any& valueRet) {
+void fnOp(opType op, std::any value, std::any &valueRet) {
   T val1 = std::any_cast<T>(valueRet);
   T val2 = std::any_cast<T>(value);
   switch (op) {
@@ -181,7 +181,7 @@ void fnOp(opType op, std::any value, std::any& valueRet) {
   }
 }
 
-rdb::payload streamInstance::constructAggregate(command_id cmd, const std::string& instance) {
+rdb::payload streamInstance::constructAggregate(command_id cmd, const std::string &instance) {
   assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor
@@ -282,13 +282,13 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   return *(localPayload.get());
 }
 
-void streamInstance::constructOutputPayload(const std::list<field>& fields) {
+void streamInstance::constructOutputPayload(const std::list<field> &fields) {
   auto i{0};
   for (auto program : fields) {
     expressionEvaluator expression;
     rdb::descFldVT retVal = expression.eval(program.lProgram, inputPayload.get());
 
-    std::any result = std::visit([](auto&& arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
+    std::any result = std::visit([](auto &&arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
 
     assert(result.has_value());
 
@@ -303,7 +303,7 @@ void streamInstance::constructOutputPayload(const std::list<field>& fields) {
   }
 }
 
-dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
+dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
@@ -313,18 +313,18 @@ dataModel::dataModel(qTree& coreInstance) : coreInstance(coreInstance) {
   }
 
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
-                                [](const query& qry) { return qry.id[0] == ':'; });
+                                [](const query &qry) { return qry.id[0] == ':'; });
   coreInstance.erase(new_end, coreInstance.end());
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
 
-  for (auto& qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
-  for (auto const& [key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
+  for (auto &qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(qry));
+  for (auto const &[key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
 }
 
 dataModel::~dataModel() {}
 
-std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string& instance,  //
+std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto revOffsetMutable(revOffset);
@@ -336,14 +336,14 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string& 
   return qSet[instance]->outputPayload->getPayload();
 }
 
-bool dataModel::fetchPayload(const std::string& instance,                     //
+bool dataModel::fetchPayload(const std::string &instance,                     //
                              std::unique_ptr<rdb::payload>::pointer payload,  //
                              const int revOffset) {
   return qSet[instance]->outputPayload->revRead(revOffset, payload->get());
 }
 
 // TODO: work area
-void dataModel::processRows(const std::set<std::string>& inSet) {
+void dataModel::processRows(const std::set<std::string> &inSet) {
   bool zeroStep{false};
 
   // Move ALL armed device read to circular buffer. - no inSet dependent.
@@ -402,7 +402,7 @@ void dataModel::processRows(const std::set<std::string>& inSet) {
   SPDLOG_INFO("END PROCESS: {}", s.str());
 }
 
-void dataModel::fetchDeclaredPayload(const std::string& instance) {
+void dataModel::fetchDeclaredPayload(const std::string &instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.isDeclaration());  // lProgram is empty()
@@ -415,7 +415,7 @@ void dataModel::fetchDeclaredPayload(const std::string& instance) {
   assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::armed);
 }
 
-void dataModel::constructInputPayload(const std::string& instance) {
+void dataModel::constructInputPayload(const std::string &instance) {
   auto qry = coreInstance[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
@@ -544,7 +544,7 @@ void dataModel::constructInputPayload(const std::string& instance) {
   }
 }
 
-std::vector<rdb::descFldVT> dataModel::getRow(const std::string& instance, const int timeOffset) {
+std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
@@ -563,8 +563,8 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string& instance, const
   return retVal;
 }
 
-size_t dataModel::streamStoredSize(const std::string& instance) {
+size_t dataModel::streamStoredSize(const std::string &instance) {
   return qSet[instance]->outputPayload->getDescriptor().getSizeInBytes() * getStreamCount(instance);
 }
 
-size_t dataModel::getStreamCount(const std::string& instance) { return qSet[instance]->outputPayload->getRecordsCount(); }
+size_t dataModel::getStreamCount(const std::string &instance) { return qSet[instance]->outputPayload->getRecordsCount(); }

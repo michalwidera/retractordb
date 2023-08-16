@@ -31,19 +31,20 @@ add_custom_target(
 
 # sudo apt install clang-format ; sudo pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
+set(CSTYLE
+    '{BasedOnStyle: Google, ColumnLimit: 129, AlignConsecutiveAssignments: true, DerivePointerAlignment: false, PointerAlignment: Right}'
+)
+
 add_custom_target(
   cformat
   COMMAND
     find ${CMAKE_SOURCE_DIR}/src -iname "*.h" -o -iname "*.cpp" -o -iname
     "*.hpp" -o -iname "*.cc" | grep --invert-match 'Parser/' | xargs
-    clang-format -i --style='{BasedOnStyle: Google, ColumnLimit: 129,
-    AlignConsecutiveAssignments: true}'
-  COMMAND
-    find ${CMAKE_SOURCE_DIR}/test -iname "*.h" -o -iname "*.cpp" -o -iname
-    "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style='{BasedOnStyle:
-    Google, ColumnLimit: 129, AlignConsecutiveAssignments: true}'
+    clang-format -i --style=${CSTYLE}
+  COMMAND find ${CMAKE_SOURCE_DIR}/test -iname "*.h" -o -iname "*.cpp" -o -iname
+          "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style=${CSTYLE}
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
-          --line-width=129
+          --line-width=80
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
 add_custom_target(

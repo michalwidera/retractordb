@@ -7,7 +7,7 @@
 
 template <typename T>
 struct cast {
-  T operator()(const T& inVar, rdb::descFld reqType);
+  T operator()(const T &inVar, rdb::descFld reqType);
 };
 
 rdb::descFldVT any_to_variant_cast(std::any a);

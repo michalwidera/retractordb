@@ -23,7 +23,7 @@ const std::string genericBinaryFileAccessor<T>::fileName() {
 }
 
 template <class T>
-ssize_t genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   if (position == std::numeric_limits<size_t>::max()) {
@@ -39,7 +39,7 @@ ssize_t genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   }
-  myFile.write(reinterpret_cast<const char*>(ptrData), size);
+  myFile.write(reinterpret_cast<const char *>(ptrData), size);
   assert((myFile.rdstate() & std::ofstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
@@ -47,7 +47,7 @@ ssize_t genericBinaryFileAccessor<T>::write(const T* ptrData, const size_t size,
 }
 
 template <class T>
-ssize_t genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName(), std::ios::in | std::ios::binary);
@@ -62,7 +62,7 @@ ssize_t genericBinaryFileAccessor<T>::read(T* ptrData, const size_t size, const 
   // Therefore +1 appears.
   // Last byte was omitted.
   // Look's like some inconsistency is here.
-  myFile.get(reinterpret_cast<char*>(ptrData), size + 1);
+  myFile.get(reinterpret_cast<char *>(ptrData), size + 1);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();

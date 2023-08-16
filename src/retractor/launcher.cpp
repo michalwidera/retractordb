@@ -23,13 +23,13 @@ using boost::lexical_cast;
 
 extern std::string parserFile(std::string sInputFile);
 extern int main_retractor(bool verbose, int iTimeLimitCntParam);
-extern int dumper(boost::program_options::variables_map& vm);
+extern int dumper(boost::program_options::variables_map &vm);
 
 int iTimeLimitCntParam{0};
 
 extern qTree coreInstance;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   if (argc > 0 && argv != nullptr) fixArgcv(argc, argv);
 
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
       return system::errc::success;
     }
 
-  } catch (std::exception& e) {
+  } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
     return system::errc::interrupted;
   }

@@ -20,7 +20,7 @@ storageAccessor::storageAccessor(const std::string fileNameDesc, const std::stri
   SPDLOG_INFO("descriptorFile-> {} | storageFile-> {}", descriptorFile, fileName);
 }
 
-void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
+void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
   if (descriptorFileExist()) {
     std::fstream myFile;
     myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -78,7 +78,7 @@ void storageAccessor::attachDescriptor(const Descriptor* descriptorParam) {
 void storageAccessor::moveRef() {
   auto it = std::find_if(descriptor.begin(),
                          descriptor.end(),                                             //
-                         [](auto& item) { return std::get<rtype>(item) == rdb::REF; }  //
+                         [](auto &item) { return std::get<rtype>(item) == rdb::REF; }  //
   );
 
   // Descriptor changes storageFile location
@@ -104,7 +104,7 @@ void storageAccessor::attachStorage() {
 
   auto it = std::find_if(descriptor.begin(),
                          descriptor.end(),                                              //
-                         [](auto& item) { return std::get<rtype>(item) == rdb::TYPE; }  //
+                         [](auto &item) { return std::get<rtype>(item) == rdb::TYPE; }  //
   );
 
   if (it != descriptor.end()) {
@@ -179,15 +179,15 @@ void storageAccessor::reset() {
   SPDLOG_INFO("reset - drop & recreate storage.");
 }
 
-void storageAccessor::cleanPayload(uint8_t* destination) {
-  destination = (destination == nullptr)                            //
-                    ? static_cast<uint8_t*>(storagePayload->get())  //
+void storageAccessor::cleanPayload(uint8_t *destination) {
+  destination = (destination == nullptr)                             //
+                    ? static_cast<uint8_t *>(storagePayload->get())  //
                     : destination;
   auto size   = descriptor.getSizeInBytes();
   std::memset(destination, 0, size);
 }
 
-Descriptor& storageAccessor::getDescriptor() { return descriptor; }
+Descriptor &storageAccessor::getDescriptor() { return descriptor; }
 
 std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
   if (!storagePayload) {
@@ -234,19 +234,19 @@ void storageAccessor::fire() {
 
 bool storageAccessor::read_() {
   assert(isDeclared());
-  uint8_t* destination = static_cast<uint8_t*>(chamber->get());
+  uint8_t *destination = static_cast<uint8_t *>(chamber->get());
 
   auto size   = descriptor.getSizeInBytes();
   auto result = accessor->read(destination, size, 0);
   return result == 0;
 }
 
-bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
+bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
   assert(!isDeclared());
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {
-    destination = static_cast<uint8_t*>(storagePayload->get());
+    destination = static_cast<uint8_t *>(storagePayload->get());
   }
 
   assert(destination != nullptr);
@@ -268,7 +268,7 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t* destination) {
   return result == 0;
 }
 
-bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
+bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
   const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
 
   if (!isDeclared()) return read_(recordPositionFromBack, destination);
@@ -302,8 +302,8 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t* destination) {
   // in case of accessing buffer that has no data yet - zeros are returned
 
   if (recordIndex >= circularBuffer.size()) {
-    destination = (destination == nullptr)                            //
-                      ? static_cast<uint8_t*>(storagePayload->get())  //
+    destination = (destination == nullptr)                             //
+                      ? static_cast<uint8_t *>(storagePayload->get())  //
                       : destination;
 
     assert(destination != nullptr);
@@ -330,7 +330,7 @@ bool storageAccessor::write(const size_t recordIndex) {
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
-    result = accessor->write(static_cast<uint8_t*>(storagePayload->get()),
+    result = accessor->write(static_cast<uint8_t *>(storagePayload->get()),
                              size);  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
@@ -339,7 +339,7 @@ bool storageAccessor::write(const size_t recordIndex) {
   }
 
   if (recordsCount > 0 && recordIndex < recordsCount) {
-    result = accessor->write(static_cast<uint8_t*>(storagePayload->get()), size, recordIndex * size);
+    result = accessor->write(static_cast<uint8_t *>(storagePayload->get()), size, recordIndex * size);
     assert(result == 0);
     SPDLOG_INFO("write {}", recordIndex);
   }

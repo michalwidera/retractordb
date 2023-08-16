@@ -11,7 +11,7 @@
 #include <typeinfo>
 
 template <typename T, typename K>
-void visit_descFld(const K& inVar, K& retVal) {
+void visit_descFld(const K &inVar, K &retVal) {
   // List of unsupported types by this function
   static_assert(!std::is_same_v<T, boost::rational<int>>);
   static_assert(!std::is_same_v<T, std::pair<int, int>>);
@@ -27,10 +27,10 @@ void visit_descFld(const K& inVar, K& retVal) {
                    [&retVal](double a) { retVal = static_cast<T>(a); },                                  //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },             //
                    [&retVal](std::pair<std::string, int> a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
-                   [&retVal](const std::string& a) {
+                   [&retVal](const std::string &a) {
                      try {
                        retVal = static_cast<T>(std::stoi(a));
-                     } catch (std::exception& err) {
+                     } catch (std::exception &err) {
                        SPDLOG_ERROR("Cant conv nonint string to integer.");
                      };
                    }  //
@@ -58,7 +58,7 @@ void visit_descFld(const K& inVar, K& retVal) {
     } else if (inVar.type() == typeid(std::string)) {
       try {
         retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
-      } catch (std::exception& err) {
+      } catch (std::exception &err) {
         SPDLOG_ERROR("Cant conv nonint string to integer here.");
       };
     } else {
@@ -69,7 +69,7 @@ void visit_descFld(const K& inVar, K& retVal) {
 
 // https://stackoverflow.com/questions/23304177/c-alternative-for-parsing-input-with-sscanf
 template <char C>
-std::istream& expect(std::istream& in) {
+std::istream &expect(std::istream &in) {
   if ((in >> std::ws).peek() == C) {
     in.ignore();
   } else {
@@ -80,7 +80,7 @@ std::istream& expect(std::istream& in) {
 
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
 template <typename T>
-T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
+T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
   T retVal;
   switch (reqType) {
     case rdb::BYTE:
@@ -121,7 +121,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                      },                                                                                                       //
                      [&retVal](std::pair<int, int> a) { retVal = a; },                                                        //
                      [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair(atoi(a.first.c_str()), a.second); },  //
-                     [&retVal](const std::string& a) {
+                     [&retVal](const std::string &a) {
                        std::istringstream in(a);
                        int first{0};
                        int second{1};
@@ -173,7 +173,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                             [&retVal](std::pair<std::string, int> a) {
                               retVal = boost::rational<int>(a.second, 1);
                             },  //  first is skipped
-                            [&retVal](const std::string& a) {
+                            [&retVal](const std::string &a) {
                               std::istringstream in(a);
                               int nom{0}, den{1};
                               in >> nom >> expect<'/'> >> den;
@@ -219,7 +219,7 @@ T cast<T>::operator()(const T& inVar, rdb::descFld reqType) {
                      [&retVal](double a) { retVal = std::to_string(a); },                                                      //
                      [&retVal](std::pair<int, int> a) { retVal = std::to_string(a.first) + "," + std::to_string(a.second); },  //
                      [&retVal](std::pair<std::string, int> a) { retVal = a.first + "," + std::to_string(a.second); },          //
-                     [&retVal](const std::string& a) { retVal = a; },                                                          //
+                     [&retVal](const std::string &a) { retVal = a; },                                                          //
                      [&retVal](boost::rational<int> a) {
                        std::stringstream ss;
                        ss << a;
