@@ -9,7 +9,7 @@
 namespace rdb {
 
 template <class T>
-binaryDeviceAccessor<T>::binaryDeviceAccessor(std::string fileName) : fileNameStr(fileName) {
+binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string fileName) : fileNameStr(fileName) {
   fd = ::open(fileNameStr.c_str(), O_RDONLY | O_CLOEXEC, 0644);
 }
 
@@ -39,10 +39,10 @@ ssize_t binaryDeviceAccessor<T>::read(T* ptrData, const size_t size, const size_
   if (fd < 0) {
     return fd;  // <- Error status
   }
-  const ssize_t read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
-  if (read_size != size) {                              // dev/random has no seek - but binary files should loop?
+  auto read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
+  if (read_size != size) {                     // dev/random has no seek - but binary files should loop?
     ::lseek(fd, 0, SEEK_SET);
-    const ssize_t read_size_sh = ::read(fd, ptrData, size);
+    auto read_size_sh = ::read(fd, ptrData, size);
     if (read_size_sh != size) return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

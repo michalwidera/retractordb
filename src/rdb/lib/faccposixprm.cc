@@ -9,7 +9,7 @@
 namespace rdb {
 
 template <class T>
-posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {
+posixPrmBinaryFileAccessor<T>::posixPrmBinaryFileAccessor(const std::string fileName) : fileNameStr(fileName) {
   fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", fileNameStr, fd);

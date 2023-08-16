@@ -8,7 +8,7 @@
 
 namespace rdb {
 template <class T>
-posixBinaryFileAccessor<T>::posixBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {}
+posixBinaryFileAccessor<T>::posixBinaryFileAccessor(const std::string fileName) : fileNameStr(fileName) {}
 
 template <class T>
 std::string posixBinaryFileAccessor<T>::fileName() {

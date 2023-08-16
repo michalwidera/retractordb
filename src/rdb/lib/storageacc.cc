@@ -13,7 +13,7 @@ namespace rdb {
 
 bool isOpen(const storageState val) { return (val == storageState::openExisting || val == storageState::openAndCreate); };
 
-storageAccessor::storageAccessor(std::string fileNameDesc, const std::string fileName)
+storageAccessor::storageAccessor(const std::string fileNameDesc, const std::string fileName)
     :  //
       descriptorFile(fileNameDesc + ".desc"),
       storageFile(fileName) {

@@ -114,8 +114,7 @@ int main(int argc, char* argv[]) {
       }
       payloadStatus = clean;
       dacc->setRemoveOnExit(false);
-      if (dacc->isDeclared())
-        dacc->setCapacity(1);
+      if (dacc->isDeclared()) dacc->setCapacity(1);
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
       std::cout << "exit|quit|q \t\t\t exit\n";

@@ -15,7 +15,7 @@ namespace rdb {
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 template <class T>
-genericBinaryFileAccessor<T>::genericBinaryFileAccessor(std::string fileName) : fileNameStr(fileName) {}
+genericBinaryFileAccessor<T>::genericBinaryFileAccessor(const std::string fileName) : fileNameStr(fileName) {}
 
 template <class T>
 std::string genericBinaryFileAccessor<T>::fileName() {

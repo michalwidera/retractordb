@@ -24,7 +24,7 @@ class textSourceAccessor : public FileAccessorInterface<T> {
  public:
   ~textSourceAccessor();
 
-  explicit textSourceAccessor(std::string fileName);
+  explicit textSourceAccessor(const std::string fileName);
 
   ssize_t read(T *ptrData, const size_t size, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
