@@ -48,11 +48,6 @@ modules:
         enabled: false
   - name: Cppcheck
     enabled: false
-    rules:
-      - key: 'CPPCHECK-CPP-391'
-        enabled: false
-      - key: 'CPPCHECK-CPP-345'
-        enabled: false
   - name: Pylint
     enabled: true
     rules:

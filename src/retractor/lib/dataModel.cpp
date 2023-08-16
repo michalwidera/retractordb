@@ -125,8 +125,6 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
   auto outFasterThanIn = deltaDst < deltaSrc;
 
-  auto prevQuot{-1};
-
   auto storedRecordCountDst_{storedRecordCountDst};
   storedRecordCountDst_ += 1;
   storedRecordCountDst_ *= descriptorSrcSize * deltaDst.numerator();
@@ -150,7 +148,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   }
 
   // 3. Cleanup source after processing
-  if (prevQuot != 0) source->revRead(0);  // Reset source
+  source->revRead(0);  // Reset source
 
   // 4. Return constructed object.
   return *(result.get());
