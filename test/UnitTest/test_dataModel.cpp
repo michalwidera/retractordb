@@ -115,7 +115,7 @@ TEST_F(xschema, check_test0) {
   };
 
   {
-    streamInstance data{"file_A", "file_A.dat", dataStorageDescriptor, dataInternalDescriptor};
+    streamInstance data{coreInstance, "file_A", "file_A.dat", dataStorageDescriptor, dataInternalDescriptor};
 
     data.inputPayload->setItem(0, 123);
     data.inputPayload->setItem(1, 345);
@@ -130,7 +130,7 @@ TEST_F(xschema, check_test0) {
   }
 
   {
-    streamInstance data{"file_B", "file_B.dat", dataStorageDescriptor, dataInternalDescriptor};
+    streamInstance data{coreInstance, "file_B", "file_B.dat", dataStorageDescriptor, dataInternalDescriptor};
 
     data.inputPayload->setItem(0, 123);
     data.inputPayload->setItem(1, 345);
@@ -159,7 +159,8 @@ TEST_F(xschema, create_struct_local_str1a) {
   auto dataDescriptor{rdb::Descriptor("A", 4, 1, rdb::INTEGER) |  //
                       rdb::Descriptor("B", 4, 1, rdb::INTEGER)};
 
-  streamInstance q("str1a",         // storage and descriptor are the same name
+  streamInstance q(coreInstance,    //
+                   "str1a",         // storage and descriptor are the same name
                    dataDescriptor,  //
                    dataDescriptor);
 
@@ -172,7 +173,7 @@ TEST_F(xschema, create_struct_local_str1a) {
 }
 
 TEST_F(xschema, check_construct_payload) {
-  streamInstance data{coreInstance["str1"]};
+  streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setRemoveOnExit(false);
 
   // str1
@@ -202,7 +203,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
       rdb::Descriptor("str1_1", 1, 1, rdb::BYTE)       //
   };
 
-  streamInstance data{coreInstance["str1"]};
+  streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setRemoveOnExit(false);
 
   // str1
@@ -228,11 +229,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
 }
 
 TEST_F(xschema, check_sum) {
-  streamInstance dataStr1{coreInstance["str1"]};
+  streamInstance dataStr1{coreInstance, coreInstance["str1"]};
   dataStr1.outputPayload->setRemoveOnExit(false);
   dataStr1.outputPayload->revRead(0);
 
-  streamInstance dataStr2{coreInstance["str2"]};
+  streamInstance dataStr2{coreInstance, coreInstance["str2"]};
   dataStr2.outputPayload->setRemoveOnExit(false);
   dataStr2.outputPayload->revRead(0);
 
