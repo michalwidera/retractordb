@@ -1,24 +1,23 @@
-#include <boost/lexical_cast.hpp>     // for lexical_cast
-#include <boost/program_options.hpp>  // IWYU pragma: keep
-#include <boost/regex.hpp>            // IWYU pragma: keep
+#include "dumper.h"
+
+#include <boost/lexical_cast.hpp>  // for lexical_cast
+#include <boost/regex.hpp>         // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
 #include <fstream>
 #include <iostream>  // for operator<<
 
-#include "QStruct.h"  // for query, token
-#include "config.h"   // Add an automatically generated configuration file
+#include "config.h"  // Add an automatically generated configuration file
 
 using namespace boost;
 
 // Object coreInstance in QStruct.cpp
-extern "C" qTree coreInstance;
 
 //
 // 1. dumper.exe out_p.qry --dot >out.dot
 // 2. dot -Tjpg out.dot -o file.jpg
 // 3. start file.jgp
 //
-void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags) {
+void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
@@ -180,7 +179,7 @@ void dumpGraphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bo
   xout << "}" << std::endl;
 }
 
-void dumpQFieldsProgram() {
+void dumper::qFieldsProgram() {
   std::cout << std::endl;
   std::cout << "fcnt_ref\tid_ref\ttoken\tvalue" << std::endl;
   for (auto q : coreInstance) {
@@ -200,7 +199,7 @@ void dumpQFieldsProgram() {
   }
 }
 
-void dumpQFields() {
+void dumper::qFields() {
   std::cout << std::endl;
   std::cout << "fcnt\tid_ref\tfName" << std::endl;
   for (auto q : coreInstance) {
@@ -214,7 +213,7 @@ void dumpQFields() {
   }
 }
 
-void dumpQPrograms() {
+void dumper::qPrograms() {
   std::cout << std::endl;
   std::cout << "qcnt\tid_ref\ttoken\tvalue" << std::endl;
   for (auto q : coreInstance) {
@@ -229,7 +228,7 @@ void dumpQPrograms() {
   }
 }
 
-void dumpQSet() {
+void dumper::qSet() {
   std::cout << std::endl;
   std::cout << "id\tlen prg\tlen sch\tinterval\tfilename" << std::endl;
   for (auto q : coreInstance) {
@@ -242,7 +241,7 @@ void dumpQSet() {
   }
 }
 
-void dumpRawTextFile() {
+void dumper::rawTextFile() {
   for (auto q : coreInstance) {
     std::cout << q.id << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
@@ -272,7 +271,7 @@ void dumpRawTextFile() {
   }
 }
 
-int dumper(boost::program_options::variables_map &vm) {
+int dumper::run(boost::program_options::variables_map &vm) {
   try {
     if (vm.count("tags") != 0 && vm.count("fields") == 0) {
       std::cerr << "Conflicting parameters." << std::endl;
@@ -280,14 +279,14 @@ int dumper(boost::program_options::variables_map &vm) {
       return system::errc::invalid_argument;
     }
     if (vm.count("dot")) {
-      dumpGraphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0);
+      graphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0);
     } else if (vm.count("csv")) {
-      dumpQSet();
-      dumpQPrograms();
-      dumpQFields();
-      dumpQFieldsProgram();
+      qSet();
+      qPrograms();
+      qFields();
+      qFieldsProgram();
     } else {
-      dumpRawTextFile();
+      rawTextFile();
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << std::endl;

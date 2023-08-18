@@ -15,6 +15,7 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/QStruct.h"
 #include "lib/compiler.hpp"
+#include "lib/dumper.h"
 #include "uxSysTermTools.h"
 
 using namespace boost;
@@ -23,7 +24,6 @@ using boost::lexical_cast;
 
 extern std::string parserFile(std::string sInputFile);
 extern int main_retractor(bool verbose, int iTimeLimitCntParam);
-extern int dumper(boost::program_options::variables_map &vm);
 
 int iTimeLimitCntParam{0};
 
@@ -125,7 +125,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (onlyCompile) {
-      if (!vm.count("quiet")) dumper(vm);
+      if (!vm.count("quiet")) {
+        dumper dm(coreInstance);
+        return dm.run(vm);
+      }
       return system::errc::success;
     }
 
