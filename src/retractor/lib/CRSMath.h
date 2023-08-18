@@ -35,6 +35,7 @@ class TimeLine : private boost::noncopyable {
    * Prepared list is then taken as argument by getNextTimeSlot function
    */
   explicit TimeLine(set<rational<int>> const &inSet);
+  TimeLine() = delete;
 
   /** Function return true if given delta is in current time slot
    * Note: This is not trivial

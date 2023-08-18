@@ -42,7 +42,7 @@ class storageAccessor {
 
  public:
   storageAccessor() = delete;
-  storageAccessor(const std::string fileNameDesc, const std::string fileName = "");
+  explicit storageAccessor(const std::string fileNameDesc, const std::string fileName = "");
   ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;

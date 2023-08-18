@@ -5,7 +5,8 @@
 #include "QStruct.h"  // for query, token
 
 struct compiler {
-  compiler(qTree &coreInstance) : coreInstance(coreInstance){};
+  explicit compiler(qTree &coreInstance) : coreInstance(coreInstance){};
+  compiler() = delete;
 
   std::string intervalCounter();
   std::string simplifyLProgram();

@@ -14,6 +14,7 @@
 
 struct streamInstance {
   qTree &coreInstance;
+  streamInstance() = delete;
 
   std::unique_ptr<rdb::storageAccessor> outputPayload;  // here is payload that will be stored - select clause
   std::unique_ptr<rdb::payload> inputPayload;           // payload used for computation in select
