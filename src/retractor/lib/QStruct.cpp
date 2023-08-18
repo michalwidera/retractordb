@@ -102,6 +102,8 @@ void qTree::dfs(const std::string v) {
 void qTree::topologicalSort() {
   // https://cp-algorithms.com/graph/topological-sort.html#implementation
 
+  qTree &coreInstance{*this};
+
   ans.clear();
   for (auto q : coreInstance) visited[q.id] = false;
   for (auto q : coreInstance) adj[q.id] = q.getDepStream();
@@ -183,9 +185,9 @@ query &getQuery(const std::string &query_name) {
   return (void_query);  // proforma
 }
 
-int getSeqNr(const std::string &query_name) {
+int qTree::getSeqNr(const std::string &query_name) {
   int cnt(0);
-  for (auto &q : coreInstance) {
+  for (auto &q : *this) {
     if (query_name == q.id)
       return cnt;
     else
@@ -193,13 +195,6 @@ int getSeqNr(const std::string &query_name) {
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
   return -1;  // INVALID QUERY_NR
-}
-
-bool isExist(const std::string &query_name) {
-  for (auto &q : coreInstance) {
-    if (query_name == q.id) return true;
-  }
-  return false;
 }
 
 boost::rational<int> token::getRI() {

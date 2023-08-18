@@ -89,7 +89,6 @@ bool operator<(const query &lhs, const query &rhs);
 query &getQuery(const std::string &query_name);
 int getSeqNr(const std::string &query_name);
 bool isDeclared(const std::string &query_name);
-bool isExist(const std::string &query_name);
 
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
@@ -100,6 +99,7 @@ class qTree : public std::vector<query> {
   vector<std::string> ans;
 
   void dfs(const std::string v);  // Depth First Traversal
+  int getSeqNr(const std::string &query_name);
 
  public:
   query &operator[](const std::string &query_name) { return getQuery(query_name); };
