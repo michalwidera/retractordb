@@ -2,7 +2,6 @@
 #define STORAGE_RDB_INCLUDE_FAINTERFACE_H_
 
 #include <cstdint>  // uint8_t
-
 #include <limits>
 #include <string>
 
@@ -53,7 +52,7 @@ struct FileAccessorInterface {
    *
    * @return std::string filename
    */
-  virtual const std::string fileName() = 0;
+  virtual std::string fileName() = 0;
 
   /**
    * @brief Control method for data source

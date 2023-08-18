@@ -19,7 +19,7 @@ binaryDeviceAccessor<T>::~binaryDeviceAccessor() {
 }
 
 template <class T>
-const std::string binaryDeviceAccessor<T>::fileName() {
+std::string binaryDeviceAccessor<T>::fileName() {
   return fileNameStr;
 }
 

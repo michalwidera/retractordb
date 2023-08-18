@@ -25,7 +25,7 @@ K readFromFstream(std::fstream &myFile) {
 }
 
 template <typename T>
-textSourceAccessor<T>::textSourceAccessor(const std::string fileName) : fileNameStr(fileName) {
+textSourceAccessor<T>::textSourceAccessor(const std::string &fileName) : fileNameStr(fileName) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
@@ -37,7 +37,7 @@ textSourceAccessor<T>::~textSourceAccessor() {
 }
 
 template <class T>
-const std::string textSourceAccessor<T>::fileName() {
+std::string textSourceAccessor<T>::fileName() {
   return fileNameStr;
 }
 

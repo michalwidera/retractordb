@@ -8,9 +8,8 @@
 #error DECL_T, DECL_F, DECL_E, BEGIN_E_GEN_T,END_E_GEN_T conflicts with inner fldType.h declaration.
 #endif
 
-#include <cstdint>  // uint8_t - C++20
-
 #include <boost/rational.hpp>  // boost::rational
+#include <cstdint>             // uint8_t - C++20
 #include <string>              // std::string
 #include <tuple>               //
 #include <utility>             // std::pair
