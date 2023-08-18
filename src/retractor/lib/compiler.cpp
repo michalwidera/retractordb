@@ -19,11 +19,8 @@
 
 using boost::lexical_cast;
 
-// Object coreInstance in QStruct.cpp
-extern "C" qTree coreInstance;
-
 /** This procedure computes time delays (delta) for generated streams */
-std::string intervalCounter() {
+std::string compiler::intervalCounter() {
   while (true) {
     bool bOnceAgain(false);
     coreInstance.sort();
@@ -159,7 +156,7 @@ std::string intervalCounter() {
   return std::string("OK");
 }
 
-std::string generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
+std::string compiler::generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
   if (sName2 == "")
     return GetStringcommand_id(cmd) + std::string("_") + sName1;
   else
@@ -169,7 +166,7 @@ std::string generateStreamName(const std::string &sName1, const std::string &sNa
 /* Goal of this procedure is to provide stream to canonical form
 TODO: Stream_MAX,MIN,AVG...
 */
-std::string simplifyLProgram() {
+std::string compiler::simplifyLProgram() {
   coreInstance.sort();
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
     // Optimization phase 2
@@ -227,7 +224,7 @@ std::string simplifyLProgram() {
 }
 
 // Goal of this procedure is to unroll schema based of given command
-std::list<field> combine(const std::string &sName1, const std::string &sName2, token &cmd_token) {
+std::list<field> compiler::combine(const std::string &sName1, const std::string &sName2, token &cmd_token) {
   std::list<field> lRetVal;
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
@@ -321,7 +318,7 @@ std::list<field> combine(const std::string &sName1, const std::string &sName2, t
 // unfortunately algorithm if broken - because does not search backward but next
 // by next and some * can be process which have arguments appear as two asterisk
 // In such case unroll does not appear and algorithm gets shitin-shitout
-std::string prepareFields() {
+std::string compiler::prepareFields() {
   int fieldCountSh = 0;
   coreInstance.topologicalSort();
   for (auto &q : coreInstance) {
@@ -367,7 +364,7 @@ std::string prepareFields() {
 }
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
-std::string replicateIDX() {
+std::string compiler::replicateIDX() {
   for (auto &q : coreInstance) {             // for each query
     for (auto &f : q.lSchema) {              // for each field in query
       std::vector<std::string> usedSchemaX;  //
@@ -415,7 +412,7 @@ Command method of presentation aims simple data processing
 Aim of this procedure is change all of push_idXXX to push_id
 note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction */
-std::string convertReferences() {
+std::string compiler::convertReferences() {
   boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
   boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
   boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");              // something[1]
@@ -541,7 +538,7 @@ std::string convertReferences() {
 
 /* This function will convert fields list where stream a from b#c
 clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
-std::string convertRemotes() {
+std::string compiler::convertRemotes() {
   std::map<std::string, std::map<STRINT>> offsetMap;
 
   // This loop fill&create OffsetMap structure.
@@ -576,7 +573,7 @@ std::string convertRemotes() {
   return std::string("OK");
 }
 
-std::string applyConstraints() {
+std::string compiler::applyConstraints() {
   for (auto &q : coreInstance) {       // for each query
     if (q.isDeclaration()) continue;   // do not check declaration in constraints.
     assert(!q.isReductionRequired());  // process data only with two or less arguments
@@ -595,7 +592,7 @@ std::string applyConstraints() {
   return std::string("OK");
 }
 
-std::map<std::string, int> countBuffersCapacity() {
+std::map<std::string, int> compiler::countBuffersCapacity() {
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
   for (auto &q : coreInstance) {       // for each declaration

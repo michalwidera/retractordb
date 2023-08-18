@@ -102,22 +102,23 @@ int main(int argc, char *argv[]) {
     if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
 
     std::string response;
-    response = simplifyLProgram();
+    compiler cm(coreInstance);
+    response = cm.simplifyLProgram();
     assert(response == "OK");
-    response = prepareFields();
+    response = cm.prepareFields();
     assert(response == "OK");
-    response = intervalCounter();
+    response = cm.intervalCounter();
     assert(response == "OK");
-    response = convertReferences();
+    response = cm.convertReferences();
     assert(response == "OK");
-    response = replicateIDX();
+    response = cm.replicateIDX();
     assert(response == "OK");
-    response = convertRemotes();
+    response = cm.convertRemotes();
     assert(response == "OK");
 
-    coreInstance.maxCapacity = countBuffersCapacity();
+    coreInstance.maxCapacity = cm.countBuffersCapacity();
 
-    response = applyConstraints();
+    response = cm.applyConstraints();
     if (response != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //
                 << "Check result:" << response << std::endl;

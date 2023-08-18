@@ -49,25 +49,25 @@ class crsMathTest : public ::testing::Test {
   virtual void SetUp() {
     auto compiled = parserFile("ut_crsmath.rql") == "OK";
     assert(compiled && "Query set malformed according to grammar.");
-    // dataArea = std::make_unique<dataModel>(coreInstance);
 
+    compiler cm(coreInstance);
     std::string response;
-    response = simplifyLProgram();
+    response = cm.simplifyLProgram();
     assert(response == "OK");
-    response = prepareFields();
+    response = cm.prepareFields();
     assert(response == "OK");
-    response = intervalCounter();
+    response = cm.intervalCounter();
     assert(response == "OK");
-    response = convertReferences();
+    response = cm.convertReferences();
     assert(response == "OK");
-    response = replicateIDX();
+    response = cm.replicateIDX();
     assert(response == "OK");
-    response = convertRemotes();
+    response = cm.convertRemotes();
     assert(response == "OK");
 
-    coreInstance.maxCapacity = countBuffersCapacity();
+    coreInstance.maxCapacity = cm.countBuffersCapacity();
 
-    response = applyConstraints();
+    response = cm.applyConstraints();
     assert(response == "OK");
   }
 
