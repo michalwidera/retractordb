@@ -318,24 +318,6 @@ TEST(crdb, posixBinaryFileAccessor_char) {
   ASSERT_TRUE(result3);
 }
 
-TEST(crdb, posixPrmBinaryFileAccessor_byte) {
-  auto result1 = test_1<uint8_t, rdb::posixPrmBinaryFileAccessor<uint8_t>>();
-  ASSERT_TRUE(result1);
-  auto result2 = test_2<uint8_t, rdb::posixPrmBinaryFileAccessor<uint8_t>>();
-  ASSERT_TRUE(result2);
-  auto result3 = test_3<uint8_t, rdb::posixPrmBinaryFileAccessor<uint8_t>>();
-  ASSERT_TRUE(result3);
-}
-
-TEST(crdb, posixPrmBinaryFileAccessor_char) {
-  auto result1 = test_1<char, rdb::posixPrmBinaryFileAccessor<char>>();
-  ASSERT_TRUE(result1);
-  auto result2 = test_2<char, rdb::posixPrmBinaryFileAccessor<char>>();
-  ASSERT_TRUE(result2);
-  auto result3 = test_3<char, rdb::posixPrmBinaryFileAccessor<char>>();
-  ASSERT_TRUE(result3);
-}
-
 TEST(crdb, payload_assign_operator) {
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) |  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) |  //

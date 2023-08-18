@@ -1,14 +1,27 @@
 #include "rdb/faccposix.h"
 
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <cassert>
-
 namespace rdb {
+
 template <class T>
-posixBinaryFileAccessor<T>::posixBinaryFileAccessor(const std::string &fileName) : fileNameStr(fileName) {}
+posixBinaryFileAccessor<T>::posixBinaryFileAccessor(const std::string &fileName) : fileNameStr(fileName) {
+  fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  if (fd < 0)
+    SPDLOG_ERROR("::open {} -> {}", fileNameStr, fd);
+  else
+    SPDLOG_INFO("::open {} -> {}", fileNameStr, fd);
+  assert(fd >= 0);
+}
+
+template <class T>
+posixBinaryFileAccessor<T>::~posixBinaryFileAccessor() {
+  ::close(fd);
+}
 
 template <class T>
 std::string posixBinaryFileAccessor<T>::fileName() {
@@ -17,21 +30,14 @@ std::string posixBinaryFileAccessor<T>::fileName() {
 
 template <class T>
 ssize_t posixBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
-  int fd;
+  assert(fd >= 0);
+  if (fd < 0) {
+    return errno;  // Error status
+  }
   if (position == std::numeric_limits<size_t>::max()) {
-    fd = ::open(fileNameStr.c_str(), O_APPEND | O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-    assert(fd >= 0);
-    if (fd < 0) {
-      return errno;  // Error status
-    }
     auto result = ::lseek(fd, 0, SEEK_END);
     assert(result != static_cast<off_t>(-1));
   } else {
-    fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-    assert(fd >= 0);
-    if (fd < 0) {
-      return errno;  // Error status
-    }
     auto result = ::lseek(fd, position, SEEK_SET);
     assert(result != static_cast<off_t>(-1));
     if (result == static_cast<off_t>(-1)) {
@@ -51,20 +57,16 @@ ssize_t posixBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, c
     ptrData += write_result;
     sizesh -= write_result;
   }
-  ::close(fd);
   return EXIT_SUCCESS;
 }
 
 template <class T>
 ssize_t posixBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
-  int fd = -1;
-  fd     = ::open(fileNameStr.c_str(), O_RDONLY | O_CLOEXEC);
   assert(fd >= 0);
   if (fd < 0) {
     return fd;  // <- Error status
   }
-  ::pread(fd, ptrData, size, static_cast<off_t>(position));
-  ::close(fd);
+  ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
   return EXIT_SUCCESS;
 }
 

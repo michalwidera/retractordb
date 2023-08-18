@@ -147,11 +147,9 @@ void storageAccessor::initializeAccessor() {
   assert(storageType != "");
 
   if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::posixPrmBinaryFileAccessor<uint8_t>>(storageFile);
+    accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
   } else if (storageType == "GENERIC") {
     accessor = std::make_unique<rdb::genericBinaryFileAccessor<uint8_t>>(storageFile);
-  } else if (storageType == "POSIX") {
-    accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
   } else if (storageType == "DEVICE") {
     accessor = std::make_unique<rdb::binaryDeviceAccessor<uint8_t>>(storageFile);
   } else if (storageType == "TEXTSOURCE") {

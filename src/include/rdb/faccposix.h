@@ -7,14 +7,21 @@ namespace rdb {
 /**
  * @brief Object that implements storage interface via posix calls
  *
- * File Accessor as Posix - type. This is underlying type that supports access to binary fields.
- * Posix functions are used as interface. :Rdb user does not need to use this object directly
+ * File Accessor as Posix Permanent - type.
+ * This is underlying type that supports access to binary fields. Posix functions are
  */
 template <typename T>
 class posixBinaryFileAccessor : public FileAccessorInterface<T> {
   std::string fileNameStr;
 
+  /**
+   * @brief Posix File Descriptor
+   */
+  int fd;
+
  public:
+  ~posixBinaryFileAccessor();
+
   explicit posixBinaryFileAccessor(const std::string &fileName);
 
   ssize_t read(T *ptrData, const size_t size, const size_t position) override;
