@@ -195,13 +195,6 @@ int getSeqNr(const std::string &query_name) {
   return -1;  // INVALID QUERY_NR
 }
 
-bool isDeclared(const std::string &query_name) {
-  for (auto &q : coreInstance) {
-    if (query_name == q.id) return q.isDeclaration();
-  }
-  return false;
-}
-
 bool isExist(const std::string &query_name) {
   for (auto &q : coreInstance) {
     if (query_name == q.id) return true;
