@@ -15,8 +15,6 @@
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 
-extern qTree coreInstance;
-
 using namespace antlrcpp;
 using namespace antlr4;
 
@@ -50,6 +48,8 @@ class ParserErrorListener : public BaseErrorListener {
 int fieldCount = 0;
 
 class ParserListener : public RQLBaseListener {
+  qTree &coreInstance;
+
   /* Helper variable required for rational numbers processing */
   boost::rational<int> rationalResult;
 
@@ -76,6 +76,8 @@ class ParserListener : public RQLBaseListener {
   };
 
  public:
+  ParserListener(qTree &coreInstance) : coreInstance(coreInstance){};
+
   void enterProg(RQLParser::ProgContext *ctx) {}
 
   void exitFieldID(RQLParser::FieldIDContext *ctx) { recpToken(PUSH_ID3, ctx->getText()); }
@@ -243,7 +245,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parserFile(std::string sInputFile) {
+std::string parserFile(qTree &coreInstance, std::string sInputFile) {
   std::ifstream ins;
   // Create the input stream.
   ins.open(sInputFile.c_str());
@@ -259,7 +261,7 @@ std::string parserFile(std::string sInputFile) {
   // to create a parse tree.
   RQLParser parser(&tokens);
   ParserErrorListener parserErrorListener;
-  ParserListener parserListener;
+  ParserListener parserListener(coreInstance);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
@@ -268,7 +270,7 @@ std::string parserFile(std::string sInputFile) {
   return status;
 }
 
-std::string parserString(std::string inlet) {
+std::string parserString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -281,7 +283,7 @@ std::string parserString(std::string inlet) {
   // to create a parse tree.
   RQLParser parser(&tokens);
   ParserErrorListener parserErrorListener;
-  ParserListener parserListener;
+  ParserListener parserListener(coreInstance);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);

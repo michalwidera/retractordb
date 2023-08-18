@@ -22,7 +22,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::string parserFile(std::string sInputFile);
+extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
 extern int main_retractor(bool verbose, int iTimeLimitCntParam);
 
 int iTimeLimitCntParam{0};
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
       return EPERM;  // ERROR defined in errno-base.h
     }
 
-    auto parseOut = parserFile(sInputFile);
+    auto parseOut = parserFile(coreInstance, sInputFile);
 
     if (parseOut != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //
