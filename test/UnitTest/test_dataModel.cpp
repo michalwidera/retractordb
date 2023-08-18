@@ -20,7 +20,7 @@
 
 extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
 
-extern "C" qTree coreInstance;
+qTree coreInstance;
 
 /*
 file path: test/UnitTest/Data/dataModel/ut_example_schema.rql

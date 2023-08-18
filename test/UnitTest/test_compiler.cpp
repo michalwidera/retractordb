@@ -7,12 +7,12 @@
 #include <vector>
 
 #include "retractor/lib/QStruct.h"
-#include "retractor/lib/compiler.hpp"
+#include "retractor/lib/compiler.h"
 
 extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
 extern std::string parserString(qTree &coreInstance, std::string sInputFile);
 
-extern qTree coreInstance;
+qTree coreInstance;
 
 bool compiled = false;
 

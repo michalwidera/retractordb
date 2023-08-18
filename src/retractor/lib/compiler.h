@@ -6,7 +6,6 @@
 
 struct compiler {
   compiler(qTree &coreInstance) : coreInstance(coreInstance){};
-  qTree &coreInstance;
 
   std::string intervalCounter();
   std::string simplifyLProgram();
@@ -18,6 +17,7 @@ struct compiler {
   std::map<std::string, int> countBuffersCapacity();
 
  private:
+  qTree &coreInstance;
   std::list<field> combine(const std::string &sName1, const std::string &sName2, token &cmd_token);
   std::string generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd);
 };

@@ -6,9 +6,11 @@
 
 struct dumper {
   dumper(qTree &coreInstance) : coreInstance(coreInstance){};
-  qTree &coreInstance;
 
   int run(boost::program_options::variables_map &vm);
+
+ private:
+  qTree &coreInstance;
 
   void graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags);
   void qFieldsProgram();

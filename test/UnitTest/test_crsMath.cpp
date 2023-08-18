@@ -11,7 +11,7 @@
 #include "rdb/storageacc.h"
 #include "retractor/lib/CRSMath.h"
 #include "retractor/lib/QStruct.h"  // coreInstance
-#include "retractor/lib/compiler.hpp"
+#include "retractor/lib/compiler.h"
 #include "retractor/lib/dataModel.h"
 
 // ctest -R '^ut-test_crsMath' -V
@@ -22,7 +22,7 @@ using namespace CRationalStreamMath;
 
 extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
 
-extern "C" qTree coreInstance;
+qTree coreInstance;
 
 const int TEST_COUNT = 15;
 

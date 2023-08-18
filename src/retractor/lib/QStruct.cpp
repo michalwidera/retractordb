@@ -24,10 +24,6 @@ using namespace boost::lambda;
 #define CMDID_H_CREATE_DEFINITION_CMDI
 #include "cmdID.h"
 
-extern "C" {
-qTree coreInstance;
-}
-
 static_assert(std::is_copy_constructible_v<rdb::descFldVT> == true);
 
 // int _floor( boost::rational<int> & value ) {
@@ -176,9 +172,9 @@ void qTree::removeNonStreamItems(const char leadingSign) {
   erase(new_end, end());
 }
 
-query &getQuery(const std::string &query_name) {
+query &qTree::getQuery(const std::string &query_name) {
   assert(query_name != "");
-  for (auto &q : coreInstance)
+  for (auto &q : *this)
     if (q.id == query_name) return q;
   SPDLOG_ERROR("Missing - {}", query_name);
   static query void_query;
@@ -328,7 +324,7 @@ void query::fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &
 }
 
 // TODO: remove Descriptor(a,b) and use Descriptor(a,b,c) here - strings are broken if not fix
-rdb::Descriptor query::descriptorFrom() {
+rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
   SPDLOG_INFO("call query::descriptorFrom()");
   rdb::Descriptor retVal{};
   if (isDeclaration()) {
@@ -341,25 +337,25 @@ rdb::Descriptor query::descriptorFrom() {
     case STREAM_MAX:
     case STREAM_MIN:
     case STREAM_SUM: {
-      auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
+      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().getMaxType();
       retVal | rdb::Descriptor(id + "_0", maxLen, 1, maxType);
     } break;
     case STREAM_HASH: {
-      retVal.createHash(id, getQuery(arg1).descriptorStorage(), getQuery(arg2).descriptorStorage());
+      retVal.createHash(id, coreInstance.getQuery(arg1).descriptorStorage(), coreInstance.getQuery(arg2).descriptorStorage());
       retVal.cleanRef();
     } break;
     case STREAM_DEHASH_DIV:
     case STREAM_DEHASH_MOD:
     case STREAM_SUBTRACT:
     case STREAM_TIMEMOVE: {
-      fillDescriptor(getQuery(arg1).lSchema, retVal, id);
+      fillDescriptor(coreInstance.getQuery(arg1).lSchema, retVal, id);
     } break;
     case PUSH_STREAM: {
-      fillDescriptor(getQuery(cmd.getStr_()).lSchema, retVal, id);
+      fillDescriptor(coreInstance.getQuery(cmd.getStr_()).lSchema, retVal, id);
     } break;
     case STREAM_ADD: {
-      fillDescriptor(getQuery(arg1).lSchema, retVal, id);
-      fillDescriptor(getQuery(arg2).lSchema, retVal, id);
+      fillDescriptor(coreInstance.getQuery(arg1).lSchema, retVal, id);
+      fillDescriptor(coreInstance.getQuery(arg2).lSchema, retVal, id);
     } break;
     case STREAM_AGSE: {
       // * INFO - sync with dataModel.cpp
@@ -369,7 +365,7 @@ rdb::Descriptor query::descriptorFrom() {
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
       assert(step > 0);
-      auto [maxType, maxLen] = getQuery(arg1).descriptorStorage().getMaxType();
+      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().getMaxType();
       for (int i = 0; i < abs(length); i++) {
         retVal | rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
       }

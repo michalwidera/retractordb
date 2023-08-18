@@ -66,11 +66,11 @@ streamInstance::streamInstance(qTree &coreInstance,                        //
 }
 
 streamInstance::streamInstance(qTree &coreInstance, query &qry)
-    : streamInstance(coreInstance,             //
-                     qry.id,                   // descriptor file (q.id)
-                     qry.filename,             // storage file (filename)
-                     qry.descriptorStorage(),  //
-                     qry.descriptorFrom()      //
+    : streamInstance(coreInstance,                     //
+                     qry.id,                           // descriptor file (q.id)
+                     qry.filename,                     // storage file (filename)
+                     qry.descriptorStorage(),          //
+                     qry.descriptorFrom(coreInstance)  //
       ) {
   SPDLOG_INFO("streamInstance <- qry");
 };
@@ -490,7 +490,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset       = Subtract(getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      const auto timeOffset       = Subtract(coreInstance.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -530,8 +530,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc1     = arg[0].getStr_();
       const auto nameSrc2     = arg[1].getStr_();
-      const auto intervalSrc1 = getQuery(nameSrc1).rInterval;
-      const auto intervalSrc2 = getQuery(nameSrc2).rInterval;
+      const auto intervalSrc1 = coreInstance.getQuery(nameSrc1).rInterval;
+      const auto intervalSrc2 = coreInstance.getQuery(nameSrc2).rInterval;
 
       const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount();
 

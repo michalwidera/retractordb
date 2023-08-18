@@ -21,6 +21,8 @@ typedef boost::rational<int> number;
 
 #include "fldType.h"
 
+class qTree;
+
 class token {
   command_id command;
   rdb::descFldVT valueVT;
@@ -79,16 +81,12 @@ class query {
   void reset();
 
   rdb::Descriptor descriptorStorage();
-  rdb::Descriptor descriptorFrom();
+  rdb::Descriptor descriptorFrom(qTree &coreInstance);
 
   friend std::ostream &operator<<(std::ostream &os, const query &s);
 };
 
 bool operator<(const query &lhs, const query &rhs);
-
-query &getQuery(const std::string &query_name);
-int getSeqNr(const std::string &query_name);
-bool isDeclared(const std::string &query_name);
 
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
@@ -103,6 +101,8 @@ class qTree : public std::vector<query> {
 
  public:
   query &operator[](const std::string &query_name) { return getQuery(query_name); };
+
+  query &getQuery(const std::string &query_name);
 
   void sort() { std::sort(begin(), end()); };
   void topologicalSort();

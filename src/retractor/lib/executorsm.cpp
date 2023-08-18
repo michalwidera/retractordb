@@ -35,6 +35,8 @@
 #include <boost/system/error_code.hpp>
 #include <boost/thread.hpp>
 
+#include "executorsm.h"
+
 namespace IPC = boost::interprocess;
 
 // Define for IPC purposes - maps & strings (most important IPCString i IPCMap)
@@ -59,34 +61,29 @@ using namespace CRationalStreamMath;
 // Map stores relations processId -> sended stream
 std::map<const int, std::string> id2StreamName_Relation;
 
-// Object coreInstance in QStruct.cpp
-extern "C" qTree coreInstance;
-
 static dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
 int iTimeLimitCnt(0);
 
-typedef boost::property_tree::ptree ptree;
+qTree *executorsm::coreInstancePtr = nullptr;
 
-extern int iTest();
-
-std::map<std::string, ptree> streamTable;
-
-std::set<std::string> getAwaitedStreamsSet(TimeLine &tl) {
+std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl) {
+  assert(coreInstancePtr != nullptr);
   std::set<std::string> retVal;
-  for (const auto &it : coreInstance)
+  for (const auto &it : *coreInstancePtr)
     if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) retVal.insert(it.id);
 
   return retVal;
 }
 
-ptree collectStreamsParameters() {
+ptree executorsm::collectStreamsParameters() {
+  assert(coreInstancePtr != nullptr);
   ptree ptRetval;
   assert(pProc != nullptr && "pProc must be checked before procedure call.");
   SPDLOG_DEBUG("get cmd rcv.");
-  for (auto &q : coreInstance) {
+  for (auto &q : *coreInstancePtr) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
     long recordsCount = -1;
@@ -95,12 +92,13 @@ ptree collectStreamsParameters() {
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
                  boost::lexical_cast<std::string>(pProc->getStreamCount(q.id)));
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".location"), q.filename);
-    ptRetval.put(std::string("db.stream.") + q.id + std::string(".cap"), coreInstance.maxCapacity[q.id]);
+    ptRetval.put(std::string("db.stream.") + q.id + std::string(".cap"), (*coreInstancePtr).maxCapacity[q.id]);
   }
   return ptRetval;
 }
 
-ptree commandProcessor(ptree ptInval) {
+ptree executorsm::commandProcessor(ptree ptInval) {
+  assert(coreInstancePtr != nullptr);
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
@@ -116,7 +114,7 @@ ptree commandProcessor(ptree ptInval) {
       std::string streamName = ptInval.get("db.argument", "");
       assert(streamName != "");
       SPDLOG_DEBUG("got detail {} rcv.", streamName);
-      for (const auto &s : coreInstance[streamName].lSchema)
+      for (const auto &s : (*coreInstancePtr)[streamName].lSchema)
         ptRetval.put(std::string("db.field.") + std::get<rdb::rname>(s.field_), std::get<rdb::rname>(s.field_));
     }
     //
@@ -140,7 +138,7 @@ ptree commandProcessor(ptree ptInval) {
       // let's assume that we have 1/10 duration
       // that means 10 elements are going in second
       // so - we need 10 elements for one second buffer
-      int maxElements = boost::rational_cast<int>(1 / coreInstance[streamName].rInterval);
+      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval);
       maxElements     = (maxElements < 2) ? 2 : maxElements;
       IPC::message_queue mq(IPC::open_or_create,  // open or crate
                             queueName.c_str(),    // name
@@ -176,7 +174,8 @@ ptree commandProcessor(ptree ptInval) {
 }
 
 // Thread procedure
-void commandProcessorLoop() {
+void executorsm::commandProcessorLoop() {
+  assert(coreInstancePtr != nullptr);
   try {
     IPC::message_queue::remove("RetractorQueryQueue");
     IPC::shared_memory_object::remove("RetractorShmemMap");
@@ -222,12 +221,12 @@ void commandProcessorLoop() {
   }
 }
 
-std::string printRowValue(const std::string &query_name) {
+std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
   ptree pt;
   pt.put("stream", query_name);
-  pt.put("count", boost::lexical_cast<std::string>(getQuery(query_name).lSchema.size()));
+  pt.put("count", boost::lexical_cast<std::string>(coreInstance.getQuery(query_name).lSchema.size()));
   int i = 0;
   for (auto value : pProc->getRow(query_name, 0)) {
     //
@@ -258,10 +257,12 @@ std::string printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int main_retractor(bool verbose, int iTimeLimitCntParam) {
+int executorsm::run(bool verbose, int iTimeLimitCntParam) {
+  executorsm::coreInstancePtr = &coreInstance;
+
   iTimeLimitCnt = iTimeLimitCntParam;
   auto retVal   = system::errc::success;
-  thread bt(commandProcessorLoop);  // Sending service in thread
+  thread bt(executorsm::commandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {

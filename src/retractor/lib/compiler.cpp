@@ -1,4 +1,4 @@
-#include "compiler.hpp"
+#include "compiler.h"
 
 #include <spdlog/spdlog.h>
 
@@ -127,7 +127,7 @@ std::string compiler::intervalCounter() {
           // push_stream core0 -> deltaSrc
           // stream agse <5,3> -> step_of_window,size_of_window
           boost::rational<int> coreDelta = coreInstance.getDelta(t1.getStr_());
-          int coreWindow                 = getQuery(t1.getStr_()).lSchema.size();
+          int coreWindow                 = coreInstance.getQuery(t1.getStr_()).lSchema.size();
           auto [step, windowSize]        = std::get<std::pair<int, int>>(op.getVT());
           assert(step > 0);
           windowSize = abs(windowSize);
@@ -229,24 +229,25 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
-    if (getQuery(sName1).descriptorStorage().sizeFlat() != getQuery(sName2).descriptorStorage().sizeFlat())
+    if (coreInstance.getQuery(sName1).descriptorStorage().sizeFlat() !=
+        coreInstance.getQuery(sName2).descriptorStorage().sizeFlat())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
-    lRetVal = getQuery(sName1).lSchema;
+    lRetVal = coreInstance.getQuery(sName1).lSchema;
   } else if (cmd == STREAM_DEHASH_DIV)
-    lRetVal = getQuery(sName1).lSchema;
+    lRetVal = coreInstance.getQuery(sName1).lSchema;
   else if (cmd == STREAM_DEHASH_MOD)
-    lRetVal = getQuery(sName1).lSchema;
+    lRetVal = coreInstance.getQuery(sName1).lSchema;
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
     int i            = 0;
-    for (auto f : getQuery(sName1).lSchema) {
+    for (auto f : coreInstance.getQuery(sName1).lSchema) {
       field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
                  token(PUSH_ID, std::make_pair(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
-    for (auto f : getQuery(sName2).lSchema) {
+    for (auto f : coreInstance.getQuery(sName2).lSchema) {
       field intf(rdb::rField(/*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
                              sizeof(boost::rational<int>), 1, rdb::RATIONAL),
                  token(PUSH_ID, std::make_pair(sName2, i++)));
@@ -254,9 +255,9 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
     }
     return lRetVal;
   } else if (cmd == STREAM_SUBTRACT)
-    lRetVal = getQuery(sName1).lSchema;
+    lRetVal = coreInstance.getQuery(sName1).lSchema;
   else if (cmd == STREAM_TIMEMOVE)
-    lRetVal = getQuery(sName1).lSchema;
+    lRetVal = coreInstance.getQuery(sName1).lSchema;
   else if (cmd == STREAM_AVG) {
     field intf(rdb::rField("avg", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
@@ -340,7 +341,7 @@ std::string compiler::prepareFields() {
             // q.lSchema =  getQuery(t.getStr()).lSchema;
             // copy list of fields from one to another
             int filedPosition = 0;
-            for (auto s : getQuery(t.getStr_()).lSchema) {
+            for (auto s : coreInstance.getQuery(t.getStr_()).lSchema) {
               std::list<token> lTempProgram;
               lTempProgram.push_back(token(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++)));
               std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCountSh++);
@@ -374,7 +375,7 @@ std::string compiler::replicateIDX() {
       if (usedSchemaX.size() != 0) {
         int minSizeFlat{std::numeric_limits<int>::max()};
         for (auto schema : usedSchemaX) {
-          auto size = getQuery(schema).descriptorStorage().sizeFlat();
+          auto size = coreInstance.getQuery(schema).descriptorStorage().sizeFlat();
           if (size < minSizeFlat) minSizeFlat = size;
         }
 
@@ -481,8 +482,8 @@ std::string compiler::convertReferences() {
               const std::string field(what[1]);
               query *pQ1(nullptr), *pQ2(nullptr);
               auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
-              pQ1 = &getQuery(schema1);
-              if (q.lProgram.size() == 3) pQ2 = &getQuery(schema2);
+              pQ1 = &coreInstance.getQuery(schema1);
+              if (q.lProgram.size() == 3) pQ2 = &coreInstance.getQuery(schema2);
               bool bFieldFound(false);
               int offset1(0);
               if (pQ1 != nullptr) {
@@ -582,7 +583,8 @@ std::string compiler::applyConstraints() {
     switch (cmd.getCommandID()) {
       case STREAM_HASH: {
         SPDLOG_ERROR("Hash operations need to work on two schemas with the same size.");
-        if (getQuery(arg1).descriptorStorage().sizeFlat() != getQuery(arg2).descriptorStorage().sizeFlat())
+        if (coreInstance.getQuery(arg1).descriptorStorage().sizeFlat() !=
+            coreInstance.getQuery(arg2).descriptorStorage().sizeFlat())
           return std::string("HASH operation constraint failed on " + q.id);
       } break;
       default:

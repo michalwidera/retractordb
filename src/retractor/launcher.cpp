@@ -14,8 +14,9 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/QStruct.h"
-#include "lib/compiler.hpp"
+#include "lib/compiler.h"
 #include "lib/dumper.h"
+#include "lib/executorsm.h"
 #include "uxSysTermTools.h"
 
 using namespace boost;
@@ -23,13 +24,12 @@ using namespace boost;
 using boost::lexical_cast;
 
 extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
-extern int main_retractor(bool verbose, int iTimeLimitCntParam);
 
 int iTimeLimitCntParam{0};
 
-extern qTree coreInstance;
-
 int main(int argc, char *argv[]) {
+  qTree coreInstance;
+
   fixArgcv(argc, argv);
   setupLoggerMain(std::string(argv[0]));
 
@@ -138,5 +138,6 @@ int main(int argc, char *argv[]) {
     return system::errc::interrupted;
   }
 
-  return main_retractor(vm.count("verbose"), iTimeLimitCntParam);
+  executorsm exec(coreInstance);
+  return exec.run(vm.count("verbose"), iTimeLimitCntParam);
 }
