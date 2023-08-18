@@ -18,13 +18,8 @@ using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
 int main(int argc, char *argv[]) {
-  if (argc > 0 && argv != nullptr) fixArgcv(argc, argv);
-
-  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
-  spdlog::set_default_logger(filelog);
-  constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
-  spdlog::set_pattern(common_log_pattern);
-  spdlog::flush_on(spdlog::level::trace);
+  fixArgcv(argc, argv);
+  setupLoggerMain(std::string(argv[0]));
 
   try {
     namespace po = boost::program_options;

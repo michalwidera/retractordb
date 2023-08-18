@@ -30,13 +30,8 @@ int iTimeLimitCntParam{0};
 extern qTree coreInstance;
 
 int main(int argc, char *argv[]) {
-  if (argc > 0 && argv != nullptr) fixArgcv(argc, argv);
-
-  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
-  spdlog::set_default_logger(filelog);
-  constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
-  spdlog::set_pattern(common_log_pattern);
-  spdlog::flush_on(spdlog::level::trace);
+  fixArgcv(argc, argv);
+  setupLoggerMain(std::string(argv[0]));
 
   namespace po = boost::program_options;
   po::variables_map vm;

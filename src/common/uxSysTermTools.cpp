@@ -1,9 +1,12 @@
 #include <fcntl.h>
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 int _kbhit(void) {
   struct termios oldt;
@@ -35,9 +38,18 @@ void fixArgcv(int argc, char *argv[]) {
   // C99: The parameters argc and argv and the strings pointed to by the argv
   // array shall be modifiable by the program, and retain their last-stored
   // values between program startup and program termination.
-  for (int i = 0; i < argc; ++i) {
-    auto len = strlen(argv[i]);
-    if (len > 0)
-      if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
-  }
+  if (argc > 0 && argv != nullptr)
+    for (int i = 0; i < argc; ++i) {
+      auto len = strlen(argv[i]);
+      if (len > 0)
+        if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
+    }
+}
+
+void setupLoggerMain(const std::string &loggerFile) {
+  auto filelog = spdlog::basic_logger_mt("log", loggerFile + ".log");
+  spdlog::set_default_logger(filelog);
+  constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
+  spdlog::set_pattern(common_log_pattern);
+  spdlog::flush_on(spdlog::level::trace);
 }

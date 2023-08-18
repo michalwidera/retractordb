@@ -3,3 +3,4 @@
 int _kbhit(void);
 int _getch();
 void fixArgcv(int argc, char *argv[]);
+void setupLoggerMain(const std::string &loggerFile);
