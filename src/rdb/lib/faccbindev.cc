@@ -39,10 +39,10 @@ ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t size, const size_
   if (fd < 0) {
     return fd;  // <- Error status
   }
-  auto read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
-  if (read_size != size) {                     // dev/random has no seek - but binary files should loop?
+  size_t read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
+  if (read_size != size) {                       // dev/random has no seek - but binary files should loop?
     ::lseek(fd, 0, SEEK_SET);
-    auto read_size_sh = ::read(fd, ptrData, size);
+    size_t read_size_sh = ::read(fd, ptrData, size);
     if (read_size_sh != size) return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
