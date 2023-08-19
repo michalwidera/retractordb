@@ -8,6 +8,11 @@ add_subdirectory(qry)
 add_subdirectory(retractor)
 
 add_custom_target(
+  dev
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-dev.sh
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
+
+add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
