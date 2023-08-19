@@ -59,13 +59,13 @@ using namespace CRationalStreamMath;
 // (strSegment.get_segment_manager());
 
 // Map stores relations processId -> sended stream
-std::map<const int, std::string> id2StreamName_Relation;
+static std::map<const int, std::string> id2StreamName_Relation;
 
 static dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
-int iTimeLimitCnt(0);
+static int iTimeLimitCnt(0);
 
 qTree *executorsm::coreInstancePtr = nullptr;
 

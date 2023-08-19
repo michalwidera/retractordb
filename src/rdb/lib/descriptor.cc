@@ -38,6 +38,8 @@ static inline void rtrim(std::string &s) {
 
 bool flatOutput = false;
 
+static const int error_desc_location{-1};
+
 rdb::descFld GetFieldType(std::string name) {
   ltrim(name);
   rtrim(name);

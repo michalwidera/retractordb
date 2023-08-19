@@ -65,7 +65,7 @@ class Retractor(ConanFile):
 
     def requirements(self):
         """Auto-generation of antlr4call.sh script"""
-        antlr4_version_file = open("scripts/antlr4call.sh", "w")
+        antlr4_version_file = open("scripts/antlr4call.sh", "w", encoding="utf-8")
         antlr4_version_file.write(script.replace("VERSION", self.antlr_version))
         antlr4_version_file.close()
 

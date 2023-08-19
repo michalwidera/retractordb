@@ -89,7 +89,7 @@ static std::map<std::string, ptree> streamTable;
 
 static int timeLimitCntQry{0};  // testing purposes - time limit query (-m)
 
-enum outputFormatMode { RAW, GRAPHITE, INFLUXDB } outputFormatMode(RAW);
+static enum outputFormatMode { RAW, GRAPHITE, INFLUXDB } outputFormatMode(RAW);
 
 // Graphite embedded schema in format "path.to.data value timestamp"
 static ptree schema;

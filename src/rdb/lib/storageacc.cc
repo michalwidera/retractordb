@@ -200,7 +200,7 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
-const size_t storageAccessor::getRecordsCount() { return recordsCount; }
+size_t storageAccessor::getRecordsCount() { return recordsCount; }
 
 std::string storageAccessor::getStorageName() { return storageFile; }
 

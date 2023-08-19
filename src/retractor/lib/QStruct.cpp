@@ -85,7 +85,7 @@ bool isThere(const std::vector<query> &v, const std::string &query_name) {
   return false;
 }
 
-void qTree::dfs(const std::string v) {
+void qTree::dfs(const std::string &v) {
   visited[v] = true;
   for (auto u : adj[v]) {
     if (!visited[u]) dfs(u);

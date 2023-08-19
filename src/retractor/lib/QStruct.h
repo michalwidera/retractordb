@@ -96,7 +96,7 @@ class qTree : public std::vector<query> {
   std::map<std::string, vector<std::string>> adj;  // adjacency list of graph
   vector<std::string> ans;
 
-  void dfs(const std::string v);  // Depth First Traversal
+  void dfs(const std::string &v);  // Depth First Traversal
   int getSeqNr(const std::string &query_name);
 
  public:

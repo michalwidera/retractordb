@@ -25,7 +25,7 @@ using boost::lexical_cast;
 
 extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
 
-int iTimeLimitCntParam{0};
+static int iTimeLimitCntParam{0};
 
 int main(int argc, char *argv[]) {
   qTree coreInstance;

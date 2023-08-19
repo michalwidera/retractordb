@@ -15,7 +15,7 @@
 #include <typeinfo>  // operator typeid
 #include <variant>
 
-cast<rdb::descFldVT> castFldVT;
+static cast<rdb::descFldVT> castFldVT;
 
 expressionEvaluator::expressionEvaluator(/* args */) {}
 

@@ -18,8 +18,6 @@ namespace rdb {
 
 enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 
-constexpr int error_desc_location = -1;
-
 extern bool flatOutput;
 
 //
