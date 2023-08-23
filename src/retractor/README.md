@@ -50,3 +50,7 @@ Branch: master:b38fb68, Code compiler: GNU Ver. 13.2.0, Build time: 2308192116, 
 This is free software; see the source for copying conditions.
 There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 ```
+
+## Storage state machine
+
+![Use Case Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/retractor/UML/storage-access-state.puml)
