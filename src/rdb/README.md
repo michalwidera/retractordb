@@ -5,6 +5,7 @@
 ## RetractorDB - inner database structure
 
 Retractor DB is using inner database format. This format supports read,update, append commands interface. This database is called _STORAGE_ here.
+Folder rdb contains common library and tool xtrdb that uses rdb library to access dumped data by executor.
 
 > :warning: **This is work in progress**: This readme can be outdated.
 
