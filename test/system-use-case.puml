@@ -1,0 +1,39 @@
+@startuml
+
+skin rose
+
+title RetractorDB - Use Case Diagram
+
+
+(Create Query File) as QF<<Create>>
+(Compile Query) as CF<<Compile>>
+(Execute Query) as CX<<Execute>>
+
+(Query Plan) as QP<<Show>>
+(Current Data From Query) as CD<<Read>>
+(Read Dump) as RD<<Dump>>
+(System Status) as SS<<Status>>
+
+(Show Query Diagram) as QD
+(Display Current Signal) as SI
+
+
+actor :Operator: as O<<Operator>>
+actor :User: as U<<User>> 
+
+O  -down-> U
+
+O - QF
+O - CF
+CF .down.> CX : <<include>>
+QF .> CF : <<include>>
+
+QP -up- U
+CD -up- U
+RD -up- U
+SS -up- U
+
+QD .up.> QP : <<extend>>
+SI .up.> CD : <<extend>>
+
+@enduml
