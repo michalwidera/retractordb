@@ -5,7 +5,7 @@ CI Build Status: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.s
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
-These are sources of RetractorDB Time Series Database System prototype. This is work in progress.
+These are sources of RetractorDB Time Series Database System prototype. __This is work in progress.__
 
 Project Web Page
 -----------------------------------------------------------------------
