@@ -19,7 +19,7 @@ namespace IPC = boost::interprocess;
 
 int main(int argc, char *argv[]) {
   fixArgcv(argc, argv);
-  setupLoggerMain(std::string(argv[0]));
+  const auto tempLocation = setupLoggerMain(std::string(argv[0]));
 
   try {
     namespace po = boost::program_options;
@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
       std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
       std::cout << desc;
       std::cout << config_line << std::endl;
+      std::cout << "Log: " << tempLocation << std::endl;
       std::cout << warranty << std::endl;
       return system::errc::success;
     }
