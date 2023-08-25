@@ -6,6 +6,8 @@
 
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <iostream>  //remove it with std::
 #include <string>
 
 int _kbhit(void) {
@@ -46,10 +48,39 @@ void fixArgcv(int argc, char *argv[]) {
     }
 }
 
-void setupLoggerMain(const std::string &loggerFile) {
-  auto filelog = spdlog::basic_logger_mt("log", loggerFile + ".log");
+std::string setupLoggerMain(const std::string &loggerFile) {
+  namespace fs = std::filesystem;
+  fs::path tmp;
+
+  const auto loggerFileSole = fs::path(loggerFile).filename();
+  assert(!loggerFileSole.empty());
+
+  // Functional description: system first checks if in current folder
+  // there is temp folder - if found we stop looking and temp folder became log folder
+  // then is there temp folder in home directory - if found we stop looking and this is log
+  // next with tmp - the same process
+  // if none of them have been found - we are trying to get system temp folder /tmp
+  // if temporary folder is not found - we stop on assert failure.
+
+  for (const auto &tempName : std::vector<std::string>{"temp", "tmp"}) {
+    const auto currentPath{fs::current_path().append(tempName)};
+    if (fs::is_directory(currentPath) && tmp.empty()) tmp = currentPath;
+
+    const auto homeDir{fs::path(getenv("HOME")).append(tempName)};
+    if (fs::is_directory(homeDir) && tmp.empty()) tmp = homeDir;
+  }
+
+  if (tmp.empty()) tmp = fs::temp_directory_path();
+
+  assert(!tmp.empty());
+
+  tmp.append(loggerFileSole.string());
+
+  auto filelog = spdlog::basic_logger_mt("log", tmp.string() + ".log");
   spdlog::set_default_logger(filelog);
   constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
   spdlog::set_pattern(common_log_pattern);
   spdlog::flush_on(spdlog::level::trace);
+
+  return tmp.string() + ".log";
 }
