@@ -7,29 +7,24 @@ add_subdirectory(rdb)
 add_subdirectory(qry)
 add_subdirectory(retractor)
 
-add_custom_target(
-  dev
+add_custom_target(dev
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-dev.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
-add_custom_target(
-  simple
+add_custom_target(simple
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
-add_custom_target(
-  dsp
+add_custom_target(dsp
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-dsp.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
 
-add_custom_target(
-  simple-view
+add_custom_target(simple-view
   COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
           out.dot -o out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
-add_custom_target(
-  dsp-view
+add_custom_target(dsp-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
@@ -40,8 +35,7 @@ set(CSTYLE
     '{BasedOnStyle: Google, ColumnLimit: 129, AlignConsecutiveAssignments: true, DerivePointerAlignment: false, PointerAlignment: Right}'
 )
 
-add_custom_target(
-  cformat
+add_custom_target(cformat
   COMMAND
     find ${CMAKE_SOURCE_DIR}/src -iname "*.h" -o -iname "*.cpp" -o -iname
     "*.hpp" -o -iname "*.cc" | grep --invert-match 'Parser/' | xargs
@@ -52,15 +46,13 @@ add_custom_target(
           --line-width=80
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
-add_custom_target(
-  showelf
+add_custom_target(showelf
   COMMAND readelf -p .comment retractor/xretractor
   COMMAND readelf -p .comment rdb/xtrdb
   COMMAND readelf -p .comment qry/xqry
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-add_custom_target(
-  vim
+add_custom_target(vim
   COMMAND [ ! -f ~/.vim ] && mkdir -p ~/.vim
   COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)
 
@@ -70,8 +62,7 @@ add_custom_target(
 # $make clear_cache
 add_custom_target(clear-cache COMMAND rm ${CMAKE_BINARY_DIR}/CMakeCache.txt)
 add_custom_target(patch COMMAND git diff --patch > ${CMAKE_BINARY_DIR}/my.patch)
-add_custom_target(
-  cppcheck
+add_custom_target(cppcheck
   COMMAND cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
   COMMAND
     cppcheck --inline-suppr --error-exitcode=1
