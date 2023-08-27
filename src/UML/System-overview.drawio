@@ -1,10 +1,10 @@
-<mxfile host="Electron" modified="2023-08-27T15:53:22.713Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.6.8 Chrome/114.0.5735.289 Electron/25.5.0 Safari/537.36" etag="VacMcevUx1ht9DnXYQPj" version="21.6.8" type="device">
+<mxfile host="Electron" modified="2023-08-27T16:06:23.714Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.6.8 Chrome/114.0.5735.289 Electron/25.5.0 Safari/537.36" etag="u1TOx_dZJQO20yot7iQ2" version="21.6.8" type="device">
   <diagram name="Strona-1" id="BG2U26oZRh6Gp2IAzY93">
-    <mxGraphModel dx="1100" dy="894" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1102" dy="894" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="VHUyBY8sBE0EKWtmwpwd-44" value="Storage" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+        <mxCell id="VHUyBY8sBE0EKWtmwpwd-44" value="Storage" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
           <mxGeometry x="9" y="600" width="240" height="200" as="geometry" />
         </mxCell>
         <mxCell id="VHUyBY8sBE0EKWtmwpwd-45" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="VHUyBY8sBE0EKWtmwpwd-44" vertex="1">
