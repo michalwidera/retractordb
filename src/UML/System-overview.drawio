@@ -16,7 +16,7 @@
                 <mxCell id="VHUyBY8sBE0EKWtmwpwd-57" value="Retractor" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
                     <mxGeometry x="9" y="20" width="561" height="560" as="geometry"/>
                 </mxCell>
-                <mxCell id="VHUyBY8sBE0EKWtmwpwd-58" value="qxry" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="VHUyBY8sBE0EKWtmwpwd-57" vertex="1">
+                <mxCell id="VHUyBY8sBE0EKWtmwpwd-58" value="xqry" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;startSize=23;" parent="VHUyBY8sBE0EKWtmwpwd-57" vertex="1">
                     <mxGeometry x="240" y="195" width="570" height="325" as="geometry"/>
                 </mxCell>
                 <mxCell id="VHUyBY8sBE0EKWtmwpwd-29" value="Read data from&lt;br&gt;Shared Memory" style="rounded=1;whiteSpace=wrap;html=1;" parent="VHUyBY8sBE0EKWtmwpwd-58" vertex="1">
