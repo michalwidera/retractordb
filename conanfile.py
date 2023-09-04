@@ -80,5 +80,3 @@ class Retractor(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-        #if conan_version >= Version("2.0"):
-        #    cmake.install()

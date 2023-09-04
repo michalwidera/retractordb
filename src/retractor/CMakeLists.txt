@@ -21,7 +21,8 @@ target_link_libraries(
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 
-add_custom_target(grammar
+add_custom_target(
+  grammar
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/antlr4call.sh RQL.g4
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/retractor
   SOURCES ${CMAKE_SOURCE_DIR}/src/retractor/RQL.g4)
