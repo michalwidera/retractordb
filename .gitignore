@@ -31,6 +31,8 @@ CMakeUserPresets.json
 *.png
 *.swp
 *.log
+*.bkp
+*.dtmp
 conan.lock
 conanbuildinfo.txt
 conaninfo.txt

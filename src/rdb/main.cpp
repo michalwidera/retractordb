@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "cap [value]\t\t\t set device stream backread capacity\n";
-      std::cout << "lock|flux \t\t (un)lock circular backread buffer\n";
+      std::cout << "lock|flux \t\t\t (un)lock circular backread buffer\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
       std::cout << "echo \t\t\t\t print message on terminal\n";

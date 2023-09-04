@@ -1,9 +1,9 @@
 @startuml
 
-title Processing data sequence \n for Device one-stop-read
+title Processing data sequence \n for Device one-time read-only data source (OTRO)
 [*] --> Storage
 
-state Storage as "Storage State Machine" {
+state Storage as "One-Time Data Source accessor State Machine" {
 
   state ZeroStep as "ZERO Step" {
     [*] --> Empty
@@ -14,13 +14,12 @@ state Storage as "Storage State Machine" {
     state Armed : data in chamber ready
     state Flux : chamber moved to payload
     state Lock : data in circural buffer 
-    Flux --> Armed 
-    Armed --> Lock
-    Lock --> Flux
+    Flux ---> Armed : freeze data in chamber
+    Armed ---> Lock : fire chamber data into c-buf
+    Lock ---> Flux : read data from source
   }
 
-  Empty-> Lock
-
+  Empty -> Lock : first read from source
 
   note right of Flux
   read data from data source 
