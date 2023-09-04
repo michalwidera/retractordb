@@ -1,7 +1,7 @@
 """Module required for conan build system."""
 from curses import keyname
 
-from conan import ConanFile, Version, __version__ as conan_version
+from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 script = """#!/bin/bash
@@ -80,5 +80,5 @@ class Retractor(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-        if conan_version >= Version("2.0"):
-            cmake.install()
+        #if conan_version >= Version("2.0"):
+        #    cmake.install()
