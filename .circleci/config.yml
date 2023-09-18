@@ -145,7 +145,7 @@ commands:
 jobs:
   build-2204-debug:
     working_directory: ~/retractordb
-    executor: ubuntu2204machine-current
+    executor: ubuntu2204docker-current
     steps:
       - checkout
       - prep-env-159
@@ -168,7 +168,7 @@ jobs:
 
   build-2204-conan20:
     working_directory: ~/retractordb
-    executor: ubuntu2204machine-edge
+    executor: ubuntu2204docker-edge
     steps:
       - checkout
       - prep-env-200
