@@ -31,10 +31,10 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB - time series database and data processing engine"
     homepage = "https://retractordb.com"
-    antlr_version = "4.13.0"
+    antlr_version = "4.13.1"
     requires = (
-        "boost/1.82.0",
-        "gtest/1.13.0",
+        "boost/1.83.0",
+        "gtest/1.14.0",
         "antlr4-cppruntime/" + antlr_version,
         "spdlog/1.10.0",
     )
