@@ -16,13 +16,16 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-2204-ARM:
+          requires:
+            - build-2204-release
 
   nightly:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_1_*_*_1
-          # At 01:00 on Monday.
-          cron: "0 1 * * 1"
+          # https://crontab.guru/#0_15_*_*_3,6
+          # At 15:00 on Wednesday and Saturday.
+          cron: "0 15 * * 3,6"
           filters:
             branches:
               only:
@@ -37,6 +40,9 @@ workflows:
           requires:
             - build-2204-conan20
       - build-2204-debug:
+          requires:
+            - build-2204-release
+      - build-2204-ARM:
           requires:
             - build-2204-release
 
@@ -63,7 +69,7 @@ executors:
 
   ubuntu2004machine-arm:
     machine:
-      image: ubuntu-2004:202101-01
+      image: ubuntu-2204:current
     resource_class: arm.large
 
 commands:
