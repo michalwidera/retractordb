@@ -16,16 +16,13 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-      - build-2204-ARM:
-          requires:
-            - build-2204-release
 
   nightly:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_15_*_*_3,6
-          # At 15:00 on Wednesday and Saturday.
-          cron: "0 15 * * 3,6"
+          # https://crontab.guru/#0_4_*_*_3,6
+          # At 4:00 on Wednesday and Saturday.
+          cron: "0 4 * * 3,6"
           filters:
             branches:
               only:
