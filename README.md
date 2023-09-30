@@ -22,7 +22,7 @@ How to install
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind clang-format
+sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind clang-format mold
 pip install conan
 conan profile detect
 git clone https://github.com/michalwidera/retractordb.git
