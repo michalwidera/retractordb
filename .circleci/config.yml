@@ -16,6 +16,12 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+      - build-2204-ARM:
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
 
   nightly:
     triggers:
@@ -192,6 +198,10 @@ jobs:
           build_type: Debug
 
   build-2204-ARM:
+    parameters:
+      build_type:
+        type: string
+        default: "Debug"
     working_directory: ~/retractordb
     executor: ubuntu2004machine-arm
     steps:
@@ -201,9 +211,13 @@ jobs:
       - conan-build:
           build_param: --build missing
       - run:
-          name: test
+          name: Smoke test
           command: |
-              export PATH="$HOME/.local/bin:$PATH"
-              xretractor -h && xqry -h
-              # cd build/Release && make test
-              # There is a problem on test on ARM - I will postpone this failure for now - build is more important that this for now.
+            export PATH="$HOME/.local/bin:$PATH"
+            cd build/<<parameters.build_type>> && make showelf
+            xretractor -h && xqry -h
+      - run:
+          name: Regression & Unit test
+          command: |
+            export PATH="$HOME/.local/bin:$PATH"
+            cd build/<<parameters.build_type>>/test && ctest -V
