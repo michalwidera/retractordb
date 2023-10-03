@@ -209,6 +209,7 @@ jobs:
       - prep-env-200:
           gcc_version: gcc-10
       - conan-build:
+          build_type: <<parameters.build_type>>
           build_param: --build missing
       - run:
           name: Smoke test
