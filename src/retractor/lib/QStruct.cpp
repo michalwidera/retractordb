@@ -294,20 +294,20 @@ std::vector<std::string> query::getDepStream() {
 rdb::Descriptor query::descriptorStorage() {
   rdb::Descriptor retVal{};
   for (auto &f : lSchema)
-    retVal | rdb::Descriptor(std::get<rdb::rname>(f.field_),   //
-                             std::get<rdb::rlen>(f.field_),    //
-                             std::get<rdb::rarray>(f.field_),  //
-                             std::get<rdb::rtype>(f.field_));
+    retVal += rdb::Descriptor(std::get<rdb::rname>(f.field_),   //
+                              std::get<rdb::rlen>(f.field_),    //
+                              std::get<rdb::rarray>(f.field_),  //
+                              std::get<rdb::rtype>(f.field_));
 
   if (isDeclaration()) {
-    retVal | rdb::Descriptor(filename, 0, 0, rdb::REF);
+    retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);
 
     auto filenameShdw{filename};
     std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
     if (filenameShdw.find(".txt") != std::string::npos)
-      retVal | rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
+      retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
     else
-      retVal | rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
+      retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
   }
   return retVal;
 }
@@ -316,10 +316,10 @@ void query::fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &
   auto i{0};
   for (const auto &f : lSchemaVar) {
     if (std::get<rdb::rlen>(f.field_) == 0) continue;
-    val | rdb::Descriptor(id + "_" + std::to_string(i++),   //
-                          std::get<rdb::rlen>(f.field_),    //
-                          std::get<rdb::rarray>(f.field_),  //
-                          std::get<rdb::rtype>(f.field_));
+    val += rdb::Descriptor(id + "_" + std::to_string(i++),   //
+                           std::get<rdb::rlen>(f.field_),    //
+                           std::get<rdb::rarray>(f.field_),  //
+                           std::get<rdb::rtype>(f.field_));
   };
 }
 
@@ -328,7 +328,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
   SPDLOG_INFO("call query::descriptorFrom()");
   rdb::Descriptor retVal{};
   if (isDeclaration()) {
-    retVal | descriptorStorage();
+    retVal += descriptorStorage();
     return retVal;
   }
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};
@@ -338,7 +338,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
     case STREAM_MIN:
     case STREAM_SUM: {
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().getMaxType();
-      retVal | rdb::Descriptor(id + "_0", maxLen, 1, maxType);
+      retVal += rdb::Descriptor(id + "_0", maxLen, 1, maxType);
     } break;
     case STREAM_HASH: {
       retVal.createHash(id, coreInstance.getQuery(arg1).descriptorStorage(), coreInstance.getQuery(arg2).descriptorStorage());
@@ -367,7 +367,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       assert(step > 0);
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().getMaxType();
       for (int i = 0; i < abs(length); i++) {
-        retVal | rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
+        retVal += rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
       }
     } break;
     default:
