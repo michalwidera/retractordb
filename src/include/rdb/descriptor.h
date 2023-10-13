@@ -43,7 +43,7 @@ class Descriptor : public std::vector<rField> {
 
   void append(std::initializer_list<rField> l);
 
-  Descriptor &operator|(const Descriptor &rhs);
+  Descriptor &operator+=(const Descriptor &rhs);
   Descriptor &operator=(const Descriptor &rhs);
   bool operator==(const Descriptor &rhs) const;
 
@@ -91,6 +91,9 @@ class Descriptor : public std::vector<rField> {
   friend std::ostream &operator<<(std::ostream &os, const Descriptor &rhs);
   friend std::istream &operator>>(std::istream &is, Descriptor &rhs);
 };
+
+// http://www.gotw.ca/gotw/004.htm
+const Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
 std::ostream &flat(std::ostream &os);
 }  // namespace rdb

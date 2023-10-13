@@ -115,7 +115,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
                                   maxLen,                              //
                                   1,                                   //
                                   maxType)};
-    descriptor | rdb::Descriptor{x};
+    descriptor += rdb::Descriptor{x};
   }
 
   // 2. Construct payload

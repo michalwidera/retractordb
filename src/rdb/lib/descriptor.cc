@@ -181,10 +181,16 @@ int Descriptor::sizeFlat() {
 
 void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
 
-Descriptor &Descriptor::operator|(const Descriptor &rhs) {
-  if (this != &rhs)
+const Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
+  Descriptor ret(lhs);
+  ret += rhs;
+  return ret;
+}
+
+Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
+  if (this != &rhs) {
     insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
-  else {
+  } else {
     // Descriptor b(*this);
     // insert(end(), b.begin(), b.end());
     assert(false && "can not merge same to same");
@@ -271,7 +277,7 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
   return *this;
 }
 
-Descriptor::Descriptor(const Descriptor &init) { *this | init; }
+Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
   return std::get<rlen>(field) * std::get<rarray>(field);        //
@@ -418,7 +424,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
         ;
     }
 
-    rhs | Descriptor(name, GetFieldLenFromType(ft), arrayLen, ft);
+    rhs += Descriptor(name, GetFieldLenFromType(ft), arrayLen, ft);
   } while (!is.eof());
   is.imbue(origLocale);
 
