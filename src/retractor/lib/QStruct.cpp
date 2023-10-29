@@ -174,11 +174,13 @@ void qTree::removeNonStreamItems(const char leadingSign) {
 
 query &qTree::getQuery(const std::string &query_name) {
   assert(query_name != "");
-  for (auto &q : *this)
-    if (q.id == query_name) return q;
-  SPDLOG_ERROR("Missing - {}", query_name);
-  static query void_query;
-  return (void_query);  // proforma
+
+  auto it = std::find_if(begin(),end(),[query_name](auto &node){ return node.id == query_name; });
+  if (it == std::end(*this)) {
+    SPDLOG_ERROR("Missing - {}", query_name);
+    throw std::logic_error("Query not found.");
+  }
+  return (*it);
 }
 
 int qTree::getSeqNr(const std::string &query_name) {
@@ -190,6 +192,7 @@ int qTree::getSeqNr(const std::string &query_name) {
       ++cnt;
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
+  throw std::logic_error("No such stream in set.");
   return -1;  // INVALID QUERY_NR
 }
 

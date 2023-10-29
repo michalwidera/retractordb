@@ -55,6 +55,7 @@ How xqry terminal works
 #include <boost/range/algorithm.hpp>
 
 // boost::this_process::get_id()
+#include <algorithm>
 #include <boost/process/environment.hpp>
 #include <ctime>
 
@@ -257,17 +258,18 @@ ptree netClient(std::string netCommand, const std::string &netArgument) {
 }
 
 bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
-  bool found(false);
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
   sInputStream    = input;       // this is required for consumer process.
   ptree pt        = netClient("get", "");
-  for (const auto &v : pt.get_child("db.stream")) {
-    if (sInputStream == v.second.get<std::string>("")) {
-      streamTable[sInputStream] = netClient("show", sInputStream);
-      found                     = true;
-      break;
-    }
-  }
+
+  auto stream = pt.get_child("db.stream");
+  bool found  = std::any_of(stream.begin(), stream.end(), [&input](auto &node) {
+    const ptree &v = node.second;
+    bool ret       = (input == v.get<std::string>(""));
+    if (ret) streamTable[sInputStream] = netClient("show", sInputStream);
+    return ret;
+  });
+  
   if (!found) {
     std::cerr << "not found" << std::endl;
     return found;
@@ -324,12 +326,15 @@ void dir() {
   std::vector<std::string> vcols = {"", "duration", "size", "count", "location", "cap"};
   std::stringstream ss;
   for (auto nName : vcols) {
-    int maxSize = 0;
-    for (const auto &v : pt.get_child("db.stream")) {
-      if (v.second.get<std::string>(nName).length() > maxSize) maxSize = v.second.get<std::string>(nName).length();
-    }
+    auto stream    = pt.get_child("db.stream");
+    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](auto &node1, auto &node2) {
+      const ptree &v1 = node1.second;
+      const ptree &v2 = node2.second;
+
+      return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
+    });
     ss << "|%";
-    ss << maxSize;
+    ss << maxSizeIt->second.get<std::string>(nName).length();
     ss << "s";
   }
   ss << "|\n";
@@ -341,12 +346,15 @@ void dir() {
 }
 
 bool detailShow(const std::string &input) {
-  bool found(false);
   ptree pt = netClient("get", "");
   std::cerr << "got answer" << std::endl;
-  for (const auto &v : pt.get_child("db.stream")) {
-    if (input == v.second.get<std::string>("")) found = true;
-  }
+
+  const auto streams = pt.get_child("db.stream");
+  bool found         = std::any_of(streams.begin(), streams.end(), [&input](auto &node) {
+    const ptree &v = node.second;
+    return input == v.get<std::string>("");
+  });
+
   if (found) {
     ptree ptsh = netClient("detail", input);
     for (const auto &v : ptsh.get_child("db.field")) printf("%s.%s\n", input.c_str(), v.second.get<std::string>("").c_str());
