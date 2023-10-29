@@ -263,7 +263,7 @@ bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   ptree pt        = netClient("get", "");
 
   auto stream = pt.get_child("db.stream");
-  bool found  = std::any_of(stream.begin(), stream.end(), [&input](auto &node) {
+  bool found  = std::any_of(stream.begin(), stream.end(), [&input](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[sInputStream] = netClient("show", sInputStream);
@@ -327,7 +327,7 @@ void dir() {
   std::stringstream ss;
   for (auto nName : vcols) {
     auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](auto &node1, auto &node2) {
+    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto &node1,const auto &node2) {
       const ptree &v1 = node1.second;
       const ptree &v2 = node2.second;
 
@@ -350,7 +350,7 @@ bool detailShow(const std::string &input) {
   std::cerr << "got answer" << std::endl;
 
   const auto streams = pt.get_child("db.stream");
-  bool found         = std::any_of(streams.begin(), streams.end(), [&input](auto &node) {
+  bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto &node) {
     const ptree &v = node.second;
     return input == v.get<std::string>("");
   });

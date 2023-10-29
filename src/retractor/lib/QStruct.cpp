@@ -175,7 +175,7 @@ void qTree::removeNonStreamItems(const char leadingSign) {
 query &qTree::getQuery(const std::string &query_name) {
   assert(query_name != "");
 
-  auto it = std::find_if(begin(),end(),[query_name](auto &node){ return node.id == query_name; });
+  auto it = std::find_if(begin(),end(),[query_name](const auto &node){ return node.id == query_name; });
   if (it == std::end(*this)) {
     SPDLOG_ERROR("Missing - {}", query_name);
     throw std::logic_error("Query not found.");
