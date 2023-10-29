@@ -269,7 +269,7 @@ bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
     if (ret) streamTable[sInputStream] = netClient("show", sInputStream);
     return ret;
   });
-  
+
   if (!found) {
     std::cerr << "not found" << std::endl;
     return found;
@@ -327,7 +327,7 @@ void dir() {
   std::stringstream ss;
   for (auto nName : vcols) {
     auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto &node1,const auto &node2) {
+    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto &node1, const auto &node2) {
       const ptree &v1 = node1.second;
       const ptree &v2 = node2.second;
 
