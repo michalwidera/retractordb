@@ -86,24 +86,26 @@ boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
 boost::atomic<bool> done(false);
 
-static std::map<std::string, ptree> streamTable;
+std::map<std::string, ptree> streamTable;
 
-static int timeLimitCntQry{0};  // testing purposes - time limit query (-m)
+int timeLimitCntQry{0};  // testing purposes - time limit query (-m)
 
-static enum outputFormatMode { RAW, GRAPHITE, INFLUXDB } outputFormatMode(RAW);
+enum class formatMode { RAW, GRAPHITE, INFLUXDB };
+
+formatMode outputFormatMode{formatMode::RAW};
 
 // Graphite embedded schema in format "path.to.data value timestamp"
-static ptree schema;
+ptree schema;
 
-static std::string sInputStream{""};
+std::string sInputStream{""};
 
 void setmode(std::string const &mode) {
   if (mode == "RAW")
-    outputFormatMode = RAW;
+    outputFormatMode = formatMode::RAW;
   else if (mode == "GRAPHITE")
-    outputFormatMode = GRAPHITE;
+    outputFormatMode = formatMode::GRAPHITE;
   else if (mode == "INFLUXDB")
-    outputFormatMode = INFLUXDB;
+    outputFormatMode = formatMode::INFLUXDB;
   else
     assert(false);
 }
@@ -121,11 +123,11 @@ void consumer() {
       BOOST_FOREACH (std::string w, streamTable | map_keys)
         if (w == stream) {
           int count = boost::lexical_cast<int>(e_value.get("count", ""));
-          if (outputFormatMode == RAW) {
+          if (outputFormatMode == formatMode::RAW) {
             for (int i = 0; i < count; i++) printf("%s ", e_value.get(boost::lexical_cast<std::string>(i), "").c_str());
             printf("\r\n");
           }
-          if (outputFormatMode == GRAPHITE) {
+          if (outputFormatMode == formatMode::GRAPHITE) {
             int i = 0;
             for (const auto &v : schema.get_child("db.field")) {
               printf("%s.%s %s %llu\n", sInputStream.c_str(), v.second.get<std::string>("").c_str(),
@@ -133,7 +135,7 @@ void consumer() {
             }
           }
           // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
-          if (outputFormatMode == INFLUXDB) {
+          if (outputFormatMode == formatMode::INFLUXDB) {
             using namespace std::chrono;
             int i = 0;
             printf("%s ", sInputStream.c_str());
