@@ -9,21 +9,12 @@ How xqry terminal works
 */
 
 #include <array>
-#include <cassert>
-#include <chrono>
-#include <cstdio>
-#include <ctime>
-
-// This define is required to remove deprecation of boost/bind.hpp
-// some boost libraries still didn't remove dependency to boost bin
-// remove this is boost will clean up on own side.
-#define BOOST_BIND_GLOBAL_PLACEHOLDERS
-
+#include <atomic>
 #include <boost/config.hpp>
 #include <boost/foreach.hpp>
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/lexical_cast.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -32,33 +23,28 @@ How xqry terminal works
 #include <boost/range/algorithm.hpp>
 #include <boost/range/algorithm/find.hpp>
 #include <boost/regex.hpp>
-#include <boost/thread.hpp>
+#include <cassert>
+#include <chrono>
+#include <cstdio>
+#include <ctime>
 #include <iostream>
 #include <sstream>
-
-// For data transmission purposes
-#include <boost/asio.hpp>
-#include <boost/atomic.hpp>
-#include <boost/bind/bind.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
+#include <thread>
 
 // for: BOOST_FOREACH( cmd_e i, commands | map_keys )
+#include <algorithm>
 #include <boost/assign.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/process/environment.hpp>
 #include <boost/range/adaptor/map.hpp>
 #include <boost/range/algorithm.hpp>
-
-// boost::this_process::get_id()
-#include <algorithm>
-#include <boost/process/environment.hpp>
 #include <ctime>
 
+#include "qry.hpp"
 #include "uxSysTermTools.h"
 
 using namespace boost;
@@ -84,7 +70,7 @@ typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
 
 boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
-boost::atomic<bool> done(false);
+std::atomic<bool> done{false};
 
 std::map<std::string, ptree> streamTable;
 
@@ -122,16 +108,16 @@ void consumer() {
       using namespace boost::adaptors;
       BOOST_FOREACH (std::string w, streamTable | map_keys)
         if (w == stream) {
-          int count = boost::lexical_cast<int>(e_value.get("count", ""));
+          int count = std::stoi(e_value.get("count", ""));
           if (outputFormatMode == formatMode::RAW) {
-            for (int i = 0; i < count; i++) printf("%s ", e_value.get(boost::lexical_cast<std::string>(i), "").c_str());
+            for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
             printf("\r\n");
           }
           if (outputFormatMode == formatMode::GRAPHITE) {
             int i = 0;
             for (const auto &v : schema.get_child("db.field")) {
               printf("%s.%s %s %llu\n", sInputStream.c_str(), v.second.get<std::string>("").c_str(),
-                     e_value.get(boost::lexical_cast<std::string>(i++), "").c_str(), (unsigned long long)time(nullptr));
+                     e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
             }
           }
           // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
@@ -145,8 +131,7 @@ void consumer() {
                 firstValNoComma = false;
               else
                 printf(",");
-              printf("%s=%s", v.second.get<std::string>("").c_str(),
-                     e_value.get(boost::lexical_cast<std::string>(i++), "").c_str());
+              printf("%s=%s", v.second.get<std::string>("").c_str(), e_value.get(std::to_string(i++), "").c_str());
             }
             printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
           }
@@ -154,14 +139,14 @@ void consumer() {
           if (timeLimitCntQry > 1) --timeLimitCntQry;
         }
     }
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  while (spsc_queue.pop(e_value)) boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+  while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
 void producer() {
   try {
-    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(boost::this_process::get_id());
+    std::string queueName = "brcdbr" + std::to_string(boost::this_process::get_id());
     IPC::message_queue mq(IPC::open_only, queueName.c_str());
     std::array<char, 1024> message;
     unsigned int priority;
@@ -170,7 +155,7 @@ void producer() {
       bool messageReceived = false;
       while (!messageReceived && !done) {
         messageReceived = mq.try_receive(message.data(), 1024, recvd_size, priority);
-        boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
       }
       if (done) continue;
       message[recvd_size] = 0;
@@ -181,12 +166,12 @@ void producer() {
       // read_json(strstream, pt) ;
       // read_xml(strstream, pt);
       read_info(strstream, pt);
-      while (!spsc_queue.push(pt)) boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+      while (!spsc_queue.push(pt)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << std::endl << "catch on producer queue" << std::endl;
     std::cerr << "queue:"
-              << "brcdbr" + boost::lexical_cast<std::string>(boost::this_process::get_id()) << std::endl;
+              << "brcdbr" + std::to_string(boost::this_process::get_id()) << std::endl;
     done = true;
     return;
   }
@@ -221,15 +206,15 @@ ptree netClient(std::string netCommand, const std::string &netArgument) {
     std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
     IPCMap *mymap                        = ret.first;
     assert(mymap);
-    int processId = boost::this_process::get_id();
-    auto it       = mymap->find(processId);
+    std::size_t processId = boost::this_process::get_id();
+    auto it               = mymap->find(processId);
 
     // When server works under valgrid - must be 10 probes x 10ms
     constexpr int maxAcceptableFails = 10;
 
     int cntr(maxAcceptableFails);
     while (it == mymap->end() && cntr) {
-      boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
       it = mymap->find(processId);
       --cntr;
     }
@@ -264,8 +249,8 @@ bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   sInputStream    = input;       // this is required for consumer process.
   ptree pt        = netClient("get", "");
 
-  auto stream = pt.get_child("db.stream");
-  bool found  = std::any_of(stream.begin(), stream.end(), [&input](const auto &node) {
+  auto stream      = pt.get_child("db.stream");
+  const bool found = std::any_of(stream.begin(), stream.end(), [input](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[sInputStream] = netClient("show", sInputStream);
@@ -280,11 +265,11 @@ bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   //
   // Function in this thread will start listner on udp
   //
-  boost::thread producer_thread(producer);
+  std::jthread producer_thread(producer);
   //
   // Function in this thrade will start fetching data from queue
   //
-  boost::thread consumer_thread(consumer);
+  std::jthread consumer_thread(consumer);
   do {
     if (noneedctrlc) {
       // If this option appear - any key will not stop process
@@ -293,7 +278,7 @@ bool select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
     }
     if (done) break;
     if (timeLimitCntQry == 1) break;
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   } while (true);
   if (timeLimitCntQry != 1 && !done) {
     _getch();  // no wait ... feed key from kbhit

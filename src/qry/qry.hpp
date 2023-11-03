@@ -3,12 +3,9 @@
 #include <boost/property_tree/ptree.hpp>
 #include <string>
 
-int _getch();
-void consumer();
-void producer();
-bool select(bool noneedctrlc, int timeLimit, const std::string &input);
+bool select(bool, int, const std::string &);
 void dir();
 int hello();
-void setmode(std::string const &mode);
-bool detailShow(const std::string &input);
-boost::property_tree::ptree netClient(std::string netCommand, const std::string &netArgument);
+void setmode(std::string const &);
+bool detailShow(const std::string &);
+boost::property_tree::ptree netClient(std::string, const std::string &);
