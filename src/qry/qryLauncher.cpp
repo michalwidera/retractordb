@@ -44,9 +44,12 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     po::notify(vm);
     setbuf(stdout, nullptr);
-    if (vm.count("graphite")) setmode("GRAPHITE");
-    if (vm.count("raw")) setmode("RAW");
-    if (vm.count("influxdb")) setmode("INFLUXDB");
+
+    qry obj;
+
+    if (vm.count("graphite")) obj.setmode("GRAPHITE");
+    if (vm.count("raw")) obj.setmode("RAW");
+    if (vm.count("influxdb")) obj.setmode("INFLUXDB");
     if (vm.count("help")) {
       std::cout << argv[0] << " - data query tool." << std::endl << std::endl;
       std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
@@ -57,16 +60,16 @@ int main(int argc, char *argv[]) {
       return system::errc::success;
     }
     if (vm.count("hello"))
-      return hello();
+      return obj.hello();
     else if (vm.count("kill")) {
-      ptree pt = netClient("kill", "");
+      ptree pt = obj.netClient("kill", "");
       printf("kill sent.\n");
     } else if (vm.count("dir"))
-      dir();
+      obj.dir();
     else if (vm.count("detail")) {
-      if (!detailShow(sInputStream)) return system::errc::no_such_file_or_directory;
+      if (!obj.detailShow(sInputStream)) return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
-      if (!select(vm.count("needctrlc"), timeLimit, sInputStream)) return system::errc::no_such_file_or_directory;
+      if (!obj.select(vm.count("needctrlc"), timeLimit, sInputStream)) return system::errc::no_such_file_or_directory;
     } else {
       std::cout << argv[0] << ": fatal error: no argument" << std::endl;
       SPDLOG_ERROR("stop - error, no argument.");

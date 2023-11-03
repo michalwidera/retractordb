@@ -4,6 +4,8 @@
 
 #include "qry/qry.hpp"
 
-bool check_hello_function() { return (hello() == boost::system::errc::protocol_error); }
+qry obj;
 
-TEST(xqry, test_hello) { ASSERT_TRUE(check_hello_function()); }
+TEST(xqry, test_hello) { 
+  ASSERT_TRUE(obj.hello() == boost::system::errc::protocol_error);
+}
