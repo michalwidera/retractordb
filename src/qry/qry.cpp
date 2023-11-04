@@ -173,65 +173,72 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
     SPDLOG_ERROR("not found: {}", input);
     return found;
   }
-  schema = netClient("detail", input);
+
   //
   // Function in this thread will start listner on udp
   //
   std::jthread producer_thread(producer);
 
   ptree e_value;
-  while (!done) {
-    if (noneedctrlc) {
-      // If this option appear - any key will not stop process
-    } else {
-      if (_kbhit()) break;
-    }
-    if (timeLimitCntQry == 1) break;
 
-    while (spsc_queue.pop(e_value)) {
-      const std::string stream = e_value.get("stream", "");
-      for (auto &[w, k] : streamTable)
-        if (w == stream) {
-          if (outputFormatMode == formatMode::RAW) {
-            const int count = std::stoi(e_value.get("count", ""));
-            for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
-            printf("\r\n");
-          } else if (outputFormatMode == formatMode::GRAPHITE) {
-            int i{0};
-            for (const auto &v : schema.get_child("db.field")) {
-              printf("%s.%s %s %llu\n", sInputStream.c_str(), v.second.get<std::string>("").c_str(),
-                     e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
+  try {
+    while (!done) {
+      if (noneedctrlc) {
+        // If this option appear - any key will not stop process
+      } else {
+        if (_kbhit()) break;
+      }
+      if (timeLimitCntQry == 1) break;
+
+      while (spsc_queue.pop(e_value)) {
+        const std::string stream = e_value.get("stream", "");
+        for (auto &[w, k] : streamTable)
+          if (w == stream) {
+            if (outputFormatMode == formatMode::RAW) {
+              const int count = std::stoi(e_value.get("count", ""));
+              for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
+              printf("\r\n");
+            } else if (outputFormatMode == formatMode::GRAPHITE) {
+              int i{0};
+              const auto schema = netClient("detail", input);
+              for (const auto &v : schema.get_child("db.field")) {
+                printf("%s.%s %s %llu\n", input.c_str(), v.second.get<std::string>("").c_str(),
+                       e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
+              }
+            } else if (outputFormatMode == formatMode::INFLUXDB) {
+              // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
+              using namespace std::chrono;
+              int i{0};
+              printf("%s ", input.c_str());
+              bool firstValNoComma(true);
+              const auto schema = netClient("detail", input);
+              for (const auto &v : schema.get_child("db.field")) {
+                if (firstValNoComma)
+                  firstValNoComma = false;
+                else
+                  printf(",");
+                printf("%s=%s", v.second.get<std::string>("").c_str(), e_value.get(std::to_string(i++), "").c_str());
+              }
+              printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
             }
-          } else if (outputFormatMode == formatMode::INFLUXDB) {
-            // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
-            using namespace std::chrono;
-            int i{0};
-            printf("%s ", sInputStream.c_str());
-            bool firstValNoComma(true);
-            for (const auto &v : schema.get_child("db.field")) {
-              if (firstValNoComma)
-                firstValNoComma = false;
-              else
-                printf(",");
-              printf("%s=%s", v.second.get<std::string>("").c_str(), e_value.get(std::to_string(i++), "").c_str());
-            }
-            printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
+            // This part is time limited (-m) resposbile
+            if (timeLimitCntQry > 1) --timeLimitCntQry;
           }
-          // This part is time limited (-m) resposbile
-          if (timeLimitCntQry > 1) --timeLimitCntQry;
-        }
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-  while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-  if (timeLimitCntQry != 1 && !done) {
-    _getch();  // no wait ... feed key from kbhit
+    if (timeLimitCntQry != 1 && !done) {
+      _getch();  // no wait ... feed key from kbhit
+    }
+
+  } catch (...) {
+    SPDLOG_ERROR("General exception catched.");
   }
 
   done = true;
   producer_thread.join();
-  assert(found == true);
   return found;
 }
 
