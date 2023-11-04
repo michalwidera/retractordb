@@ -46,54 +46,7 @@ boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
 std::atomic<bool> done{false};
 
-//
-// Consumer process asynchronously fetch data from query and puts on
-// screen/output
-//
-void qry::consumer(qry *pThis) {
-  ptree e_value;
-  while (!done) {
-    while (spsc_queue.pop(e_value)) {
-      const std::string stream = e_value.get("stream", "");
-      for (auto &[w, k] : pThis->streamTable)
-        if (w == stream) {
-          int count = std::stoi(e_value.get("count", ""));
-          if (pThis->outputFormatMode == formatMode::RAW) {
-            for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
-            printf("\r\n");
-          }
-          if (pThis->outputFormatMode == formatMode::GRAPHITE) {
-            int i = 0;
-            for (const auto &v : pThis->schema.get_child("db.field")) {
-              printf("%s.%s %s %llu\n", pThis->sInputStream.c_str(), v.second.get<std::string>("").c_str(),
-                     e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
-            }
-          }
-          // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
-          if (pThis->outputFormatMode == formatMode::INFLUXDB) {
-            using namespace std::chrono;
-            int i = 0;
-            printf("%s ", pThis->sInputStream.c_str());
-            bool firstValNoComma(true);
-            for (const auto &v : pThis->schema.get_child("db.field")) {
-              if (firstValNoComma)
-                firstValNoComma = false;
-              else
-                printf(",");
-              printf("%s=%s", v.second.get<std::string>("").c_str(), e_value.get(std::to_string(i++), "").c_str());
-            }
-            printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
-          }
-          // This part is time limited (-m) resposbile
-          if (pThis->timeLimitCntQry > 1) --(pThis->timeLimitCntQry);
-        }
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-  while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
-}
-
-void qry::producer(qry *pThis) {
+void qry::producer() {
   try {
     const int messageSize = 1024;
     std::string queueName = "brcdbr" + std::to_string(boost::this_process::get_id());
@@ -125,7 +78,7 @@ void qry::producer(qry *pThis) {
   }
 }
 
-ptree qry::netClient(std::string netCommand, const std::string &netArgument) {
+ptree qry::netClient(const std::string &netCommand, const std::string &netArgument) {
   ptree pt_response;
   ptree pt_request;
   try {
@@ -204,16 +157,15 @@ ptree qry::netClient(std::string netCommand, const std::string &netArgument) {
   return pt_response;
 }
 
-bool qry::select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
+bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &input) {
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
-  sInputStream    = input;       // this is required for consumer process.
   ptree pt        = netClient("get", "");
 
   auto stream      = pt.get_child("db.stream");
   const bool found = std::any_of(stream.begin(), stream.end(), [input, this](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
-    if (ret) streamTable[sInputStream] = netClient("show", sInputStream);
+    if (ret) streamTable[input] = netClient("show", input);
     return ret;
   });
 
@@ -221,31 +173,64 @@ bool qry::select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
     SPDLOG_ERROR("not found: {}", input);
     return found;
   }
-  schema = netClient("detail", sInputStream);
+  schema = netClient("detail", input);
   //
   // Function in this thread will start listner on udp
   //
-  std::jthread producer_thread(producer, this);
-  //
-  // Function in this thrade will start fetching data from queue
-  //
-  std::jthread consumer_thread(consumer, this);
-  do {
+  std::jthread producer_thread(producer);
+
+  ptree e_value;
+  while (!done) {
     if (noneedctrlc) {
       // If this option appear - any key will not stop process
     } else {
       if (_kbhit()) break;
     }
-    if (done) break;
     if (timeLimitCntQry == 1) break;
+
+    while (spsc_queue.pop(e_value)) {
+      const std::string stream = e_value.get("stream", "");
+      for (auto &[w, k] : streamTable)
+        if (w == stream) {
+          if (outputFormatMode == formatMode::RAW) {
+            const int count = std::stoi(e_value.get("count", ""));
+            for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
+            printf("\r\n");
+          } else if (outputFormatMode == formatMode::GRAPHITE) {
+            int i{0};
+            for (const auto &v : schema.get_child("db.field")) {
+              printf("%s.%s %s %llu\n", sInputStream.c_str(), v.second.get<std::string>("").c_str(),
+                     e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
+            }
+          } else if (outputFormatMode == formatMode::INFLUXDB) {
+            // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
+            using namespace std::chrono;
+            int i{0};
+            printf("%s ", sInputStream.c_str());
+            bool firstValNoComma(true);
+            for (const auto &v : schema.get_child("db.field")) {
+              if (firstValNoComma)
+                firstValNoComma = false;
+              else
+                printf(",");
+              printf("%s=%s", v.second.get<std::string>("").c_str(), e_value.get(std::to_string(i++), "").c_str());
+            }
+            printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
+          }
+          // This part is time limited (-m) resposbile
+          if (timeLimitCntQry > 1) --timeLimitCntQry;
+        }
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  } while (true);
+  }
+  while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
   if (timeLimitCntQry != 1 && !done) {
     _getch();  // no wait ... feed key from kbhit
   }
+
   done = true;
   producer_thread.join();
-  consumer_thread.join();
   assert(found == true);
   return found;
 }

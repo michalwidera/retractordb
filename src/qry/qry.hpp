@@ -8,8 +8,7 @@
 enum class formatMode { RAW, GRAPHITE, INFLUXDB };
 
 class qry {
-  static void consumer(qry *);
-  static void producer(qry *);
+  static void producer();
 
  public:
   std::map<std::string, boost::property_tree::ptree> streamTable;
@@ -25,9 +24,9 @@ class qry {
 
   std::string sInputStream{""};
 
-  bool select(bool, int, const std::string &);
+  bool select(bool, const int, const std::string &);
   void dir();
   int hello();
   bool detailShow(const std::string &);
-  boost::property_tree::ptree netClient(std::string, const std::string &);
+  boost::property_tree::ptree netClient(const std::string &, const std::string &);
 };
