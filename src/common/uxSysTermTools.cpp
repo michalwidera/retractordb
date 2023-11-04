@@ -87,7 +87,7 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
     console_sink->set_pattern("%v%$");
     console_sink->set_level(spdlog::level::trace);
 
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(tmp.string() + ".log", true);
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(tmp.string() + ".log", false /* truncate log */);
 
     file_sink->set_level(spdlog::level::trace);
     file_sink->set_pattern(common_log_pattern);

@@ -80,10 +80,10 @@ int main(int argc, char *argv[]) {
       return EPERM;  // ERROR defined in errno-base.h
     }
   } catch (IPC::interprocess_exception &ex) {
-    SPDLOG_ERROR("stop - IPC qry catch client:{}", ex.what());
+    SPDLOG_ERROR("IPC: {}", ex.what());
     return system::errc::no_child_process;
   } catch (std::exception &e) {
-    SPDLOG_ERROR("stop - Exception catch client:{}", e.what());
+    SPDLOG_ERROR("Std: {}", e.what());
     return system::errc::interrupted;
   }
   SPDLOG_INFO("ok");

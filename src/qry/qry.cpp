@@ -167,10 +167,8 @@ void qry::producer() {
       read_info(strstream, pt);
       while (!spsc_queue.push(pt)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-  } catch (IPC::interprocess_exception &ex) {
-    std::cerr << ex.what() << std::endl << "catch on producer queue" << std::endl;
-    std::cerr << "queue:"
-              << "brcdbr" + std::to_string(boost::this_process::get_id()) << std::endl;
+  } catch (IPC::interprocess_exception &e) {
+    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(boost::this_process::get_id()));
     done = true;
     return;
   }
@@ -231,13 +229,13 @@ ptree qry::netClient(std::string netCommand, const std::string &netArgument) {
     // read_xml(strstream, pt_response);
     read_info(strstream, pt_response);
   } catch (IPC::interprocess_exception &e) {
-    SPDLOG_ERROR("IPC::interprocess_exception catch {}", e.what());
+    SPDLOG_ERROR("IPC: {}", e.what());
     done = true;
   } catch (boost::system::system_error &e) {
-    SPDLOG_ERROR("boost::system::system_error catch {}", e.what());
+    SPDLOG_ERROR("Boost::system: {}", e.what());
     done = true;
   } catch (std::exception &e) {
-    SPDLOG_ERROR("std::exception catch {}", e.what());
+    SPDLOG_ERROR("Std: {}", e.what());
     pt_response.put("error.response", e.what());
     done = true;
   }
@@ -300,7 +298,7 @@ int qry::hello() {
     SPDLOG_INFO("rcv: {} {}", v.first.c_str(), rcv.c_str());
   }
   if (rcv != "world") {
-    SPDLOG_ERROR("{}", rcv.c_str());
+    SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
     return system::errc::protocol_error;
   }
   return system::errc::success;
