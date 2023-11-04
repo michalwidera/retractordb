@@ -74,58 +74,37 @@ boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
 std::atomic<bool> done{false};
 
-std::map<std::string, boost::property_tree::ptree> streamTable;
-int timeLimitCntQry{0};  // testing purposes - time limit query (-m)
-enum class formatMode { RAW, GRAPHITE, INFLUXDB };
-formatMode outputFormatMode{formatMode::RAW};
-
-// Graphite embedded schema in format "path.to.data value timestamp"
-boost::property_tree::ptree schema;
-
-std::string sInputStream{""};
-
-void qry::setmode(std::string const &mode) {
-  if (mode == "RAW")
-    outputFormatMode = formatMode::RAW;
-  else if (mode == "GRAPHITE")
-    outputFormatMode = formatMode::GRAPHITE;
-  else if (mode == "INFLUXDB")
-    outputFormatMode = formatMode::INFLUXDB;
-  else
-    assert(false);
-}
-
 //
 // Consumer process asynchronously fetch data from query and puts on
 // screen/output
 //
-void qry::consumer() {
+void qry::consumer(qry *pThis) {
   ptree e_value;
   while (!done) {
     while (spsc_queue.pop(e_value)) {
       std::string stream = e_value.get("stream", "");
       using namespace boost::adaptors;
-      BOOST_FOREACH (std::string w, streamTable | map_keys)
+      BOOST_FOREACH (std::string w, pThis->streamTable | map_keys)
         if (w == stream) {
           int count = std::stoi(e_value.get("count", ""));
-          if (outputFormatMode == formatMode::RAW) {
+          if (pThis->outputFormatMode == formatMode::RAW) {
             for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
             printf("\r\n");
           }
-          if (outputFormatMode == formatMode::GRAPHITE) {
+          if (pThis->outputFormatMode == formatMode::GRAPHITE) {
             int i = 0;
-            for (const auto &v : schema.get_child("db.field")) {
-              printf("%s.%s %s %llu\n", sInputStream.c_str(), v.second.get<std::string>("").c_str(),
+            for (const auto &v : pThis->schema.get_child("db.field")) {
+              printf("%s.%s %s %llu\n", pThis->sInputStream.c_str(), v.second.get<std::string>("").c_str(),
                      e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
             }
           }
           // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
-          if (outputFormatMode == formatMode::INFLUXDB) {
+          if (pThis->outputFormatMode == formatMode::INFLUXDB) {
             using namespace std::chrono;
             int i = 0;
-            printf("%s ", sInputStream.c_str());
+            printf("%s ", pThis->sInputStream.c_str());
             bool firstValNoComma(true);
-            for (const auto &v : schema.get_child("db.field")) {
+            for (const auto &v : pThis->schema.get_child("db.field")) {
               if (firstValNoComma)
                 firstValNoComma = false;
               else
@@ -135,7 +114,7 @@ void qry::consumer() {
             printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
           }
           // This part is time limited (-m) resposbile
-          if (timeLimitCntQry > 1) --timeLimitCntQry;
+          if (pThis->timeLimitCntQry > 1) --(pThis->timeLimitCntQry);
         }
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -143,7 +122,7 @@ void qry::consumer() {
   while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
-void qry::producer() {
+void qry::producer(qry *pThis) {
   try {
     std::string queueName = "brcdbr" + std::to_string(boost::this_process::get_id());
     IPC::message_queue mq(IPC::open_only, queueName.c_str());
@@ -263,11 +242,11 @@ bool qry::select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   //
   // Function in this thread will start listner on udp
   //
-  std::jthread producer_thread(producer);
+  std::jthread producer_thread(producer, this);
   //
   // Function in this thrade will start fetching data from queue
   //
-  std::jthread consumer_thread(consumer);
+  std::jthread consumer_thread(consumer, this);
   do {
     if (noneedctrlc) {
       // If this option appear - any key will not stop process

@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
 
     qry obj;
 
-    if (vm.count("graphite")) obj.setmode("GRAPHITE");
-    if (vm.count("raw")) obj.setmode("RAW");
-    if (vm.count("influxdb")) obj.setmode("INFLUXDB");
+    if (vm.count("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
+    if (vm.count("raw")) obj.outputFormatMode = formatMode::RAW;
+    if (vm.count("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
     if (vm.count("help")) {
       std::cout << argv[0] << " - data query tool." << std::endl << std::endl;
       std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
