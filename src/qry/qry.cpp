@@ -8,6 +8,9 @@ How xqry terminal works
 5. End of process
 */
 
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
+
 #include <array>
 #include <boost/config.hpp>
 #include <boost/foreach.hpp>
@@ -216,6 +219,7 @@ ptree qry::netClient(std::string netCommand, const std::string &netArgument) {
     }
     if (it == mymap->end()) {
       printf("server not found\n");
+      SPDLOG_ERROR("server not found");
       done = true;
       pt_response.put("error.response", "server not found");
       return pt_response;
@@ -226,14 +230,14 @@ ptree qry::netClient(std::string netCommand, const std::string &netArgument) {
     // read_json(strstream, pt_response) ;
     // read_xml(strstream, pt_response);
     read_info(strstream, pt_response);
-  } catch (IPC::interprocess_exception &ex) {
-    std::cerr << ex.what() << std::endl << "catch IPC server" << std::endl;
+  } catch (IPC::interprocess_exception &e) {
+    SPDLOG_ERROR("IPC::interprocess_exception catch {}", e.what());
     done = true;
   } catch (boost::system::system_error &e) {
-    std::cerr << e.what() << std::endl << "boost system_error" << std::endl;
+    SPDLOG_ERROR("boost::system::system_error catch {}", e.what());
     done = true;
   } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    SPDLOG_ERROR("std::exception catch {}", e.what());
     pt_response.put("error.response", e.what());
     done = true;
   }
@@ -254,7 +258,7 @@ bool qry::select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
   });
 
   if (!found) {
-    std::cerr << "not found" << std::endl;
+    SPDLOG_ERROR("not found: {}", input);
     return found;
   }
   schema = netClient("detail", sInputStream);
@@ -288,14 +292,15 @@ bool qry::select(bool noneedctrlc, int iTimeLimit, const std::string &input) {
 
 int qry::hello() {
   ptree pt = netClient("hello", "");
-  printf("snd: hello\n");
+  SPDLOG_INFO("snd: hello");
+
   std::string rcv("fail.");
   BOOST_FOREACH (ptree::value_type &v, pt) {
     rcv = v.second.get<std::string>("");
-    printf("rcv: %s %s\n", v.first.c_str(), rcv.c_str());
+    SPDLOG_INFO("rcv: {} {}", v.first.c_str(), rcv.c_str());
   }
   if (rcv != "world") {
-    printf("%s\n", rcv.c_str());
+    SPDLOG_ERROR("{}", rcv.c_str());
     return system::errc::protocol_error;
   }
   return system::errc::success;
@@ -330,7 +335,7 @@ void qry::dir() {
 
 bool qry::detailShow(const std::string &input) {
   ptree pt = netClient("get", "");
-  std::cerr << "got answer" << std::endl;
+  SPDLOG_INFO("got answer");
 
   const auto streams = pt.get_child("db.stream");
   bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto &node) {
@@ -342,6 +347,7 @@ bool qry::detailShow(const std::string &input) {
     ptree ptsh = netClient("detail", input);
     for (const auto &v : ptsh.get_child("db.field")) printf("%s.%s\n", input.c_str(), v.second.get<std::string>("").c_str());
   } else
-    std::cerr << "not found" << std::endl;
+    SPDLOG_ERROR("not found");
+
   return found;
 }

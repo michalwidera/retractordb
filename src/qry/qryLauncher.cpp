@@ -1,4 +1,3 @@
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
@@ -17,9 +16,15 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
+void cleanup() {
+  spdlog::shutdown();  // flush logs on disk
+}
+
 int main(int argc, char *argv[]) {
   fixArgcv(argc, argv);
-  const auto tempLocation = setupLoggerMain(std::string(argv[0]));
+  const auto tempLocation = setupLoggerMain(std::string(argv[0]), true);
+  /* const int result_atexit = */
+  std::atexit(cleanup);
 
   try {
     namespace po = boost::program_options;
@@ -63,7 +68,7 @@ int main(int argc, char *argv[]) {
       return obj.hello();
     else if (vm.count("kill")) {
       ptree pt = obj.netClient("kill", "");
-      printf("kill sent.\n");
+      SPDLOG_INFO("kill sent");
     } else if (vm.count("dir"))
       obj.dir();
     else if (vm.count("detail")) {
@@ -71,8 +76,7 @@ int main(int argc, char *argv[]) {
     } else if (vm.count("select") && sInputStream != "none") {
       if (!obj.select(vm.count("needctrlc"), timeLimit, sInputStream)) return system::errc::no_such_file_or_directory;
     } else {
-      std::cout << argv[0] << ": fatal error: no argument" << std::endl;
-      SPDLOG_ERROR("stop - error, no argument.");
+      SPDLOG_ERROR("no argument.");
       return EPERM;  // ERROR defined in errno-base.h
     }
   } catch (IPC::interprocess_exception &ex) {
@@ -82,7 +86,7 @@ int main(int argc, char *argv[]) {
     SPDLOG_ERROR("stop - Exception catch client:{}", e.what());
     return system::errc::interrupted;
   }
-  std::cout << "ok." << std::endl;
-  SPDLOG_INFO("stop");
+  SPDLOG_INFO("ok");
+
   return system::errc::success;
 }

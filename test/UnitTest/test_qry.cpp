@@ -6,6 +6,4 @@
 
 qry obj;
 
-TEST(xqry, test_hello) { 
-  ASSERT_TRUE(obj.hello() == boost::system::errc::protocol_error);
-}
+TEST(xqry, test_hello) { ASSERT_TRUE(obj.hello() == boost::system::errc::protocol_error); }
