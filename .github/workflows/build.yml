@@ -24,7 +24,7 @@ jobs:
           conan profile new default --detect
           conan profile update settings.compiler.libcxx=libstdc++11 default
           conan source .
-          conan install . -s build_type Debug
+          conan install . -s build_type=Debug
           conan build . -s build_type=Debug
           cd build/Debug && build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} cmake .
       - name: Run sonar-scanner
