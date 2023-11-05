@@ -262,7 +262,8 @@ int qry::hello() {
   // catches in regressions
 }
 
-void qry::dir() {
+std::string qry::dir() {
+  std::stringstream retval;
   ptree pt                       = netClient("get", "");
   std::vector<std::string> vcols = {"", "duration", "size", "count", "location", "cap"};
   std::stringstream ss;
@@ -274,19 +275,27 @@ void qry::dir() {
 
       return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
     });
+    if (stream.size() == 1) assert(maxSizeIt == stream.begin());
     ss << "|%";
     ss << maxSizeIt->second.get<std::string>(nName).length();
     ss << "s";
   }
   ss << "|\n";
+
+  char buffer[1024];
   for (const auto &v : pt.get_child("db.stream")) {
-    printf(ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
-           v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
-           v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
+    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
+            v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
+            v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
+    retval << buffer;
   }
+
+  return retval.str();
 }
 
-bool qry::detailShow(const std::string &input) {
+std::string qry::detailShow(const std::string &input) {
+  std::stringstream retval;
+
   ptree pt = netClient("get", "");
   SPDLOG_INFO("got answer");
 
@@ -298,9 +307,9 @@ bool qry::detailShow(const std::string &input) {
 
   if (found) {
     ptree ptsh = netClient("detail", input);
-    for (const auto &v : ptsh.get_child("db.field")) printf("%s.%s\n", input.c_str(), v.second.get<std::string>("").c_str());
+    for (const auto &v : ptsh.get_child("db.field")) retval << input << "." << v.second.get<std::string>("") << "\n";
   } else
     SPDLOG_ERROR("not found");
 
-  return found;
+  return retval.str();
 }

@@ -70,9 +70,13 @@ int main(int argc, char *argv[]) {
       ptree pt = obj.netClient("kill", "");
       SPDLOG_INFO("kill sent");
     } else if (vm.count("dir"))
-      obj.dir();
+      std::cout << obj.dir();
     else if (vm.count("detail")) {
-      if (!obj.detailShow(sInputStream)) return system::errc::no_such_file_or_directory;
+      auto ret = obj.detailShow(sInputStream);
+      if (ret != "")
+        std::cout << ret;
+      else
+        return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
       if (!obj.select(vm.count("needctrlc"), timeLimit, sInputStream)) return system::errc::no_such_file_or_directory;
     } else {

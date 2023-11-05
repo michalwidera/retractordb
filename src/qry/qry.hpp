@@ -17,9 +17,9 @@ class qry {
   formatMode outputFormatMode{formatMode::RAW};
 
   bool select(bool, const int, const std::string &);
-  void dir();
+  std::string dir();
   int hello();
-  bool detailShow(const std::string &);
+  std::string detailShow(const std::string &);
   virtual boost::property_tree::ptree netClient(const std::string &, const std::string &);
   virtual ~qry(){};
 };
