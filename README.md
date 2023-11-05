@@ -5,7 +5,9 @@ CI Build Status: [![CircleCI](https://circleci.com/gh/michalwidera/retractordb.s
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
-These are sources of RetractorDB Time Series Database System prototype. __This is work in progress.__
+These are sources of RetractorDB Time Series Database System prototype.
+
+__This is work in progress.__
 
 Project Web Page
 -----------------------------------------------------------------------
@@ -22,8 +24,9 @@ How to install
 -----------------------------------------------------------------------
 
 ```
-sudo apt-get -y install gcc cmake make build-essential python3 python3-pip valgrind clang-format
+sudo apt-get -y install gcc cmake make build-essential python3 python3-pip python3-venv valgrind clang-format mold
 pip install conan
+pip install cmakelang
 conan profile detect
 git clone https://github.com/michalwidera/retractordb.git
 cd retractordb
@@ -32,6 +35,13 @@ conan build . -s build_type=Debug --build missing
 cd build/Debug
 make install
 ```
+
+optional in case of Externaly Managed PYTHON
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
+and add this activate into .bashrc or simillar startup script.
 
 optional in build/Debug folder:
 ```
@@ -79,9 +89,9 @@ This could be a data file, binary file or even device file from _/dev_ directory
 Second starts from _select_ keyword and have following formal form:
 
 ```
-select column_names
-stream output_stream
-from junction_of_input_streams
+select column_expression [as ColumnName], [column_expression [as ColumnName]]
+stream output_stream_name
+from stream_junction_expression
 ```
 
 Example:
