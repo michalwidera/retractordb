@@ -83,5 +83,5 @@ class Retractor(ConanFile):
     def build(self):
         """Build."""
         cmake = CMake(self)
-        cmake.configure()
+        # cmake.configure()
         cmake.build()
