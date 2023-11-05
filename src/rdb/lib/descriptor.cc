@@ -36,9 +36,16 @@ static inline void rtrim(std::string &s) {
       s.end());
 }
 
-bool flatOutput = false;
+static bool flatOutput = false;
 
 static const int error_desc_location{-1};
+
+bool getFlat() {
+  return flatOutput;
+}
+void setFlat(bool var) {
+  flatOutput = var;
+}
 
 rdb::descFld GetFieldType(std::string name) {
   ltrim(name);
@@ -181,7 +188,7 @@ int Descriptor::sizeFlat() {
 
 void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
 
-const Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
+Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
   Descriptor ret(lhs);
   ret += rhs;
   return ret;

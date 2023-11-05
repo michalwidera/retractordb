@@ -44,7 +44,7 @@ namespace IPC = boost::interprocess;
 
 boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
-std::atomic<bool> done{false};
+static std::atomic<bool> done{false};
 
 void qry::producer() {
   try {
@@ -161,8 +161,8 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
   ptree pt        = netClient("get", "");
 
-  auto stream      = pt.get_child("db.stream");
-  const bool found = std::any_of(stream.begin(), stream.end(), [input, this](const auto &node) {
+  const auto stream = pt.get_child("db.stream");
+  const bool found  = std::any_of(stream.begin(), stream.end(), [input, this](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[input] = netClient("show", input);
@@ -191,9 +191,9 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
       if (timeLimitCntQry == 1) break;
 
       while (spsc_queue.pop(e_value)) {
-        const std::string stream = e_value.get("stream", "");
+        const std::string streamN = e_value.get("stream", "");
         for (auto &[w, k] : streamTable)
-          if (w == stream) {
+          if (w == streamN) {
             if (outputFormatMode == formatMode::RAW) {
               const int count = std::stoi(e_value.get("count", ""));
               for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());

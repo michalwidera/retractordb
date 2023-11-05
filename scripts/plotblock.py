@@ -57,8 +57,8 @@ try:
                 collectionList[i].appendleft(record[i])
 
                 lineCount = 0
-                for i in collectionList[i]:
-                    print(f"{lineCount} {i}")
+                for j in collectionList[i]:
+                    print(f"{lineCount} {j}")
                     lineCount += 1
 
                 # gnuplot sometimes get too much data and raises memory exception

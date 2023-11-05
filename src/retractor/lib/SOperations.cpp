@@ -9,9 +9,9 @@ using namespace boost;
 
 // https://stackoverflow.com/questions/35971827/c-boost-rational-class-floor-function
 
-constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(num.numerator() / num.denominator()); }
+static int floorR(boost::rational<int> const &num) { return static_cast<int>(num.numerator() / num.denominator()); }
 
-constexpr int ceilR(boost::rational<int> const &num) {
+static int ceilR(boost::rational<int> const &num) {
   auto inum = static_cast<int>(num.numerator() / num.denominator());
   return (num == inum) ? inum : ((num.numerator() > 0) ? ++inum : --inum);
 }
