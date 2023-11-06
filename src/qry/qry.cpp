@@ -175,7 +175,8 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
   }
 
   //
-  // Function in this thread will start listner on udp
+  // Function in this thread will start listner
+  // join is leaded in object destructor
   //
   std::jthread producer_thread(producer);
 
@@ -238,7 +239,6 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
   }
 
   done = true;
-  producer_thread.join();
   return found;
 }
 

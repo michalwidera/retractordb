@@ -9,11 +9,6 @@
 #include "dataModel.h"
 #include "uxSysTermTools.h"
 
-// This defines is required to remove deprecation of boost/bind.hpp
-// some boost libraries still didn't remove dependency to boost bin
-// remove this is boost will clean up on own side.
-#define BOOST_BIND_GLOBAL_PLACEHOLDERS
-
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 

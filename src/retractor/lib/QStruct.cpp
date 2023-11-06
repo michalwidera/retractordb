@@ -3,10 +3,7 @@
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
-#include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
-#include <boost/function.hpp>        // IWYU pragma: keep
-#include <boost/lambda/bind.hpp>     // IWYU pragma: keep
-#include <boost/lambda/lambda.hpp>   // IWYU pragma: keep
+
 #include <cassert>                   // for assert
 #include <cctype>                    // tolower
 #include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
@@ -17,7 +14,6 @@
 #include <type_traits>
 
 using namespace boost;
-using namespace boost::lambda;
 
 #define FLDTYPE_H_CREATE_DEFINITION_FLDT
 #include "fldType.h"

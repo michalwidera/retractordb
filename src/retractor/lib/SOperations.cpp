@@ -1,7 +1,6 @@
 #include <SOperations.h>
 
 #include <algorithm>                 // for min
-#include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
 #include <cassert>                   // for assert
 #include <stdexcept>                 // for out_of_range
 
