@@ -3,14 +3,13 @@
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
-
-#include <cassert>                   // for assert
-#include <cctype>                    // tolower
-#include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
-#include <iostream>                  // for cerr
-#include <sstream>                   // for operator<<, basic_ostream, endl
-#include <stack>                     // for stack
-#include <stdexcept>                 // for logic_error
+#include <cassert>             // for assert
+#include <cctype>              // tolower
+#include <ext/alloc_traits.h>  // for __alloc_traits<>::value_type
+#include <iostream>            // for cerr
+#include <sstream>             // for operator<<, basic_ostream, endl
+#include <stack>               // for stack
+#include <stdexcept>           // for logic_error
 #include <type_traits>
 
 using namespace boost;

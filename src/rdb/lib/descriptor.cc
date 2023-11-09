@@ -40,12 +40,8 @@ static bool flatOutput = false;
 
 static const int error_desc_location{-1};
 
-bool getFlat() {
-  return flatOutput;
-}
-void setFlat(bool var) {
-  flatOutput = var;
-}
+bool getFlat() { return flatOutput; }
+void setFlat(bool var) { flatOutput = var; }
 
 rdb::descFld GetFieldType(std::string name) {
   ltrim(name);

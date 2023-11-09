@@ -21,5 +21,5 @@ class qry {
   int hello();
   std::string detailShow(const std::string &);
   virtual boost::property_tree::ptree netClient(const std::string &, const std::string &);
-  virtual ~qry(){};
+  virtual ~qry() = default;
 };

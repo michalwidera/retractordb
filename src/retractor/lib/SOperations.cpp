@@ -1,8 +1,8 @@
 #include <SOperations.h>
 
-#include <algorithm>                 // for min
-#include <cassert>                   // for assert
-#include <stdexcept>                 // for out_of_range
+#include <algorithm>  // for min
+#include <cassert>    // for assert
+#include <stdexcept>  // for out_of_range
 
 using namespace boost;
 

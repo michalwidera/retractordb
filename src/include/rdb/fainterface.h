@@ -63,7 +63,7 @@ struct FileAccessorInterface {
    */
   virtual ssize_t fctrl(void *ptrData, const size_t size) { return 0; };
 
-  virtual ~FileAccessorInterface(){};
+  virtual ~FileAccessorInterface() = default;
 };
 }  // namespace rdb
 
