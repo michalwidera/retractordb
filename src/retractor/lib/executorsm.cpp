@@ -4,6 +4,10 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
+#include <filesystem>
+#include <iostream>
+#include <memory>
+
 #include <boost/chrono.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
@@ -20,12 +24,7 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/thread.hpp>
-#include <filesystem>
-#include <iostream>
-#include <memory>
 
-#include "CRSMath.h"
-#include "QStruct.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
 #include "uxSysTermTools.h"
