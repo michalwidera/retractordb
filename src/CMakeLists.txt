@@ -34,7 +34,7 @@ add_custom_target(
           out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
 
-# sudo apt install clang-format ; sudo pip install cmakelang
+# sudo apt install clang-format ; pip install cmakelang
 # https://zed0.co.uk/clang-format-configurator/
 set(CSTYLE
     '{BasedOnStyle: Google, ColumnLimit: 129, AlignConsecutiveAssignments: true, DerivePointerAlignment: false, PointerAlignment: Right}'

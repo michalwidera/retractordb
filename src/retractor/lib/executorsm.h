@@ -6,11 +6,12 @@
 #include <string>
 
 #include "CRSMath.h"
+#include "QStruct.h"
 
 typedef boost::property_tree::ptree ptree;
 
 struct executorsm {
-  explicit executorsm(qTree &coreInstance) : coreInstance(coreInstance){};
+  explicit executorsm(qTree &coreInstance) : coreInstance(coreInstance) {};
   executorsm() = delete;
 
   int run(bool verbose, int iTimeLimitCntParam);

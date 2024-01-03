@@ -1,5 +1,7 @@
 #include <fcntl.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/sinks/daily_file_sink.h>
+#include <spdlog/sinks/stdout_sinks.h>
 #include <spdlog/spdlog.h>
 #include <termios.h>
 #include <unistd.h>
@@ -48,7 +50,8 @@ void fixArgcv(int argc, char *argv[]) {
     }
 }
 
-std::string setupLoggerMain(const std::string &loggerFile) {
+// https://github.com/gabime/spdlog/wiki/2.-Creating-loggers#creating-loggers-with-multiple-sinks
+std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
   namespace fs = std::filesystem;
   fs::path tmp;
 
@@ -76,11 +79,31 @@ std::string setupLoggerMain(const std::string &loggerFile) {
 
   tmp.append(loggerFileSole.string());
 
-  auto filelog = spdlog::basic_logger_mt("log", tmp.string() + ".log");
-  spdlog::set_default_logger(filelog);
   constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
-  spdlog::set_pattern(common_log_pattern);
-  spdlog::flush_on(spdlog::level::trace);
 
+  if (dual) {
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+
+    console_sink->set_pattern("%v%$");
+    console_sink->set_level(spdlog::level::trace);
+
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(tmp.string() + ".log", false /* truncate log */);
+
+    file_sink->set_level(spdlog::level::trace);
+    file_sink->set_pattern(common_log_pattern);
+
+    std::vector<spdlog::sink_ptr> sinks({console_sink, file_sink});
+
+    auto combined_logger = std::make_shared<spdlog::logger>("mlog", sinks.begin(), sinks.end());
+    spdlog::register_logger(combined_logger);
+    spdlog::set_default_logger(spdlog::get("mlog"));
+
+  } else {
+    auto filelog = spdlog::basic_logger_mt("log", tmp.string() + ".log");
+    spdlog::set_default_logger(filelog);
+
+    spdlog::set_pattern(common_log_pattern);
+    spdlog::flush_on(spdlog::level::trace);
+  }
   return tmp.string() + ".log";
 }

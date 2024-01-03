@@ -1,21 +1,12 @@
+#include "executorsm.h"
+
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
+
 #include <array>
 #include <filesystem>
 #include <iostream>
 #include <memory>
-
-#include "CRSMath.h"
-#include "QStruct.h"
-#include "config.h"  // Add an automatically generated configuration file
-#include "dataModel.h"
-#include "uxSysTermTools.h"
-
-// This defines is required to remove deprecation of boost/bind.hpp
-// some boost libraries still didn't remove dependency to boost bin
-// remove this is boost will clean up on own side.
-#define BOOST_BIND_GLOBAL_PLACEHOLDERS
-
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/spdlog.h>
 
 #include <boost/chrono.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
@@ -24,7 +15,6 @@
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/process/environment.hpp>  // boost::this_process::get_id()
 #include <boost/program_options.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -35,7 +25,9 @@
 #include <boost/system/error_code.hpp>
 #include <boost/thread.hpp>
 
-#include "executorsm.h"
+#include "config.h"  // Add an automatically generated configuration file
+#include "dataModel.h"
+#include "uxSysTermTools.h"
 
 namespace IPC = boost::interprocess;
 

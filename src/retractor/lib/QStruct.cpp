@@ -3,21 +3,16 @@
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
-#include <boost/core/enable_if.hpp>  // for enable_if_c<>::type
-#include <boost/function.hpp>        // IWYU pragma: keep
-#include <boost/lambda/bind.hpp>     // IWYU pragma: keep
-#include <boost/lambda/lambda.hpp>   // IWYU pragma: keep
-#include <cassert>                   // for assert
-#include <cctype>                    // tolower
-#include <ext/alloc_traits.h>        // for __alloc_traits<>::value_type
-#include <iostream>                  // for cerr
-#include <sstream>                   // for operator<<, basic_ostream, endl
-#include <stack>                     // for stack
-#include <stdexcept>                 // for logic_error
+#include <cassert>             // for assert
+#include <cctype>              // tolower
+#include <ext/alloc_traits.h>  // for __alloc_traits<>::value_type
+#include <iostream>            // for cerr
+#include <sstream>             // for operator<<, basic_ostream, endl
+#include <stack>               // for stack
+#include <stdexcept>           // for logic_error
 #include <type_traits>
 
 using namespace boost;
-using namespace boost::lambda;
 
 #define FLDTYPE_H_CREATE_DEFINITION_FLDT
 #include "fldType.h"
@@ -107,7 +102,10 @@ void qTree::topologicalSort() {
     if (!visited[q.id]) dfs(q.id);
 
   qTree tempInstance;
-  for (auto qname : ans) tempInstance.push_back(coreInstance[qname]);
+  // for (auto qname : ans) tempInstance.push_back(coreInstance[qname]); -> same:
+  std::for_each(ans.begin(), ans.end(),
+                [&tempInstance, &coreInstance](const std::string &qname)  //
+                { tempInstance.push_back(coreInstance[qname]); });
   coreInstance = tempInstance;
 }
 
@@ -174,11 +172,13 @@ void qTree::removeNonStreamItems(const char leadingSign) {
 
 query &qTree::getQuery(const std::string &query_name) {
   assert(query_name != "");
-  for (auto &q : *this)
-    if (q.id == query_name) return q;
-  SPDLOG_ERROR("Missing - {}", query_name);
-  static query void_query;
-  return (void_query);  // proforma
+
+  auto it = std::find_if(begin(), end(), [query_name](const auto &node) { return node.id == query_name; });
+  if (it == std::end(*this)) {
+    SPDLOG_ERROR("Missing - {}", query_name);
+    throw std::logic_error("Query not found.");
+  }
+  return (*it);
 }
 
 int qTree::getSeqNr(const std::string &query_name) {
@@ -190,6 +190,7 @@ int qTree::getSeqNr(const std::string &query_name) {
       ++cnt;
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
+  throw std::logic_error("No such stream in set.");
   return -1;  // INVALID QUERY_NR
 }
 

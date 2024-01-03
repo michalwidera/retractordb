@@ -3,6 +3,7 @@
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>  // std::div
 #include <iostream>
@@ -313,12 +314,12 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
-  for (auto qry : coreInstance) {
-    if (qry.id == ":STORAGE") storagePath = qry.filename;
-  }
+  auto storageIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
+                                [](const auto &qry) { return qry.id == ":STORAGE"; });
+  if (storageIt != std::end(coreInstance)) storagePath = storageIt->filename;
 
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
-                                [](const query &qry) { return qry.id[0] == ':'; });
+                                [](const auto &qry) { return qry.id[0] == ':'; });
   coreInstance.erase(new_end, coreInstance.end());
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
@@ -427,7 +428,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
   assert(qry.lProgram.size() > 0 && "constructInputPayload does not process declarations");
 
   std::vector<token> arg;
-  for (auto tk : qry.lProgram) arg.push_back(tk);
+  std::copy(qry.lProgram.begin(), qry.lProgram.end(), std::back_inserter(arg));
+  // same: for (auto tk : qry.lProgram) arg.push_back(tk);
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
 

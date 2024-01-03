@@ -242,8 +242,6 @@ std::any payload::getItem(const int positionFlat) {
 
 // Friend operators
 
-extern bool flatOutput;
-
 std::istream &operator>>(std::istream &is, const payload &rhs) {
   std::string fieldName;
   is >> fieldName;
@@ -307,7 +305,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
 
   for (auto const &r : rhs.getDescriptor()) {
     if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
-    if (!flatOutput)
+    if (!getFlat())
       os << "\t";
     else
       os << " ";
@@ -364,16 +362,16 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
 
         if (i < std::get<rarray>(r) - 1) os << " ";
       }
-    if (!flatOutput) os << std::endl;
+    if (!getFlat()) os << std::endl;
   }
   if (rhs.getDescriptor().isEmpty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  if (flatOutput) os << " ";
+  if (getFlat()) os << " ";
   os << "}";
-  if (!flatOutput) os << std::endl;
-  flatOutput = false;
+  if (!getFlat()) os << std::endl;
+  setFlat(false);
   return os;
 }
 

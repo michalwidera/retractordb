@@ -18,8 +18,8 @@ namespace rdb {
 
 enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 
-extern bool flatOutput;
-
+bool getFlat();
+void setFlat(bool);
 //
 // Creates ability to create descriptions of binary frames using types and arrays
 //
@@ -93,7 +93,7 @@ class Descriptor : public std::vector<rField> {
 };
 
 // http://www.gotw.ca/gotw/004.htm
-const Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
+Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
 std::ostream &flat(std::ostream &os);
 }  // namespace rdb

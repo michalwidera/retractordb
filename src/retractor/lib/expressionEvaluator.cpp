@@ -240,7 +240,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
           rStack.push(callFun(b, trunc));
         break;
       case PUSH_ID: {
-        assert(payload != NULL);
+        assert(payload != nullptr);
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
         const auto anyValue   = payload->getItem(instancePosition.second);
         rdb::descFldVT val    = any_to_variant_cast(anyValue);
@@ -252,7 +252,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         abort();
         break;
       case PUSH_ID2: {
-        assert(payload != NULL);
+        assert(payload != nullptr);
         std::regex r("(\\w*)\\[(\\d*)\\]");
         std::smatch what;
         std::regex_search(tkStr, what, r);  // something[1]

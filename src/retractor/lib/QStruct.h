@@ -15,11 +15,8 @@
 #include <boost/rational.hpp>
 
 #include "cmdID.h"
-#include "rdb/descriptor.h"
-
-typedef boost::rational<int> number;
-
 #include "fldType.h"
+#include "rdb/descriptor.h"
 
 class qTree;
 
