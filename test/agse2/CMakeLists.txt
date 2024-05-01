@@ -9,4 +9,4 @@ add_test(
     xtrdb < term.script > out.txt ;  \
     find ./*.desc | sed 's/\.[^.]*$//' | cut -c 3- | xargs rm -f ; \
     rm -f *.desc ; \
-    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")

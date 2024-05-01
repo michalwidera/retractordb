@@ -4,7 +4,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash -c "set -e ; \
     xretractor query.rql -c > out.txt ; \
-    ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
+    ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
 
 add_test(
   NAME ${TestID}-vg

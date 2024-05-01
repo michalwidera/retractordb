@@ -7,5 +7,5 @@ add_test(
   xretractor -c query.rql > out_compile.txt ; \
   xretractor query.rql -m 5 -v > verbose.txt ; \
   xtrdb < term.script > out_xtrdb.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt ; \
-  ${CMAKE_COMMAND} -E compare_files pattern_xtrdb.txt out_xtrdb.txt")
+  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_compile.txt out_compile.txt ; \
+  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_xtrdb.txt out_xtrdb.txt")
