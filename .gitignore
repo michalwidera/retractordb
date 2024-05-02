@@ -41,3 +41,4 @@ graph_info.json
 .project
 .cmake
 .settings/*
+.vscode/*
