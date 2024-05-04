@@ -14,9 +14,26 @@ find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 find_package(GTest REQUIRED)
+find_package(antlr4)
 
-find_program(PROG valgrind REQUIRED)
-message(STATUS "Required tool: ${PROG}")
+find_program(PROG_VALGRIND valgrind REQUIRED)
+message(STATUS "Required tool: ${PROG_VALGRIND}")
+
+if(DEFINED antlr4_PACKAGE_FOLDER_DEBUG)
+  set(antlr4Path ${antlr4_PACKAGE_FOLDER_DEBUG})
+else()
+  set(antlr4Path ${antlr4_PACKAGE_FOLDER_RELEASE})
+endif()
+
+if(DEFINED openjdk_BIN_DIRS_DEBUG)
+  set(javaPath ${openjdk_BIN_DIRS_DEBUG})
+else()
+  set(javaPath ${openjdk_BIN_DIRS_RELEASE})
+endif()
+
+message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
+message(STATUS "antlr4Path: ${antlr4Path}")
+message(STATUS "javaPath: ${javaPath}")
 
 enable_testing()
 
