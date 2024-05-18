@@ -5,6 +5,7 @@ CMakeLists.txt.user
 cmake_install.cmake
 src/include/config.h
 src/retractor/.antlr
+src/rdb/.antlr
 examples/generator/CMakeFiles
 examples/generator/xgenerator
 examples/temp/
