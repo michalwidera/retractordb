@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
 project(retractor LANGUAGES CXX)
 
-add_subdirectory(Parser)
+add_subdirectory(rqlParser)
 
 file(GLOB BUILDSRCS_CPP "*.cpp")
 file(GLOB BUILDCOMMON_CPP "../../common/*.cpp")

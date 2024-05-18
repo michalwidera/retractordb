@@ -18,7 +18,8 @@ target_link_libraries(
   antlr4_static
   retractor
   rdb
-  parser)
+  descParser
+  rqlParser)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 

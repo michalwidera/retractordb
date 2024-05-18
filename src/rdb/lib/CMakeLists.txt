@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
 project(rdb LANGUAGES CXX)
 
-add_subdirectory(Parser)
+add_subdirectory(descParser)
 
 file(GLOB_RECURSE BUILDRDB_CC "*.cc")
 

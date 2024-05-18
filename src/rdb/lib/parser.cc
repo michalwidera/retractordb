@@ -1,6 +1,6 @@
-#include "Parser/DESCBaseListener.h"
-#include "Parser/DESCLexer.h"
-#include "Parser/DESCParser.h"
+#include "descParser/DESCBaseListener.h"
+#include "descParser/DESCLexer.h"
+#include "descParser/DESCParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/descriptor.h"
 

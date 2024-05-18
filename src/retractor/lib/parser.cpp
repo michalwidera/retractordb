@@ -9,9 +9,9 @@
 #include <iostream>
 #include <string>
 
-#include "Parser/RQLBaseListener.h"
-#include "Parser/RQLLexer.h"
-#include "Parser/RQLParser.h"
+#include "rqlParser/RQLBaseListener.h"
+#include "rqlParser/RQLLexer.h"
+#include "rqlParser/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 
