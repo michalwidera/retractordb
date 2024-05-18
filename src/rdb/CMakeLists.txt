@@ -17,10 +17,11 @@ target_link_libraries(${PROJECT_NAME} boost::boost spdlog::spdlog_header_only
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 
 add_custom_target(
-  gramdesc
+  descgrammar
   COMMAND
     ${javaPath}/java -classpath ${antlr4Path}/res/antlr-complete.jar
-    org.antlr.v4.Tool -o lib/Parser -lib lib/Parser
-    -encoding UTF-8 -Dlanguage=Cpp -listener DESC.g4
+    org.antlr.v4.Tool -o ${CMAKE_SOURCE_DIR}/src/rdb/lib/Parser -lib
+    ${CMAKE_SOURCE_DIR}/src/rdb/lib/Parser -encoding UTF-8 -Dlanguage=Cpp
+    -listener DESC.g4
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/rdb
   SOURCES ${CMAKE_SOURCE_DIR}/src/rdb/DESC.g4)

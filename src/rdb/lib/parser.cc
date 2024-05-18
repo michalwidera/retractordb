@@ -2,7 +2,6 @@
 #include "Parser/DESCLexer.h"
 #include "Parser/DESCParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
-
 #include "rdb/descriptor.h"
 
 using namespace antlrcpp;
@@ -38,7 +37,8 @@ class ParserErrorListener : public BaseErrorListener {
 
 class ParserDESCListener : public DESCBaseListener {
   rdb::Descriptor &desc;
-public:
+
+ public:
   ParserDESCListener(rdb::Descriptor &desc) : desc(desc){};
 };
 
