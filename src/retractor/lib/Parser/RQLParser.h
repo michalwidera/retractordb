@@ -16,23 +16,23 @@ public:
     T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
-    DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, FILE = 31, 
-    STORAGE = 32, MIN = 33, MAX = 34, AVG = 35, SUMC = 36, ID = 37, STRING = 38, 
-    FLOAT = 39, DECIMAL = 40, REAL = 41, EQUAL = 42, GREATER = 43, LESS = 44, 
-    EXCLAMATION = 45, DOUBLE_BAR = 46, DOT = 47, UNDERLINE = 48, AT = 49, 
-    SHARP = 50, AND = 51, MOD = 52, DOLLAR = 53, COMMA = 54, SEMI = 55, 
-    COLON = 56, DOUBLE_COLON = 57, STAR = 58, DIVIDE = 59, PLUS = 60, MINUS = 61, 
-    BIT_NOT = 62, BIT_OR = 63, BIT_XOR = 64, SPACE = 65, COMMENT = 66, LINE_COMMENT1 = 67, 
-    LINE_COMMENT2 = 68
+    DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, COUNT = 31, 
+    SEGMENTS = 32, FILE = 33, STORAGE = 34, MIN = 35, MAX = 36, AVG = 37, 
+    SUMC = 38, ID = 39, STRING = 40, FLOAT = 41, DECIMAL = 42, REAL = 43, 
+    EQUAL = 44, GREATER = 45, LESS = 46, EXCLAMATION = 47, DOUBLE_BAR = 48, 
+    DOT = 49, UNDERLINE = 50, AT = 51, SHARP = 52, AND = 53, MOD = 54, DOLLAR = 55, 
+    COMMA = 56, SEMI = 57, COLON = 58, DOUBLE_COLON = 59, STAR = 60, DIVIDE = 61, 
+    PLUS = 62, MINUS = 63, BIT_NOT = 64, BIT_OR = 65, BIT_XOR = 66, SPACE = 67, 
+    COMMENT = 68, LINE_COMMENT1 = 69, LINE_COMMENT2 = 70
   };
 
   enum {
-    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleRational_se = 3, 
-    RuleFraction_rule = 4, RuleDeclare_statement = 5, RuleField_declaration = 6, 
-    RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
-    RuleAsterisk = 11, RuleExpression = 12, RuleExpression_factor = 13, 
-    RuleTerm = 14, RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
-    RuleAgregator = 18, RuleFunction_call = 19
+    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleDeclare_statement = 3, 
+    RuleStorage_param = 4, RuleRational_se = 5, RuleFraction_rule = 6, RuleField_declaration = 7, 
+    RuleField_type = 8, RuleSelect_list = 9, RuleField_id = 10, RuleUnary_op_expression = 11, 
+    RuleAsterisk = 12, RuleExpression = 13, RuleExpression_factor = 14, 
+    RuleTerm = 15, RuleStream_expression = 16, RuleStream_term = 17, RuleStream_factor = 18, 
+    RuleAgregator = 19, RuleFunction_call = 20
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -55,9 +55,10 @@ public:
   class ProgContext;
   class Storage_statementContext;
   class Select_statementContext;
+  class Declare_statementContext;
+  class Storage_paramContext;
   class Rational_seContext;
   class Fraction_ruleContext;
-  class Declare_statementContext;
   class Field_declarationContext;
   class Field_typeContext;
   class Select_listContext;
@@ -135,17 +136,75 @@ public:
   public:
     SelectContext(Select_statementContext *ctx);
 
+    antlr4::Token *stream_name = nullptr;
+    antlr4::Token *name = nullptr;
     antlr4::tree::TerminalNode *SELECT();
     Select_listContext *select_list();
     antlr4::tree::TerminalNode *STREAM();
-    antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FROM();
     Stream_expressionContext *stream_expression();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *FILE();
+    antlr4::tree::TerminalNode *STRING();
+    std::vector<Storage_paramContext *> storage_param();
+    Storage_paramContext* storage_param(size_t i);
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Select_statementContext* select_statement();
+
+  class  Declare_statementContext : public antlr4::ParserRuleContext {
+  public:
+    Declare_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Declare_statementContext() = default;
+    void copyFrom(Declare_statementContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  DeclareContext : public Declare_statementContext {
+  public:
+    DeclareContext(Declare_statementContext *ctx);
+
+    antlr4::Token *stream_name = nullptr;
+    antlr4::Token *file_name = nullptr;
+    antlr4::tree::TerminalNode *DECLARE();
+    std::vector<Field_declarationContext *> field_declaration();
+    Field_declarationContext* field_declaration(size_t i);
+    antlr4::tree::TerminalNode *STREAM();
+    std::vector<antlr4::tree::TerminalNode *> COMMA();
+    antlr4::tree::TerminalNode* COMMA(size_t i);
+    Rational_seContext *rational_se();
+    antlr4::tree::TerminalNode *FILE();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *STRING();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Declare_statementContext* declare_statement();
+
+  class  Storage_paramContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *size = nullptr;
+    antlr4::Token *segments = nullptr;
+    Storage_paramContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *COUNT();
+    antlr4::tree::TerminalNode *DECIMAL();
+    antlr4::tree::TerminalNode *SEGMENTS();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Storage_paramContext* storage_param();
 
   class  Rational_seContext : public antlr4::ParserRuleContext {
   public:
@@ -214,41 +273,6 @@ public:
   };
 
   Fraction_ruleContext* fraction_rule();
-
-  class  Declare_statementContext : public antlr4::ParserRuleContext {
-  public:
-    Declare_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Declare_statementContext() = default;
-    void copyFrom(Declare_statementContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  DeclareContext : public Declare_statementContext {
-  public:
-    DeclareContext(Declare_statementContext *ctx);
-
-    antlr4::Token *stream_name = nullptr;
-    antlr4::Token *file_name = nullptr;
-    antlr4::tree::TerminalNode *DECLARE();
-    std::vector<Field_declarationContext *> field_declaration();
-    Field_declarationContext* field_declaration(size_t i);
-    antlr4::tree::TerminalNode *STREAM();
-    std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode* COMMA(size_t i);
-    Rational_seContext *rational_se();
-    antlr4::tree::TerminalNode *FILE();
-    antlr4::tree::TerminalNode *ID();
-    antlr4::tree::TerminalNode *STRING();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Declare_statementContext* declare_statement();
 
   class  Field_declarationContext : public antlr4::ParserRuleContext {
   public:

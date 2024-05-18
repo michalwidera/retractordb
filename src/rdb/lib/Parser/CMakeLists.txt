@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
-project(parser LANGUAGES CXX)
+project(Parser LANGUAGES CXX)
 
 find_package(antlr4-runtime REQUIRED)
 
-file(GLOB BUILDPARSERRQL_CPP "*.cpp")
+file(GLOB BUILDPARSERDSC_CPP "*.cpp")
 
-add_library(${PROJECT_NAME} STATIC ${BUILDPARSERRQL_CPP})
+add_library(${PROJECT_NAME} STATIC ${BUILDPARSERDSC_CPP})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

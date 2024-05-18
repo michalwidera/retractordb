@@ -23,6 +23,12 @@ public:
   virtual void enterSelect(RQLParser::SelectContext *ctx) = 0;
   virtual void exitSelect(RQLParser::SelectContext *ctx) = 0;
 
+  virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
+  virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
+
+  virtual void enterStorage_param(RQLParser::Storage_paramContext *ctx) = 0;
+  virtual void exitStorage_param(RQLParser::Storage_paramContext *ctx) = 0;
+
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
 
@@ -34,9 +40,6 @@ public:
 
   virtual void enterFraction(RQLParser::FractionContext *ctx) = 0;
   virtual void exitFraction(RQLParser::FractionContext *ctx) = 0;
-
-  virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
-  virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
 
   virtual void enterSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;
   virtual void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) = 0;

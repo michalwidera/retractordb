@@ -31,9 +31,8 @@ else()
   set(javaPath ${openjdk_BIN_DIRS_RELEASE})
 endif()
 
-message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}")
-message(STATUS "antlr4Path: ${antlr4Path}")
-message(STATUS "javaPath: ${javaPath}")
+# message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}") message(STATUS
+# "antlr4Path: ${antlr4Path}") message(STATUS "javaPath: ${javaPath}")
 
 enable_testing()
 
