@@ -45,13 +45,13 @@ workflows:
 
 executors:
   ubuntu2204docker-edge:
-    machine:
-      image: ubuntu-2204:edge
+    docker:
+      - image: cimg/base:edge
     resource_class: large
 
   ubuntu2204docker-current:
-    machine:
-      image: ubuntu-2204:current
+    docker:
+      - image: cimg/base:current
     resource_class: large
 
   ubuntu2004machine-arm:
