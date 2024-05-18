@@ -46,22 +46,12 @@ workflows:
 executors:
   ubuntu2204docker-edge:
     docker:
-      - image: cimg/base:edge
+      - image: cimg/base:edge-22.04
     resource_class: large
 
   ubuntu2204docker-current:
     docker:
-      - image: cimg/base:current
-    resource_class: large
-
-  ubuntu2204machine-current:
-    machine:
-      image: ubuntu-2204:current
-    resource_class: large
-
-  ubuntu2204machine-edge:
-    machine:
-      image: ubuntu-2204:current
+      - image: cimg/base:current-22.04
     resource_class: large
 
   ubuntu2004machine-arm:
