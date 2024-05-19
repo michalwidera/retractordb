@@ -17,8 +17,26 @@ public:
   virtual void enterDesc(DESCParser::DescContext *ctx) = 0;
   virtual void exitDesc(DESCParser::DescContext *ctx) = 0;
 
-  virtual void enterCommand(DESCParser::CommandContext *ctx) = 0;
-  virtual void exitCommand(DESCParser::CommandContext *ctx) = 0;
+  virtual void enterByte(DESCParser::ByteContext *ctx) = 0;
+  virtual void exitByte(DESCParser::ByteContext *ctx) = 0;
+
+  virtual void enterString(DESCParser::StringContext *ctx) = 0;
+  virtual void exitString(DESCParser::StringContext *ctx) = 0;
+
+  virtual void enterUnsigned(DESCParser::UnsignedContext *ctx) = 0;
+  virtual void exitUnsigned(DESCParser::UnsignedContext *ctx) = 0;
+
+  virtual void enterFloat(DESCParser::FloatContext *ctx) = 0;
+  virtual void exitFloat(DESCParser::FloatContext *ctx) = 0;
+
+  virtual void enterDouble(DESCParser::DoubleContext *ctx) = 0;
+  virtual void exitDouble(DESCParser::DoubleContext *ctx) = 0;
+
+  virtual void enterRef(DESCParser::RefContext *ctx) = 0;
+  virtual void exitRef(DESCParser::RefContext *ctx) = 0;
+
+  virtual void enterType(DESCParser::TypeContext *ctx) = 0;
+  virtual void exitType(DESCParser::TypeContext *ctx) = 0;
 
 
 };

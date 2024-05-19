@@ -19,8 +19,26 @@ public:
   virtual void enterDesc(DESCParser::DescContext * /*ctx*/) override { }
   virtual void exitDesc(DESCParser::DescContext * /*ctx*/) override { }
 
-  virtual void enterCommand(DESCParser::CommandContext * /*ctx*/) override { }
-  virtual void exitCommand(DESCParser::CommandContext * /*ctx*/) override { }
+  virtual void enterByte(DESCParser::ByteContext * /*ctx*/) override { }
+  virtual void exitByte(DESCParser::ByteContext * /*ctx*/) override { }
+
+  virtual void enterString(DESCParser::StringContext * /*ctx*/) override { }
+  virtual void exitString(DESCParser::StringContext * /*ctx*/) override { }
+
+  virtual void enterUnsigned(DESCParser::UnsignedContext * /*ctx*/) override { }
+  virtual void exitUnsigned(DESCParser::UnsignedContext * /*ctx*/) override { }
+
+  virtual void enterFloat(DESCParser::FloatContext * /*ctx*/) override { }
+  virtual void exitFloat(DESCParser::FloatContext * /*ctx*/) override { }
+
+  virtual void enterDouble(DESCParser::DoubleContext * /*ctx*/) override { }
+  virtual void exitDouble(DESCParser::DoubleContext * /*ctx*/) override { }
+
+  virtual void enterRef(DESCParser::RefContext * /*ctx*/) override { }
+  virtual void exitRef(DESCParser::RefContext * /*ctx*/) override { }
+
+  virtual void enterType(DESCParser::TypeContext * /*ctx*/) override { }
+  virtual void exitType(DESCParser::TypeContext * /*ctx*/) override { }
 
 
   virtual void enterEveryRule(antlr4::ParserRuleContext * /*ctx*/) override { }

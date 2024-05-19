@@ -20,8 +20,8 @@ add_custom_target(
   descgrammar
   COMMAND
     ${javaPath}/java -classpath ${antlr4Path}/res/antlr-complete.jar
-    org.antlr.v4.Tool -o ${CMAKE_SOURCE_DIR}/src/rdb/lib/Parser -lib
-    ${CMAKE_SOURCE_DIR}/src/rdb/lib/Parser -encoding UTF-8 -Dlanguage=Cpp
+    org.antlr.v4.Tool -o ${CMAKE_SOURCE_DIR}/src/rdb/lib/descParser -lib
+    ${CMAKE_SOURCE_DIR}/src/rdb/lib/descParser -encoding UTF-8 -Dlanguage=Cpp
     -listener DESC.g4
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/rdb
   SOURCES ${CMAKE_SOURCE_DIR}/src/rdb/DESC.g4)

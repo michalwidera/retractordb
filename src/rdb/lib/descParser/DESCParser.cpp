@@ -55,26 +55,28 @@ void descParserInitialize() {
       "desc", "command"
     },
     std::vector<std::string>{
-      "", "'{'", "'}'", "'BYTE'", "'STRING'", "'UINT'", "'INTEGER'", "'FLOAT'", 
-      "'DOUBLE'", "'RATIONAl'", "'INTPAIR'", "'IDXPAIR'", "'TYPE'", "'REF'"
+      "", "'{'", "'}'", "'['", "']'", "'\"'", "'BYTE'", "'STRING'", "'UINT'", 
+      "'INTEGER'", "'FLOAT'", "'DOUBLE'", "'RATIONAl'", "'INTPAIR'", "'IDXPAIR'", 
+      "'TYPE'", "'REF'"
     },
     std::vector<std::string>{
-      "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", "FLOAT_T", 
-      "DOUBLE_T", "RATIONAL_T", "INTPAIR_T", "IDXPAIR_T", "TYPE_T", "REF_T", 
-      "ID", "STRING", "REF_TYPE_ARG"
+      "", "", "", "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", 
+      "FLOAT_T", "DOUBLE_T", "RATIONAL_T", "INTPAIR_T", "IDXPAIR_T", "TYPE_T", 
+      "REF_T", "ID", "STRING", "DECIMAL", "REF_TYPE_ARG"
     }
   );
   static const int32_t serializedATNSegment[] = {
-  	4,1,16,30,2,0,7,0,2,1,7,1,1,0,1,0,5,0,7,8,0,10,0,12,0,10,9,0,1,0,1,0,
-  	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,28,8,1,1,
-  	1,0,0,2,0,2,0,0,34,0,4,1,0,0,0,2,27,1,0,0,0,4,8,5,1,0,0,5,7,3,2,1,0,6,
-  	5,1,0,0,0,7,10,1,0,0,0,8,6,1,0,0,0,8,9,1,0,0,0,9,11,1,0,0,0,10,8,1,0,
-  	0,0,11,12,5,2,0,0,12,1,1,0,0,0,13,14,5,3,0,0,14,28,5,14,0,0,15,16,5,4,
-  	0,0,16,28,5,14,0,0,17,18,5,5,0,0,18,28,5,14,0,0,19,20,5,7,0,0,20,28,5,
-  	14,0,0,21,22,5,8,0,0,22,28,5,14,0,0,23,24,5,13,0,0,24,28,5,15,0,0,25,
-  	26,5,12,0,0,26,28,5,16,0,0,27,13,1,0,0,0,27,15,1,0,0,0,27,17,1,0,0,0,
-  	27,19,1,0,0,0,27,21,1,0,0,0,27,23,1,0,0,0,27,25,1,0,0,0,28,3,1,0,0,0,
-  	2,8,27
+  	4,1,20,36,2,0,7,0,2,1,7,1,1,0,1,0,5,0,7,8,0,10,0,12,0,10,9,0,1,0,1,0,
+  	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  	1,1,1,1,1,3,1,34,8,1,1,1,0,0,2,0,2,0,0,40,0,4,1,0,0,0,2,33,1,0,0,0,4,
+  	8,5,1,0,0,5,7,3,2,1,0,6,5,1,0,0,0,7,10,1,0,0,0,8,6,1,0,0,0,8,9,1,0,0,
+  	0,9,11,1,0,0,0,10,8,1,0,0,0,11,12,5,2,0,0,12,1,1,0,0,0,13,14,5,6,0,0,
+  	14,34,5,17,0,0,15,16,5,7,0,0,16,17,5,17,0,0,17,18,5,3,0,0,18,19,5,19,
+  	0,0,19,34,5,4,0,0,20,21,5,8,0,0,21,34,5,17,0,0,22,23,5,10,0,0,23,34,5,
+  	17,0,0,24,25,5,11,0,0,25,34,5,17,0,0,26,27,5,16,0,0,27,28,5,18,0,0,28,
+  	29,5,5,0,0,29,30,5,18,0,0,30,34,5,5,0,0,31,32,5,15,0,0,32,34,5,20,0,0,
+  	33,13,1,0,0,0,33,15,1,0,0,0,33,20,1,0,0,0,33,22,1,0,0,0,33,24,1,0,0,0,
+  	33,26,1,0,0,0,33,31,1,0,0,0,34,3,1,0,0,0,2,8,33
   };
   staticData->serializedATN = antlr4::atn::SerializedATNView(serializedATNSegment, sizeof(serializedATNSegment) / sizeof(serializedATNSegment[0]));
 
@@ -174,7 +176,7 @@ DESCParser::DescContext* DESCParser::desc() {
     _errHandler->sync(this);
     _la = _input->LA(1);
     while ((((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & 12728) != 0)) {
+      ((1ULL << _la) & 101824) != 0)) {
       setState(5);
       command();
       setState(10);
@@ -200,63 +202,177 @@ DESCParser::CommandContext::CommandContext(ParserRuleContext *parent, size_t inv
   : ParserRuleContext(parent, invokingState) {
 }
 
-tree::TerminalNode* DESCParser::CommandContext::BYTE_T() {
-  return getToken(DESCParser::BYTE_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::ID() {
-  return getToken(DESCParser::ID, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::STRING_T() {
-  return getToken(DESCParser::STRING_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::UNSIGNED_T() {
-  return getToken(DESCParser::UNSIGNED_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::FLOAT_T() {
-  return getToken(DESCParser::FLOAT_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::DOUBLE_T() {
-  return getToken(DESCParser::DOUBLE_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::REF_T() {
-  return getToken(DESCParser::REF_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::STRING() {
-  return getToken(DESCParser::STRING, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::TYPE_T() {
-  return getToken(DESCParser::TYPE_T, 0);
-}
-
-tree::TerminalNode* DESCParser::CommandContext::REF_TYPE_ARG() {
-  return getToken(DESCParser::REF_TYPE_ARG, 0);
-}
-
 
 size_t DESCParser::CommandContext::getRuleIndex() const {
   return DESCParser::RuleCommand;
 }
 
-void DESCParser::CommandContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterCommand(this);
+void DESCParser::CommandContext::copyFrom(CommandContext *ctx) {
+  ParserRuleContext::copyFrom(ctx);
 }
 
-void DESCParser::CommandContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitCommand(this);
+//----------------- FloatContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::FloatContext::FLOAT_T() {
+  return getToken(DESCParser::FLOAT_T, 0);
 }
 
+tree::TerminalNode* DESCParser::FloatContext::ID() {
+  return getToken(DESCParser::ID, 0);
+}
+
+DESCParser::FloatContext::FloatContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::FloatContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterFloat(this);
+}
+void DESCParser::FloatContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitFloat(this);
+}
+//----------------- RefContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::RefContext::REF_T() {
+  return getToken(DESCParser::REF_T, 0);
+}
+
+std::vector<tree::TerminalNode *> DESCParser::RefContext::STRING() {
+  return getTokens(DESCParser::STRING);
+}
+
+tree::TerminalNode* DESCParser::RefContext::STRING(size_t i) {
+  return getToken(DESCParser::STRING, i);
+}
+
+DESCParser::RefContext::RefContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::RefContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterRef(this);
+}
+void DESCParser::RefContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitRef(this);
+}
+//----------------- TypeContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::TypeContext::TYPE_T() {
+  return getToken(DESCParser::TYPE_T, 0);
+}
+
+tree::TerminalNode* DESCParser::TypeContext::REF_TYPE_ARG() {
+  return getToken(DESCParser::REF_TYPE_ARG, 0);
+}
+
+DESCParser::TypeContext::TypeContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::TypeContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterType(this);
+}
+void DESCParser::TypeContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitType(this);
+}
+//----------------- UnsignedContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::UnsignedContext::UNSIGNED_T() {
+  return getToken(DESCParser::UNSIGNED_T, 0);
+}
+
+tree::TerminalNode* DESCParser::UnsignedContext::ID() {
+  return getToken(DESCParser::ID, 0);
+}
+
+DESCParser::UnsignedContext::UnsignedContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::UnsignedContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterUnsigned(this);
+}
+void DESCParser::UnsignedContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitUnsigned(this);
+}
+//----------------- ByteContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::ByteContext::BYTE_T() {
+  return getToken(DESCParser::BYTE_T, 0);
+}
+
+tree::TerminalNode* DESCParser::ByteContext::ID() {
+  return getToken(DESCParser::ID, 0);
+}
+
+DESCParser::ByteContext::ByteContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::ByteContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterByte(this);
+}
+void DESCParser::ByteContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitByte(this);
+}
+//----------------- StringContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::StringContext::STRING_T() {
+  return getToken(DESCParser::STRING_T, 0);
+}
+
+tree::TerminalNode* DESCParser::StringContext::DECIMAL() {
+  return getToken(DESCParser::DECIMAL, 0);
+}
+
+tree::TerminalNode* DESCParser::StringContext::ID() {
+  return getToken(DESCParser::ID, 0);
+}
+
+DESCParser::StringContext::StringContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::StringContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterString(this);
+}
+void DESCParser::StringContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitString(this);
+}
+//----------------- DoubleContext ------------------------------------------------------------------
+
+tree::TerminalNode* DESCParser::DoubleContext::DOUBLE_T() {
+  return getToken(DESCParser::DOUBLE_T, 0);
+}
+
+tree::TerminalNode* DESCParser::DoubleContext::ID() {
+  return getToken(DESCParser::ID, 0);
+}
+
+DESCParser::DoubleContext::DoubleContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::DoubleContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterDouble(this);
+}
+void DESCParser::DoubleContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitDouble(this);
+}
 DESCParser::CommandContext* DESCParser::command() {
   CommandContext *_localctx = _tracker.createInstance<CommandContext>(_ctx, getState());
   enterRule(_localctx, 2, DESCParser::RuleCommand);
@@ -269,69 +385,88 @@ DESCParser::CommandContext* DESCParser::command() {
     exitRule();
   });
   try {
-    setState(27);
+    setState(33);
     _errHandler->sync(this);
     switch (_input->LA(1)) {
       case DESCParser::BYTE_T: {
+        _localctx = _tracker.createInstance<DESCParser::ByteContext>(_localctx);
         enterOuterAlt(_localctx, 1);
         setState(13);
         match(DESCParser::BYTE_T);
         setState(14);
-        antlrcpp::downCast<CommandContext *>(_localctx)->name = match(DESCParser::ID);
+        antlrcpp::downCast<ByteContext *>(_localctx)->name = match(DESCParser::ID);
         break;
       }
 
       case DESCParser::STRING_T: {
+        _localctx = _tracker.createInstance<DESCParser::StringContext>(_localctx);
         enterOuterAlt(_localctx, 2);
         setState(15);
         match(DESCParser::STRING_T);
         setState(16);
-        antlrcpp::downCast<CommandContext *>(_localctx)->name = match(DESCParser::ID);
+        antlrcpp::downCast<StringContext *>(_localctx)->name = match(DESCParser::ID);
+        setState(17);
+        match(DESCParser::T__2);
+        setState(18);
+        match(DESCParser::DECIMAL);
+        setState(19);
+        match(DESCParser::T__3);
         break;
       }
 
       case DESCParser::UNSIGNED_T: {
+        _localctx = _tracker.createInstance<DESCParser::UnsignedContext>(_localctx);
         enterOuterAlt(_localctx, 3);
-        setState(17);
+        setState(20);
         match(DESCParser::UNSIGNED_T);
-        setState(18);
-        antlrcpp::downCast<CommandContext *>(_localctx)->name = match(DESCParser::ID);
+        setState(21);
+        antlrcpp::downCast<UnsignedContext *>(_localctx)->name = match(DESCParser::ID);
         break;
       }
 
       case DESCParser::FLOAT_T: {
+        _localctx = _tracker.createInstance<DESCParser::FloatContext>(_localctx);
         enterOuterAlt(_localctx, 4);
-        setState(19);
+        setState(22);
         match(DESCParser::FLOAT_T);
-        setState(20);
-        antlrcpp::downCast<CommandContext *>(_localctx)->name = match(DESCParser::ID);
+        setState(23);
+        antlrcpp::downCast<FloatContext *>(_localctx)->name = match(DESCParser::ID);
         break;
       }
 
       case DESCParser::DOUBLE_T: {
+        _localctx = _tracker.createInstance<DESCParser::DoubleContext>(_localctx);
         enterOuterAlt(_localctx, 5);
-        setState(21);
+        setState(24);
         match(DESCParser::DOUBLE_T);
-        setState(22);
-        antlrcpp::downCast<CommandContext *>(_localctx)->name = match(DESCParser::ID);
+        setState(25);
+        antlrcpp::downCast<DoubleContext *>(_localctx)->name = match(DESCParser::ID);
         break;
       }
 
       case DESCParser::REF_T: {
+        _localctx = _tracker.createInstance<DESCParser::RefContext>(_localctx);
         enterOuterAlt(_localctx, 6);
-        setState(23);
+        setState(26);
         match(DESCParser::REF_T);
-        setState(24);
-        antlrcpp::downCast<CommandContext *>(_localctx)->name = match(DESCParser::STRING);
+        setState(27);
+        antlrcpp::downCast<RefContext *>(_localctx)->name = match(DESCParser::STRING);
+        setState(28);
+        match(DESCParser::T__4);
+        setState(29);
+        antlrcpp::downCast<RefContext *>(_localctx)->file = match(DESCParser::STRING);
+        setState(30);
+        match(DESCParser::T__4);
         break;
       }
 
       case DESCParser::TYPE_T: {
+        _localctx = _tracker.createInstance<DESCParser::TypeContext>(_localctx);
         enterOuterAlt(_localctx, 7);
-        setState(25);
+        setState(31);
         match(DESCParser::TYPE_T);
-        setState(26);
-        match(DESCParser::REF_TYPE_ARG);
+        setState(32);
+        antlrcpp::downCast<TypeContext *>(_localctx)->type = match(DESCParser::REF_TYPE_ARG);
         break;
       }
 
