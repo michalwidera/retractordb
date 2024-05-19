@@ -23,12 +23,14 @@ target_link_libraries(
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
 
+message(STATUS "setup rqlgrammar in PROJECT_SOURCE_DIR=" ${PROJECT_SOURCE_DIR} )
+
 add_custom_target(
   rqlgrammar
   COMMAND
     ${javaPath}/java -classpath ${antlr4Path}/res/antlr-complete.jar
-    org.antlr.v4.Tool -o ${CMAKE_SOURCE_DIR}/src/retractor/lib/Parser -lib
-    ${CMAKE_SOURCE_DIR}/src/retractor/lib/Parser -encoding UTF-8 -Dlanguage=Cpp
+    org.antlr.v4.Tool -o ${PROJECT_SOURCE_DIR}/lib/rqlParser -lib
+    ${PROJECT_SOURCE_DIR}/lib/rqlParser -encoding UTF-8 -Dlanguage=Cpp
     -listener RQL.g4
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/retractor
-  SOURCES ${CMAKE_SOURCE_DIR}/src/retractor/RQL.g4)
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+  SOURCES ${PROJECT_SOURCE_DIR}/RQL.g4)

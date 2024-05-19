@@ -69,20 +69,71 @@ public:
    
   };
 
-  class  FloatContext : public CommandContext {
+  class  UnsignedIDContext : public CommandContext {
   public:
-    FloatContext(CommandContext *ctx);
+    UnsignedIDContext(CommandContext *ctx);
 
     antlr4::Token *name = nullptr;
-    antlr4::tree::TerminalNode *FLOAT_T();
+    antlr4::Token *arr = nullptr;
+    antlr4::tree::TerminalNode *UNSIGNED_T();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  TypeIDContext : public CommandContext {
+  public:
+    TypeIDContext(CommandContext *ctx);
+
+    antlr4::Token *type = nullptr;
+    antlr4::tree::TerminalNode *TYPE_T();
+    antlr4::tree::TerminalNode *REF_TYPE_ARG();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  StringIDContext : public CommandContext {
+  public:
+    StringIDContext(CommandContext *ctx);
+
+    antlr4::Token *name = nullptr;
+    antlr4::tree::TerminalNode *STRING_T();
+    antlr4::tree::TerminalNode *DECIMAL();
     antlr4::tree::TerminalNode *ID();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  RefContext : public CommandContext {
+  class  IntegerIDContext : public CommandContext {
   public:
-    RefContext(CommandContext *ctx);
+    IntegerIDContext(CommandContext *ctx);
+
+    antlr4::Token *name = nullptr;
+    antlr4::Token *arr = nullptr;
+    antlr4::tree::TerminalNode *INTEGER_T();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ByteIDContext : public CommandContext {
+  public:
+    ByteIDContext(CommandContext *ctx);
+
+    antlr4::Token *name = nullptr;
+    antlr4::Token *arr = nullptr;
+    antlr4::tree::TerminalNode *BYTE_T();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  RefIDContext : public CommandContext {
+  public:
+    RefIDContext(CommandContext *ctx);
 
     antlr4::Token *name = nullptr;
     antlr4::Token *file = nullptr;
@@ -93,58 +144,28 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  TypeContext : public CommandContext {
+  class  FloatIDContext : public CommandContext {
   public:
-    TypeContext(CommandContext *ctx);
-
-    antlr4::Token *type = nullptr;
-    antlr4::tree::TerminalNode *TYPE_T();
-    antlr4::tree::TerminalNode *REF_TYPE_ARG();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  UnsignedContext : public CommandContext {
-  public:
-    UnsignedContext(CommandContext *ctx);
+    FloatIDContext(CommandContext *ctx);
 
     antlr4::Token *name = nullptr;
-    antlr4::tree::TerminalNode *UNSIGNED_T();
+    antlr4::Token *arr = nullptr;
+    antlr4::tree::TerminalNode *FLOAT_T();
     antlr4::tree::TerminalNode *ID();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  ByteContext : public CommandContext {
-  public:
-    ByteContext(CommandContext *ctx);
-
-    antlr4::Token *name = nullptr;
-    antlr4::tree::TerminalNode *BYTE_T();
-    antlr4::tree::TerminalNode *ID();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  class  StringContext : public CommandContext {
-  public:
-    StringContext(CommandContext *ctx);
-
-    antlr4::Token *name = nullptr;
-    antlr4::tree::TerminalNode *STRING_T();
     antlr4::tree::TerminalNode *DECIMAL();
-    antlr4::tree::TerminalNode *ID();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  DoubleContext : public CommandContext {
+  class  DoubleIDContext : public CommandContext {
   public:
-    DoubleContext(CommandContext *ctx);
+    DoubleIDContext(CommandContext *ctx);
 
     antlr4::Token *name = nullptr;
+    antlr4::Token *arr = nullptr;
     antlr4::tree::TerminalNode *DOUBLE_T();
     antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

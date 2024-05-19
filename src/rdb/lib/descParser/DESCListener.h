@@ -17,26 +17,29 @@ public:
   virtual void enterDesc(DESCParser::DescContext *ctx) = 0;
   virtual void exitDesc(DESCParser::DescContext *ctx) = 0;
 
-  virtual void enterByte(DESCParser::ByteContext *ctx) = 0;
-  virtual void exitByte(DESCParser::ByteContext *ctx) = 0;
+  virtual void enterByteID(DESCParser::ByteIDContext *ctx) = 0;
+  virtual void exitByteID(DESCParser::ByteIDContext *ctx) = 0;
 
-  virtual void enterString(DESCParser::StringContext *ctx) = 0;
-  virtual void exitString(DESCParser::StringContext *ctx) = 0;
+  virtual void enterIntegerID(DESCParser::IntegerIDContext *ctx) = 0;
+  virtual void exitIntegerID(DESCParser::IntegerIDContext *ctx) = 0;
 
-  virtual void enterUnsigned(DESCParser::UnsignedContext *ctx) = 0;
-  virtual void exitUnsigned(DESCParser::UnsignedContext *ctx) = 0;
+  virtual void enterUnsignedID(DESCParser::UnsignedIDContext *ctx) = 0;
+  virtual void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) = 0;
 
-  virtual void enterFloat(DESCParser::FloatContext *ctx) = 0;
-  virtual void exitFloat(DESCParser::FloatContext *ctx) = 0;
+  virtual void enterFloatID(DESCParser::FloatIDContext *ctx) = 0;
+  virtual void exitFloatID(DESCParser::FloatIDContext *ctx) = 0;
 
-  virtual void enterDouble(DESCParser::DoubleContext *ctx) = 0;
-  virtual void exitDouble(DESCParser::DoubleContext *ctx) = 0;
+  virtual void enterDoubleID(DESCParser::DoubleIDContext *ctx) = 0;
+  virtual void exitDoubleID(DESCParser::DoubleIDContext *ctx) = 0;
 
-  virtual void enterRef(DESCParser::RefContext *ctx) = 0;
-  virtual void exitRef(DESCParser::RefContext *ctx) = 0;
+  virtual void enterRefID(DESCParser::RefIDContext *ctx) = 0;
+  virtual void exitRefID(DESCParser::RefIDContext *ctx) = 0;
 
-  virtual void enterType(DESCParser::TypeContext *ctx) = 0;
-  virtual void exitType(DESCParser::TypeContext *ctx) = 0;
+  virtual void enterTypeID(DESCParser::TypeIDContext *ctx) = 0;
+  virtual void exitTypeID(DESCParser::TypeIDContext *ctx) = 0;
+
+  virtual void enterStringID(DESCParser::StringIDContext *ctx) = 0;
+  virtual void exitStringID(DESCParser::StringIDContext *ctx) = 0;
 
 
 };

@@ -19,26 +19,29 @@ public:
   virtual void enterDesc(DESCParser::DescContext * /*ctx*/) override { }
   virtual void exitDesc(DESCParser::DescContext * /*ctx*/) override { }
 
-  virtual void enterByte(DESCParser::ByteContext * /*ctx*/) override { }
-  virtual void exitByte(DESCParser::ByteContext * /*ctx*/) override { }
+  virtual void enterByteID(DESCParser::ByteIDContext * /*ctx*/) override { }
+  virtual void exitByteID(DESCParser::ByteIDContext * /*ctx*/) override { }
 
-  virtual void enterString(DESCParser::StringContext * /*ctx*/) override { }
-  virtual void exitString(DESCParser::StringContext * /*ctx*/) override { }
+  virtual void enterIntegerID(DESCParser::IntegerIDContext * /*ctx*/) override { }
+  virtual void exitIntegerID(DESCParser::IntegerIDContext * /*ctx*/) override { }
 
-  virtual void enterUnsigned(DESCParser::UnsignedContext * /*ctx*/) override { }
-  virtual void exitUnsigned(DESCParser::UnsignedContext * /*ctx*/) override { }
+  virtual void enterUnsignedID(DESCParser::UnsignedIDContext * /*ctx*/) override { }
+  virtual void exitUnsignedID(DESCParser::UnsignedIDContext * /*ctx*/) override { }
 
-  virtual void enterFloat(DESCParser::FloatContext * /*ctx*/) override { }
-  virtual void exitFloat(DESCParser::FloatContext * /*ctx*/) override { }
+  virtual void enterFloatID(DESCParser::FloatIDContext * /*ctx*/) override { }
+  virtual void exitFloatID(DESCParser::FloatIDContext * /*ctx*/) override { }
 
-  virtual void enterDouble(DESCParser::DoubleContext * /*ctx*/) override { }
-  virtual void exitDouble(DESCParser::DoubleContext * /*ctx*/) override { }
+  virtual void enterDoubleID(DESCParser::DoubleIDContext * /*ctx*/) override { }
+  virtual void exitDoubleID(DESCParser::DoubleIDContext * /*ctx*/) override { }
 
-  virtual void enterRef(DESCParser::RefContext * /*ctx*/) override { }
-  virtual void exitRef(DESCParser::RefContext * /*ctx*/) override { }
+  virtual void enterRefID(DESCParser::RefIDContext * /*ctx*/) override { }
+  virtual void exitRefID(DESCParser::RefIDContext * /*ctx*/) override { }
 
-  virtual void enterType(DESCParser::TypeContext * /*ctx*/) override { }
-  virtual void exitType(DESCParser::TypeContext * /*ctx*/) override { }
+  virtual void enterTypeID(DESCParser::TypeIDContext * /*ctx*/) override { }
+  virtual void exitTypeID(DESCParser::TypeIDContext * /*ctx*/) override { }
+
+  virtual void enterStringID(DESCParser::StringIDContext * /*ctx*/) override { }
+  virtual void exitStringID(DESCParser::StringIDContext * /*ctx*/) override { }
 
 
   virtual void enterEveryRule(antlr4::ParserRuleContext * /*ctx*/) override { }

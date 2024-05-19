@@ -4,6 +4,8 @@
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/descriptor.h"
 
+#include <iostream>
+
 using namespace antlrcpp;
 using namespace antlr4;
 
@@ -40,6 +42,16 @@ class ParserDESCListener : public DESCBaseListener {
 
  public:
   ParserDESCListener(rdb::Descriptor &desc) : desc(desc){};
+
+  void enterDesc(DESCParser::DescContext *ctx) {}
+
+  void exitByteID(DESCParser::ByteIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitStringID(DESCParser::StringIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitFloatID(DESCParser::FloatIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitDoubleID(DESCParser::DoubleIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitRefID(DESCParser::RefIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitTypeID(DESCParser::TypeIDContext *ctx) { std::cout << ctx->getText(); }
 };
 
 std::string parserDESCString(rdb::Descriptor &desc, std::string inlet) {
