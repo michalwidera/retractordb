@@ -1,4 +1,4 @@
-grammar RQL;
+parser grammar RQL;
 
 prog                : ( select_statement
                       | declare_statement

@@ -245,7 +245,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parserFile(qTree &coreInstance, std::string sInputFile) {
+std::string parserRQLFile(qTree &coreInstance, std::string sInputFile) {
   std::ifstream ins;
   // Create the input stream.
   ins.open(sInputFile.c_str());
@@ -270,7 +270,7 @@ std::string parserFile(qTree &coreInstance, std::string sInputFile) {
   return status;
 }
 
-std::string parserString(qTree &coreInstance, std::string inlet) {
+std::string parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.

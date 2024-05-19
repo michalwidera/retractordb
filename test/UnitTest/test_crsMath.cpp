@@ -20,7 +20,7 @@
 
 using namespace CRationalStreamMath;
 
-extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
@@ -47,7 +47,7 @@ class crsMathTest : public ::testing::Test {
   virtual ~crsMathTest() {}
 
   virtual void SetUp() {
-    auto compiled = parserFile(coreInstance, "ut_crsmath.rql") == "OK";
+    auto compiled = parserRQLFile(coreInstance, "ut_crsmath.rql") == "OK";
     assert(compiled && "Query set malformed according to grammar.");
 
     compiler cm(coreInstance);

@@ -21,7 +21,7 @@ UNSIGNED_T:         'UINT';
 INTEGER_T:          'INTEGER';
 FLOAT_T:            'FLOAT';
 DOUBLE_T:           'DOUBLE';
-RATIONAL_T:         'RATIONAl';
+RATIONAL_T:         'RATIONAL';
 INTPAIR_T:          'INTPAIR';
 IDXPAIR_T:          'IDXPAIR';
 
@@ -34,3 +34,5 @@ ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
 DECIMAL:            DEC_DIGIT+;
 REF_TYPE_ARG:       'TEXTSOURCE' | 'DEVICE' | 'GENERIC' | 'DEFAULT';
+
+SPACE:              [ \t\r\n]+    -> skip;

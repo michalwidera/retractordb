@@ -14,6 +14,8 @@
 
 const uint AREA_SIZE = 10;
 
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+
 template <typename T, typename K>
 bool test_1() {
   K binaryAccessor1("testfile-fstream");
@@ -441,4 +443,9 @@ TEST(crdb, position_conversion_test3) {
   std::stringstream coutstring;
   coutstring << rdb::flat << payload;
   ASSERT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
+}
+
+TEST(crdb, descriptor_parser_test) {
+  rdb::Descriptor out;
+  ASSERT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] }") == "OK");
 }

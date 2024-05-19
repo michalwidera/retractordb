@@ -41,11 +41,18 @@ class ParserDESCListener : public DESCBaseListener {
   rdb::Descriptor &desc;
 
  public:
-  ParserDESCListener(rdb::Descriptor &desc) : desc(desc){};
+  ParserDESCListener(rdb::Descriptor &desc) : desc(desc){
+    //std::cerr << "constructor" << std::endl;
+  };
 
-  void enterDesc(DESCParser::DescContext *ctx) {}
+  void enterDesc(DESCParser::DescContext *ctx) {
+    //std::cerr << "enterDesc" << std::endl;
+  }
 
-  void exitByteID(DESCParser::ByteIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitByteID(DESCParser::ByteIDContext *ctx) {
+    //std::cerr << "exit BYTEID" << std::endl; 
+    std::cout << ctx->getText(); 
+    }
   void exitStringID(DESCParser::StringIDContext *ctx) { std::cout << ctx->getText(); }
   void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) { std::cout << ctx->getText(); }
   void exitFloatID(DESCParser::FloatIDContext *ctx) { std::cout << ctx->getText(); }

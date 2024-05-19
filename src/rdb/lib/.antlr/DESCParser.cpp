@@ -56,17 +56,17 @@ void descParserInitialize() {
     },
     std::vector<std::string>{
       "", "'{'", "'}'", "'['", "']'", "'\"'", "'BYTE'", "'STRING'", "'UINT'", 
-      "'INTEGER'", "'FLOAT'", "'DOUBLE'", "'RATIONAl'", "'INTPAIR'", "'IDXPAIR'", 
+      "'INTEGER'", "'FLOAT'", "'DOUBLE'", "'RATIONAL'", "'INTPAIR'", "'IDXPAIR'", 
       "'TYPE'", "'REF'"
     },
     std::vector<std::string>{
       "", "", "", "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", 
       "FLOAT_T", "DOUBLE_T", "RATIONAL_T", "INTPAIR_T", "IDXPAIR_T", "TYPE_T", 
-      "REF_T", "ID", "STRING", "DECIMAL", "REF_TYPE_ARG"
+      "REF_T", "ID", "STRING", "DECIMAL", "REF_TYPE_ARG", "SPACE"
     }
   );
   static const int32_t serializedATNSegment[] = {
-  	4,1,20,63,2,0,7,0,2,1,7,1,1,0,1,0,5,0,7,8,0,10,0,12,0,10,9,0,1,0,1,0,
+  	4,1,21,63,2,0,7,0,2,1,7,1,1,0,1,0,5,0,7,8,0,10,0,12,0,10,9,0,1,0,1,0,
   	1,1,1,1,1,1,1,1,1,1,3,1,19,8,1,1,1,1,1,1,1,1,1,1,1,3,1,26,8,1,1,1,1,1,
   	1,1,1,1,1,1,3,1,33,8,1,1,1,1,1,1,1,1,1,1,1,3,1,40,8,1,1,1,1,1,1,1,1,1,
   	1,1,3,1,47,8,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,61,
