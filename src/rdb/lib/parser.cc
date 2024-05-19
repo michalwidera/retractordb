@@ -9,29 +9,29 @@
 using namespace antlrcpp;
 using namespace antlr4;
 
-std::string status = "OK";
+std::string statusDesc = "OK";
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
-class LexerErrorListener : public BaseErrorListener {
+class LexerErrorListenerDesc : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
     std::cerr << "Descriptor Syntax error - ";
     std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
-    status = "Fail";
+    statusDesc = "Fail";
     exit(EPERM);
     return;
   }
 };
 
-class ParserErrorListener : public BaseErrorListener {
+class ParserErrorListenerDesc : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
     std::cerr << "Descriptor Syntax error - ";
     std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
-    status = "Fail";
+    statusDesc = "Fail";
     exit(EPERM);
     return;
   }
@@ -67,18 +67,18 @@ std::string parserDESCString(rdb::Descriptor &desc, std::string inlet) {
   // to create a token stream.
   DESCLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
-  LexerErrorListener lexerErrorListener;
+  LexerErrorListenerDesc lexerErrorListener;
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
   // Create a parser which parses the token stream
   // to create a parse tree.
   DESCParser parser(&tokens);
-  ParserErrorListener parserErrorListener;
+  ParserErrorListenerDesc parserErrorListener;
   ParserDESCListener parserDescListener(desc);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserDescListener);
   tree::ParseTree *tree = parser.desc();
-  return status;
+  return statusDesc;
 }
