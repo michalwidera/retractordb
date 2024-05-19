@@ -24,11 +24,13 @@ class DESCParser : public antlr4::Parser {
     IDXPAIR_T    = 14,
     TYPE_T       = 15,
     REF_T        = 16,
-    ID           = 17,
-    STRING       = 18,
-    DECIMAL      = 19,
-    REF_TYPE_ARG = 20,
-    SPACE        = 21
+    DOT          = 17,
+    ID           = 18,
+    STRING       = 19,
+    DECIMAL      = 20,
+    REF_TYPE_ARG = 21,
+    FILENAME     = 22,
+    SPACE        = 23
   };
 
   enum { RuleDesc = 0, RuleCommand = 1 };
@@ -95,7 +97,7 @@ class DESCParser : public antlr4::Parser {
 
     antlr4::Token *type = nullptr;
     antlr4::tree::TerminalNode *TYPE_T();
-    antlr4::tree::TerminalNode *REF_TYPE_ARG();
+    antlr4::tree::TerminalNode *ID();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -158,7 +160,7 @@ class DESCParser : public antlr4::Parser {
 
     antlr4::Token *file = nullptr;
     antlr4::tree::TerminalNode *REF_T();
-    antlr4::tree::TerminalNode *STRING();
+    antlr4::tree::TerminalNode *FILENAME();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

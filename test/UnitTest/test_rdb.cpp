@@ -448,4 +448,5 @@ TEST(crdb, position_conversion_test3) {
 TEST(crdb, descriptor_parser_test) {
   rdb::Descriptor out;
   ASSERT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
+  ASSERT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
 }

@@ -12,6 +12,8 @@
 #include <typeinfo>
 #include <utility>
 
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+
 namespace rdb {
 // https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
 
@@ -383,53 +385,13 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   return os;
 }
 
-// Look here to explain:
-// https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
-struct synsugar_is_space : std::ctype<char> {
-  synsugar_is_space() : ctype<char>(get_table()) {}
-  static mask const *get_table() {
-    static std::array<mask, table_size> rc;
-    rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = std::ctype_base::space;
-    return &rc[0];
-  }
-};
-
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
-  auto origLocale = is.getloc();
-  is.imbue(std::locale(origLocale, std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
-  do {
-    std::string type;
-    std::string name;
-    int len = 0;
-    is >> type;
-    if (is.eof()) break;
-    auto ft = GetFieldType(type);
+  std::stringstream strstream;
+  std::string str;
+  while (is >> str) strstream << " " << str;
 
-    if (ft == rdb::REF) {
-      char c;
-      while (is.get(c) && c != '"')
-        ;
-      while (is.get(c) && c != '"') name += c;
-      name.erase(remove(name.begin(), name.end(), '"'), name.end());
-    } else {
-      is >> name;
-      ltrim(name);
-      rtrim(name);
-    }
-
-    auto arrayLen = 1;
-    char c        = is.peek();  // peek character
-    if (c == '[') {
-      while (is.get(c) && c != '[')
-        ;
-      is >> arrayLen;
-      while (is.get(c) && c != ']')
-        ;
-    }
-
-    rhs += Descriptor(name, GetFieldLenFromType(ft), arrayLen, ft);
-  } while (!is.eof());
-  is.imbue(origLocale);
+  auto result = parserDESCString(rhs, strstream.str().c_str());
+  assert(result == "OK");
 
   return is;
 }
