@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
 
-project(rqlParser LANGUAGES CXX)
+project(rqlparser LANGUAGES CXX)
 
 find_package(antlr4-runtime REQUIRED)
 
