@@ -22,5 +22,3 @@ target_link_libraries(
   rqlparser)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
-
-
