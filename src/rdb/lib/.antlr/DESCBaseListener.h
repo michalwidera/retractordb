@@ -31,6 +31,9 @@ class DESCBaseListener : public DESCListener {
   virtual void enterDoubleID(DESCParser::DoubleIDContext * /*ctx*/) override {}
   virtual void exitDoubleID(DESCParser::DoubleIDContext * /*ctx*/) override {}
 
+  virtual void enterRationalID(DESCParser::RationalIDContext * /*ctx*/) override {}
+  virtual void exitRationalID(DESCParser::RationalIDContext * /*ctx*/) override {}
+
   virtual void enterRefID(DESCParser::RefIDContext * /*ctx*/) override {}
   virtual void exitRefID(DESCParser::RefIDContext * /*ctx*/) override {}
 

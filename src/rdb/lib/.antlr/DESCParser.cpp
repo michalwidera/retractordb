@@ -57,26 +57,28 @@ void descParserInitialize() {
                                "IDXPAIR_T", "TYPE_T",     "REF_T",     "ID",      "STRING",   "DECIMAL",    "REF_TYPE_ARG",
                                "SPACE"});
   static const int32_t serializedATNSegment[] = {
-      4, 1, 21, 63, 2, 0,  7, 0, 2,  1,  7, 1,  1, 0,  1,  0,  5,  0,  7,  8,  0,  10, 0, 12, 0, 10, 9,  0,  1, 0,
-      1, 0, 1,  1,  1, 1,  1, 1, 1,  1,  1, 1,  3, 1,  19, 8,  1,  1,  1,  1,  1,  1,  1, 1,  1, 1,  1,  3,  1, 26,
-      8, 1, 1,  1,  1, 1,  1, 1, 1,  1,  1, 1,  3, 1,  33, 8,  1,  1,  1,  1,  1,  1,  1, 1,  1, 1,  1,  3,  1, 40,
-      8, 1, 1,  1,  1, 1,  1, 1, 1,  1,  1, 1,  3, 1,  47, 8,  1,  1,  1,  1,  1,  1,  1, 1,  1, 1,  1,  1,  1, 1,
-      1, 1, 1,  1,  1, 1,  1, 1, 1,  1,  1, 3,  1, 61, 8,  1,  1,  1,  0,  0,  2,  0,  2, 0,  0, 73, 0,  4,  1, 0,
-      0, 0, 2,  60, 1, 0,  0, 0, 4,  8,  5, 1,  0, 0,  5,  7,  3,  2,  1,  0,  6,  5,  1, 0,  0, 0,  7,  10, 1, 0,
-      0, 0, 8,  6,  1, 0,  0, 0, 8,  9,  1, 0,  0, 0,  9,  11, 1,  0,  0,  0,  10, 8,  1, 0,  0, 0,  11, 12, 5, 2,
-      0, 0, 12, 1,  1, 0,  0, 0, 13, 14, 5, 6,  0, 0,  14, 18, 5,  17, 0,  0,  15, 16, 5, 3,  0, 0,  16, 17, 5, 19,
-      0, 0, 17, 19, 5, 4,  0, 0, 18, 15, 1, 0,  0, 0,  18, 19, 1,  0,  0,  0,  19, 61, 1, 0,  0, 0,  20, 21, 5, 9,
-      0, 0, 21, 25, 5, 17, 0, 0, 22, 23, 5, 3,  0, 0,  23, 24, 5,  19, 0,  0,  24, 26, 5, 4,  0, 0,  25, 22, 1, 0,
-      0, 0, 25, 26, 1, 0,  0, 0, 26, 61, 1, 0,  0, 0,  27, 28, 5,  8,  0,  0,  28, 32, 5, 17, 0, 0,  29, 30, 5, 3,
-      0, 0, 30, 31, 5, 19, 0, 0, 31, 33, 5, 4,  0, 0,  32, 29, 1,  0,  0,  0,  32, 33, 1, 0,  0, 0,  33, 61, 1, 0,
-      0, 0, 34, 35, 5, 10, 0, 0, 35, 39, 5, 17, 0, 0,  36, 37, 5,  3,  0,  0,  37, 38, 5, 19, 0, 0,  38, 40, 5, 4,
-      0, 0, 39, 36, 1, 0,  0, 0, 39, 40, 1, 0,  0, 0,  40, 61, 1,  0,  0,  0,  41, 42, 5, 11, 0, 0,  42, 46, 5, 17,
-      0, 0, 43, 44, 5, 3,  0, 0, 44, 45, 5, 19, 0, 0,  45, 47, 5,  4,  0,  0,  46, 43, 1, 0,  0, 0,  46, 47, 1, 0,
-      0, 0, 47, 61, 1, 0,  0, 0, 48, 49, 5, 16, 0, 0,  49, 50, 5,  18, 0,  0,  50, 51, 5, 5,  0, 0,  51, 52, 5, 18,
-      0, 0, 52, 61, 5, 5,  0, 0, 53, 54, 5, 15, 0, 0,  54, 61, 5,  20, 0,  0,  55, 56, 5, 7,  0, 0,  56, 57, 5, 17,
-      0, 0, 57, 58, 5, 3,  0, 0, 58, 59, 5, 19, 0, 0,  59, 61, 5,  4,  0,  0,  60, 13, 1, 0,  0, 0,  60, 20, 1, 0,
-      0, 0, 60, 27, 1, 0,  0, 0, 60, 34, 1, 0,  0, 0,  60, 41, 1,  0,  0,  0,  60, 48, 1, 0,  0, 0,  60, 53, 1, 0,
-      0, 0, 60, 55, 1, 0,  0, 0, 61, 3,  1, 0,  0, 0,  7,  8,  18, 25, 32, 39, 46, 60};
+      4,  1, 21, 69, 2,  0, 7,  0, 2,  1,  7,  1, 1,  0, 1,  0,  5,  0,  7,  8,  0,  10, 0,  12, 0,  10, 9,  0,  1,  0,
+      1,  0, 1,  1,  1,  1, 1,  1, 1,  1,  1,  1, 3,  1, 19, 8,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  1,  26,
+      8,  1, 1,  1,  1,  1, 1,  1, 1,  1,  1,  1, 3,  1, 33, 8,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  1,  40,
+      8,  1, 1,  1,  1,  1, 1,  1, 1,  1,  1,  1, 3,  1, 47, 8,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  1,  54,
+      8,  1, 1,  1,  1,  1, 1,  1, 1,  1,  1,  1, 1,  1, 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  3,  1,  67, 8,  1,  1,
+      1,  0, 0,  2,  0,  2, 0,  0, 81, 0,  4,  1, 0,  0, 0,  2,  66, 1,  0,  0,  0,  4,  8,  5,  1,  0,  0,  5,  7,  3,
+      2,  1, 0,  6,  5,  1, 0,  0, 0,  7,  10, 1, 0,  0, 0,  8,  6,  1,  0,  0,  0,  8,  9,  1,  0,  0,  0,  9,  11, 1,
+      0,  0, 0,  10, 8,  1, 0,  0, 0,  11, 12, 5, 2,  0, 0,  12, 1,  1,  0,  0,  0,  13, 14, 5,  6,  0,  0,  14, 18, 5,
+      17, 0, 0,  15, 16, 5, 3,  0, 0,  16, 17, 5, 19, 0, 0,  17, 19, 5,  4,  0,  0,  18, 15, 1,  0,  0,  0,  18, 19, 1,
+      0,  0, 0,  19, 67, 1, 0,  0, 0,  20, 21, 5, 9,  0, 0,  21, 25, 5,  17, 0,  0,  22, 23, 5,  3,  0,  0,  23, 24, 5,
+      19, 0, 0,  24, 26, 5, 4,  0, 0,  25, 22, 1, 0,  0, 0,  25, 26, 1,  0,  0,  0,  26, 67, 1,  0,  0,  0,  27, 28, 5,
+      8,  0, 0,  28, 32, 5, 17, 0, 0,  29, 30, 5, 3,  0, 0,  30, 31, 5,  19, 0,  0,  31, 33, 5,  4,  0,  0,  32, 29, 1,
+      0,  0, 0,  32, 33, 1, 0,  0, 0,  33, 67, 1, 0,  0, 0,  34, 35, 5,  10, 0,  0,  35, 39, 5,  17, 0,  0,  36, 37, 5,
+      3,  0, 0,  37, 38, 5, 19, 0, 0,  38, 40, 5, 4,  0, 0,  39, 36, 1,  0,  0,  0,  39, 40, 1,  0,  0,  0,  40, 67, 1,
+      0,  0, 0,  41, 42, 5, 11, 0, 0,  42, 46, 5, 17, 0, 0,  43, 44, 5,  3,  0,  0,  44, 45, 5,  19, 0,  0,  45, 47, 5,
+      4,  0, 0,  46, 43, 1, 0,  0, 0,  46, 47, 1, 0,  0, 0,  47, 67, 1,  0,  0,  0,  48, 49, 5,  12, 0,  0,  49, 53, 5,
+      17, 0, 0,  50, 51, 5, 3,  0, 0,  51, 52, 5, 19, 0, 0,  52, 54, 5,  4,  0,  0,  53, 50, 1,  0,  0,  0,  53, 54, 1,
+      0,  0, 0,  54, 67, 1, 0,  0, 0,  55, 56, 5, 16, 0, 0,  56, 57, 5,  5,  0,  0,  57, 58, 5,  18, 0,  0,  58, 67, 5,
+      5,  0, 0,  59, 60, 5, 15, 0, 0,  60, 67, 5, 20, 0, 0,  61, 62, 5,  7,  0,  0,  62, 63, 5,  17, 0,  0,  63, 64, 5,
+      3,  0, 0,  64, 65, 5, 19, 0, 0,  65, 67, 5, 4,  0, 0,  66, 13, 1,  0,  0,  0,  66, 20, 1,  0,  0,  0,  66, 27, 1,
+      0,  0, 0,  66, 34, 1, 0,  0, 0,  66, 41, 1, 0,  0, 0,  66, 48, 1,  0,  0,  0,  66, 55, 1,  0,  0,  0,  66, 59, 1,
+      0,  0, 0,  66, 61, 1, 0,  0, 0,  67, 3,  1, 0,  0, 0,  8,  8,  18, 25, 32, 39, 46, 53, 66};
   staticData->serializedATN =
       antlr4::atn::SerializedATNView(serializedATNSegment, sizeof(serializedATNSegment) / sizeof(serializedATNSegment[0]));
 
@@ -155,7 +157,7 @@ DESCParser::DescContext *DESCParser::desc() {
     setState(8);
     _errHandler->sync(this);
     _la = _input->LA(1);
-    while ((((_la & ~0x3fULL) == 0) && ((1ULL << _la) & 102336) != 0)) {
+    while ((((_la & ~0x3fULL) == 0) && ((1ULL << _la) & 106432) != 0)) {
       setState(5);
       command();
       setState(10);
@@ -221,9 +223,9 @@ void DESCParser::TypeIDContext::exitRule(tree::ParseTreeListener *listener) {
 
 tree::TerminalNode *DESCParser::StringIDContext::STRING_T() { return getToken(DESCParser::STRING_T, 0); }
 
-tree::TerminalNode *DESCParser::StringIDContext::DECIMAL() { return getToken(DESCParser::DECIMAL, 0); }
-
 tree::TerminalNode *DESCParser::StringIDContext::ID() { return getToken(DESCParser::ID, 0); }
+
+tree::TerminalNode *DESCParser::StringIDContext::DECIMAL() { return getToken(DESCParser::DECIMAL, 0); }
 
 DESCParser::StringIDContext::StringIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
@@ -253,6 +255,24 @@ void DESCParser::IntegerIDContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr) parserListener->exitIntegerID(this);
 }
+//----------------- RationalIDContext ------------------------------------------------------------------
+
+tree::TerminalNode *DESCParser::RationalIDContext::RATIONAL_T() { return getToken(DESCParser::RATIONAL_T, 0); }
+
+tree::TerminalNode *DESCParser::RationalIDContext::ID() { return getToken(DESCParser::ID, 0); }
+
+tree::TerminalNode *DESCParser::RationalIDContext::DECIMAL() { return getToken(DESCParser::DECIMAL, 0); }
+
+DESCParser::RationalIDContext::RationalIDContext(CommandContext *ctx) { copyFrom(ctx); }
+
+void DESCParser::RationalIDContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr) parserListener->enterRationalID(this);
+}
+void DESCParser::RationalIDContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  if (parserListener != nullptr) parserListener->exitRationalID(this);
+}
 //----------------- ByteIDContext ------------------------------------------------------------------
 
 tree::TerminalNode *DESCParser::ByteIDContext::BYTE_T() { return getToken(DESCParser::BYTE_T, 0); }
@@ -275,9 +295,7 @@ void DESCParser::ByteIDContext::exitRule(tree::ParseTreeListener *listener) {
 
 tree::TerminalNode *DESCParser::RefIDContext::REF_T() { return getToken(DESCParser::REF_T, 0); }
 
-std::vector<tree::TerminalNode *> DESCParser::RefIDContext::STRING() { return getTokens(DESCParser::STRING); }
-
-tree::TerminalNode *DESCParser::RefIDContext::STRING(size_t i) { return getToken(DESCParser::STRING, i); }
+tree::TerminalNode *DESCParser::RefIDContext::STRING() { return getToken(DESCParser::STRING, 0); }
 
 DESCParser::RefIDContext::RefIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
@@ -338,7 +356,7 @@ DESCParser::CommandContext *DESCParser::command() {
     exitRule();
   });
   try {
-    setState(60);
+    setState(66);
     _errHandler->sync(this);
     switch (_input->LA(1)) {
       case DESCParser::BYTE_T: {
@@ -451,44 +469,64 @@ DESCParser::CommandContext *DESCParser::command() {
         break;
       }
 
-      case DESCParser::REF_T: {
-        _localctx = _tracker.createInstance<DESCParser::RefIDContext>(_localctx);
+      case DESCParser::RATIONAL_T: {
+        _localctx = _tracker.createInstance<DESCParser::RationalIDContext>(_localctx);
         enterOuterAlt(_localctx, 6);
         setState(48);
-        match(DESCParser::REF_T);
+        match(DESCParser::RATIONAL_T);
         setState(49);
-        antlrcpp::downCast<RefIDContext *>(_localctx)->name = match(DESCParser::STRING);
-        setState(50);
+        antlrcpp::downCast<RationalIDContext *>(_localctx)->name = match(DESCParser::ID);
+        setState(53);
+        _errHandler->sync(this);
+
+        _la = _input->LA(1);
+        if (_la == DESCParser::T__2) {
+          setState(50);
+          match(DESCParser::T__2);
+          setState(51);
+          antlrcpp::downCast<RationalIDContext *>(_localctx)->arr = match(DESCParser::DECIMAL);
+          setState(52);
+          match(DESCParser::T__3);
+        }
+        break;
+      }
+
+      case DESCParser::REF_T: {
+        _localctx = _tracker.createInstance<DESCParser::RefIDContext>(_localctx);
+        enterOuterAlt(_localctx, 7);
+        setState(55);
+        match(DESCParser::REF_T);
+        setState(56);
         match(DESCParser::T__4);
-        setState(51);
+        setState(57);
         antlrcpp::downCast<RefIDContext *>(_localctx)->file = match(DESCParser::STRING);
-        setState(52);
+        setState(58);
         match(DESCParser::T__4);
         break;
       }
 
       case DESCParser::TYPE_T: {
         _localctx = _tracker.createInstance<DESCParser::TypeIDContext>(_localctx);
-        enterOuterAlt(_localctx, 7);
-        setState(53);
+        enterOuterAlt(_localctx, 8);
+        setState(59);
         match(DESCParser::TYPE_T);
-        setState(54);
+        setState(60);
         antlrcpp::downCast<TypeIDContext *>(_localctx)->type = match(DESCParser::REF_TYPE_ARG);
         break;
       }
 
       case DESCParser::STRING_T: {
         _localctx = _tracker.createInstance<DESCParser::StringIDContext>(_localctx);
-        enterOuterAlt(_localctx, 8);
-        setState(55);
+        enterOuterAlt(_localctx, 9);
+        setState(61);
         match(DESCParser::STRING_T);
-        setState(56);
+        setState(62);
         antlrcpp::downCast<StringIDContext *>(_localctx)->name = match(DESCParser::ID);
-        setState(57);
+        setState(63);
         match(DESCParser::T__2);
-        setState(58);
-        match(DESCParser::DECIMAL);
-        setState(59);
+        setState(64);
+        antlrcpp::downCast<StringIDContext *>(_localctx)->strsize = match(DESCParser::DECIMAL);
+        setState(65);
         match(DESCParser::T__3);
         break;
       }

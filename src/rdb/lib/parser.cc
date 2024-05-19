@@ -50,28 +50,60 @@ class ParserDESCListener : public DESCBaseListener {
     // std::cerr << "enterDesc" << std::endl;
   }
 
-  void exitByteID(DESCParser::ByteIDContext *ctx) {
-    std::cerr << "exit ByteID" << std::endl;
-    std::cout << ctx->getText();
-    std::cout << ctx->children.size();
+  void exitDesc(DESCParser::DescContext *ctx) {
+    // std::cerr << "exitDesc:" << desc << std::endl;
+  }
 
-    if (ctx->arr) std::cout << "arr:" << ctx->arr->getText() << ":" << std::endl;
+  void exitByteID(DESCParser::ByteIDContext *ctx) {
+    int count = 1;
+    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(uint8_t), count, rdb::BYTE)});
   }
 
   void exitIntegerID(DESCParser::IntegerIDContext *ctx) {
-    std::cerr << "exit IntegerID" << std::endl;
+    int count = 1;
+    if (ctx->arr) count = std::stoi(ctx->arr->getText());
 
-    std::cout << "name:" << ctx->children[1]->getText() << ":" << std::endl;
-    // if ( ctx->children.size() == 5 )
-    if (ctx->arr) std::cout << "arr:" << ctx->arr->getText() << ":" << std::endl;
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(int), count, rdb::INTEGER)});
   }
 
-  void exitStringID(DESCParser::StringIDContext *ctx) { std::cout << ctx->getText(); }
-  void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) { std::cout << ctx->getText(); }
-  void exitFloatID(DESCParser::FloatIDContext *ctx) { std::cout << ctx->getText(); }
-  void exitDoubleID(DESCParser::DoubleIDContext *ctx) { std::cout << ctx->getText(); }
-  void exitRefID(DESCParser::RefIDContext *ctx) { std::cout << ctx->getText(); }
-  void exitTypeID(DESCParser::TypeIDContext *ctx) { std::cout << ctx->getText(); }
+  void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) {
+    int count = 1;
+    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(unsigned), count, rdb::UINT)});
+  }
+
+  void exitFloatID(DESCParser::FloatIDContext *ctx) {
+    int count = 1;
+    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(float), count, rdb::FLOAT)});
+  }
+
+  void exitDoubleID(DESCParser::DoubleIDContext *ctx) {
+    int count = 1;
+    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(double), count, rdb::DOUBLE)});
+  }
+
+  void exitRationalID(DESCParser::RationalIDContext *ctx) {
+    int count = 1;
+    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(boost::rational<int>), count, rdb::RATIONAL)});
+  }
+
+  void exitStringID(DESCParser::StringIDContext *ctx) {
+    int count = std::stoi(ctx->strsize->getText());
+    desc.append({rdb::rField(ctx->name->getText(), sizeof(char), count, rdb::STRING)});
+  }
+
+  void exitRefID(DESCParser::RefIDContext *ctx) { desc.append({rdb::rField(ctx->file->getText(), 0, 0, rdb::REF)}); }
+
+  void exitTypeID(DESCParser::TypeIDContext *ctx) { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
 };
 
 std::string parserDESCString(rdb::Descriptor &desc, std::string inlet) {

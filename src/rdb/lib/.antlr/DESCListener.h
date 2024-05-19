@@ -29,6 +29,9 @@ class DESCListener : public antlr4::tree::ParseTreeListener {
   virtual void enterDoubleID(DESCParser::DoubleIDContext *ctx) = 0;
   virtual void exitDoubleID(DESCParser::DoubleIDContext *ctx)  = 0;
 
+  virtual void enterRationalID(DESCParser::RationalIDContext *ctx) = 0;
+  virtual void exitRationalID(DESCParser::RationalIDContext *ctx)  = 0;
+
   virtual void enterRefID(DESCParser::RefIDContext *ctx) = 0;
   virtual void exitRefID(DESCParser::RefIDContext *ctx)  = 0;
 

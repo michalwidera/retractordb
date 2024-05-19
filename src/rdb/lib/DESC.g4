@@ -8,9 +8,10 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?  # ByteID
                       | UNSIGNED_T name=ID ('[' arr=DECIMAL ']')?  # UnsignedID
                       | FLOAT_T name=ID    ('[' arr=DECIMAL ']')?  # FloatID
                       | DOUBLE_T name=ID   ('[' arr=DECIMAL ']')?  # DoubleID
-                      | REF_T name=STRING '"' file=STRING '"'      # RefID
+                      | RATIONAL_T name=ID ('[' arr=DECIMAL ']')?  # RationalID
+                      | REF_T '"' file=STRING '"'                  # RefID
                       | TYPE_T type=REF_TYPE_ARG                   # TypeID
-                      | STRING_T name=ID '[' DECIMAL ']'           # StringID
+                      | STRING_T name=ID '[' strsize=DECIMAL ']'   # StringID
                       ;
 
 // sync types with: src/include/rdb/fldType.h

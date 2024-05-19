@@ -104,10 +104,11 @@ class DESCParser : public antlr4::Parser {
    public:
     StringIDContext(CommandContext *ctx);
 
-    antlr4::Token *name = nullptr;
+    antlr4::Token *name    = nullptr;
+    antlr4::Token *strsize = nullptr;
     antlr4::tree::TerminalNode *STRING_T();
-    antlr4::tree::TerminalNode *DECIMAL();
     antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -119,6 +120,19 @@ class DESCParser : public antlr4::Parser {
     antlr4::Token *name = nullptr;
     antlr4::Token *arr  = nullptr;
     antlr4::tree::TerminalNode *INTEGER_T();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class RationalIDContext : public CommandContext {
+   public:
+    RationalIDContext(CommandContext *ctx);
+
+    antlr4::Token *name = nullptr;
+    antlr4::Token *arr  = nullptr;
+    antlr4::tree::TerminalNode *RATIONAL_T();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -142,11 +156,9 @@ class DESCParser : public antlr4::Parser {
    public:
     RefIDContext(CommandContext *ctx);
 
-    antlr4::Token *name = nullptr;
     antlr4::Token *file = nullptr;
     antlr4::tree::TerminalNode *REF_T();
-    std::vector<antlr4::tree::TerminalNode *> STRING();
-    antlr4::tree::TerminalNode *STRING(size_t i);
+    antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
