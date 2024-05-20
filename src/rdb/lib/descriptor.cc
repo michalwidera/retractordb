@@ -49,30 +49,6 @@ std::string GetFieldType(rdb::descFld e) {
   return typeDictionary[e];
 }
 
-int GetFieldLenFromType(rdb::descFld ft) {
-  switch (ft) {
-    case rdb::UINT:
-      return sizeof(unsigned);
-    case rdb::INTEGER:
-      return sizeof(int);
-    case rdb::FLOAT:
-      return sizeof(float);
-    case rdb::DOUBLE:
-      return sizeof(double);
-    case rdb::BYTE:
-      return 1;
-    case rdb::STRING:
-      return 1;
-    case rdb::REF:
-    case rdb::TYPE:
-      return 0;
-    default:
-      SPDLOG_ERROR("Undefined type rdb->int:{}", (int)ft);
-      assert(false && "Undefined type");
-  }
-  return 0;
-}
-
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
 Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
