@@ -15,28 +15,6 @@
 extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
 
 namespace rdb {
-// https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
-
-static inline void ltrim(std::string &s) {
-  s.erase(                                      //
-      s.begin(),                                //
-      std::find_if(s.begin(), s.end(),          //
-                   [](auto ch) {                //
-                     return !std::isspace(ch);  //
-                   }                            //
-                   ));
-}
-
-static inline void rtrim(std::string &s) {
-  s.erase(                                //
-      std::find_if(s.rbegin(), s.rend(),  //
-                   [](auto ch) {          //
-                     return !std::isspace(ch);
-                   }  //
-                   )
-          .base(),
-      s.end());
-}
 
 static bool flatOutput = false;
 
@@ -46,8 +24,6 @@ bool getFlat() { return flatOutput; }
 void setFlat(bool var) { flatOutput = var; }
 
 rdb::descFld GetFieldType(std::string name) {
-  ltrim(name);
-  rtrim(name);
   std::map<std::string, rdb::descFld> typeDictionary  //
       = {{"STRING", rdb::STRING},                     //
          {"UINT", rdb::UINT},                         //
