@@ -14,7 +14,7 @@ select_statement    : SELECT select_list
                       STREAM stream_name=ID
                       FROM stream_expression
                       (FILE name=STRING)?
-                      (RETENTION segments=DECIMAL capacity=DECIMAL)?
+                      (retention)?
                     # Select
                     ;
 
@@ -27,6 +27,10 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
 rational_se         : fraction_rule # RationalAsFraction_proforma
                     | FLOAT         # RationalAsFloat
                     | DECIMAL       # RationalAsDecimal
+                    ;
+
+retention           : RETENTION segments=DECIMAL capacity=DECIMAL
+                    # Retetion
                     ;
 
 fraction_rule       : DECIMAL DIVIDE DECIMAL

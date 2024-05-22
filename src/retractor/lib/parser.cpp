@@ -171,6 +171,16 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
+  void exitRetetion(RQLParser::RetentionContext *ctx) {
+    /*
+    @TODO
+    qry.descriptorStorage += rdb::Descriptor("",                                   //
+                                             std::stoi(ctx->segments->getText()),  //
+                                             std::stoi(ctx->capacity->getText()),  //
+                                             rdb::RETENTION);
+    */
+  }
+
   void exitStorage(RQLParser::StorageContext *ctx) {
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
