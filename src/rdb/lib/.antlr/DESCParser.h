@@ -24,13 +24,15 @@ class DESCParser : public antlr4::Parser {
     IDXPAIR_T    = 14,
     TYPE_T       = 15,
     REF_T        = 16,
-    DOT          = 17,
-    ID           = 18,
-    STRING       = 19,
-    DECIMAL      = 20,
-    REF_TYPE_ARG = 21,
-    FILENAME     = 22,
-    SPACE        = 23
+    SEGMENT_T    = 17,
+    CAPACITY_T   = 18,
+    DOT          = 19,
+    ID           = 20,
+    STRING       = 21,
+    DECIMAL      = 22,
+    REF_TYPE_ARG = 23,
+    FILENAME     = 24,
+    SPACE        = 25
   };
 
   enum { RuleDesc = 0, RuleCommand = 1 };
@@ -102,6 +104,17 @@ class DESCParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class CapacityIDContext : public CommandContext {
+   public:
+    CapacityIDContext(CommandContext *ctx);
+
+    antlr4::Token *size = nullptr;
+    antlr4::tree::TerminalNode *CAPACITY_T();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class StringIDContext : public CommandContext {
    public:
     StringIDContext(CommandContext *ctx);
@@ -123,6 +136,17 @@ class DESCParser : public antlr4::Parser {
     antlr4::Token *arr  = nullptr;
     antlr4::tree::TerminalNode *INTEGER_T();
     antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class SegmentIDContext : public CommandContext {
+   public:
+    SegmentIDContext(CommandContext *ctx);
+
+    antlr4::Token *size = nullptr;
+    antlr4::tree::TerminalNode *SEGMENT_T();
     antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

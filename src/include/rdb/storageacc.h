@@ -27,6 +27,8 @@ class storageAccessor {
   std::string descriptorFile = "";
   std::string storageFile    = "";
   std::string storageType    = "DEFAULT";
+  size_t capacity            = 0;
+  size_t segment             = 0;
   void moveRef();
   void attachStorage();
 

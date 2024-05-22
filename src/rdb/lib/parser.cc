@@ -104,6 +104,14 @@ class ParserDESCListener : public DESCBaseListener {
   void exitRefID(DESCParser::RefIDContext *ctx) { desc.append({rdb::rField(ctx->file->getText(), 0, 0, rdb::REF)}); }
 
   void exitTypeID(DESCParser::TypeIDContext *ctx) { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
+
+  void exitSegmentID(DESCParser::SegmentIDContext *ctx) {
+    desc.append({rdb::rField("", std::stoi(ctx->size->getText()), 0, rdb::SEGMENT)});
+  }
+
+  void exitCapacityID(DESCParser::CapacityIDContext *ctx) {
+    desc.append({rdb::rField("", std::stoi(ctx->size->getText()), 0, rdb::CAPACITY)});
+  }
 };
 
 std::string parserDESCString(rdb::Descriptor &desc, std::string inlet) {

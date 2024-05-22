@@ -32,6 +32,8 @@ rdb::descFld GetFieldType(std::string name) {
          {"FLOAT", rdb::FLOAT},                       //
          {"REF", rdb::REF},                           //
          {"TYPE", rdb::TYPE},                         //
+         {"SEGMENT", rdb::SEGMENT},                   //
+         {"CAPACITY", rdb::CAPACITY},                 //
          {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
@@ -45,6 +47,8 @@ std::string GetFieldType(rdb::descFld e) {
          {rdb::FLOAT, "FLOAT"},                       //
          {rdb::REF, "REF"},                           //
          {rdb::TYPE, "TYPE"},                         //
+         {rdb::SEGMENT, "SEGMENT"},                   //
+         {rdb::CAPACITY, "CAPACITY"},                 //
          {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
 }
@@ -72,7 +76,10 @@ void Descriptor::updateConvMaps() {
   int offset{0};
   int clen_alignment{0};
   for (int i = 0; i < clen; ++i) {
-    if (std::get<rtype>(*it) == rdb::TYPE || std::get<rtype>(*it) == rdb::REF) {
+    if (std::get<rtype>(*it) == rdb::TYPE ||     //
+        std::get<rtype>(*it) == rdb::REF ||      //
+        std::get<rtype>(*it) == rdb::SEGMENT ||  //
+        std::get<rtype>(*it) == rdb::CAPACITY) {
       ++it;
       ++clen_alignment;
       continue;
@@ -173,22 +180,30 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                          //
-                                    [](const rField &i) {                            //
-                                     return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                            std::get<rdb::rtype>(i) == rdb::TYPE;
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                              //
+                                    [](const rField &i) {                                //
+                                     return std::get<rdb::rtype>(i) == rdb::REF ||      //
+                                            std::get<rdb::rtype>(i) == rdb::TYPE ||     //
+                                            std::get<rdb::rtype>(i) == rdb::SEGMENT ||  //
+                                            std::get<rdb::rtype>(i) == rdb::CAPACITY;
                                    });
-  auto refCountThis = std::count_if(begin(), end(),                                  //
-                                    [](const rField &i) {                            //
-                                      return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                             std::get<rdb::rtype>(i) == rdb::TYPE;
+  auto refCountThis = std::count_if(begin(), end(),                                      //
+                                    [](const rField &i) {                                //
+                                      return std::get<rdb::rtype>(i) == rdb::REF ||      //
+                                             std::get<rdb::rtype>(i) == rdb::TYPE ||     //
+                                             std::get<rdb::rtype>(i) == rdb::SEGMENT ||  //
+                                             std::get<rdb::rtype>(i) == rdb::CAPACITY;
                                     });
 
   auto i{0};
   for (const rField &f : *this) {
-    if (std::get<rdb::rtype>(f) == rdb::REF ||       //
-        std::get<rdb::rtype>(f) == rdb::TYPE ||      //
-        std::get<rdb::rtype>(rhs[i]) == rdb::REF ||  //
+    if (std::get<rdb::rtype>(f) == rdb::REF ||            //
+        std::get<rdb::rtype>(f) == rdb::TYPE ||           //
+        std::get<rdb::rtype>(f) == rdb::CAPACITY ||       //
+        std::get<rdb::rtype>(f) == rdb::SEGMENT ||        //
+        std::get<rdb::rtype>(rhs[i]) == rdb::CAPACITY ||  //
+        std::get<rdb::rtype>(rhs[i]) == rdb::SEGMENT ||   //
+        std::get<rdb::rtype>(rhs[i]) == rdb::REF ||       //
         std::get<rdb::rtype>(rhs[i]) == rdb::TYPE) {
       ++i;
       continue;
@@ -205,11 +220,14 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 Descriptor &Descriptor::cleanRef() {
   Descriptor rhs(*this);
   clear();
-  std::copy_if(rhs.begin(), rhs.end(),                          //
-               std::back_inserter(*this),                       //
-               [](const rField &i) {                            //
-                 return std::get<rdb::rtype>(i) != rdb::REF &&  //
-                        std::get<rdb::rtype>(i) != rdb::TYPE;
+  std::copy_if(rhs.begin(), rhs.end(),                               //
+               std::back_inserter(*this),                            //
+               [](const rField &i) {                                 //
+                 return std::get<rdb::rtype>(i) != rdb::REF &&       //
+                        std::get<rdb::rtype>(i) != rdb::TYPE &&      //
+                        std::get<rdb::rtype>(i) != rdb::CAPACITY &&  //
+                        std::get<rdb::rtype>(i) != rdb::SEGMENT      //
+                     ;
                });
 
   dirtyMap = true;
@@ -296,6 +314,8 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   for (auto const field : *this) {
     if (std::get<rtype>(field) == rdb::REF) continue;
     if (std::get<rtype>(field) == rdb::TYPE) continue;
+    if (std::get<rtype>(field) == rdb::CAPACITY) continue;
+    if (std::get<rtype>(field) == rdb::SEGMENT) continue;
     if (retVal <= std::get<rtype>(field)) {
       retVal = std::get<rtype>(field);
       if (size < len(field)) size = len(field);
@@ -317,10 +337,24 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
     else
       os << " ";
     os << GetFieldType(std::get<rtype>(r)) << " ";
-    if (std::get<rtype>(r) == rdb::REF)
-      os << "\"" << std::get<rname>(r) << "\"";
-    else
-      os << std::get<rname>(r);
+
+    switch (std::get<rtype>(r)) {
+      case rdb::REF:
+        os << "\"" << std::get<rname>(r) << "\"";
+        break;
+      case rdb::TYPE:
+        os << std::get<rname>(r);
+        break;
+      case rdb::SEGMENT:
+        os << std::get<rlen>(r);
+        break;
+      case rdb::CAPACITY:
+        os << std::get<rlen>(r);
+        break;
+      default:
+        os << std::get<rname>(r);
+    }
+
     if (std::get<rarray>(r) > 1)
       os << "[" << std::get<rarray>(r) << "]";
     else if (std::get<rtype>(r) == rdb::STRING)

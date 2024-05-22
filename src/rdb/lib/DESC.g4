@@ -12,6 +12,8 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?  # ByteID
                       | REF_T '"' file=FILENAME '"'                # RefID
                       | TYPE_T type=ID                             # TypeID
                       | STRING_T name=ID '[' strsize=DECIMAL ']'   # StringID
+                      | SEGMENT_T size=DECIMAL                     # SegmentID
+                      | CAPACITY_T size=DECIMAL                    # CapacityID
                       ;
 
 // sync types with: src/include/rdb/fldType.h
@@ -30,6 +32,9 @@ fragment DEC_DIGIT: [0-9];
 
 TYPE_T:             'TYPE'; 
 REF_T:              'REF';
+
+SEGMENT_T:          'SEGMENT';
+CAPACITY_T:         'CAPACITY';
 
 DOT:                '.';
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
