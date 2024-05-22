@@ -3,105 +3,36 @@
 
 #pragma once
 
+
 #include "antlr4-runtime.h"
 
-class RQLParser : public antlr4::Parser {
- public:
+
+
+
+class  RQLParser : public antlr4::Parser {
+public:
   enum {
-    T__0          = 1,
-    T__1          = 2,
-    T__2          = 3,
-    T__3          = 4,
-    T__4          = 5,
-    T__5          = 6,
-    T__6          = 7,
-    T__7          = 8,
-    T__8          = 9,
-    T__9          = 10,
-    T__10         = 11,
-    T__11         = 12,
-    T__12         = 13,
-    T__13         = 14,
-    T__14         = 15,
-    T__15         = 16,
-    T__16         = 17,
-    T__17         = 18,
-    T__18         = 19,
-    T__19         = 20,
-    BYTE_T        = 21,
-    STRING_T      = 22,
-    UNSIGNED_T    = 23,
-    INTEGER_T     = 24,
-    FLOAT_T       = 25,
-    DOUBLE_T      = 26,
-    SELECT        = 27,
-    STREAM        = 28,
-    FROM          = 29,
-    DECLARE       = 30,
-    COUNT         = 31,
-    SEGMENTS      = 32,
-    FILE          = 33,
-    STORAGE       = 34,
-    MIN           = 35,
-    MAX           = 36,
-    AVG           = 37,
-    SUMC          = 38,
-    ID            = 39,
-    STRING        = 40,
-    FLOAT         = 41,
-    DECIMAL       = 42,
-    REAL          = 43,
-    EQUAL         = 44,
-    GREATER       = 45,
-    LESS          = 46,
-    EXCLAMATION   = 47,
-    DOUBLE_BAR    = 48,
-    DOT           = 49,
-    UNDERLINE     = 50,
-    AT            = 51,
-    SHARP         = 52,
-    AND           = 53,
-    MOD           = 54,
-    DOLLAR        = 55,
-    COMMA         = 56,
-    SEMI          = 57,
-    COLON         = 58,
-    DOUBLE_COLON  = 59,
-    STAR          = 60,
-    DIVIDE        = 61,
-    PLUS          = 62,
-    MINUS         = 63,
-    BIT_NOT       = 64,
-    BIT_OR        = 65,
-    BIT_XOR       = 66,
-    SPACE         = 67,
-    COMMENT       = 68,
-    LINE_COMMENT1 = 69,
-    LINE_COMMENT2 = 70
+    T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
+    T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
+    T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
+    BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
+    DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
+    FILE = 32, STORAGE = 33, MIN = 34, MAX = 35, AVG = 36, SUMC = 37, ID = 38, 
+    STRING = 39, FLOAT = 40, DECIMAL = 41, REAL = 42, EQUAL = 43, GREATER = 44, 
+    LESS = 45, EXCLAMATION = 46, DOUBLE_BAR = 47, DOT = 48, UNDERLINE = 49, 
+    AT = 50, SHARP = 51, AND = 52, MOD = 53, DOLLAR = 54, COMMA = 55, SEMI = 56, 
+    COLON = 57, DOUBLE_COLON = 58, STAR = 59, DIVIDE = 60, PLUS = 61, MINUS = 62, 
+    BIT_NOT = 63, BIT_OR = 64, BIT_XOR = 65, SPACE = 66, COMMENT = 67, LINE_COMMENT1 = 68, 
+    LINE_COMMENT2 = 69
   };
 
   enum {
-    RuleProg                = 0,
-    RuleStorage_statement   = 1,
-    RuleSelect_statement    = 2,
-    RuleDeclare_statement   = 3,
-    RuleStorage_param       = 4,
-    RuleRational_se         = 5,
-    RuleFraction_rule       = 6,
-    RuleField_declaration   = 7,
-    RuleField_type          = 8,
-    RuleSelect_list         = 9,
-    RuleField_id            = 10,
-    RuleUnary_op_expression = 11,
-    RuleAsterisk            = 12,
-    RuleExpression          = 13,
-    RuleExpression_factor   = 14,
-    RuleTerm                = 15,
-    RuleStream_expression   = 16,
-    RuleStream_term         = 17,
-    RuleStream_factor       = 18,
-    RuleAgregator           = 19,
-    RuleFunction_call       = 20
+    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleDeclare_statement = 3, 
+    RuleRational_se = 4, RuleFraction_rule = 5, RuleField_declaration = 6, 
+    RuleField_type = 7, RuleSelect_list = 8, RuleField_id = 9, RuleUnary_op_expression = 10, 
+    RuleAsterisk = 11, RuleExpression = 12, RuleExpression_factor = 13, 
+    RuleTerm = 14, RuleStream_expression = 15, RuleStream_term = 16, RuleStream_factor = 17, 
+    RuleAgregator = 18, RuleFunction_call = 19
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -112,19 +43,19 @@ class RQLParser : public antlr4::Parser {
 
   std::string getGrammarFileName() const override;
 
-  const antlr4::atn::ATN &getATN() const override;
+  const antlr4::atn::ATN& getATN() const override;
 
-  const std::vector<std::string> &getRuleNames() const override;
+  const std::vector<std::string>& getRuleNames() const override;
 
-  const antlr4::dfa::Vocabulary &getVocabulary() const override;
+  const antlr4::dfa::Vocabulary& getVocabulary() const override;
 
   antlr4::atn::SerializedATNView getSerializedATN() const override;
+
 
   class ProgContext;
   class Storage_statementContext;
   class Select_statementContext;
   class Declare_statementContext;
-  class Storage_paramContext;
   class Rational_seContext;
   class Fraction_ruleContext;
   class Field_declarationContext;
@@ -140,39 +71,42 @@ class RQLParser : public antlr4::Parser {
   class Stream_termContext;
   class Stream_factorContext;
   class AgregatorContext;
-  class Function_callContext;
+  class Function_callContext; 
 
-  class ProgContext : public antlr4::ParserRuleContext {
-   public:
+  class  ProgContext : public antlr4::ParserRuleContext {
+  public:
     ProgContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *EOF();
     std::vector<Select_statementContext *> select_statement();
-    Select_statementContext *select_statement(size_t i);
+    Select_statementContext* select_statement(size_t i);
     std::vector<Declare_statementContext *> declare_statement();
-    Declare_statementContext *declare_statement(size_t i);
+    Declare_statementContext* declare_statement(size_t i);
     std::vector<Storage_statementContext *> storage_statement();
-    Storage_statementContext *storage_statement(size_t i);
+    Storage_statementContext* storage_statement(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
-  ProgContext *prog();
+  ProgContext* prog();
 
-  class Storage_statementContext : public antlr4::ParserRuleContext {
-   public:
+  class  Storage_statementContext : public antlr4::ParserRuleContext {
+  public:
     Storage_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Storage_statementContext() = default;
     void copyFrom(Storage_statementContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class StorageContext : public Storage_statementContext {
-   public:
+  class  StorageContext : public Storage_statementContext {
+  public:
     StorageContext(Storage_statementContext *ctx);
 
     antlr4::Token *folder_name = nullptr;
@@ -182,25 +116,29 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Storage_statementContext *storage_statement();
+  Storage_statementContext* storage_statement();
 
-  class Select_statementContext : public antlr4::ParserRuleContext {
-   public:
+  class  Select_statementContext : public antlr4::ParserRuleContext {
+  public:
     Select_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Select_statementContext() = default;
     void copyFrom(Select_statementContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class SelectContext : public Select_statementContext {
-   public:
+  class  SelectContext : public Select_statementContext {
+  public:
     SelectContext(Select_statementContext *ctx);
 
     antlr4::Token *stream_name = nullptr;
-    antlr4::Token *name        = nullptr;
+    antlr4::Token *name = nullptr;
+    antlr4::Token *segments = nullptr;
+    antlr4::Token *capacity = nullptr;
     antlr4::tree::TerminalNode *SELECT();
     Select_listContext *select_list();
     antlr4::tree::TerminalNode *STREAM();
@@ -208,38 +146,41 @@ class RQLParser : public antlr4::Parser {
     Stream_expressionContext *stream_expression();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FILE();
+    antlr4::tree::TerminalNode *RETENTION();
     antlr4::tree::TerminalNode *STRING();
-    std::vector<Storage_paramContext *> storage_param();
-    Storage_paramContext *storage_param(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Select_statementContext *select_statement();
+  Select_statementContext* select_statement();
 
-  class Declare_statementContext : public antlr4::ParserRuleContext {
-   public:
+  class  Declare_statementContext : public antlr4::ParserRuleContext {
+  public:
     Declare_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Declare_statementContext() = default;
     void copyFrom(Declare_statementContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class DeclareContext : public Declare_statementContext {
-   public:
+  class  DeclareContext : public Declare_statementContext {
+  public:
     DeclareContext(Declare_statementContext *ctx);
 
     antlr4::Token *stream_name = nullptr;
-    antlr4::Token *file_name   = nullptr;
+    antlr4::Token *file_name = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
     std::vector<Field_declarationContext *> field_declaration();
-    Field_declarationContext *field_declaration(size_t i);
+    Field_declarationContext* field_declaration(size_t i);
     antlr4::tree::TerminalNode *STREAM();
     std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode *COMMA(size_t i);
+    antlr4::tree::TerminalNode* COMMA(size_t i);
     Rational_seContext *rational_se();
     antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *ID();
@@ -248,37 +189,23 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Declare_statementContext *declare_statement();
+  Declare_statementContext* declare_statement();
 
-  class Storage_paramContext : public antlr4::ParserRuleContext {
-   public:
-    antlr4::Token *size     = nullptr;
-    antlr4::Token *segments = nullptr;
-    Storage_paramContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *COUNT();
-    antlr4::tree::TerminalNode *DECIMAL();
-    antlr4::tree::TerminalNode *SEGMENTS();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Storage_paramContext *storage_param();
-
-  class Rational_seContext : public antlr4::ParserRuleContext {
-   public:
+  class  Rational_seContext : public antlr4::ParserRuleContext {
+  public:
     Rational_seContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Rational_seContext() = default;
     void copyFrom(Rational_seContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class RationalAsDecimalContext : public Rational_seContext {
-   public:
+  class  RationalAsDecimalContext : public Rational_seContext {
+  public:
     RationalAsDecimalContext(Rational_seContext *ctx);
 
     antlr4::tree::TerminalNode *DECIMAL();
@@ -286,8 +213,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class RationalAsFloatContext : public Rational_seContext {
-   public:
+  class  RationalAsFloatContext : public Rational_seContext {
+  public:
     RationalAsFloatContext(Rational_seContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT();
@@ -295,8 +222,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class RationalAsFraction_proformaContext : public Rational_seContext {
-   public:
+  class  RationalAsFraction_proformaContext : public Rational_seContext {
+  public:
     RationalAsFraction_proformaContext(Rational_seContext *ctx);
 
     Fraction_ruleContext *fraction_rule();
@@ -304,45 +231,49 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Rational_seContext *rational_se();
+  Rational_seContext* rational_se();
 
-  class Fraction_ruleContext : public antlr4::ParserRuleContext {
-   public:
+  class  Fraction_ruleContext : public antlr4::ParserRuleContext {
+  public:
     Fraction_ruleContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Fraction_ruleContext() = default;
     void copyFrom(Fraction_ruleContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class FractionContext : public Fraction_ruleContext {
-   public:
+  class  FractionContext : public Fraction_ruleContext {
+  public:
     FractionContext(Fraction_ruleContext *ctx);
 
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode *DECIMAL(size_t i);
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
     antlr4::tree::TerminalNode *DIVIDE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Fraction_ruleContext *fraction_rule();
+  Fraction_ruleContext* fraction_rule();
 
-  class Field_declarationContext : public antlr4::ParserRuleContext {
-   public:
+  class  Field_declarationContext : public antlr4::ParserRuleContext {
+  public:
     Field_declarationContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Field_declarationContext() = default;
     void copyFrom(Field_declarationContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class SingleDeclarationContext : public Field_declarationContext {
-   public:
+  class  SingleDeclarationContext : public Field_declarationContext {
+  public:
     SingleDeclarationContext(Field_declarationContext *ctx);
 
     antlr4::Token *type_size = nullptr;
@@ -353,21 +284,23 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Field_declarationContext *field_declaration();
+  Field_declarationContext* field_declaration();
 
-  class Field_typeContext : public antlr4::ParserRuleContext {
-   public:
+  class  Field_typeContext : public antlr4::ParserRuleContext {
+  public:
     Field_typeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Field_typeContext() = default;
     void copyFrom(Field_typeContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class TypeUnsignedContext : public Field_typeContext {
-   public:
+  class  TypeUnsignedContext : public Field_typeContext {
+  public:
     TypeUnsignedContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *UNSIGNED_T();
@@ -375,8 +308,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class TypeIntContext : public Field_typeContext {
-   public:
+  class  TypeIntContext : public Field_typeContext {
+  public:
     TypeIntContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *INTEGER_T();
@@ -384,8 +317,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class TypeFloatContext : public Field_typeContext {
-   public:
+  class  TypeFloatContext : public Field_typeContext {
+  public:
     TypeFloatContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT_T();
@@ -393,8 +326,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class TypeStringContext : public Field_typeContext {
-   public:
+  class  TypeStringContext : public Field_typeContext {
+  public:
     TypeStringContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *STRING_T();
@@ -402,8 +335,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class TypeByteContext : public Field_typeContext {
-   public:
+  class  TypeByteContext : public Field_typeContext {
+  public:
     TypeByteContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *BYTE_T();
@@ -411,8 +344,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class TypeDoubleContext : public Field_typeContext {
-   public:
+  class  TypeDoubleContext : public Field_typeContext {
+  public:
     TypeDoubleContext(Field_typeContext *ctx);
 
     antlr4::tree::TerminalNode *DOUBLE_T();
@@ -420,33 +353,35 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Field_typeContext *field_type();
+  Field_typeContext* field_type();
 
-  class Select_listContext : public antlr4::ParserRuleContext {
-   public:
+  class  Select_listContext : public antlr4::ParserRuleContext {
+  public:
     Select_listContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Select_listContext() = default;
     void copyFrom(Select_listContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class SelectListContext : public Select_listContext {
-   public:
+  class  SelectListContext : public Select_listContext {
+  public:
     SelectListContext(Select_listContext *ctx);
 
     std::vector<ExpressionContext *> expression();
-    ExpressionContext *expression(size_t i);
+    ExpressionContext* expression(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode *COMMA(size_t i);
+    antlr4::tree::TerminalNode* COMMA(size_t i);
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SelectListFullscanContext : public Select_listContext {
-   public:
+  class  SelectListFullscanContext : public Select_listContext {
+  public:
     SelectListFullscanContext(Select_listContext *ctx);
 
     AsteriskContext *asterisk();
@@ -454,21 +389,23 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Select_listContext *select_list();
+  Select_listContext* select_list();
 
-  class Field_idContext : public antlr4::ParserRuleContext {
-   public:
+  class  Field_idContext : public antlr4::ParserRuleContext {
+  public:
     Field_idContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Field_idContext() = default;
     void copyFrom(Field_idContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class FieldIDUnderlineContext : public Field_idContext {
-   public:
+  class  FieldIDUnderlineContext : public Field_idContext {
+  public:
     FieldIDUnderlineContext(Field_idContext *ctx);
 
     antlr4::Token *tablename = nullptr;
@@ -478,11 +415,11 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class FieldIDTableContext : public Field_idContext {
-   public:
+  class  FieldIDTableContext : public Field_idContext {
+  public:
     FieldIDTableContext(Field_idContext *ctx);
 
-    antlr4::Token *tablename    = nullptr;
+    antlr4::Token *tablename = nullptr;
     antlr4::Token *column_index = nullptr;
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *DECIMAL();
@@ -490,8 +427,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class FieldIDContext : public Field_idContext {
-   public:
+  class  FieldIDContext : public Field_idContext {
+  public:
     FieldIDContext(Field_idContext *ctx);
 
     antlr4::Token *column_name = nullptr;
@@ -500,23 +437,23 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class FieldIDColumnNameContext : public Field_idContext {
-   public:
+  class  FieldIDColumnNameContext : public Field_idContext {
+  public:
     FieldIDColumnNameContext(Field_idContext *ctx);
 
-    antlr4::Token *tablename   = nullptr;
+    antlr4::Token *tablename = nullptr;
     antlr4::Token *column_name = nullptr;
     antlr4::tree::TerminalNode *DOT();
     std::vector<antlr4::tree::TerminalNode *> ID();
-    antlr4::tree::TerminalNode *ID(size_t i);
+    antlr4::tree::TerminalNode* ID(size_t i);
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Field_idContext *field_id();
+  Field_idContext* field_id();
 
-  class Unary_op_expressionContext : public antlr4::ParserRuleContext {
-   public:
+  class  Unary_op_expressionContext : public antlr4::ParserRuleContext {
+  public:
     antlr4::Token *op = nullptr;
     Unary_op_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -527,12 +464,13 @@ class RQLParser : public antlr4::Parser {
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
-  Unary_op_expressionContext *unary_op_expression();
+  Unary_op_expressionContext* unary_op_expression();
 
-  class AsteriskContext : public antlr4::ParserRuleContext {
-   public:
+  class  AsteriskContext : public antlr4::ParserRuleContext {
+  public:
     AsteriskContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *STAR();
@@ -541,57 +479,61 @@ class RQLParser : public antlr4::Parser {
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
-  AsteriskContext *asterisk();
+  AsteriskContext* asterisk();
 
-  class ExpressionContext : public antlr4::ParserRuleContext {
-   public:
+  class  ExpressionContext : public antlr4::ParserRuleContext {
+  public:
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     Expression_factorContext *expression_factor();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
-  ExpressionContext *expression();
+  ExpressionContext* expression();
 
-  class Expression_factorContext : public antlr4::ParserRuleContext {
-   public:
+  class  Expression_factorContext : public antlr4::ParserRuleContext {
+  public:
     Expression_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Expression_factorContext() = default;
     void copyFrom(Expression_factorContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class ExpPlusContext : public Expression_factorContext {
-   public:
+  class  ExpPlusContext : public Expression_factorContext {
+  public:
     ExpPlusContext(Expression_factorContext *ctx);
 
     std::vector<Expression_factorContext *> expression_factor();
-    Expression_factorContext *expression_factor(size_t i);
+    Expression_factorContext* expression_factor(size_t i);
     antlr4::tree::TerminalNode *PLUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpMinusContext : public Expression_factorContext {
-   public:
+  class  ExpMinusContext : public Expression_factorContext {
+  public:
     ExpMinusContext(Expression_factorContext *ctx);
 
     std::vector<Expression_factorContext *> expression_factor();
-    Expression_factorContext *expression_factor(size_t i);
+    Expression_factorContext* expression_factor(size_t i);
     antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpTermContext : public Expression_factorContext {
-   public:
+  class  ExpTermContext : public Expression_factorContext {
+  public:
     ExpTermContext(Expression_factorContext *ctx);
 
     TermContext *term();
@@ -599,21 +541,23 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Expression_factorContext *expression_factor();
-  Expression_factorContext *expression_factor(int precedence);
-  class TermContext : public antlr4::ParserRuleContext {
-   public:
+  Expression_factorContext* expression_factor();
+  Expression_factorContext* expression_factor(int precedence);
+  class  TermContext : public antlr4::ParserRuleContext {
+  public:
     TermContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     TermContext() = default;
     void copyFrom(TermContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class ExpInContext : public TermContext {
-   public:
+  class  ExpInContext : public TermContext {
+  public:
     ExpInContext(TermContext *ctx);
 
     Expression_factorContext *expression_factor();
@@ -621,8 +565,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpRationalContext : public TermContext {
-   public:
+  class  ExpRationalContext : public TermContext {
+  public:
     ExpRationalContext(TermContext *ctx);
 
     Fraction_ruleContext *fraction_rule();
@@ -630,8 +574,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpFloatContext : public TermContext {
-   public:
+  class  ExpFloatContext : public TermContext {
+  public:
     ExpFloatContext(TermContext *ctx);
 
     antlr4::tree::TerminalNode *FLOAT();
@@ -640,8 +584,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpDecContext : public TermContext {
-   public:
+  class  ExpDecContext : public TermContext {
+  public:
     ExpDecContext(TermContext *ctx);
 
     antlr4::tree::TerminalNode *DECIMAL();
@@ -650,8 +594,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpAggContext : public TermContext {
-   public:
+  class  ExpAggContext : public TermContext {
+  public:
     ExpAggContext(TermContext *ctx);
 
     AgregatorContext *agregator();
@@ -659,8 +603,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpFnCallContext : public TermContext {
-   public:
+  class  ExpFnCallContext : public TermContext {
+  public:
     ExpFnCallContext(TermContext *ctx);
 
     Function_callContext *function_call();
@@ -668,19 +612,19 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpDivContext : public TermContext {
-   public:
+  class  ExpDivContext : public TermContext {
+  public:
     ExpDivContext(TermContext *ctx);
 
     std::vector<TermContext *> term();
-    TermContext *term(size_t i);
+    TermContext* term(size_t i);
     antlr4::tree::TerminalNode *DIVIDE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpFieldContext : public TermContext {
-   public:
+  class  ExpFieldContext : public TermContext {
+  public:
     ExpFieldContext(TermContext *ctx);
 
     Field_idContext *field_id();
@@ -688,8 +632,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpStringContext : public TermContext {
-   public:
+  class  ExpStringContext : public TermContext {
+  public:
     ExpStringContext(TermContext *ctx);
 
     antlr4::tree::TerminalNode *STRING();
@@ -697,8 +641,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpUnaryContext : public TermContext {
-   public:
+  class  ExpUnaryContext : public TermContext {
+  public:
     ExpUnaryContext(TermContext *ctx);
 
     Unary_op_expressionContext *unary_op_expression();
@@ -706,43 +650,45 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class ExpMultContext : public TermContext {
-   public:
+  class  ExpMultContext : public TermContext {
+  public:
     ExpMultContext(TermContext *ctx);
 
     std::vector<TermContext *> term();
-    TermContext *term(size_t i);
+    TermContext* term(size_t i);
     antlr4::tree::TerminalNode *STAR();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  TermContext *term();
-  TermContext *term(int precedence);
-  class Stream_expressionContext : public antlr4::ParserRuleContext {
-   public:
+  TermContext* term();
+  TermContext* term(int precedence);
+  class  Stream_expressionContext : public antlr4::ParserRuleContext {
+  public:
     Stream_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Stream_expressionContext() = default;
     void copyFrom(Stream_expressionContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class SExpPlusContext : public Stream_expressionContext {
-   public:
+  class  SExpPlusContext : public Stream_expressionContext {
+  public:
     SExpPlusContext(Stream_expressionContext *ctx);
 
     std::vector<Stream_termContext *> stream_term();
-    Stream_termContext *stream_term(size_t i);
+    Stream_termContext* stream_term(size_t i);
     antlr4::tree::TerminalNode *PLUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpTermContext : public Stream_expressionContext {
-   public:
+  class  SExpTermContext : public Stream_expressionContext {
+  public:
     SExpTermContext(Stream_expressionContext *ctx);
 
     Stream_termContext *stream_term();
@@ -750,8 +696,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpTimeMoveContext : public Stream_expressionContext {
-   public:
+  class  SExpTimeMoveContext : public Stream_expressionContext {
+  public:
     SExpTimeMoveContext(Stream_expressionContext *ctx);
 
     Stream_termContext *stream_term();
@@ -761,8 +707,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpMinusContext : public Stream_expressionContext {
-   public:
+  class  SExpMinusContext : public Stream_expressionContext {
+  public:
     SExpMinusContext(Stream_expressionContext *ctx);
 
     Stream_termContext *stream_term();
@@ -772,21 +718,23 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Stream_expressionContext *stream_expression();
+  Stream_expressionContext* stream_expression();
 
-  class Stream_termContext : public antlr4::ParserRuleContext {
-   public:
+  class  Stream_termContext : public antlr4::ParserRuleContext {
+  public:
     Stream_termContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     Stream_termContext() = default;
     void copyFrom(Stream_termContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class SExpFactorContext : public Stream_termContext {
-   public:
+  class  SExpFactorContext : public Stream_termContext {
+  public:
     SExpFactorContext(Stream_termContext *ctx);
 
     Stream_factorContext *stream_factor();
@@ -794,19 +742,19 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpHashContext : public Stream_termContext {
-   public:
+  class  SExpHashContext : public Stream_termContext {
+  public:
     SExpHashContext(Stream_termContext *ctx);
 
     std::vector<Stream_factorContext *> stream_factor();
-    Stream_factorContext *stream_factor(size_t i);
+    Stream_factorContext* stream_factor(size_t i);
     antlr4::tree::TerminalNode *SHARP();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpModContext : public Stream_termContext {
-   public:
+  class  SExpModContext : public Stream_termContext {
+  public:
     SExpModContext(Stream_termContext *ctx);
 
     Stream_factorContext *stream_factor();
@@ -816,8 +764,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpAgregate_proformaContext : public Stream_termContext {
-   public:
+  class  SExpAgregate_proformaContext : public Stream_termContext {
+  public:
     SExpAgregate_proformaContext(Stream_termContext *ctx);
 
     Stream_factorContext *stream_factor();
@@ -827,24 +775,24 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpAgseContext : public Stream_termContext {
-   public:
+  class  SExpAgseContext : public Stream_termContext {
+  public:
     SExpAgseContext(Stream_termContext *ctx);
 
-    antlr4::Token *step   = nullptr;
+    antlr4::Token *step = nullptr;
     antlr4::Token *window = nullptr;
     Stream_factorContext *stream_factor();
     antlr4::tree::TerminalNode *AT();
     antlr4::tree::TerminalNode *COMMA();
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode *DECIMAL(size_t i);
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
     antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SExpAndContext : public Stream_termContext {
-   public:
+  class  SExpAndContext : public Stream_termContext {
+  public:
     SExpAndContext(Stream_termContext *ctx);
 
     Stream_factorContext *stream_factor();
@@ -854,10 +802,10 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  Stream_termContext *stream_term();
+  Stream_termContext* stream_term();
 
-  class Stream_factorContext : public antlr4::ParserRuleContext {
-   public:
+  class  Stream_factorContext : public antlr4::ParserRuleContext {
+  public:
     Stream_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *ID();
@@ -865,23 +813,26 @@ class RQLParser : public antlr4::Parser {
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
-  Stream_factorContext *stream_factor();
+  Stream_factorContext* stream_factor();
 
-  class AgregatorContext : public antlr4::ParserRuleContext {
-   public:
+  class  AgregatorContext : public antlr4::ParserRuleContext {
+  public:
     AgregatorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-
+   
     AgregatorContext() = default;
     void copyFrom(AgregatorContext *context);
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+   
   };
 
-  class StreamMinContext : public AgregatorContext {
-   public:
+  class  StreamMinContext : public AgregatorContext {
+  public:
     StreamMinContext(AgregatorContext *ctx);
 
     antlr4::tree::TerminalNode *MIN();
@@ -889,8 +840,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class StreamAvgContext : public AgregatorContext {
-   public:
+  class  StreamAvgContext : public AgregatorContext {
+  public:
     StreamAvgContext(AgregatorContext *ctx);
 
     antlr4::tree::TerminalNode *AVG();
@@ -898,8 +849,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class StreamMaxContext : public AgregatorContext {
-   public:
+  class  StreamMaxContext : public AgregatorContext {
+  public:
     StreamMaxContext(AgregatorContext *ctx);
 
     antlr4::tree::TerminalNode *MAX();
@@ -907,8 +858,8 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class StreamSumContext : public AgregatorContext {
-   public:
+  class  StreamSumContext : public AgregatorContext {
+  public:
     StreamSumContext(AgregatorContext *ctx);
 
     antlr4::tree::TerminalNode *SUMC();
@@ -916,22 +867,24 @@ class RQLParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  AgregatorContext *agregator();
+  AgregatorContext* agregator();
 
-  class Function_callContext : public antlr4::ParserRuleContext {
-   public:
+  class  Function_callContext : public antlr4::ParserRuleContext {
+  public:
     Function_callContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     std::vector<Expression_factorContext *> expression_factor();
-    Expression_factorContext *expression_factor(size_t i);
+    Expression_factorContext* expression_factor(size_t i);
     std::vector<antlr4::tree::TerminalNode *> COMMA();
-    antlr4::tree::TerminalNode *COMMA(size_t i);
+    antlr4::tree::TerminalNode* COMMA(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
   };
 
-  Function_callContext *function_call();
+  Function_callContext* function_call();
+
 
   bool sempred(antlr4::RuleContext *_localctx, size_t ruleIndex, size_t predicateIndex) override;
 
@@ -943,5 +896,6 @@ class RQLParser : public antlr4::Parser {
   // ahead of time.
   static void initialize();
 
- private:
+private:
 };
+

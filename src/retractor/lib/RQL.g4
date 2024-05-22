@@ -1,4 +1,4 @@
-parser grammar RQL;
+grammar RQL;
 
 prog                : ( select_statement
                       | declare_statement
@@ -13,7 +13,8 @@ storage_statement   : STORAGE folder_name=STRING
 select_statement    : SELECT select_list
                       STREAM stream_name=ID
                       FROM stream_expression
-                      (FILE name=STRING (storage_param)*)?
+                      (FILE name=STRING)?
+                      (RETENTION segments=DECIMAL capacity=DECIMAL)?
                     # Select
                     ;
 
@@ -21,10 +22,6 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
                     # Declare
-                    ;
-
-storage_param       : COUNT size=DECIMAL
-                    | SEGMENTS segments=DECIMAL
                     ;
 
 rational_se         : fraction_rule # RationalAsFraction_proforma
@@ -143,8 +140,7 @@ SELECT:             'SELECT'|'select';
 STREAM:             'STREAM'|'stream';
 FROM:               'FROM'|'from';
 DECLARE:            'DECLARE'|'declare';
-COUNT:              'COUNT'|'count';
-SEGMENTS:           'SEGMENTS'|'segments';
+RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
 
