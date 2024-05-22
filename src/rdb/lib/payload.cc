@@ -152,6 +152,9 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
       case rdb::TYPE: {
         SPDLOG_INFO("Skip TYPE");
       } break;
+      case rdb::RETENTION: {
+        SPDLOG_INFO("Skip RETENTION");
+      } break;
       default: {
         SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
         assert(false && "setItem - Type not supported.");
@@ -234,6 +237,10 @@ std::any payload::getItem(const int positionFlat) {
       SPDLOG_ERROR("TYPE not supported.");
       return 0xdead;
     }
+    case rdb::RETENTION: {
+      SPDLOG_ERROR("RETENTION not supported.");
+      return 0xdead;
+    }
   };
   SPDLOG_ERROR("Type not supported. {}", int(std::get<rtype>(descriptor[position])));
   assert(false && "type not supported on getter.");
@@ -277,6 +284,8 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
         SPDLOG_ERROR("REF store not supported by this operator.");
       else if (desc.type(fieldName) == "TYPE")
         SPDLOG_ERROR("TYPE store not supported by this operator.");
+      else if (desc.type(fieldName) == "RETENTION")
+        SPDLOG_ERROR("RETENTION store not supported by this operator.");
       else
         SPDLOG_ERROR("field {} not found", fieldName);
     }
@@ -304,7 +313,10 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   os << "{";
 
   for (auto const &r : rhs.getDescriptor()) {
-    if ((std::get<rtype>(r) == rdb::TYPE) || (std::get<rtype>(r) == rdb::REF)) break;
+    if ((std::get<rtype>(r) == rdb::TYPE) ||  //
+        (std::get<rtype>(r) == rdb::REF) ||   //
+        (std::get<rtype>(r) == rdb::RETENTION))
+      break;
     if (!getFlat())
       os << "\t";
     else
@@ -357,6 +369,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           double data{0};
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(double), sizeof(double));
           os << data;
+        } else if (std::get<rtype>(r) == rdb::RETENTION) {
+          ;
         } else
           assert(false && "Unrecognized type");
 
