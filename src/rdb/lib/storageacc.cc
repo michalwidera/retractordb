@@ -113,23 +113,14 @@ void storageAccessor::attachStorage() {
   }
 
   auto it2 = std::find_if(descriptor.begin(),
-                          descriptor.end(),                                                  //
-                          [](auto &item) { return std::get<rtype>(item) == rdb::CAPACITY; }  //
+                          descriptor.end(),                                                   //
+                          [](auto &item) { return std::get<rtype>(item) == rdb::RETENTION; }  //
   );
 
   if (it2 != descriptor.end()) {
     capacity = std::get<rlen>(*it2);
-    SPDLOG_INFO("Capacity size from descriptor {}", capacity);
-  }
-
-  auto it3 = std::find_if(descriptor.begin(),
-                          descriptor.end(),                                                 //
-                          [](auto &item) { return std::get<rtype>(item) == rdb::SEGMENT; }  //
-  );
-
-  if (it3 != descriptor.end()) {
-    segment = std::get<rlen>(*it3);
-    SPDLOG_INFO("Segment size from descriptor {}", segment);
+    segment  = std::get<rarray>(*it2);
+    SPDLOG_INFO("Retention size from descriptor cap:{} seg:{}", capacity, segment);
   }
 
   initializeAccessor();

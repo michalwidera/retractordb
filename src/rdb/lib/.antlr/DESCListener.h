@@ -41,9 +41,6 @@ class DESCListener : public antlr4::tree::ParseTreeListener {
   virtual void enterStringID(DESCParser::StringIDContext *ctx) = 0;
   virtual void exitStringID(DESCParser::StringIDContext *ctx)  = 0;
 
-  virtual void enterSegmentID(DESCParser::SegmentIDContext *ctx) = 0;
-  virtual void exitSegmentID(DESCParser::SegmentIDContext *ctx)  = 0;
-
-  virtual void enterCapacityID(DESCParser::CapacityIDContext *ctx) = 0;
-  virtual void exitCapacityID(DESCParser::CapacityIDContext *ctx)  = 0;
+  virtual void enterRetentionID(DESCParser::RetentionIDContext *ctx) = 0;
+  virtual void exitRetentionID(DESCParser::RetentionIDContext *ctx)  = 0;
 };

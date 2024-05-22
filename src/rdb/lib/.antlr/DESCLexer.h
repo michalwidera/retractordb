@@ -24,15 +24,14 @@ class DESCLexer : public antlr4::Lexer {
     IDXPAIR_T    = 14,
     TYPE_T       = 15,
     REF_T        = 16,
-    SEGMENT_T    = 17,
-    CAPACITY_T   = 18,
-    DOT          = 19,
-    ID           = 20,
-    STRING       = 21,
-    DECIMAL      = 22,
-    REF_TYPE_ARG = 23,
-    FILENAME     = 24,
-    SPACE        = 25
+    RETENTION_T  = 17,
+    DOT          = 18,
+    ID           = 19,
+    STRING       = 20,
+    DECIMAL      = 21,
+    REF_TYPE_ARG = 22,
+    FILENAME     = 23,
+    SPACE        = 24
   };
 
   explicit DESCLexer(antlr4::CharStream *input);

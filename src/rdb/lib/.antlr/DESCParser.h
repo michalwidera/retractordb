@@ -24,15 +24,14 @@ class DESCParser : public antlr4::Parser {
     IDXPAIR_T    = 14,
     TYPE_T       = 15,
     REF_T        = 16,
-    SEGMENT_T    = 17,
-    CAPACITY_T   = 18,
-    DOT          = 19,
-    ID           = 20,
-    STRING       = 21,
-    DECIMAL      = 22,
-    REF_TYPE_ARG = 23,
-    FILENAME     = 24,
-    SPACE        = 25
+    RETENTION_T  = 17,
+    DOT          = 18,
+    ID           = 19,
+    STRING       = 20,
+    DECIMAL      = 21,
+    REF_TYPE_ARG = 22,
+    FILENAME     = 23,
+    SPACE        = 24
   };
 
   enum { RuleDesc = 0, RuleCommand = 1 };
@@ -104,17 +103,6 @@ class DESCParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class CapacityIDContext : public CommandContext {
-   public:
-    CapacityIDContext(CommandContext *ctx);
-
-    antlr4::Token *size = nullptr;
-    antlr4::tree::TerminalNode *CAPACITY_T();
-    antlr4::tree::TerminalNode *DECIMAL();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
   class StringIDContext : public CommandContext {
    public:
     StringIDContext(CommandContext *ctx);
@@ -141,13 +129,15 @@ class DESCParser : public antlr4::Parser {
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class SegmentIDContext : public CommandContext {
+  class RetentionIDContext : public CommandContext {
    public:
-    SegmentIDContext(CommandContext *ctx);
+    RetentionIDContext(CommandContext *ctx);
 
-    antlr4::Token *size = nullptr;
-    antlr4::tree::TerminalNode *SEGMENT_T();
-    antlr4::tree::TerminalNode *DECIMAL();
+    antlr4::Token *capacity = nullptr;
+    antlr4::Token *segment  = nullptr;
+    antlr4::tree::TerminalNode *RETENTION_T();
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode *DECIMAL(size_t i);
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

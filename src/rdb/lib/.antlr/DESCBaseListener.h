@@ -43,11 +43,8 @@ class DESCBaseListener : public DESCListener {
   virtual void enterStringID(DESCParser::StringIDContext * /*ctx*/) override {}
   virtual void exitStringID(DESCParser::StringIDContext * /*ctx*/) override {}
 
-  virtual void enterSegmentID(DESCParser::SegmentIDContext * /*ctx*/) override {}
-  virtual void exitSegmentID(DESCParser::SegmentIDContext * /*ctx*/) override {}
-
-  virtual void enterCapacityID(DESCParser::CapacityIDContext * /*ctx*/) override {}
-  virtual void exitCapacityID(DESCParser::CapacityIDContext * /*ctx*/) override {}
+  virtual void enterRetentionID(DESCParser::RetentionIDContext * /*ctx*/) override {}
+  virtual void exitRetentionID(DESCParser::RetentionIDContext * /*ctx*/) override {}
 
   virtual void enterEveryRule(antlr4::ParserRuleContext * /*ctx*/) override {}
   virtual void exitEveryRule(antlr4::ParserRuleContext * /*ctx*/) override {}
