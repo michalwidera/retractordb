@@ -323,6 +323,11 @@ std::ostream &flat(std::ostream &os) {
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
+
+    if (std::get<rtype>(r) == rdb::RETENTION)
+      if (std::get<rlen>(r) == 0 && std::get<rarray>(r) == 0)
+        continue; // skip retention 0,0
+
     if (!flatOutput)
       os << "\t";
     else

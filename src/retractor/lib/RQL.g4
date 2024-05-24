@@ -30,7 +30,6 @@ rational_se         : fraction_rule # RationalAsFraction_proforma
                     ;
 
 retention           : RETENTION segments=DECIMAL capacity=DECIMAL
-                    # Retetion
                     ;
 
 fraction_rule       : DECIMAL DIVIDE DECIMAL

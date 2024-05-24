@@ -310,6 +310,10 @@ rdb::Descriptor query::descriptorStorage() {
     else
       retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
   }
+  else // !isDeclaration() 
+  {
+    retVal += rdb::Descriptor("", 0, 0, rdb::RETENTION);
+  }
   return retVal;
 }
 

@@ -172,13 +172,8 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitRetetion(RQLParser::RetentionContext *ctx) {
-    /*
-    @TODO
-    qry.descriptorStorage += rdb::Descriptor("",                                   //
-                                             std::stoi(ctx->segments->getText()),  //
-                                             std::stoi(ctx->capacity->getText()),  //
-                                             rdb::RETENTION);
-    */
+    qry.capacity = std::stoi(ctx->capacity->getText());
+    qry.segments = std::stoi(ctx->segments->getText());
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {
