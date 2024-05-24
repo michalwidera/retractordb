@@ -309,8 +309,7 @@ rdb::Descriptor query::descriptorStorage() {
       retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
     else
       retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
-  }
-  else // !isDeclaration() 
+  } else  // !isDeclaration()
   {
     retVal += rdb::Descriptor("", 0, 0, rdb::RETENTION);
   }
