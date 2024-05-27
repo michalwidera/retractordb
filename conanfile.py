@@ -29,10 +29,8 @@ class Retractor(ConanFile):
 
     default_options = {
         "boost/*:shared": False,
-        "boost/*:without_serialization": False,
         "boost/*:without_thread": False,
         "boost/*:without_program_options": False,
-        "boost/*:without_test": False,
         "boost/*:multithreading": True,
         "boost/*:without_system": False,
         "boost/*:without_filesystem": False,
