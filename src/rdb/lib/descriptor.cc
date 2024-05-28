@@ -256,6 +256,18 @@ int Descriptor::getSizeInBytes() const {
   return size;
 }
 
+std::pair<int, int> Descriptor::retention() {
+  std::pair<int, int> retval{0, 0};
+
+  auto it = std::find_if(begin(), end(),                                                     //
+                         [](auto &item) { return std::get<rtype>(item) == rdb::RETENTION; }  //
+  );
+
+  if (it != end()) retval = std::pair<int, int>(std::get<rlen>(*it), std::get<rarray>(*it));
+
+  return retval;
+}
+
 int Descriptor::position(const std::string &name) {
   auto it = std::find_if(begin(), end(),                          //
                          [name](const auto &item) {               //

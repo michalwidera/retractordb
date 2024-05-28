@@ -10,6 +10,8 @@
 namespace rdb {
 /**
  * @brief Object that implements data source interface via fstream
+ *
+ * Type: TEXTSOURCE
  */
 template <typename T>
 class textSourceAccessor : public FileAccessorInterface<T> {

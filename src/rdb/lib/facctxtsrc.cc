@@ -73,7 +73,7 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t 
         while (myFile.get(c) && c != '"') var += c;
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
-        SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
+        // SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
         payload->setItem(i, var);
       } else
         for (auto j = 0; j < std::get<rarray>(item); j++) {

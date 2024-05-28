@@ -70,6 +70,12 @@ ssize_t posixBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const si
   return EXIT_SUCCESS;
 }
 
+template <typename T>
+ssize_t posixBinaryFileAccessor<T>::fctrl(void *ptrData, const size_t size) {
+  descriptor = *(reinterpret_cast<rdb::Descriptor *>(ptrData));
+  return EXIT_SUCCESS;
+}
+
 template class posixBinaryFileAccessor<uint8_t>;
 template class posixBinaryFileAccessor<char>;
 

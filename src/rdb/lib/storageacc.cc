@@ -112,16 +112,7 @@ void storageAccessor::attachStorage() {
     SPDLOG_INFO("Storage type from descriptor {}", storageType);
   }
 
-  auto it2 = std::find_if(descriptor.begin(),
-                          descriptor.end(),                                                   //
-                          [](auto &item) { return std::get<rtype>(item) == rdb::RETENTION; }  //
-  );
-
-  if (it2 != descriptor.end()) {
-    capacity = std::get<rlen>(*it2);
-    segment  = std::get<rarray>(*it2);
-    SPDLOG_INFO("Retention size from descriptor cap:{} seg:{}", capacity, segment);
-  }
+  retenetion = descriptor.retention();
 
   initializeAccessor();
 
@@ -159,8 +150,10 @@ void storageAccessor::initializeAccessor() {
 
   if (storageType == "DEFAULT") {
     accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
+    accessor->fctrl(&descriptor, 0);
   } else if (storageType == "GENERIC") {
     accessor = std::make_unique<rdb::genericBinaryFileAccessor<uint8_t>>(storageFile);
+    accessor->fctrl(&descriptor, 0);
   } else if (storageType == "DEVICE") {
     accessor = std::make_unique<rdb::binaryDeviceAccessor<uint8_t>>(storageFile);
   } else if (storageType == "TEXTSOURCE") {

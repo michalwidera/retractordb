@@ -48,6 +48,12 @@ ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t size, const size_
   return EXIT_SUCCESS;
 }
 
+template <typename T>
+ssize_t binaryDeviceAccessor<T>::fctrl(void *ptrData, const size_t size) {
+  descriptor = *(reinterpret_cast<rdb::Descriptor *>(ptrData));
+  return EXIT_SUCCESS;
+}
+
 template class binaryDeviceAccessor<uint8_t>;
 template class binaryDeviceAccessor<char>;
 
