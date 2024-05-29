@@ -44,7 +44,7 @@ class storageAccessor {
  public:
   storageAccessor() = delete;
   explicit storageAccessor(const std::string fileNameDesc, const std::string fileName = "");
-  ~storageAccessor();
+  virtual ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
   sourceState bufferState     = sourceState::empty;  // ? test lock
