@@ -112,7 +112,7 @@ void storageAccessor::attachStorage() {
     SPDLOG_INFO("Storage type from descriptor {}", storageType);
   }
 
-  retenetion = descriptor.retention();
+  retention = descriptor.retention();
 
   initializeAccessor();
 
@@ -149,7 +149,7 @@ void storageAccessor::initializeAccessor() {
   assert(storageType != "");
 
   if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::groupFileAccessor<uint8_t>>(storageFile, descriptor);
+    accessor = std::make_unique<rdb::groupFileAccessor<uint8_t>>(storageFile, retention);
   } else if (storageType == "POSIX") {
     accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
   } else if (storageType == "GENERIC") {

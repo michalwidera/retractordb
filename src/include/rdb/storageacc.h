@@ -23,12 +23,12 @@ class storageAccessor {
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;
-  bool removeOnExit              = true;
-  size_t recordsCount            = 0;
-  std::string descriptorFile     = "";
-  std::string storageFile        = "";
-  std::string storageType        = "DEFAULT";
-  std::pair<int, int> retenetion = {0, 0};
+  bool removeOnExit             = true;
+  size_t recordsCount           = 0;
+  std::string descriptorFile    = "";
+  std::string storageFile       = "";
+  std::string storageType       = "DEFAULT";
+  std::pair<int, int> retention = {0, 0};
   void moveRef();
   void attachStorage();
 

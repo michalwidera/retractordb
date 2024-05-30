@@ -9,10 +9,10 @@
 namespace rdb {
 
 template <class T>
-groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,       //
-                                        const rdb::Descriptor &descriptor  //
+groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,          //
+                                        const std::pair<int, int> &retention  //
                                         )
-    : fileNameStr(fileName), descriptor(descriptor) {
+    : fileNameStr(fileName), retention(retention) {
   vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName));
 }
 
