@@ -149,6 +149,9 @@ void storageAccessor::initializeAccessor() {
   assert(storageType != "");
 
   if (storageType == "DEFAULT") {
+    accessor = std::make_unique<rdb::groupFileAccessor<uint8_t>>(storageFile);
+    accessor->fctrl(&descriptor, 0);
+  } else if (storageType == "POSIX") {
     accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile);
     accessor->fctrl(&descriptor, 0);
   } else if (storageType == "GENERIC") {
