@@ -25,10 +25,15 @@ K readFromFstream(std::fstream &myFile) {
 }
 
 template <typename T>
-textSourceAccessor<T>::textSourceAccessor(const std::string &fileName) : fileNameStr(fileName) {
+textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,       //
+                                          const rdb::Descriptor &descriptor  //
+                                          )
+    : fileNameStr(fileName), descriptor(descriptor) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+
+  payload = std::make_unique<rdb::payload>(descriptor);
 }
 
 template <typename T>
@@ -106,13 +111,6 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t 
   std::memcpy(reinterpret_cast<char *>(ptrData), payload->get(), descriptor.getSizeInBytes());
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
-  return EXIT_SUCCESS;
-}
-
-template <typename T>
-ssize_t textSourceAccessor<T>::fctrl(void *ptrData, const size_t size) {
-  descriptor = *(reinterpret_cast<rdb::Descriptor *>(ptrData));
-  payload    = std::make_unique<rdb::payload>(descriptor);
   return EXIT_SUCCESS;
 }
 

@@ -22,8 +22,6 @@ class posixBinaryFileAccessor : public FileAccessorInterface<T> {
    */
   int fd;
 
-  Descriptor descriptor;  // filled by fctrl method
-
  public:
   ~posixBinaryFileAccessor();
 
@@ -32,8 +30,6 @@ class posixBinaryFileAccessor : public FileAccessorInterface<T> {
   ssize_t read(T *ptrData, const size_t size, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
   std::string fileName() override;
-
-  ssize_t fctrl(void *ptrData, const size_t size) override;
 };
 }  // namespace rdb
 

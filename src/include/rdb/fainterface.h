@@ -54,15 +54,6 @@ struct FileAccessorInterface {
    */
   virtual std::string fileName() = 0;
 
-  /**
-   * @brief Control method for data source
-   *
-   * @param ptrData has binary package for parametrized storage object
-   * @param size size of ptrData package
-   * @return status of operation
-   */
-  virtual ssize_t fctrl(void *ptrData, const size_t size) { return 0; };
-
   virtual ~FileAccessorInterface() = default;
 };
 }  // namespace rdb

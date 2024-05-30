@@ -9,15 +9,15 @@
 namespace rdb {
 
 template <class T>
-groupFileAccessor<T>::groupFileAccessor(const std::string &fileName) : fileNameStr(fileName) {
-
+groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,       //
+                                        const rdb::Descriptor &descriptor  //
+                                        )
+    : fileNameStr(fileName), descriptor(descriptor) {
   vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName));
 }
 
 template <class T>
-groupFileAccessor<T>::~groupFileAccessor() {
-
-}
+groupFileAccessor<T>::~groupFileAccessor() {}
 
 template <class T>
 std::string groupFileAccessor<T>::fileName() {
@@ -26,20 +26,12 @@ std::string groupFileAccessor<T>::fileName() {
 
 template <class T>
 ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
-
-  return vec[0]->write( ptrData , size , position);
+  return vec[0]->write(ptrData, size, position);
 }
 
 template <class T>
 ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
-  
-  return vec[0]->read( ptrData, size, position);
-}
-
-template <typename T>
-ssize_t groupFileAccessor<T>::fctrl(void *ptrData, const size_t size) {
-
-  return vec[0]->fctrl(ptrData, size);
+  return vec[0]->read(ptrData, size, position);
 }
 
 template class groupFileAccessor<uint8_t>;

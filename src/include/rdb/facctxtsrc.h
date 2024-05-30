@@ -17,7 +17,7 @@ template <typename T>
 class textSourceAccessor : public FileAccessorInterface<T> {
   std::string fileNameStr;
 
-  Descriptor descriptor;  // filled by fctrl method
+  Descriptor descriptor;
 
   std::unique_ptr<rdb::payload> payload;
 
@@ -26,11 +26,11 @@ class textSourceAccessor : public FileAccessorInterface<T> {
  public:
   ~textSourceAccessor();
 
-  explicit textSourceAccessor(const std::string &fileName);
+  explicit textSourceAccessor(const std::string &fileName, const rdb::Descriptor &descriptor);
 
   ssize_t read(T *ptrData, const size_t size, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
-  ssize_t fctrl(void *ptrData, const size_t size) override;
+
   std::string fileName() override;
 };
 }  // namespace rdb
