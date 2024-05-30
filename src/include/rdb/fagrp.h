@@ -17,7 +17,7 @@ namespace rdb {
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
   std::string fileNameStr       = "";
-  std::pair<int, int> retention = {0, 0};
+  std::pair<int, int> retention = {0, 0};  // segments , capacity
 
   std::vector<std::unique_ptr<posixBinaryFileAccessor<T>>> vec;
 
