@@ -21,6 +21,8 @@ class groupFileAccessor : public FileAccessorInterface<T> {
 
   std::vector<std::unique_ptr<posixBinaryFileAccessor<T>>> vec;
 
+  size_t writeCount = 0;
+
  public:
   ~groupFileAccessor();
 

@@ -38,9 +38,19 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t size, const s
     // Need to cover this with test - DOUBlECHECK
     assert(retention.second != 0);
     assert(retention.first != 0);
-    auto newPosition = position % retention.second;  // second == capacity
-    auto newVecIdx   = (position / retention.second) % retention.first;
-    return vec[newVecIdx]->write(ptrData, size, newPosition);
+    if (position == std::numeric_limits<size_t>::max()) {
+      // append procedure
+      auto newVecIdx1 = (writeCount / retention.second) % retention.first;
+      writeCount++;
+      auto newVecIdx2 = (writeCount / retention.second) % retention.first;
+      if (newVecIdx1 != newVecIdx2) vec[newVecIdx2]->write(nullptr, 0, 0);  // delete all data
+      return vec[newVecIdx2]->write(ptrData, size, position);
+    } else {
+      // write at position procedure
+      auto newPosition = position % retention.second;  // second == capacity
+      auto newVecIdx   = (position / retention.second) % retention.first;
+      return vec[newVecIdx]->write(ptrData, size, newPosition);
+    }
   }
 }
 

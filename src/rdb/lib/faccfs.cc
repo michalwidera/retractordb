@@ -26,6 +26,13 @@ template <class T>
 ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
+  if (ptrData == nullptr && size == 0 && position == 0) {
+    myFile.open(fileName(), std::ofstream::out | std::ofstream::trunc);
+    assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+    myFile.close();
+    return EXIT_SUCCESS;
+  }
   if (position == std::numeric_limits<size_t>::max()) {
     myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
