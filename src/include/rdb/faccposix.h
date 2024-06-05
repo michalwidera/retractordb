@@ -15,7 +15,7 @@ namespace rdb {
  */
 template <typename T>
 class posixBinaryFileAccessor : public FileAccessorInterface<T> {
-  std::string fileNameStr;
+  std::string filename;
 
   /**
    * @brief Posix File Descriptor

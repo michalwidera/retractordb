@@ -76,7 +76,10 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t size, const size_t p
 
 template <class T>
 size_t groupFileAccessor<T>::count() {
-  return 0;
+  size_t sumCount{0};
+  for (auto &v : vec)
+    sumCount += v->count();
+  return sumCount;
 }
 
 template class groupFileAccessor<uint8_t>;

@@ -12,7 +12,7 @@ namespace rdb {
  */
 template <typename T>
 class binaryDeviceAccessor : public FileAccessorInterface<T> {
-  const std::string fileNameStr;
+  const std::string filename;
 
   /**
    * @brief Posix File Descriptor

@@ -14,7 +14,7 @@ namespace rdb {
  */
 template <typename T>
 struct genericBinaryFileAccessor : public FileAccessorInterface<T> {
-  std::string fileNameStr;
+  std::string filename;
 
  public:
   explicit genericBinaryFileAccessor(const std::string &fileName);

@@ -3,18 +3,19 @@
 #include <fcntl.h>
 #include <spdlog/spdlog.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cassert>
 namespace rdb {
 
 template <class T>
-posixBinaryFileAccessor<T>::posixBinaryFileAccessor(const std::string &fileName) : fileNameStr(fileName) {
-  fd = ::open(fileNameStr.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+posixBinaryFileAccessor<T>::posixBinaryFileAccessor(const std::string &fileName) : filename(fileName) {
+  fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
-    SPDLOG_ERROR("::open {} -> {}", fileNameStr, fd);
+    SPDLOG_ERROR("::open {} -> {}", filename, fd);
   else
-    SPDLOG_INFO("::open {} -> {}", fileNameStr, fd);
+    SPDLOG_INFO("::open {} -> {}", filename, fd);
   assert(fd >= 0);
 }
 
@@ -25,7 +26,7 @@ posixBinaryFileAccessor<T>::~posixBinaryFileAccessor() {
 
 template <class T>
 std::string posixBinaryFileAccessor<T>::fileName() {
-  return fileNameStr;
+  return filename;
 }
 
 template <class T>
@@ -78,7 +79,9 @@ ssize_t posixBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const si
 
 template <class T>
 size_t posixBinaryFileAccessor<T>::count() {
-  return 0;
+  struct stat stat_buf;
+  int rc = stat(filename.c_str(), &stat_buf);
+  return rc == 0 ? stat_buf.st_size : -1;
 }
 
 template class posixBinaryFileAccessor<uint8_t>;
