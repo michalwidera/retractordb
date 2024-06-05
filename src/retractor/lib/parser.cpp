@@ -26,8 +26,9 @@ class LexerErrorListener : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
+    std::cerr << "Syntax error @Rql" << std::endl;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
+    std::cerr << "msg:" << msg << std::endl;
     status = "Fail";
     exit(EPERM);
   }
@@ -37,8 +38,9 @@ class ParserErrorListener : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
+    std::cerr << "Syntax error @Rql" << std::endl;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
+    std::cerr << "msg:" << msg << std::endl;
     status = "Fail";
     exit(EPERM);
   }

@@ -48,6 +48,11 @@ ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t size, const size_
   return EXIT_SUCCESS;
 }
 
+template <class T>
+size_t binaryDeviceAccessor<T>::count() {
+  return 0;
+}
+
 template class binaryDeviceAccessor<uint8_t>;
 template class binaryDeviceAccessor<char>;
 

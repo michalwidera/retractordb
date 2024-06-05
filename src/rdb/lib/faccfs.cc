@@ -76,6 +76,11 @@ ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const 
   return EXIT_SUCCESS;
 }
 
+template <class T>
+size_t genericBinaryFileAccessor<T>::count() {
+  return 0;
+}
+
 template class genericBinaryFileAccessor<uint8_t>;
 template class genericBinaryFileAccessor<char>;
 

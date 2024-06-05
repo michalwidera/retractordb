@@ -6,6 +6,9 @@
 #include <unistd.h>
 
 #include <cassert>
+
+#include <iostream>
+
 namespace rdb {
 
 template <class T>
@@ -20,6 +23,9 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,          //
       std::string fname_seq = fileName + "." + std::to_string(segment);
       vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq));
     }
+
+  std::cerr << "fagrp:" << vec.size() << std::endl;
+  std::cerr << "fagrp:" << fileName << std::endl;
 }
 
 template <class T>
@@ -66,6 +72,11 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t size, const size_t p
     auto newVecIdx   = (position / retention.second) % retention.first;
     return vec[newVecIdx]->read(ptrData, size, newPosition);
   }
+}
+
+template <class T>
+size_t groupFileAccessor<T>::count() {
+  return 0;
 }
 
 template class groupFileAccessor<uint8_t>;

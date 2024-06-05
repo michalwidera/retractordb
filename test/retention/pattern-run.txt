@@ -1,0 +1,5 @@
+.3 Record(s)
+10 Byte(s) per record.
+{	INTEGER dane
+	RETENTION 2 3
+}

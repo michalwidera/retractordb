@@ -114,6 +114,11 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t 
   return EXIT_SUCCESS;
 }
 
+template <class T>
+size_t textSourceAccessor<T>::count() {
+  return 0;
+}
+
 template class textSourceAccessor<uint8_t>;
 template class textSourceAccessor<char>;
 

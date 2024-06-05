@@ -17,8 +17,9 @@ class LexerErrorListenerDesc : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Descriptor Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
+    std::cerr << "Syntax error @Descriptor" << std::endl;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
+    std::cerr << "msg:" << msg << std::endl;
     statusDesc = "Fail";
     exit(EPERM);
     return;
@@ -29,9 +30,9 @@ class ParserErrorListenerDesc : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Descriptor Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
-    statusDesc = "Fail";
+    std::cerr << "Syntax error @Descriptor" << std::endl;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
+    std::cerr << "msg:" << msg << std::endl;    statusDesc = "Fail";
     exit(EPERM);
     return;
   }

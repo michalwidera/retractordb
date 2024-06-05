@@ -76,6 +76,11 @@ ssize_t posixBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const si
   return EXIT_SUCCESS;
 }
 
+template <class T>
+size_t posixBinaryFileAccessor<T>::count() {
+  return 0;
+}
+
 template class posixBinaryFileAccessor<uint8_t>;
 template class posixBinaryFileAccessor<char>;
 

@@ -22,6 +22,7 @@ struct genericBinaryFileAccessor : public FileAccessorInterface<T> {
   ssize_t read(T *ptrData, const size_t size, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
   std::string fileName() override;
+  size_t count() override;
 
   genericBinaryFileAccessor()                                                   = delete;
   genericBinaryFileAccessor(const genericBinaryFileAccessor &)                  = delete;

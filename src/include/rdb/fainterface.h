@@ -54,6 +54,13 @@ struct FileAccessorInterface {
    */
   virtual std::string fileName() = 0;
 
+  /**
+   * @brief data count in storage
+   * 
+   * @return number of records in storage
+   */
+  virtual size_t count() = 0;
+
   virtual ~FileAccessorInterface() = default;
 };
 }  // namespace rdb
