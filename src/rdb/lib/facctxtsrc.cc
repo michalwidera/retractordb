@@ -25,10 +25,10 @@ K readFromFstream(std::fstream &myFile) {
 }
 
 template <typename T>
-textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,       //
-                                          const rdb::Descriptor &descriptor  //
-                                          )
-    : fileNameStr(fileName), descriptor(descriptor) {
+textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,  //
+                                          const size_t size,            //
+                                          const rdb::Descriptor &descriptor)
+    : filename(fileName), descriptor(descriptor), size(size) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
@@ -43,18 +43,19 @@ textSourceAccessor<T>::~textSourceAccessor() {
 
 template <class T>
 std::string textSourceAccessor<T>::fileName() {
-  return fileNameStr;
+  return filename;
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
   assert(position == 0);
+  assert(size != 0);
 
   // myFile.seekg(position);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);

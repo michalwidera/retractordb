@@ -15,7 +15,7 @@
 #include "payload.h"
 
 namespace rdb {
-enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
+enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
 enum class sourceState { empty, flux, lock, armed };
 
 class storageAccessor {

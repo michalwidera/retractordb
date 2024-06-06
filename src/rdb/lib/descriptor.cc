@@ -18,8 +18,6 @@ namespace rdb {
 
 static bool flatOutput = false;
 
-static const int error_desc_location{-1};
-
 bool getFlat() { return flatOutput; }
 void setFlat(bool var) { flatOutput = var; }
 
@@ -247,10 +245,11 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
 Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
-  return std::get<rlen>(field) * std::get<rarray>(field);        //
+  if (std::get<rtype>(field) == rdb::RETENTION) return 0;
+  return std::get<rlen>(field) * std::get<rarray>(field);
 }
 
-int Descriptor::getSizeInBytes() const {
+size_t Descriptor::getSizeInBytes() const {
   auto size{0};
   for (auto const i : *this) size += len(i);
   return size;
@@ -268,7 +267,7 @@ std::pair<int, int> Descriptor::retention() {
   return retval;
 }
 
-int Descriptor::position(const std::string &name) {
+size_t Descriptor::position(const std::string &name) {
   auto it = std::find_if(begin(), end(),                          //
                          [name](const auto &item) {               //
                            return std::get<rname>(item) == name;  //
@@ -280,7 +279,7 @@ int Descriptor::position(const std::string &name) {
   else
     assert(false && "did not find that record id Descriptor:{}");
 
-  return error_desc_location;
+  return 0;  // ProForma Error
 }
 
 std::string Descriptor::fieldName(int fieldPosition) {  //
@@ -293,14 +292,14 @@ int Descriptor::arraySize(const std::string &name) {  //
   return std::get<rarray>((*this)[position(name)]);   //
 }
 
-int Descriptor::offsetBegArr(const std::string &name) {
+size_t Descriptor::offsetBegArr(const std::string &name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == std::get<rname>(field)) return offset;
     offset += len(field);
   }
   assert(false && "field not found with that name");
-  return error_desc_location;
+  return 0;  // ProForma Error
 }
 
 int Descriptor::offset(const int position) {

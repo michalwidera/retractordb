@@ -32,7 +32,8 @@ class ParserErrorListenerDesc : public BaseErrorListener {
                    const std::string &msg, std::exception_ptr e) override {
     std::cerr << "Syntax error @Descriptor" << std::endl;
     std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
-    std::cerr << "msg:" << msg << std::endl;    statusDesc = "Fail";
+    std::cerr << "msg:" << msg << std::endl;
+    statusDesc = "Fail";
     exit(EPERM);
     return;
   }

@@ -1,14 +1,18 @@
 #include "rdb/payload.h"
 
+#define BOOST_STACKTRACE_USE_BACKTRACE
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // std::min
 #include <boost/rational.hpp>
+#include <boost/stacktrace.hpp>
 #include <cassert>
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
 #include <numeric>  // itoa
+#include <sstream>
 
 #include "rdb/convertTypes.h"
 
@@ -174,6 +178,9 @@ T getVal(void *ptr, int offset) {
 std::any payload::getItem(const int positionFlat) {
   if (positionFlat > descriptor.sizeFlat() - 1) {
     SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, descriptor.sizeFlat());
+    std::stringstream message;
+    message << boost::stacktrace::stacktrace();
+    SPDLOG_ERROR("Stack: {}", message.str());
     assert(false && "getItem - Read out of descriptor");
     abort();
   }

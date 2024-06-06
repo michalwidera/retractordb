@@ -15,7 +15,10 @@ namespace rdb {
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 template <class T>
-genericBinaryFileAccessor<T>::genericBinaryFileAccessor(const std::string &fileName) : filename(fileName) {}
+genericBinaryFileAccessor<T>::genericBinaryFileAccessor(  //
+    const std::string &fileName,                          //
+    const size_t size)                                    //
+    : filename(fileName), size(size) {}
 
 template <class T>
 std::string genericBinaryFileAccessor<T>::fileName() {
@@ -23,7 +26,8 @@ std::string genericBinaryFileAccessor<T>::fileName() {
 }
 
 template <class T>
-ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t position) {
+  assert(size != 0);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   if (ptrData == nullptr && size == 0 && position == 0) {
@@ -54,7 +58,8 @@ ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t size,
 }
 
 template <class T>
-ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t position) {
+  assert(size != 0);
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename, std::ios::in | std::ios::binary);
@@ -79,7 +84,7 @@ ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const 
 template <class T>
 size_t genericBinaryFileAccessor<T>::count() {
   std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
-  return in.tellg();
+  return in.tellg() / size;
 }
 
 template class genericBinaryFileAccessor<uint8_t>;

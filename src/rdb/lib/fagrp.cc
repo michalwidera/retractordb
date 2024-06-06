@@ -6,26 +6,22 @@
 #include <unistd.h>
 
 #include <cassert>
-
 #include <iostream>
 
 namespace rdb {
 
 template <class T>
-groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,          //
-                                        const std::pair<int, int> &retention  //
-                                        )
-    : fileNameStr(fileName), retention(retention) {
+groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           //
+                                        const size_t size,                     //
+                                        const std::pair<int, int> &retention)  //
+    : filename(fileName), size(size), retention(retention) {
   if (retention == std::pair<int, int>{0, 0})
-    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName));
+    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, size));
   else
     for (int segment = 0; segment < retention.first; segment++) {  // first == segments
       std::string fname_seq = fileName + "." + std::to_string(segment);
-      vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq));
+      vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq, size));
     }
-
-  std::cerr << "fagrp:" << vec.size() << std::endl;
-  std::cerr << "fagrp:" << fileName << std::endl;
 }
 
 template <class T>
@@ -33,13 +29,14 @@ groupFileAccessor<T>::~groupFileAccessor() {}
 
 template <class T>
 std::string groupFileAccessor<T>::fileName() {
-  return fileNameStr;
+  return filename;
 }
 
 template <class T>
-ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
+ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
+  assert(size != 0);
   if (retention == std::pair<int, int>{0, 0})
-    return vec[0]->write(ptrData, size, position);
+    return vec[0]->write(ptrData, position);
   else {
     // Need to cover this with test - DOUBlECHECK
     assert(retention.second != 0);
@@ -49,36 +46,36 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t size, const s
       auto newVecIdx1 = (writeCount / retention.second) % retention.first;
       writeCount++;
       auto newVecIdx2 = (writeCount / retention.second) % retention.first;
-      if (newVecIdx1 != newVecIdx2) vec[newVecIdx2]->write(nullptr, 0, 0);  // delete all data
-      return vec[newVecIdx2]->write(ptrData, size, position);
+      if (newVecIdx1 != newVecIdx2) vec[newVecIdx2]->write(nullptr, 0);  // delete all data
+      return vec[newVecIdx2]->write(ptrData, position);
     } else {
       // write at position procedure
       auto newPosition = position % retention.second;  // second == capacity
       auto newVecIdx   = (position / retention.second) % retention.first;
-      return vec[newVecIdx]->write(ptrData, size, newPosition);
+      return vec[newVecIdx]->write(ptrData, newPosition);
     }
   }
 }
 
 template <class T>
-ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
+ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
+  assert(size != 0);
   if (retention == std::pair<int, int>{0, 0})
-    return vec[0]->read(ptrData, size, position);
+    return vec[0]->read(ptrData, position);
   else {
     // Need to cover this with test - DOUBlECHECK
     assert(retention.second != 0);
     assert(retention.first != 0);
     auto newPosition = position % retention.second;  // second == capacity
     auto newVecIdx   = (position / retention.second) % retention.first;
-    return vec[newVecIdx]->read(ptrData, size, newPosition);
+    return vec[newVecIdx]->read(ptrData, newPosition);
   }
 }
 
 template <class T>
 size_t groupFileAccessor<T>::count() {
   size_t sumCount{0};
-  for (auto &v : vec)
-    sumCount += v->count();
+  for (auto &v : vec) sumCount += v->count();
   return sumCount;
 }
 
