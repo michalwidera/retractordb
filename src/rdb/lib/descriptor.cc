@@ -12,40 +12,16 @@
 #include <typeinfo>
 #include <utility>
 
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+
 namespace rdb {
-// https://belaycpp.com/2021/08/24/best-ways-to-convert-an-enum-to-a-string/
-
-static inline void ltrim(std::string &s) {
-  s.erase(                                      //
-      s.begin(),                                //
-      std::find_if(s.begin(), s.end(),          //
-                   [](auto ch) {                //
-                     return !std::isspace(ch);  //
-                   }                            //
-                   ));
-}
-
-static inline void rtrim(std::string &s) {
-  s.erase(                                //
-      std::find_if(s.rbegin(), s.rend(),  //
-                   [](auto ch) {          //
-                     return !std::isspace(ch);
-                   }  //
-                   )
-          .base(),
-      s.end());
-}
 
 static bool flatOutput = false;
-
-static const int error_desc_location{-1};
 
 bool getFlat() { return flatOutput; }
 void setFlat(bool var) { flatOutput = var; }
 
 rdb::descFld GetFieldType(std::string name) {
-  ltrim(name);
-  rtrim(name);
   std::map<std::string, rdb::descFld> typeDictionary  //
       = {{"STRING", rdb::STRING},                     //
          {"UINT", rdb::UINT},                         //
@@ -54,6 +30,7 @@ rdb::descFld GetFieldType(std::string name) {
          {"FLOAT", rdb::FLOAT},                       //
          {"REF", rdb::REF},                           //
          {"TYPE", rdb::TYPE},                         //
+         {"RETENTION", rdb::RETENTION},               //
          {"DOUBLE", rdb::DOUBLE}};
   return typeDictionary[name];
 }
@@ -67,32 +44,9 @@ std::string GetFieldType(rdb::descFld e) {
          {rdb::FLOAT, "FLOAT"},                       //
          {rdb::REF, "REF"},                           //
          {rdb::TYPE, "TYPE"},                         //
+         {rdb::RETENTION, "RETENTION"},               //
          {rdb::DOUBLE, "DOUBLE"}};
   return typeDictionary[e];
-}
-
-int GetFieldLenFromType(rdb::descFld ft) {
-  switch (ft) {
-    case rdb::UINT:
-      return sizeof(unsigned);
-    case rdb::INTEGER:
-      return sizeof(int);
-    case rdb::FLOAT:
-      return sizeof(float);
-    case rdb::DOUBLE:
-      return sizeof(double);
-    case rdb::BYTE:
-      return 1;
-    case rdb::STRING:
-      return 1;
-    case rdb::REF:
-    case rdb::TYPE:
-      return 0;
-    default:
-      SPDLOG_ERROR("Undefined type rdb->int:{}", (int)ft);
-      assert(false && "Undefined type");
-  }
-  return 0;
 }
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
@@ -118,7 +72,9 @@ void Descriptor::updateConvMaps() {
   int offset{0};
   int clen_alignment{0};
   for (int i = 0; i < clen; ++i) {
-    if (std::get<rtype>(*it) == rdb::TYPE || std::get<rtype>(*it) == rdb::REF) {
+    if (std::get<rtype>(*it) == rdb::TYPE ||  //
+        std::get<rtype>(*it) == rdb::REF ||   //
+        std::get<rtype>(*it) == rdb::RETENTION) {
       ++it;
       ++clen_alignment;
       continue;
@@ -219,22 +175,26 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                          //
-                                    [](const rField &i) {                            //
-                                     return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                            std::get<rdb::rtype>(i) == rdb::TYPE;
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                              //
+                                    [](const rField &i) {                                //
+                                     return std::get<rdb::rtype>(i) == rdb::REF ||      //
+                                            std::get<rdb::rtype>(i) == rdb::TYPE ||     //
+                                            std::get<rdb::rtype>(i) == rdb::RETENTION;  //
                                    });
-  auto refCountThis = std::count_if(begin(), end(),                                  //
-                                    [](const rField &i) {                            //
-                                      return std::get<rdb::rtype>(i) == rdb::REF ||  //
-                                             std::get<rdb::rtype>(i) == rdb::TYPE;
+  auto refCountThis = std::count_if(begin(), end(),                                      //
+                                    [](const rField &i) {                                //
+                                      return std::get<rdb::rtype>(i) == rdb::REF ||      //
+                                             std::get<rdb::rtype>(i) == rdb::TYPE ||     //
+                                             std::get<rdb::rtype>(i) == rdb::RETENTION;  //
                                     });
 
   auto i{0};
   for (const rField &f : *this) {
-    if (std::get<rdb::rtype>(f) == rdb::REF ||       //
-        std::get<rdb::rtype>(f) == rdb::TYPE ||      //
-        std::get<rdb::rtype>(rhs[i]) == rdb::REF ||  //
+    if (std::get<rdb::rtype>(f) == rdb::REF ||             //
+        std::get<rdb::rtype>(f) == rdb::TYPE ||            //
+        std::get<rdb::rtype>(f) == rdb::RETENTION ||       //
+        std::get<rdb::rtype>(rhs[i]) == rdb::RETENTION ||  //
+        std::get<rdb::rtype>(rhs[i]) == rdb::REF ||        //
         std::get<rdb::rtype>(rhs[i]) == rdb::TYPE) {
       ++i;
       continue;
@@ -251,11 +211,13 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 Descriptor &Descriptor::cleanRef() {
   Descriptor rhs(*this);
   clear();
-  std::copy_if(rhs.begin(), rhs.end(),                          //
-               std::back_inserter(*this),                       //
-               [](const rField &i) {                            //
-                 return std::get<rdb::rtype>(i) != rdb::REF &&  //
-                        std::get<rdb::rtype>(i) != rdb::TYPE;
+  std::copy_if(rhs.begin(), rhs.end(),                             //
+               std::back_inserter(*this),                          //
+               [](const rField &i) {                               //
+                 return std::get<rdb::rtype>(i) != rdb::REF &&     //
+                        std::get<rdb::rtype>(i) != rdb::TYPE &&    //
+                        std::get<rdb::rtype>(i) != rdb::RETENTION  //
+                     ;
                });
 
   dirtyMap = true;
@@ -283,16 +245,29 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
 Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
-  return std::get<rlen>(field) * std::get<rarray>(field);        //
+  if (std::get<rtype>(field) == rdb::RETENTION) return 0;
+  return std::get<rlen>(field) * std::get<rarray>(field);
 }
 
-int Descriptor::getSizeInBytes() const {
+size_t Descriptor::getSizeInBytes() const {
   auto size{0};
   for (auto const i : *this) size += len(i);
   return size;
 }
 
-int Descriptor::position(const std::string &name) {
+std::pair<int, int> Descriptor::retention() {
+  std::pair<int, int> retval{0, 0};
+
+  auto it = std::find_if(begin(), end(),                                                     //
+                         [](auto &item) { return std::get<rtype>(item) == rdb::RETENTION; }  //
+  );
+
+  if (it != end()) retval = std::pair<int, int>(std::get<rlen>(*it), std::get<rarray>(*it));
+
+  return retval;
+}
+
+size_t Descriptor::position(const std::string &name) {
   auto it = std::find_if(begin(), end(),                          //
                          [name](const auto &item) {               //
                            return std::get<rname>(item) == name;  //
@@ -304,7 +279,7 @@ int Descriptor::position(const std::string &name) {
   else
     assert(false && "did not find that record id Descriptor:{}");
 
-  return error_desc_location;
+  return 0;  // ProForma Error
 }
 
 std::string Descriptor::fieldName(int fieldPosition) {  //
@@ -317,14 +292,14 @@ int Descriptor::arraySize(const std::string &name) {  //
   return std::get<rarray>((*this)[position(name)]);   //
 }
 
-int Descriptor::offsetBegArr(const std::string &name) {
+size_t Descriptor::offsetBegArr(const std::string &name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == std::get<rname>(field)) return offset;
     offset += len(field);
   }
   assert(false && "field not found with that name");
-  return error_desc_location;
+  return 0;  // ProForma Error
 }
 
 int Descriptor::offset(const int position) {
@@ -342,6 +317,7 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   for (auto const field : *this) {
     if (std::get<rtype>(field) == rdb::REF) continue;
     if (std::get<rtype>(field) == rdb::TYPE) continue;
+    if (std::get<rtype>(field) == rdb::RETENTION) continue;
     if (retVal <= std::get<rtype>(field)) {
       retVal = std::get<rtype>(field);
       if (size < len(field)) size = len(field);
@@ -358,16 +334,31 @@ std::ostream &flat(std::ostream &os) {
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
+    if (std::get<rtype>(r) == rdb::RETENTION)
+      if (std::get<rlen>(r) == 0 && std::get<rarray>(r) == 0) continue;  // skip retention 0,0
+
     if (!flatOutput)
       os << "\t";
     else
       os << " ";
     os << GetFieldType(std::get<rtype>(r)) << " ";
-    if (std::get<rtype>(r) == rdb::REF)
-      os << "\"" << std::get<rname>(r) << "\"";
-    else
-      os << std::get<rname>(r);
-    if (std::get<rarray>(r) > 1)
+
+    switch (std::get<rtype>(r)) {
+      case rdb::REF:
+        os << "\"" << std::get<rname>(r) << "\"";
+        break;
+      case rdb::TYPE:
+        os << std::get<rname>(r);
+        break;
+      case rdb::RETENTION:
+        // retention {capacity} {segment}
+        os << std::get<rlen>(r) << " " << std::get<rarray>(r);
+        break;
+      default:
+        os << std::get<rname>(r);
+    }
+
+    if (std::get<rarray>(r) > 1 && (std::get<rtype>(r) != rdb::RETENTION))
       os << "[" << std::get<rarray>(r) << "]";
     else if (std::get<rtype>(r) == rdb::STRING)
       os << "[" << std::get<rlen>(r) << "]";
@@ -383,53 +374,13 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   return os;
 }
 
-// Look here to explain:
-// https://stackoverflow.com/questions/7302996/changing-the-delimiter-for-cin-c
-struct synsugar_is_space : std::ctype<char> {
-  synsugar_is_space() : ctype<char>(get_table()) {}
-  static mask const *get_table() {
-    static std::array<mask, table_size> rc;
-    rc['['] = rc[']'] = rc['{'] = rc['}'] = rc[' '] = rc['\n'] = std::ctype_base::space;
-    return &rc[0];
-  }
-};
-
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
-  auto origLocale = is.getloc();
-  is.imbue(std::locale(origLocale, std::unique_ptr<synsugar_is_space>(new synsugar_is_space).release()));
-  do {
-    std::string type;
-    std::string name;
-    int len = 0;
-    is >> type;
-    if (is.eof()) break;
-    auto ft = GetFieldType(type);
+  std::stringstream strstream;
+  std::string str;
+  while (is >> str) strstream << " " << str;
 
-    if (ft == rdb::REF) {
-      char c;
-      while (is.get(c) && c != '"')
-        ;
-      while (is.get(c) && c != '"') name += c;
-      name.erase(remove(name.begin(), name.end(), '"'), name.end());
-    } else {
-      is >> name;
-      ltrim(name);
-      rtrim(name);
-    }
-
-    auto arrayLen = 1;
-    char c        = is.peek();  // peek character
-    if (c == '[') {
-      while (is.get(c) && c != '[')
-        ;
-      is >> arrayLen;
-      while (is.get(c) && c != ']')
-        ;
-    }
-
-    rhs += Descriptor(name, GetFieldLenFromType(ft), arrayLen, ft);
-  } while (!is.eof());
-  is.imbue(origLocale);
+  auto result = parserDESCString(rhs, strstream.str().c_str());
+  assert(result == "OK");
 
   return is;
 }

@@ -26,6 +26,7 @@ How xqry terminal works
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
+#include <boost/system/system_error.hpp>
 #include <cassert>
 #include <chrono>
 #include <cstdio>

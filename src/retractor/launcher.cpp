@@ -23,7 +23,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
 
 static int iTimeLimitCntParam{0};
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
       return EPERM;  // ERROR defined in errno-base.h
     }
 
-    auto parseOut = parserFile(coreInstance, sInputFile);
+    auto parseOut = parserRQLFile(coreInstance, sInputFile);
 
     if (parseOut != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //

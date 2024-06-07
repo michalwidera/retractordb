@@ -50,16 +50,18 @@ class Descriptor : public std::vector<rField> {
   Descriptor &createHash(const std::string &name, Descriptor lhs, Descriptor rhs);
   Descriptor &cleanRef();
 
-  int getSizeInBytes() const;
-  int position(const std::string &name);
+  size_t getSizeInBytes() const;
+  size_t position(const std::string &name);
   std::string fieldName(int fieldPosition);
   int len(const std::string &name);
   constexpr int len(const rdb::rField &field) const;
-  int offsetBegArr(const std::string &name);
+  size_t offsetBegArr(const std::string &name);
   int offset(int position);
   int arraySize(const std::string &name);
   std::string type(const std::string &name);
   int sizeFlat();
+
+  std::pair<int, int> retention();
 
   std::pair<rdb::descFld, int> getMaxType();
 

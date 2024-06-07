@@ -9,9 +9,9 @@
 #include <iostream>
 #include <string>
 
-#include "Parser/RQLBaseListener.h"
-#include "Parser/RQLLexer.h"
-#include "Parser/RQLParser.h"
+#include ".antlr/RQLBaseListener.h"
+#include ".antlr/RQLLexer.h"
+#include ".antlr/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 
@@ -26,8 +26,9 @@ class LexerErrorListener : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
+    std::cerr << "Syntax error @Rql" << std::endl;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
+    std::cerr << "msg:" << msg << std::endl;
     status = "Fail";
     exit(EPERM);
   }
@@ -37,8 +38,9 @@ class ParserErrorListener : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error - ";
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << ": " << msg;
+    std::cerr << "Syntax error @Rql" << std::endl;
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
+    std::cerr << "msg:" << msg << std::endl;
     status = "Fail";
     exit(EPERM);
   }
@@ -171,6 +173,11 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
+  void exitRetetion(RQLParser::RetentionContext *ctx) {
+    qry.capacity = std::stoi(ctx->capacity->getText());
+    qry.segments = std::stoi(ctx->segments->getText());
+  }
+
   void exitStorage(RQLParser::StorageContext *ctx) {
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
@@ -245,7 +252,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parserFile(qTree &coreInstance, std::string sInputFile) {
+std::string parserRQLFile(qTree &coreInstance, std::string sInputFile) {
   std::ifstream ins;
   // Create the input stream.
   ins.open(sInputFile.c_str());
@@ -270,7 +277,7 @@ std::string parserFile(qTree &coreInstance, std::string sInputFile) {
   return status;
 }
 
-std::string parserString(qTree &coreInstance, std::string inlet) {
+std::string parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.

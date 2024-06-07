@@ -54,16 +54,6 @@ executors:
       - image: cimg/base:current
     resource_class: large
 
-  ubuntu2204machine-current:
-    machine:
-      image: ubuntu-2204:current
-    resource_class: large
-
-  ubuntu2204machine-edge:
-    machine:
-      image: ubuntu-2204:current
-    resource_class: large
-
   ubuntu2004machine-arm:
     machine:
       image: ubuntu-2204:current

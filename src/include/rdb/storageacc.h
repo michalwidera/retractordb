@@ -10,11 +10,12 @@
 #include "faccfs.h"
 #include "faccposix.h"
 #include "facctxtsrc.h"
+#include "fagrp.h"
 #include "fainterface.h"
 #include "payload.h"
 
 namespace rdb {
-enum class storageState { noDescriptor, attachedDescriptor, openExisting, openAndCreate };
+enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
 enum class sourceState { empty, flux, lock, armed };
 
 class storageAccessor {
@@ -22,11 +23,12 @@ class storageAccessor {
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;
-  bool removeOnExit          = true;
-  size_t recordsCount        = 0;
-  std::string descriptorFile = "";
-  std::string storageFile    = "";
-  std::string storageType    = "DEFAULT";
+  bool removeOnExit             = true;
+  size_t recordsCount           = 0;
+  std::string descriptorFile    = "";
+  std::string storageFile       = "";
+  std::string storageType       = "DEFAULT";
+  std::pair<int, int> retention = {0, 0};
   void moveRef();
   void attachStorage();
 
@@ -43,7 +45,7 @@ class storageAccessor {
  public:
   storageAccessor() = delete;
   explicit storageAccessor(const std::string fileNameDesc, const std::string fileName = "");
-  ~storageAccessor();
+  virtual ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;
   sourceState bufferState     = sourceState::empty;  // ? test lock
@@ -53,6 +55,7 @@ class storageAccessor {
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
   bool revRead(const size_t recordIndex, uint8_t *destination = nullptr);
   void fire();
+  void purge();
 
   Descriptor &getDescriptor();
   std::unique_ptr<rdb::payload>::pointer getPayload();

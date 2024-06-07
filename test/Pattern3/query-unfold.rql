@@ -2,5 +2,5 @@
 
 declare a INTEGER, b INTEGER stream datasrc,0.5 file 'datafile2.dat'
 
-select * stream out1 from datasrc
+select * stream out1 from datasrc file 'out1_file.dat' retention 20 5
 select 1,a,b stream out2 from datasrc

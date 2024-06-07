@@ -66,6 +66,9 @@ class query {
   std::list<field> lSchema;
   std::list<token> lProgram;
 
+  int segments = 0;
+  int capacity = 0;
+
   bool isDeclaration() const;
   bool isReductionRequired();
   bool isGenerated();

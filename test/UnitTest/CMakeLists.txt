@@ -19,7 +19,8 @@ set(LIBRARY_TEST_SET
     antlr4_static
     retractor
     rdb
-    parser)
+    rqlparser
+    descparser)
 
 foreach(item ${V_GLOB})
   get_filename_component(OUTPUT_FILE_NOEXT ${item} NAME_WLE)

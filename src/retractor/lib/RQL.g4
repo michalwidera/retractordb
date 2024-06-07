@@ -11,18 +11,11 @@ storage_statement   : STORAGE folder_name=STRING
                     ;
 
 select_statement    : SELECT select_list
-                      STREAM ID
+                      STREAM stream_name=ID
                       FROM stream_expression
+                      (FILE name=STRING)?
+                      (retention)?
                     # Select
-                    ;
-
-rational_se         : fraction_rule # RationalAsFraction_proforma
-                    | FLOAT         # RationalAsFloat
-                    | DECIMAL       # RationalAsDecimal
-                    ;
-
-fraction_rule       : DECIMAL DIVIDE DECIMAL
-                    # Fraction
                     ;
 
 declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
@@ -30,6 +23,19 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       FILE file_name=STRING
                     # Declare
                     ;
+
+rational_se         : fraction_rule # RationalAsFraction_proforma
+                    | FLOAT         # RationalAsFloat
+                    | DECIMAL       # RationalAsDecimal
+                    ;
+
+retention           : RETENTION segments=DECIMAL capacity=DECIMAL
+                    ;
+
+fraction_rule       : DECIMAL DIVIDE DECIMAL
+                    # Fraction
+                    ;
+
 
 field_declaration   : ID field_type ('[' type_size=DECIMAL ']')?
                     # SingleDeclaration
@@ -137,6 +143,7 @@ SELECT:             'SELECT'|'select';
 STREAM:             'STREAM'|'stream';
 FROM:               'FROM'|'from';
 DECLARE:            'DECLARE'|'declare';
+RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
 

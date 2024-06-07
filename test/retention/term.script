@@ -1,0 +1,18 @@
+noprompt
+open test_db {INTEGER dane RETENTION 2 3 }
+purge
+set dane 1
+append
+set dane 2
+append
+set dane 3
+append
+set dane 4
+append
+list 4
+size
+desc
+set dane 44
+write 2
+list 4
+quit

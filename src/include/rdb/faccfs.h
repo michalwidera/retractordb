@@ -9,17 +9,21 @@ namespace rdb {
  *
  * File Accessor as File system - type. This is underlying type that supports access to binary fields.
  * std::fstream is used as interface. :Rdb user does not need to use this object directly
+ *
+ * Type: GENERIC
  */
 template <typename T>
 struct genericBinaryFileAccessor : public FileAccessorInterface<T> {
-  std::string fileNameStr;
+  const std::string filename;
+  const std::size_t size;
 
  public:
-  explicit genericBinaryFileAccessor(const std::string &fileName);
+  explicit genericBinaryFileAccessor(const std::string &fileName, const size_t size);
 
-  ssize_t read(T *ptrData, const size_t size, const size_t position) override;
-  ssize_t write(const T *ptrData, const size_t size, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t read(T *ptrData, const size_t position) override;
+  ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
   std::string fileName() override;
+  size_t count() override;
 
   genericBinaryFileAccessor()                                                   = delete;
   genericBinaryFileAccessor(const genericBinaryFileAccessor &)                  = delete;

@@ -25,10 +25,15 @@ K readFromFstream(std::fstream &myFile) {
 }
 
 template <typename T>
-textSourceAccessor<T>::textSourceAccessor(const std::string &fileName) : fileNameStr(fileName) {
+textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,  //
+                                          const size_t size,            //
+                                          const rdb::Descriptor &descriptor)
+    : filename(fileName), descriptor(descriptor), size(size) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+
+  payload = std::make_unique<rdb::payload>(descriptor);
 }
 
 template <typename T>
@@ -38,18 +43,19 @@ textSourceAccessor<T>::~textSourceAccessor() {
 
 template <class T>
 std::string textSourceAccessor<T>::fileName() {
-  return fileNameStr;
+  return filename;
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
 template <typename T>
-ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
+ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
   assert(position == 0);
+  assert(size != 0);
 
   // myFile.seekg(position);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
@@ -73,7 +79,7 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t 
         while (myFile.get(c) && c != '"') var += c;
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
-        SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
+        // SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
         payload->setItem(i, var);
       } else
         for (auto j = 0; j < std::get<rarray>(item); j++) {
@@ -109,11 +115,9 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t size, const size_t 
   return EXIT_SUCCESS;
 }
 
-template <typename T>
-ssize_t textSourceAccessor<T>::fctrl(void *ptrData, const size_t size) {
-  descriptor = *(reinterpret_cast<rdb::Descriptor *>(ptrData));
-  payload    = std::make_unique<rdb::payload>(descriptor);
-  return EXIT_SUCCESS;
+template <class T>
+size_t textSourceAccessor<T>::count() {
+  return 0;
 }
 
 template class textSourceAccessor<uint8_t>;

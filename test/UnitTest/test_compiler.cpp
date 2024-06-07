@@ -9,8 +9,8 @@
 #include "retractor/lib/QStruct.h"
 #include "retractor/lib/compiler.h"
 
-extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
-extern std::string parserString(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
@@ -25,7 +25,7 @@ bool check_compile_function() {
 
   if (!compiled) {
     coreInstance.clear();
-    compiled = parserFile(coreInstance, "ut_compiler.rql") == "OK";
+    compiled = parserRQLFile(coreInstance, "ut_compiler.rql") == "OK";
   }
   return compiled;
 }
@@ -52,8 +52,8 @@ TEST(xparser, check_compile_result) {
   }
 }
 
-TEST(xparser, check_parserString) {
-  ASSERT_TRUE(parserString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK");
+TEST(xparser, check_parserRQLString) {
+  ASSERT_TRUE(parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK");
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }

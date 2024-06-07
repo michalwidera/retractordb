@@ -226,6 +226,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   for (auto const it : outputPayload->getDescriptor()) {
     if (std::get<rdb::rtype>(it) == rdb::REF) continue;
     if (std::get<rdb::rtype>(it) == rdb::TYPE) continue;
+    if (std::get<rdb::rtype>(it) == rdb::RETENTION) continue;
 
     std::any value = castAny(outputPayload->getPayload()->getItem(i++), maxType);
     switch (maxType) {

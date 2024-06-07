@@ -15,24 +15,35 @@ namespace rdb {
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 template <class T>
-genericBinaryFileAccessor<T>::genericBinaryFileAccessor(const std::string &fileName) : fileNameStr(fileName) {}
+genericBinaryFileAccessor<T>::genericBinaryFileAccessor(  //
+    const std::string &fileName,                          //
+    const size_t size)                                    //
+    : filename(fileName), size(size) {}
 
 template <class T>
 std::string genericBinaryFileAccessor<T>::fileName() {
-  return fileNameStr;
+  return filename;
 }
 
 template <class T>
-ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t size, const size_t position) {
+ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t position) {
+  assert(size != 0);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
+  if (ptrData == nullptr && size == 0 && position == 0) {
+    myFile.open(filename, std::ofstream::out | std::ofstream::trunc);
+    assert((myFile.rdstate() & std::ofstream::failbit) == 0);
+    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+    myFile.close();
+    return EXIT_SUCCESS;
+  }
   if (position == std::numeric_limits<size_t>::max()) {
-    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
+    myFile.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     // Note: no seekp here!
   } else {
-    myFile.open(fileName(), std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+    myFile.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.seekp(position);
@@ -47,10 +58,11 @@ ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t size,
 }
 
 template <class T>
-ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const size_t position) {
-  std::fstream myFile;
+ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t position) {
+  assert(size != 0);
+  std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(fileName(), std::ios::in | std::ios::binary);
+  myFile.open(filename, std::ios::in | std::ios::binary);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.seekg(position);
@@ -67,6 +79,12 @@ ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t size, const 
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;
+}
+
+template <class T>
+size_t genericBinaryFileAccessor<T>::count() {
+  std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
+  return in.tellg() / size;
 }
 
 template class genericBinaryFileAccessor<uint8_t>;

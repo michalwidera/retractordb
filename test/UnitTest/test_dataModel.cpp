@@ -18,7 +18,7 @@
 
 // ctest -R '^ut-test_dataModel' -V
 
-extern std::string parserFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
@@ -67,7 +67,7 @@ class xschema : public ::testing::Test {
 
     // This simplified dataModel::load
     coreInstance.clear();
-    auto compiled = parserFile(coreInstance, "ut_example_schema.rql");
+    auto compiled = parserRQLFile(coreInstance, "ut_example_schema.rql");
     dataArea      = std::make_unique<dataModel>(coreInstance);
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);

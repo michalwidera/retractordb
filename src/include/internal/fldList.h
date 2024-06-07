@@ -22,6 +22,7 @@ DECL_T(IDXPAIR, std::pair<STRINT>)
 DECL_E(STRING, std::string)
 DECL_F(TYPE)
 DECL_F(REF)
+DECL_F(RETENTION)
 END_E_GEN_T(descFld)
 }  // namespace rdb
 #undef BEGIN_E_GEN_T

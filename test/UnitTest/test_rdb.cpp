@@ -14,19 +14,21 @@
 
 const uint AREA_SIZE = 10;
 
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+
 template <typename T, typename K>
 bool test_1() {
-  K binaryAccessor1("testfile-fstream");
+  K binaryAccessor1("testfile-fstream", AREA_SIZE);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    binaryAccessor1.write(xData, AREA_SIZE);
+    binaryAccessor1.write(xData);
 
     if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
 
     T yData[AREA_SIZE];
-    binaryAccessor1.read(yData, AREA_SIZE, 0);
+    binaryAccessor1.read(yData, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
@@ -38,18 +40,18 @@ bool test_1() {
 
 template <typename T, typename K>
 bool test_2() {
-  K dataStore("testfile-fstream");
+  K dataStore("testfile-fstream", AREA_SIZE);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    dataStore.write(xData, AREA_SIZE);
-    dataStore.write(xData, AREA_SIZE);  // Add one extra record
+    dataStore.write(xData);
+    dataStore.write(xData);  // Add one extra record
 
     if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
 
     T yData[AREA_SIZE];
-    dataStore.read(yData, AREA_SIZE, 0);
+    dataStore.read(yData, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
@@ -61,32 +63,32 @@ bool test_2() {
 
 template <typename T, typename K>
 bool test_3() {
-  K dataStore("testfile-fstream");
+  K dataStore("testfile-fstream", AREA_SIZE);
   {
     T xData[AREA_SIZE];
 
     std::memcpy(xData, "test aaaa", AREA_SIZE);
-    dataStore.write(xData, AREA_SIZE);
+    dataStore.write(xData);
 
     std::memcpy(xData, "test bbbb", AREA_SIZE);
-    dataStore.write(xData, AREA_SIZE);
+    dataStore.write(xData);
 
     std::memcpy(xData, "test cccc", AREA_SIZE);
-    dataStore.write(xData, AREA_SIZE);
+    dataStore.write(xData);
 
     std::memcpy(xData, "test xxxx", AREA_SIZE);
-    dataStore.write(xData, AREA_SIZE, AREA_SIZE);  // <- Update
+    dataStore.write(xData, AREA_SIZE);  // <- Update
 
     std::memcpy(xData, "test dddd", AREA_SIZE);
-    dataStore.write(xData, AREA_SIZE);
+    dataStore.write(xData);
 
     T yData[AREA_SIZE];
 
-    dataStore.read(yData, AREA_SIZE, 0);
+    dataStore.read(yData, 0);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test aaaa") != 0) return false;
 
-    dataStore.read(yData, AREA_SIZE, AREA_SIZE);
+    dataStore.read(yData, AREA_SIZE);
 
     if (strcmp(reinterpret_cast<char *>(yData), "test xxxx") != 0) return false;
   }
@@ -441,4 +443,11 @@ TEST(crdb, position_conversion_test3) {
   std::stringstream coutstring;
   coutstring << rdb::flat << payload;
   ASSERT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
+}
+
+TEST(crdb, descriptor_parser_test) {
+  rdb::Descriptor out;
+  ASSERT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
+  ASSERT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
+  ASSERT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
 }
