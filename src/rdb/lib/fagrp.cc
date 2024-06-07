@@ -54,7 +54,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
       // write at position procedure
       auto newPosition = (position/size) % retention.first;
       auto newVecIdx   = int( (position/size) / (retention.first) ) % (retention.second);
-      std::cerr << "W->[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
+      //std::cerr << "W->[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
       return vec[newVecIdx]->write(ptrData, newPosition);
     } 
   }
@@ -71,7 +71,7 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
     assert(retention.first != 0);
     auto newPosition = (position/size) % retention.first;
     auto newVecIdx   = int( (position/size) / (retention.first) ) % (retention.second);
-    std::cerr << "R<-[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
+    //std::cerr << "R<-[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
     return vec[newVecIdx]->read(ptrData, newPosition*size);
   }
 }

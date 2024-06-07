@@ -6,15 +6,12 @@ set dane 2
 append
 set dane 3
 append
-size
-desc
-list 3
 set dane 4
 append
 list 4
+size
+desc
 set dane 44
 write 2
-read dane 1
-print
 list 4
 quit

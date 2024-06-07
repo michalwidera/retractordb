@@ -1,8 +1,13 @@
-.3 Record(s)
+.{ dane:1 }
+{ dane:2 }
+{ dane:3 }
+{ dane:4 }
+4 Record(s)
 4 Byte(s) per record.
 {	INTEGER dane
 	RETENTION 2 3
 }
 { dane:1 }
 { dane:2 }
-{ dane:3 }
+{ dane:44 }
+{ dane:4 }
