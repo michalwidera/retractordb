@@ -55,6 +55,7 @@ class storageAccessor {
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
   bool revRead(const size_t recordIndex, uint8_t *destination = nullptr);
   void fire();
+  void purge();
 
   Descriptor &getDescriptor();
   std::unique_ptr<rdb::payload>::pointer getPayload();

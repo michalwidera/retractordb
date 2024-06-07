@@ -235,6 +235,8 @@ bool storageAccessor::read_() {
   return result == 0;
 }
 
+void storageAccessor::purge() { accessor->write(nullptr, 0); }
+
 bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
   assert(!isDeclared());
   abortIfStorageNotPrepared();

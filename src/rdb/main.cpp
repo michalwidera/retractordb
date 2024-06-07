@@ -124,6 +124,7 @@ int main(int argc, char *argv[]) {
       std::cout << "desc|descc \t\t\t show schema\n";
       std::cout << "read|rread [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t from payload send record to database\n";
+      std::cout << "purge \t\t\t\t remove all records from database\n";
       std::cout << "append \t\t\t\t append payload to database\n";
       std::cout << "set [field][value] \t\t set payload field value\n";
       std::cout << "setpos [position][number value]\t set payload field number value\n";
@@ -276,6 +277,8 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "append") {
       dacc->write();
       payloadStatus = stored;
+    } else if (cmd == "purge") {
+      dacc->purge();
     } else if (cmd == "status") {
       switch (payloadStatus) {
         case (fetched):

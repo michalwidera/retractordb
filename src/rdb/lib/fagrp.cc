@@ -48,16 +48,19 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
       auto newVecIdx1 = (writeCount / retention.second) % retention.first;
       writeCount++;
       auto newVecIdx2 = (writeCount / retention.second) % retention.first;
-      if (newVecIdx1 != newVecIdx2) vec[newVecIdx2]->write(nullptr, 0);  // delete all data
+      if (newVecIdx1 != newVecIdx2) vec[newVecIdx2]->write(nullptr, 0);  // delete all data from one
       return vec[newVecIdx2]->write(ptrData, position);
+    } else if (position == 0 && ptrData == nullptr) {
+      for (auto &v : vec) v->write(nullptr, 0);  // purge all
     } else {
       // write at position procedure
-      auto newPosition = (position/size) % retention.first;
-      auto newVecIdx   = int( (position/size) / (retention.first) ) % (retention.second);
-      //std::cerr << "W->[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
+      auto newPosition = (position / size) % retention.first;
+      auto newVecIdx   = int((position / size) / (retention.first)) % (retention.second);
+      // std::cerr << "W->[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
       return vec[newVecIdx]->write(ptrData, newPosition);
-    } 
+    }
   }
+  return 0;
 }
 
 template <class T>
@@ -69,11 +72,12 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
     // Need to cover this with test - DOUBlECHECK
     assert(retention.second != 0);
     assert(retention.first != 0);
-    auto newPosition = (position/size) % retention.first;
-    auto newVecIdx   = int( (position/size) / (retention.first) ) % (retention.second);
-    //std::cerr << "R<-[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
-    return vec[newVecIdx]->read(ptrData, newPosition*size);
+    auto newPosition = (position / size) % retention.first;
+    auto newVecIdx   = int((position / size) / (retention.first)) % (retention.second);
+    // std::cerr << "R<-[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
+    return vec[newVecIdx]->read(ptrData, newPosition * size);
   }
+  return 0;  // proforma
 }
 
 template <class T>
