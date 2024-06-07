@@ -18,10 +18,12 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           /
   if (retention == std::pair<int, int>{0, 0})
     vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, size));
   else
-    for (int segment = 0; segment < retention.first; segment++) {  // first == segments
+    for (int segment = 0; segment < retention.second; segment++) {
       std::string fname_seq = fileName + "." + std::to_string(segment);
       vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq, size));
     }
+
+  writeCount = count();
 }
 
 template <class T>
@@ -50,10 +52,11 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
       return vec[newVecIdx2]->write(ptrData, position);
     } else {
       // write at position procedure
-      auto newPosition = position % retention.second;  // second == capacity
-      auto newVecIdx   = (position / retention.second) % retention.first;
+      auto newPosition = (position/size) % retention.first;
+      auto newVecIdx   = int( (position/size) / (retention.first) ) % (retention.second);
+      std::cerr << "W->[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
       return vec[newVecIdx]->write(ptrData, newPosition);
-    }
+    } 
   }
 }
 
@@ -66,9 +69,10 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
     // Need to cover this with test - DOUBlECHECK
     assert(retention.second != 0);
     assert(retention.first != 0);
-    auto newPosition = position % retention.second;  // second == capacity
-    auto newVecIdx   = (position / retention.second) % retention.first;
-    return vec[newVecIdx]->read(ptrData, newPosition);
+    auto newPosition = (position/size) % retention.first;
+    auto newVecIdx   = int( (position/size) / (retention.first) ) % (retention.second);
+    std::cerr << "R<-[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
+    return vec[newVecIdx]->read(ptrData, newPosition*size);
   }
 }
 

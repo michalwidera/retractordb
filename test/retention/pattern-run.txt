@@ -3,3 +3,6 @@
 {	INTEGER dane
 	RETENTION 2 3
 }
+{ dane:1 }
+{ dane:2 }
+{ dane:3 }
