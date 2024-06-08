@@ -148,7 +148,7 @@ storage_statement
 select_statement
 declare_statement
 rational_se
-retention
+retention_from
 fraction_rule
 field_declaration
 field_type

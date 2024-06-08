@@ -14,7 +14,7 @@ select_statement    : SELECT select_list
                       STREAM stream_name=ID
                       FROM stream_expression
                       (FILE name=STRING)?
-                      (retention)?
+                      (retention_from)?
                     # Select
                     ;
 
@@ -29,7 +29,8 @@ rational_se         : fraction_rule # RationalAsFraction_proforma
                     | DECIMAL       # RationalAsDecimal
                     ;
 
-retention           : RETENTION segments=DECIMAL capacity=DECIMAL
+retention_from      : RETENTION segments=DECIMAL capacity=DECIMAL
+                    # Retention
                     ;
 
 fraction_rule       : DECIMAL DIVIDE DECIMAL

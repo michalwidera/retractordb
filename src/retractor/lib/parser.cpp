@@ -1,4 +1,5 @@
 #include <rdb/convertTypes.h>
+#include <spdlog/spdlog.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
@@ -173,9 +174,13 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
-  void exitRetetion(RQLParser::RetentionContext *ctx) {
-    qry.capacity = std::stoi(ctx->capacity->getText());
-    qry.segments = std::stoi(ctx->segments->getText());
+  void exitRetention(RQLParser::RetentionContext *ctx) {
+    SPDLOG_INFO("Parser/Retention: {} {}",            //
+                std::stoi(ctx->segments->getText()),  //
+                std::stoi(ctx->capacity->getText()));
+    qry.retention = std::pair<int, int>(      //
+        std::stoi(ctx->segments->getText()),  //
+        std::stoi(ctx->capacity->getText()));
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {

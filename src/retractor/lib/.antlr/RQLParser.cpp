@@ -50,10 +50,10 @@ void rqlParserInitialize() {
 #endif
   auto staticData = std::make_unique<RQLParserStaticData>(
       std::vector<std::string>{
-          "prog",         "storage_statement",   "select_statement",  "declare_statement", "rational_se",
-          "retention",    "fraction_rule",       "field_declaration", "field_type",        "select_list",
-          "field_id",     "unary_op_expression", "asterisk",          "expression",        "expression_factor",
-          "term",         "stream_expression",   "stream_term",       "stream_factor",     "agregator",
+          "prog",           "storage_statement",   "select_statement",  "declare_statement", "rational_se",
+          "retention_from", "fraction_rule",       "field_declaration", "field_type",        "select_list",
+          "field_id",       "unary_op_expression", "asterisk",          "expression",        "expression_factor",
+          "term",           "stream_expression",   "stream_term",       "stream_factor",     "agregator",
           "function_call"},
       std::vector<std::string>{"",
                                "'['",
@@ -511,7 +511,9 @@ tree::TerminalNode *RQLParser::SelectContext::ID() { return getToken(RQLParser::
 
 tree::TerminalNode *RQLParser::SelectContext::FILE() { return getToken(RQLParser::FILE, 0); }
 
-RQLParser::RetentionContext *RQLParser::SelectContext::retention() { return getRuleContext<RQLParser::RetentionContext>(0); }
+RQLParser::Retention_fromContext *RQLParser::SelectContext::retention_from() {
+  return getRuleContext<RQLParser::Retention_fromContext>(0);
+}
 
 tree::TerminalNode *RQLParser::SelectContext::STRING() { return getToken(RQLParser::STRING, 0); }
 
@@ -568,7 +570,7 @@ RQLParser::Select_statementContext *RQLParser::select_statement() {
     _la = _input->LA(1);
     if (_la == RQLParser::RETENTION) {
       setState(64);
-      retention();
+      retention_from();
     }
 
   } catch (RecognitionException &e) {
@@ -785,10 +787,16 @@ RQLParser::Rational_seContext *RQLParser::rational_se() {
   return _localctx;
 }
 
-//----------------- RetentionContext ------------------------------------------------------------------
+//----------------- Retention_fromContext ------------------------------------------------------------------
 
-RQLParser::RetentionContext::RetentionContext(ParserRuleContext *parent, size_t invokingState)
+RQLParser::Retention_fromContext::Retention_fromContext(ParserRuleContext *parent, size_t invokingState)
     : ParserRuleContext(parent, invokingState) {}
+
+size_t RQLParser::Retention_fromContext::getRuleIndex() const { return RQLParser::RuleRetention_from; }
+
+void RQLParser::Retention_fromContext::copyFrom(Retention_fromContext *ctx) { ParserRuleContext::copyFrom(ctx); }
+
+//----------------- RetentionContext ------------------------------------------------------------------
 
 tree::TerminalNode *RQLParser::RetentionContext::RETENTION() { return getToken(RQLParser::RETENTION, 0); }
 
@@ -796,21 +804,19 @@ std::vector<tree::TerminalNode *> RQLParser::RetentionContext::DECIMAL() { retur
 
 tree::TerminalNode *RQLParser::RetentionContext::DECIMAL(size_t i) { return getToken(RQLParser::DECIMAL, i); }
 
-size_t RQLParser::RetentionContext::getRuleIndex() const { return RQLParser::RuleRetention; }
+RQLParser::RetentionContext::RetentionContext(Retention_fromContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::RetentionContext::enterRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr) parserListener->enterRetention(this);
 }
-
 void RQLParser::RetentionContext::exitRule(tree::ParseTreeListener *listener) {
   auto parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr) parserListener->exitRetention(this);
 }
-
-RQLParser::RetentionContext *RQLParser::retention() {
-  RetentionContext *_localctx = _tracker.createInstance<RetentionContext>(_ctx, getState());
-  enterRule(_localctx, 10, RQLParser::RuleRetention);
+RQLParser::Retention_fromContext *RQLParser::retention_from() {
+  Retention_fromContext *_localctx = _tracker.createInstance<Retention_fromContext>(_ctx, getState());
+  enterRule(_localctx, 10, RQLParser::RuleRetention_from);
 
 #if __cplusplus > 201703L
   auto onExit = finally([=, this] {
@@ -820,6 +826,7 @@ RQLParser::RetentionContext *RQLParser::retention() {
     exitRule();
   });
   try {
+    _localctx = _tracker.createInstance<RQLParser::RetentionContext>(_localctx);
     enterOuterAlt(_localctx, 1);
     setState(88);
     match(RQLParser::RETENTION);

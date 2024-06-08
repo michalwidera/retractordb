@@ -300,19 +300,24 @@ rdb::Descriptor query::descriptorStorage() {
                               std::get<rdb::rarray>(f.field_),  //
                               std::get<rdb::rtype>(f.field_));
 
-  if (isDeclaration()) {
-    retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);
-
-    auto filenameShdw{filename};
-    std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
-    if (filenameShdw.find(".txt") != std::string::npos)
-      retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
-    else
-      retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
-  } else  // !isDeclaration()
-  {
-    retVal += rdb::Descriptor("", 0, 0, rdb::RETENTION);
+  if (!isDeclaration()) {
+    if (retention != std::pair<int, int>{0, 0}) {
+      SPDLOG_INFO("descriptorStorage/Retention: {} {}", retention.first, retention.second);
+      retVal += rdb::Descriptor("", retention.first, retention.second, rdb::RETENTION);
+    } else {
+      SPDLOG_INFO("descriptorStorage/Retention: Empty");
+    }
+    return retVal;
   }
+  retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);
+
+  auto filenameShdw{filename};
+  std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
+  if (filenameShdw.find(".txt") != std::string::npos)
+    retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
+  else
+    retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
+
   return retVal;
 }
 
@@ -335,6 +340,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
     retVal += descriptorStorage();
     return retVal;
   }
+
   auto [arg1, arg2, cmd]{GetArgs(lProgram)};
   switch (cmd.getCommandID()) {
     case STREAM_AVG:
@@ -377,6 +383,11 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
     default:
       SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
       assert(false);
+  }
+
+  if (retention != std::pair<int, int>{0, 0}) {
+    SPDLOG_INFO("descriptorFrom/Retention: {} {}", retention.first, retention.second);
+    retVal += rdb::Descriptor("", retention.first, retention.second, rdb::RETENTION);
   }
   return retVal;
 }

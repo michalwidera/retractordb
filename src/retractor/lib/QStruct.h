@@ -66,8 +66,7 @@ class query {
   std::list<field> lSchema;
   std::list<token> lProgram;
 
-  int segments = 0;
-  int capacity = 0;
+  std::pair<int, int> retention = {0, 0};
 
   bool isDeclaration() const;
   bool isReductionRequired();

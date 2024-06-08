@@ -85,7 +85,7 @@ class RQLParser : public antlr4::Parser {
     RuleSelect_statement    = 2,
     RuleDeclare_statement   = 3,
     RuleRational_se         = 4,
-    RuleRetention           = 5,
+    RuleRetention_from      = 5,
     RuleFraction_rule       = 6,
     RuleField_declaration   = 7,
     RuleField_type          = 8,
@@ -124,7 +124,7 @@ class RQLParser : public antlr4::Parser {
   class Select_statementContext;
   class Declare_statementContext;
   class Rational_seContext;
-  class RetentionContext;
+  class Retention_fromContext;
   class Fraction_ruleContext;
   class Field_declarationContext;
   class Field_typeContext;
@@ -207,7 +207,7 @@ class RQLParser : public antlr4::Parser {
     Stream_expressionContext *stream_expression();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FILE();
-    RetentionContext *retention();
+    Retention_fromContext *retention_from();
     antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -288,21 +288,31 @@ class RQLParser : public antlr4::Parser {
 
   Rational_seContext *rational_se();
 
-  class RetentionContext : public antlr4::ParserRuleContext {
+  class Retention_fromContext : public antlr4::ParserRuleContext {
    public:
+    Retention_fromContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+
+    Retention_fromContext() = default;
+    void copyFrom(Retention_fromContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+  };
+
+  class RetentionContext : public Retention_fromContext {
+   public:
+    RetentionContext(Retention_fromContext *ctx);
+
     antlr4::Token *segments = nullptr;
     antlr4::Token *capacity = nullptr;
-    RetentionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *RETENTION();
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode *DECIMAL(size_t i);
-
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  RetentionContext *retention();
+  Retention_fromContext *retention_from();
 
   class Fraction_ruleContext : public antlr4::ParserRuleContext {
    public:
