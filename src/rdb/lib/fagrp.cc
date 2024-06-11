@@ -12,7 +12,7 @@ namespace rdb {
 
 template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           //
-                                        const size_t recSize,                     //
+                                        const size_t recSize,                  //
                                         const std::pair<int, int> &retention)  //
     : filename(fileName), recSize(recSize), retention(retention) {
   if (retention == std::pair<int, int>{0, 0})

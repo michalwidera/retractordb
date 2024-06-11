@@ -169,7 +169,11 @@ void storageAccessor::reset() {
 
   initializeAccessor();
 
+  accessor->write(nullptr, 0);
   recordsCount = 0;
+
+  assert(recordsCount == accessor->count());
+
   SPDLOG_INFO("reset - drop & recreate storage.");
 }
 
@@ -196,7 +200,10 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
-size_t storageAccessor::getRecordsCount() { return recordsCount; }
+size_t storageAccessor::getRecordsCount() {
+  // assert(recordsCount == accessor->count());
+  return recordsCount;
+}
 
 std::string storageAccessor::getStorageName() { return storageFile; }
 
@@ -253,6 +260,8 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
 
   recordIndexRv = recordIndex;
 
+  assert(recordsCount == accessor->count());
+
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, recordIndexRv * size);
     assert(result == 0);
@@ -265,6 +274,8 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
 }
 
 bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
+  // assert( recordsCount == accessor->count());
+
   const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
 
   if (!isDeclared()) return read_(recordPositionFromBack, destination);
@@ -322,6 +333,8 @@ void storageAccessor::setCapacity(const int capacity) {
 
 bool storageAccessor::write(const size_t recordIndex) {
   abortIfStorageNotPrepared();
+
+  assert(recordsCount == accessor->count());
 
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
