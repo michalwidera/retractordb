@@ -202,6 +202,8 @@ void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
 size_t storageAccessor::getRecordsCount() {
   // assert(recordsCount == accessor->count());
+
+  // if (accessor->count() != 0) assert(recordsCount == accessor->count());
   return recordsCount;
 }
 
@@ -276,7 +278,7 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
 bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
   // assert( recordsCount == accessor->count());
 
-  const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
+  const auto recordPositionFromBack = recordsCount - recordIndex - 1;
 
   if (!isDeclared()) return read_(recordPositionFromBack, destination);
 
@@ -342,6 +344,7 @@ bool storageAccessor::write(const size_t recordIndex) {
     result = accessor->write(static_cast<uint8_t *>(storagePayload->get()));  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
+
     SPDLOG_INFO("append");
     return result == 0;
   }
@@ -351,6 +354,9 @@ bool storageAccessor::write(const size_t recordIndex) {
     assert(result == 0);
     SPDLOG_INFO("write {}", recordIndex);
   }
+
+  assert(recordsCount == accessor->count());
+
   return result == 0;
 };
 

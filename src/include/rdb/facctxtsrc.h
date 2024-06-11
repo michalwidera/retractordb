@@ -16,7 +16,7 @@ namespace rdb {
 template <typename T>
 class textSourceAccessor : public FileAccessorInterface<T> {
   const std::string filename;
-  const std::size_t size;
+  const std::size_t sizeRec;
 
   Descriptor descriptor;
 
@@ -24,11 +24,13 @@ class textSourceAccessor : public FileAccessorInterface<T> {
 
   std::fstream myFile;
 
+  std::size_t readCount = 0;
+
  public:
   ~textSourceAccessor();
 
   explicit textSourceAccessor(const std::string &fileName,  //
-                              const size_t size,            //
+                              const size_t sizeRec,         //
                               const rdb::Descriptor &descriptor);
 
   ssize_t read(T *ptrData, const size_t position) override;
