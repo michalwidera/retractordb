@@ -17,7 +17,7 @@ namespace rdb {
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
   const std::string filename;
-  const std::size_t size;
+  const std::size_t recSize;
 
   std::pair<int, int> retention = {0, 0};  // segments , capacity
 
@@ -28,7 +28,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
  public:
   ~groupFileAccessor();
 
-  explicit groupFileAccessor(const std::string &fileName, const size_t size, const std::pair<int, int> &retention);
+  explicit groupFileAccessor(const std::string &fileName, const size_t recSize, const std::pair<int, int> &retention);
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

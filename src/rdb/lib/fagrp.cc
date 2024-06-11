@@ -12,15 +12,15 @@ namespace rdb {
 
 template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           //
-                                        const size_t size,                     //
+                                        const size_t recSize,                     //
                                         const std::pair<int, int> &retention)  //
-    : filename(fileName), size(size), retention(retention) {
+    : filename(fileName), recSize(recSize), retention(retention) {
   if (retention == std::pair<int, int>{0, 0})
-    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, size));
+    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize));
   else
     for (int segment = 0; segment < retention.second; segment++) {
       std::string fname_seq = fileName + "." + std::to_string(segment);
-      vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq, size));
+      vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq, recSize));
     }
 
   writeCount = count();
@@ -36,7 +36,7 @@ std::string groupFileAccessor<T>::fileName() {
 
 template <class T>
 ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recSize != 0);
   if (retention == std::pair<int, int>{0, 0})
     return vec[0]->write(ptrData, position);
   else {
@@ -54,8 +54,8 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
       for (auto &v : vec) v->write(nullptr, 0);  // purge all
     } else {
       // write at position procedure
-      auto newPosition = (position / size) % retention.first;
-      auto newVecIdx   = int((position / size) / (retention.first)) % (retention.second);
+      auto newPosition = (position / recSize) % retention.first;
+      auto newVecIdx   = int((position / recSize) / (retention.first)) % (retention.second);
       // std::cerr << "W->[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
       return vec[newVecIdx]->write(ptrData, newPosition);
     }
@@ -65,17 +65,17 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
 template <class T>
 ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recSize != 0);
   if (retention == std::pair<int, int>{0, 0})
     return vec[0]->read(ptrData, position);
   else {
     // Need to cover this with test - DOUBlECHECK
     assert(retention.second != 0);
     assert(retention.first != 0);
-    auto newPosition = (position / size) % retention.first;
-    auto newVecIdx   = int((position / size) / (retention.first)) % (retention.second);
+    auto newPosition = (position / recSize) % retention.first;
+    auto newVecIdx   = int((position / recSize) / (retention.first)) % (retention.second);
     // std::cerr << "R<-[" << newVecIdx << "][" << newPosition << "]" << std::endl ;
-    return vec[newVecIdx]->read(ptrData, newPosition * size);
+    return vec[newVecIdx]->read(ptrData, newPosition * recSize);
   }
   return 0;  // proforma
 }
