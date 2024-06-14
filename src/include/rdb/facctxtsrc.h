@@ -24,7 +24,7 @@ class textSourceAccessor : public FileAccessorInterface<T> {
 
   std::fstream myFile;
 
-  std::size_t readCount = 0;
+  size_t readCount = 0;
 
  public:
   ~textSourceAccessor();

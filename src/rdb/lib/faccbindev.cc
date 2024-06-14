@@ -49,14 +49,16 @@ ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t position) {
     size_t read_size_sh = ::read(fd, ptrData, recSize);
     if (read_size_sh != recSize) return EXIT_FAILURE;
   }
+  cnt++;
   return EXIT_SUCCESS;
 }
 
 template <class T>
 size_t binaryDeviceAccessor<T>::count() {
-  struct stat stat_buf;
-  int rc = stat(filename.c_str(), &stat_buf);
-  return rc == 0 ? stat_buf.st_size / recSize : -1;
+  // struct stat stat_buf;
+  // int rc = stat(filename.c_str(), &stat_buf);
+  // return rc == 0 ? stat_buf.st_size / recSize : -1;
+  return cnt;
 }
 
 template class binaryDeviceAccessor<uint8_t>;

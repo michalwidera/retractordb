@@ -19,6 +19,8 @@ class binaryDeviceAccessor : public FileAccessorInterface<T> {
    */
   int fd;
 
+  size_t cnt = 0;
+
  public:
   ~binaryDeviceAccessor();
 

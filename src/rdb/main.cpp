@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <boost/system/error_code.hpp>
 #include <cassert>
 #include <cstring>
 #include <filesystem>
@@ -10,11 +11,15 @@
 #include <memory>  // make_unique
 #include <string>
 
+#include "config.h"
 #include "rdb/descriptor.h"
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
+#include "uxSysTermTools.h"
+
+using namespace boost;
 
 /*
  * This code creates xtrdb executable file.
@@ -22,8 +27,13 @@
 
 enum payloadStatusType { fetched, clean, stored, changed, error };
 
+void cleanup() {
+  spdlog::shutdown();  // flush logs on disk
+}
+
 int main(int argc, char *argv[]) {
   payloadStatusType payloadStatus{clean};
+  std::atexit(cleanup);
 
   std::string GREEN  = "\x1B[32m";
   std::string RED    = "\x1B[31m";
@@ -33,12 +43,25 @@ int main(int argc, char *argv[]) {
   std::string RESET  = "\033[0m";
   std::string BLINK  = "\x1b[5m";
 
-  auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
-  spdlog::set_default_logger(filelog);
-  constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
-  spdlog::set_pattern(common_log_pattern);
-  spdlog::flush_on(spdlog::level::trace);
+  // auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
 
+  // fixArgcv(argc, argv);
+  const auto filelog = setupLoggerMain(std::string(argv[0]), false);
+
+  // spdlog::set_default_logger(filelog);
+  // constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
+  // spdlog::set_pattern(common_log_pattern);
+  // spdlog::flush_on(spdlog::level::trace);
+
+  if (argc == 2 && strcmp(argv[1], "-h") == 0) {
+    std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
+    // std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
+    // std::cout << desc;
+    std::cout << config_line << std::endl;
+    std::cout << "Log: " << filelog << std::endl;
+    std::cout << warranty << std::endl;
+    return system::errc::success;
+  }
   std::unique_ptr<rdb::storageAccessor> dacc;
   std::string file;
   bool rox           = true;
@@ -140,6 +163,14 @@ int main(int argc, char *argv[]) {
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
       std::cout << "echo \t\t\t\t print message on terminal\n";
+
+      std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
+      // std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
+      // std::cout << desc;
+      std::cout << config_line << std::endl;
+      std::cout << "Log: " << filelog << std::endl;
+      std::cout << warranty << std::endl;
+
       std::cout << RESET;
     } else if (cmd == "dropfile") {
       std::string object;

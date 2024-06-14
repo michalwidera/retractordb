@@ -276,6 +276,11 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
 }
 
 bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
+  if (recordsCount == accessor->count())
+    SPDLOG_INFO("revRead {}: recordsCount:{} ->count():{}", storageFile, recordsCount, accessor->count());
+  else
+    SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", storageFile, recordsCount, accessor->count());
+
   // assert( recordsCount == accessor->count());
 
   const auto recordPositionFromBack = recordsCount - recordIndex - 1;

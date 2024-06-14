@@ -28,7 +28,7 @@ template <typename T>
 textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,  //
                                           const size_t sizeRec,         //
                                           const rdb::Descriptor &descriptor)
-    : filename(fileName), descriptor(descriptor), sizeRec(sizeRec) {
+    : filename(fileName), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
