@@ -246,7 +246,7 @@ bool storageAccessor::read_() {
 
 void storageAccessor::purge() { accessor->write(nullptr, 0); }
 
-bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
+bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destination) {
   assert(!isDeclared());
   abortIfStorageNotPrepared();
 
@@ -260,7 +260,7 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
 
   auto recordIndexRv{0};
 
-  recordIndexRv = recordIndex;
+  recordIndexRv = recordIndexFromFront;
 
   assert(recordsCount == accessor->count());
 
@@ -275,17 +275,17 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
   return result == 0;
 }
 
-bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
+bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   if (recordsCount == accessor->count())
     SPDLOG_INFO("revRead {}: recordsCount:{} ->count():{}", storageFile, recordsCount, accessor->count());
   else
     SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", storageFile, recordsCount, accessor->count());
 
-  // assert( recordsCount == accessor->count());
-
-  const auto recordPositionFromBack = recordsCount - recordIndex - 1;
-
-  if (!isDeclared()) return read_(recordPositionFromBack, destination);
+  if (!isDeclared()) {
+    assert(recordsCount == accessor->count());
+    const auto recordPositionFromBack = recordsCount - recordIndexFromBack - 1;
+    return read(recordPositionFromBack, destination);
+  }
 
   // For all _DECLARED_ data sources buffer capacity at least _MUST_ be 1
   // In order to maintain the consistency of declared data sources,
@@ -294,7 +294,7 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
   assert(circularBuffer.capacity() > 0);
   assert(isDeclared());
 
-  if (recordIndex == 0 && bufferState == sourceState::flux) {
+  if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     //
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
@@ -302,7 +302,7 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
     assert(result && "Failure during read.");
     bufferState = sourceState::armed;
   }
-  assert(recordIndex >= 0);
+  assert(recordIndexFromBack >= 0);
 
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources
@@ -310,12 +310,12 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
   // - only for recordIndex > 0 if sourceState::flux
   // - also for recordIndex == 0 if sourceState::lock
 
-  SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer.capacity(), recordIndex, storageFile);
-  assert((recordIndex < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
+  SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer.capacity(), recordIndexFromBack, storageFile);
+  assert((recordIndexFromBack < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
 
   // in case of accessing buffer that has no data yet - zeros are returned
 
-  if (recordIndex >= circularBuffer.size()) {
+  if (recordIndexFromBack >= circularBuffer.size()) {
     destination = (destination == nullptr)                             //
                       ? static_cast<uint8_t *>(storagePayload->get())  //
                       : destination;
@@ -323,14 +323,14 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
     assert(destination != nullptr);
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read buffer fn {} - non existing data from pos:{} capacity:{}", accessor->fileName(), recordIndex,
+    SPDLOG_WARN("read buffer fn {} - non existing data from pos:{} capacity:{}", accessor->fileName(), recordIndexFromBack,
                 circularBuffer.capacity());
     return true;
   }
 
-  assert((recordIndex < circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
+  assert((recordIndexFromBack < circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
 
-  *(storagePayload.get()) = circularBuffer[recordIndex];
+  *(storagePayload.get()) = circularBuffer[recordIndexFromBack];
   return true;
 }
 

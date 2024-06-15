@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
       if (dacc->isDeclared()) {
         dacc->bufferState = rdb::sourceState::flux;
       }
-      auto returnStatus = (cmd == "read") ? dacc->revRead(dacc->getRecordsCount() - record - 1) : dacc->revRead(record);
+      auto returnStatus = (cmd == "read") ? dacc->read(record) : dacc->revRead(record);
       if (dacc->isDeclared()) {
         dacc->fire();
         dacc->bufferState = rdb::sourceState::lock;
@@ -280,7 +280,7 @@ int main(int argc, char *argv[]) {
           std::cout << RED << "record out of range - list command\n" << RESET;
           continue;
         }
-        auto returnStatus = (cmd == "rlist") ? dacc->revRead(i) : dacc->revRead(dacc->getRecordsCount() - i - 1);
+        auto returnStatus = (cmd == "rlist") ? dacc->revRead(i) : dacc->read(i);
         payloadStatus     = returnStatus ? fetched : error;
 
         if (payloadStatus == error) {
