@@ -91,3 +91,13 @@ template class groupFileAccessor<uint8_t>;
 template class groupFileAccessor<char>;
 
 }  // namespace rdb
+
+/*
+PYTHON MODEL
+
+window = 3
+silos = 2
+
+for i in range(0,20): print(i, i% window)
+
+*/
