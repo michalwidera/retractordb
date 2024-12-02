@@ -3,7 +3,7 @@
 #include <rdb/fagrp.h>
 #include <string>
 
-TEST(fileAccessor, test_dir) {
+TEST(xFileAccessor, test_dir) {
   ASSERT_TRUE(true);
 
   struct {
