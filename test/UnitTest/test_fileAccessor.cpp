@@ -5,20 +5,21 @@
 
 #include <filesystem>
 
-const std::string sandBoxFolder = "/tmp/test_sandbox";
+const std::filesystem::path sandBoxFolder = "/tmp/test_sandbox";
 
 TEST(xFileAccessor, test_dir) {
 
   bool filepathExists = std::filesystem::is_directory(sandBoxFolder);
-
-  if (!filepathExists) {
-    std::filesystem::create_directories(sandBoxFolder);
-    std::filesystem::permissions(
-        sandBoxFolder,
-        std::filesystem::perms::others_all,
-        std::filesystem::perm_options::remove
-    );
+  if (filepathExists) {
+    std::filesystem::remove_all(sandBoxFolder);
   }
+
+  std::filesystem::create_directories(sandBoxFolder);
+  std::filesystem::permissions(
+      sandBoxFolder,
+      std::filesystem::perms::others_all,
+      std::filesystem::perm_options::remove
+  );
 
   std::filesystem::current_path(sandBoxFolder);
 
@@ -28,7 +29,8 @@ TEST(xFileAccessor, test_dir) {
     char data;
   } record ;
 
-  const std::string filename = "test_file";
+  std::string filename = "test_file";
+
   auto recsize = sizeof(char);
   auto silos_count = 3;
   auto silos_size = 3;
