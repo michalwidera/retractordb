@@ -146,7 +146,7 @@ std::string compiler::intervalCounter() {
       }  // switch ( op.getCommandID() )
       assert(delta != -1);
       q.rInterval = delta;  // There is established delta value - return value
-    }                       // BOOST_FOREACH ( query & q , coreInstance )
+    }  // BOOST_FOREACH ( query & q , coreInstance )
     if (!bOnceAgain)
       break;
     else
@@ -217,9 +217,9 @@ std::string compiler::simplifyLProgram() {
           break;
 
         }  // Endif PUSH_STREAM, PUSH_VAL
-      }    // Endfor
-    }      // Endif
-  }        // Endfor
+      }  // Endfor
+    }  // Endif
+  }  // Endfor
   return std::string("OK");
 }
 

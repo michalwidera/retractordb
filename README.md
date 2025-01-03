@@ -53,6 +53,12 @@ make grammar
 make cformat
 ```
 
+additional:
+
+```
+https://github.com/cheshirekow/cmake_format
+```
+
 Work with antl4 and .g4 files requires java - install it with:
 ```
 sudo apt install default-jre
