@@ -43,12 +43,12 @@ TEST(xFileAccessor, test_dir) {
   ASSERT_TRUE(true);
 
   struct {
-    char data;
+    BYTE data;
   } record;
 
   std::string filename = "test_file";
 
-  auto recsize     = sizeof(char);
+  auto recsize     = sizeof(BYTE);
   auto silos_count = 0;
   auto silos_size  = 0;
   auto retention   = std::pair<int, int>(silos_count, silos_size);
