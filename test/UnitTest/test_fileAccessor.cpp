@@ -2,9 +2,29 @@
 #include <rdb/fagrp.h>
 
 #include <filesystem>
+#include <fstream>
 #include <string>
+#include <vector>
 
-const std::filesystem::path sandBoxFolder = "/tmp/test_sandbox";
+typedef unsigned char BYTE;
+
+// cd build/Debug
+// make install ; ctest -R test_fileAccessor -V
+
+const std::filesystem::path sandBoxFolder = "/tmp/test_fileAccessor";
+
+std::ifstream::pos_type filesize(std::string filename) {
+  std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
+  return in.tellg();
+}
+
+std::vector<BYTE> readFile(std::string filename) {
+  // open the file:
+  std::ifstream file(filename, std::ios::binary);
+
+  // read the data:
+  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+}
 
 TEST(xFileAccessor, test_dir) {
   bool filepathExists = std::filesystem::is_directory(sandBoxFolder);
@@ -29,12 +49,22 @@ TEST(xFileAccessor, test_dir) {
   std::string filename = "test_file";
 
   auto recsize     = sizeof(char);
-  auto silos_count = 3;
-  auto silos_size  = 3;
+  auto silos_count = 0;
+  auto silos_size  = 0;
   auto retention   = std::pair<int, int>(silos_count, silos_size);
   auto gfa         = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
-  record.data      = 1;
+  record.data      = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data = 2;
+  record.data = 12;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
+
+  for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
+    std::cout << entry.path() << ":" << filesize(entry.path());
+    auto data = readFile(entry.path());
+    std::cout << ":" << data.size();
+    for (auto &d : data) {
+      std::cout << ":" << (int)d;
+    }
+    std::cout << std::endl;
+  }
 }
