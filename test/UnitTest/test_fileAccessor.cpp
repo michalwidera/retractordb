@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,13 @@ TEST(xFileAccessor, test_dir) {
     BYTE data;
   } record;
 
+  struct fileInfo {
+    int sizeFromSystem;
+    std::vector<BYTE> fileContents;
+  };
+
+  std::map<std::string, fileInfo> mapOfFiles;
+
   std::string filename = "test_file";
 
   auto recsize     = sizeof(BYTE);
@@ -58,11 +66,12 @@ TEST(xFileAccessor, test_dir) {
   record.data = 12;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
 
-  for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
-    std::cout << entry.path() << ":" << filesize(entry.path());
-    auto data = readFile(entry.path());
-    std::cout << ":" << data.size();
-    for (auto &d : data) {
+  for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder))
+    mapOfFiles[entry.path()] = fileInfo{filesize(entry.path()), readFile(entry.path())};
+
+  for (const auto &entry : mapOfFiles) {
+    std::cout << entry.first << ":" << entry.second.sizeFromSystem;
+    for (auto &d : entry.second.fileContents) {
       std::cout << ":" << (int)d;
     }
     std::cout << std::endl;
