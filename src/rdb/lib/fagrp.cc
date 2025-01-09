@@ -5,10 +5,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <boost/json.hpp>
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 namespace rdb {
+
+std::ifstream::pos_type filesize(const std::string &filename) {
+  std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
+  return in.tellg();
+}
 
 template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           //
@@ -82,9 +90,20 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
 
 template <class T>
 size_t groupFileAccessor<T>::count() {
-  size_t sumCount{0};
-  for (auto &v : vec) sumCount += v->count();
-  return sumCount;
+  size_t writeCount{0};
+
+  auto fileExists = std::filesystem::exists(fileName() + ".ccc");
+  if (fileExists) {
+    std::ifstream input(fileName() + ".ccc");
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    boost::json::value json_data = boost::json::parse(buffer.str());
+    writeCount                   = json_data.as_object().at("writeCount").as_int64();
+  }
+
+  for (auto &v : vec) writeCount += v->count();
+
+  return writeCount;
 }
 
 template class groupFileAccessor<uint8_t>;

@@ -14,12 +14,12 @@ typedef unsigned char BYTE;
 
 const std::filesystem::path sandBoxFolder = "/tmp/test_fileAccessor";
 
-std::ifstream::pos_type filesize(std::string filename) {
+std::ifstream::pos_type filesize(const std::string &filename) {
   std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
   return in.tellg();
 }
 
-std::vector<BYTE> readFile(std::string filename) {
+std::vector<BYTE> readFile(const std::string &filename) {
   // open the file:
   std::ifstream file(filename, std::ios::binary);
 
@@ -27,8 +27,13 @@ std::vector<BYTE> readFile(std::string filename) {
   return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 }
 
-TEST(xFileAccessor, test_dir) {
-  bool filepathExists = std::filesystem::is_directory(sandBoxFolder);
+TEST(FileAccessorTest, test_dir) {
+  bool filepathExists = false;
+  try {
+    filepathExists = std::filesystem::is_directory(sandBoxFolder);
+  } catch (const std::filesystem::filesystem_error &e) {
+    std::cerr << "Filesystem error: " << e.what() << '\n';
+  }
   if (filepathExists) {
     std::filesystem::remove_all(sandBoxFolder);
   }
@@ -40,8 +45,6 @@ TEST(xFileAccessor, test_dir) {
       std::filesystem::perm_options::remove  //
   );
   std::filesystem::current_path(sandBoxFolder);
-
-  ASSERT_TRUE(true);
 
   struct {
     BYTE data;
@@ -66,14 +69,16 @@ TEST(xFileAccessor, test_dir) {
   record.data = 12;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
 
-  for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder))
-    mapOfFiles[entry.path()] = fileInfo{filesize(entry.path()), readFile(entry.path())};
+  for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
+    mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
+  }
 
   for (const auto &entry : mapOfFiles) {
-    std::cout << entry.first << ":" << entry.second.sizeFromSystem;
+    std::stringstream ss;
+    ss << entry.first << ":" << entry.second.sizeFromSystem;
     for (auto &d : entry.second.fileContents) {
-      std::cout << ":" << (int)d;
+      ss << ":" << static_cast<int>(d);
     }
-    std::cout << std::endl;
+    GTEST_LOG_(INFO) << ss.str();
   }
 }
