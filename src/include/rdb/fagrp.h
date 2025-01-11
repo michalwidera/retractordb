@@ -14,10 +14,27 @@ namespace rdb {
  *
  * Type: DEFAULT (NEW)
  */
+
+class ccc {
+ public:
+  ccc(const std::string &fileName);
+
+  void write(const size_t writeCount);
+
+  size_t read();
+
+ private:
+  const std::string fileName;
+  bool initialized{false};
+  size_t writeCount{0};
+};
+
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
   const std::string filename;
   const std::size_t recSize;
+
+  ccc cccFile;
 
   std::pair<int, int> retention = {0, 0};  // segments , capacity
 

@@ -13,6 +13,37 @@
 
 namespace rdb {
 
+ccc::ccc(const std::string &fileName) : fileName(fileName) {}
+
+void ccc::write(const size_t writeCountParam) {
+  writeCount = writeCountParam;
+  boost::json::object obj;
+  obj["writeCount"] = writeCount;
+  std::ofstream output(fileName + ".ccc");
+  if (!output.is_open()) {
+    throw std::runtime_error("Failed to open file for writing: " + fileName + ".ccc");
+  }
+  output << boost::json::serialize(obj) << std::endl;
+  initialized = true;
+}
+
+size_t ccc::read() {
+  if (!initialized) {
+    initialized = true;
+
+    auto fileExists = std::filesystem::exists(fileName + ".ccc");
+    if (fileExists) {
+      std::ifstream input(fileName + ".ccc");
+      std::ostringstream buffer;
+      buffer << input.rdbuf();
+      boost::json::value json_data = boost::json::parse(buffer.str());
+      writeCount                   = json_data.as_object().at("writeCount").as_int64();
+    }
+  }
+
+  return writeCount;
+};
+
 std::ifstream::pos_type filesize(const std::string &filename) {
   std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
   return in.tellg();
@@ -22,7 +53,7 @@ template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           //
                                         const size_t recSize,                  //
                                         const std::pair<int, int> &retention)  //
-    : filename(fileName), recSize(recSize), retention(retention) {
+    : filename(fileName), recSize(recSize), retention(retention), cccFile(fileName) {
   if (retention == std::pair<int, int>{0, 0})
     vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize));
   else
@@ -90,16 +121,7 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
 
 template <class T>
 size_t groupFileAccessor<T>::count() {
-  size_t writeCount{0};
-
-  auto fileExists = std::filesystem::exists(fileName() + ".ccc");
-  if (fileExists) {
-    std::ifstream input(fileName() + ".ccc");
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    boost::json::value json_data = boost::json::parse(buffer.str());
-    writeCount                   = json_data.as_object().at("writeCount").as_int64();
-  }
+  size_t writeCount{cccFile.read()};
 
   for (auto &v : vec) writeCount += v->count();
 
