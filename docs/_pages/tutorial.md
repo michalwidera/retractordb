@@ -33,7 +33,7 @@ tmux
 ./build/xqry -s str2
 ```
 
-Math-and-Model
+Math and Model
 ==============
 
 Following code initiate data.
