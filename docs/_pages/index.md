@@ -5,25 +5,25 @@ title: "RetractorDB"
 header:
   overlay_color: "#000"
   overlay_filter: "0.5"
-  overlay_image: /docs/assets/images/IMG_0786_s.JPG
+  overlay_image: /assets/images/IMG_0786_s.JPG
   caption: "Photo credit: Tomasz Widera"
 excerpt: "The open source time series database"
 feature_row:
   - image_path: assets/images/splash-1.jpg
     title: "Unique way of data processing"
     excerpt: "This system offers unique method of data processing. Using a declarative language, the system creates query execution plans based on __number theory__ equations."
-  - image_path: /docs/assets/images/splash-2.jpg
+  - image_path: /assets/images/splash-2.jpg
     image_caption: "Photos by Tomasz Widera"
     title: "What \"the different\" actually mean?"
     excerpt: "This is a repetitive question after the first contact. In short: This system can do what others cannot. So ... are you ready for __rocket science__?"
     url: /different/
     btn_label: "Read more"
     btn_class: "btn--primary"
-  - image_path: /docs/assets/images/splash-3.jpg
+  - image_path: /assets/images/splash-3.jpg
     title: "Prototype!"
     excerpt: "Please notice that system is in __prototype stage__. The goal is to create new standard for time series processing query languages. Take, learn and spread across all other projects. Good ideas should be supported."
 feature_row2:
-  - image_path: /docs/assets/images/splash-4.jpg
+  - image_path: /assets/images/splash-4.jpg
     title: "Removing complexity is not always a win."
     excerpt: '_“Serverless” means you have servers, but can’t configure/customize them.
 “No-code” means there is code, but you can’t change it.
@@ -34,7 +34,7 @@ Removing complexity is not always a win._
 Twitter/Kris Johnson/@OldManKris'
 
 feature_row3:
-  - image_path: /docs/assets/images/splash-5.jpg
+  - image_path: /assets/images/splash-5.jpg
     alt: "placeholder image 2"
     title: "Code that materializes an idea..."
     excerpt: '
