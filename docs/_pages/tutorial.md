@@ -33,14 +33,6 @@ tmux
 ./build/xqry -s str2
 ```
 
-Video Tutorials
-===============
-
-_Please note that on videos you will hear previous database name. Due trademark conflict this name has been changed to RetractorDB. New videos will be uploaded soon._
-
-Here you can find some video tutorials about RetractorDB Time Series Database system. I suggest to start from Session Record. Math basis are hard to understand for start but at the end everyone who intends to use that system should touch this. Apologies for low quality of these tutorials but this is only a side job for me. I did my best to spread that idea. Hope it will be enough.
-
-
 Math-and-Model
 ==============
 
