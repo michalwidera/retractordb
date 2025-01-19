@@ -6,7 +6,7 @@ excerpt: "Code that materializes an idea.."
 header:
   overlay_color: "#000"
   overlay_filter: "0.5"
-  overlay_image: /assets/images/IMG_0758.JPG
+  overlay_image: /docs/assets/images/IMG_0758.JPG
   caption: "Photo credit: Tomasz Widera"
   overlay_color: "#333"
 ---

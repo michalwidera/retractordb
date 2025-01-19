@@ -5,7 +5,7 @@ title: "Trademark guidelines"
 header:
   overlay_color: "#000"
   overlay_filter: "0.5"
-  overlay_image: /assets/images/IMG_0748.JPG
+  overlay_image: /docs/assets/images/IMG_0748.JPG
   caption: "Photo credit: Tomasz Widera"
 excerpt: "RetractorDB is the open source time series database"
 toc: true
@@ -34,5 +34,5 @@ used in graphical form. The code that generates this trademark is following:
 
 | SVG Sources |
 | :---: |
-| ![RetractorDB-SVG](../assets/images/retractordb.svg) |
-| ![RetractorDB-SVG-onblack](../assets/images/retractordb-onblack.svg) |
+| ![RetractorDB-SVG](../docs/assets/images/retractordb.svg) |
+| ![RetractorDB-SVG-onblack](../docs/assets/images/retractordb-onblack.svg) |

@@ -21,7 +21,7 @@ twitter_username: widera_michal
 github_username:  michalwidera
 minimal_mistakes_skin: default
 search: true
-logo: "/assets/images/icon/ms-icon-70x70.png"
+logo: "/docs/assets/images/icon/ms-icon-70x70.png"
 
 url: "https://retractordb.com" # the base hostname & protocol for your site, e.g. http://example.com
 
@@ -67,7 +67,7 @@ plugins:
 
 author:
   name   : "Michal Widera"
-  avatar : "/assets/images/michal-photo.jpg"
+  avatar : "/docs/assets/images/michal-photo.jpg"
   bio    : "Software engineer"
   links:
     - label: "Twitter"
