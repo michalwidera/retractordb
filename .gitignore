@@ -26,8 +26,6 @@ CMakeUserPresets.json
 *.lkn
 *.qry*
 *.dot
-*.jpg
-*.png
 *.swp
 *.log
 *.bkp

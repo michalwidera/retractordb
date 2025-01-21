@@ -10,12 +10,16 @@ workflows:
               only:
                  - master
                  - /issue_.*/
+              ignore:
+                 - /[doc*]
       - build-2204-release:
           filters:
             branches:
               only:
                  - master
                  - /issue_.*/
+              ignore:
+                 - /[doc*]
 
   nightly:
     triggers:
@@ -28,6 +32,8 @@ workflows:
               only:
                 - master
                 - /issue_.*/
+              ignore:
+                 - /[doc*]
     jobs:
       - build-2204-release
       - build-2204-conan20:
