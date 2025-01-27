@@ -22,7 +22,7 @@ class Retractor(ConanFile):
         "antlr4-cppruntime/" + antlr_version,
         "antlr4/" + antlr_version,
         "spdlog/1.10.0",
-        "openjdk/21.0.2",
+        "openjdk/21.0.1",
     )
     testing = []
     package_type = "application"
