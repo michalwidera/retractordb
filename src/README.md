@@ -14,4 +14,4 @@
 
 ## DrawIo - system model
 
-![System overview](https://github.com/michalwidera/retractordb/blob/master/src/UML/System-overview.drawio.svg)
+![System overview](https://github.com/michalwidera/retractordb/blob/master/src/UML/System-overview.svg)
