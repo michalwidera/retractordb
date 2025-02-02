@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 # Packages are managed in ./CMakeLists.txt find_package(Boost REQUIRED)
 # find_package(spdlog REQUIRED) find_package(fmt REQUIRED)
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 project(xqry LANGUAGES CXX)
 
 set(SOURCES_QRY qryLauncher.cpp qry.cpp ../common/uxSysTermTools.cpp)
