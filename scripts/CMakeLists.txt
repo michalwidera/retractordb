@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-
+cmake_minimum_required(VERSION 3.6)
 install(PROGRAMS plotblock.py buildrdb.sh DESTINATION ~/.local/bin)
 
 add_custom_target(

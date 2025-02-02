@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-
+cmake_minimum_required(VERSION 3.6)
 project(xretractor LANGUAGES CXX)
 
 add_subdirectory(lib)

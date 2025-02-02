@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-
+cmake_minimum_required(VERSION 3.6)
 enable_testing()
 
 # message(STATUS ${CMAKE_CURRENT_BINARY_DIR}) message(STATUS

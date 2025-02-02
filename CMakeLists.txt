@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-
+cmake_minimum_required(VERSION 3.6)
 project(retractordb)
 
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
