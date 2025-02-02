@@ -17,7 +17,7 @@ class Retractor(ConanFile):
     homepage = "https://retractordb.com"
     antlr_version = "4.13.1"
     requires = (
-        "boost/1.86.0",
+        "boost/1.85.0",
         "gtest/1.15.0",
         "antlr4-cppruntime/" + antlr_version,
         "antlr4/" + antlr_version,
