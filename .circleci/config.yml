@@ -4,18 +4,12 @@ workflows:
 
   commit:
     jobs:
-      - build-2204-debug:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-      - build-2204-release:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
+      - build-release:
+        filters:
+          branches:
+            only:
+               - master
+               - /issue_.*/
 
   nightly:
     triggers:
@@ -29,43 +23,43 @@ workflows:
                 - master
                 - /issue_.*/
     jobs:
-      - build-2204-release
-      - build-2204-debug:
+      - build-release
+      - build-debug:
           requires:
-            - build-2204-release
-      - build-2204-ARM:
+            - build-release
+      - build-ARM:
           requires:
-            - build-2204-release
-
+            - build-release
+    
   fix_dev_check:
     triggers:
-      # https://crontab.guru/#30_20_*_*_*
-      # At 20:30.
       - schedule:
-          cron: "30 20 * * *"
+          # https://crontab.guru/#30_20_*_*_*
+          # At 20:30.
+          cron: "30 21 * * *"
           filters:
             branches:
               only:
                 - /fix_.*/
                 - /dev_.*/
     jobs:
-      - build-2204-release
-      - build-2204-debug:
+      - build-release
+      - build-debug:
           requires:
-            - build-2204-release
-  
+            - build-release
+
 executors:
-  ubuntu2204docker-edge:
+  ubuntu-docker-2204:
     docker:
       - image: cimg/base:edge
     resource_class: large
 
-  ubuntu2204docker-current:
-    docker:
-      - image: cimg/base:current
-    resource_class: large
+  ubuntu-machine:
+    machine:
+      image: ubuntu-2404:2024.11.1
+    resource_class: large 
 
-  ubuntu2004machine-arm:
+  ubuntu-machine-arm:
     machine:
       image: ubuntu-2204:current
     resource_class: arm.large
@@ -131,9 +125,9 @@ commands:
             cd build/<<parameters.build_type>> && make cppcheck
 
 jobs:
-  build-2204-release:
+  build-release:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker-edge
+    executor: ubuntu-docker-2204
     steps:
       - checkout
       - prep-env-200
@@ -141,9 +135,9 @@ jobs:
           build_param: --build missing
       - run-test
 
-  build-2204-debug:
+  build-debug:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker-edge
+    executor: ubuntu-docker-2204
     steps:
       - checkout
       - prep-env-200
@@ -153,13 +147,13 @@ jobs:
       - run-test:
           build_type: Debug
 
-  build-2204-ARM:
+  build-ARM:
     parameters:
       build_type:
         type: string
         default: "Debug"
     working_directory: ~/retractordb
-    executor: ubuntu2004machine-arm
+    executor: ubuntu-machine-arm
     steps:
       - checkout
       - prep-env-200:
