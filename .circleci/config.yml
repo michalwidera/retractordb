@@ -21,7 +21,7 @@ workflows:
                  - /issue_.*/
       - build-debug:
           requires:
-            - build-release
+            - hold-for-approval
           filters:
             branches:
               only:
