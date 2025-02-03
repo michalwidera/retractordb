@@ -45,8 +45,10 @@ workflows:
 
   fixcheck:
     triggers:
+      # https://crontab.guru/#0_12_*_*_1
+      # At 12:00 on Monday.
       - schedule:
-          cron: "0 6 * * 4"
+          cron: "0 12 * * 1"
           filters:
             branches:
               only:
