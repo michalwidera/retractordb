@@ -34,12 +34,13 @@ workflows:
   fix_dev_check:
     triggers:
       - schedule:
-          # https://crontab.guru/#30_20_*_*_*
-          # At 20:30.
+          # https://crontab.guru/#30_21_*_*_*
+          # At 20:31.
           cron: "30 21 * * *"
           filters:
             branches:
               only:
+                - master
                 - /fix_.*/
                 - /dev_.*/
     jobs:
