@@ -34,9 +34,9 @@ workflows:
   fix_dev_check:
     triggers:
       - schedule:
-          # https://crontab.guru/#30_21_*_*_*
-          # At 20:31.
-          cron: "30 21 * * *"
+          # https://crontab.guru/#0_4_*_*_2
+          # At 04:00 on Tuesday.
+          cron: "0 4 * * 2"
           filters:
             branches:
               only:
