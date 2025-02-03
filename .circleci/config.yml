@@ -30,12 +30,6 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-2204-release
-      - build-2204-conan20:
-          requires:
-            - build-2204-release
-      - build-2204-conan20-debug:
-          requires:
-            - build-2204-conan20
       - build-2204-debug:
           requires:
             - build-2204-release
@@ -43,10 +37,12 @@ workflows:
           requires:
             - build-2204-release
 
-  fixcheck:
+  fix_dev_check:
     triggers:
+      # https://crontab.guru/#30_20_*_*_*
+      # At 20:30.
       - schedule:
-          cron: "0 6 * * 4"
+          cron: "30 20 * * *"
           filters:
             branches:
               only:
@@ -75,22 +71,6 @@ executors:
     resource_class: arm.large
 
 commands:
-  prep-env-159:
-    parameters:
-      gcc_version:
-        type: string
-        default: "gcc"
-    steps:
-      - run:
-          name: Install toolchain - conan 1.59
-          command: |
-            uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind cppcheck mold
-            pip3 install --upgrade pip
-            pip3 install conan==1.59
-            conan profile new default --detect
-            conan profile update settings.compiler.libcxx=libstdc++11 default
   prep-env-200:
     parameters:
       gcc_version:
@@ -151,30 +131,7 @@ commands:
             cd build/<<parameters.build_type>> && make cppcheck
 
 jobs:
-  build-2204-debug:
-    working_directory: ~/retractordb
-    executor: ubuntu2204docker-current
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-build:
-          build_type: Debug
-      - run-test:
-          build_type: Debug
-      - run-cppcheck:
-          build_type: Debug
-
   build-2204-release:
-    working_directory: ~/retractordb
-    executor: ubuntu2204docker-current
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-build
-      - run-test
-      - run-cppcheck
-
-  build-2204-conan20:
     working_directory: ~/retractordb
     executor: ubuntu2204docker-edge
     steps:
@@ -184,7 +141,7 @@ jobs:
           build_param: --build missing
       - run-test
 
-  build-2204-conan20-debug:
+  build-2204-debug:
     working_directory: ~/retractordb
     executor: ubuntu2204docker-edge
     steps:
