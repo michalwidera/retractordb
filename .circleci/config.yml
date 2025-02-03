@@ -10,23 +10,6 @@ workflows:
             only:
                - master
                - /issue_.*/
-      - hold-for-approval:
-          type: approval
-          requires:
-            - build-release
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-      - build-debug:
-          requires:
-            - hold-for-approval
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
 
   nightly:
     triggers:
