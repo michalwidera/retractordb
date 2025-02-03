@@ -56,11 +56,11 @@ workflows:
       - build-debug:
           requires:
             - build-release
-  
+
 executors:
-  ubuntu-docker:
+  ubuntu-docker-2204:
     docker:
-      - image: ubuntu-2404:edge
+      - image: cimg/base:edge
     resource_class: large
 
   ubuntu-machine:
@@ -136,7 +136,7 @@ commands:
 jobs:
   build-release:
     working_directory: ~/retractordb
-    executor: ubuntu-machine
+    executor: ubuntu-docker-2204
     steps:
       - checkout
       - prep-env-200
@@ -146,7 +146,7 @@ jobs:
 
   build-debug:
     working_directory: ~/retractordb
-    executor: ubuntu-machine
+    executor: ubuntu-docker-2204
     steps:
       - checkout
       - prep-env-200
