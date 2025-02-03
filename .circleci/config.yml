@@ -10,6 +10,15 @@ workflows:
             only:
                - master
                - /issue_.*/
+      - hold-for-approval:
+          type: approval
+          requires:
+            - build-release
+          filters:
+            branches:
+              only:
+                 - master
+                 - /issue_.*/
       - build-debug:
           requires:
             - build-release
@@ -18,7 +27,6 @@ workflows:
               only:
                  - master
                  - /issue_.*/
-
 
   nightly:
     triggers:
@@ -39,13 +47,13 @@ workflows:
       - build-ARM:
           requires:
             - build-release
-
+    
   fix_dev_check:
     triggers:
       - schedule:
           # https://crontab.guru/#30_20_*_*_*
           # At 20:30.
-          cron: "30 20 * * *"
+          cron: "30 21 * * *"
           filters:
             branches:
               only:
