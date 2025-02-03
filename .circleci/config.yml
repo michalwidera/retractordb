@@ -63,6 +63,11 @@ executors:
       - image: ubuntu-2404:edge
     resource_class: large
 
+  ubuntu-machine:
+    machine:
+      image: ubuntu-2404:2024.11.1
+    resource_class: large 
+
   ubuntu-machine-arm:
     machine:
       image: ubuntu-2204:current
@@ -131,7 +136,7 @@ commands:
 jobs:
   build-release:
     working_directory: ~/retractordb
-    executor: ubuntu-docker
+    executor: ubuntu-machine
     steps:
       - checkout
       - prep-env-200
@@ -141,7 +146,7 @@ jobs:
 
   build-debug:
     working_directory: ~/retractordb
-    executor: ubuntu-docker
+    executor: ubuntu-machine
     steps:
       - checkout
       - prep-env-200
