@@ -19,3 +19,4 @@ plot(f,20*log10(m+1e-5),'', w/pi,20*log10(abs(h)),'');
 xlabel('Znormalizowana czestotliwosc')
 ylabel('wzmocnienie (dB)')
 grid on
+remez(filtord,f,m)
