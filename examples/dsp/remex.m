@@ -20,3 +20,4 @@ xlabel('Znormalizowana czestotliwosc')
 ylabel('wzmocnienie (dB)')
 grid on
 remez(filtord,f,m)
+floor ( remez(filtord,f,m) * 32767 )
