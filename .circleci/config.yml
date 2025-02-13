@@ -4,22 +4,12 @@ workflows:
 
   commit:
     jobs:
-      - build-2204-debug:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-              ignore:
-                 - /[doc*]
-      - build-2204-release:
-          filters:
-            branches:
-              only:
-                 - master
-                 - /issue_.*/
-              ignore:
-                 - /[doc*]
+      - build-release:
+        filters:
+          branches:
+            only:
+               - master
+               - /issue_.*/
 
   nightly:
     triggers:
@@ -32,56 +22,49 @@ workflows:
               only:
                 - master
                 - /issue_.*/
-              ignore:
-                 - /[doc*]
     jobs:
-      - build-2204-release
-      - build-2204-conan20:
+      - build-release
+      - build-debug:
           requires:
-            - build-2204-release
-      - build-2204-conan20-debug:
+            - build-release
+      - build-ARM:
           requires:
-            - build-2204-conan20
-      - build-2204-debug:
+            - build-release
+    
+  fix_dev_check:
+    triggers:
+      - schedule:
+          # https://crontab.guru/#0_4_*_*_2
+          # At 04:00 on Tuesday.
+          cron: "0 4 * * 2"
+          filters:
+            branches:
+              only:
+                - /fix_.*/
+                - /dev_.*/
+    jobs:
+      - build-release
+      - build-debug:
           requires:
-            - build-2204-release
-      - build-2204-ARM:
-          requires:
-            - build-2204-release
+            - build-release
 
 executors:
-  ubuntu2204docker-edge:
+  ubuntu-docker-2204:
     docker:
       - image: cimg/base:edge
     resource_class: large
 
-  ubuntu2204docker-current:
-    docker:
-      - image: cimg/base:current
-    resource_class: large
+  ubuntu-machine:
+    machine:
+      image: ubuntu-2404:2024.11.1
+    resource_class: large 
 
-  ubuntu2004machine-arm:
+  ubuntu-machine-arm:
     machine:
       image: ubuntu-2204:current
     resource_class: arm.large
 
 commands:
-  prep-env-159:
-    parameters:
-      gcc_version:
-        type: string
-        default: "gcc"
-    steps:
-      - run:
-          name: Install toolchain - conan 1.59
-          command: |
-            uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind cppcheck mold
-            pip3 install --upgrade pip
-            pip3 install conan==1.59
-            conan profile new default --detect
-            conan profile update settings.compiler.libcxx=libstdc++11 default
   prep-env-200:
     parameters:
       gcc_version:
@@ -142,32 +125,9 @@ commands:
             cd build/<<parameters.build_type>> && make cppcheck
 
 jobs:
-  build-2204-debug:
+  build-release:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker-current
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-build:
-          build_type: Debug
-      - run-test:
-          build_type: Debug
-      - run-cppcheck:
-          build_type: Debug
-
-  build-2204-release:
-    working_directory: ~/retractordb
-    executor: ubuntu2204docker-current
-    steps:
-      - checkout
-      - prep-env-159
-      - conan-build
-      - run-test
-      - run-cppcheck
-
-  build-2204-conan20:
-    working_directory: ~/retractordb
-    executor: ubuntu2204docker-edge
+    executor: ubuntu-docker-2204
     steps:
       - checkout
       - prep-env-200
@@ -175,9 +135,9 @@ jobs:
           build_param: --build missing
       - run-test
 
-  build-2204-conan20-debug:
+  build-debug:
     working_directory: ~/retractordb
-    executor: ubuntu2204docker-edge
+    executor: ubuntu-docker-2204
     steps:
       - checkout
       - prep-env-200
@@ -187,13 +147,13 @@ jobs:
       - run-test:
           build_type: Debug
 
-  build-2204-ARM:
+  build-ARM:
     parameters:
       build_type:
         type: string
         default: "Debug"
     working_directory: ~/retractordb
-    executor: ubuntu2004machine-arm
+    executor: ubuntu-machine-arm
     steps:
       - checkout
       - prep-env-200:
