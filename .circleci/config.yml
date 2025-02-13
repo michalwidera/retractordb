@@ -40,7 +40,6 @@ workflows:
           filters:
             branches:
               only:
-                - master
                 - /fix_.*/
                 - /dev_.*/
     jobs:
