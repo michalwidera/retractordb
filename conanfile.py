@@ -1,6 +1,7 @@
 """Module required for conan build system."""
-from conan import ConanFile
+from conan import ConanFile, tools
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+
 
 # These modules are required for +x on generated script
 import os
@@ -17,7 +18,7 @@ class Retractor(ConanFile):
     homepage = "https://retractordb.com"
     antlr_version = "4.13.1"
     requires = (
-        "boost/1.85.0",
+        "boost/1.85.0", # 1.86.0 is broken - BOOST_HEADER_DEPRECATED("<boost/process/v1/environment.hpp>")
         "gtest/1.15.0",
         "antlr4-cppruntime/" + antlr_version,
         "antlr4/" + antlr_version,
@@ -44,10 +45,16 @@ class Retractor(ConanFile):
     def build_requirements(self):
         self.tool_requires("cmake/[>=3.25]")
 
+    def package(self):
+        cmake = self._configure_cmake()
+        cmake.install()
+        self.copy(pattern="LICENSE", dst="licenses")
+
     def package_info(self):
         """Set libraries required for compile and execute."""
+        self.cpp_info.libs = tools.collect_libs(self)
         self.cpp_info.system_libs = ["pthread", "rt", "dl"]
-        self.cpp_info.compiler = "20"
+        self.cpp_info.compiler = "23"
 
     def build(self):
         """Build."""

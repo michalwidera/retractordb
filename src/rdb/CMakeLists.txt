@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+
 project(xtrdb LANGUAGES CXX)
 
 find_package(antlr4-runtime REQUIRED)
