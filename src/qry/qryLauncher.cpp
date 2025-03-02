@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
       return obj.hello();
     else if (vm.count("kill")) {
       ptree pt = obj.netClient("kill", "");
-      SPDLOG_INFO("kill sent");
+      SPDLOG_INFO("kill sent to server");
     } else if (vm.count("dir"))
       std::cout << obj.dir();
     else if (vm.count("detail")) {
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     SPDLOG_ERROR("Std: {}", e.what());
     return system::errc::interrupted;
   }
-  SPDLOG_INFO("ok");
+  SPDLOG_INFO("ok.");
 
   return system::errc::success;
 }

@@ -7,7 +7,7 @@ find_package(antlr4 REQUIRED)
 
 add_subdirectory(lib)
 
-set(SOURCES_RDB main.cpp)
+set(SOURCES_RDB main.cpp ../common/uxSysTermTools.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 

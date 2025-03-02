@@ -13,16 +13,18 @@ namespace rdb {
 template <typename T>
 class binaryDeviceAccessor : public FileAccessorInterface<T> {
   const std::string filename;
-  const std::size_t size;
+  const std::size_t recSize;
   /**
    * @brief Posix File Descriptor
    */
   int fd;
 
+  size_t cnt = 0;
+
  public:
   ~binaryDeviceAccessor();
 
-  explicit binaryDeviceAccessor(const std::string fileName, const size_t size);
+  explicit binaryDeviceAccessor(const std::string fileName, const size_t recSize);
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

@@ -4,11 +4,15 @@
 import sys
 import argparse
 import collections
+import signal
 
 from time import sleep
 
-# from signal import signal, SIGPIPE, SIG_DFL
-# signal(SIGPIPE, SIG_DFL)
+def signal_handler(signal, frame):
+    """Handles SIGINT signal."""
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("x", default=10, help="x dimension in points", type=int)
@@ -37,38 +41,36 @@ print(f"set xrange [0:{str(args.x)}]")
 print(f"set yrange [0:{str(args.y)}]")
 print("set ticslevel 0")
 print("set hidden3d")
+print("set view 60,30")
+# print("set grid")
+# print("set key outside")
 
-try:
-    for line in iter(sys.stdin.readline, ""):
+for line in iter(sys.stdin.readline, ""):
 
-        print("plot", end="")
-        for i in prdata:
-            desc = i.split(":")
-            print(f" '-' u 1:2 t '{desc[0]}' w lines lc rgb '{desc[1]}'", end="")
-            if i != prdata[-1]:
-                print(",", end="")
-        print()
-        i = None
+    print("plot", end="")
+    for i in prdata:
+        desc = i.split(":")
+        print(f" '-' u 1:2 t '{desc[0]}' w lines lc rgb '{desc[1]}'", end="")
+        if i != prdata[-1]:
+            print(",", end="")
+    print()
+    i = None
 
-        for i in range(len(prdata)):
-            record = line.split()
+    for i in range(len(prdata)):
+        record = line.split()
 
-            if len(record) > i:
-                collectionList[i].appendleft(record[i])
+        if len(record) > i:
+            collectionList[i].appendleft(record[i])
 
-                lineCount = 0
-                for j in collectionList[i]:
-                    print(f"{lineCount} {j}")
-                    lineCount += 1
+            lineCount = 0
+            for j in collectionList[i]:
+                print(f"{lineCount} {j}")
+                lineCount += 1
 
-                # gnuplot sometimes get too much data and raises memory exception
-                if args.sleep != 0:
-                    sleep(args.sleep)
+            # gnuplot sometimes get too much data and raises memory exception
+            if args.sleep != 0:
+                sleep(args.sleep)
 
-            print("e")
-            sys.stdout.flush()
-        i = None
-
-# ctrl+c to graceful exit loop
-except KeyboardInterrupt:
-    pass
+        print("e")
+        sys.stdout.flush()
+    i = None

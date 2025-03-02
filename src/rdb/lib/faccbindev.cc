@@ -10,8 +10,9 @@
 namespace rdb {
 
 template <class T>
-binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string fileName, const size_t size)  //
-    : filename(fileName), size(size) {
+binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string fileName,  //
+                                              const size_t recSize)        //
+    : filename(fileName), recSize(recSize) {
   fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC, 0644);
 }
 
@@ -33,7 +34,7 @@ ssize_t binaryDeviceAccessor<T>::write(const T *ptrData, const size_t position) 
 
 template <class T>
 ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recSize != 0);
   assert(position == 0);
   if (position != 0) {
     return EXIT_FAILURE;
@@ -42,20 +43,22 @@ ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t position) {
   if (fd < 0) {
     return fd;  // <- Error status
   }
-  size_t read_size = ::read(fd, ptrData, size);  // /dev/random no seek supported
-  if (read_size != size) {                       // dev/random has no seek - but binary files should loop?
+  size_t read_size = ::read(fd, ptrData, recSize);  // /dev/random no seek supported
+  if (read_size != recSize) {                       // dev/random has no seek - but binary files should loop?
     ::lseek(fd, 0, SEEK_SET);
-    size_t read_size_sh = ::read(fd, ptrData, size);
-    if (read_size_sh != size) return EXIT_FAILURE;
+    size_t read_size_sh = ::read(fd, ptrData, recSize);
+    if (read_size_sh != recSize) return EXIT_FAILURE;
   }
+  cnt++;
   return EXIT_SUCCESS;
 }
 
 template <class T>
 size_t binaryDeviceAccessor<T>::count() {
-  struct stat stat_buf;
-  int rc = stat(filename.c_str(), &stat_buf);
-  return rc == 0 ? stat_buf.st_size / size : -1;
+  // struct stat stat_buf;
+  // int rc = stat(filename.c_str(), &stat_buf);
+  // return rc == 0 ? stat_buf.st_size / recSize : -1;
+  return cnt;
 }
 
 template class binaryDeviceAccessor<uint8_t>;

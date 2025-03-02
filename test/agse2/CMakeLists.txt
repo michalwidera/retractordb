@@ -4,7 +4,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    rm -f xretractor.log ; \
     xretractor query.rql -m 15 -v > verbose.txt ; \
     xtrdb < term.script > out.txt ;  \
     find ./*.desc | sed 's/\.[^.]*$//' | cut -c 3- | xargs rm -f ; \

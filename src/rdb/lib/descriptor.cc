@@ -271,7 +271,7 @@ size_t Descriptor::position(const std::string &name) {
   auto it = std::find_if(begin(), end(),                          //
                          [name](const auto &item) {               //
                            return std::get<rname>(item) == name;  //
-                         }                                        //
+                         }  //
   );
 
   if (it != end())

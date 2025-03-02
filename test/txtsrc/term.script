@@ -1,0 +1,8 @@
+noprompt
+open test_db
+descc
+rread 0
+printt
+rread 0
+printt
+quit
