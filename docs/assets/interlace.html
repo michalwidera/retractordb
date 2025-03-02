@@ -67,11 +67,11 @@
         <p>Enter two sequences and two rational numbers to generate a combined sequence.</p>
         
         <form id="sequenceForm">
-            <label for="literalSequence">Literal Sequence (comma-separated letters/words):</label>
-            <input type="text" id="literalSequence" placeholder="e.g., a, b, c, d, e" required>
+            <label for="firstSequence">First Sequence (comma-separated letters/words/numbers):</label>
+            <input type="text" id="firstSequence" placeholder="e.g., a, b, c, d, e" required>
             
-            <label for="numeralSequence">Numeral Sequence (comma-separated numbers):</label>
-            <input type="text" id="numeralSequence" placeholder="e.g., 1, 2, 3, 4, 5" required>
+            <label for="secondSequence">Second Sequence (comma-separated letters/words/numbers):</label>
+            <input type="text" id="secondSequence" placeholder="e.g., 1, 2, 3, 4, 5" required>
             
             <label for="rationalNumber1">First Rational Number:</label>
             <input type="text" id="rationalNumber1" placeholder="e.g., 2/3 or 0.5" required>
@@ -128,18 +128,7 @@
             if (items.length === 0) {
                 throw new Error(`${type} sequence cannot be empty`);
             }
-            
-            // For numeral sequence, convert to numbers
-            if (type === 'numeral') {
-                return items.map(item => {
-                    const num = parseFloat(item);
-                    if (isNaN(num)) {
-                        throw new Error(`Invalid number in numeral sequence: ${item}`);
-                    }
-                    return num;
-                });
-            }
-            
+
             return items;
         }
         
@@ -147,25 +136,25 @@
         function combineSequences() {
             try {
                 // Get input values
-                const literalSeqStr = document.getElementById('literalSequence').value;
-                const numeralSeqStr = document.getElementById('numeralSequence').value;
+                const literalSeqStr = document.getElementById('firstSequence').value;
+                const numeralSeqStr = document.getElementById('secondSequence').value;
                 const rationalNum1Str = document.getElementById('rationalNumber1').value;
                 const rationalNum2Str = document.getElementById('rationalNumber2').value;
                 
                 // Parse inputs
-                const literalSequence = parseSequence(literalSeqStr, 'literal');
-                const numeralSequence = parseSequence(numeralSeqStr, 'numeral');
+                const firstSequence = parseSequence(literalSeqStr, 'literal');
+                const secondSequence = parseSequence(numeralSeqStr, 'numeral');
                 const rationalNum1 = parseRationalNumber(rationalNum1Str);
                 const rationalNum2 = parseRationalNumber(rationalNum2Str);
 
                 const rationalNum3 = parseFloat( rationalNum2 / (rationalNum1 + rationalNum2) );
 
                 const delta = rationalNum3;
-                const A = literalSequence;
-                const B = numeralSequence;
+                const A = firstSequence;
+                const B = secondSequence;
                 
                 // Check if sequences have the same length
-                //if (literalSequence.length !== numeralSequence.length) {
+                //if (firstSequence.length !== secondSequence.length) {
                 //    throw new Error('The two sequences must have the same length');
                 //}
                 
@@ -177,7 +166,7 @@
                     const seq_1 = Math.floor((i+1)*delta);
                     const seq   = Math.floor(i*delta);
                     if ( seq == seq_1 ) {
-                        if (i-seq_1 >= numeralSequence.length)
+                        if (i-seq_1 >= secondSequence.length)
                             break;
 
                         const weightedItem = {
@@ -185,7 +174,7 @@
                         };
                         combinedSequence.push(weightedItem);
                     } else {
-                        if (seq >= literalSequence.length)
+                        if (seq >= firstSequence.length)
                             break;
 
                         const weightedItem = {
@@ -204,8 +193,8 @@
                 
                 // https://www.webnots.com/alt-code-shortcuts-for-superscript-and-subscript/
                 resultContent.innerHTML = `
-                    <p><strong>Literal Sequence:</strong> ${literalSequence.join(', ')}</p>
-                    <p><strong>Numeral Sequence:</strong> ${numeralSequence.join(', ')}</p>
+                    <p><strong>Literal Sequence:</strong> ${firstSequence.join(', ')}</p>
+                    <p><strong>Numeral Sequence:</strong> ${secondSequence.join(', ')}</p>
                     <p><strong>First Rational Number (r₁):</strong> ${rationalNum1}</p>
                     <p><strong>Second Rational Number (r₂):</strong> ${rationalNum2}</p>
                     <p><strong>Third Rational Number (r₃):</strong> ${rationalNum3}</p>
