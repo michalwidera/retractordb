@@ -50,11 +50,11 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 }
 
 template <class T>
-groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,           //
-                                        const size_t recSize,                  //
-                                        const std::pair<int, int> &retention)  //
+groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
+                                        const size_t recSize,          //
+                                        const retention_t &retention)  //
     : filename(fileName), recSize(recSize), retention(retention), cccFile(fileName) {
-  if (retention == std::pair<int, int>{0, 0})
+  if (retention == retention_t{0, 0})
     vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize));
   else
     for (int segment = 0; segment < retention.second; segment++) {
@@ -76,7 +76,7 @@ std::string groupFileAccessor<T>::fileName() {
 template <class T>
 ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
   assert(recSize != 0);
-  if (retention == std::pair<int, int>{0, 0})
+  if (retention == retention_t{0, 0})
     return vec[0]->write(ptrData, position);
   else {
     // Need to cover this with test - DOUBlECHECK
@@ -105,7 +105,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 template <class T>
 ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   assert(recSize != 0);
-  if (retention == std::pair<int, int>{0, 0})
+  if (retention == retention_t{0, 0})
     return vec[0]->read(ptrData, position);
   else {
     // Need to cover this with test - DOUBlECHECK

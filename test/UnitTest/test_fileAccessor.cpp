@@ -12,6 +12,10 @@ typedef unsigned char BYTE;
 // cd build/Debug
 // make install ; ctest -R test_fileAccessor -V
 
+// Source under test:
+// /home/michal/GitHub/retractordb/src/rdb/lib/fagrp.cc
+// /home/michal/GitHub/retractordb/src/include/rdb/fagrp.h
+
 const std::filesystem::path sandBoxFolder = "/tmp/test_fileAccessor";
 
 std::ifstream::pos_type filesize(const std::string &filename) {
@@ -62,7 +66,7 @@ TEST(FileAccessorTest, test_dir) {
   auto recsize     = sizeof(BYTE);
   auto silos_count = 0;
   auto silos_size  = 0;
-  auto retention   = std::pair<int, int>(silos_count, silos_size);
+  auto retention   = rdb::retention_t{silos_count, silos_size};
   auto gfa         = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
   record.data      = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));

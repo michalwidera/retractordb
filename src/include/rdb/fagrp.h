@@ -29,6 +29,8 @@ class ccc {
   size_t writeCount{0};
 };
 
+typedef std::pair<uint, int> retention_t;
+
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
   const std::string filename;
@@ -36,7 +38,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
 
   ccc cccFile;
 
-  std::pair<int, int> retention = {0, 0};  // segments , capacity
+  retention_t retention = {0, 0};  // segments , capacity
 
   std::vector<std::unique_ptr<posixBinaryFileAccessor<T>>> vec;
 
@@ -45,7 +47,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
  public:
   ~groupFileAccessor();
 
-  explicit groupFileAccessor(const std::string &fileName, const size_t recSize, const std::pair<int, int> &retention);
+  explicit groupFileAccessor(const std::string &fileName, const size_t recSize, const retention_t &retention);
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
