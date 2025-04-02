@@ -36,7 +36,7 @@ TEST(FileAccessorTest, test_dir) {
   try {
     filepathExists = std::filesystem::is_directory(sandBoxFolder);
   } catch (const std::filesystem::filesystem_error &e) {
-    std::cerr << "Filesystem error: " << e.what() << '\n';
+    GTEST_LOG_(FATAL) << "Filesystem error: " << e.what() << '\n';
   }
   if (filepathExists) {
     std::filesystem::remove_all(sandBoxFolder);
@@ -78,11 +78,10 @@ TEST(FileAccessorTest, test_dir) {
   }
 
   for (const auto &entry : mapOfFiles) {
+    GTEST_LOG_(INFO) << "filename:" << entry.first;
+    GTEST_LOG_(INFO) << "filesize:" << entry.second.sizeFromSystem;
     std::stringstream ss;
-    ss << entry.first << ":" << entry.second.sizeFromSystem;
-    for (auto &d : entry.second.fileContents) {
-      ss << ":" << static_cast<int>(d);
-    }
-    GTEST_LOG_(INFO) << ss.str();
+    for (auto &d : entry.second.fileContents) ss << "[" << static_cast<int>(d) << "]";
+    GTEST_LOG_(INFO) << "contents:" << ss.str();
   }
 }

@@ -29,7 +29,9 @@ class ccc {
   size_t writeCount{0};
 };
 
-typedef std::pair<uint, int> retention_t;
+typedef uint segments_t;  // silos_count
+typedef uint capacity_t;  // silos_size
+typedef std::pair<segments_t, capacity_t> retention_t;
 
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
@@ -38,7 +40,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
 
   ccc cccFile;
 
-  retention_t retention = {0, 0};  // segments , capacity
+  retention_t retention{0, 0};
 
   std::vector<std::unique_ptr<posixBinaryFileAccessor<T>>> vec;
 

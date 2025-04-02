@@ -264,26 +264,7 @@ TEST(xrdb, test_descriptor_compare) {
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
   ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
-/*
-TEST(xrdb, test_ref_storage) {
-  auto storageDescriptor{rdb::Descriptor("dane", 4, 1, rdb::INTEGER) |          //
-                         rdb::Descriptor("datafile_rdb.txt", 0, 0, rdb::REF) |  //
-                         rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)};
-  std::unique_ptr<rdb::storageAccessor> storage;
 
-  storage = std::make_unique<rdb::storageAccessor>("datafile1"); // descriptorName (.desc auto-attach)
-  storage->attachDescriptor(&storageDescriptor);
-  storage->setRemoveOnExit(false);
-
-  storage->revRead(0);
-
-  ASSERT_TRUE(std::any_cast<int>(storage->getPayload()->getItem(0)) == 65);
-
-  storage->revRead(1);
-
-  ASSERT_TRUE(std::any_cast<int>(storage->getPayload()->getItem(0)) == 64);
-}
-*/
 TEST(crdb, genericBinaryFileAccessor_byte) {
   auto result1 = test_1<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
   ASSERT_TRUE(result1);
