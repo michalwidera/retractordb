@@ -255,6 +255,13 @@ dehasheven: ([1, 2, 3, 4, 5, 6], Fraction(1, 2))
 dehashodd: (['a', 'b', 'c', 'd', 'e', 'f'], Fraction(1, 1))
 ```
 
+Additional materials
+------------------------------------------------------------------------
+* [Slides in PL](https://retractordb.com/assets/presentation/Prezentacja_RetractorDB_PL.pdf)
+* [Interlace example online](https://retractordb.com/assets/interlace.html)
+* [Sum example online](https://retractordb.com/assets/sum.html)
+
+
 Papers
 ======
 
