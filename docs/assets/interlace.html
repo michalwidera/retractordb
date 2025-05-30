@@ -72,6 +72,8 @@
             
             <label for="secondSequence">Second Sequence (comma-separated letters/words/numbers):</label>
             <input type="text" id="secondSequence" placeholder="e.g., 1, 2, 3, 4, 5" required>
+
+            <p>Rational Number: how quickly the next data arrives in seconds or fractions of seconds</p>
             
             <label for="rationalNumber1">First Rational Number:</label>
             <input type="text" id="rationalNumber1" placeholder="e.g., 2/3 or 0.5" required>
@@ -195,7 +197,6 @@
                 resultContent.innerHTML = `
                     <p><strong>Literal Sequence:</strong> ${firstSequence.join(', ')}</p>
                     <p><strong>Numeral Sequence:</strong> ${secondSequence.join(', ')}</p>
-                    <p>Rational Number: how quickly the next data arrives in seconds or fractions of seconds</p>
                     <p><strong>First Rational Number (r₁):</strong> ${rationalNum1}</p>
                     <p><strong>Second Rational Number (r₂):</strong> ${rationalNum2}</p>
                     <p><strong>Third Rational Number (r₃):</strong> ${rationalNum3}</p>
