@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 # Packages are managed in ./CMakeLists.txt find_package(Boost REQUIRED)
 # find_package(spdlog REQUIRED) find_package(fmt REQUIRED)

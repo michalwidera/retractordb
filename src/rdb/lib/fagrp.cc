@@ -49,6 +49,8 @@ std::ifstream::pos_type filesize(const std::string &filename) {
   return in.tellg();
 }
 
+// fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
+
 template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
                                         const size_t recSize,          //
@@ -57,11 +59,14 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
   if (retention == retention_t{0, 0})
     vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize));
   else
-    for (int segment = 0; segment < retention.second; segment++) {
+  {
+    assert(retention.second != 0);
+    assert(retention.first != 0);
+    for (int segment = 0; segment < retention.first; segment++) {
       std::string fname_seq = fileName + "." + std::to_string(segment);
       vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fname_seq, recSize));
     }
-
+  }
   writeCount = count();
 }
 

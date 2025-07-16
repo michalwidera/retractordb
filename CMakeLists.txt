@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 project(retractordb)
 
@@ -42,7 +42,7 @@ include_directories(
 
 link_directories(${Boost_LIBRARY_DIRS})
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compileCommands req. from
                                       # .vsccode/c_cpp_properties.json
 
