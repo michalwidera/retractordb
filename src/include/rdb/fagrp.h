@@ -15,36 +15,32 @@ namespace rdb {
  * Type: DEFAULT (NEW)
  */
 
-class ccc {
- public:
-  ccc(const std::string &fileName);
-
-  void write(const size_t writeCount);
-
-  size_t read();
-
- private:
-  const std::string fileName;
-  bool initialized{false};
-  size_t writeCount{0};
-};
-
-typedef uint segments_t;  // silos_count
-typedef uint capacity_t;  // silos_size
-typedef std::pair<segments_t, capacity_t> retention_t;
+typedef size_t segments_t;  // silos_count
+typedef size_t capacity_t;  // silos_size
+struct retention_t { 
+  segments_t segments;
+  capacity_t capacity;
+  bool noRetention() const {
+    return segments == 0 && capacity == 0;
+  };
+  retention_t & operator = (const std::pair<segments_t, capacity_t> &p) {
+    segments = p.first;
+    capacity = p.second;
+    return *this;
+  };
+} ;
 
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
   const std::string filename;
   const std::size_t recSize;
 
-  ccc cccFile;
-
   retention_t retention{0, 0};
 
-  std::vector<std::unique_ptr<posixBinaryFileAccessor<T>>> vec;
+  std::unique_ptr<posixBinaryFileAccessor<T>> accessor;
 
   size_t writeCount = 0;
+  size_t currentSegment = 0;
 
  public:
   ~groupFileAccessor();

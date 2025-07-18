@@ -64,13 +64,76 @@ TEST(FileAccessorTest, test_dir) {
   std::string filename = "test_file";
 
   auto recsize     = sizeof(BYTE);
-  auto silos_count = 0;
-  auto silos_size  = 0;
+  size_t silos_count = 0;
+  size_t silos_size  = 0;
   auto retention   = rdb::retention_t{silos_count, silos_size};
   auto gfa         = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
   record.data      = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
   record.data = 12;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+
+  for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
+    mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
+  }
+
+  for (const auto &entry : mapOfFiles) {
+    GTEST_LOG_(INFO) << "filename:" << entry.first;
+    GTEST_LOG_(INFO) << "filesize:" << entry.second.sizeFromSystem;
+    std::stringstream ss;
+    for (auto &d : entry.second.fileContents) ss << "[" << static_cast<int>(d) << "]";
+    GTEST_LOG_(INFO) << "contents:" << ss.str();
+  }
+}
+
+TEST(FileAccessorTest, test_retention) {
+  bool filepathExists = false;
+  try {
+    filepathExists = std::filesystem::is_directory(sandBoxFolder);
+  } catch (const std::filesystem::filesystem_error &e) {
+    GTEST_LOG_(FATAL) << "Filesystem error: " << e.what() << '\n';
+  }
+  if (filepathExists) {
+    std::filesystem::remove_all(sandBoxFolder);
+  }
+
+  std::filesystem::create_directories(sandBoxFolder);
+  std::filesystem::permissions(              //
+      sandBoxFolder,                         //
+      std::filesystem::perms::others_all,    //
+      std::filesystem::perm_options::remove  //
+  );
+  std::filesystem::current_path(sandBoxFolder);
+
+  struct {
+    BYTE data;
+  } record;
+
+  struct fileInfo {
+    int sizeFromSystem;
+    std::vector<BYTE> fileContents;
+  };
+
+  std::map<std::string, fileInfo> mapOfFiles;
+
+  std::string filename = "test_file";
+
+  auto recsize     = sizeof(BYTE);
+  size_t silos_count = 2;
+  size_t silos_size  = 3;
+  auto retention   = rdb::retention_t{silos_count, silos_size};
+  auto gfa         = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
+  record.data      = 11;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data      = 12;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data      = 13;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data      = 14;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data      = 15;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data      = 16;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
 
   for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
