@@ -17,18 +17,16 @@ namespace rdb {
 
 typedef size_t segments_t;  // silos_count
 typedef size_t capacity_t;  // silos_size
-struct retention_t { 
+struct retention_t {
   segments_t segments;
   capacity_t capacity;
-  bool noRetention() const {
-    return segments == 0 && capacity == 0;
-  };
-  retention_t & operator = (const std::pair<segments_t, capacity_t> &p) {
+  bool noRetention() const { return segments == 0 && capacity == 0; };
+  retention_t &operator=(const std::pair<segments_t, capacity_t> &p) {
     segments = p.first;
     capacity = p.second;
     return *this;
   };
-} ;
+};
 
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
@@ -39,7 +37,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
 
   std::unique_ptr<posixBinaryFileAccessor<T>> accessor;
 
-  size_t writeCount = 0;
+  size_t writeCount     = 0;
   size_t currentSegment = 0;
 
  public:

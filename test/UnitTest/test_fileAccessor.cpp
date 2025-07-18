@@ -63,12 +63,12 @@ TEST(FileAccessorTest, test_dir) {
 
   std::string filename = "test_file";
 
-  auto recsize     = sizeof(BYTE);
-  size_t silos_count = 0;
-  size_t silos_size  = 0;
-  auto retention   = rdb::retention_t{silos_count, silos_size};
-  auto gfa         = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
-  record.data      = 11;
+  auto recsize                = sizeof(BYTE);
+  rdb::segments_t silos_count = 0;
+  rdb::capacity_t silos_size  = 0;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
+  record.data                 = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
   record.data = 12;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
@@ -118,22 +118,22 @@ TEST(FileAccessorTest, test_retention) {
 
   std::string filename = "test_file";
 
-  auto recsize     = sizeof(BYTE);
-  size_t silos_count = 2;
-  size_t silos_size  = 3;
-  auto retention   = rdb::retention_t{silos_count, silos_size};
-  auto gfa         = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
-  record.data      = 11;
+  auto recsize                = sizeof(BYTE);
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 3;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
+  record.data                 = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data      = 12;
+  record.data = 12;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data      = 13;
+  record.data = 13;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data      = 14;
+  record.data = 14;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data      = 15;
+  record.data = 15;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data      = 16;
+  record.data = 16;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
 
   for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
