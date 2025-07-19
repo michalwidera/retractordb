@@ -12,7 +12,7 @@ namespace rdb {
  */
 template <typename T>
 class binaryDeviceAccessor : public FileAccessorInterface<T> {
-  const std::string filename;
+  std::string filename;
   const std::size_t recSize;
   /**
    * @brief Posix File Descriptor
@@ -28,7 +28,9 @@ class binaryDeviceAccessor : public FileAccessorInterface<T> {
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
-  std::string fileName() override;
+
+  auto name() const -> const std::string & override;
+  auto name() -> std::string & override;
   size_t count() override;
 };
 }  // namespace rdb

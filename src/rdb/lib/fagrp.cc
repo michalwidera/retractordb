@@ -33,7 +33,12 @@ template <class T>
 groupFileAccessor<T>::~groupFileAccessor() {}
 
 template <class T>
-std::string groupFileAccessor<T>::fileName() {
+auto groupFileAccessor<T>::name() const -> const std::string & {
+  return filename;
+}
+
+template <class T>
+auto groupFileAccessor<T>::name() -> std::string & {
   return filename;
 }
 
@@ -82,7 +87,7 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
 
 template <class T>
 size_t groupFileAccessor<T>::count() {
-  //return writeCount;
+  // return writeCount;
   return accessor->count();
 }
 

@@ -32,7 +32,7 @@ bool test_1() {
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
-  auto statusRemove1 = remove(binaryAccessor1.fileName().c_str());
+  auto statusRemove1 = remove(binaryAccessor1.name().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;
@@ -55,7 +55,7 @@ bool test_2() {
 
     if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
   }
-  auto statusRemove1 = remove(dataStore.fileName().c_str());
+  auto statusRemove1 = remove(dataStore.name().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;
@@ -92,7 +92,7 @@ bool test_3() {
 
     if (strcmp(reinterpret_cast<char *>(yData), "test xxxx") != 0) return false;
   }
-  auto statusRemove1 = remove(dataStore.fileName().c_str());
+  auto statusRemove1 = remove(dataStore.name().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;

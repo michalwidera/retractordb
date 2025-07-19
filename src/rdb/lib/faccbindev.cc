@@ -22,7 +22,12 @@ binaryDeviceAccessor<T>::~binaryDeviceAccessor() {
 }
 
 template <class T>
-std::string binaryDeviceAccessor<T>::fileName() {
+auto binaryDeviceAccessor<T>::name() const -> const std::string & {
+  return filename;
+}
+
+template <class T>
+auto binaryDeviceAccessor<T>::name() -> std::string & {
   return filename;
 }
 

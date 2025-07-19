@@ -21,7 +21,12 @@ genericBinaryFileAccessor<T>::genericBinaryFileAccessor(  //
     : filename(fileName), size(size) {}
 
 template <class T>
-std::string genericBinaryFileAccessor<T>::fileName() {
+auto genericBinaryFileAccessor<T>::name() const -> const std::string & {
+  return filename;
+}
+
+template <class T>
+auto genericBinaryFileAccessor<T>::name() -> std::string & {
   return filename;
 }
 
