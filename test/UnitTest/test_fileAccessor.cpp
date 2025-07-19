@@ -84,6 +84,11 @@ TEST(FileAccessorTest, test_dir) {
     for (auto &d : entry.second.fileContents) ss << "[" << static_cast<int>(d) << "]";
     GTEST_LOG_(INFO) << "contents:" << ss.str();
   }
+
+  GTEST_ASSERT_EQ(mapOfFiles.size(), 1);
+  GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].sizeFromSystem, 2);
+  GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].fileContents, std::vector<BYTE>({11, 12}));
+  GTEST_ASSERT_EQ(gfa->count(), 2);  // count is not affected by retention
 }
 
 TEST(FileAccessorTest, test_retention) {
@@ -123,17 +128,17 @@ TEST(FileAccessorTest, test_retention) {
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
   auto gfa                    = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
-  record.data                 = 11;
+  record.data                 = 1;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data = 12;
+  record.data = 2;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data = 13;
+  record.data = 3;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data = 14;
+  record.data = 4;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data = 15;
+  record.data = 5;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
-  record.data = 16;
+  record.data = 6;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
 
   for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
@@ -147,4 +152,11 @@ TEST(FileAccessorTest, test_retention) {
     for (auto &d : entry.second.fileContents) ss << "[" << static_cast<int>(d) << "]";
     GTEST_LOG_(INFO) << "contents:" << ss.str();
   }
+
+  GTEST_ASSERT_EQ(mapOfFiles.size(), 2);
+  GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].sizeFromSystem, 3);
+  GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file_segment_1"].sizeFromSystem, 3);
+  GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].fileContents, std::vector<BYTE>({1, 2, 3}));
+  GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file_segment_1"].fileContents, std::vector<BYTE>({4, 5, 6}));
+  GTEST_ASSERT_EQ(gfa->count(), 6);
 }

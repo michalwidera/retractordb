@@ -103,7 +103,7 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   auto positionInSegment = position % retention.capacity;
 
   assert(segmentIndex - removedSegments >= 0 && "Segment index after removing segments is out of bounds.");
-
+  // segfault: positionInSegment=1; removedSegments=0; segmentIndex=1; vec.size()=1
   return vec[segmentIndex - removedSegments]->read(ptrData, positionInSegment);
 }
 
