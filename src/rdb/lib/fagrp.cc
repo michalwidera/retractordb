@@ -78,11 +78,14 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
     }
   }
 
+  assert(currentSegment - removedSegments >= 0 && "Segment index after removing segments is out of bounds.");
+
   if (position != std::numeric_limits<size_t>::max()) {
     auto segmentIndex      = position / retention.capacity;
     auto positionInSegment = position % retention.capacity;
 
     assert(segmentIndex < vec.size() && "Segment index out of bounds. Check retention settings and position.");
+    assert(segmentIndex - removedSegments >= 0 && "Segment index after removing segments is out of bounds.");
 
     return vec[segmentIndex - removedSegments]->write(ptrData, positionInSegment);
   } else
@@ -98,6 +101,8 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
 
   auto segmentIndex      = position / retention.capacity;
   auto positionInSegment = position % retention.capacity;
+
+  assert(segmentIndex - removedSegments >= 0 && "Segment index after removing segments is out of bounds.");
 
   return vec[segmentIndex - removedSegments]->read(ptrData, positionInSegment);
 }
