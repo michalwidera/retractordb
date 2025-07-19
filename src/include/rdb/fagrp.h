@@ -36,7 +36,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
 
   retention_t retention{0, 0};
 
-  std::unique_ptr<posixBinaryFileAccessor<T>> accessor;
+  std::vector<std::unique_ptr<posixBinaryFileAccessor<T>>> vec;
 
   size_t writeCount     = 0;
   size_t currentSegment = 0;

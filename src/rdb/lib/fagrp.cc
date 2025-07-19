@@ -25,7 +25,7 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
                                         const size_t recSize,          //
                                         const retention_t &retention)  //
     : filename(fileName), prevFileName(fileName), recSize(recSize), retention(retention) {
-  accessor   = std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize);
+  vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize));
   writeCount = 0;
 }
 
@@ -52,7 +52,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
   if (position == std::numeric_limits<size_t>::max()) writeCount++;
 
-  if (retention.noRetention()) return accessor->write(ptrData, position);
+  if (retention.noRetention()) return vec[currentSegment]->write(ptrData, position);
 
   assert(retention.capacity != 0);
   assert(retention.segments != 0);
@@ -60,39 +60,37 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
   if (writeCount > retention.capacity) {
     // rotate segments
 
-    currentSegment = (currentSegment + 1) % retention.segments;
+    currentSegment = currentSegment + 1;
     spdlog::info("Rotating segments: currentSegment={}", currentSegment);
 
     spdlog::info("Renaming file: {} to {}_segment_{}", filename, filename, currentSegment);
 
     name() = filename + "_segment_" + std::to_string(currentSegment);
 
-    accessor.reset();  // Close the current accessor
-
-    std::unique_ptr<posixBinaryFileAccessor<T>> accessorNew = std::make_unique<posixBinaryFileAccessor<T>>(filename, recSize);
-
-    accessor.swap(accessorNew);
+    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(filename, recSize));
 
     writeCount = 0;
   }
-  return accessor->write(ptrData, position);
+  return vec[currentSegment]->write(ptrData, position);
 }
 
 template <class T>
 ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   assert(recSize != 0);
-  if (retention.noRetention()) return accessor->read(ptrData, position);
+  if (retention.noRetention()) return vec[currentSegment]->read(ptrData, position);
 
   assert(retention.capacity != 0);
   assert(retention.segments != 0);
 
-  return accessor->read(ptrData, position);
+  return vec[currentSegment]->read(ptrData, position);
 }
 
 template <class T>
 size_t groupFileAccessor<T>::count() {
   // return writeCount;
-  return accessor->count();
+  size_t sumCount = 0;
+  for (auto &v : vec) sumCount += v->count();
+  return sumCount;
 }
 
 template class groupFileAccessor<uint8_t>;
