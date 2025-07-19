@@ -43,15 +43,7 @@ int main(int argc, char *argv[]) {
   std::string RESET  = "\033[0m";
   std::string BLINK  = "\x1b[5m";
 
-  // auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
-
-  // fixArgcv(argc, argv);
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
-
-  // spdlog::set_default_logger(filelog);
-  // constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
-  // spdlog::set_pattern(common_log_pattern);
-  // spdlog::flush_on(spdlog::level::trace);
 
   if (argc == 2 && strcmp(argv[1], "-h") == 0) {
     std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;

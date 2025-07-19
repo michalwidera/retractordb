@@ -24,7 +24,7 @@ template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
                                         const size_t recSize,          //
                                         const retention_t &retention)  //
-    : filename(fileName), recSize(recSize), retention(retention) {
+    : filename(fileName), prevFileName(fileName), recSize(recSize), retention(retention) {
   accessor   = std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize);
   writeCount = 0;
 }
@@ -39,6 +39,10 @@ auto groupFileAccessor<T>::name() const -> const std::string & {
 
 template <class T>
 auto groupFileAccessor<T>::name() -> std::string & {
+  // setter
+  spdlog::info("Setting name of groupFileAccessor from {} to {}", prevFileName, filename);
+  std::filesystem::rename(prevFileName, filename);
+  prevFileName = filename;
   return filename;
 }
 
@@ -61,7 +65,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
     spdlog::info("Renaming file: {} to {}_segment_{}", filename, filename, currentSegment);
 
-    std::filesystem::rename(filename, filename + "_segment_" + std::to_string(currentSegment));
+    name() = filename + "_segment_" + std::to_string(currentSegment);
 
     accessor.reset();  // Close the current accessor
 
