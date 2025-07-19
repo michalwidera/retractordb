@@ -82,7 +82,10 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   assert(retention.capacity != 0);
   assert(retention.segments != 0);
 
-  return vec[currentSegment]->read(ptrData, position);
+  auto segmentIndex = position / retention.capacity;
+  auto positionInSegment = position % retention.capacity;
+
+  return vec[segmentIndex]->read(ptrData, positionInSegment);
 }
 
 template <class T>
