@@ -41,6 +41,8 @@ class groupFileAccessor : public FileAccessorInterface<T> {
   size_t writeCount     = 0;
   size_t currentSegment = 0;
 
+  size_t removedSegments = 0;
+
  public:
   ~groupFileAccessor();
 
