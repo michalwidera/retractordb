@@ -71,7 +71,16 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
     writeCount = 0;
   }
-  return vec[currentSegment]->write(ptrData, position);
+
+  if (position != std::numeric_limits<size_t>::max()) {
+    auto segmentIndex      = position / retention.capacity;
+    auto positionInSegment = position % retention.capacity;
+
+    assert(segmentIndex < vec.size() && "Segment index out of bounds. Check retention settings and position.");
+
+    return vec[segmentIndex]->write(ptrData, positionInSegment);
+  } else
+    return vec[currentSegment]->write(ptrData, position);
 }
 
 template <class T>
@@ -82,7 +91,7 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   assert(retention.capacity != 0);
   assert(retention.segments != 0);
 
-  auto segmentIndex = position / retention.capacity;
+  auto segmentIndex      = position / retention.capacity;
   auto positionInSegment = position % retention.capacity;
 
   return vec[segmentIndex]->read(ptrData, positionInSegment);
