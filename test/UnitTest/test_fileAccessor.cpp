@@ -156,7 +156,7 @@ TEST(FileAccessorTest, test_retention_one_read_and_retention) {
   }
 
   // Check file contents and sizes
-  
+
   GTEST_ASSERT_EQ(mapOfFiles.size(), 2);
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].sizeFromSystem, 3);
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file_segment_1"].sizeFromSystem, 3);
