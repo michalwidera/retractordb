@@ -91,7 +91,7 @@ TEST(FileAccessorTest, test_dir) {
   GTEST_ASSERT_EQ(gfa->count(), 2);  // count is not affected by retention
 }
 
-TEST(FileAccessorTest, test_retention) {
+TEST(FileAccessorTest, test_retention_one_read_and_retention) {
   bool filepathExists = false;
   try {
     filepathExists = std::filesystem::is_directory(sandBoxFolder);
@@ -128,7 +128,9 @@ TEST(FileAccessorTest, test_retention) {
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
   auto gfa                    = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
-  record.data                 = 1;
+
+  // Write records
+  record.data = 1;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
   record.data = 2;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
@@ -153,10 +155,37 @@ TEST(FileAccessorTest, test_retention) {
     GTEST_LOG_(INFO) << "contents:" << ss.str();
   }
 
+  // Check file contents and sizes
+  
   GTEST_ASSERT_EQ(mapOfFiles.size(), 2);
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].sizeFromSystem, 3);
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file_segment_1"].sizeFromSystem, 3);
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].fileContents, std::vector<BYTE>({1, 2, 3}));
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file_segment_1"].fileContents, std::vector<BYTE>({4, 5, 6}));
   GTEST_ASSERT_EQ(gfa->count(), 6);
+
+  // Read records
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 0);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 1);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 1);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 2);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 2);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 3);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 3);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 4);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 4);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 5);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 5);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 6);  // last record
 }
