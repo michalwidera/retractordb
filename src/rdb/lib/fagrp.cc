@@ -32,7 +32,7 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
     vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
   } else {
     auto min = std::numeric_limits<size_t>::max();
-    auto max = std::numeric_limits<size_t>::min();
+    auto max = 0;
     for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
       // vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
       // mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
@@ -103,7 +103,10 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
     writeCount = 0;
 
     if (retention.segments != 0 && vec.size() > retention.segments) {
-      spdlog::info("Removing oldest segment: {}", vec.front()->name());
+      auto segmentToRemove = vec.front()->name();
+      spdlog::info("Removing oldest segment: {}", segmentToRemove);
+      std::cerr << "Removing oldest segment: " << segmentToRemove << std::endl;
+      std::filesystem::remove(segmentToRemove);
       vec.erase(vec.begin());
       removedSegments++;
       assert(vec.size() > 0);
