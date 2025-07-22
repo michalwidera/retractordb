@@ -14,8 +14,8 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_4_*_*_3,6
-          # At 4:00 on Wednesday and Saturday.
+          # https://crontab.guru/#0_4_*_*_3
+          # At 4:00 on Wednesday.
           cron: "0 4 * * 3,6"
           filters:
             branches:
