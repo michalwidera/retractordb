@@ -3,8 +3,8 @@
 { dane:3 }
 { dane:4 }
 4 Record(s)
-4 Byte(s) per record.
-{	INTEGER dane
+1 Byte(s) per record.
+{	BYTE dane
 	RETENTION 2 3
 }
 { dane:1 }

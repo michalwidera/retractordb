@@ -40,7 +40,7 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
         auto val = atoi(sm[1].str().c_str());
         if (val < min) min = val;
         if (val > max) max = val;
-        std::cerr << "Found existing file: " << filename << "\t" << val << std::endl;
+        // std::cerr << "Found existing file: " << filename << "\t" << val << std::endl;
       }
     }
     if (max == std::numeric_limits<size_t>::min() && min == std::numeric_limits<size_t>::max()) {
@@ -48,7 +48,7 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
       min = 0;
       max = 0;
     }
-    std::cerr << "Min/Max segment: " << min << "/" << max << std::endl;
+    // std::cerr << "Min/Max segment: " << min << "/" << max << std::endl;
 
     removedSegments = min;
     for (auto i = min; i <= max; ++i) {
@@ -56,16 +56,16 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
       currentFilename = filename + "_segment_" + std::to_string(currentSegment);
       vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
       SPDLOG_INFO("Adding existing segment: {}", name());
-      std::cerr << "Adding existing segment: " << name() << std::endl;
+      // std::cerr << "Adding existing segment: " << name() << std::endl;
 
       writeCount = vec.back()->count();
     }
   }
 
-  std::cerr << "Write count initialized to: " << writeCount << std::endl;
-  std::cerr << "Current segment: " << currentSegment << std::endl;
-  std::cerr << "Current filename: " << currentFilename << std::endl;
-  std::cerr << "vec size: " << vec.size() << std::endl;
+  // std::cerr << "Write count initialized to: " << writeCount << std::endl;
+  // std::cerr << "Current segment: " << currentSegment << std::endl;
+  // std::cerr << "Current filename: " << currentFilename << std::endl;
+  // std::cerr << "vec size: " << vec.size() << std::endl;
 }
 
 template <class T>
@@ -111,7 +111,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
     if (retention.segments != 0 && vec.size() > retention.segments) {
       auto segmentToRemove = vec.front()->name();
       spdlog::info("Removing oldest segment: {}", segmentToRemove);
-      std::cerr << "Removing oldest segment: " << segmentToRemove << std::endl;
+      // std::cerr << "Removing oldest segment: " << segmentToRemove << std::endl;
       std::filesystem::remove(segmentToRemove);
       vec.erase(vec.begin());
       removedSegments++;
@@ -130,10 +130,11 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
     return vec[segmentIndex - removedSegments]->write(ptrData, positionInSegment);
   } else {
-    if (position == std::numeric_limits<size_t>::max())
-      std::cerr << "Appending to segment: " << currentSegment - removedSegments << " file: " << name() << std::endl;
-    else
-      std::cerr << "Writing to segment: " << currentSegment - removedSegments << " at " << position << std::endl;
+    // if (position == std::numeric_limits<size_t>::max())
+    //  std::cerr << "Appending to segment: " << currentSegment - removedSegments << " file: " << name() << std::endl;
+    // else
+    //  std::cerr << "Writing to segment: " << currentSegment - removedSegments << " at " << position << std::endl;
+
     return vec[currentSegment - removedSegments]->write(ptrData, position);
   }
 }
