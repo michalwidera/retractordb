@@ -1,1 +1,3 @@
-test_db.*
+test_file
+test_file*
+test_file.desc

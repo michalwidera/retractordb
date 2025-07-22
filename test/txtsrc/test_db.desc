@@ -1,0 +1,4 @@
+{	INTEGER a
+	REF "data-from-test-db.txt"
+        TYPE TEXTSOURCE 
+}

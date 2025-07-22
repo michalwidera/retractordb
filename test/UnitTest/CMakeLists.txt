@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
                     ${CMAKE_SOURCE_DIR}/src)

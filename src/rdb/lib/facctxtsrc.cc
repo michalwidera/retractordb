@@ -26,9 +26,9 @@ K readFromFstream(std::fstream &myFile) {
 
 template <typename T>
 textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,  //
-                                          const size_t size,            //
+                                          const size_t sizeRec,         //
                                           const rdb::Descriptor &descriptor)
-    : filename(fileName), descriptor(descriptor), size(size) {
+    : filename(fileName), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(fileName, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
@@ -42,7 +42,12 @@ textSourceAccessor<T>::~textSourceAccessor() {
 }
 
 template <class T>
-std::string textSourceAccessor<T>::fileName() {
+auto textSourceAccessor<T>::name() const -> const std::string & {
+  return filename;
+}
+
+template <class T>
+auto textSourceAccessor<T>::name() -> std::string & {
   return filename;
 }
 
@@ -55,17 +60,9 @@ ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t position) {
 template <typename T>
 ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
   assert(position == 0);
-  assert(size != 0);
+  assert(sizeRec != 0);
 
-  // myFile.seekg(position);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
-
-  // This (+1) look's like error (need investigate)
-  // During test posix interface have properly read size data
-  // but fstream get read instead 12 bytes only 11
-  // Therefore +1 appears.
-  // Last byte was omitted.
-  // Look's like some inconsistency is here.
 
   auto i = 0;
   for (auto item : descriptor) {
@@ -74,8 +71,7 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
         std::string var;
         auto strLen = std::get<rlen>(item) * std::get<rarray>(item);
         char c;
-        while (myFile.get(c) && c != '"')
-          ;
+        while (myFile.get(c) && c != '"');
         while (myFile.get(c) && c != '"') var += c;
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
@@ -112,12 +108,14 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
   std::memcpy(reinterpret_cast<char *>(ptrData), payload->get(), descriptor.getSizeInBytes());
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
+  readCount++;
+
   return EXIT_SUCCESS;
 }
 
 template <class T>
 size_t textSourceAccessor<T>::count() {
-  return 0;
+  return readCount;
 }
 
 template class textSourceAccessor<uint8_t>;

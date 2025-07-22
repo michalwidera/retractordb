@@ -61,7 +61,7 @@ class Descriptor : public std::vector<rField> {
   std::string type(const std::string &name);
   int sizeFlat();
 
-  std::pair<int, int> retention();
+  std::pair<size_t, size_t> retention();
 
   std::pair<rdb::descFld, int> getMaxType();
 

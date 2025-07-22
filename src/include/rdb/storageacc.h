@@ -23,12 +23,12 @@ class storageAccessor {
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;
-  bool removeOnExit             = true;
-  size_t recordsCount           = 0;
-  std::string descriptorFile    = "";
-  std::string storageFile       = "";
-  std::string storageType       = "DEFAULT";
-  std::pair<int, int> retention = {0, 0};
+  bool removeOnExit          = true;
+  size_t recordsCount        = 0;
+  std::string descriptorFile = "";
+  std::string storageFile    = "";
+  std::string storageType    = "DEFAULT";
+  retention_t retention      = {0, 0};
   void moveRef();
   void attachStorage();
 
@@ -40,7 +40,6 @@ class storageAccessor {
   // Read data from storage described as accessor
   // if var:destination is null read into storageAccessor payload
   bool read_();  // read from device into chamber
-  bool read_(const size_t recordIndex, uint8_t *destination = nullptr);
 
  public:
   storageAccessor() = delete;
@@ -53,7 +52,8 @@ class storageAccessor {
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
   bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
-  bool revRead(const size_t recordIndex, uint8_t *destination = nullptr);
+  bool revRead(const size_t recordIndexFromBack, uint8_t *destination = nullptr);
+  bool read(const size_t recordIndexFromFront, uint8_t *destination = nullptr);
   void fire();
   void purge();
 

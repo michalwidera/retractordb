@@ -169,7 +169,11 @@ void storageAccessor::reset() {
 
   initializeAccessor();
 
+  accessor->write(nullptr, 0);
   recordsCount = 0;
+
+  assert(recordsCount == accessor->count());
+
   SPDLOG_INFO("reset - drop & recreate storage.");
 }
 
@@ -196,7 +200,12 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setRemoveOnExit(bool value) { removeOnExit = value; }
 
-size_t storageAccessor::getRecordsCount() { return recordsCount; }
+size_t storageAccessor::getRecordsCount() {
+  // assert(recordsCount == accessor->count());
+
+  // if (accessor->count() != 0) assert(recordsCount == accessor->count());
+  return recordsCount;
+}
 
 std::string storageAccessor::getStorageName() { return storageFile; }
 
@@ -237,7 +246,7 @@ bool storageAccessor::read_() {
 
 void storageAccessor::purge() { accessor->write(nullptr, 0); }
 
-bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
+bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destination) {
   assert(!isDeclared());
   abortIfStorageNotPrepared();
 
@@ -251,23 +260,32 @@ bool storageAccessor::read_(const size_t recordIndex, uint8_t *destination) {
 
   auto recordIndexRv{0};
 
-  recordIndexRv = recordIndex;
+  recordIndexRv = recordIndexFromFront;
+
+  assert(recordsCount == accessor->count());
 
   if (recordsCount > 0 && recordIndexRv < recordsCount) {
     result = accessor->read(destination, recordIndexRv * size);
     assert(result == 0);
-    SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor->fileName(), recordIndexRv, recordsCount);
+    SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor->name(), recordIndexRv, recordsCount);
   } else {
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor->fileName(), recordIndexRv, recordsCount);
+    SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor->name(), recordIndexRv, recordsCount);
   }
   return result == 0;
 }
 
-bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
-  const auto recordPositionFromBack = getRecordsCount() - recordIndex - 1;
+bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
+  if (recordsCount == accessor->count())
+    SPDLOG_INFO("revRead {}: recordsCount:{} ->count():{}", storageFile, recordsCount, accessor->count());
+  else
+    SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", storageFile, recordsCount, accessor->count());
 
-  if (!isDeclared()) return read_(recordPositionFromBack, destination);
+  if (!isDeclared()) {
+    assert(recordsCount == accessor->count());
+    const auto recordPositionFromBack = recordsCount - recordIndexFromBack - 1;
+    return read(recordPositionFromBack, destination);
+  }
 
   // For all _DECLARED_ data sources buffer capacity at least _MUST_ be 1
   // In order to maintain the consistency of declared data sources,
@@ -276,7 +294,7 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
   assert(circularBuffer.capacity() > 0);
   assert(isDeclared());
 
-  if (recordIndex == 0 && bufferState == sourceState::flux) {
+  if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     //
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
@@ -284,7 +302,7 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
     assert(result && "Failure during read.");
     bufferState = sourceState::armed;
   }
-  assert(recordIndex >= 0);
+  assert(recordIndexFromBack >= 0);
 
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources
@@ -292,12 +310,12 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
   // - only for recordIndex > 0 if sourceState::flux
   // - also for recordIndex == 0 if sourceState::lock
 
-  SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer.capacity(), recordIndex, storageFile);
-  assert((recordIndex < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
+  SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer.capacity(), recordIndexFromBack, storageFile);
+  assert((recordIndexFromBack < circularBuffer.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
 
   // in case of accessing buffer that has no data yet - zeros are returned
 
-  if (recordIndex >= circularBuffer.size()) {
+  if (recordIndexFromBack >= circularBuffer.size()) {
     destination = (destination == nullptr)                             //
                       ? static_cast<uint8_t *>(storagePayload->get())  //
                       : destination;
@@ -305,14 +323,14 @@ bool storageAccessor::revRead(const size_t recordIndex, uint8_t *destination) {
     assert(destination != nullptr);
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read buffer fn {} - non existing data from pos:{} capacity:{}", accessor->fileName(), recordIndex,
+    SPDLOG_WARN("read buffer fn {} - non existing data from pos:{} capacity:{}", accessor->name(), recordIndexFromBack,
                 circularBuffer.capacity());
     return true;
   }
 
-  assert((recordIndex < circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
+  assert((recordIndexFromBack < circularBuffer.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
 
-  *(storagePayload.get()) = circularBuffer[recordIndex];
+  *(storagePayload.get()) = circularBuffer[recordIndexFromBack];
   return true;
 }
 
@@ -323,12 +341,15 @@ void storageAccessor::setCapacity(const int capacity) {
 bool storageAccessor::write(const size_t recordIndex) {
   abortIfStorageNotPrepared();
 
+  assert(recordsCount == accessor->count());
+
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount) {
     result = accessor->write(static_cast<uint8_t *>(storagePayload->get()));  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount++;
+
     SPDLOG_INFO("append");
     return result == 0;
   }
@@ -338,6 +359,9 @@ bool storageAccessor::write(const size_t recordIndex) {
     assert(result == 0);
     SPDLOG_INFO("write {}", recordIndex);
   }
+
+  assert(recordsCount == accessor->count());
+
   return result == 0;
 };
 

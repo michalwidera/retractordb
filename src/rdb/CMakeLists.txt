@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 project(xtrdb LANGUAGES CXX)
 
@@ -7,7 +7,7 @@ find_package(antlr4 REQUIRED)
 
 add_subdirectory(lib)
 
-set(SOURCES_RDB main.cpp)
+set(SOURCES_RDB main.cpp ../common/uxSysTermTools.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 

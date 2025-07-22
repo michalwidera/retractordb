@@ -360,9 +360,6 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
       fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
       assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
-      qSet[q.id]->outputPayload->fire();                                          // chamber -> outputPayload
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);   //
-
       zeroStep = true;
     }
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
