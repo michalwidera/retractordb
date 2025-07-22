@@ -27,7 +27,12 @@ posixBinaryFileAccessor<T>::~posixBinaryFileAccessor() {
 }
 
 template <class T>
-std::string posixBinaryFileAccessor<T>::fileName() {
+auto posixBinaryFileAccessor<T>::name() const -> const std::string & {
+  return filename;
+}
+
+template <class T>
+auto posixBinaryFileAccessor<T>::name() -> std::string & {
   return filename;
 }
 

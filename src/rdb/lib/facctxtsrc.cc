@@ -42,7 +42,12 @@ textSourceAccessor<T>::~textSourceAccessor() {
 }
 
 template <class T>
-std::string textSourceAccessor<T>::fileName() {
+auto textSourceAccessor<T>::name() const -> const std::string & {
+  return filename;
+}
+
+template <class T>
+auto textSourceAccessor<T>::name() -> std::string & {
   return filename;
 }
 

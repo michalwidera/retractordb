@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 # Packages are managed in ./CMakeLists.txt find_package(Boost REQUIRED)
 # find_package(spdlog REQUIRED) find_package(fmt REQUIRED)
@@ -44,7 +44,7 @@ add_custom_target(
   cformat
   COMMAND
     find ${CMAKE_SOURCE_DIR}/src -iname "*.h" -o -iname "*.cpp" -o -iname
-    "*.hpp" -o -iname "*.cc" | grep --invert-match 'Parser/' | xargs
+    "*.hpp" -o -iname "*.cc" | grep --invert-match '.antlr/' | xargs
     clang-format -i --style=${CSTYLE}
   COMMAND find ${CMAKE_SOURCE_DIR}/test -iname "*.h" -o -iname "*.cpp" -o -iname
           "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style=${CSTYLE}
