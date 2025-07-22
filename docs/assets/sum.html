@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Combiner - Sum Operation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            border-left: 5px solid #4CAF50;
+        }
+        .error {
+            color: #d32f2f;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sequence Combiner - Sum</h1>
+        <p>Enter two sequences and two rational numbers to generate a combined sequence.</p>
+        
+        <form id="sequenceForm">
+            <label for="firstSequence">First Sequence (comma-separated letters/words/numbers):</label>
+            <input type="text" id="firstSequence" placeholder="e.g., a, b, c, d, e" required>
+            
+            <label for="secondSequence">Second Sequence (comma-separated letters/words/numbers):</label>
+            <input type="text" id="secondSequence" placeholder="e.g., 1, 2, 3, 4, 5" required>
+            
+            <label for="rationalNumber1">First Rational Number:</label>
+            <input type="text" id="rationalNumber1" placeholder="e.g., 2/3 or 0.5" required>
+            
+            <label for="rationalNumber2">Second Rational Number:</label>
+            <input type="text" id="rationalNumber2" placeholder="e.g., 1/4 or 0.25" required>
+            
+            <button type="button" onclick="combineSequences()">Combine Sequences</button>
+        </form>
+        
+        <div id="result" class="result" style="display: none;">
+            <h3>Result:</h3>
+            <div id="resultContent"></div>
+            <h3>Combined Sequence:</h3>
+            <div id="combinedSequence"></div>
+        </div>
+    </div>
+
+    <script>
+        // Function to parse rational number from string (e.g., "2/3" or "0.5")
+        function parseRationalNumber(str) {
+            str = str.trim();
+            
+            // Check if it's in fraction format (e.g., "2/3")
+            if (str.includes('/')) {
+                const parts = str.split('/');
+                if (parts.length !== 2) {
+                    throw new Error(`Invalid rational number format: ${str}`);
+                }
+                
+                const numerator = parseFloat(parts[0]);
+                const denominator = parseFloat(parts[1]);
+                
+                if (isNaN(numerator) || isNaN(denominator) || denominator === 0) {
+                    throw new Error(`Invalid rational number: ${str}`);
+                }
+                
+                return numerator / denominator;
+            } 
+            // Otherwise, try to parse as decimal
+            else {
+                const number = parseFloat(str);
+                if (isNaN(number)) {
+                    throw new Error(`Invalid rational number: ${str}`);
+                }
+                return number;
+            }
+        }
+        
+        // Function to parse a sequence string into an array
+        function parseSequence(str, type) {
+            const items = str.split(',').map(item => item.trim()).filter(item => item !== '');
+            
+            if (items.length === 0) {
+                throw new Error(`${type} sequence cannot be empty`);
+            }
+
+            return items;
+        }
+        
+        // Main function to combine sequences
+        function combineSequences() {
+            try {
+                // Get input values
+                const literalSeqStr = document.getElementById('firstSequence').value;
+                const numeralSeqStr = document.getElementById('secondSequence').value;
+                const rationalNum1Str = document.getElementById('rationalNumber1').value;
+                const rationalNum2Str = document.getElementById('rationalNumber2').value;
+                
+                // Parse inputs
+                const firstSequence = parseSequence(literalSeqStr, 'literal');
+                const secondSequence = parseSequence(numeralSeqStr, 'numeral');
+                const rationalNum1 = parseRationalNumber(rationalNum1Str);
+                const rationalNum2 = parseRationalNumber(rationalNum2Str);
+
+                const rationalNum3 = Math.min( rationalNum1 , rationalNum2 );
+
+                const delta = rationalNum3;
+                const A = firstSequence;
+                const B = secondSequence;
+                
+                // Check if sequences have the same length
+                //if (firstSequence.length !== secondSequence.length) {
+                //    throw new Error('The two sequences must have the same length');
+                //}
+                
+                // Combine sequences
+                const combinedSequence = [];
+
+                let i = 0;
+                while(true) {
+                    const seq_1 = Math.floor(i*rationalNum1/rationalNum2);
+                    const seq_2 = Math.floor(i*rationalNum2/rationalNum1);
+                    if ( rationalNum3 == rationalNum1 ) {
+                        if (seq_1 >= secondSequence.length)
+                            break;
+                        if (i >= firstSequence.length)
+                            break;
+
+                        const weightedItem = {
+                            combined: A[i] + B[seq_1]
+                        };
+                        combinedSequence.push(weightedItem);
+                    } else {
+                        if (seq_2 >= firstSequence.length)
+                            break;
+                        if (i >= secondSequence.length)
+                            break;
+
+                        const weightedItem = {
+                            combined: A[seq_2] + B[i]
+                        };
+                        combinedSequence.push(weightedItem);
+                    }
+                    i++;
+                }
+
+                
+                // Display result
+                const resultDiv = document.getElementById('result');
+                const resultContent = document.getElementById('resultContent');
+                const combinedSequenceDiv = document.getElementById('combinedSequence');
+                
+                // https://www.webnots.com/alt-code-shortcuts-for-superscript-and-subscript/
+                resultContent.innerHTML = `
+                    <p><strong>Literal Sequence:</strong> ${firstSequence.join(', ')}</p>
+                    <p><strong>Numeral Sequence:</strong> ${secondSequence.join(', ')}</p>
+                    <p><strong>First Rational Number (r₁):</strong> ${rationalNum1}</p>
+                    <p><strong>Second Rational Number (r₂):</strong> ${rationalNum2}</p>
+                    <p><strong>Third Rational Number (r₃):</strong> ${rationalNum3}</p>
+                `;
+                
+                combinedSequenceDiv.innerHTML = `
+                    <table style="width:100%; border-collapse: collapse;">
+                        <tr style="background-color: #e8f5e9;">
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Index</th>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Combined</th>
+                        </tr>
+                        ${combinedSequence.map((item, index) => `
+                            <tr>
+                                <td style="border: 1px solid #ddd; padding: 8px;">${index}</td>
+                                <td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">${item.combined}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                `;
+                
+                resultDiv.style.display = 'block';
+                
+                // Clear any previous error
+                clearError();
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+        
+        // Function to show error message
+        function showError(message) {
+            clearError();
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.id = 'errorMessage';
+            errorDiv.textContent = message;
+            
+            const form = document.getElementById('sequenceForm');
+            form.appendChild(errorDiv);
+            
+            // Hide result div
+            document.getElementById('result').style.display = 'none';
+        }
+        
+        // Function to clear error message
+        function clearError() {
+            const existingError = document.getElementById('errorMessage');
+            if (existingError) {
+                existingError.remove();
+            }
+        }
+    </script>
+</body>
+</html>

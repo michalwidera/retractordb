@@ -1,0 +1,7 @@
+main:
+    - title: "Tutorial"
+      url: /tutorial/
+    - title: "Download"
+      url: https://github.com/michalwidera/retractordb
+    - title: "About"
+      url: /about/
