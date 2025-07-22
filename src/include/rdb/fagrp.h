@@ -31,7 +31,7 @@ struct retention_t {
 template <typename T>
 class groupFileAccessor : public FileAccessorInterface<T> {
   std::string filename;
-  std::string prevFileName;
+  std::string currentFilename;
   const std::size_t recSize;
 
   retention_t retention{0, 0};

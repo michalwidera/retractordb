@@ -24,8 +24,9 @@ template <class T>
 groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
                                         const size_t recSize,          //
                                         const retention_t &retention)  //
-    : filename(fileName), prevFileName(fileName), recSize(recSize), retention(retention) {
-  vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(fileName, recSize));
+    : filename(fileName), recSize(recSize), retention(retention) {
+  currentFilename = filename + "_segment_" + std::to_string(currentSegment);
+  vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
   writeCount = 0;
 }
 
@@ -34,16 +35,17 @@ groupFileAccessor<T>::~groupFileAccessor() {}
 
 template <class T>
 auto groupFileAccessor<T>::name() const -> const std::string & {
-  return filename;
+  if (retention.noRetention()) return filename;
+  return currentFilename;
 }
 
 template <class T>
 auto groupFileAccessor<T>::name() -> std::string & {
-  // setter
-  spdlog::info("Setting name of groupFileAccessor from {} to {}", prevFileName, filename);
-  std::filesystem::rename(prevFileName, filename);
-  prevFileName = filename;
-  return filename;
+  if (retention.noRetention()) {
+    // pottenially consider change filename storage file here.
+    return filename;
+  }
+  return currentFilename;
 }
 
 template <class T>
@@ -52,7 +54,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
   if (position == std::numeric_limits<size_t>::max()) writeCount++;
 
-  if (retention.noRetention()) return vec[currentSegment - removedSegments]->write(ptrData, position);
+  if (retention.noRetention()) return vec[0]->write(ptrData, position);
 
   assert(retention.capacity != 0);
 
@@ -60,13 +62,11 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
     // rotate segments
 
     currentSegment++;
+    currentFilename = filename + "_segment_" + std::to_string(currentSegment);
+
     spdlog::info("Rotating segments: currentSegment={}", currentSegment);
 
-    spdlog::info("Renaming file: {} to {}_segment_{}", filename, filename, currentSegment);
-
-    name() = filename + "_segment_" + std::to_string(currentSegment);
-
-    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(filename, recSize));
+    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
 
     writeCount = 0;
 
@@ -95,7 +95,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 template <class T>
 ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   assert(recSize != 0);
-  if (retention.noRetention()) return vec[currentSegment - removedSegments]->read(ptrData, position);
+  if (retention.noRetention()) return vec[0]->read(ptrData, position);
 
   assert(retention.capacity != 0);
 
@@ -119,13 +119,3 @@ template class groupFileAccessor<uint8_t>;
 template class groupFileAccessor<char>;
 
 }  // namespace rdb
-
-/*
-PYTHON MODEL
-
-window = 3
-silos = 2
-
-for i in range(0,20): print(i, i% window)
-
-*/
