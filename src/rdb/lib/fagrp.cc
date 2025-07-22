@@ -86,6 +86,24 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
   assert(retention.capacity != 0);
 
+  // Purge operation
+  if (ptrData == nullptr && position == 0) {
+    for (auto &v : vec) std::filesystem::remove(v->name());
+    vec.clear();
+
+    // Reset state
+    writeCount      = 0;
+    currentSegment  = 0;
+    currentFilename = filename + "_segment_" + std::to_string(currentSegment);
+    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+    removedSegments = 0;
+    spdlog::info("Purged all segments, current segment is now 0.");
+    assert(vec.size() == 1 && "After purge, there should be only one segment left.");
+    assert(vec[0]->count() == 0 && "After purge, the segment should be empty.");
+    spdlog::info("Purged all segments, current segment is now 0.");
+    return 0;
+  }
+
   if (writeCount > retention.capacity) {
     // rotate segments
 
