@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
 
 namespace rdb {
 
@@ -25,9 +26,40 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
                                         const size_t recSize,          //
                                         const retention_t &retention)  //
     : filename(fileName), recSize(recSize), retention(retention) {
-  currentFilename = filename + "_segment_" + std::to_string(currentSegment);
-  vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
   writeCount = 0;
+  currentFilename = filename + "_segment_" + std::to_string(currentSegment);
+  if (retention.noRetention()) {
+    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+  } else {
+    auto min = std::numeric_limits<size_t>::max();
+    auto max = std::numeric_limits<size_t>::min();
+    for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
+      // vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+      // mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
+
+      auto filename = entry.path().filename().string();
+      std::smatch sm;
+      if (regex_match(filename, sm, std::regex(fileName + "_segment_([0-9]+)"))) {
+        auto val = atoi(sm[1].str().c_str());
+        if (val < min) min = val;
+        if (val > max) max = val;
+        std::cerr << "Found existing file: " << filename << "\t" << val << std::endl;
+      }
+    }
+    std::cerr << "Min/Max segment: " << min << "/" << max << std::endl;
+
+    removedSegments = min;
+    for ( auto i = min; i <= max; ++i) {
+      currentSegment = i;
+      currentFilename = filename + "_segment_" + std::to_string(currentSegment);
+      vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+      SPDLOG_INFO("Adding existing segment: {}", currentFilename);
+    }
+
+    size_t sumCount = 0;
+    for (auto &v : vec) sumCount += v->count();
+    writeCount = removedSegments * retention.capacity + sumCount;  // initial write count based on existing segments
+  }
 }
 
 template <class T>
