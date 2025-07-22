@@ -26,17 +26,14 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
                                         const size_t recSize,          //
                                         const retention_t &retention)  //
     : filename(fileName), recSize(recSize), retention(retention) {
-  writeCount = 0;
+  writeCount      = 0;
   currentFilename = filename + "_segment_" + std::to_string(currentSegment);
   if (retention.noRetention()) {
     vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
   } else {
     auto min = std::numeric_limits<size_t>::max();
-    auto max = 0;
+    auto max = std::numeric_limits<size_t>::min();
     for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
-      // vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
-      // mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
-
       auto filename = entry.path().filename().string();
       std::smatch sm;
       if (regex_match(filename, sm, std::regex(fileName + "_segment_([0-9]+)"))) {
@@ -46,20 +43,29 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
         std::cerr << "Found existing file: " << filename << "\t" << val << std::endl;
       }
     }
+    if (max == std::numeric_limits<size_t>::min() && min == std::numeric_limits<size_t>::max()) {
+      // No existing segments found, start from 0 - only desc file may be found
+      min = 0;
+      max = 0;
+    }
     std::cerr << "Min/Max segment: " << min << "/" << max << std::endl;
 
     removedSegments = min;
-    for ( auto i = min; i <= max; ++i) {
-      currentSegment = i;
+    for (auto i = min; i <= max; ++i) {
+      currentSegment  = i;
       currentFilename = filename + "_segment_" + std::to_string(currentSegment);
       vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
-      SPDLOG_INFO("Adding existing segment: {}", currentFilename);
-    }
+      SPDLOG_INFO("Adding existing segment: {}", name());
+      std::cerr << "Adding existing segment: " << name() << std::endl;
 
-    size_t sumCount = 0;
-    for (auto &v : vec) sumCount += v->count();
-    writeCount = removedSegments * retention.capacity + sumCount;  // initial write count based on existing segments
+      writeCount = vec.back()->count();
+    }
   }
+
+  std::cerr << "Write count initialized to: " << writeCount << std::endl;
+  std::cerr << "Current segment: " << currentSegment << std::endl;
+  std::cerr << "Current filename: " << currentFilename << std::endl;
+  std::cerr << "vec size: " << vec.size() << std::endl;
 }
 
 template <class T>
@@ -123,8 +129,13 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
     assert(segmentIndex - removedSegments >= 0 && "Segment index after removing segments is out of bounds.");
 
     return vec[segmentIndex - removedSegments]->write(ptrData, positionInSegment);
-  } else
+  } else {
+    if (position == std::numeric_limits<size_t>::max())
+      std::cerr << "Appending to segment: " << currentSegment - removedSegments << " file: " << name() << std::endl;
+    else
+      std::cerr << "Writing to segment: " << currentSegment - removedSegments << " at " << position << std::endl;
     return vec[currentSegment - removedSegments]->write(ptrData, position);
+  }
 }
 
 template <class T>
