@@ -6,5 +6,4 @@ STORAGE 'temp'
 DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile2.dat'
 DECLARE b INTEGER STREAM core1, 0.2 FILE 'datafile3.dat'
 
-SELECT str1[0]*10,str1[1]*10,str1[1]*str1[0]+20 STREAM str1 FROM (core0+core1)>1
-
+SELECT str1[0]*10,str1[1]*10,str1[1]*str1[0]+20 STREAM str1 FROM (core0+core1)>5

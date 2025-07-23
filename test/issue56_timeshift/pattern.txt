@@ -9,7 +9,7 @@ STREAM_ADD_core0_core1(1/10)
 		PUSH_ID(STREAM_ADD_core0_core1[1])
 str1(1/10)
 	:- PUSH_STREAM(STREAM_ADD_core0_core1)
-	:- STREAM_TIMEMOVE(1)
+	:- STREAM_TIMEMOVE(5)
 	str1_0: INTEGER
 		PUSH_ID(str1[0])
 		PUSH_VAL(10)
