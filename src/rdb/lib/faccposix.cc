@@ -45,16 +45,16 @@ ssize_t posixBinaryFileAccessor<T>::write(const T *ptrData, const size_t positio
   if (ptrData == nullptr && position == 0) {
     // nullptr, position 0,0 - truncate file.
     auto result = ::ftruncate(fd, 0);
-    assert(result != static_cast<off_t>(-1));
+    assert(result != -1);
     return errno;
   }
   if (position == std::numeric_limits<size_t>::max()) {
     auto result = ::lseek(fd, 0, SEEK_END);
-    assert(result != static_cast<off_t>(-1));
+    assert(result != -1);
   } else {
     auto result = ::lseek(fd, position, SEEK_SET);
-    assert(result != static_cast<off_t>(-1));
-    if (result == static_cast<off_t>(-1)) return errno;  // Error status
+    assert(result != -1);
+    if (result == -1) return errno;  // Error status
   }
   size_t sizesh(size);
   while (sizesh > 0) {
