@@ -63,24 +63,24 @@ void Descriptor::updateConvMaps() {
   offsetMap.clear();
 
   clen = 0;
-  for (auto it : *this) clen += (std::get<rtype>(it) == rdb::STRING) ? 1 : std::get<rarray>(it);
+  for (auto it : *this) clen += (it.rtype == rdb::STRING) ? 1 : it.rarray;
 
   std::vector<rField>::iterator it = this->begin();
   int fieldCounter{0};
   int backCounterArray{0};
-  int counterArray{std::get<rarray>(*it)};
+  int counterArray{(*it).rarray};
   int offset{0};
   int clen_alignment{0};
   for (int i = 0; i < clen; ++i) {
-    if (std::get<rtype>(*it) == rdb::TYPE ||  //
-        std::get<rtype>(*it) == rdb::REF ||   //
-        std::get<rtype>(*it) == rdb::RETENTION) {
+    if ((*it).rtype == rdb::TYPE ||  //
+        (*it).rtype == rdb::REF ||   //
+        (*it).rtype == rdb::RETENTION) {
       ++it;
       ++clen_alignment;
       continue;
     }
 
-    if (std::get<rtype>(*it) == rdb::STRING) {
+    if ((*it).rtype == rdb::STRING) {
       counterArray     = 1;
       backCounterArray = 0;
     }
@@ -90,10 +90,10 @@ void Descriptor::updateConvMaps() {
       convReMap[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
 
       offsetMap.push_back(offset);
-      if (std::get<rtype>(*it) == rdb::STRING)
+      if ((*it).rtype == rdb::STRING)
         offset += len(*it);
       else
-        offset += std::get<rlen>(*it);
+        offset += (*it).rlen;
     }
 
     --counterArray;
@@ -104,7 +104,7 @@ void Descriptor::updateConvMaps() {
       if (it == this->end()) break;
       backCounterArray = 0;
       ++fieldCounter;
-      counterArray = std::get<rarray>(*it);
+      counterArray = (*it).rarray;
     }
   }
   clen -= clen_alignment;
@@ -175,33 +175,31 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                              //
-                                    [](const rField &i) {                                //
-                                     return std::get<rdb::rtype>(i) == rdb::REF ||      //
-                                            std::get<rdb::rtype>(i) == rdb::TYPE ||     //
-                                            std::get<rdb::rtype>(i) == rdb::RETENTION;  //
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),              //
+                                    [](const rField &i) {                //
+                                     return i.rtype == rdb::REF ||      //
+                                            i.rtype == rdb::TYPE ||     //
+                                            i.rtype == rdb::RETENTION;  //
                                    });
-  auto refCountThis = std::count_if(begin(), end(),                                      //
-                                    [](const rField &i) {                                //
-                                      return std::get<rdb::rtype>(i) == rdb::REF ||      //
-                                             std::get<rdb::rtype>(i) == rdb::TYPE ||     //
-                                             std::get<rdb::rtype>(i) == rdb::RETENTION;  //
+  auto refCountThis = std::count_if(begin(), end(),                      //
+                                    [](const rField &i) {                //
+                                      return i.rtype == rdb::REF ||      //
+                                             i.rtype == rdb::TYPE ||     //
+                                             i.rtype == rdb::RETENTION;  //
                                     });
 
   auto i{0};
   for (const rField &f : *this) {
-    if (std::get<rdb::rtype>(f) == rdb::REF ||             //
-        std::get<rdb::rtype>(f) == rdb::TYPE ||            //
-        std::get<rdb::rtype>(f) == rdb::RETENTION ||       //
-        std::get<rdb::rtype>(rhs[i]) == rdb::RETENTION ||  //
-        std::get<rdb::rtype>(rhs[i]) == rdb::REF ||        //
-        std::get<rdb::rtype>(rhs[i]) == rdb::TYPE) {
+    if (f.rtype == rdb::REF ||             //
+        f.rtype == rdb::TYPE ||            //
+        f.rtype == rdb::RETENTION ||       //
+        rhs[i].rtype == rdb::RETENTION ||  //
+        rhs[i].rtype == rdb::REF ||        //
+        rhs[i].rtype == rdb::TYPE) {
       ++i;
       continue;
     }
-    if (len(f) < len(rhs[i]) ||  //
-        std::get<rdb::rtype>(f) < std::get<rdb::rtype>(rhs[i]))
-      return false;
+    if (len(f) < len(rhs[i]) || f.rtype < rhs[i].rtype) return false;
 
     ++i;
   }
@@ -211,12 +209,12 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 Descriptor &Descriptor::cleanRef() {
   Descriptor rhs(*this);
   clear();
-  std::copy_if(rhs.begin(), rhs.end(),                             //
-               std::back_inserter(*this),                          //
-               [](const rField &i) {                               //
-                 return std::get<rdb::rtype>(i) != rdb::REF &&     //
-                        std::get<rdb::rtype>(i) != rdb::TYPE &&    //
-                        std::get<rdb::rtype>(i) != rdb::RETENTION  //
+  std::copy_if(rhs.begin(), rhs.end(),             //
+               std::back_inserter(*this),          //
+               [](const rField &i) {               //
+                 return i.rtype != rdb::REF &&     //
+                        i.rtype != rdb::TYPE &&    //
+                        i.rtype != rdb::RETENTION  //
                      ;
                });
 
@@ -232,8 +230,8 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
   clear();
   auto i{0};
   for (auto const &looper : lhs) {
-    auto maxRtype = std::max(std::get<rdb::rtype>(lhs[i]), std::get<rdb::rtype>(rhs[i]));
-    auto maxRlen  = std::max(std::get<rdb::rlen>(lhs[i]), std::get<rdb::rlen>(rhs[i]));
+    auto maxRtype = std::max(lhs[i].rtype, rhs[i].rtype);
+    auto maxRlen  = std::max(lhs[i].rlen, rhs[i].rlen);
     push_back(rField(name + "_" + std::to_string(i), maxRlen, 1, maxRtype));
     ++i;
   }
@@ -245,8 +243,8 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
 Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
-  if (std::get<rtype>(field) == rdb::RETENTION) return 0;
-  return std::get<rlen>(field) * std::get<rarray>(field);
+  if (field.rtype == rdb::RETENTION) return 0;
+  return field.rlen * field.rarray;
 }
 
 size_t Descriptor::getSizeInBytes() const {
@@ -258,19 +256,19 @@ size_t Descriptor::getSizeInBytes() const {
 std::pair<size_t, size_t> Descriptor::retention() {
   std::pair<size_t, size_t> retval{0, 0};
 
-  auto it = std::find_if(begin(), end(),                                                     //
-                         [](auto &item) { return std::get<rtype>(item) == rdb::RETENTION; }  //
+  auto it = std::find_if(begin(), end(),                                          //
+                         [](auto &item) { return item.rtype == rdb::RETENTION; }  //
   );
 
-  if (it != end()) retval = std::pair<int, int>(std::get<rlen>(*it), std::get<rarray>(*it));
+  if (it != end()) retval = std::pair<int, int>((*it).rlen, (*it).rarray);
 
   return retval;
 }
 
 size_t Descriptor::position(const std::string &name) {
-  auto it = std::find_if(begin(), end(),                          //
-                         [name](const auto &item) {               //
-                           return std::get<rname>(item) == name;  //
+  auto it = std::find_if(begin(), end(),               //
+                         [name](const auto &item) {    //
+                           return item.rname == name;  //
                          }  //
   );
 
@@ -283,19 +281,19 @@ size_t Descriptor::position(const std::string &name) {
 }
 
 std::string Descriptor::fieldName(int fieldPosition) {  //
-  return std::get<rname>((*this)[fieldPosition]);       //
+  return ((*this)[fieldPosition]).rname;                //
 }
 
 int Descriptor::len(const std::string &name) { return len((*this)[position(name)]); }
 
 int Descriptor::arraySize(const std::string &name) {  //
-  return std::get<rarray>((*this)[position(name)]);   //
+  return ((*this)[position(name)]).rarray;            //
 }
 
 size_t Descriptor::offsetBegArr(const std::string &name) {
   auto offset{0};
   for (auto const field : *this) {
-    if (name == std::get<rname>(field)) return offset;
+    if (name == field.rname) return offset;
     offset += len(field);
   }
   assert(false && "field not found with that name");
@@ -307,19 +305,19 @@ int Descriptor::offset(const int position) {
   return offsetMap[position];
 }
 
-std::string Descriptor::type(const std::string &name) {           //
-  return GetFieldType(std::get<rtype>((*this)[position(name)]));  //
+std::string Descriptor::type(const std::string &name) {  //
+  return GetFieldType(((*this)[position(name)]).rtype);  //
 }
 
 std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   rdb::descFld retVal{rdb::BYTE};
   auto size{1};
   for (auto const field : *this) {
-    if (std::get<rtype>(field) == rdb::REF) continue;
-    if (std::get<rtype>(field) == rdb::TYPE) continue;
-    if (std::get<rtype>(field) == rdb::RETENTION) continue;
-    if (retVal <= std::get<rtype>(field)) {
-      retVal = std::get<rtype>(field);
+    if (field.rtype == rdb::REF) continue;
+    if (field.rtype == rdb::TYPE) continue;
+    if (field.rtype == rdb::RETENTION) continue;
+    if (retVal <= field.rtype) {
+      retVal = field.rtype;
       if (size < len(field)) size = len(field);
     }
   }
@@ -334,34 +332,34 @@ std::ostream &flat(std::ostream &os) {
 std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
-    if (std::get<rtype>(r) == rdb::RETENTION)
-      if (std::get<rlen>(r) == 0 && std::get<rarray>(r) == 0) continue;  // skip retention 0,0
+    if (r.rtype == rdb::RETENTION)
+      if (r.rtype == 0 && r.rarray == 0) continue;  // skip retention 0,0
 
     if (!flatOutput)
       os << "\t";
     else
       os << " ";
-    os << GetFieldType(std::get<rtype>(r)) << " ";
+    os << GetFieldType(r.rtype) << " ";
 
-    switch (std::get<rtype>(r)) {
+    switch (r.rtype) {
       case rdb::REF:
-        os << "\"" << std::get<rname>(r) << "\"";
+        os << "\"" << r.rname << "\"";
         break;
       case rdb::TYPE:
-        os << std::get<rname>(r);
+        os << r.rname;
         break;
       case rdb::RETENTION:
         // retention {capacity} {segment}
-        os << std::get<rlen>(r) << " " << std::get<rarray>(r);
+        os << r.rlen << " " << r.rarray;
         break;
       default:
-        os << std::get<rname>(r);
+        os << r.rname;
     }
 
-    if (std::get<rarray>(r) > 1 && (std::get<rtype>(r) != rdb::RETENTION))
-      os << "[" << std::get<rarray>(r) << "]";
-    else if (std::get<rtype>(r) == rdb::STRING)
-      os << "[" << std::get<rlen>(r) << "]";
+    if (r.rarray > 1 && (r.rtype != rdb::RETENTION))
+      os << "[" << r.rarray << "]";
+    else if (r.rtype == rdb::STRING)
+      os << "[" << r.rlen << "]";
     if (!flatOutput) os << std::endl;
   }
   if (rhs.isEmpty())

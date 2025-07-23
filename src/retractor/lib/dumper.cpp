@@ -63,11 +63,11 @@ void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs
         // Patch on gramma problem -
         // dot program is using { as important sign - we need to convert { to <
         //
-        std::string name(std::get<rdb::rname>(f.field_));
+        std::string name(f.field_.rname);
         std::replace(name.begin(), name.end(), '{', '/');
         std::replace(name.begin(), name.end(), '}', '/');
         xout << name;
-        std::cout << "(" << GetStringdescFld(std::get<rdb::rtype>(f.field_)) << ")";
+        std::cout << "(" << GetStringdescFld(f.field_.rtype) << ")";
       }
       xout << "}";
     }  // if ( bShowFileds ) - end of fields in stream
@@ -130,7 +130,7 @@ void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs
                   "label=\"";
         else
           xout << "[shape=record,label=\"";
-        std::string sFieldName(std::get<rdb::rname>(f.field_));
+        std::string sFieldName(f.field_.rname);
         std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
         std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
         xout << sFieldName;
@@ -186,7 +186,7 @@ void dumper::qFieldsProgram() {
     for (auto f : q.lSchema) {
       for (auto t : f.lProgram) {
         std::cout << q.id << "\t";
-        std::cout << std::get<rdb::rname>(f.field_) << "\t";
+        std::cout << f.field_.rname << "\t";
 
         if (t.getStrCommandID() == "PUSH_ID")
           std::cout << t;
@@ -207,7 +207,7 @@ void dumper::qFields() {
     for (auto f : q.lSchema) {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
-      std::cout << std::get<rdb::rname>(f.field_) << "\t";
+      std::cout << f.field_.rname << "\t";
       std::cout << std::endl;
     }
   }
@@ -258,7 +258,7 @@ void dumper::rawTextFile() {
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
     for (auto f : q.lSchema) {
       std::cout << "\t";
-      std::cout << std::get<rdb::rname>(f.field_) << ": " << GetStringdescFld(std::get<rdb::rtype>(f.field_));
+      std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
       std::cout << std::endl;
       for (auto tf : f.lProgram)
         if (tf.getStrCommandID() == "PUSH_ID") {

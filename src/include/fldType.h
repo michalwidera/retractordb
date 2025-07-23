@@ -11,7 +11,6 @@
 #include <boost/rational.hpp>  // boost::rational
 #include <cstdint>             // uint8_t - C++20
 #include <string>              // std::string
-#include <tuple>               //
 #include <utility>             // std::pair
 #include <vector>              // std::vector
 
@@ -49,10 +48,16 @@
 #define DECL_T(elementName, elementType) elementName,
 #define DECL_E(elementName, elementType) elementName
 #define DECL_F(elementName) , elementName
-#define END_E_GEN_T(ENUM_NAME)                                 \
-  }                                                            \
-  ;                                                            \
-  typedef std::tuple<std::string, int, int, ENUM_NAME> rField; \
+#define END_E_GEN_T(ENUM_NAME)                                                                              \
+  }                                                                                                         \
+  ;                                                                                                         \
+  struct rField {                                                                                           \
+    std::string rname;                                                                                      \
+    int rlen;                                                                                               \
+    int rarray;                                                                                             \
+    ENUM_NAME rtype;                                                                                        \
+    rField(std::string n, int s, int c, ENUM_NAME t) : rname(std::move(n)), rlen(s), rarray(c), rtype(t) {} \
+  };                                                                                                        \
   std::string GetString##ENUM_NAME(const enum ENUM_NAME index);
 #include "internal/fldList.h"
 #endif

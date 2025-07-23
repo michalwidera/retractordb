@@ -104,7 +104,7 @@ void payload::setItemBy(const int positionFlat, std::any value) {
   T data          = std::any_cast<T>(value);
   auto position   = descriptor.convert(positionFlat).value().first;
   auto offsetFlat = descriptor.offset(positionFlat);
-  std::memcpy(payloadData.get() + offsetFlat, &data, std::get<rlen>(descriptor[position]));
+  std::memcpy(payloadData.get() + offsetFlat, &data, descriptor[position].rlen);
 }
 
 void payload::setItem(const int positionFlat, std::any valueParam) {
@@ -115,7 +115,7 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
   }
 
   auto position      = descriptor.convert(positionFlat).value().first;
-  auto requestedType = std::get<rtype>(descriptor[position]);
+  auto requestedType = descriptor[position].rtype;
 
   cast<std::any> castAny;
   std::any value = castAny(valueParam, requestedType);
@@ -123,7 +123,7 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
   try {
     switch (requestedType) {
       case rdb::STRING: {
-        const auto len = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
+        const auto len = descriptor[position].rlen * descriptor[position].rarray;
         std::string data(std::any_cast<std::string>(value));
         auto lenr       = std::min(len, static_cast<int>(data.length()));
         auto destOffset = descriptor.offset(positionFlat);
@@ -195,9 +195,9 @@ std::any payload::getItem(const int positionFlat) {
 
   // The aim of this procedure is : get raw data from descriptor and return as std::any
 
-  switch (std::get<rtype>(descriptor[position])) {
+  switch (descriptor[position].rtype) {
     case rdb::STRING: {
-      auto len       = std::get<rlen>(descriptor[position]) * std::get<rarray>(descriptor[position]);
+      auto len       = descriptor[position].rlen * descriptor[position].rarray;
       char *charData = reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat);
 
       auto descLen  = descriptor.getSizeInBytes();
@@ -249,7 +249,7 @@ std::any payload::getItem(const int positionFlat) {
       return 0xdead;
     }
   };
-  SPDLOG_ERROR("Type not supported. {}", int(std::get<rtype>(descriptor[position])));
+  SPDLOG_ERROR("Type not supported. {}", int(descriptor[position].rtype));
   assert(false && "type not supported on getter.");
   return 0xdead;
 }
@@ -320,21 +320,21 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   os << "{";
 
   for (auto const &r : rhs.getDescriptor()) {
-    if ((std::get<rtype>(r) == rdb::TYPE) ||  //
-        (std::get<rtype>(r) == rdb::REF) ||   //
-        (std::get<rtype>(r) == rdb::RETENTION))
+    if ((r.rtype == rdb::TYPE) ||  //
+        (r.rtype == rdb::REF) ||   //
+        (r.rtype == rdb::RETENTION))
       break;
     if (!getFlat())
       os << "\t";
     else
       os << " ";
-    os << std::get<rname>(r);
+    os << r.rname;
     os << ":";
     auto desc    = rhs.getDescriptor();
-    auto offset_ = desc.offsetBegArr(std::get<rname>(r));
-    if (std::get<rtype>(r) == STRING) {
+    auto offset_ = desc.offsetBegArr(r.rname);
+    if (r.rtype == STRING) {
       char *charData = reinterpret_cast<char *>(rhs.get() + offset_);
-      auto len       = desc.len(std::get<rname>(r));
+      auto len       = desc.len(r.rname);
       for (auto i = 0; i < len; i++)
         if (charData[i] == 0) {
           len = i;
@@ -343,8 +343,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
 
       os << std::string(charData, len);
     } else
-      for (auto i = 0; i < std::get<rarray>(r); i++) {
-        if (std::get<rtype>(r) == rdb::BYTE) {
+      for (auto i = 0; i < r.rarray; i++) {
+        if (r.rtype == rdb::BYTE) {
           uint8_t data{0};
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
           if (rhs.hexFormat) {
@@ -352,7 +352,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
             os << std::setw(2);
           }
           os << (int)data;
-        } else if (std::get<rtype>(r) == rdb::INTEGER) {
+        } else if (r.rtype == rdb::INTEGER) {
           int data{0};
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(int), sizeof(int));
           if (rhs.hexFormat) {
@@ -360,7 +360,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
             os << std::setw(8);
           }
           os << data;
-        } else if (std::get<rtype>(r) == rdb::UINT) {
+        } else if (r.rtype == rdb::UINT) {
           unsigned int data{0};
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(unsigned), sizeof(unsigned int));
           if (rhs.hexFormat) {
@@ -368,20 +368,20 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
             os << std::setw(8);
           }
           os << data;
-        } else if (std::get<rtype>(r) == rdb::FLOAT) {
+        } else if (r.rtype == rdb::FLOAT) {
           float data{0};
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(float), sizeof(float));
           os << data;
-        } else if (std::get<rtype>(r) == rdb::DOUBLE) {
+        } else if (r.rtype == rdb::DOUBLE) {
           double data{0};
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(double), sizeof(double));
           os << data;
-        } else if (std::get<rtype>(r) == rdb::RETENTION) {
+        } else if (r.rtype == rdb::RETENTION) {
           ;
         } else
           assert(false && "Unrecognized type");
 
-        if (i < std::get<rarray>(r) - 1) os << " ";
+        if (i < r.rarray - 1) os << " ";
       }
     if (!getFlat()) os << std::endl;
   }
