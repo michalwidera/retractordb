@@ -3,9 +3,9 @@ STREAM_ADD_core0_core1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_ADD
-	core0_0: RATIONAL
+	core0_0: INTEGER
 		PUSH_ID(STREAM_ADD_core0_core1[0])
-	core1_1: RATIONAL
+	core1_1: INTEGER
 		PUSH_ID(STREAM_ADD_core0_core1[1])
 str1(1/10)
 	:- PUSH_STREAM(STREAM_ADD_core0_core1)
