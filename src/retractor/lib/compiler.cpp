@@ -241,15 +241,13 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
     int fieldCountSh = 0;
     int i            = 0;
     for (auto f : coreInstance.getQuery(sName1).lSchema) {
-      field intf(rdb::rField(sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), sizeof(boost::rational<int>), 1,
-                             rdb::RATIONAL),
+      field intf(rdb::rField(sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray, f.field_.rtype),
                  token(PUSH_ID, std::make_pair(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : coreInstance.getQuery(sName2).lSchema) {
-      field intf(rdb::rField(sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), sizeof(boost::rational<int>), 1,
-                             rdb::RATIONAL),
+      field intf(rdb::rField(sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray, f.field_.rtype),
                  token(PUSH_ID, std::make_pair(sName2, i++)));
       lRetVal.push_back(intf);
     }
