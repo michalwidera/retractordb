@@ -112,10 +112,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   auto descriptorSrcSize = source->getDescriptor().sizeFlat();
   auto [maxType, maxLen] = source->getDescriptor().getMaxType();
   for (auto i = 0; i < lengthAbs; ++i) {
-    rdb::rField x{std::make_tuple(instance + "_" + std::to_string(i),  //
-                                  maxLen,                              //
-                                  1,                                   //
-                                  maxType)};
+    rdb::rField x(instance + "_" + std::to_string(i),  //
+                  maxLen,                              //
+                  1,                                   //
+                  maxType);
     descriptor += rdb::Descriptor{x};
   }
 
@@ -194,7 +194,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   outputPayload->revRead(0);
 
   auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
-  rdb::rField x{std::make_tuple(instance, maxLen, 1, maxType)};  // TODO - Check 1
+  rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
   rdb::Descriptor descriptor{x};
   // same as core[instance].descriptorFrom()
 
@@ -224,9 +224,9 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
 
   auto i{0};
   for (auto const it : outputPayload->getDescriptor()) {
-    if (std::get<rdb::rtype>(it) == rdb::REF) continue;
-    if (std::get<rdb::rtype>(it) == rdb::TYPE) continue;
-    if (std::get<rdb::rtype>(it) == rdb::RETENTION) continue;
+    if (it.rtype == rdb::REF) continue;
+    if (it.rtype == rdb::TYPE) continue;
+    if (it.rtype == rdb::RETENTION) continue;
 
     std::any value = castAny(outputPayload->getPayload()->getItem(i++), maxType);
     switch (maxType) {
@@ -299,10 +299,10 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 
     assert(result.has_value());
 
-    assert(std::get<rdb::rtype>(program.field_) == std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
+    assert(program.field_.rtype == (outputPayload->getDescriptor()[i]).rtype);
 
     cast<std::any> castAny;
-    std::any value = castAny(result, std::get<rdb::rtype>(outputPayload->getDescriptor()[i]));
+    std::any value = castAny(result, (outputPayload->getDescriptor()[i]).rtype);
 
     outputPayload->getPayload()->setItem(i, value);
 
@@ -562,7 +562,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   }
   auto i{0};
   for (auto f : payload->getDescriptor()) {
-    if (std::get<rdb::rlen>(f) == 0) continue;
+    if (f.rlen == 0) continue;
     retVal.push_back(any_to_variant_cast(payload->getItem(i++)));
   }
   return retVal;

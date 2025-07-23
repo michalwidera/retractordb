@@ -66,10 +66,10 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
 
   auto i = 0;
   for (auto item : descriptor) {
-    if (std::get<rlen>(item) != 0) {
-      if (std::get<rtype>(item) == rdb::STRING) {
+    if (item.rlen != 0) {
+      if (item.rtype == rdb::STRING) {
         std::string var;
-        auto strLen = std::get<rlen>(item) * std::get<rarray>(item);
+        auto strLen = item.rlen * item.rarray;
         char c;
         while (myFile.get(c) && c != '"');
         while (myFile.get(c) && c != '"') var += c;
@@ -78,24 +78,24 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
         // SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
         payload->setItem(i, var);
       } else
-        for (auto j = 0; j < std::get<rarray>(item); j++) {
-          if (std::get<rtype>(item) == rdb::INTEGER) {
+        for (auto j = 0; j < item.rarray; j++) {
+          if (item.rtype == rdb::INTEGER) {
             auto var = readFromFstream<int>(myFile);
             payload->setItem(i + j, var);
-          } else if (std::get<rtype>(item) == rdb::UINT) {
+          } else if (item.rtype == rdb::UINT) {
             auto var = readFromFstream<unsigned>(myFile);
             payload->setItem(i + j, var);
-          } else if (std::get<rtype>(item) == rdb::FLOAT) {
+          } else if (item.rtype == rdb::FLOAT) {
             auto var = readFromFstream<float>(myFile);
             payload->setItem(i + j, var);
-          } else if (std::get<rtype>(item) == rdb::DOUBLE) {
+          } else if (item.rtype == rdb::DOUBLE) {
             auto var = readFromFstream<double>(myFile);
             payload->setItem(i + j, var);
-          } else if (std::get<rtype>(item) == rdb::BYTE) {  // This is different!
+          } else if (item.rtype == rdb::BYTE) {  // This is different!
             auto var = readFromFstream<unsigned>(myFile);
             payload->setItem(i + j, static_cast<uint8_t>(var));
           } else {
-            SPDLOG_ERROR("Unsupported type in text data source: {}", std::get<rtype>(item));
+            SPDLOG_ERROR("Unsupported type in text data source: {}", item.rtype);
             assert(false && "read - Unsupported type in text data source");
             abort();
           }

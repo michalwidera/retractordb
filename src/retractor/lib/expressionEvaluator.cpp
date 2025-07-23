@@ -262,7 +262,6 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         const int offset1(atoi(sOffset1.c_str()));
 
         const auto anyValue = payload->getItem(offset1);
-        // auto rdbtype = std::get<rdb::rtype>(payload->getDescriptor()[offset1]);
 
         rdb::descFldVT val = any_to_variant_cast(anyValue);
         rStack.push(val);

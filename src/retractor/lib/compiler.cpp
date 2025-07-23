@@ -241,15 +241,13 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
     int fieldCountSh = 0;
     int i            = 0;
     for (auto f : coreInstance.getQuery(sName1).lSchema) {
-      field intf(rdb::rField(/*"Field_"*/ sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
-                             sizeof(boost::rational<int>), 1, rdb::RATIONAL),
+      field intf(rdb::rField(sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray, f.field_.rtype),
                  token(PUSH_ID, std::make_pair(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
     for (auto f : coreInstance.getQuery(sName2).lSchema) {
-      field intf(rdb::rField(/*"Field_"*/ sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++),
-                             sizeof(boost::rational<int>), 1, rdb::RATIONAL),
+      field intf(rdb::rField(sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray, f.field_.rtype),
                  token(PUSH_ID, std::make_pair(sName2, i++)));
       lRetVal.push_back(intf);
     }
@@ -394,9 +392,9 @@ std::string compiler::replicateIDX() {
               lTempProgram.push_back(token(t.getCommandID(), t.getVT()));
           }
           field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
-                                     std::get<rdb::rlen>(oldField.field_),       //
+                                     oldField.field_.rlen,                       //
                                      1,                                          // (expanded)
-                                     std::get<rdb::rtype>(oldField.field_)),
+                                     oldField.field_.rtype),
                          lTempProgram);
           q.lSchema.push_back(newField);
         }
@@ -439,7 +437,7 @@ std::string compiler::convertReferences() {
                 if (q1.id == schema) {
                   int offset1(0);
                   for (auto &f1 : q1.lSchema) {
-                    if (std::get<rdb::rname>(f1.field_) == field) {
+                    if (f1.field_.rname == field) {
                       t = token(PUSH_ID, std::make_pair(schema, offset1));
                       break;
                     } else
@@ -489,7 +487,7 @@ std::string compiler::convertReferences() {
               if (pQ1 != nullptr) {
                 offset1 = 0;
                 for (auto &f1 : (*pQ1).lSchema) {
-                  if (std::get<rdb::rname>(f1.field_) == field) {
+                  if ((f1.field_).rname == field) {
                     t           = token(PUSH_ID, std::make_pair(schema1, offset1));
                     bFieldFound = true;
                   }
@@ -499,7 +497,7 @@ std::string compiler::convertReferences() {
               if (pQ2 != nullptr && !bFieldFound) {
                 offset1 = 0;
                 for (auto &f2 : (*pQ2).lSchema) {
-                  if (std::get<rdb::rname>(f2.field_) == field) {
+                  if (f2.field_.rname == field) {
                     t           = token(PUSH_ID, std::make_pair(schema2, offset1));
                     bFieldFound = true;
                   }

@@ -77,13 +77,13 @@ void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
 
 void storageAccessor::moveRef() {
   auto it = std::find_if(descriptor.begin(),
-                         descriptor.end(),                                             //
-                         [](auto &item) { return std::get<rtype>(item) == rdb::REF; }  //
+                         descriptor.end(),                                  //
+                         [](auto &item) { return item.rtype == rdb::REF; }  //
   );
 
   // Descriptor changes storageFile location
   if (it != descriptor.end()) {
-    storageFile = std::get<rname>(*it);
+    storageFile = (*it).rname;
     SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile);
   }
 
@@ -101,12 +101,12 @@ void storageAccessor::attachStorage() {
   assert(storageFile != "");
 
   auto it1 = std::find_if(descriptor.begin(),
-                          descriptor.end(),                                              //
-                          [](auto &item) { return std::get<rtype>(item) == rdb::TYPE; }  //
+                          descriptor.end(),                                   //
+                          [](auto &item) { return item.rtype == rdb::TYPE; }  //
   );
 
   if (it1 != descriptor.end()) {
-    storageType = std::get<rname>(*it1);
+    storageType = (*it1).rname;
     SPDLOG_INFO("Storage type from descriptor {}", storageType);
   }
 

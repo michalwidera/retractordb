@@ -162,8 +162,7 @@ class ParserListener : public RQLBaseListener {
   void exitSelect(RQLParser::SelectContext *ctx) {
     // this loop creates field names in streamName + "_" + counter++
     for (auto &i : qry.lSchema) {
-      if (std::get<rdb::rname>(i.field_).substr(0, 1) == "_")
-        std::get<rdb::rname>(i.field_) = ctx->ID()->getText() + std::get<rdb::rname>(i.field_);
+      if ((i.field_.rname).substr(0, 1) == "_") (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
     }
 
     qry.id       = ctx->ID()->getText();

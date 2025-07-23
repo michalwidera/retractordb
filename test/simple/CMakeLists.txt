@@ -1,6 +1,6 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 add_test(
-  NAME ${TestID}
+  NAME ${TestID}-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash -c "set -e ; \
     xretractor query-simple.rql -c > out-compile.txt ; \

@@ -18,6 +18,11 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
+  simple-timeshift
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/issue56_timeshift)
+
+add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-dsp.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
