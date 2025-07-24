@@ -22,37 +22,37 @@ bool getFlat() { return flatOutput; }
 void setFlat(bool var) { flatOutput = var; }
 
 rdb::descFld GetFieldType(std::string name) {
-  std::map<std::string, rdb::descFld> typeDictionary  //
-      = {{"STRING", rdb::STRING},                     //
-         {"UINT", rdb::UINT},                         //
-         {"BYTE", rdb::BYTE},                         //
-         {"INTEGER", rdb::INTEGER},                   //
-         {"FLOAT", rdb::FLOAT},                       //
-         {"REF", rdb::REF},                           //
-         {"TYPE", rdb::TYPE},                         //
-         {"RETENTION", rdb::RETENTION},               //
+  static const std::map<std::string, rdb::descFld> typeDictionary  //
+      = {{"STRING", rdb::STRING},                                  //
+         {"UINT", rdb::UINT},                                      //
+         {"BYTE", rdb::BYTE},                                      //
+         {"INTEGER", rdb::INTEGER},                                //
+         {"FLOAT", rdb::FLOAT},                                    //
+         {"REF", rdb::REF},                                        //
+         {"TYPE", rdb::TYPE},                                      //
+         {"RETENTION", rdb::RETENTION},                            //
          {"DOUBLE", rdb::DOUBLE}};
-  return typeDictionary[name];
+  return typeDictionary.at(name);
 }
 
 std::string GetFieldType(rdb::descFld e) {
-  std::map<rdb::descFld, std::string> typeDictionary  //
-      = {{rdb::STRING, "STRING"},                     //
-         {rdb::UINT, "UINT"},                         //
-         {rdb::BYTE, "BYTE"},                         //
-         {rdb::INTEGER, "INTEGER"},                   //
-         {rdb::FLOAT, "FLOAT"},                       //
-         {rdb::REF, "REF"},                           //
-         {rdb::TYPE, "TYPE"},                         //
-         {rdb::RETENTION, "RETENTION"},               //
+  static const std::map<rdb::descFld, std::string> typeDictionary  //
+      = {{rdb::STRING, "STRING"},                                  //
+         {rdb::UINT, "UINT"},                                      //
+         {rdb::BYTE, "BYTE"},                                      //
+         {rdb::INTEGER, "INTEGER"},                                //
+         {rdb::FLOAT, "FLOAT"},                                    //
+         {rdb::REF, "REF"},                                        //
+         {rdb::TYPE, "TYPE"},                                      //
+         {rdb::RETENTION, "RETENTION"},                            //
          {rdb::DOUBLE, "DOUBLE"}};
-  return typeDictionary[e];
+  return typeDictionary.at(e);
 }
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
 Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
-  push_back(rField(n, l, a, t));                                              //
+  emplace_back(std::move(n), l, a, t);                                        //
 }
 
 void Descriptor::updateConvMaps() {
