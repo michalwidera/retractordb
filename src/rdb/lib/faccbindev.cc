@@ -1,6 +1,7 @@
 #include "rdb/faccbindev.h"
 
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>  // ::read, ::open ...
@@ -14,6 +15,9 @@ binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string fileName,  //
                                               const size_t recSize)        //
     : filename(fileName), recSize(recSize) {
   fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC, 0644);
+  assert(fd >= 0);
+  assert(recSize != 0);
+  // checking fd on read function.
 }
 
 template <class T>
@@ -39,6 +43,9 @@ ssize_t binaryDeviceAccessor<T>::write(const T *ptrData, const size_t position) 
 
 template <class T>
 ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t position) {
+  if (fd < 0) return EXIT_FAILURE;
+  if (recSize == 0) return EXIT_FAILURE;  // No read on data source supported
+
   assert(recSize != 0);
   assert(position == 0);
   if (position != 0) {
