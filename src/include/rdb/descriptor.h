@@ -51,14 +51,14 @@ class Descriptor : public std::vector<rField> {
   Descriptor &cleanRef();
 
   size_t getSizeInBytes() const;
-  size_t position(const std::string &name);
+  size_t position(const std::string_view name);
   std::string fieldName(int fieldPosition);
-  int len(const std::string &name);
+  int len(const std::string_view name);
   constexpr int len(const rdb::rField &field) const;
-  size_t offsetBegArr(const std::string &name);
+  size_t offsetBegArr(const std::string_view name);
   int offset(int position);
-  int arraySize(const std::string &name);
-  std::string type(const std::string &name);
+  int arraySize(const std::string_view name);
+  std::string type(const std::string_view name);
   int sizeFlat();
 
   std::pair<size_t, size_t> retention();
@@ -69,7 +69,7 @@ class Descriptor : public std::vector<rField> {
   std::optional<int> convert(std::pair<int, int> position);
 
   template <typename T>
-  std::string toString(const std::string &name, T *ptr) {
+  std::string toString(const std::string_view name, T *ptr) {
     return std::string(reinterpret_cast<char *>(ptr + offsetBegArr(name)), len(name));
   }
 
@@ -83,7 +83,7 @@ class Descriptor : public std::vector<rField> {
    * container
    */
   template <typename T, typename K>
-  auto cast(const std::string &name, K *ptr) {
+  auto cast(const std::string_view name, K *ptr) {
     return *(reinterpret_cast<T *>(ptr + offsetBegArr(name)));
   };
 
