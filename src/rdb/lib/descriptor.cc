@@ -21,7 +21,7 @@ static bool flatOutput = false;
 bool getFlat() { return flatOutput; }
 void setFlat(bool var) { flatOutput = var; }
 
-rdb::descFld GetFieldType(std::string name) {
+rdb::descFld GetFieldType(std::string &name) {
   static const std::map<std::string, rdb::descFld> typeDictionary  //
       = {{"STRING", rdb::STRING},                                  //
          {"UINT", rdb::UINT},                                      //
@@ -265,7 +265,7 @@ std::pair<size_t, size_t> Descriptor::retention() {
   return retval;
 }
 
-size_t Descriptor::position(const std::string &name) {
+size_t Descriptor::position(const std::string_view name) {
   auto it = std::find_if(begin(), end(),               //
                          [name](const auto &item) {    //
                            return item.rname == name;  //
@@ -284,13 +284,13 @@ std::string Descriptor::fieldName(int fieldPosition) {  //
   return ((*this)[fieldPosition]).rname;                //
 }
 
-int Descriptor::len(const std::string &name) { return len((*this)[position(name)]); }
+int Descriptor::len(const std::string_view name) { return len((*this)[position(name)]); }
 
-int Descriptor::arraySize(const std::string &name) {  //
+int Descriptor::arraySize(const std::string_view name) {  //
   return ((*this)[position(name)]).rarray;            //
 }
 
-size_t Descriptor::offsetBegArr(const std::string &name) {
+size_t Descriptor::offsetBegArr(const std::string_view name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == field.rname) return offset;
@@ -305,7 +305,7 @@ int Descriptor::offset(const int position) {
   return offsetMap[position];
 }
 
-std::string Descriptor::type(const std::string &name) {  //
+std::string Descriptor::type(const std::string_view name) {  //
   return GetFieldType(((*this)[position(name)]).rtype);  //
 }
 
