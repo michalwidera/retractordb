@@ -60,10 +60,7 @@ additional:
 https://github.com/cheshirekow/cmake_format
 ```
 
-Work with antl4 and .g4 files requires java - install it with:
-```
-sudo apt install default-jre
-```
+Work with antl4 and .g4 files requires java - it will install with conan install.
 
 If you want see graphic response, use gnuplot - install it with:
 ```
