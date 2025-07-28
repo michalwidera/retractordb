@@ -24,7 +24,7 @@ struct memoryFileAccessor : public FileAccessorInterface<T> {
   auto name() -> std::string & override;
   size_t count() override;
 
-  memoryFileAccessor()                                                   = delete;
+  memoryFileAccessor()                                            = delete;
   memoryFileAccessor(const memoryFileAccessor &)                  = delete;
   const memoryFileAccessor &operator=(const memoryFileAccessor &) = delete;
 };

@@ -8,10 +8,10 @@
 #include "descriptor.h"
 #include "faccbindev.h"
 #include "faccfs.h"
+#include "faccmemory.h"
 #include "faccposix.h"
 #include "facctxtsrc.h"
 #include "fagrp.h"
-#include "faccmemory.h"
 #include "fainterface.h"
 #include "payload.h"
 

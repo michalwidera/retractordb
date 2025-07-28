@@ -287,7 +287,7 @@ std::string Descriptor::fieldName(int fieldPosition) {  //
 int Descriptor::len(const std::string_view name) { return len((*this)[position(name)]); }
 
 int Descriptor::arraySize(const std::string_view name) {  //
-  return ((*this)[position(name)]).rarray;            //
+  return ((*this)[position(name)]).rarray;                //
 }
 
 size_t Descriptor::offsetBegArr(const std::string_view name) {
@@ -306,7 +306,7 @@ int Descriptor::offset(const int position) {
 }
 
 std::string Descriptor::type(const std::string_view name) {  //
-  return GetFieldType(((*this)[position(name)]).rtype);  //
+  return GetFieldType(((*this)[position(name)]).rtype);      //
 }
 
 std::pair<rdb::descFld, int> Descriptor::getMaxType() {

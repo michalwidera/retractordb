@@ -4,16 +4,16 @@
 #include <fstream>
 #include <limits>
 #include <map>
-#include <vector>
 #include <span>
+#include <vector>
 
 static std::map<std::string, std::vector<std::span<uint8_t>>> memoryStorage;
 
 namespace rdb {
 template <class T>
 memoryFileAccessor<T>::memoryFileAccessor(  //
-    const std::string &fileName,                          //
-    const size_t size)                                    //
+    const std::string &fileName,            //
+    const size_t size)                      //
     : filename(fileName), size(size) {}
 
 template <class T>
