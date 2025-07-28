@@ -11,6 +11,7 @@
 #include "faccposix.h"
 #include "facctxtsrc.h"
 #include "fagrp.h"
+#include "faccmemory.h"
 #include "fainterface.h"
 #include "payload.h"
 

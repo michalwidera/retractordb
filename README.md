@@ -49,7 +49,8 @@ make test
 cmake .
 make
 make install
-make grammar
+make descgrammar
+make rqlgrammar
 make cformat
 ```
 
