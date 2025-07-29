@@ -47,8 +47,6 @@ int main(int argc, char *argv[]) {
 
   if (argc == 2 && strcmp(argv[1], "-h") == 0) {
     std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
-    // std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
-    // std::cout << desc;
     std::cout << config_line << std::endl;
     std::cout << "Log: " << filelog << std::endl;
     std::cout << warranty << std::endl;
