@@ -74,6 +74,5 @@ size_t binaryDeviceAccessor<T>::count() {
 }
 
 template class binaryDeviceAccessor<uint8_t>;
-template class binaryDeviceAccessor<char>;
 
 }  // namespace rdb

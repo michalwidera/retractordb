@@ -93,6 +93,5 @@ size_t genericBinaryFileAccessor<T>::count() {
 }
 
 template class genericBinaryFileAccessor<uint8_t>;
-template class genericBinaryFileAccessor<char>;
 
 }  // namespace rdb

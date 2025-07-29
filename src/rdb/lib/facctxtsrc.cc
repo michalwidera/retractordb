@@ -119,6 +119,5 @@ size_t textSourceAccessor<T>::count() {
 }
 
 template class textSourceAccessor<uint8_t>;
-template class textSourceAccessor<char>;
 
 }  // namespace rdb

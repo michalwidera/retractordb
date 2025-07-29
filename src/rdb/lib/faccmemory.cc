@@ -47,6 +47,5 @@ size_t memoryFileAccessor<T>::count() {
 }
 
 template class memoryFileAccessor<uint8_t>;
-template class memoryFileAccessor<char>;
 
 }  // namespace rdb

@@ -89,6 +89,5 @@ size_t posixBinaryFileAccessor<T>::count() {
 }
 
 template class posixBinaryFileAccessor<uint8_t>;
-template class posixBinaryFileAccessor<char>;
 
 }  // namespace rdb

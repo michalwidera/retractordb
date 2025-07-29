@@ -100,7 +100,7 @@ from stream_junction_expression
 
 Example:
 ```
-select core1[0]/2+1,core0
+select str2[0]/2+1,str2[1]
 stream str2
 from core1+core0
 ```

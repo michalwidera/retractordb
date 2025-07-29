@@ -163,6 +163,5 @@ size_t groupFileAccessor<T>::count() {
 }
 
 template class groupFileAccessor<uint8_t>;
-template class groupFileAccessor<char>;
 
 }  // namespace rdb
