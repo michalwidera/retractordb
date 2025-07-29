@@ -145,7 +145,7 @@ void qTree::dumpCore() {
   sp << "|\n";
 
   printf(ss.str().c_str(), vcols[0].c_str(), vcols[1].c_str(), vcols[2].c_str(), vcols[3].c_str());
-  printf("%s",sp.str().c_str());
+  printf("%s", sp.str().c_str());
 
   for (const auto &it : *this)
     printf(ss.str().c_str(),                                                                                       //
