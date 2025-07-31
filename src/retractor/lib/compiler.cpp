@@ -158,9 +158,9 @@ std::string compiler::intervalCounter() {
 
 std::string compiler::generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
   if (sName2 == "")
-    return GetStringcommand_id(cmd) + std::string("_") + sName1;
+    return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
   else
-    return GetStringcommand_id(cmd) + std::string("_") + sName2 + std::string("_") + sName1;
+    return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
 }
 
 /* Goal of this procedure is to provide stream to canonical form

@@ -24,6 +24,7 @@ class Retractor(ConanFile):
         "antlr4/" + antlr_version,
         "spdlog/1.10.0",
         "openjdk/21.0.1",
+        "magic_enum/0.9.7"
     )
     testing = []
     package_type = "application"

@@ -61,7 +61,7 @@ bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.
 
 command_id token::getCommandID() { return command; }
 
-std::string token::getStrCommandID() { return GetStringcommand_id(command); }
+std::string token::getStrCommandID() { return std::string(GetStringcommand_id(command)); }
 
 void query::reset() {
   id.clear();

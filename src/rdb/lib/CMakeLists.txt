@@ -22,4 +22,4 @@ add_custom_target(
 
 target_include_directories(
   ${PROJECT_NAME} PRIVATE ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR}
-                          ${fmt_INCLUDE_DIR})
+                          ${fmt_INCLUDE_DIR} ${magic_enum_INCLUDE_DIR})

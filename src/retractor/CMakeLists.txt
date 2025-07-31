@@ -15,6 +15,7 @@ target_link_libraries(
   ${PROJECT_NAME}
   boost::boost
   spdlog::spdlog_header_only
+  magic_enum::magic_enum
   antlr4_static
   retractor
   rdb

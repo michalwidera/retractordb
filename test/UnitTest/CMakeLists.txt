@@ -16,6 +16,7 @@ set(LIBRARY_TEST_SET
     boost::boost
     gtest::gtest
     spdlog::spdlog_header_only
+    magic_enum::magic_enum
     antlr4_static
     retractor
     rdb
