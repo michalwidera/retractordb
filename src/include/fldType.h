@@ -1,7 +1,6 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
-// NOLINTBEGIN(cert-err58-cpp)
 
 #ifndef FLDTYPE_H
 #define FLDTYPE_H
@@ -62,4 +61,3 @@ template <class... Ts>
 Overload(Ts...) -> Overload<Ts...>;
 #endif
 
-// NOLINTEND(cert-err58-cpp)

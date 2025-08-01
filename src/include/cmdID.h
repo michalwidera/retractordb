@@ -1,8 +1,6 @@
 // Based on
 // https://github.com/Neargye/magic_enum
 
-// NOLINTBEGIN(cert-err58-cpp)
-
 #ifndef CMDID_H_DECLARATION_DONE_CMDI
 #define CMDID_H_DECLARATION_DONE_CMDI
 
@@ -57,4 +55,3 @@ constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { 
 
 #endif  // CMDID_H_DECLARATION_DONE_CMDI
 
-// NOLINTEND(cert-err58-cpp)
