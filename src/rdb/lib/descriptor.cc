@@ -233,8 +233,8 @@ size_t Descriptor::getSizeInBytes() const {
 std::pair<size_t, size_t> Descriptor::retention() {
   std::pair<size_t, size_t> retval{0, 0};
 
-  auto it = std::find_if(begin(), end(),                                          //
-                         [](auto &item) { return item.rtype == rdb::RETENTION; }  //
+  auto it = std::find_if(begin(), end(),                                                //
+                         [](const auto &item) { return item.rtype == rdb::RETENTION; }  //
   );
 
   if (it != end()) retval = std::pair<int, int>((*it).rlen, (*it).rarray);
