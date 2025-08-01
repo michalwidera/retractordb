@@ -54,4 +54,3 @@ enum command_id {
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }
 
 #endif  // CMDID_H_DECLARATION_DONE_CMDI
-

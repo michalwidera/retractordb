@@ -77,8 +77,8 @@ void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
 
 void storageAccessor::moveRef() {
   auto it = std::find_if(descriptor.begin(),
-                         descriptor.end(),                                  //
-                         [](auto &item) { return item.rtype == rdb::REF; }  //
+                         descriptor.end(),                                        //
+                         [](const auto &item) { return item.rtype == rdb::REF; }  //
   );
 
   // Descriptor changes storageFile location
@@ -101,8 +101,8 @@ void storageAccessor::attachStorage() {
   assert(storageFile != "");
 
   auto it1 = std::find_if(descriptor.begin(),
-                          descriptor.end(),                                   //
-                          [](auto &item) { return item.rtype == rdb::TYPE; }  //
+                          descriptor.end(),                                         //
+                          [](const auto &item) { return item.rtype == rdb::TYPE; }  //
   );
 
   if (it1 != descriptor.end()) {

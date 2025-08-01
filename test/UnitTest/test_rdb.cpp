@@ -132,7 +132,7 @@ bool test_descriptor() {
 
   if (data2.position("Control") != 2) return false;
   if (data2.len("Control") != 1) return false;
-  if (strcmp(data2.type("Control").c_str(), "BYTE") != 0) return false;
+  if (strcmp(data2.type("Control").data(), "BYTE") != 0) return false;
   if (data2.offsetBegArr("Control") != 14) return false;
 
   return true;

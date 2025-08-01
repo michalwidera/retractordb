@@ -1,7 +1,6 @@
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
-
 #ifndef FLDTYPE_H
 #define FLDTYPE_H
 
@@ -10,8 +9,8 @@
 #include <magic_enum/magic_enum.hpp>  // magic_enum::enum_name
 #include <string>                     // std::string
 #include <utility>                    // std::pair
-#include <vector>  // std::vector
 #include <variant>
+#include <vector>  // std::vector
 
 namespace rdb {
 
@@ -60,4 +59,3 @@ struct Overload : Ts... {
 template <class... Ts>
 Overload(Ts...) -> Overload<Ts...>;
 #endif
-

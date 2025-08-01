@@ -9,6 +9,7 @@
 #include <iostream>
 #include <limits>
 #include <locale>
+#include <magic_enum/magic_enum.hpp>
 #include <typeinfo>
 #include <utility>
 
@@ -21,33 +22,9 @@ static bool flatOutput = false;
 bool getFlat() { return flatOutput; }
 void setFlat(bool var) { flatOutput = var; }
 
-rdb::descFld GetFieldType(std::string &name) {
-  static const std::map<std::string, rdb::descFld> typeDictionary  //
-      = {{"STRING", rdb::STRING},                                  //
-         {"UINT", rdb::UINT},                                      //
-         {"BYTE", rdb::BYTE},                                      //
-         {"INTEGER", rdb::INTEGER},                                //
-         {"FLOAT", rdb::FLOAT},                                    //
-         {"REF", rdb::REF},                                        //
-         {"TYPE", rdb::TYPE},                                      //
-         {"RETENTION", rdb::RETENTION},                            //
-         {"DOUBLE", rdb::DOUBLE}};
-  return typeDictionary.at(name);
-}
+constexpr auto GetFieldType(const std::string_view name) { return magic_enum::enum_cast<rdb::descFld>(name); }
 
-std::string GetFieldType(rdb::descFld e) {
-  static const std::map<rdb::descFld, std::string> typeDictionary  //
-      = {{rdb::STRING, "STRING"},                                  //
-         {rdb::UINT, "UINT"},                                      //
-         {rdb::BYTE, "BYTE"},                                      //
-         {rdb::INTEGER, "INTEGER"},                                //
-         {rdb::FLOAT, "FLOAT"},                                    //
-         {rdb::REF, "REF"},                                        //
-         {rdb::TYPE, "TYPE"},                                      //
-         {rdb::RETENTION, "RETENTION"},                            //
-         {rdb::DOUBLE, "DOUBLE"}};
-  return typeDictionary.at(e);
-}
+constexpr auto GetFieldType(const rdb::descFld index) { return magic_enum::enum_name(index); }
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
@@ -305,8 +282,8 @@ int Descriptor::offset(const int position) {
   return offsetMap[position];
 }
 
-std::string Descriptor::type(const std::string_view name) {  //
-  return GetFieldType(((*this)[position(name)]).rtype);      //
+std::string_view Descriptor::type(const std::string_view name) {  //
+  return GetFieldType(((*this)[position(name)]).rtype);           //
 }
 
 std::pair<rdb::descFld, int> Descriptor::getMaxType() {

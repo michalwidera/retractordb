@@ -58,7 +58,7 @@ class Descriptor : public std::vector<rField> {
   size_t offsetBegArr(const std::string_view name);
   int offset(int position);
   int arraySize(const std::string_view name);
-  std::string type(const std::string_view name);
+  std::string_view type(const std::string_view name);
   int sizeFlat();
 
   std::pair<size_t, size_t> retention();
