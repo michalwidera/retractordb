@@ -23,6 +23,7 @@ sources:
     - '.git'
     - '.antlr'
     - 'parser.cpp'
+    - 'parser.cc'
     - 'examples'
     
     
