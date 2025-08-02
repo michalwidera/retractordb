@@ -16,9 +16,9 @@ namespace rdb {
 
 template <class T>
 genericBinaryFileAccessor<T>::genericBinaryFileAccessor(  //
-    const std::string &fileName,                          //
+    const std::string_view fileName,                      //
     const size_t size)                                    //
-    : filename(fileName), size(size) {}
+    : filename(std::string(fileName)), size(size) {}
 
 template <class T>
 auto genericBinaryFileAccessor<T>::name() const -> const std::string & {

@@ -1,8 +1,4 @@
-// Based on
-// https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
-
-#ifndef FLDTYPE_H
-#define FLDTYPE_H
+#pragma once
 
 #include <boost/rational.hpp>         // boost::rational
 #include <cstdint>                    // uint8_t - C++20
@@ -11,6 +7,9 @@
 #include <utility>                    // std::pair
 #include <variant>
 #include <vector>  // std::vector
+
+// Based on
+// https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings
 
 namespace rdb {
 
@@ -58,4 +57,3 @@ struct Overload : Ts... {
 };
 template <class... Ts>
 Overload(Ts...) -> Overload<Ts...>;
-#endif

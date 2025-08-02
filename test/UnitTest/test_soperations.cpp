@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 
-#include "SOperations.h"
+#include "SOperations.hpp"
 
 // ctest -R '^ut-soperations' -V
 

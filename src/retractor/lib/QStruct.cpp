@@ -15,9 +15,9 @@
 using namespace boost;
 
 #define FLDTYPE_H_CREATE_DEFINITION_FLDT
-#include "fldType.h"
+#include "fldType.hpp"
 #define CMDID_H_CREATE_DEFINITION_CMDI
-#include "cmdID.h"
+#include "cmdID.hpp"
 
 static_assert(std::is_copy_constructible_v<rdb::descFldVT> == true);
 

@@ -12,9 +12,9 @@ static std::map<std::string, std::vector<std::span<uint8_t>>> memoryStorage;
 namespace rdb {
 template <class T>
 memoryFileAccessor<T>::memoryFileAccessor(  //
-    const std::string &fileName,            //
+    const std::string_view fileName,        //
     const size_t size)                      //
-    : filename(fileName), size(size) {}
+    : filename(std::string(fileName)), size(size) {}
 
 template <class T>
 auto memoryFileAccessor<T>::name() const -> const std::string & {

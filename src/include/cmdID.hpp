@@ -1,11 +1,10 @@
-// Based on
-// https://github.com/Neargye/magic_enum
-
-#ifndef CMDID_H_DECLARATION_DONE_CMDI
-#define CMDID_H_DECLARATION_DONE_CMDI
+#pragma once
 
 #include <magic_enum/magic_enum.hpp>  // magic_enum::enum_name
 #include <string>                     // std::string
+
+// Based on
+// https://github.com/Neargye/magic_enum
 
 enum command_id {
   VOID_COMMAND,       // 0
@@ -52,5 +51,3 @@ enum command_id {
 };
 
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }
-
-#endif  // CMDID_H_DECLARATION_DONE_CMDI

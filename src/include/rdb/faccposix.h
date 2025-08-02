@@ -25,7 +25,7 @@ class posixBinaryFileAccessor : public FileAccessorInterface<T> {
  public:
   ~posixBinaryFileAccessor();
 
-  explicit posixBinaryFileAccessor(const std::string &fileName, const size_t size);
+  explicit posixBinaryFileAccessor(const std::string_view fileName, const size_t size);
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

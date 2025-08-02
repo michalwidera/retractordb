@@ -25,12 +25,12 @@ K readFromFstream(std::fstream &myFile) {
 }
 
 template <typename T>
-textSourceAccessor<T>::textSourceAccessor(const std::string &fileName,  //
-                                          const size_t sizeRec,         //
+textSourceAccessor<T>::textSourceAccessor(const std::string_view fileName,  //
+                                          const size_t sizeRec,             //
                                           const rdb::Descriptor &descriptor)
-    : filename(fileName), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
+    : filename(std::string(fileName)), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(fileName, std::ios::in);
+  myFile.open(filename, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
   payload = std::make_unique<rdb::payload>(descriptor);

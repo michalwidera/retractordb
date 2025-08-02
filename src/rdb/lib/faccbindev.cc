@@ -11,9 +11,9 @@
 namespace rdb {
 
 template <class T>
-binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string fileName,  //
-                                              const size_t recSize)        //
-    : filename(fileName), recSize(recSize) {
+binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string_view fileName,  //
+                                              const size_t recSize)             //
+    : filename(std::string(fileName)), recSize(recSize) {
   fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC, 0644);
   assert(fd >= 0);
   assert(recSize != 0);

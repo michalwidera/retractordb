@@ -8,8 +8,9 @@ import signal
 
 from time import sleep
 
-def signal_handler(signal, frame):
+def signal_handler(signal_arg, *_):
     """Handles SIGINT signal."""
+    print('Signal handler called with signal', signal_arg)
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)

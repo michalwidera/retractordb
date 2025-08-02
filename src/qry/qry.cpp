@@ -36,7 +36,7 @@ How xqry terminal works
 #include <sstream>
 #include <thread>
 
-#include "uxSysTermTools.h"
+#include "uxSysTermTools.hpp"
 
 using namespace boost;
 

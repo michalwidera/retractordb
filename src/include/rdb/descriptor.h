@@ -8,8 +8,8 @@
 #include <tuple>
 #include <vector>
 
-#include "cmdID.h"
-#include "fldType.h"
+#include "cmdID.hpp"
+#include "fldType.hpp"
 
 namespace rdb {
 
