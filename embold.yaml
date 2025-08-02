@@ -22,6 +22,7 @@ sources:
     - 'library'
     - '.git'
     - '.antlr'
+    - 'parser.cpp'
     - 'examples'
     
     
