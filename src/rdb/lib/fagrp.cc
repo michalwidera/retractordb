@@ -22,10 +22,10 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 // fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
 
 template <class T>
-groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
-                                        const size_t recSize,          //
-                                        const retention_t &retention)  //
-    : filename(fileName), recSize(recSize), retention(retention) {
+groupFileAccessor<T>::groupFileAccessor(const std::string_view fileName,  //
+                                        const size_t recSize,             //
+                                        const retention_t &retention)     //
+    : filename(std::string(fileName)), recSize(recSize), retention(retention) {
   writeCount      = 0;
   currentFilename = filename + "_segment_" + std::to_string(currentSegment);
   if (retention.noRetention()) {
@@ -34,9 +34,9 @@ groupFileAccessor<T>::groupFileAccessor(const std::string &fileName,   //
     auto min = std::numeric_limits<size_t>::max();
     auto max = std::numeric_limits<size_t>::min();
     for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
-      auto filename = entry.path().filename().string();
+      auto filenameEx = entry.path().filename().string();
       std::smatch sm;
-      if (regex_match(filename, sm, std::regex(fileName + "_segment_([0-9]+)"))) {
+      if (regex_match(filenameEx, sm, std::regex(filename + "_segment_([0-9]+)"))) {
         auto val = atoi(sm[1].str().c_str());
         if (val < min) min = val;
         if (val > max) max = val;
@@ -163,6 +163,5 @@ size_t groupFileAccessor<T>::count() {
 }
 
 template class groupFileAccessor<uint8_t>;
-template class groupFileAccessor<char>;
 
 }  // namespace rdb

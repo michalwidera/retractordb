@@ -14,8 +14,8 @@
 // Boost libraries
 #include <boost/rational.hpp>
 
-#include "cmdID.h"
-#include "fldType.h"
+#include "cmdID.hpp"
+#include "fldType.hpp"
 #include "rdb/descriptor.h"
 
 class qTree;

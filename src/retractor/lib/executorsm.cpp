@@ -26,7 +26,7 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
-#include "uxSysTermTools.h"
+#include "uxSysTermTools.hpp"
 
 namespace IPC = boost::interprocess;
 

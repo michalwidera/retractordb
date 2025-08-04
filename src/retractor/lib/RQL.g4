@@ -131,7 +131,7 @@ function_call       : ( 'Sqrt'
                     | 'IsNonZero' ) '(' expression_factor ( COMMA expression_factor )* ')'
                     ;
 
-// sync types with: src/include/rdb/fldType.h
+// sync types with: src/include/rdb/fldType.hpp
 
 BYTE_T:             'BYTE'|'Byte'|'CHAR'|'Char';
 STRING_T:           'STRING'|'String';

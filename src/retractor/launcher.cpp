@@ -17,7 +17,7 @@
 #include "lib/compiler.h"
 #include "lib/dumper.h"
 #include "lib/executorsm.h"
-#include "uxSysTermTools.h"
+#include "uxSysTermTools.hpp"
 
 using namespace boost;
 

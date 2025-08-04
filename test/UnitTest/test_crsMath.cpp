@@ -75,7 +75,11 @@ class crsMathTest : public ::testing::Test {
     coreInstance.clear();
 
     // This magic is clearing all files that have .desc and are .desc - so called artifacts
-    std::system("find ./*.desc | sed 's/\\.[^.]*$//' | cut -c 3- | xargs rm -f ; rm -f *.desc");
+    auto result = std::system("find ./*.desc | sed 's/\\.[^.]*$//' | cut -c 3- | xargs rm -f ; rm -f *.desc");
+    if (result != 0) {
+      SPDLOG_ERROR("Error during cleanup - {}", result);
+      assert(false && "Error during cleanup");
+    }
   }
 };
 

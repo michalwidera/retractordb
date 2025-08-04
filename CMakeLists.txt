@@ -15,6 +15,7 @@ find_package(fmt REQUIRED)
 find_package(antlr4-runtime REQUIRED)
 find_package(GTest REQUIRED)
 find_package(antlr4)
+find_package(magic_enum CONFIG REQUIRED)
 
 find_program(PROG_VALGRIND valgrind REQUIRED)
 message(STATUS "Required tool: ${PROG_VALGRIND}")
@@ -37,8 +38,13 @@ endif()
 enable_testing()
 
 include_directories(
-  ${Boost_INCLUDE_DIR} ${spdlog_INCLUDE_DIR} ${fmt_INCLUDE_DIR}
-  ${antlr4-runtime_INCLUDE_DIR} src/include)
+  ${Boost_INCLUDE_DIR}
+  ${Boost_LIBRARY_DIRS}
+  ${spdlog_INCLUDE_DIR}
+  ${fmt_INCLUDE_DIR}
+  ${magic_enum_INCLUDE_DIR}
+  ${antlr4-runtime_INCLUDE_DIR}
+  src/include)
 
 link_directories(${Boost_LIBRARY_DIRS})
 

@@ -24,7 +24,7 @@ class binaryDeviceAccessor : public FileAccessorInterface<T> {
  public:
   ~binaryDeviceAccessor();
 
-  explicit binaryDeviceAccessor(const std::string fileName, const size_t recSize);
+  explicit binaryDeviceAccessor(const std::string_view fileName, const size_t recSize);
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

@@ -29,8 +29,8 @@ class textSourceAccessor : public FileAccessorInterface<T> {
  public:
   ~textSourceAccessor();
 
-  explicit textSourceAccessor(const std::string &fileName,  //
-                              const size_t sizeRec,         //
+  explicit textSourceAccessor(const std::string_view fileName,  //
+                              const size_t sizeRec,             //
                               const rdb::Descriptor &descriptor);
 
   ssize_t read(T *ptrData, const size_t position) override;

@@ -21,11 +21,10 @@ sources:
     - 'grunt'
     - 'library'
     - '.git'
-    - 'Parser'
+    - '.antlr'
+    - 'parser.cpp'
+    - 'parser.cc'
     - 'examples'
-    - 'cmdID.h'
-    - 'fldType.h'
-    - 'fldList.h'
     
     
 # Specify the languages you would like to Scan. Default is all Detected

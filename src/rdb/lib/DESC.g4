@@ -15,7 +15,7 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?    # ByteID
                       | RETENTION_T capacity=DECIMAL segment=DECIMAL # RetentionID
                       ;
 
-// sync types with: src/include/rdb/fldType.h
+// sync types with: src/include/rdb/fldType.hpp
 
 BYTE_T:             'BYTE';
 STRING_T:           'STRING';

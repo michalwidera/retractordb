@@ -13,9 +13,9 @@
 #include <iostream>
 
 #include "QStruct.h"
-#include "SOperations.h"
-#include "cmdID.h"
-#include "fldType.h"
+#include "SOperations.hpp"
+#include "cmdID.hpp"
+#include "fldType.hpp"
 
 using boost::lexical_cast;
 
@@ -158,9 +158,9 @@ std::string compiler::intervalCounter() {
 
 std::string compiler::generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
   if (sName2 == "")
-    return GetStringcommand_id(cmd) + std::string("_") + sName1;
+    return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
   else
-    return GetStringcommand_id(cmd) + std::string("_") + sName2 + std::string("_") + sName1;
+    return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
 }
 
 /* Goal of this procedure is to provide stream to canonical form
@@ -540,14 +540,14 @@ std::string compiler::convertReferences() {
 /* This function will convert fields list where stream a from b#c
 clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
 std::string compiler::convertRemotes() {
-  std::map<std::string, std::map<STRINT>> offsetMap;
+  std::map<std::string, std::map<std::string, int>> offsetMap;
 
   // This loop fill&create OffsetMap structure.
-  for (auto &q : coreInstance) {       // for each query
-    assert(!q.isReductionRequired());  // that has at least two arguments
-    auto offset{0};                    //
-    std::map<STRINT> offsetItem;       //
-    for (auto &f : q.lProgram) {       // for each token in stream program
+  for (auto &q : coreInstance) {            // for each query
+    assert(!q.isReductionRequired());       // that has at least two arguments
+    auto offset{0};                         //
+    std::map<std::string, int> offsetItem;  //
+    for (auto &f : q.lProgram) {            // for each token in stream program
       if (f.getCommandID() == PUSH_STREAM) {
         offsetItem[f.getStr_()] = offset;
         offset += coreInstance[f.getStr_()].descriptorStorage().sizeFlat();
@@ -565,7 +565,7 @@ std::string compiler::convertRemotes() {
     for (auto &f : q.lSchema) {             // for each field in query and
       for (auto &t : f.lProgram) {          // for each token in query field - do:
         if (t.getCommandID() == PUSH_ID) {  // fix only PUSH_ID tokens
-          auto [schema, offset] = std::get<std::pair<STRINT>>(t.getVT());
+          auto [schema, offset] = std::get<std::pair<std::string, int>>(t.getVT());
           if (schema != q.id) t = token(PUSH_ID, std::make_pair(q.id, offsetMap[q.id][schema] + offset));
         }
       }

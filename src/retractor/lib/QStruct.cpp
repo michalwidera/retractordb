@@ -15,9 +15,9 @@
 using namespace boost;
 
 #define FLDTYPE_H_CREATE_DEFINITION_FLDT
-#include "fldType.h"
+#include "fldType.hpp"
 #define CMDID_H_CREATE_DEFINITION_CMDI
-#include "cmdID.h"
+#include "cmdID.hpp"
 
 static_assert(std::is_copy_constructible_v<rdb::descFldVT> == true);
 
@@ -61,7 +61,7 @@ bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.
 
 command_id token::getCommandID() { return command; }
 
-std::string token::getStrCommandID() { return GetStringcommand_id(command); }
+std::string token::getStrCommandID() { return std::string(GetStringcommand_id(command)); }
 
 void query::reset() {
   id.clear();
@@ -145,7 +145,7 @@ void qTree::dumpCore() {
   sp << "|\n";
 
   printf(ss.str().c_str(), vcols[0].c_str(), vcols[1].c_str(), vcols[2].c_str(), vcols[3].c_str());
-  printf(sp.str().c_str());
+  printf("%s", sp.str().c_str());
 
   for (const auto &it : *this)
     printf(ss.str().c_str(),                                                                                       //
@@ -206,7 +206,7 @@ std::string token::getStr_() {
   if (valueVT.index() == rdb::STRING)
     return std::get<std::string>(valueVT);
   else if (valueVT.index() == rdb::IDXPAIR) {
-    auto r = std::get<std::pair<STRINT>>(valueVT);
+    auto r = std::get<std::pair<std::string, int>>(valueVT);
     return r.first;
   } else
     return "Error";

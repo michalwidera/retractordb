@@ -46,7 +46,7 @@ class groupFileAccessor : public FileAccessorInterface<T> {
  public:
   ~groupFileAccessor();
 
-  explicit groupFileAccessor(const std::string &fileName, const size_t recSize, const retention_t &retention);
+  explicit groupFileAccessor(const std::string_view fileName, const size_t recSize, const retention_t &retention);
 
   ssize_t read(T *ptrData, const size_t position) override;
   ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

@@ -11,6 +11,7 @@ How xqry terminal works
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>
@@ -35,7 +36,7 @@ How xqry terminal works
 #include <sstream>
 #include <thread>
 
-#include "uxSysTermTools.h"
+#include "uxSysTermTools.hpp"
 
 using namespace boost;
 
@@ -50,7 +51,7 @@ static std::atomic<bool> done{false};
 void qry::producer() {
   try {
     const int messageSize = 1024;
-    std::string queueName = "brcdbr" + std::to_string(boost::this_process::get_id());
+    std::string queueName = "brcdbr" + std::to_string(getpid());
     IPC::message_queue mq(IPC::open_only, queueName.c_str());
     std::array<char, messageSize> message;
     unsigned int priority{0};
@@ -73,7 +74,7 @@ void qry::producer() {
       while (!spsc_queue.push(pt)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   } catch (IPC::interprocess_exception &e) {
-    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(boost::this_process::get_id()));
+    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(getpid()));
     done = true;
     return;
   }
@@ -96,7 +97,7 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     pt_request.put("db.message", netCommand);
-    pt_request.put("db.id", boost::this_process::get_id());
+    pt_request.put("db.id", getpid());
     if (netArgument != "") pt_request.put("db.argument", netArgument);
     //
     // request part
@@ -119,7 +120,8 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
     IPCMap *mymap                        = ret.first;
     assert(mymap);
-    std::size_t processId = boost::this_process::get_id();
+
+    std::size_t processId = getpid();
     auto it               = mymap->find(processId);
 
     // When server works under valgrid - must be 10 probes x 10ms

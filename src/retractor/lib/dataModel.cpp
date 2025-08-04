@@ -11,7 +11,7 @@
 #include <regex>
 
 #include "QStruct.h"  // coreInstance
-#include "SOperations.h"
+#include "SOperations.hpp"
 #include "expressionEvaluator.h"
 #include "rdb/convertTypes.h"
 

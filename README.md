@@ -49,7 +49,8 @@ make test
 cmake .
 make
 make install
-make grammar
+make descgrammar
+make rqlgrammar
 make cformat
 ```
 
@@ -59,10 +60,7 @@ additional:
 https://github.com/cheshirekow/cmake_format
 ```
 
-Work with antl4 and .g4 files requires java - install it with:
-```
-sudo apt install default-jre
-```
+Work with antl4 and .g4 files requires java - it will install with conan install.
 
 If you want see graphic response, use gnuplot - install it with:
 ```
@@ -102,7 +100,7 @@ from stream_junction_expression
 
 Example:
 ```
-select core1[0]/2+1,core0
+select str2[0]/2+1,str2[1]
 stream str2
 from core1+core0
 ```

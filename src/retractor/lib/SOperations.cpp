@@ -1,5 +1,4 @@
-#include <SOperations.h>
-
+#include <SOperations.hpp>
 #include <algorithm>  // for min
 #include <cassert>    // for assert
 #include <stdexcept>  // for out_of_range

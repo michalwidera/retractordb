@@ -18,12 +18,13 @@ class Retractor(ConanFile):
     homepage = "https://retractordb.com"
     antlr_version = "4.13.1"
     requires = (
-        "boost/1.85.0", # 1.86.0 is broken - BOOST_HEADER_DEPRECATED("<boost/process/v1/environment.hpp>")
-        "gtest/1.15.0",
+        "boost/1.88.0",
+        "gtest/1.16.0",
         "antlr4-cppruntime/" + antlr_version,
         "antlr4/" + antlr_version,
         "spdlog/1.10.0",
         "openjdk/21.0.1",
+        "magic_enum/0.9.7"
     )
     testing = []
     package_type = "application"

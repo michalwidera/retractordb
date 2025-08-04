@@ -9,7 +9,7 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "qry.hpp"
-#include "uxSysTermTools.h"
+#include "uxSysTermTools.hpp"
 
 using namespace boost;
 using boost::property_tree::ptree;
