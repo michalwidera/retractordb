@@ -24,10 +24,9 @@ K readFromFstream(std::fstream &myFile) {
   return var;
 }
 
-template <typename T>
-textSourceAccessor<T>::textSourceAccessor(const std::string_view fileName,  //
-                                          const size_t sizeRec,             //
-                                          const rdb::Descriptor &descriptor)
+textSourceAccessor::textSourceAccessor(const std::string_view fileName,  //
+                                       const size_t sizeRec,             //
+                                       const rdb::Descriptor &descriptor)
     : filename(std::string(fileName)), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename, std::ios::in);
@@ -36,29 +35,18 @@ textSourceAccessor<T>::textSourceAccessor(const std::string_view fileName,  //
   payload = std::make_unique<rdb::payload>(descriptor);
 }
 
-template <typename T>
-textSourceAccessor<T>::~textSourceAccessor() {
-  myFile.close();
-}
+textSourceAccessor::~textSourceAccessor() { myFile.close(); }
 
-template <class T>
-auto textSourceAccessor<T>::name() const -> const std::string & {
-  return filename;
-}
+auto textSourceAccessor::name() const -> const std::string & { return filename; }
 
-template <class T>
-auto textSourceAccessor<T>::name() -> std::string & {
-  return filename;
-}
+auto textSourceAccessor::name() -> std::string & { return filename; }
 
-template <typename T>
-ssize_t textSourceAccessor<T>::write(const T *ptrData, const size_t position) {
+ssize_t textSourceAccessor::write(const uint8_t *ptrData, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
-template <typename T>
-ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
+ssize_t textSourceAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
   assert(sizeRec != 0);
 
@@ -113,11 +101,6 @@ ssize_t textSourceAccessor<T>::read(T *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-template <class T>
-size_t textSourceAccessor<T>::count() {
-  return readCount;
-}
-
-template class textSourceAccessor<uint8_t>;
+size_t textSourceAccessor::count() { return readCount; }
 
 }  // namespace rdb

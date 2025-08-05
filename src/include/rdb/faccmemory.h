@@ -9,16 +9,15 @@ namespace rdb {
  *
  * Type: MEMORY
  */
-template <typename T>
-struct memoryFileAccessor : public FileAccessorInterface<T> {
+struct memoryFileAccessor : public FileAccessorInterface {
   std::string filename;
   const std::size_t size;
 
  public:
   explicit memoryFileAccessor(const std::string_view fileName, const size_t size);
 
-  ssize_t read(T *ptrData, const size_t position) override;
-  ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t read(uint8_t *ptrData, const size_t position) override;
+  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
 
   auto name() const -> const std::string & override;
   auto name() -> std::string & override;

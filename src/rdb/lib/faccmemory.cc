@@ -1,51 +1,40 @@
 #include "rdb/faccmemory.h"
 
+#include <array>
 #include <cassert>
 #include <fstream>
 #include <limits>
 #include <map>
-#include <span>
 #include <vector>
 
-static std::map<std::string, std::vector<std::span<uint8_t>>> memoryStorage;
+static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 
 namespace rdb {
-template <class T>
-memoryFileAccessor<T>::memoryFileAccessor(  //
-    const std::string_view fileName,        //
-    const size_t size)                      //
+
+memoryFileAccessor::memoryFileAccessor(  //
+    const std::string_view fileName,     //
+    const size_t size)                   //
     : filename(std::string(fileName)), size(size) {}
 
-template <class T>
-auto memoryFileAccessor<T>::name() const -> const std::string & {
-  return filename;
-}
+auto memoryFileAccessor::name() const -> const std::string & { return filename; }
 
-template <class T>
-auto memoryFileAccessor<T>::name() -> std::string & {
-  return filename;
-}
+auto memoryFileAccessor::name() -> std::string & { return filename; }
 
-template <class T>
-ssize_t memoryFileAccessor<T>::write(const T *ptrData, const size_t position) {
+ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
   assert(size != 0);
   // TODO
   return EXIT_SUCCESS;
 }
 
-template <class T>
-ssize_t memoryFileAccessor<T>::read(T *ptrData, const size_t position) {
+ssize_t memoryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(size != 0);
   // TODO
   return EXIT_SUCCESS;
 }
 
-template <class T>
-size_t memoryFileAccessor<T>::count() {
+size_t memoryFileAccessor::count() {
   // TODO
   return 0;
 }
-
-template class memoryFileAccessor<uint8_t>;
 
 }  // namespace rdb

@@ -266,20 +266,20 @@ TEST(xrdb, test_descriptor_compare) {
 }
 
 TEST(crdb, genericBinaryFileAccessor_byte) {
-  auto result1 = test_1<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
+  auto result1 = test_1<uint8_t, rdb::genericBinaryFileAccessor>();
   ASSERT_TRUE(result1);
-  auto result2 = test_2<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
+  auto result2 = test_2<uint8_t, rdb::genericBinaryFileAccessor>();
   ASSERT_TRUE(result2);
-  auto result3 = test_3<uint8_t, rdb::genericBinaryFileAccessor<uint8_t>>();
+  auto result3 = test_3<uint8_t, rdb::genericBinaryFileAccessor>();
   ASSERT_TRUE(result3);
 }
 
 TEST(crdb, posixBinaryFileAccessor_byte) {
-  auto result1 = test_1<uint8_t, rdb::posixBinaryFileAccessor<uint8_t>>();
+  auto result1 = test_1<uint8_t, rdb::posixBinaryFileAccessor>();
   ASSERT_TRUE(result1);
-  auto result2 = test_2<uint8_t, rdb::posixBinaryFileAccessor<uint8_t>>();
+  auto result2 = test_2<uint8_t, rdb::posixBinaryFileAccessor>();
   ASSERT_TRUE(result2);
-  auto result3 = test_3<uint8_t, rdb::posixBinaryFileAccessor<uint8_t>>();
+  auto result3 = test_3<uint8_t, rdb::posixBinaryFileAccessor>();
   ASSERT_TRUE(result3);
 }
 

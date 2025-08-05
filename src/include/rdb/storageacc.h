@@ -20,7 +20,7 @@ enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
 enum class sourceState { empty, flux, lock, armed };
 
 class storageAccessor {
-  std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
+  std::unique_ptr<FileAccessorInterface> accessor;
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;

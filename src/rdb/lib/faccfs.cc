@@ -14,24 +14,16 @@ namespace rdb {
 // https://en.cppreference.com/w/cpp/io/ios_base/openmode
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-template <class T>
-genericBinaryFileAccessor<T>::genericBinaryFileAccessor(  //
-    const std::string_view fileName,                      //
-    const size_t size)                                    //
+genericBinaryFileAccessor::genericBinaryFileAccessor(  //
+    const std::string_view fileName,                   //
+    const size_t size)                                 //
     : filename(std::string(fileName)), size(size) {}
 
-template <class T>
-auto genericBinaryFileAccessor<T>::name() const -> const std::string & {
-  return filename;
-}
+auto genericBinaryFileAccessor::name() const -> const std::string & { return filename; }
 
-template <class T>
-auto genericBinaryFileAccessor<T>::name() -> std::string & {
-  return filename;
-}
+auto genericBinaryFileAccessor::name() -> std::string & { return filename; }
 
-template <class T>
-ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t position) {
+ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
   assert(size != 0);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -62,8 +54,7 @@ ssize_t genericBinaryFileAccessor<T>::write(const T *ptrData, const size_t posit
   return EXIT_SUCCESS;
 }
 
-template <class T>
-ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t position) {
+ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(size != 0);
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -86,12 +77,9 @@ ssize_t genericBinaryFileAccessor<T>::read(T *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-template <class T>
-size_t genericBinaryFileAccessor<T>::count() {
+size_t genericBinaryFileAccessor::count() {
   std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
   return in.tellg() / size;
 }
-
-template class genericBinaryFileAccessor<uint8_t>;
 
 }  // namespace rdb

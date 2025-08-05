@@ -13,8 +13,7 @@ namespace rdb {
  *
  * Type: DEFAULT
  */
-template <typename T>
-class posixBinaryFileAccessor : public FileAccessorInterface<T> {
+class posixBinaryFileAccessor : public FileAccessorInterface {
   std::string filename;
   const std::size_t size;
   /**
@@ -27,8 +26,8 @@ class posixBinaryFileAccessor : public FileAccessorInterface<T> {
 
   explicit posixBinaryFileAccessor(const std::string_view fileName, const size_t size);
 
-  ssize_t read(T *ptrData, const size_t position) override;
-  ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t read(uint8_t *ptrData, const size_t position) override;
+  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
   auto name() const -> const std::string & override;
   auto name() -> std::string & override;
   size_t count() override;

@@ -13,8 +13,7 @@ namespace rdb {
  *
  * Type: TEXTSOURCE
  */
-template <typename T>
-class textSourceAccessor : public FileAccessorInterface<T> {
+class textSourceAccessor : public FileAccessorInterface {
   std::string filename;
   const std::size_t sizeRec;
 
@@ -33,8 +32,8 @@ class textSourceAccessor : public FileAccessorInterface<T> {
                               const size_t sizeRec,             //
                               const rdb::Descriptor &descriptor);
 
-  ssize_t read(T *ptrData, const size_t position) override;
-  ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t read(uint8_t *ptrData, const size_t position) override;
+  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
 
   auto name() const -> const std::string & override;
   auto name() -> std::string & override;
