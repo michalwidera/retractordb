@@ -22,19 +22,25 @@ auto memoryFileAccessor::name() -> std::string & { return filename; }
 
 ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
   assert(size != 0);
-  // TODO
+  std::vector<uint8_t> vec(ptrData, ptrData + size);
+  if (position == std::numeric_limits<size_t>::max()) {
+    // Append to the end of the file
+    memoryStorage[filename].push_back(vec);
+  } else {
+    memoryStorage[filename][position] = std::move(vec);
+  }
   return EXIT_SUCCESS;
 }
 
 ssize_t memoryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(size != 0);
-  // TODO
+  auto &vec = memoryStorage[filename][position];
+  std::copy(vec.begin(), vec.end(), ptrData);
   return EXIT_SUCCESS;
 }
 
 size_t memoryFileAccessor::count() {
-  // TODO
-  return 0;
+  return memoryStorage[filename].size();
 }
 
 }  // namespace rdb
