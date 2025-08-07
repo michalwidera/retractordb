@@ -1,5 +1,4 @@
 :STORAGE(0/1)	temp/
-:SUBSTRAT(0/1)	'memory'
 STREAM_ADD_core0_core1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
