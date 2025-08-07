@@ -182,6 +182,15 @@ class ParserListener : public RQLBaseListener {
         std::stoi(ctx->capacity->getText()));
   }
 
+  void exitSubstrat(RQLParser::SubstratContext *ctx) {
+    qry.id           = ":SUBSTRAT";
+    qry.substratType = ctx->substrat_type->getText();
+    coreInstance.push_back(qry);
+    program.clear();
+    qry.reset();
+    fieldCount = 0;
+  }
+
   void exitStorage(RQLParser::StorageContext *ctx) {
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();

@@ -60,8 +60,9 @@ class query {
 
   std::list<std::string> getFieldNamesList();
 
-  std::string id = "";
-  std::string filename;
+  std::string id                 = "";
+  std::string filename           = "";
+  std::string substratType       = "";
   boost::rational<int> rInterval = 0;
   std::list<field> lSchema;
   std::list<token> lProgram;

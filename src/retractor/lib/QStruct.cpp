@@ -66,6 +66,7 @@ std::string token::getStrCommandID() { return std::string(GetStringcommand_id(co
 void query::reset() {
   id.clear();
   filename.clear();
+  substratType.clear();
   rInterval = 0;
   lSchema.clear();
   lProgram.clear();

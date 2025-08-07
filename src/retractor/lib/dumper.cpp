@@ -27,6 +27,7 @@ void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs
   std::set<std::string> planStreamRelationsSet;
   for (auto q : coreInstance) {
     if (q.id == ":STORAGE") continue;
+    if (q.id == ":SUBSTRAT") continue;
     //
     // Stream presentation
     //
@@ -230,12 +231,13 @@ void dumper::qPrograms() {
 
 void dumper::qSet() {
   std::cout << std::endl;
-  std::cout << "id\tlen prg\tlen sch\tinterval\tfilename" << std::endl;
+  std::cout << "id\tlen prg\tlen sch\tinterval\tsubtype\tfilename" << std::endl;
   for (auto q : coreInstance) {
     std::cout << q.id << "\t";
     std::cout << (int)q.lProgram.size() << "\t";
     std::cout << (int)q.lSchema.size() << "\t";
     std::cout << q.rInterval << "\t";
+    std::cout << q.substratType << "\t";
     std::cout << q.filename << "\t";
     std::cout << std::endl;
   }
@@ -245,6 +247,7 @@ void dumper::rawTextFile() {
   for (auto q : coreInstance) {
     std::cout << q.id << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
+    if (!q.substratType.empty()) std::cout << "\t" << q.substratType;
     std::cout << std::endl;
     for (auto t : q.lProgram)
       if (t.getStrCommandID() == "PUSH_ID" ||          //

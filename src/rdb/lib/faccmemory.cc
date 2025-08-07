@@ -39,8 +39,6 @@ ssize_t memoryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-size_t memoryFileAccessor::count() {
-  return memoryStorage[filename].size();
-}
+size_t memoryFileAccessor::count() { return memoryStorage[filename].size(); }
 
 }  // namespace rdb

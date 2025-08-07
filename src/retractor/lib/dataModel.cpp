@@ -319,6 +319,10 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
                                 [](const auto &qry) { return qry.id == ":STORAGE"; });
   if (storageIt != std::end(coreInstance)) storagePath = storageIt->filename;
 
+  auto substratTypeIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
+                                     [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
+  if (substratTypeIt != std::end(coreInstance)) substratType = substratTypeIt->substratType;
+
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
                                 [](const auto &qry) { return qry.id[0] == ':'; });
   coreInstance.erase(new_end, coreInstance.end());
