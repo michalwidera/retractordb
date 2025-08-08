@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <rdb/faccmemory.h>
 #include <rdb/fagrp.h>
 
 #include <filesystem>
@@ -89,6 +90,66 @@ TEST(FileAccessorTest, test_dir) {
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].sizeFromSystem, 2);
   GTEST_ASSERT_EQ(mapOfFiles["/tmp/test_fileAccessor/test_file"].fileContents, std::vector<BYTE>({11, 12}));
   GTEST_ASSERT_EQ(gfa->count(), 2);  // count is not affected by retention
+}
+
+TEST(MemoryAccessorTest, test_infinite_memory_accessor) {
+  struct {
+    BYTE data;
+  } record;
+
+  std::string filename = "test_file_memory_1";
+
+  auto recsize   = sizeof(BYTE);
+  auto retention = rdb::memoryFileAccessor::no_retention;
+  auto gfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+
+  // Write records
+  record.data = 1;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data = 2;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data = 3;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data = 4;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+
+  GTEST_ASSERT_EQ(gfa->count(), 4);
+}
+
+TEST(MemoryAccessorTest, test_retention_memory_accessor) {
+  struct {
+    BYTE data;
+  } record;
+
+  std::string filename = "test_file_memory_2";
+
+  auto recsize   = sizeof(BYTE);
+  auto retention = 2;
+  auto gfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+
+  // Write records
+  record.data = 1;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data = 2;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data = 3;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  record.data = 4;
+  gfa->write(reinterpret_cast<uint8_t *>(&record));
+
+  GTEST_ASSERT_EQ(gfa->count(), 4);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 2);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 3);
+
+  gfa->read(reinterpret_cast<uint8_t *>(&record), 3);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 4);
+
+  // Read records - expect assert failure because of retention
+  GTEST_LOG_(INFO) << "Reading record at index 0 - expect assert failure";
+  ASSERT_DEATH(gfa->read(reinterpret_cast<uint8_t *>(&record), 0), "Position out of bounds in memory storage");
 }
 
 TEST(FileAccessorTest, test_retention_one_read_and_retention) {

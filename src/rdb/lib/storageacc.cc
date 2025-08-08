@@ -144,7 +144,7 @@ void storageAccessor::initializeAccessor() {
   if (storageType == "DEFAULT") {
     accessor = std::make_unique<rdb::groupFileAccessor>(storageFile, size, retention);
   } else if (storageType == "MEMORY") {
-    accessor = std::make_unique<rdb::memoryFileAccessor>(storageFile, size);
+    accessor = std::make_unique<rdb::memoryFileAccessor>(storageFile, size, rdb::memoryFileAccessor::no_retention);
   } else if (storageType == "POSIX") {
     accessor = std::make_unique<rdb::posixBinaryFileAccessor>(storageFile, size);
   } else if (storageType == "GENERIC") {
