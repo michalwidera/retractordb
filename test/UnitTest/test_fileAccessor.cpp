@@ -97,23 +97,42 @@ TEST(MemoryAccessorTest, test_infinite_memory_accessor) {
     BYTE data;
   } record;
 
-  std::string filename = "test_file_memory_1";
+  std::string filename = "test_file_memory";
 
   auto recsize   = sizeof(BYTE);
   auto retention = rdb::memoryFileAccessor::no_retention;
-  auto gfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
 
   // Write records
   record.data = 1;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
   record.data = 2;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
   record.data = 3;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
   record.data = 4;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(gfa->count(), 4);
+  GTEST_ASSERT_EQ(mfa->count(), 4);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 0), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 1);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 1), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 2);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 2), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 3);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 3), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 4);
+
+  mfa->write(nullptr);  // Clear the storage
+  GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
 }
 
 TEST(MemoryAccessorTest, test_retention_memory_accessor) {
@@ -121,36 +140,37 @@ TEST(MemoryAccessorTest, test_retention_memory_accessor) {
     BYTE data;
   } record;
 
-  std::string filename = "test_file_memory_2";
+  std::string filename = "test_file_memory";
 
   auto recsize   = sizeof(BYTE);
   auto retention = 2;
-  auto gfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
 
   // Write records
   record.data = 1;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
   record.data = 2;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
   record.data = 3;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
   record.data = 4;
-  gfa->write(reinterpret_cast<uint8_t *>(&record));
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(gfa->count(), 4);
+  GTEST_ASSERT_EQ(mfa->count(), 4);
 
-  gfa->read(reinterpret_cast<uint8_t *>(&record), 2);
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 2), EXIT_SUCCESS);
   GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
   GTEST_ASSERT_EQ(record.data, 3);
 
-  gfa->read(reinterpret_cast<uint8_t *>(&record), 3);
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 3), EXIT_SUCCESS);
   GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
   GTEST_ASSERT_EQ(record.data, 4);
 
-  // so far I have no idea how to test asserts in gtest
-  // Read records - expect assert failure because of retention
-  // GTEST_LOG_(INFO) << "Reading record at index 0 - expect assert failure";
-  // ASSERT_DEATH(gfa->read(reinterpret_cast<uint8_t *>(&record), 0), "Position out of bounds in memory storage");
+  GTEST_LOG_(INFO) << "Reading record at index 0 - expect failure";
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 0), EXIT_FAILURE);
+
+  mfa->write(nullptr);  // Clear the storage
+  GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
 }
 
 TEST(FileAccessorTest, test_retention_one_read_and_retention) {
