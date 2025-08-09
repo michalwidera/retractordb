@@ -1,3 +1,5 @@
+# cd build/Debug make install ; ctest -R issue61_tmpmem-run -V
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 add_test(
   NAME ${TestID}-compile

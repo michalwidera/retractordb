@@ -329,10 +329,10 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   os << "{";
 
   for (auto const &r : rhs.getDescriptor()) {
-    if ((r.rtype == rdb::TYPE) ||  //
-        (r.rtype == rdb::REF) ||   //
-        (r.rtype == rdb::RETENTION) ||
-        (r.rtype == rdb::RETMEMORY))  // skip these types
+    if ((r.rtype == rdb::TYPE) ||       //
+        (r.rtype == rdb::REF) ||        //
+        (r.rtype == rdb::RETENTION) ||  //
+        (r.rtype == rdb::RETMEMORY))    // skip these types
       break;
     if (!getFlat())
       os << "\t";
@@ -390,8 +390,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           ;
         } else if (r.rtype == rdb::RETMEMORY) {
           ;
-        }
-         else
+        } else
           assert(false && "Unrecognized type");
 
         if (i < r.rarray - 1) os << " ";

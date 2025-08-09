@@ -120,6 +120,17 @@ int Descriptor::sizeFlat() {
   return clen;
 };
 
+std::vector<rField> Descriptor::fieldsFlat() {
+  updateConvMaps();
+  std::vector<rField> ret;
+  ret.reserve(clen);
+  for (const auto &i : (*this)) {
+    if (isConfigurationField(i.rtype)) continue;  // skip configuration fields
+    ret.push_back(i);
+  }
+  return ret;
+}
+
 void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
 
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {

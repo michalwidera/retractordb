@@ -16,6 +16,7 @@ struct compiler {
   std::string convertRemotes();
   std::string applyConstraints();
   std::map<std::string, int> countBuffersCapacity();
+  std::string fillSubstractsMemSize(const std::map<std::string, int> &capMap);
 
  private:
   qTree &coreInstance;
