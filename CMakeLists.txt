@@ -8,7 +8,6 @@ add_definitions(-Wno-deprecated-declarations)
 add_definitions(-DHAS_BOOST)
 
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
-
 find_package(Boost CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
