@@ -25,19 +25,19 @@ typedef std::variant<uint8_t,                      //
     descFldVT;
 
 enum descFld {
-  BYTE,      //
-  INTEGER,   //
-  UINT,      //
-  RATIONAL,  //
-  FLOAT,     //
-  DOUBLE,    //
-  INTPAIR,   //
-  IDXPAIR,   //
-  STRING,    //
-  TYPE,      //
-  REF,       //
-  RETENTION, //
-  RETMEMORY  // Retention memory
+  BYTE,       //
+  INTEGER,    //
+  UINT,       //
+  RATIONAL,   //
+  FLOAT,      //
+  DOUBLE,     //
+  INTPAIR,    //
+  IDXPAIR,    //
+  STRING,     //
+  TYPE,       //
+  REF,        //
+  RETENTION,  //
+  RETMEMORY   // Retention memory
 };
 
 constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view { return magic_enum::enum_name(index); }

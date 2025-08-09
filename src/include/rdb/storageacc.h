@@ -30,6 +30,8 @@ class storageAccessor {
   std::string storageFile    = "";
   std::string storageType    = "DEFAULT";
   retention_t retention      = {0, 0};
+  int retmemory              = rdb::memoryFileAccessor::no_retention;
+
   void moveRef();
   void attachStorage();
 

@@ -26,6 +26,13 @@ constexpr auto GetFieldType(const std::string_view name) { return magic_enum::en
 
 constexpr auto GetFieldType(const rdb::descFld index) { return magic_enum::enum_name(index); }
 
+constexpr auto isConfigurationField(const rdb::descFld index) {
+  return index == rdb::TYPE ||       //
+         index == rdb::REF ||        //
+         index == rdb::RETENTION ||  //
+         index == rdb::RETMEMORY;
+}
+
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
 Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
@@ -49,9 +56,7 @@ void Descriptor::updateConvMaps() {
   int offset{0};
   int clen_alignment{0};
   for (int i = 0; i < clen; ++i) {
-    if ((*it).rtype == rdb::TYPE ||  //
-        (*it).rtype == rdb::REF ||   //
-        (*it).rtype == rdb::RETENTION) {
+    if (isConfigurationField((*it).rtype)) {
       ++it;
       ++clen_alignment;
       continue;
@@ -152,27 +157,17 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),              //
-                                    [](const rField &i) {                //
-                                     return i.rtype == rdb::REF ||      //
-                                            i.rtype == rdb::TYPE ||     //
-                                            i.rtype == rdb::RETENTION;  //
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),  //
+                                    [](const rField &i) {    //
+                                     return isConfigurationField(i.rtype);
                                    });
-  auto refCountThis = std::count_if(begin(), end(),                      //
-                                    [](const rField &i) {                //
-                                      return i.rtype == rdb::REF ||      //
-                                             i.rtype == rdb::TYPE ||     //
-                                             i.rtype == rdb::RETENTION;  //
+  auto refCountThis = std::count_if(begin(), end(),        //
+                                    [](const rField &i) {  //
+                                      return isConfigurationField(i.rtype);
                                     });
-
   auto i{0};
   for (const rField &f : *this) {
-    if (f.rtype == rdb::REF ||             //
-        f.rtype == rdb::TYPE ||            //
-        f.rtype == rdb::RETENTION ||       //
-        rhs[i].rtype == rdb::RETENTION ||  //
-        rhs[i].rtype == rdb::REF ||        //
-        rhs[i].rtype == rdb::TYPE) {
+    if (isConfigurationField(f.rtype) || isConfigurationField(rhs[i].rtype)) {
       ++i;
       continue;
     }
@@ -186,13 +181,10 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 Descriptor &Descriptor::cleanRef() {
   Descriptor rhs(*this);
   clear();
-  std::copy_if(rhs.begin(), rhs.end(),             //
-               std::back_inserter(*this),          //
-               [](const rField &i) {               //
-                 return i.rtype != rdb::REF &&     //
-                        i.rtype != rdb::TYPE &&    //
-                        i.rtype != rdb::RETENTION  //
-                     ;
+  std::copy_if(rhs.begin(), rhs.end(),     //
+               std::back_inserter(*this),  //
+               [](const rField &i) {       //
+                 return !isConfigurationField(i.rtype);
                });
 
   dirtyMap = true;
@@ -221,6 +213,7 @@ Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
   if (field.rtype == rdb::RETENTION) return 0;
+  if (field.rtype == rdb::RETMEMORY) return 0;
   return field.rlen * field.rarray;
 }
 
@@ -242,6 +235,17 @@ std::pair<size_t, size_t> Descriptor::retention() {
   return retval;
 }
 
+int Descriptor::retmemory() {
+  int retval{0};
+
+  auto it = std::find_if(begin(), end(),                                                //
+                         [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
+  );
+
+  if (it != end()) retval = (*it).rlen;
+
+  return retval;
+}
 size_t Descriptor::position(const std::string_view name) {
   auto it = std::find_if(begin(), end(),               //
                          [name](const auto &item) {    //
@@ -290,9 +294,7 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
   rdb::descFld retVal{rdb::BYTE};
   auto size{1};
   for (auto const field : *this) {
-    if (field.rtype == rdb::REF) continue;
-    if (field.rtype == rdb::TYPE) continue;
-    if (field.rtype == rdb::RETENTION) continue;
+    if (isConfigurationField(field.rtype)) continue;
     if (retVal <= field.rtype) {
       retVal = field.rtype;
       if (size < len(field)) size = len(field);
@@ -311,7 +313,8 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   for (auto const &r : rhs) {
     if (r.rtype == rdb::RETENTION)
       if (r.rtype == 0 && r.rarray == 0) continue;  // skip retention 0,0
-
+    if (r.rtype == rdb::RETMEMORY)
+      if (r.rlen == 0) continue;  // skip retention memory 0
     if (!flatOutput)
       os << "\t";
     else
@@ -328,6 +331,10 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       case rdb::RETENTION:
         // retention {capacity} {segment}
         os << r.rlen << " " << r.rarray;
+        break;
+      case rdb::RETMEMORY:
+        // retention memory {capacity}
+        os << r.rlen;
         break;
       default:
         os << r.rname;
