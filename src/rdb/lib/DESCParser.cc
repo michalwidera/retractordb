@@ -1,8 +1,9 @@
+#include ".antlr/DESCParser.h"
+
 #include <iostream>
 
 #include ".antlr/DESCBaseListener.h"
 #include ".antlr/DESCLexer.h"
-#include ".antlr/DESCParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/descriptor.h"
 

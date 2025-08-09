@@ -62,13 +62,12 @@ class query {
 
   std::string id                 = "";
   std::string filename           = "";
-  std::string substratType       = "";
   boost::rational<int> rInterval = 0;
   std::list<field> lSchema;
   std::list<token> lProgram;
 
   std::pair<int, int> retention = {0, 0};
-  int retmemory = 0;
+  int retmemory                 = 0;
 
   bool isDeclaration() const;
   bool isReductionRequired();

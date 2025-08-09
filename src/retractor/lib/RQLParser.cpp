@@ -1,3 +1,5 @@
+#include ".antlr/RQLParser.h"
+
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
@@ -12,7 +14,6 @@
 
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"
-#include ".antlr/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 
@@ -175,7 +176,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitRetention(RQLParser::RetentionContext *ctx) {
     if (ctx->segments) {
-      // retention {capacity} !{segments} 
+      // retention {capacity} !{segments}
       SPDLOG_INFO("Parser/Retention: {} {}",            //
                   std::stoi(ctx->segments->getText()),  //
                   std::stoi(ctx->capacity->getText()));
@@ -187,12 +188,11 @@ class ParserListener : public RQLBaseListener {
       SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
       qry.retmemory = std::stoi(ctx->capacity->getText());
     }
-
   }
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
-    qry.id           = ":SUBSTRAT";
-    qry.substratType = ctx->substrat_type->getText();
+    qry.id       = ":SUBSTRAT";
+    qry.filename = ctx->substrat_type->getText();
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
