@@ -15,8 +15,8 @@ public:
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, BYTE_T = 6, STRING_T = 7, 
     UNSIGNED_T = 8, INTEGER_T = 9, FLOAT_T = 10, DOUBLE_T = 11, RATIONAL_T = 12, 
     INTPAIR_T = 13, IDXPAIR_T = 14, TYPE_T = 15, REF_T = 16, RETENTION_T = 17, 
-    DOT = 18, MINUS = 19, ID = 20, STRING = 21, DECIMAL = 22, FILENAME = 23, 
-    SPACE = 24
+    RETMEMORY_T = 18, DOT = 19, MINUS = 20, ID = 21, STRING = 22, DECIMAL = 23, 
+    FILENAME = 24, SPACE = 25
   };
 
   explicit DESCLexer(antlr4::CharStream *input);

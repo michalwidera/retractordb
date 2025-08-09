@@ -12,7 +12,8 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?       # ByteID
                       | REF_T '"' file=FILENAME '"'                     # RefID
                       | TYPE_T type=ID                                  # TypeID
                       | STRING_T name=ID '[' strsize=DECIMAL ']'        # StringID
-                      | RETENTION_T capacity=DECIMAL (segment=DECIMAL)? # RetentionID
+                      | RETENTION_T capacity=DECIMAL segment=DECIMAL    # RetentionID
+                      | RETMEMORY_T capacity=DECIMAL                    # RetentionMemoryID
                       ;
 
 // sync types with: src/include/rdb/fldType.hpp
@@ -33,6 +34,7 @@ TYPE_T:             'TYPE';
 REF_T:              'REF';
 
 RETENTION_T:        'RETENTION';
+RETMEMORY_T:        'RETMEMORY';
 
 
 DOT:                '.';

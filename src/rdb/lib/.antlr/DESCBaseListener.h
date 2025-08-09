@@ -49,6 +49,9 @@ public:
   virtual void enterRetentionID(DESCParser::RetentionIDContext * /*ctx*/) override { }
   virtual void exitRetentionID(DESCParser::RetentionIDContext * /*ctx*/) override { }
 
+  virtual void enterRetentionMemoryID(DESCParser::RetentionMemoryIDContext * /*ctx*/) override { }
+  virtual void exitRetentionMemoryID(DESCParser::RetentionMemoryIDContext * /*ctx*/) override { }
+
 
   virtual void enterEveryRule(antlr4::ParserRuleContext * /*ctx*/) override { }
   virtual void exitEveryRule(antlr4::ParserRuleContext * /*ctx*/) override { }

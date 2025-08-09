@@ -110,11 +110,11 @@ class ParserDESCListener : public DESCBaseListener {
 
   void exitRetentionID(DESCParser::RetentionIDContext *ctx) {
     // retention {capacity} !{segments} <- in grammar.
-    if (ctx->segment) {
-      desc.append({rdb::rField("", std::stoi(ctx->segment->getText()), std::stoi(ctx->capacity->getText()), rdb::RETENTION)});
-    } else {
-      desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
-    }
+    desc.append({rdb::rField("", std::stoi(ctx->segment->getText()), std::stoi(ctx->capacity->getText()), rdb::RETENTION)});
+  }
+
+  void exitRetentionMemoryID(DESCParser::RetentionMemoryIDContext *ctx) {
+    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
   }
 };
 

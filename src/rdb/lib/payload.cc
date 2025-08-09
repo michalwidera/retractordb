@@ -252,7 +252,7 @@ std::any payload::getItem(const int positionFlat) {
       return 0xdead;
     }
     case rdb::RETMEMORY: {
-      SPDLOG_ERROR("RETMEMORY not supported.");
+      SPDLOG_ERROR("RETENTION MEMORY not supported.");
       return 0xdead;
     }
   };
@@ -300,8 +300,6 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
         SPDLOG_ERROR("TYPE store not supported by this operator.");
       else if (desc.type(fieldName) == "RETENTION")
         SPDLOG_ERROR("RETENTION store not supported by this operator.");
-      else if (desc.type(fieldName) == "RETMEMORY")
-        SPDLOG_ERROR("RETMEMORY store not supported by this operator.");
       else
         SPDLOG_ERROR("field {} not found", fieldName);
     }

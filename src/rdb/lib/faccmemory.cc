@@ -21,7 +21,7 @@ auto memoryFileAccessor::name() -> std::string & { return filename; }
 
 ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
   assert(size != 0);
-
+  auto location = position / size;
   // If ptrData is null, clear the storage and reset removed_count
   if (ptrData == nullptr) {
     memoryStorage[filename].clear();  // Clear the storage if ptrData is null
@@ -42,27 +42,28 @@ ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position)
     // Append to the end of the file
     memoryStorage[filename].push_back(vec);
   } else {
-    if (position < removed_count) {
-      SPDLOG_ERROR("Write failed: Position out of bounds in memory storage: position {}, removed_count {}", position,
+    if (location < removed_count) {
+      SPDLOG_ERROR("Write failed: Position out of bounds in memory storage: location {}, removed_count {}", location,
                    removed_count);
       return EXIT_FAILURE;  // Return an error code if position is out of bounds
     }
-    assert(position >= removed_count && "write failed: Position out of bounds in memory storage");
-    memoryStorage[filename][position - removed_count] = std::move(vec);
+    assert(location >= removed_count && "write failed: Position out of bounds in memory storage");
+    memoryStorage[filename][location - removed_count] = std::move(vec);
   }
   return EXIT_SUCCESS;
 }
 
 ssize_t memoryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(size != 0);
-  if (position < removed_count) {
-    SPDLOG_ERROR("Read failed: Position out of bounds in memory storage: position {}, removed_count {}", position,
+  auto location = position / size;
+  if (location < removed_count) {
+    SPDLOG_ERROR("Read failed: Position out of bounds in memory storage: location {}, removed_count {}", location,
                  removed_count);
     return EXIT_FAILURE;  // Return an error code if position is out of bounds
   }
-  assert(position >= removed_count && "read failed: Position out of bounds in memory storage");
+  assert(location >= removed_count && "read failed: Position out of bounds in memory storage");
 
-  auto &vec = memoryStorage[filename][position - removed_count];
+  auto &vec = memoryStorage[filename][location - removed_count];
   std::copy(vec.begin(), vec.end(), ptrData);
   return EXIT_SUCCESS;
 }
