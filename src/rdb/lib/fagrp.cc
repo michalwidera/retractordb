@@ -21,15 +21,14 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 // fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
 
-template <class T>
-groupFileAccessor<T>::groupFileAccessor(const std::string_view fileName,  //
-                                        const size_t recSize,             //
-                                        const retention_t &retention)     //
+groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
+                                     const size_t recSize,             //
+                                     const retention_t &retention)     //
     : filename(std::string(fileName)), recSize(recSize), retention(retention) {
   writeCount      = 0;
   currentFilename = filename + "_segment_" + std::to_string(currentSegment);
   if (retention.noRetention()) {
-    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+    vec.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recSize));
   } else {
     auto min = std::numeric_limits<size_t>::max();
     auto max = std::numeric_limits<size_t>::min();
@@ -51,24 +50,21 @@ groupFileAccessor<T>::groupFileAccessor(const std::string_view fileName,  //
     for (auto i = min; i <= max; ++i) {
       currentSegment  = i;
       currentFilename = filename + "_segment_" + std::to_string(currentSegment);
-      vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+      vec.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recSize));
       SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount = vec.back()->count();
     }
   }
 }
 
-template <class T>
-groupFileAccessor<T>::~groupFileAccessor() {}
+groupFileAccessor::~groupFileAccessor() {}
 
-template <class T>
-auto groupFileAccessor<T>::name() const -> const std::string & {
+auto groupFileAccessor::name() const -> const std::string & {
   if (retention.noRetention()) return filename;
   return currentFilename;
 }
 
-template <class T>
-auto groupFileAccessor<T>::name() -> std::string & {
+auto groupFileAccessor::name() -> std::string & {
   if (retention.noRetention()) {
     // pottenially consider change filename storage file here.
     return filename;
@@ -76,8 +72,7 @@ auto groupFileAccessor<T>::name() -> std::string & {
   return currentFilename;
 }
 
-template <class T>
-ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
+ssize_t groupFileAccessor::write(const uint8_t *ptrData, const size_t position) {
   assert(recSize != 0);
 
   if (position == std::numeric_limits<size_t>::max()) writeCount++;
@@ -95,7 +90,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
     writeCount      = 0;
     currentSegment  = 0;
     currentFilename = filename + "_segment_" + std::to_string(currentSegment);
-    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+    vec.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recSize));
     removedSegments = 0;
     spdlog::info("Purged all segments, current segment is now 0.");
     assert(vec.size() == 1 && "After purge, there should be only one segment left.");
@@ -112,7 +107,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
 
     spdlog::info("Rotating segments: currentSegment={}", currentSegment);
 
-    vec.push_back(std::make_unique<posixBinaryFileAccessor<T>>(name(), recSize));
+    vec.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recSize));
 
     writeCount = 0;
 
@@ -141,8 +136,7 @@ ssize_t groupFileAccessor<T>::write(const T *ptrData, const size_t position) {
   }
 }
 
-template <class T>
-ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
+ssize_t groupFileAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(recSize != 0);
   if (retention.noRetention()) return vec[0]->read(ptrData, position);
 
@@ -155,13 +149,10 @@ ssize_t groupFileAccessor<T>::read(T *ptrData, const size_t position) {
   return vec[segmentIndex - removedSegments]->read(ptrData, positionInSegment);
 }
 
-template <class T>
-size_t groupFileAccessor<T>::count() {
+size_t groupFileAccessor::count() {
   size_t sumCount = 0;
   for (auto &v : vec) sumCount += v->count();
   return sumCount + removedSegments * retention.capacity;  // compensate for removed segments
 }
-
-template class groupFileAccessor<uint8_t>;
 
 }  // namespace rdb

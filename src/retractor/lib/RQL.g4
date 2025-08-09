@@ -3,11 +3,16 @@ grammar RQL;
 prog                : ( select_statement
                       | declare_statement
                       | storage_statement
+                      | substrat_statement
                       )+ EOF
                     ;
 
 storage_statement   : STORAGE folder_name=STRING
                     # Storage
+                    ;
+
+substrat_statement  : SUBSTRAT substrat_type=STRING
+                    # Substrat
                     ;
 
 select_statement    : SELECT select_list
@@ -29,7 +34,7 @@ rational_se         : fraction_rule # RationalAsFraction_proforma
                     | DECIMAL       # RationalAsDecimal
                     ;
 
-retention_from      : RETENTION segments=DECIMAL capacity=DECIMAL
+retention_from      : RETENTION capacity=DECIMAL (segments=DECIMAL)?
                     # Retention
                     ;
 
@@ -147,6 +152,7 @@ DECLARE:            'DECLARE'|'declare';
 RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
+SUBSTRAT:           'SUBSTRAT'|'substrat';
 
 MIN:                'MIN'|'min';
 MAX:                'MAX'|'max';

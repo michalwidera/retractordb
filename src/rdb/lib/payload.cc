@@ -159,6 +159,9 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
       case rdb::RETENTION: {
         SPDLOG_INFO("Skip RETENTION");
       } break;
+      case rdb::RETMEMORY: {
+        SPDLOG_INFO("Skip RETMEMORY");
+      } break;
       default: {
         SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
         assert(false && "setItem - Type not supported.");
@@ -248,6 +251,10 @@ std::any payload::getItem(const int positionFlat) {
       SPDLOG_ERROR("RETENTION not supported.");
       return 0xdead;
     }
+    case rdb::RETMEMORY: {
+      SPDLOG_ERROR("RETENTION MEMORY not supported.");
+      return 0xdead;
+    }
   };
   SPDLOG_ERROR("Type not supported. {}", int(descriptor[position].rtype));
   assert(false && "type not supported on getter.");
@@ -320,9 +327,10 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   os << "{";
 
   for (auto const &r : rhs.getDescriptor()) {
-    if ((r.rtype == rdb::TYPE) ||  //
-        (r.rtype == rdb::REF) ||   //
-        (r.rtype == rdb::RETENTION))
+    if ((r.rtype == rdb::TYPE) ||       //
+        (r.rtype == rdb::REF) ||        //
+        (r.rtype == rdb::RETENTION) ||  //
+        (r.rtype == rdb::RETMEMORY))    // skip these types
       break;
     if (!getFlat())
       os << "\t";
@@ -377,6 +385,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           std::memcpy(&data, rhs.get() + offset_ + i * sizeof(double), sizeof(double));
           os << data;
         } else if (r.rtype == rdb::RETENTION) {
+          ;
+        } else if (r.rtype == rdb::RETMEMORY) {
           ;
         } else
           assert(false && "Unrecognized type");

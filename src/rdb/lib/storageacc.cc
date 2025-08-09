@@ -111,7 +111,7 @@ void storageAccessor::attachStorage() {
   }
 
   retention = descriptor.retention();
-
+  retmemory = descriptor.retmemory();
   initializeAccessor();
 
   if (isDeclared()) {
@@ -142,17 +142,17 @@ void storageAccessor::initializeAccessor() {
   auto size = descriptor.getSizeInBytes();
 
   if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::groupFileAccessor<uint8_t>>(storageFile, size, retention);
+    accessor = std::make_unique<rdb::groupFileAccessor>(storageFile, size, retention);
   } else if (storageType == "MEMORY") {
-    accessor = std::make_unique<rdb::memoryFileAccessor<uint8_t>>(storageFile, size);
+    accessor = std::make_unique<rdb::memoryFileAccessor>(storageFile, size, retmemory);
   } else if (storageType == "POSIX") {
-    accessor = std::make_unique<rdb::posixBinaryFileAccessor<uint8_t>>(storageFile, size);
+    accessor = std::make_unique<rdb::posixBinaryFileAccessor>(storageFile, size);
   } else if (storageType == "GENERIC") {
-    accessor = std::make_unique<rdb::genericBinaryFileAccessor<uint8_t>>(storageFile, size);
+    accessor = std::make_unique<rdb::genericBinaryFileAccessor>(storageFile, size);
   } else if (storageType == "DEVICE") {
-    accessor = std::make_unique<rdb::binaryDeviceAccessor<uint8_t>>(storageFile, size);
+    accessor = std::make_unique<rdb::binaryDeviceAccessor>(storageFile, size);
   } else if (storageType == "TEXTSOURCE") {
-    accessor = std::make_unique<rdb::textSourceAccessor<uint8_t>>(storageFile, size, descriptor);
+    accessor = std::make_unique<rdb::textSourceAccessor>(storageFile, size, descriptor);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType);
     assert(false && "Unsupported storage type");

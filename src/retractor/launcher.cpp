@@ -126,6 +126,9 @@ int main(int argc, char *argv[]) {
       return system::errc::protocol_error;
     }
 
+    response = cm.fillSubstractsMemSize(coreInstance.maxCapacity);
+    assert(response == "OK");
+
     if (onlyCompile) {
       if (!vm.count("quiet")) {
         dumper dm(coreInstance);

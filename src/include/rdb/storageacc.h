@@ -20,7 +20,7 @@ enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
 enum class sourceState { empty, flux, lock, armed };
 
 class storageAccessor {
-  std::unique_ptr<FileAccessorInterface<uint8_t>> accessor;
+  std::unique_ptr<FileAccessorInterface> accessor;
   std::unique_ptr<rdb::payload> storagePayload;
   std::unique_ptr<rdb::payload> chamber;
   Descriptor descriptor;
@@ -30,6 +30,8 @@ class storageAccessor {
   std::string storageFile    = "";
   std::string storageType    = "DEFAULT";
   retention_t retention      = {0, 0};
+  int retmemory              = rdb::memoryFileAccessor::no_retention;
+
   void moveRef();
   void attachStorage();
 

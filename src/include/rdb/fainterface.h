@@ -24,7 +24,6 @@ namespace rdb {
  *
  * @tparam T Type of stored data - uint8_t or char
  */
-template <typename T>
 struct FileAccessorInterface {
   /**
    * @brief Reads from storage amount of bytes into memory pointed by ptrData
@@ -35,7 +34,7 @@ struct FileAccessorInterface {
    * @param position position from the beginning of file [unit: Bytes]
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual ssize_t read(T *ptrData, const size_t position) = 0;
+  virtual ssize_t read(uint8_t *ptrData, const size_t position) = 0;
 
   /**
    * @brief Updates or appends data in the storage
@@ -45,7 +44,7 @@ struct FileAccessorInterface {
    * @param position position from the beginning of file [unit: Bytes]. If max possible value - works as append.
    * @return status of operation - 0/EXIT_SUCCESS success
    */
-  virtual ssize_t write(const T *ptrData, const size_t position = std::numeric_limits<size_t>::max()) = 0;
+  virtual ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
   // following: https://stackoverflow.com/questions/51615363/how-to-write-c-getters-and-setters
   virtual auto name() const -> const std::string & = 0;

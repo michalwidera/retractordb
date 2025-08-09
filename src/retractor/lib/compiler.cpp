@@ -209,7 +209,8 @@ std::string compiler::simplifyLProgram() {
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
           newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
-          newQuery.id = generateStreamName(arg1, arg2, cmd);
+          newQuery.retmemory = 1;
+          newQuery.id        = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           it = coreInstance.begin();
@@ -590,6 +591,15 @@ std::string compiler::applyConstraints() {
       default:
         break;
     }
+  }
+  return std::string("OK");
+}
+
+std::string compiler::fillSubstractsMemSize(const std::map<std::string, int> &capMap) {
+  for (const auto &q : capMap) {                           // for each query
+    if (coreInstance[q.first].retmemory == 0) continue;    // do not check declaration in constraints.
+    assert(!coreInstance[q.first].isReductionRequired());  // process data only with two or less arguments
+    coreInstance[q.first].retmemory = q.second;            // set memory size
   }
   return std::string("OK");
 }

@@ -1,3 +1,5 @@
+#include ".antlr/RQLParser.h"
+
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
@@ -12,7 +14,6 @@
 
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"
-#include ".antlr/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 
@@ -174,12 +175,28 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitRetention(RQLParser::RetentionContext *ctx) {
-    SPDLOG_INFO("Parser/Retention: {} {}",            //
-                std::stoi(ctx->segments->getText()),  //
-                std::stoi(ctx->capacity->getText()));
-    qry.retention = std::pair<int, int>(      //
-        std::stoi(ctx->segments->getText()),  //
-        std::stoi(ctx->capacity->getText()));
+    if (ctx->segments) {
+      // retention {capacity} !{segments}
+      SPDLOG_INFO("Parser/Retention: {} {}",            //
+                  std::stoi(ctx->segments->getText()),  //
+                  std::stoi(ctx->capacity->getText()));
+      qry.retention = std::pair<int, int>(      //
+          std::stoi(ctx->segments->getText()),  //
+          std::stoi(ctx->capacity->getText()));
+    } else {
+      // retention {capacity} - note: segments is optional but capacity is required
+      SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
+      qry.retmemory = std::stoi(ctx->capacity->getText());
+    }
+  }
+
+  void exitSubstrat(RQLParser::SubstratContext *ctx) {
+    qry.id       = ":SUBSTRAT";
+    qry.filename = ctx->substrat_type->getText();
+    coreInstance.push_back(qry);
+    program.clear();
+    qry.reset();
+    fieldCount = 0;
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {

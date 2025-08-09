@@ -17,22 +17,23 @@ public:
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
-    FILE = 32, STORAGE = 33, MIN = 34, MAX = 35, AVG = 36, SUMC = 37, ID = 38, 
-    STRING = 39, FLOAT = 40, DECIMAL = 41, REAL = 42, EQUAL = 43, GREATER = 44, 
-    LESS = 45, EXCLAMATION = 46, DOUBLE_BAR = 47, DOT = 48, UNDERLINE = 49, 
-    AT = 50, SHARP = 51, AND = 52, MOD = 53, DOLLAR = 54, COMMA = 55, SEMI = 56, 
-    COLON = 57, DOUBLE_COLON = 58, STAR = 59, DIVIDE = 60, PLUS = 61, MINUS = 62, 
-    BIT_NOT = 63, BIT_OR = 64, BIT_XOR = 65, SPACE = 66, COMMENT = 67, LINE_COMMENT1 = 68, 
-    LINE_COMMENT2 = 69
+    FILE = 32, STORAGE = 33, SUBSTRAT = 34, MIN = 35, MAX = 36, AVG = 37, 
+    SUMC = 38, ID = 39, STRING = 40, FLOAT = 41, DECIMAL = 42, REAL = 43, 
+    EQUAL = 44, GREATER = 45, LESS = 46, EXCLAMATION = 47, DOUBLE_BAR = 48, 
+    DOT = 49, UNDERLINE = 50, AT = 51, SHARP = 52, AND = 53, MOD = 54, DOLLAR = 55, 
+    COMMA = 56, SEMI = 57, COLON = 58, DOUBLE_COLON = 59, STAR = 60, DIVIDE = 61, 
+    PLUS = 62, MINUS = 63, BIT_NOT = 64, BIT_OR = 65, BIT_XOR = 66, SPACE = 67, 
+    COMMENT = 68, LINE_COMMENT1 = 69, LINE_COMMENT2 = 70
   };
 
   enum {
-    RuleProg = 0, RuleStorage_statement = 1, RuleSelect_statement = 2, RuleDeclare_statement = 3, 
-    RuleRational_se = 4, RuleRetention_from = 5, RuleFraction_rule = 6, 
-    RuleField_declaration = 7, RuleField_type = 8, RuleSelect_list = 9, 
-    RuleField_id = 10, RuleUnary_op_expression = 11, RuleAsterisk = 12, 
-    RuleExpression = 13, RuleExpression_factor = 14, RuleTerm = 15, RuleStream_expression = 16, 
-    RuleStream_term = 17, RuleStream_factor = 18, RuleAgregator = 19, RuleFunction_call = 20
+    RuleProg = 0, RuleStorage_statement = 1, RuleSubstrat_statement = 2, 
+    RuleSelect_statement = 3, RuleDeclare_statement = 4, RuleRational_se = 5, 
+    RuleRetention_from = 6, RuleFraction_rule = 7, RuleField_declaration = 8, 
+    RuleField_type = 9, RuleSelect_list = 10, RuleField_id = 11, RuleUnary_op_expression = 12, 
+    RuleAsterisk = 13, RuleExpression = 14, RuleExpression_factor = 15, 
+    RuleTerm = 16, RuleStream_expression = 17, RuleStream_term = 18, RuleStream_factor = 19, 
+    RuleAgregator = 20, RuleFunction_call = 21
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -54,6 +55,7 @@ public:
 
   class ProgContext;
   class Storage_statementContext;
+  class Substrat_statementContext;
   class Select_statementContext;
   class Declare_statementContext;
   class Rational_seContext;
@@ -85,6 +87,8 @@ public:
     Declare_statementContext* declare_statement(size_t i);
     std::vector<Storage_statementContext *> storage_statement();
     Storage_statementContext* storage_statement(size_t i);
+    std::vector<Substrat_statementContext *> substrat_statement();
+    Substrat_statementContext* substrat_statement(size_t i);
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -118,6 +122,32 @@ public:
   };
 
   Storage_statementContext* storage_statement();
+
+  class  Substrat_statementContext : public antlr4::ParserRuleContext {
+  public:
+    Substrat_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Substrat_statementContext() = default;
+    void copyFrom(Substrat_statementContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  SubstratContext : public Substrat_statementContext {
+  public:
+    SubstratContext(Substrat_statementContext *ctx);
+
+    antlr4::Token *substrat_type = nullptr;
+    antlr4::tree::TerminalNode *SUBSTRAT();
+    antlr4::tree::TerminalNode *STRING();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Substrat_statementContext* substrat_statement();
 
   class  Select_statementContext : public antlr4::ParserRuleContext {
   public:
@@ -247,8 +277,8 @@ public:
   public:
     RetentionContext(Retention_fromContext *ctx);
 
-    antlr4::Token *segments = nullptr;
     antlr4::Token *capacity = nullptr;
+    antlr4::Token *segments = nullptr;
     antlr4::tree::TerminalNode *RETENTION();
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode* DECIMAL(size_t i);

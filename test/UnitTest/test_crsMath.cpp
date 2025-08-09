@@ -69,6 +69,9 @@ class crsMathTest : public ::testing::Test {
 
     response = cm.applyConstraints();
     assert(response == "OK");
+
+    response = cm.fillSubstractsMemSize(coreInstance.maxCapacity);
+    assert(response == "OK");
   }
 
   virtual void TearDown() {

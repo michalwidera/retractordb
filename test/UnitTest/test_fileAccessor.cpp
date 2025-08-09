@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <rdb/faccmemory.h>
 #include <rdb/fagrp.h>
 
 #include <filesystem>
@@ -31,7 +32,88 @@ std::vector<BYTE> readFile(const std::string &filename) {
   return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 }
 
-TEST(FileAccessorTest, test_dir) {
+TEST(MemoryAccessorTest, test_faccmemory_infinite) {
+  struct {
+    BYTE data;
+  } record;
+
+  std::string filename = "test_file_memory";
+
+  auto recsize   = sizeof(BYTE);
+  auto retention = rdb::memoryFileAccessor::no_retention;
+  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+
+  // Write records
+  record.data = 1;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+  record.data = 2;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+  record.data = 3;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+  record.data = 4;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+
+  GTEST_ASSERT_EQ(mfa->count(), 4);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 0), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 1);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 1), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 2);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 2), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 3);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 3), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 4);
+
+  mfa->write(nullptr);               // Clear the storage
+  GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
+}
+
+TEST(MemoryAccessorTest, test_faccmemory_retention) {
+  struct {
+    BYTE data;
+  } record;
+
+  std::string filename = "test_file_memory";
+
+  auto recsize   = sizeof(BYTE);
+  auto retention = 2;
+  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+
+  // Write records
+  record.data = 1;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+  record.data = 2;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+  record.data = 3;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+  record.data = 4;
+  GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
+
+  GTEST_ASSERT_EQ(mfa->count(), 4);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 2), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 3);
+
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 3), EXIT_SUCCESS);
+  GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
+  GTEST_ASSERT_EQ(record.data, 4);
+
+  GTEST_LOG_(INFO) << "Reading record at index 0 - expect failure";
+  GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 0), EXIT_FAILURE);
+
+  mfa->write(nullptr);               // Clear the storage
+  GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
+}
+
+TEST(FileAccessorTest, test_fagrp_dir) {
   bool filepathExists = false;
   try {
     filepathExists = std::filesystem::is_directory(sandBoxFolder);
@@ -67,7 +149,7 @@ TEST(FileAccessorTest, test_dir) {
   rdb::segments_t silos_count = 0;
   rdb::capacity_t silos_size  = 0;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention);
   record.data                 = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
   record.data = 12;
@@ -91,7 +173,7 @@ TEST(FileAccessorTest, test_dir) {
   GTEST_ASSERT_EQ(gfa->count(), 2);  // count is not affected by retention
 }
 
-TEST(FileAccessorTest, test_retention_one_read_and_retention) {
+TEST(FileAccessorTest, test_fagrp_one_read_and_retention) {
   bool filepathExists = false;
   try {
     filepathExists = std::filesystem::is_directory(sandBoxFolder);
@@ -127,7 +209,7 @@ TEST(FileAccessorTest, test_retention_one_read_and_retention) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor<uint8_t>>(filename, recsize, retention);
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention);
 
   // Write records
   record.data = 1;

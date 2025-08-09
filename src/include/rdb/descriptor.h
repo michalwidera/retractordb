@@ -60,8 +60,10 @@ class Descriptor : public std::vector<rField> {
   int arraySize(const std::string_view name);
   std::string_view type(const std::string_view name);
   int sizeFlat();
+  std::vector<rField> fieldsFlat();
 
   std::pair<size_t, size_t> retention();
+  int retmemory();
 
   std::pair<rdb::descFld, int> getMaxType();
 

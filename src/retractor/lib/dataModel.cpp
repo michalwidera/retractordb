@@ -227,6 +227,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
     if (it.rtype == rdb::REF) continue;
     if (it.rtype == rdb::TYPE) continue;
     if (it.rtype == rdb::RETENTION) continue;
+    if (it.rtype == rdb::RETMEMORY) continue;
 
     std::any value = castAny(outputPayload->getPayload()->getItem(i++), maxType);
     switch (maxType) {
@@ -319,12 +320,20 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
                                 [](const auto &qry) { return qry.id == ":STORAGE"; });
   if (storageIt != std::end(coreInstance)) storagePath = storageIt->filename;
 
+  auto substratTypeIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
+                                     [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
+  if (substratTypeIt != std::end(coreInstance)) substratType = substratTypeIt->filename;
+
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
                                 [](const auto &qry) { return qry.id[0] == ':'; });
   coreInstance.erase(new_end, coreInstance.end());
 
-  SPDLOG_INFO("Create struct on CORE INSTANCE");
+  SPDLOG_INFO("Update queires if substratType is set: {}", substratType);
+  for (auto &qry : coreInstance) {
+    if (substratType.empty()) qry.retmemory = 0;  // <- if substratType is empty - set retmemory to 0
+  }
 
+  SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry));
   for (auto const &[key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
 }
@@ -561,8 +570,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }
   auto i{0};
-  for (auto f : payload->getDescriptor()) {
-    if (f.rlen == 0) continue;
+  for (auto f : payload->getDescriptor().fieldsFlat()) {
     retVal.push_back(any_to_variant_cast(payload->getItem(i++)));
   }
   return retVal;

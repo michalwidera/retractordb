@@ -5,7 +5,7 @@
 4 Record(s)
 1 Byte(s) per record.
 {	BYTE dane
-	RETENTION 2 3
+	RETENTION 3 2
 }
 { dane:1 }
 { dane:2 }

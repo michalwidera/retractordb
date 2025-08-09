@@ -54,6 +54,7 @@ struct streamInstance {
 class dataModel {
  private:
   std::string storagePath{""};
+  std::string substratType{""};
   qTree &coreInstance;
 
  public:

@@ -27,6 +27,7 @@ void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs
   std::set<std::string> planStreamRelationsSet;
   for (auto q : coreInstance) {
     if (q.id == ":STORAGE") continue;
+    if (q.id == ":SUBSTRAT") continue;
     //
     // Stream presentation
     //

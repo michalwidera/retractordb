@@ -1,8 +1,9 @@
+#include ".antlr/DESCParser.h"
+
 #include <iostream>
 
 #include ".antlr/DESCBaseListener.h"
 #include ".antlr/DESCLexer.h"
-#include ".antlr/DESCParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/descriptor.h"
 
@@ -108,9 +109,12 @@ class ParserDESCListener : public DESCBaseListener {
   void exitTypeID(DESCParser::TypeIDContext *ctx) { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
 
   void exitRetentionID(DESCParser::RetentionIDContext *ctx) {
-    // len - capacity
-    // arr - segments
-    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), std::stoi(ctx->segment->getText()), rdb::RETENTION)});
+    // retention {capacity} !{segments} <- in grammar.
+    desc.append({rdb::rField("", std::stoi(ctx->segment->getText()), std::stoi(ctx->capacity->getText()), rdb::RETENTION)});
+  }
+
+  void exitRetentionMemoryID(DESCParser::RetentionMemoryIDContext *ctx) {
+    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
   }
 };
 

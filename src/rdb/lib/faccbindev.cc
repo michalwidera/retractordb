@@ -10,9 +10,8 @@
 
 namespace rdb {
 
-template <class T>
-binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string_view fileName,  //
-                                              const size_t recSize)             //
+binaryDeviceAccessor::binaryDeviceAccessor(const std::string_view fileName,  //
+                                           const size_t recSize)             //
     : filename(std::string(fileName)), recSize(recSize) {
   fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC, 0644);
   assert(fd >= 0);
@@ -20,29 +19,18 @@ binaryDeviceAccessor<T>::binaryDeviceAccessor(const std::string_view fileName,  
   // checking fd on read function.
 }
 
-template <class T>
-binaryDeviceAccessor<T>::~binaryDeviceAccessor() {
-  ::close(fd);
-}
+binaryDeviceAccessor::~binaryDeviceAccessor() { ::close(fd); }
 
-template <class T>
-auto binaryDeviceAccessor<T>::name() const -> const std::string & {
-  return filename;
-}
+auto binaryDeviceAccessor::name() const -> const std::string & { return filename; }
 
-template <class T>
-auto binaryDeviceAccessor<T>::name() -> std::string & {
-  return filename;
-}
+auto binaryDeviceAccessor::name() -> std::string & { return filename; }
 
-template <class T>
-ssize_t binaryDeviceAccessor<T>::write(const T *ptrData, const size_t position) {
+ssize_t binaryDeviceAccessor::write(const uint8_t *ptrData, const size_t position) {
   // no write on data source supported
   return EXIT_FAILURE;
 }
 
-template <class T>
-ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t position) {
+ssize_t binaryDeviceAccessor::read(uint8_t *ptrData, const size_t position) {
   if (fd < 0) return EXIT_FAILURE;
   if (recSize == 0) return EXIT_FAILURE;  // No read on data source supported
 
@@ -65,14 +53,11 @@ ssize_t binaryDeviceAccessor<T>::read(T *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-template <class T>
-size_t binaryDeviceAccessor<T>::count() {
+size_t binaryDeviceAccessor::count() {
   // struct stat stat_buf;
   // int rc = stat(filename.c_str(), &stat_buf);
   // return rc == 0 ? stat_buf.st_size / recSize : -1;
   return cnt;
 }
-
-template class binaryDeviceAccessor<uint8_t>;
 
 }  // namespace rdb

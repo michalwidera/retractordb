@@ -60,13 +60,14 @@ class query {
 
   std::list<std::string> getFieldNamesList();
 
-  std::string id = "";
-  std::string filename;
+  std::string id                 = "";
+  std::string filename           = "";
   boost::rational<int> rInterval = 0;
   std::list<field> lSchema;
   std::list<token> lProgram;
 
   std::pair<int, int> retention = {0, 0};
+  int retmemory                 = 0;
 
   bool isDeclaration() const;
   bool isReductionRequired();
