@@ -329,8 +329,8 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
         os << r.rname;
         break;
       case rdb::RETENTION:
-        // retention {capacity} {segment}
-        os << r.rlen << " " << r.rarray;
+        // retention {segment} {capacity} 
+        os << r.rarray << " " << r.rlen ;
         break;
       case rdb::RETMEMORY:
         // retention memory {capacity}

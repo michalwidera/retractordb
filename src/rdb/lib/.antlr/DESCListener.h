@@ -47,9 +47,6 @@ public:
   virtual void enterRetentionID(DESCParser::RetentionIDContext *ctx) = 0;
   virtual void exitRetentionID(DESCParser::RetentionIDContext *ctx) = 0;
 
-  virtual void enterRetMemoryID(DESCParser::RetMemoryIDContext *ctx) = 0;
-  virtual void exitRetMemoryID(DESCParser::RetMemoryIDContext *ctx) = 0;
-
 
 };
 

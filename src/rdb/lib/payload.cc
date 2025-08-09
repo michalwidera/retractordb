@@ -159,6 +159,9 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
       case rdb::RETENTION: {
         SPDLOG_INFO("Skip RETENTION");
       } break;
+      case rdb::RETMEMORY: {
+        SPDLOG_INFO("Skip RETMEMORY");
+      } break;
       default: {
         SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
         assert(false && "setItem - Type not supported.");
@@ -246,6 +249,10 @@ std::any payload::getItem(const int positionFlat) {
     }
     case rdb::RETENTION: {
       SPDLOG_ERROR("RETENTION not supported.");
+      return 0xdead;
+    }
+    case rdb::RETMEMORY: {
+      SPDLOG_ERROR("RETMEMORY not supported.");
       return 0xdead;
     }
   };

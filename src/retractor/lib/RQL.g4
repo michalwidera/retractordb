@@ -34,7 +34,7 @@ rational_se         : fraction_rule # RationalAsFraction_proforma
                     | DECIMAL       # RationalAsDecimal
                     ;
 
-retention_from      : RETENTION segments=DECIMAL capacity=DECIMAL
+retention_from      : RETENTION capacity=DECIMAL (segments=DECIMAL)?
                     # Retention
                     ;
 

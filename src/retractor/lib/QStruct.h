@@ -68,6 +68,7 @@ class query {
   std::list<token> lProgram;
 
   std::pair<int, int> retention = {0, 0};
+  int retmemory = 0;
 
   bool isDeclaration() const;
   bool isReductionRequired();

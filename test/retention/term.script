@@ -1,5 +1,5 @@
 noprompt
-open test_file { BYTE dane RETENTION 2 3 }
+open test_file { BYTE dane RETENTION 3 2 }
 purge
 set dane 1
 append

@@ -308,6 +308,12 @@ rdb::Descriptor query::descriptorStorage() {
     } else {
       SPDLOG_INFO("descriptorStorage/Retention: Empty");
     }
+    if (retmemory != 0) {
+      SPDLOG_INFO("descriptorStorage/Retention memory: {}", retmemory);
+      retVal += rdb::Descriptor("", retmemory, 0, rdb::RETMEMORY);
+    } else {
+      SPDLOG_INFO("descriptorStorage/Retention memory: Empty");
+    }
     return retVal;
   }
   retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);

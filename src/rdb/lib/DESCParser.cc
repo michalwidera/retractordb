@@ -108,14 +108,12 @@ class ParserDESCListener : public DESCBaseListener {
   void exitTypeID(DESCParser::TypeIDContext *ctx) { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
 
   void exitRetentionID(DESCParser::RetentionIDContext *ctx) {
-    // len - capacity
-    // arr - segments
-    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), std::stoi(ctx->segment->getText()), rdb::RETENTION)});
-  }
-
-  void exitRetMemoryID(DESCParser::RetentionIDContext *ctx) {
-    // len - capacity
-    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
+    // retention {capacity} !{segments} <- in grammar.
+    if (ctx->segment) {
+      desc.append({rdb::rField("", std::stoi(ctx->segment->getText()), std::stoi(ctx->capacity->getText()), rdb::RETENTION)});
+    } else {
+      desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
+    }
   }
 };
 

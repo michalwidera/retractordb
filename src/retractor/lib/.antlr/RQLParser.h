@@ -277,8 +277,8 @@ public:
   public:
     RetentionContext(Retention_fromContext *ctx);
 
-    antlr4::Token *segments = nullptr;
     antlr4::Token *capacity = nullptr;
+    antlr4::Token *segments = nullptr;
     antlr4::tree::TerminalNode *RETENTION();
     std::vector<antlr4::tree::TerminalNode *> DECIMAL();
     antlr4::tree::TerminalNode* DECIMAL(size_t i);

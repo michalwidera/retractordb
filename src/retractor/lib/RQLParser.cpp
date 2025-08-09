@@ -174,12 +174,20 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitRetention(RQLParser::RetentionContext *ctx) {
-    SPDLOG_INFO("Parser/Retention: {} {}",            //
-                std::stoi(ctx->segments->getText()),  //
-                std::stoi(ctx->capacity->getText()));
-    qry.retention = std::pair<int, int>(      //
-        std::stoi(ctx->segments->getText()),  //
-        std::stoi(ctx->capacity->getText()));
+    if (ctx->segments) {
+      // retention {capacity} !{segments} 
+      SPDLOG_INFO("Parser/Retention: {} {}",            //
+                  std::stoi(ctx->segments->getText()),  //
+                  std::stoi(ctx->capacity->getText()));
+      qry.retention = std::pair<int, int>(      //
+          std::stoi(ctx->segments->getText()),  //
+          std::stoi(ctx->capacity->getText()));
+    } else {
+      // retention {capacity} - note: segments is optional but capacity is required
+      SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
+      qry.retmemory = std::stoi(ctx->capacity->getText());
+    }
+
   }
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
