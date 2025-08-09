@@ -300,6 +300,8 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
         SPDLOG_ERROR("TYPE store not supported by this operator.");
       else if (desc.type(fieldName) == "RETENTION")
         SPDLOG_ERROR("RETENTION store not supported by this operator.");
+      else if (desc.type(fieldName) == "RETMEMORY")
+        SPDLOG_ERROR("RETMEMORY store not supported by this operator.");
       else
         SPDLOG_ERROR("field {} not found", fieldName);
     }
@@ -329,7 +331,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   for (auto const &r : rhs.getDescriptor()) {
     if ((r.rtype == rdb::TYPE) ||  //
         (r.rtype == rdb::REF) ||   //
-        (r.rtype == rdb::RETENTION))
+        (r.rtype == rdb::RETENTION) ||
+        (r.rtype == rdb::RETMEMORY))  // skip these types
       break;
     if (!getFlat())
       os << "\t";
@@ -385,7 +388,10 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           os << data;
         } else if (r.rtype == rdb::RETENTION) {
           ;
-        } else
+        } else if (r.rtype == rdb::RETMEMORY) {
+          ;
+        }
+         else
           assert(false && "Unrecognized type");
 
         if (i < r.rarray - 1) os << " ";
