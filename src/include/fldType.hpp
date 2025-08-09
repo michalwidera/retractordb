@@ -36,7 +36,8 @@ enum descFld {
   STRING,    //
   TYPE,      //
   REF,       //
-  RETENTION
+  RETENTION, //
+  RETMEMORY  // Retention memory
 };
 
 constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view { return magic_enum::enum_name(index); }

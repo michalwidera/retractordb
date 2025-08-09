@@ -112,6 +112,11 @@ class ParserDESCListener : public DESCBaseListener {
     // arr - segments
     desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), std::stoi(ctx->segment->getText()), rdb::RETENTION)});
   }
+
+  void exitRetMemoryID(DESCParser::RetentionIDContext *ctx) {
+    // len - capacity
+    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
+  }
 };
 
 std::string parserDESCString(rdb::Descriptor &desc, std::string inlet) {
