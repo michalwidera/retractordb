@@ -25,13 +25,13 @@ ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position)
   // If ptrData is null, clear the storage and reset removed_count
   if (ptrData == nullptr) {
     memoryStorage[filename].clear();  // Clear the storage if ptrData is null
-    removed_count = 0;  // Reset removed count
+    removed_count = 0;                // Reset removed count
     return EXIT_SUCCESS;
   }
 
   std::vector<uint8_t> vec(ptrData, ptrData + size);
 
-  if (retention_size != no_retention) // If retention size is set, manage the retention
+  if (retention_size != no_retention)  // If retention size is set, manage the retention
     if (memoryStorage[filename].size() > retention_size) {
       // Remove the oldest record if retention size is reached
       memoryStorage[filename].erase(memoryStorage[filename].begin());

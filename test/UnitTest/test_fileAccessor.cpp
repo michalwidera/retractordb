@@ -71,7 +71,7 @@ TEST(MemoryAccessorTest, test_faccmemory_infinite) {
   GTEST_LOG_(INFO) << "Read record data: " << static_cast<int>(record.data);
   GTEST_ASSERT_EQ(record.data, 4);
 
-  mfa->write(nullptr);  // Clear the storage
+  mfa->write(nullptr);               // Clear the storage
   GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
 }
 
@@ -109,7 +109,7 @@ TEST(MemoryAccessorTest, test_faccmemory_retention) {
   GTEST_LOG_(INFO) << "Reading record at index 0 - expect failure";
   GTEST_ASSERT_EQ(mfa->read(reinterpret_cast<uint8_t *>(&record), 0), EXIT_FAILURE);
 
-  mfa->write(nullptr);  // Clear the storage
+  mfa->write(nullptr);               // Clear the storage
   GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
 }
 
