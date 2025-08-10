@@ -22,8 +22,8 @@ sources:
     - 'library'
     - '.git'
     - '.antlr'
-    - 'parser.cpp'
-    - 'parser.cc'
+    - 'RQLParser.cpp'
+    - 'DESCParser.cc'
     - 'examples'
     
     
