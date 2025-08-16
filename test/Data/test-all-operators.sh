@@ -1,11 +1,14 @@
 #!/bin/sh
 
-if [ "$1" == "" ]; then
-    echo "missing source file. Try query-all.rql"
+if [ -z "$1" ]
+  then
+    echo "No argument supplied. Try query-all.rql"
     exit 1
 fi
 
 pkill xretractor
+rm -f str*
+rm -f core*
 
 if ! xretractor $1 -c ; then exit 1 ; fi
 
