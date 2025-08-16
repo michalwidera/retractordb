@@ -23,7 +23,7 @@ set_tests_properties(${TestID}-dumper PROPERTIES DEPENDS ${TestID}-on-query)
 add_test(
   NAME ${TestID}-waterfall
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND sh -c "xretractor query-lnx.rql -m 10")
+  COMMAND sh -c "rm -f str*; rm -f core*; xretractor query-lnx.rql -m 10")
 
 add_test(
   NAME ${TestID}-workflow

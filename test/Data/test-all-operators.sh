@@ -22,4 +22,7 @@ xqry -s str2 -m 5
 xqry -l
 xqry -k
 
-pkill xretractor
+pkill xretractor ; true
+# Ensure that the script exits cleanly even if pkill fails
+# This is useful in CI environments where pkill might not find the process
+# and return a non-zero exit code.

@@ -72,6 +72,9 @@ class ParserListener : public RQLBaseListener {
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSizeArray = 1;
 
+  std::string substratType = "";
+  std::string storageName = "";
+
   void recpToken(command_id id) { program.push_back(token(id)); };
 
   template <typename T>
@@ -191,8 +194,16 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
+    if (!substratType.empty()) {
+      std::cerr << "Parser/Storage: Substrat type is already set to " << substratType << std::endl;
+      abort();
+    }
+
     qry.id       = ":SUBSTRAT";
     qry.filename = ctx->substrat_type->getText();
+
+    substratType = qry.filename;
+
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
@@ -200,8 +211,16 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {
+    if (!storageName.empty()) {
+      std::cerr << "Parser/Storage: Storage name is already set to " << substratType << std::endl;
+      abort();
+    }
+
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
+
+    storageName = qry.filename;
+  
     // Remove ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
