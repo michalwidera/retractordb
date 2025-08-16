@@ -1,8 +1,13 @@
 #!/bin/sh
 
-if [ "$1" != "" ]; then
+if [ "$1" == "" ]; then
+    echo "missing source file. Try query-lnx.rql"
+    exit 1
+fi
 
-if ! xretractor $1 -c ; then exit ; fi
+pkill xretractor
+
+if ! xretractor $1 -c ; then exit 1 ; fi
 
 xretractor $1 -m 8000 &
 
@@ -14,6 +19,4 @@ xqry -s str2 -m 5
 xqry -l
 xqry -k
 
-else
-    echo "missing source file. Try query-lnx.rql"
-fi
+pkill xretractor
