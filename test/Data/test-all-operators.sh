@@ -1,6 +1,11 @@
 #!/bin/sh
 
-if [ "$1" != "" ]; then
+if [ "$1" == "" ]; then
+    echo "missing source file. Try query-all.rql"
+    exit 1
+fi
+
+pkill xretractor
 
 if ! xretractor $1 -c; then exit 1 ; fi
 
@@ -13,6 +18,4 @@ xqry -s str2 -m 5
 xqry -l
 xqry -k
 
-else
-    echo "missing source file. Try query-all.rql"
-fi
+pkill xretractor
