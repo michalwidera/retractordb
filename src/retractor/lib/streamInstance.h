@@ -1,13 +1,12 @@
 #pragma once
 
-#include <rdb/descriptor.h>  // rdb::Descriptor
-#include <rdb/payload.h>     // rdb::payload
-#include <rdb/storageacc.h>  // rdb::storageAccessor
-
 #include <memory>  // unique_ptr
 #include <string>
 
-#include "QStruct.h"  // query
+#include "QStruct.h"         // qTree
+#include "rdb/descriptor.h"  // rdb::Descriptor
+#include "rdb/payload.h"     // rdb::payload
+#include "rdb/storageacc.h"  // rdb::storageAccessor
 
 struct streamInstance {
   qTree &coreInstance;

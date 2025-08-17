@@ -1,4 +1,3 @@
-#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>

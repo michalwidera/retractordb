@@ -1,6 +1,5 @@
 #include ".antlr/RQLParser.h"
 
-#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -17,6 +16,7 @@
 #include ".antlr/RQLLexer.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
+#include "rdb/convertTypes.h"
 
 using namespace antlrcpp;
 using namespace antlr4;

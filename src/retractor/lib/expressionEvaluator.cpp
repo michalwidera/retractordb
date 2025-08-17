@@ -1,7 +1,5 @@
 #include "expressionEvaluator.h"
 
-#include <rdb/convertTypes.h>
-#include <rdb/payload.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -14,6 +12,9 @@
 #include <string>
 #include <typeinfo>  // operator typeid
 #include <variant>
+
+#include "rdb/convertTypes.h"
+#include "rdb/payload.h"
 
 static cast<rdb::descFldVT> castFldVT;
 

@@ -1,6 +1,8 @@
 #include "dataModel.h"
+#include "SOperations.hpp"
+#include "expressionEvaluator.h"
+#include "rdb/convertTypes.h"
 
-#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -10,10 +12,7 @@
 #include <memory>  // unique_ptr
 #include <regex>
 
-#include "QStruct.h"  // coreInstance
-#include "SOperations.hpp"
-#include "expressionEvaluator.h"
-#include "rdb/convertTypes.h"
+
 
 // ctest -R '^ut-dataModel' -V
 
