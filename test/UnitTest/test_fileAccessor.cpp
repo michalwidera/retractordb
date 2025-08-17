@@ -40,7 +40,7 @@ TEST(MemoryAccessorTest, test_faccmemory_infinite) {
   std::string filename = "test_file_memory";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = rdb::memoryFileAccessor::no_retention;
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
   auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
 
   // Write records
@@ -83,7 +83,7 @@ TEST(MemoryAccessorTest, test_faccmemory_retention) {
   std::string filename = "test_file_memory";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = 2;
+  auto retention = std::pair<std::string, size_t>("MEMORY", 2);
   auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
 
   // Write records

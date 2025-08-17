@@ -330,7 +330,9 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
 
   SPDLOG_INFO("Update queires if substratType is set: {}", substratType);
   for (auto &qry : coreInstance) {
-    if (substratType.empty()) qry.retmemory = 0;  // <- if substratType is empty - set retmemory to 0
+    if (substratType.empty())
+      qry.substratPolicy = std::make_pair(
+          "DEFAULT", rdb::memoryFileAccessor::no_retention);  // <- if substratType is empty - set substratPolicy to 0
   }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");

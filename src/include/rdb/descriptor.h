@@ -10,7 +10,7 @@
 
 #include "cmdID.hpp"
 #include "fldType.hpp"
-
+#include "retention.h"
 namespace rdb {
 
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
@@ -62,8 +62,8 @@ class Descriptor : public std::vector<rField> {
   int sizeFlat();
   std::vector<rField> fieldsFlat();
 
-  std::pair<size_t, size_t> retention();
-  int retmemory();
+  rdb::retention_t retention();
+  std::pair<std::string, size_t> substratPolicy();
 
   std::pair<rdb::descFld, int> getMaxType();
 

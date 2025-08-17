@@ -1,6 +1,5 @@
 #include "QStruct.h"
 
-#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
 #include <cassert>             // for assert
@@ -11,6 +10,9 @@
 #include <stack>               // for stack
 #include <stdexcept>           // for logic_error
 #include <type_traits>
+
+#include "rdb/convertTypes.h"
+#include "rdb/retention.h"
 
 using namespace boost;
 
@@ -301,16 +303,16 @@ rdb::Descriptor query::descriptorStorage() {
                               f.field_.rtype);
 
   if (!isDeclaration()) {
-    if (retention != std::pair<int, int>{0, 0}) {
-      SPDLOG_INFO("descriptorStorage/Retention: {} {}", retention.first, retention.second);
-      retVal += rdb::Descriptor("", retention.first, retention.second, rdb::RETENTION);
+    if (!retention.noRetention()) {
+      SPDLOG_INFO("descriptorStorage/Retention: {} {}", retention.segments, retention.capacity);
+      retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
     } else {
       SPDLOG_INFO("descriptorStorage/Retention: Empty");
     }
-    if (retmemory != 0) {
-      SPDLOG_INFO("descriptorStorage/Retention memory: {}", retmemory);
-      retVal += rdb::Descriptor("", retmemory, 0, rdb::RETMEMORY);
-      retVal += rdb::Descriptor("MEMORY", 0, 0, rdb::TYPE);
+    if (substratPolicy.second != 0) {
+      SPDLOG_INFO("descriptorStorage/Retention memory: {}", substratPolicy.second);
+      retVal += rdb::Descriptor("", substratPolicy.second, 0, rdb::RETMEMORY);
+      retVal += rdb::Descriptor(substratPolicy.first, 0, 0, rdb::TYPE);
     } else {
       SPDLOG_INFO("descriptorStorage/Retention memory: Empty");
     }
@@ -392,9 +394,9 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       assert(false);
   }
 
-  if (retention != std::pair<int, int>{0, 0}) {
-    SPDLOG_INFO("descriptorFrom/Retention: {} {}", retention.first, retention.second);
-    retVal += rdb::Descriptor("", retention.first, retention.second, rdb::RETENTION);
+  if (!retention.noRetention()) {
+    SPDLOG_INFO("descriptorFrom/Retention: {} {}", retention.segments, retention.capacity);
+    retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
   }
   return retVal;
 }

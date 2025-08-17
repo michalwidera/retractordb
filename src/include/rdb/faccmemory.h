@@ -16,8 +16,8 @@ struct memoryFileAccessor : public FileAccessorInterface {
   int removed_count = 0;      // Count of removed records, used for retention management
   enum { no_retention = 0 };  // Default retention size if not specified
  public:
-  explicit memoryFileAccessor(const std::string_view fileName, const size_t size, const int retention_size = no_retention)
-      : filename(std::string(fileName)), size(size), retention_size(retention_size){};
+  explicit memoryFileAccessor(const std::string_view fileName, const size_t size, std::pair<std::string, size_t> retention_size)
+      : filename(std::string(fileName)), size(size), retention_size(retention_size.second){};
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

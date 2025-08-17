@@ -1,4 +1,4 @@
-:STORAGE(0/1)	temp/
+:STORAGE	temp/
 str1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)

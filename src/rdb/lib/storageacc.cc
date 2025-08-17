@@ -110,8 +110,6 @@ void storageAccessor::attachStorage() {
     SPDLOG_INFO("Storage type from descriptor {}", storageType);
   }
 
-  retention = descriptor.retention();
-  retmemory = descriptor.retmemory();
   initializeAccessor();
 
   if (isDeclared()) {
@@ -142,9 +140,9 @@ void storageAccessor::initializeAccessor() {
   auto size = descriptor.getSizeInBytes();
 
   if (storageType == "DEFAULT") {
-    accessor = std::make_unique<rdb::groupFileAccessor>(storageFile, size, retention);
+    accessor = std::make_unique<rdb::groupFileAccessor>(storageFile, size, descriptor.retention());
   } else if (storageType == "MEMORY") {
-    accessor = std::make_unique<rdb::memoryFileAccessor>(storageFile, size, retmemory);
+    accessor = std::make_unique<rdb::memoryFileAccessor>(storageFile, size, descriptor.substratPolicy());
   } else if (storageType == "POSIX") {
     accessor = std::make_unique<rdb::posixBinaryFileAccessor>(storageFile, size);
   } else if (storageType == "GENERIC") {

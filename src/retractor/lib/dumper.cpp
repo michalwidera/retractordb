@@ -242,9 +242,10 @@ void dumper::qSet() {
   }
 }
 
-void dumper::rawTextFile() {
+void dumper::onlyCompileShowProgram() {
   for (auto q : coreInstance) {
-    std::cout << q.id << "(" << q.rInterval << ")";
+    std::cout << q.id;
+    if (q.id[0] != ':') std::cout << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
@@ -287,7 +288,7 @@ int dumper::run(boost::program_options::variables_map &vm) {
       qFields();
       qFieldsProgram();
     } else {
-      rawTextFile();
+      onlyCompileShowProgram();
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << std::endl;

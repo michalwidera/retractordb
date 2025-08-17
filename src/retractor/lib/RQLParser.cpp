@@ -3,6 +3,7 @@
 #include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
 #include <boost/json.hpp>
@@ -72,8 +73,8 @@ class ParserListener : public RQLBaseListener {
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSizeArray = 1;
 
-  std::string substratType = "";
-  std::string storageName = "";
+  std::string substratType_LP = "";
+  std::string storageName     = "";
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
@@ -189,20 +190,24 @@ class ParserListener : public RQLBaseListener {
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
       SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
-      qry.retmemory = std::stoi(ctx->capacity->getText());
+      qry.substratPolicy.second = std::stoi(ctx->capacity->getText());
     }
   }
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
-    if (!substratType.empty()) {
-      std::cerr << "Parser/Storage: Substrat type is already set to " << substratType << std::endl;
+    if (!substratType_LP.empty()) {
+      std::cerr << "Parser/Storage: Substrat type is already set to " << substratType_LP << std::endl;
       abort();
     }
 
     qry.id       = ":SUBSTRAT";
     qry.filename = ctx->substrat_type->getText();
 
-    substratType = qry.filename;
+    // This removes ''
+    qry.filename.erase(qry.filename.size() - 1);
+    qry.filename.erase(0, 1);
+
+    substratType_LP = qry.filename;
 
     coreInstance.push_back(qry);
     program.clear();
@@ -212,18 +217,20 @@ class ParserListener : public RQLBaseListener {
 
   void exitStorage(RQLParser::StorageContext *ctx) {
     if (!storageName.empty()) {
-      std::cerr << "Parser/Storage: Storage name is already set to " << substratType << std::endl;
+      std::cerr << "Parser/Storage: Storage name is already set to " << substratType_LP << std::endl;
       abort();
     }
 
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
 
-    storageName = qry.filename;
-  
-    // Remove ''
+    // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
+
+    storageName = qry.filename;
+    std::transform(storageName.begin(), storageName.end(), storageName.begin(), ::toupper);
+
     // Add / at the end of path
     if (qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
     // This should set paths correct on compiled system
