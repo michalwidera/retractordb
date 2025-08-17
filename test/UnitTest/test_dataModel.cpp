@@ -52,9 +52,9 @@ class xschema : public ::testing::Test {
         "str2.desc",    //
         "str1a",        //
         "str1a.desc",   //
-        "file_A.dat",   //
+        "file_A",       //
         "file_A.desc",  //
-        "file_B.dat",   //
+        "file_B",       //
         "file_B.desc"   //
     };
 
@@ -101,7 +101,7 @@ class xschema : public ::testing::Test {
 
   void TearDown() override { SPDLOG_INFO("TearDown"); }
 };
-
+/*
 TEST_F(xschema, check_test0) {
   auto dataInternalDescriptor{
       rdb::Descriptor("A[1]", 4, 1, rdb::INTEGER) +  //
@@ -115,7 +115,7 @@ TEST_F(xschema, check_test0) {
   };
 
   {
-    streamInstance data{coreInstance, "file_A", "file_A.dat", dataStorageDescriptor, dataInternalDescriptor};
+    streamInstance data{coreInstance, "file_A", "file_A", dataStorageDescriptor, dataInternalDescriptor};
 
     data.inputPayload->setItem(0, 123);
     data.inputPayload->setItem(1, 345);
@@ -130,7 +130,7 @@ TEST_F(xschema, check_test0) {
   }
 
   {
-    streamInstance data{coreInstance, "file_B", "file_B.dat", dataStorageDescriptor, dataInternalDescriptor};
+    streamInstance data{coreInstance, "file_B", "file_B", dataStorageDescriptor, dataInternalDescriptor};
 
     data.inputPayload->setItem(0, 123);
     data.inputPayload->setItem(1, 345);
@@ -164,6 +164,8 @@ TEST_F(xschema, create_struct_local_str1a) {
                    dataDescriptor,  //
                    dataDescriptor);
 
+  // streamInstance q{coreInstance, coreInstance["str1a"]};
+
   q.outputPayload->getPayload()->setItem(0, 2);
   q.outputPayload->getPayload()->setItem(1, atoi(build_id));
   q.outputPayload->write();
@@ -171,7 +173,7 @@ TEST_F(xschema, create_struct_local_str1a) {
 
   ASSERT_TRUE(q.outputPayload->getRecordsCount() == 1);
 }
-
+*/
 TEST_F(xschema, check_construct_payload) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setRemoveOnExit(false);
@@ -198,11 +200,6 @@ TEST_F(xschema, check_construct_payload) {
 }
 
 TEST_F(xschema, check_construct_payload_mirror) {
-  auto dataDescriptor{
-      rdb::Descriptor("str1_0", 4, 1, rdb::INTEGER) +  //
-      rdb::Descriptor("str1_1", 1, 1, rdb::BYTE)       //
-  };
-
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setRemoveOnExit(false);
 

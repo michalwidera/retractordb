@@ -16,22 +16,8 @@ struct streamInstance {
   std::unique_ptr<rdb::payload> inputPayload;           // payload used for computation in select
                                                         // clause - created by from clause.
 
-  // This constructor cover issue when storage name is different from descriptor name
-  explicit streamInstance(qTree &coreInstance,                         //
-                          const std::string &descriptorName,           //
-                          const std::string &storageName,              // <- query %% filename
-                          const rdb::Descriptor &storageDescriptor,    // <- query %% descriptorStorage()
-                          const rdb::Descriptor &internalDescriptor);  // <- query %% descriptorFrom()
-
-  // This constructor cover same name for storage and descriptor file name (+.desc)
-  explicit streamInstance(qTree &coreInstance,                         //
-                          const std::string &idAndStorageName,         // <- query %% filename
-                          const rdb::Descriptor &storageDescriptor,    // <- query %% descriptorStorage()
-                          const rdb::Descriptor &internalDescriptor);  // <- query %% descriptorFrom()
-
   // This constructor will create data based on QStruct query
-  explicit streamInstance(qTree &coreInstance,  //
-                          query &qry);
+  explicit streamInstance(qTree &coreInstance, query &qry);
 
   rdb::payload constructAgsePayload(const int length,             //  _@(_,length)
                                     const int step,               //  _@(step,_)

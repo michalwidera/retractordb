@@ -18,56 +18,30 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 */
 
-streamInstance::streamInstance(qTree &coreInstance,                       //
-                               const std::string &descriptorName,         // q.id
-                               const std::string &storageNameParam,       // filename
-                               const rdb::Descriptor &storageDescriptor,  //
-                               const rdb::Descriptor &internalDescriptor)
-    : coreInstance(coreInstance) {
+streamInstance::streamInstance(qTree &coreInstance, query &qry) : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
-  const auto storageName{storageNameParam == "" ? descriptorName : storageNameParam};
-  SPDLOG_INFO("streamInstance desc:{} storage:{}", descriptorName, storageName);
-  inputPayload = std::make_unique<rdb::payload>(internalDescriptor);
+  const auto storageName{qry.filename == "" ? qry.id : qry.filename};
+  SPDLOG_INFO("streamInstance desc:{} storage:{}", qry.id, storageName);
+  inputPayload = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
 
-  outputPayload = std::make_unique<rdb::storageAccessor>(descriptorName, storageName);
-  outputPayload->attachDescriptor(&storageDescriptor);
+  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName);
+  // outputPayload->manageLocation()
+  auto desc = qry.descriptorStorage();
+  outputPayload->attachDescriptor(&desc);
 
-  auto requestedCapacity = coreInstance.maxCapacity[descriptorName];
+  auto requestedCapacity = coreInstance.maxCapacity[qry.id];
   outputPayload->setCapacity(requestedCapacity);
 
   {
     std::stringstream strStream;
     strStream << rdb::flat << outputPayload->getDescriptor();
-    SPDLOG_INFO("storage/external descriptor: id:{} desc:{}", descriptorName, strStream.str());
+    SPDLOG_INFO("storage/external descriptor: id:{} desc:{}", qry.id, strStream.str());
   }
   {
     std::stringstream strStream;
     strStream << rdb::flat << inputPayload->getDescriptor();
-    SPDLOG_INFO("image/internal descriptor: filename:{} desc:{}", storageNameParam, strStream.str());
+    SPDLOG_INFO("image/internal descriptor: filename:{} desc:{}", qry.filename, strStream.str());
   }
-};
-
-streamInstance::streamInstance(qTree &coreInstance,                        //
-                               const std::string &idAndStorageName,        // q.id = filename
-                               const rdb::Descriptor &storageDescriptor,   //
-                               const rdb::Descriptor &internalDescriptor)  //
-    : streamInstance(coreInstance,                                         //
-                     idAndStorageName,                                     // descriptor file
-                     idAndStorageName,                                     // storage file
-                     storageDescriptor,                                    //
-                     internalDescriptor                                    //
-      ) {
-  SPDLOG_INFO("streamInstance - storage and id are the same");
-}
-
-streamInstance::streamInstance(qTree &coreInstance, query &qry)
-    : streamInstance(coreInstance,                     //
-                     qry.id,                           // descriptor file (q.id)
-                     qry.filename,                     // storage file (filename)
-                     qry.descriptorStorage(),          //
-                     qry.descriptorFrom(coreInstance)  //
-      ) {
-  SPDLOG_INFO("streamInstance <- qry");
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div

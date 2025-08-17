@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 
+#include "QStruct.h"         // qTree
 #include "rdb/descriptor.h"  // rdb::Descriptor
 #include "rdb/payload.h"     // rdb::payload
 #include "streamInstance.h"  // streamInstance
-#include "QStruct.h"         // qTree
 class dataModel {
  private:
   std::string storagePath{""};
