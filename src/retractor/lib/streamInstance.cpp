@@ -20,28 +20,18 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 
 streamInstance::streamInstance(qTree &coreInstance, query &qry) : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
-  const auto storageName{qry.filename == "" ? qry.id : qry.filename};
-  SPDLOG_INFO("streamInstance desc:{} storage:{}", qry.id, storageName);
-  inputPayload = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
+  assert(!qry.id.empty());
 
+  const auto storageName{qry.filename == "" ? qry.id : qry.filename};
+
+  inputPayload = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
   outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName);
-  // outputPayload->manageLocation()
+
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
 
   auto requestedCapacity = coreInstance.maxCapacity[qry.id];
   outputPayload->setCapacity(requestedCapacity);
-
-  {
-    std::stringstream strStream;
-    strStream << rdb::flat << outputPayload->getDescriptor();
-    SPDLOG_INFO("storage/external descriptor: id:{} desc:{}", qry.id, strStream.str());
-  }
-  {
-    std::stringstream strStream;
-    strStream << rdb::flat << inputPayload->getDescriptor();
-    SPDLOG_INFO("image/internal descriptor: filename:{} desc:{}", qry.filename, strStream.str());
-  }
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
