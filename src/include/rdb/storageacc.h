@@ -44,7 +44,7 @@ class storageAccessor {
 
  public:
   storageAccessor() = delete;
-  explicit storageAccessor(const std::string fileNameDesc, const std::string fileName = "");
+  explicit storageAccessor(const std::string qryID, const std::string fileName = "", const std::string_view storageParam = "");
   virtual ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;

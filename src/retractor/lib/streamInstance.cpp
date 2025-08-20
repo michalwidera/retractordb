@@ -1,3 +1,5 @@
+#include "streamInstance.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -9,7 +11,6 @@
 
 #include "QStruct.h"  // coreInstance
 #include "SOperations.hpp"
-#include "dataModel.h"
 #include "expressionEvaluator.h"
 #include "rdb/convertTypes.h"
 
@@ -18,14 +19,14 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 */
 
-streamInstance::streamInstance(qTree &coreInstance, query &qry) : coreInstance(coreInstance) {
+streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string storagePathParam) : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
   assert(!qry.id.empty());
 
   const auto storageName{qry.filename == "" ? qry.id : qry.filename};
 
-  inputPayload = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
-  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName);
+  inputPayload  = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
+  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName, storagePathParam);
 
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);

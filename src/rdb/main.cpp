@@ -54,9 +54,10 @@ int main(int argc, char *argv[]) {
   }
   std::unique_ptr<rdb::storageAccessor> dacc;
   std::string file;
-  bool rox           = true;
-  std::string prompt = ".";
-  std::string ok     = "ok\n";
+  std::string storageParam = "";  // storage path parameter
+  bool rox                 = true;
+  std::string prompt       = ".";
+  std::string ok           = "ok\n";
   std::string cmd;
   std::string wasteComment;
   do {
@@ -99,14 +100,18 @@ int main(int argc, char *argv[]) {
       std::cout << BLINK << wasteComment << std::endl << RESET;
       continue;
     }
+    if (cmd == "storage") {
+      std::cin >> storageParam;
+      continue;
+    }
     if (cmd == "open") {
       std::cin >> file;
       if (file.find('{') != std::string::npos) {
         std::cout << RED << "unrecognized or missing file:" << file << "\n" << RESET;
         continue;
       }
-      dacc = std::make_unique<rdb::storageAccessor>(file, file);
-
+      dacc = std::make_unique<rdb::storageAccessor>(file, file, storageParam);
+      assert(dacc != nullptr);
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
       } else {
@@ -134,6 +139,8 @@ int main(int argc, char *argv[]) {
       std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
       std::cout << "open file [schema] \t\t open or create database with schema\n";
       std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] }\n";
+      std::cout << "storage [path] \t\t\t set storage path for database\n";
+      std::cout << "dropfile \t\t\t remove file from disk\n";
       std::cout << "desc|descc \t\t\t show schema\n";
       std::cout << "read|rread [n] \t\t\t read record from database into payload\n";
       std::cout << "write [n] \t\t\t from payload send record to database\n";
@@ -153,6 +160,7 @@ int main(int argc, char *argv[]) {
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
       std::cout << "echo \t\t\t\t print message on terminal\n";
+      std::cout << "help|h \t\t\t\t show this help\n";
 
       std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
       // std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;

@@ -262,8 +262,6 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam) {
 
     if (verbose) coreInstance.dumpCore();
 
-    coreInstance.removeNonStreamItems(':');
-
     TimeLine tl(coreInstance.getAvailableTimeIntervals());
     //
     // Main loop of data processing

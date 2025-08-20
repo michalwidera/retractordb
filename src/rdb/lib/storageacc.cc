@@ -13,11 +13,30 @@ namespace rdb {
 
 bool isOpen(const storageState val) { return (val == storageState::openAndCreate); };
 
-storageAccessor::storageAccessor(const std::string fileNameDesc, const std::string fileName)
-    :  //
-      descriptorFile(fileNameDesc + ".desc"),
-      storageFile(fileName) {
-  SPDLOG_INFO("descriptorFile-> {} | storageFile-> {}", descriptorFile, fileName);
+storageAccessor::storageAccessor(const std::string qryID, const std::string fileName, const std::string_view storageParam)
+    : descriptorFile(qryID + ".desc"), storageFile(fileName) {
+  assert(!qryID.empty());
+  assert(!fileName.empty());
+
+  if (storageParam.empty()) {
+    SPDLOG_INFO("That's OK. Storage path is empty - no change of storageFile");
+    return;  // no change
+  }
+
+  if (!std::filesystem::is_directory(storageParam)) {
+    SPDLOG_ERROR("Storage path {} does not point to directory.", storageParam);
+    assert(false && "Storage path does not point to directory.");
+    abort();
+  }
+
+  SPDLOG_INFO("Storage path before {}", storageFile);
+  SPDLOG_INFO("Descriptor path before {}", descriptorFile);
+
+  descriptorFile = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile);
+  storageFile    = std::filesystem::path(storageParam) / std::filesystem::path(storageFile);
+
+  SPDLOG_INFO("Storage path changed to {}", storageFile);
+  SPDLOG_INFO("Descriptor path changed to {}", descriptorFile);
 }
 
 void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {

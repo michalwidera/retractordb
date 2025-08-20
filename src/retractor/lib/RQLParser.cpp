@@ -73,8 +73,8 @@ class ParserListener : public RQLBaseListener {
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSizeArray = 1;
 
-  std::string substratType_LP = "";
-  std::string storageName     = "";
+  bool substratType_already_set = false;
+  bool storageName_already_set  = false;
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
@@ -195,10 +195,11 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
-    if (!substratType_LP.empty()) {
-      std::cerr << "Parser/Storage: Substrat type is already set to " << substratType_LP << std::endl;
+    if (substratType_already_set) {
+      std::cerr << "Parser/Storage: Substrat type is already set" << std::endl;
       abort();
     }
+    substratType_already_set = true;
 
     qry.id       = ":SUBSTRAT";
     qry.filename = ctx->substrat_type->getText();
@@ -207,8 +208,6 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    substratType_LP = qry.filename;
-
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
@@ -216,10 +215,11 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {
-    if (!storageName.empty()) {
-      std::cerr << "Parser/Storage: Storage name is already set to " << substratType_LP << std::endl;
+    if (storageName_already_set) {
+      std::cerr << "Parser/Storage: Storage name is already set" << std::endl;
       abort();
     }
+    storageName_already_set = true;
 
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
@@ -228,14 +228,11 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    storageName = qry.filename;
-    std::transform(storageName.begin(), storageName.end(), storageName.begin(), ::toupper);
+    assert(qry.filename.size() > 0 && "Storage name must not be empty");
 
     // Add / at the end of path
     if (qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
-    // This should set paths correct on compiled system
-    std::filesystem::path native_system_path{qry.filename};
-    qry.filename = native_system_path.make_preferred().string();
+
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();

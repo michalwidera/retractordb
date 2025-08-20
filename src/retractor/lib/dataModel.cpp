@@ -20,19 +20,34 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
-  auto storageIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
-                                [](const auto &qry) { return qry.id == ":STORAGE"; });
-  if (storageIt != std::end(coreInstance)) storagePath = storageIt->filename;
+  auto storagePath  = std::string{""};
+  auto substratType = std::string{""};
 
-  auto substratTypeIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
-                                     [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
-  if (substratTypeIt != std::end(coreInstance)) substratType = substratTypeIt->filename;
+  assert(!coreInstance.empty());
+  for (const auto &it : coreInstance) SPDLOG_INFO("query.id {}", it.id);
+
+  for (const auto &it : coreInstance)
+    if (it.id == ":STORAGE") {
+      storagePath = it.filename;
+      SPDLOG_INFO("Assert - Storage path set to {}", storagePath);
+      assert(!storagePath.empty());
+      break;
+    }
+
+  for (const auto &it : coreInstance)
+    if (it.id == ":SUBSTRAT") {
+      substratType = it.filename;
+      SPDLOG_INFO("Assert - substrat Type set to {}", substratType);
+      assert(!substratType.empty());
+      break;
+    }
 
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
-                                [](const auto &qry) { return qry.id[0] == ':'; });
+                                [](const query &qry) { return qry.id[0] == ':'; });
   coreInstance.erase(new_end, coreInstance.end());
 
-  SPDLOG_INFO("Update queires if substratType is set: {}", substratType);
+  SPDLOG_INFO("!Storage path set to : {}", storagePath);
+  SPDLOG_INFO("!substratType is set: {}", substratType);
   for (auto &qry : coreInstance) {
     if (substratType.empty())
       qry.substratPolicy = std::make_pair(
@@ -40,7 +55,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
-  for (auto &qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry));
+  for (auto &qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry, storagePath));
   for (auto const &[key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
 }
 
