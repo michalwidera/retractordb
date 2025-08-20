@@ -234,8 +234,8 @@ size_t Descriptor::getSizeInBytes() const {
   return size;
 }
 
-std::pair<size_t, size_t> Descriptor::retention() {
-  std::pair<size_t, size_t> retval{0, 0};
+rdb::retention_t Descriptor::retention() {
+  rdb::retention_t retval{0, 0};
 
   auto it = std::find_if(begin(), end(),                                                //
                          [](const auto &item) { return item.rtype == rdb::RETENTION; }  //
@@ -246,17 +246,25 @@ std::pair<size_t, size_t> Descriptor::retention() {
   return retval;
 }
 
-int Descriptor::retmemory() {
+std::pair<std::string, size_t> Descriptor::substratPolicy() {
   int retval{0};
 
-  auto it = std::find_if(begin(), end(),                                                //
-                         [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
+  auto it1 = std::find_if(begin(), end(),                                                //
+                          [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
   );
 
-  if (it != end()) retval = (*it).rlen;
+  if (it1 != end()) retval = (*it1).rlen;
 
-  return retval;
+  std::string retvalType{""};
+  auto it2 = std::find_if(begin(), end(),                                           //
+                          [](const auto &item) { return item.rtype == rdb::TYPE; }  //
+  );
+
+  if (it2 != end()) retvalType = (*it2).rname;
+
+  return std::make_pair(retvalType, retval);
 }
+
 size_t Descriptor::position(const std::string_view name) {
   auto it = std::find_if(begin(), end(),               //
                          [name](const auto &item) {    //

@@ -17,6 +17,7 @@
 #include "cmdID.hpp"
 #include "fldType.hpp"
 #include "rdb/descriptor.h"
+#include "rdb/retention.h"
 
 class qTree;
 
@@ -66,8 +67,8 @@ class query {
   std::list<field> lSchema;
   std::list<token> lProgram;
 
-  std::pair<int, int> retention = {0, 0};
-  int retmemory                 = 0;
+  rdb::retention_t retention                    = rdb::retention_t{0, 0};        // Retention segments and capacity
+  std::pair<std::string, size_t> substratPolicy = std::make_pair("DEFAULT", 0);  // rdb::memoryFileAccessor::no_retention
 
   bool isDeclaration() const;
   bool isReductionRequired();
@@ -110,9 +111,6 @@ class qTree : public std::vector<query> {
   boost::rational<int> getDelta(const std::string &query_name);
   void dumpCore();
   std::set<boost::rational<int>> getAvailableTimeIntervals();
-
-  // This code removes :STORAGE from coreInstance
-  void removeNonStreamItems(const char leadingChar);
 
   std::map<std::string, int> maxCapacity;
 };

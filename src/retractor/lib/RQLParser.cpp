@@ -1,8 +1,8 @@
 #include ".antlr/RQLParser.h"
 
-#include <rdb/convertTypes.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
 #include <boost/json.hpp>
@@ -16,6 +16,7 @@
 #include ".antlr/RQLLexer.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
+#include "rdb/convertTypes.h"
 
 using namespace antlrcpp;
 using namespace antlr4;
@@ -71,6 +72,9 @@ class ParserListener : public RQLBaseListener {
 
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSizeArray = 1;
+
+  bool substratType_already_set = false;
+  bool storageName_already_set  = false;
 
   void recpToken(command_id id) { program.push_back(token(id)); };
 
@@ -186,13 +190,24 @@ class ParserListener : public RQLBaseListener {
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
       SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
-      qry.retmemory = std::stoi(ctx->capacity->getText());
+      qry.substratPolicy.second = std::stoi(ctx->capacity->getText());
     }
   }
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
+    if (substratType_already_set) {
+      std::cerr << "Parser/Storage: Substrat type is already set" << std::endl;
+      abort();
+    }
+    substratType_already_set = true;
+
     qry.id       = ":SUBSTRAT";
     qry.filename = ctx->substrat_type->getText();
+
+    // This removes ''
+    qry.filename.erase(qry.filename.size() - 1);
+    qry.filename.erase(0, 1);
+
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
@@ -200,16 +215,24 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {
+    if (storageName_already_set) {
+      std::cerr << "Parser/Storage: Storage name is already set" << std::endl;
+      abort();
+    }
+    storageName_already_set = true;
+
     qry.id       = ":STORAGE";
     qry.filename = ctx->folder_name->getText();
-    // Remove ''
+
+    // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
+
+    assert(qry.filename.size() > 0 && "Storage name must not be empty");
+
     // Add / at the end of path
     if (qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
-    // This should set paths correct on compiled system
-    std::filesystem::path native_system_path{qry.filename};
-    qry.filename = native_system_path.make_preferred().string();
+
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();

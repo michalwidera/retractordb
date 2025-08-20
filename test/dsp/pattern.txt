@@ -1,4 +1,4 @@
-:STORAGE(0/1)	temp/
+:STORAGE	temp/
 signalRow(1/50)
 	:- PUSH_STREAM(source)
 	:- STREAM_AGSE(1,25)

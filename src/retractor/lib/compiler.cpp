@@ -168,6 +168,13 @@ TODO: Stream_MAX,MIN,AVG...
 */
 std::string compiler::simplifyLProgram() {
   coreInstance.sort();
+
+  auto substratType_C = std::string("DEFAULT");
+  auto substratTypeIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
+                                     [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
+  if (substratTypeIt != std::end(coreInstance)) substratType_C = substratTypeIt->filename;
+  std::transform(substratType_C.begin(), substratType_C.end(), substratType_C.begin(), ::toupper);
+
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
     // Optimization phase 2
     if ((*it).isReductionRequired()) {
@@ -209,8 +216,8 @@ std::string compiler::simplifyLProgram() {
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
           newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
-          newQuery.retmemory = 1;
-          newQuery.id        = generateStreamName(arg1, arg2, cmd);
+          newQuery.substratPolicy = std::make_pair(substratType_C, 1);
+          newQuery.id             = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           it = coreInstance.begin();
@@ -596,10 +603,10 @@ std::string compiler::applyConstraints() {
 }
 
 std::string compiler::fillSubstractsMemSize(const std::map<std::string, int> &capMap) {
-  for (const auto &q : capMap) {                           // for each query
-    if (coreInstance[q.first].retmemory == 0) continue;    // do not check declaration in constraints.
-    assert(!coreInstance[q.first].isReductionRequired());  // process data only with two or less arguments
-    coreInstance[q.first].retmemory = q.second;            // set memory size
+  for (const auto &q : capMap) {                                     // for each query
+    if (coreInstance[q.first].substratPolicy.second == 0) continue;  // do not check declaration in constraints.
+    assert(!coreInstance[q.first].isReductionRequired());            // process data only with two or less arguments
+    coreInstance[q.first].substratPolicy.second = q.second;          // set memory size
   }
   return std::string("OK");
 }

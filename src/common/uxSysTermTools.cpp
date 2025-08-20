@@ -65,6 +65,8 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
   // if none of them have been found - we are trying to get system temp folder /tmp
   // if temporary folder is not found - we stop on assert failure.
 
+  /*
+  conflict with temp in rql
   for (const auto &tempName : std::vector<std::string>{"temp", "tmp"}) {
     const auto currentPath{fs::current_path().append(tempName)};
     if (fs::is_directory(currentPath) && tmp.empty()) tmp = currentPath;
@@ -72,6 +74,7 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
     const auto homeDir{fs::path(getenv("HOME")).append(tempName)};
     if (fs::is_directory(homeDir) && tmp.empty()) tmp = homeDir;
   }
+  */
 
   if (tmp.empty()) tmp = fs::temp_directory_path();
 

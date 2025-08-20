@@ -18,5 +18,5 @@ struct dumper {
   void qFields();
   void qPrograms();
   void qSet();
-  void rawTextFile();
+  void onlyCompileShowProgram();
 };

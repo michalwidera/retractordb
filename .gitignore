@@ -22,6 +22,7 @@ astyle/
 compile_commands.json
 install_manifest.txt
 CMakeUserPresets.json
+CMakePresets.json
 *.dmp
 *.lkn
 *.qry*

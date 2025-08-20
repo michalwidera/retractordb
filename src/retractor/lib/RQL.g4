@@ -11,7 +11,7 @@ storage_statement   : STORAGE folder_name=STRING
                     # Storage
                     ;
 
-substrat_statement  : SUBSTRAT substrat_type=STRING
+substrat_statement  : SUBSTRAT substrat_type=STRING_SUBSTRAT
                     # Substrat
                     ;
 
@@ -158,6 +158,8 @@ MIN:                'MIN'|'min';
 MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
+
+STRING_SUBSTRAT:    '\'' ('MEMORY'|'memory'|'DEFAULT'|'default'|'POSIX'|'posix'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource') '\'';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
