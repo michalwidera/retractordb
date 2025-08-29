@@ -99,8 +99,8 @@ commands:
             pip3 install --upgrade pip
             pip3 install conan
             conan profile detect
-            echo <<parameters.conan_profile1>> >> ~/.conan2/profiles/default
-            echo <<parameters.conan_profile2>> >> ~/.conan2/profiles/default
+            echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
+            echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default
             conan profile show
   conan-build:
     parameters:
@@ -176,8 +176,8 @@ jobs:
       - checkout
       - prep-env:
           build_package: "ninja-build"
-          conan_profile1: "echo '[conf]'"
-          conan_profile2: "echo 'tools.cmake.cmaketoolchain:generator=Ninja'"
+          conan_profile1: "[conf]"
+          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
       - conan-build:
           build_param: --build missing
           build_tool: ninja
@@ -207,8 +207,8 @@ jobs:
       - checkout
       - prep-env:
           build_package: ninja-build
-          conan_profile1: "echo '[conf]'"
-          conan_profile2: "echo 'tools.cmake.cmaketoolchain:generator=Ninja'"
+          conan_profile1: "[conf]"
+          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
       - conan-build:
           build_type: Debug
           build_param: --build missing
