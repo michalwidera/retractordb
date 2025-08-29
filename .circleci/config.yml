@@ -86,7 +86,7 @@ commands:
       conan_profile2:
         type: string
         default: ""
-      build-package:
+      build_package:
         type: string
         default: "make"
     steps:
@@ -95,7 +95,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build-package>> build-essential python3 python3-pip valgrind cppcheck mold
+            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip valgrind cppcheck mold
             pip3 install --upgrade pip
             pip3 install conan
             conan profile detect
@@ -175,7 +175,7 @@ jobs:
     steps:
       - checkout
       - prep-env:
-          build_package: ninja-build
+          build_package: "ninja-build"
           conan_profile1: "echo '[conf]'"
           conan_profile2: "echo 'tools.cmake.cmaketoolchain:generator=Ninja'"
       - conan-build:
