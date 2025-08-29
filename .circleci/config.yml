@@ -38,14 +38,15 @@ workflows:
   fix_dev_check:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_4_*_*_2
-          # At 04:00 on Tuesday.
-          cron: "0 4 * * 2"
+          # https://crontab.guru/#0_4_*_*_6
+          # At 04:00 on Saturday.
+          cron: "0 4 * * 6"
           filters:
             branches:
               only:
                 - /fix_.*/
                 - /dev_.*/
+                - /issue_.*/
     jobs:
       - build-release
       - build-debug:
