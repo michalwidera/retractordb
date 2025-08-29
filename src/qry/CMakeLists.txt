@@ -9,4 +9,4 @@ add_executable(${PROJECT_NAME} ${SOURCES_QRY})
 target_link_libraries(${PROJECT_NAME} boost::boost spdlog::spdlog_header_only
                       magic_enum::magic_enum)
 
-install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ~/.local/bin)

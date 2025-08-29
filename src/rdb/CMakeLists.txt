@@ -14,4 +14,4 @@ add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 target_link_libraries(${PROJECT_NAME} boost::boost spdlog::spdlog_header_only
                       magic_enum::magic_enum rdb descparser)
 
-install(TARGETS ${PROJECT_NAME} DESTINATION ~/.local/bin)
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ~/.local/bin)
