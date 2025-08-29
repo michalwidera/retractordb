@@ -4,16 +4,19 @@ workflows:
 
   commit:
     jobs:
-      - build-release:
+      - build-release-ninja:
         filters:
           branches:
             only:
                - master
                - /issue_.*/
-      - build-release-ninja:
+      - build-ARM:
+          requires:
+            - build-release-ninja
         filters:
           branches:
             only:
+               - master
                - /issue_.*/
 
   nightly:
@@ -29,9 +32,13 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-release
+      - build-release-ninja
       - build-debug:
           requires:
             - build-release
+      - build-debug-ninja:
+          requires:
+            - build-release-ninja
       - build-ARM:
           requires:
             - build-release
@@ -217,8 +224,6 @@ jobs:
     executor: ubuntu-machine-arm
     steps:
       - checkout
-      - prep-env-200:
-          gcc_version: gcc-10
       - conan-build:
           build_type: <<parameters.build_type>>
           build_param: --build missing
