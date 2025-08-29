@@ -5,19 +5,19 @@ workflows:
   commit:
     jobs:
       - build-release-ninja:
-        filters:
-          branches:
-            only:
-               - master
-               - /issue_.*/
+          filters:
+            branches:
+              only:
+                - master
+                - /issue_.*/
       - build-ARM:
           requires:
             - build-release-ninja
-        filters:
-          branches:
-            only:
-               - master
-               - /issue_.*/
+          filters:
+            branches:
+              only:
+                - master
+                - /issue_.*/
 
   nightly:
     triggers:
