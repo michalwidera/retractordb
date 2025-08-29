@@ -11,8 +11,6 @@ workflows:
                 - master
                 - /issue_.*/
       - build-ARM:
-          requires:
-            - build-release-ninja
           filters:
             branches:
               only:
@@ -224,6 +222,7 @@ jobs:
     executor: ubuntu-machine-arm
     steps:
       - checkout
+      - prep-env-200
       - conan-build:
           build_type: <<parameters.build_type>>
           build_param: --build missing
