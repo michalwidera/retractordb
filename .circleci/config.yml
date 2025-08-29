@@ -75,38 +75,33 @@ executors:
     resource_class: arm.large
 
 commands:
-  prep-env-200:
+  prep-env:
     parameters:
       gcc_version:
         type: string
         default: "gcc"
-    steps:
-      - run:
-          name: Install toolchain - conan 2.0 - Make
-          command: |
-            uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake make build-essential python3 python3-pip valgrind cppcheck mold
-            pip3 install --upgrade pip
-            pip3 install conan
-            conan profile detect
-  prep-env-200-ninja:
-    parameters:
-      gcc_version:
+      conan_profile1:
         type: string
-        default: "gcc"
+        default: ""
+      conan_profile2:
+        type: string
+        default: ""
+      build-package:
+        type: string
+        default: "make"
     steps:
       - run:
-          name: Install toolchain - conan 2.0 - Ninja
+          name: Install toolchain - conan 2.0
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake ninja-build build-essential python3 python3-pip valgrind cppcheck mold
+            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build-package>> build-essential python3 python3-pip valgrind cppcheck mold
             pip3 install --upgrade pip
             pip3 install conan
             conan profile detect
-            echo '[conf]' >>  ~/.conan2/profiles/default
-            echo 'tools.cmake.cmaketoolchain:generator=Ninja' >>  ~/.conan2/profiles/default
+            echo <<parameters.conan_profile1>>  ~/.conan2/profiles/default
+            echo <<parameters.conan_profile2>>  ~/.conan2/profiles/default
+            conan profile show
   conan-build:
     parameters:
       build_type:
@@ -166,7 +161,10 @@ jobs:
     executor: ubuntu-docker-2204
     steps:
       - checkout
-      - prep-env-200
+      - prep-env:
+          build_package: make
+          conan_profile1: ""
+          conan_profile2: ""
       - conan-build:
           build_param: --build missing
       - run-test
@@ -176,7 +174,10 @@ jobs:
     executor: ubuntu-docker-2204
     steps:
       - checkout
-      - prep-env-200-ninja
+      - prep-env:
+          build_package: ninja-build
+          conan_profile1: "echo '[conf]'"
+          conan_profile2: "echo 'tools.cmake.cmaketoolchain:generator=Ninja'"
       - conan-build:
           build_param: --build missing
           build_tool: ninja
@@ -189,7 +190,10 @@ jobs:
     executor: ubuntu-docker-2204
     steps:
       - checkout
-      - prep-env-200
+      - prep-env:
+          build_package: make
+          conan_profile1: ""
+          conan_profile2: ""
       - conan-build:
           build_type: Debug
           build_param: --build missing
@@ -201,7 +205,10 @@ jobs:
     executor: ubuntu-docker-2204
     steps:
       - checkout
-      - prep-env-200-ninja
+      - prep-env:
+          build_package: ninja-build
+          conan_profile1: "echo '[conf]'"
+          conan_profile2: "echo 'tools.cmake.cmaketoolchain:generator=Ninja'"
       - conan-build:
           build_type: Debug
           build_param: --build missing
@@ -222,7 +229,10 @@ jobs:
     executor: ubuntu-machine-arm
     steps:
       - checkout
-      - prep-env-200
+      - prep-env:
+          build_package: make
+          conan_profile1: ""
+          conan_profile2: ""
       - conan-build:
           build_type: <<parameters.build_type>>
           build_param: --build missing
