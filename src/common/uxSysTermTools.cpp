@@ -102,7 +102,7 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
     spdlog::set_default_logger(spdlog::get("mlog"));
 
   } else {
-    auto filelog = spdlog::basic_logger_mt("log", "/tmp/retractor-logs/" + tmp.string() + ".log");
+    auto filelog = spdlog::basic_logger_mt("log", tmp.string() + ".log");
     spdlog::set_default_logger(filelog);
 
     spdlog::set_pattern(common_log_pattern);

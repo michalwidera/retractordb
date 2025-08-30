@@ -10,8 +10,8 @@ control_c()
     stty sane
 }
 
-STREAM=str1
-QUERY=query-simple.rql
+STREAM=${1:-str1}
+QUERY=${2:-query-simple.rql}
 
 if ! xretractor $QUERY -c -r ; then exit 1 ; fi
 

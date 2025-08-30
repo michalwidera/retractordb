@@ -18,6 +18,16 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
+  simple-max0
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str0 query-max.rql
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
+
+add_custom_target(
+  simple-max1
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str1 query-max.rql
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
+
+add_custom_target(
   simple-timeshift
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/issue56_timeshift)
@@ -32,6 +42,13 @@ add_custom_target(
   COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
           out.dot -o out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
+
+  
+add_custom_target(
+  simple-max-view
+  COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
+          out.dot -o out.png && feh out.png
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
 
 add_custom_target(
   dsp-view

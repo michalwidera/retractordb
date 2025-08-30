@@ -1,0 +1,38 @@
+# ctest -R '^simple_max' -V
+get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+add_test(
+  NAME ${TestID}-compile
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e ; \
+    xretractor query-max.rql -c > out-compile.txt ; \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out-compile.txt")
+
+add_test(
+  NAME ${TestID}-dot
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e ; \
+    xretractor query-max.rql -c -d -f -t -s > out.dot ; \
+    ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out.dot")
+
+add_test(
+  NAME ${TestID}-vg-1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor
+          query-max.rql -c)
+
+add_test(
+  NAME ${TestID}-vg-2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor
+          query-max.rql -m 5)
+
+add_test(
+  NAME ${TestID}-run
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+    bash -c "set -e ; \
+    rm temp/str0 temp/str0.desc ; \
+    rm temp/str1 temp/str1.desc ; \
+  xretractor query-max.rql -m 10 ; \
+  xtrdb < term.script > out.txt ;  \
+  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out.txt")

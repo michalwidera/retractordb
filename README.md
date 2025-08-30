@@ -11,14 +11,14 @@ __This is work in progress.__
 
 Project Web Page
 -----------------------------------------------------------------------
-[https://retractordb.com](https://retractordb.com)
+[Retractordb.com](https://retractordb.com) is the official web page of RetractorDB system.
 
 Commands
 -----------------------------------------------------------------------
 
 * _xqry_: database client
 * _xretractor_: database main process
-* _xdisplay_: query plan presentation script
+* _xtrdb_: data accessor and testing tool
 
 How to install
 -----------------------------------------------------------------------
@@ -83,6 +83,49 @@ To get full functionality additional packages may be required like:
 ```
 sudo apt install graphviz feh tmux gnuplot
 ```
+How to Ninja (instead of make)
+-----------------------------------------------------------------------
+[Ninja](https://ninja-build.org/manual.html) is build system.
+If you want use this instead of makefile please follow this [path](https://docs.conan.io/2/examples/tools/cmake/cmake_toolchain/use_different_toolchain_generator.html):
+
+0. Install ninja
+
+```
+sudo apt install ninja-build
+```
+
+1. Modify conan2 profile (for instance):
+
+```
+more ~/.conan2/profiles/default
+[settings]
+arch=x86_64
+build_type=Release
+compiler=gcc
+compiler.cppstd=gnu23
+compiler.libcxx=libstdc++11
+compiler.version=13
+os=Linux
+
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja
+```
+
+2. If previous build/Debug exist - remove this.
+3. Then you can issue:
+```
+conan install . -s build_type=Debug --build missing
+conan build . -s build_type=Debug --build missing
+cd build/Debug
+ninja install
+ninja test
+ninja descgrammar
+ninja rqlgrammar
+ninja cformat
+ninja
+```
+
+4. Have fun.
 
 Query Language
 -----------------------------------------------------------------------

@@ -4,4 +4,5 @@ open str1
 size
 desc
 list 9
+dropfile { str1 str1.desc STREAM_ADD_core0_core1 STREAM_ADD_core0_core1.desc }
 quit

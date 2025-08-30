@@ -5,8 +5,8 @@
 #include <magic_enum/magic_enum.hpp>  // magic_enum::enum_name
 #include <string>                     // std::string
 #include <utility>                    // std::pair
-#include <variant>
-#include <vector>  // std::vector
+#include <variant>                    // std::variant
+#include <vector>                     // std::vector
 
 // Based on
 // https://www.codeproject.com/Articles/10500/Converting-C-enums-to-strings

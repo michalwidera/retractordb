@@ -175,6 +175,9 @@ int main(int argc, char *argv[]) {
       do {
         object.clear();
         std::cin >> object;
+        if (storageParam != "" && object.find(storageParam) == std::string::npos) {
+          object = storageParam + "/" + object;
+        }
         if (std::filesystem::exists(object)) {
           std::filesystem::remove(object);
         }

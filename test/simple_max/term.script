@@ -4,5 +4,4 @@ open str1
 size
 desc
 list 9
-dropfile { str1 str1.desc }
 quit
