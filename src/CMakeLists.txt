@@ -18,8 +18,13 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
-  simple-max
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
+  simple-max0
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str0 query-max.rql
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
+
+add_custom_target(
+  simple-max1
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str1 query-max.rql
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
 
 add_custom_target(
