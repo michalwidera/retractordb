@@ -20,44 +20,47 @@ esac
 echo "Note: Current folder is << $foldername >> and will start build in << $build_folder >>"
 
 PS3='Build RetractorDB, please enter your choice: '
-options=("Release" "Debug" "Relase (build only)" "Debug (build only)" "Relase (make)" "Debug (make)" "Reset (clean)" "Quit")
+options=("Release" "Debug" "Reset (clean)" "Init Conan Profile" "setup gcc23" "setup ninja" "Quit")
 select opt in "${options[@]}"
 do
     case $opt in
         "Release")
+            sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv /.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Release --build missing
             conan build $build_folder -s build_type=Release --build missing
             break
             ;;
         "Debug")
+            sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
             conan source $build_folder
             conan install $build_folder -s build_type=Debug --build missing
             conan build $build_folder -s build_type=Debug --build missing
             break
             ;;
-        "Relase (build only)")
-            conan build $build_folder -s build_type=Release
-            break
-            ;;
-        "Debug (build only)")
-            conan build $build_folder -s build_type=Debug
-            break
-            ;;
-        "Relase (make)")
-            cd $build_folder/build/Release && make
-            break
-            ;;
-        "Debug (make)")
-            cd $build_folder/build/Debug && make
-            break
-            ;;
         "Reset (clean)")
-            cd ~/.local/bin && rm -f -- antlr-* xqry xretractor xtrdb plotblock.py
+            rm -rf $build_folder/build
+            rm -rf ~/.conan2/
+            break
+            ;;
+        "setup gcc23")
+            sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
+            cat ~/.conan2/profiles/default
+            break
+            ;;
+        "Init Conan Profile")
+            conan profile detect -f
+            break
+            ;;
+        "setup ninja")
+            echo '[conf]' >> ~/.conan2/profiles/default
+            echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default
+            cat ~/.conan2/profiles/default
             break
             ;;
         "Quit")
             echo "Ok, quit - no action."
+            cat ~/.conan2/profiles/default
             break
             ;;
         *) echo "invalid option $REPLY";;

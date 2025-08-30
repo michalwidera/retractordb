@@ -16,12 +16,11 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB - time series database and data processing engine"
     homepage = "https://retractordb.com"
-    antlr_version = "4.13.1"
     requires = (
         "boost/1.88.0",
-        "gtest/1.16.0",
-        "antlr4-cppruntime/" + antlr_version,
-        "antlr4/" + antlr_version,
+        "gtest/1.17.0",
+        "antlr4-cppruntime/4.13.2",
+        "antlr4/4.13.1",
         "spdlog/1.10.0",
         "openjdk/21.0.1",
         "magic_enum/0.9.7"
