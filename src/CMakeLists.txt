@@ -43,7 +43,6 @@ add_custom_target(
           out.dot -o out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
-  
 add_custom_target(
   simple-max-view
   COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
@@ -85,6 +84,13 @@ add_custom_target(
   vim
   COMMAND [ ! -f ~/.vim ] && mkdir -p ~/.vim
   COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)
+
+add_custom_target(
+  build_debug_packages
+  COMMAND cpack --config CPackConfig.cmake
+  COMMAND cpack --config CPackSourceConfig.cmake
+  COMMAND ls -lart *.tar.gz
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/build/Debug)
 
 # This target is required when VSCode will call nina and CMakeCache.txt is in
 # incompatible format - conan build .. complains : CMake Error: Error: generator

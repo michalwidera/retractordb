@@ -42,3 +42,4 @@ graph_info.json
 .vscode/*
 .vscode/settings.json
 docs/
+bin/*

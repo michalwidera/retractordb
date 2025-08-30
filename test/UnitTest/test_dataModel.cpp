@@ -188,34 +188,34 @@ TEST_F(xschema, check_sum) {
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }
-  /*
+/*
 TEST_F(xschema, compute_instance_1) {
-  // SELECT str7[0] STREAM str7 FROM core0.max
+// SELECT str7[0] STREAM str7 FROM core0.max
 
-  // datafile1.txt
-  // 20 31
-  // 21 32
-  // 22 33
+// datafile1.txt
+// 20 31
+// 21 32
+// 22 33
 
-  {
-    auto payload = *(dataArea->qSet["str7"]->inputPayload);
-    std::stringstream coutstring;
-    coutstring << rdb::flat << payload;
-    std::cerr << coutstring.str() << std::endl;
-    ASSERT_TRUE("{ str7_0:31 }" == coutstring.str());
-  }
-
-  std::set<std::string> rowSet = {"str7"};
-  dataArea->processRows(rowSet);
-  {
-    auto payload = *(dataArea->qSet["str7"]->inputPayload);
-    std::stringstream coutstring;
-    coutstring << rdb::flat << payload;
-    std::cerr << coutstring.str() << std::endl;
-    ASSERT_TRUE("{ str7_0:32 }" == coutstring.str());
-  }
+{
+  auto payload = *(dataArea->qSet["str7"]->inputPayload);
+  std::stringstream coutstring;
+  coutstring << rdb::flat << payload;
+  std::cerr << coutstring.str() << std::endl;
+  ASSERT_TRUE("{ str7_0:31 }" == coutstring.str());
 }
-    */
+
+std::set<std::string> rowSet = {"str7"};
+dataArea->processRows(rowSet);
+{
+  auto payload = *(dataArea->qSet["str7"]->inputPayload);
+  std::stringstream coutstring;
+  coutstring << rdb::flat << payload;
+  std::cerr << coutstring.str() << std::endl;
+  ASSERT_TRUE("{ str7_0:32 }" == coutstring.str());
+}
+}
+  */
 
 TEST_F(xschema, getRow_1) {
   /* datafile1.txt contents:
