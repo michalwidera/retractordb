@@ -45,7 +45,7 @@ class Retractor(ConanFile):
 
     def layout(self):
         """Choose cmake_layout output."""
-        cmake_layout(self)
+        cmake_layout(self, src_folder=".")
 
     def build_requirements(self):
         self.tool_requires("cmake/[>=3.25]")

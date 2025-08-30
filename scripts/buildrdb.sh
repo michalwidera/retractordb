@@ -25,7 +25,7 @@ select opt in "${options[@]}"
 do
     case $opt in
         "Release")
-            sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv /.conan2/profiles/temp ~/.conan2/profiles/default
+            sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Release --build missing
             conan build $build_folder -s build_type=Release --build missing

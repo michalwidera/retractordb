@@ -101,79 +101,7 @@ class xschema : public ::testing::Test {
 
   void TearDown() override { SPDLOG_INFO("TearDown"); }
 };
-/*
-TEST_F(xschema, check_test0) {
-  auto dataInternalDescriptor{
-      rdb::Descriptor("A[1]", 4, 1, rdb::INTEGER) +  //
-      rdb::Descriptor("A[2]", 4, 1, rdb::INTEGER) +  //
-      rdb::Descriptor("A[3]", 4, 1, rdb::INTEGER)    //
-  };
 
-  auto dataStorageDescriptor{
-      rdb::Descriptor("A[1]", 4, 1, rdb::INTEGER) +  //
-      rdb::Descriptor("A[2]", 4, 1, rdb::INTEGER)    //
-  };
-
-  {
-    streamInstance data{coreInstance, "file_A", "file_A", dataStorageDescriptor, dataInternalDescriptor};
-
-    data.inputPayload->setItem(0, 123);
-    data.inputPayload->setItem(1, 345);
-
-    auto v1 = data.inputPayload->getItem(0);
-
-    data.outputPayload->getPayload()->setItem(0, 234);
-    data.outputPayload->getPayload()->setItem(1, 456);
-    data.outputPayload->write();
-
-    ASSERT_TRUE(data.outputPayload->getRecordsCount() == 1);
-  }
-
-  {
-    streamInstance data{coreInstance, "file_B", "file_B", dataStorageDescriptor, dataInternalDescriptor};
-
-    data.inputPayload->setItem(0, 123);
-    data.inputPayload->setItem(1, 345);
-
-    auto v1 = data.inputPayload->getItem(0);
-
-    data.outputPayload->getPayload()->setItem(0, 234);
-    data.outputPayload->getPayload()->setItem(1, 456);
-    data.outputPayload->write();
-
-    ASSERT_TRUE(data.outputPayload->getRecordsCount() == 1);
-  }
-}
-
-TEST_F(xschema, check_test_check_constructor) {
-  SPDLOG_INFO("Records in str1 {}", dataArea->qSet["str1"]->outputPayload->getRecordsCount());
-
-  ASSERT_TRUE(dataArea->qSet["str1"]->outputPayload->getRecordsCount() == 3);
-
-  ASSERT_TRUE(coreInstance.size() == dataArea->qSet.size());
-}
-
-TEST_F(xschema, create_struct_local_str1a) {
-  SPDLOG_INFO("Create struct on LOCAL ARTIFACTS");
-
-  auto dataDescriptor{rdb::Descriptor("A", 4, 1, rdb::INTEGER) +  //
-                      rdb::Descriptor("B", 4, 1, rdb::INTEGER)};
-
-  streamInstance q(coreInstance,    //
-                   "str1a",         // storage and descriptor are the same name
-                   dataDescriptor,  //
-                   dataDescriptor);
-
-  // streamInstance q{coreInstance, coreInstance["str1a"]};
-
-  q.outputPayload->getPayload()->setItem(0, 2);
-  q.outputPayload->getPayload()->setItem(1, atoi(build_id));
-  q.outputPayload->write();
-  q.outputPayload->setRemoveOnExit(false);
-
-  ASSERT_TRUE(q.outputPayload->getRecordsCount() == 1);
-}
-*/
 TEST_F(xschema, check_construct_payload) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setRemoveOnExit(false);
@@ -260,7 +188,7 @@ TEST_F(xschema, check_sum) {
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }
-/*
+  /*
 TEST_F(xschema, compute_instance_1) {
   // SELECT str7[0] STREAM str7 FROM core0.max
 
@@ -268,6 +196,7 @@ TEST_F(xschema, compute_instance_1) {
   // 20 31
   // 21 32
   // 22 33
+
   {
     auto payload = *(dataArea->qSet["str7"]->inputPayload);
     std::stringstream coutstring;
@@ -275,6 +204,7 @@ TEST_F(xschema, compute_instance_1) {
     std::cerr << coutstring.str() << std::endl;
     ASSERT_TRUE("{ str7_0:31 }" == coutstring.str());
   }
+
   std::set<std::string> rowSet = {"str7"};
   dataArea->processRows(rowSet);
   {
@@ -285,7 +215,7 @@ TEST_F(xschema, compute_instance_1) {
     ASSERT_TRUE("{ str7_0:32 }" == coutstring.str());
   }
 }
-*/
+    */
 
 TEST_F(xschema, getRow_1) {
   /* datafile1.txt contents:
