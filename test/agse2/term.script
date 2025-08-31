@@ -30,10 +30,10 @@ size
 descc
 list 6
 
-dropfile { serial1.desc serial1.desc }
-dropfile { serial2.desc serial2.desc }
-dropfile { serial3.desc serial3.desc }
-dropfile { serial7.desc serial7.desc }
-dropfile { serial8.desc serial8.desc }
+dropfile { serial1 serial1.desc }
+dropfile { serial2 serial2.desc }
+dropfile { serial3 serial3.desc }
+dropfile { serial7 serial7.desc }
+dropfile { serial8 serial8.desc }
 
 quit
