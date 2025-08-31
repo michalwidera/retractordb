@@ -22,4 +22,4 @@ target_link_libraries(
   descparser
   rqlparser)
 
-install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ~/.local/bin)
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
