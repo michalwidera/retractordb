@@ -56,7 +56,7 @@ static dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
-static int iTimeLimitCnt(0);
+int iTimeLimitCnt(0);
 
 qTree *executorsm::coreInstancePtr = nullptr;
 
@@ -248,7 +248,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(bool verbose, int iTimeLimitCntParam) {
+int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &guard) {
   executorsm::coreInstancePtr = &coreInstance;
 
   iTimeLimitCnt = iTimeLimitCntParam;
@@ -290,6 +290,13 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam) {
         else
           break;
       }
+
+      // Check if system service lock is still active
+      if (!guard.isLockActive()) {
+        SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
+        break;
+      }
+
       //
       // Inner time is counted in miliseconds
       // probably can be increased in faster machines

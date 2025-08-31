@@ -30,4 +30,10 @@ size
 descc
 list 6
 
+dropfile { serial1 serial1.desc }
+dropfile { serial2 serial2.desc }
+dropfile { serial3 serial3.desc }
+dropfile { serial7 serial7.desc }
+dropfile { serial8 serial8.desc }
+
 quit

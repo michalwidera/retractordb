@@ -7,6 +7,7 @@
 
 #include "CRSMath.h"
 #include "QStruct.h"
+#include "lockManager.hpp"
 
 typedef boost::property_tree::ptree ptree;
 
@@ -14,7 +15,7 @@ struct executorsm {
   explicit executorsm(qTree &coreInstance) : coreInstance(coreInstance){};
   executorsm() = delete;
 
-  int run(bool verbose, int iTimeLimitCntParam);
+  int run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &guard);
 
  private:
   static qTree *coreInstancePtr;

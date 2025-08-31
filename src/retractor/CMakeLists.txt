@@ -7,7 +7,8 @@ add_subdirectory(lib)
 find_package(antlr4-runtime REQUIRED)
 find_package(antlr4 REQUIRED)
 
-set(SOURCES_RETRACTOR launcher.cpp ${BUILDSRCS_CPP} ${BUILDCOMMON_CPP})
+set(SOURCES_RETRACTOR launcher.cpp lockManager.cpp ${BUILDSRCS_CPP}
+                      ${BUILDCOMMON_CPP})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 
