@@ -40,7 +40,7 @@ do
             ;;
         "Reset (clean)")
             rm -rf $build_folder/build
-            rm -rf ~/.conan2/
+            rm $build_folder/CMakeCache.txt
             break
             ;;
         "setup gcc23")
