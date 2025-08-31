@@ -86,11 +86,11 @@ add_custom_target(
   COMMAND cp -r ${CMAKE_SOURCE_DIR}/scripts/vim/* ~/.vim)
 
 add_custom_target(
-  build_debug_packages
+  packages
   COMMAND cpack --config CPackConfig.cmake
   COMMAND cpack --config CPackSourceConfig.cmake
   COMMAND ls -lart *.tar.gz
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/build/Debug)
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # This target is required when VSCode will call nina and CMakeCache.txt is in
 # incompatible format - conan build .. complains : CMake Error: Error: generator

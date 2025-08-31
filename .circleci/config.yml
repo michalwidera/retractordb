@@ -149,6 +149,19 @@ commands:
           name: Static analysis
           command: |
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> cppcheck
+  run-package:
+    parameters:
+      build_type:
+        type: string
+        default: "Release"
+      build_tool:
+        type: string
+        default: "make"
+    steps:
+      - run:
+          name: Package
+          command: |
+            cd build/<<parameters.build_type>> && <<parameters.build_tool>> packages
 
 jobs:
   build-release:
@@ -163,6 +176,7 @@ jobs:
       - conan-build:
           build_param: --build missing
       - run-test
+      - run-package
 
   build-release-ninja:
     working_directory: ~/retractordb
@@ -177,6 +191,8 @@ jobs:
           build_param: --build missing
           build_tool: ninja
       - run-test:
+          build_tool: ninja
+      - run-package:
           build_tool: ninja
   
 
@@ -194,6 +210,9 @@ jobs:
           build_param: --build missing
       - run-test:
           build_type: Debug
+      - run-package:
+          build_type: Debug 
+          
 
   build-debug-ninja:
     working_directory: ~/retractordb
@@ -209,6 +228,9 @@ jobs:
           build_param: --build missing
           build_tool: ninja
       - run-test:
+          build_type: Debug
+          build_tool: ninja
+      - run-package:
           build_type: Debug
           build_tool: ninja
 
