@@ -60,7 +60,7 @@ add_subdirectory(test)
 
 install(
   DIRECTORY ${CMAKE_INSTALL_BINDIR}
-  DESTINATION $ENV{HOME}/.local/bin
+  DESTINATION $ENV{HOME}/.local
   FILES_MATCHING
   PATTERN "*")
 
