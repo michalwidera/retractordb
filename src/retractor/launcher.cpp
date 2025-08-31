@@ -101,8 +101,8 @@ int main(int argc, char *argv[]) {
     if (vm.count("status")) {
       std::cout << "Checking service status." << std::endl;
       bool isRunning = guard.isAnotherInstanceRunning();
-      std::cout << "Service:" << serviceName << ": " << (isRunning ? "Running" : "Stopped") << std::endl;
-      return system::errc::success;
+      std::cout << serviceName << ": " << (isRunning ? "Running" : "Stopped") << std::endl;
+      return isRunning ? system::errc::no_lock_available : system::errc::success;
     }
 
     if (vm.count("help")) {
