@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
@@ -17,6 +18,7 @@
 #include "lib/compiler.h"
 #include "lib/dumper.h"
 #include "lib/executorsm.h"
+#include "lockManager.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -26,6 +28,28 @@ using boost::lexical_cast;
 extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
 
 static int iTimeLimitCntParam{0};
+
+extern int iTimeLimitCnt;
+
+static void handleSignal(int signum) {
+  switch (signum) {
+    case SIGINT:
+      SPDLOG_INFO("Received SIGINT, initiating shutdown...");
+      break;
+    case SIGTERM:
+      SPDLOG_INFO("Received SIGTERM, initiating shutdown...");
+      break;
+    case SIGHUP:
+      SPDLOG_INFO("Received SIGHUP, initiating shutdown...");
+      break;
+    default:
+      SPDLOG_INFO("Received unknown signal: {}", signum);
+      break;
+  }
+
+  // This will cause the main loop to exit
+  iTimeLimitCnt = 1;
+}
 
 int main(int argc, char *argv[]) {
   qTree coreInstance;
@@ -41,6 +65,9 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < argc; ++i) {
     if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--onlycompile") == 0) onlyCompile = true;
   }
+
+  const std::string serviceName = std::string(argv[0]) + "_service";
+  FlockServiceGuard guard(serviceName);
 
   try {
     std::string sInputFile{""};
@@ -58,6 +85,7 @@ int main(int argc, char *argv[]) {
     } else {
       desc.add_options()                                                          //
           ("help,h", "Show program options")                                      //
+          ("status,s", "check service status")                                    //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0),  //
@@ -69,6 +97,13 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    if (vm.count("status")) {
+      std::cout << "Checking service status." << std::endl;
+      bool isRunning = guard.isAnotherInstanceRunning();
+      std::cout << "Service:" << serviceName << ": " << (isRunning ? "Running" : "Stopped") << std::endl;
+      return system::errc::success;
+    }
 
     if (vm.count("help")) {
       std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
@@ -142,6 +177,18 @@ int main(int argc, char *argv[]) {
     return system::errc::interrupted;
   }
 
+  signal(SIGINT, handleSignal);   // Ctrl+C
+  signal(SIGTERM, handleSignal);  // Terminate
+  signal(SIGHUP, handleSignal);   // Hangup
+
+  if (!guard.acquireLock()) {
+    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
+    return system::errc::no_lock_available;
+  }
+
+  SPDLOG_INFO("Service lock acquired successfully.");
+  SPDLOG_INFO("Current process PID: {}", getpid());
+
   executorsm exec(coreInstance);
-  return exec.run(vm.count("verbose"), iTimeLimitCntParam);
+  return exec.run(vm.count("verbose"), iTimeLimitCntParam, guard);
 }

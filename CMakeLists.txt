@@ -5,6 +5,9 @@ project(
   VERSION 0.1.1
   LANGUAGES CXX)
 
+set(CMAKE_SKIP_BUILD_RPATH FALSE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
