@@ -229,10 +229,23 @@ public:
 
   class  Rule_statementContext : public antlr4::ParserRuleContext {
   public:
+    Rule_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Rule_statementContext() = default;
+    void copyFrom(Rule_statementContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  RulezContext : public Rule_statementContext {
+  public:
+    RulezContext(Rule_statementContext *ctx);
+
     antlr4::Token *name = nullptr;
     antlr4::Token *stream_name = nullptr;
-    Rule_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *RULE();
     antlr4::tree::TerminalNode *ON();
     antlr4::tree::TerminalNode *WHEN();
@@ -242,10 +255,8 @@ public:
     antlr4::tree::TerminalNode* ID(size_t i);
     Dump_partContext *dump_part();
     System_partContext *system_part();
-
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
   };
 
   Rule_statementContext* rule_statement();

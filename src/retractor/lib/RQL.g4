@@ -34,6 +34,7 @@ rule_statement      : RULE name=ID
                       ON stream_name=ID
                       WHEN logic_expression
                       DO ( dump_part | system_part )
+                    # Rulez
                     ;
 
 dump_part           : DUMP '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL (RETENTION rule_retnetion=DECIMAL)?

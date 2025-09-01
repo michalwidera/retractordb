@@ -29,8 +29,8 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
   virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
 
-  virtual void enterRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
-  virtual void exitRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
+  virtual void enterRulez(RQLParser::RulezContext *ctx) = 0;
+  virtual void exitRulez(RQLParser::RulezContext *ctx) = 0;
 
   virtual void enterDump_part(RQLParser::Dump_partContext *ctx) = 0;
   virtual void exitDump_part(RQLParser::Dump_partContext *ctx) = 0;

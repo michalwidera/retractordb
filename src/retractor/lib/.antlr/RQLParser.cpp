@@ -766,59 +766,65 @@ RQLParser::Rule_statementContext::Rule_statementContext(ParserRuleContext *paren
   : ParserRuleContext(parent, invokingState) {
 }
 
-tree::TerminalNode* RQLParser::Rule_statementContext::RULE() {
-  return getToken(RQLParser::RULE, 0);
-}
-
-tree::TerminalNode* RQLParser::Rule_statementContext::ON() {
-  return getToken(RQLParser::ON, 0);
-}
-
-tree::TerminalNode* RQLParser::Rule_statementContext::WHEN() {
-  return getToken(RQLParser::WHEN, 0);
-}
-
-RQLParser::Logic_expressionContext* RQLParser::Rule_statementContext::logic_expression() {
-  return getRuleContext<RQLParser::Logic_expressionContext>(0);
-}
-
-tree::TerminalNode* RQLParser::Rule_statementContext::DO() {
-  return getToken(RQLParser::DO, 0);
-}
-
-std::vector<tree::TerminalNode *> RQLParser::Rule_statementContext::ID() {
-  return getTokens(RQLParser::ID);
-}
-
-tree::TerminalNode* RQLParser::Rule_statementContext::ID(size_t i) {
-  return getToken(RQLParser::ID, i);
-}
-
-RQLParser::Dump_partContext* RQLParser::Rule_statementContext::dump_part() {
-  return getRuleContext<RQLParser::Dump_partContext>(0);
-}
-
-RQLParser::System_partContext* RQLParser::Rule_statementContext::system_part() {
-  return getRuleContext<RQLParser::System_partContext>(0);
-}
-
 
 size_t RQLParser::Rule_statementContext::getRuleIndex() const {
   return RQLParser::RuleRule_statement;
 }
 
-void RQLParser::Rule_statementContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->enterRule_statement(this);
+void RQLParser::Rule_statementContext::copyFrom(Rule_statementContext *ctx) {
+  ParserRuleContext::copyFrom(ctx);
 }
 
-void RQLParser::Rule_statementContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
-  if (parserListener != nullptr)
-    parserListener->exitRule_statement(this);
+//----------------- RulezContext ------------------------------------------------------------------
+
+tree::TerminalNode* RQLParser::RulezContext::RULE() {
+  return getToken(RQLParser::RULE, 0);
 }
 
+tree::TerminalNode* RQLParser::RulezContext::ON() {
+  return getToken(RQLParser::ON, 0);
+}
+
+tree::TerminalNode* RQLParser::RulezContext::WHEN() {
+  return getToken(RQLParser::WHEN, 0);
+}
+
+RQLParser::Logic_expressionContext* RQLParser::RulezContext::logic_expression() {
+  return getRuleContext<RQLParser::Logic_expressionContext>(0);
+}
+
+tree::TerminalNode* RQLParser::RulezContext::DO() {
+  return getToken(RQLParser::DO, 0);
+}
+
+std::vector<tree::TerminalNode *> RQLParser::RulezContext::ID() {
+  return getTokens(RQLParser::ID);
+}
+
+tree::TerminalNode* RQLParser::RulezContext::ID(size_t i) {
+  return getToken(RQLParser::ID, i);
+}
+
+RQLParser::Dump_partContext* RQLParser::RulezContext::dump_part() {
+  return getRuleContext<RQLParser::Dump_partContext>(0);
+}
+
+RQLParser::System_partContext* RQLParser::RulezContext::system_part() {
+  return getRuleContext<RQLParser::System_partContext>(0);
+}
+
+RQLParser::RulezContext::RulezContext(Rule_statementContext *ctx) { copyFrom(ctx); }
+
+void RQLParser::RulezContext::enterRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->enterRulez(this);
+}
+void RQLParser::RulezContext::exitRule(tree::ParseTreeListener *listener) {
+  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  if (parserListener != nullptr)
+    parserListener->exitRulez(this);
+}
 RQLParser::Rule_statementContext* RQLParser::rule_statement() {
   Rule_statementContext *_localctx = _tracker.createInstance<Rule_statementContext>(_ctx, getState());
   enterRule(_localctx, 10, RQLParser::RuleRule_statement);
@@ -831,15 +837,16 @@ RQLParser::Rule_statementContext* RQLParser::rule_statement() {
     exitRule();
   });
   try {
+    _localctx = _tracker.createInstance<RQLParser::RulezContext>(_localctx);
     enterOuterAlt(_localctx, 1);
     setState(100);
     match(RQLParser::RULE);
     setState(101);
-    antlrcpp::downCast<Rule_statementContext *>(_localctx)->name = match(RQLParser::ID);
+    antlrcpp::downCast<RulezContext *>(_localctx)->name = match(RQLParser::ID);
     setState(102);
     match(RQLParser::ON);
     setState(103);
-    antlrcpp::downCast<Rule_statementContext *>(_localctx)->stream_name = match(RQLParser::ID);
+    antlrcpp::downCast<RulezContext *>(_localctx)->stream_name = match(RQLParser::ID);
     setState(104);
     match(RQLParser::WHEN);
     setState(105);

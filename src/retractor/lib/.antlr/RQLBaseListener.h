@@ -31,8 +31,8 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
   virtual void exitDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
 
-  virtual void enterRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
-  virtual void exitRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
+  virtual void enterRulez(RQLParser::RulezContext * /*ctx*/) override { }
+  virtual void exitRulez(RQLParser::RulezContext * /*ctx*/) override { }
 
   virtual void enterDump_part(RQLParser::Dump_partContext * /*ctx*/) override { }
   virtual void exitDump_part(RQLParser::Dump_partContext * /*ctx*/) override { }
