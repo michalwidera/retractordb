@@ -17,9 +17,6 @@ public:
   virtual void enterProg(RQLParser::ProgContext *ctx) = 0;
   virtual void exitProg(RQLParser::ProgContext *ctx) = 0;
 
-  virtual void enterRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
-  virtual void exitRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
-
   virtual void enterStorage(RQLParser::StorageContext *ctx) = 0;
   virtual void exitStorage(RQLParser::StorageContext *ctx) = 0;
 
@@ -31,6 +28,15 @@ public:
 
   virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
   virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
+
+  virtual void enterRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
+  virtual void exitRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
+
+  virtual void enterDump_part(RQLParser::Dump_partContext *ctx) = 0;
+  virtual void exitDump_part(RQLParser::Dump_partContext *ctx) = 0;
+
+  virtual void enterSystem_part(RQLParser::System_partContext *ctx) = 0;
+  virtual void exitSystem_part(RQLParser::System_partContext *ctx) = 0;
 
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;

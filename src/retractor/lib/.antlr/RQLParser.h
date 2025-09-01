@@ -18,23 +18,24 @@ public:
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
     FILE = 32, STORAGE = 33, SUBSTRAT = 34, RULE = 35, ON = 36, WHEN = 37, 
-    DO = 38, IN = 39, TO = 40, MIN = 41, MAX = 42, AVG = 43, SUMC = 44, 
-    STRING_SUBSTRAT = 45, ID = 46, STRING = 47, FLOAT = 48, DECIMAL = 49, 
-    REAL = 50, EQUAL = 51, GREATER = 52, LESS = 53, EXCLAMATION = 54, DOUBLE_BAR = 55, 
-    DOT = 56, UNDERLINE = 57, AT = 58, SHARP = 59, AND = 60, MOD = 61, DOLLAR = 62, 
-    COMMA = 63, SEMI = 64, COLON = 65, DOUBLE_COLON = 66, STAR = 67, DIVIDE = 68, 
-    PLUS = 69, MINUS = 70, BIT_NOT = 71, BIT_OR = 72, BIT_XOR = 73, AND_C = 74, 
-    OR_C = 75, SPACE = 76, COMMENT = 77, LINE_COMMENT1 = 78, LINE_COMMENT2 = 79
+    DUMP = 38, SYSTEM = 39, DO = 40, TO = 41, MIN = 42, MAX = 43, AVG = 44, 
+    SUMC = 45, STRING_SUBSTRAT = 46, ID = 47, STRING = 48, FLOAT = 49, DECIMAL = 50, 
+    REAL = 51, EQUAL = 52, GREATER = 53, LESS = 54, EXCLAMATION = 55, DOUBLE_BAR = 56, 
+    DOT = 57, UNDERLINE = 58, AT = 59, SHARP = 60, AND = 61, MOD = 62, DOLLAR = 63, 
+    COMMA = 64, SEMI = 65, COLON = 66, DOUBLE_COLON = 67, STAR = 68, DIVIDE = 69, 
+    PLUS = 70, MINUS = 71, BIT_NOT = 72, BIT_OR = 73, BIT_XOR = 74, AND_C = 75, 
+    OR_C = 76, SPACE = 77, COMMENT = 78, LINE_COMMENT1 = 79, LINE_COMMENT2 = 80
   };
 
   enum {
-    RuleProg = 0, RuleRule_statement = 1, RuleStorage_statement = 2, RuleSubstrat_statement = 3, 
-    RuleSelect_statement = 4, RuleDeclare_statement = 5, RuleRational_se = 6, 
-    RuleRetention_from = 7, RuleFraction_rule = 8, RuleField_declaration = 9, 
-    RuleField_type = 10, RuleSelect_list = 11, RuleField_id = 12, RuleUnary_op_expression = 13, 
-    RuleAsterisk = 14, RuleLogic_expression = 15, RuleCondition = 16, RuleExpression = 17, 
-    RuleExpression_factor = 18, RuleTerm = 19, RuleStream_expression = 20, 
-    RuleStream_term = 21, RuleStream_factor = 22, RuleAgregator = 23, RuleFunction_call = 24
+    RuleProg = 0, RuleStorage_statement = 1, RuleSubstrat_statement = 2, 
+    RuleSelect_statement = 3, RuleDeclare_statement = 4, RuleRule_statement = 5, 
+    RuleDump_part = 6, RuleSystem_part = 7, RuleRational_se = 8, RuleRetention_from = 9, 
+    RuleFraction_rule = 10, RuleField_declaration = 11, RuleField_type = 12, 
+    RuleSelect_list = 13, RuleField_id = 14, RuleUnary_op_expression = 15, 
+    RuleAsterisk = 16, RuleLogic_expression = 17, RuleCondition = 18, RuleExpression = 19, 
+    RuleExpression_factor = 20, RuleTerm = 21, RuleStream_expression = 22, 
+    RuleStream_term = 23, RuleStream_factor = 24, RuleAgregator = 25, RuleFunction_call = 26
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -55,11 +56,13 @@ public:
 
 
   class ProgContext;
-  class Rule_statementContext;
   class Storage_statementContext;
   class Substrat_statementContext;
   class Select_statementContext;
   class Declare_statementContext;
+  class Rule_statementContext;
+  class Dump_partContext;
+  class System_partContext;
   class Rational_seContext;
   class Retention_fromContext;
   class Fraction_ruleContext;
@@ -102,36 +105,6 @@ public:
   };
 
   ProgContext* prog();
-
-  class  Rule_statementContext : public antlr4::ParserRuleContext {
-  public:
-    antlr4::Token *name = nullptr;
-    antlr4::Token *stream_name = nullptr;
-    antlr4::Token *action = nullptr;
-    antlr4::Token *step_back = nullptr;
-    antlr4::Token *step_forward = nullptr;
-    Rule_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *RULE();
-    antlr4::tree::TerminalNode *ON();
-    antlr4::tree::TerminalNode *WHEN();
-    Logic_expressionContext *logic_expression();
-    antlr4::tree::TerminalNode *DO();
-    antlr4::tree::TerminalNode *IN();
-    antlr4::tree::TerminalNode *TO();
-    std::vector<antlr4::tree::TerminalNode *> ID();
-    antlr4::tree::TerminalNode* ID(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode* DECIMAL(size_t i);
-    std::vector<antlr4::tree::TerminalNode *> MINUS();
-    antlr4::tree::TerminalNode* MINUS(size_t i);
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  Rule_statementContext* rule_statement();
 
   class  Storage_statementContext : public antlr4::ParserRuleContext {
   public:
@@ -253,6 +226,66 @@ public:
   };
 
   Declare_statementContext* declare_statement();
+
+  class  Rule_statementContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *name = nullptr;
+    antlr4::Token *stream_name = nullptr;
+    Rule_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *RULE();
+    antlr4::tree::TerminalNode *ON();
+    antlr4::tree::TerminalNode *WHEN();
+    Logic_expressionContext *logic_expression();
+    antlr4::tree::TerminalNode *DO();
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
+    Dump_partContext *dump_part();
+    System_partContext *system_part();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Rule_statementContext* rule_statement();
+
+  class  Dump_partContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *step_back = nullptr;
+    antlr4::Token *step_forward = nullptr;
+    antlr4::Token *rule_retnetion = nullptr;
+    Dump_partContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *DUMP();
+    antlr4::tree::TerminalNode *TO();
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    std::vector<antlr4::tree::TerminalNode *> MINUS();
+    antlr4::tree::TerminalNode* MINUS(size_t i);
+    antlr4::tree::TerminalNode *RETENTION();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Dump_partContext* dump_part();
+
+  class  System_partContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *syscmd = nullptr;
+    System_partContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *SYSTEM();
+    antlr4::tree::TerminalNode *STRING();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  System_partContext* system_part();
 
   class  Rational_seContext : public antlr4::ParserRuleContext {
   public:

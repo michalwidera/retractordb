@@ -19,9 +19,6 @@ public:
   virtual void enterProg(RQLParser::ProgContext * /*ctx*/) override { }
   virtual void exitProg(RQLParser::ProgContext * /*ctx*/) override { }
 
-  virtual void enterRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
-  virtual void exitRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
-
   virtual void enterStorage(RQLParser::StorageContext * /*ctx*/) override { }
   virtual void exitStorage(RQLParser::StorageContext * /*ctx*/) override { }
 
@@ -33,6 +30,15 @@ public:
 
   virtual void enterDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
   virtual void exitDeclare(RQLParser::DeclareContext * /*ctx*/) override { }
+
+  virtual void enterRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
+  virtual void exitRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
+
+  virtual void enterDump_part(RQLParser::Dump_partContext * /*ctx*/) override { }
+  virtual void exitDump_part(RQLParser::Dump_partContext * /*ctx*/) override { }
+
+  virtual void enterSystem_part(RQLParser::System_partContext * /*ctx*/) override { }
+  virtual void exitSystem_part(RQLParser::System_partContext * /*ctx*/) override { }
 
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext * /*ctx*/) override { }
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext * /*ctx*/) override { }

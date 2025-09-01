@@ -8,12 +8,6 @@ prog                : ( select_statement
                       )+ EOF
                     ;
 
-rule_statement      : RULE name=ID
-                      ON stream_name=ID
-                      WHEN logic_expression
-                      DO action=ID IN '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL
-                    ;
-
 storage_statement   : STORAGE folder_name=STRING
                     # Storage
                     ;
@@ -34,6 +28,18 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
                     # Declare
+                    ;
+
+rule_statement      : RULE name=ID
+                      ON stream_name=ID
+                      WHEN logic_expression
+                      DO ( dump_part | system_part )
+                    ;
+
+dump_part           : DUMP '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL (RETENTION rule_retnetion=DECIMAL)?
+                    ;
+
+system_part         : SYSTEM syscmd=STRING
                     ;
 
 rational_se         : fraction_rule # RationalAsFraction_proforma
@@ -168,8 +174,9 @@ SUBSTRAT:           'SUBSTRAT'|'substrat';
 RULE:               'RULE'|'rule';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
+DUMP:               'DUMP'|'dump';
+SYSTEM:             'SYSTEM'|'system';
 DO:                 'DO'|'do';
-IN:                 'IN'|'in';
 TO:                 'TO'|'to';
 
 MIN:                'MIN'|'min';
