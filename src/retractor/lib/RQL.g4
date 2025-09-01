@@ -4,7 +4,14 @@ prog                : ( select_statement
                       | declare_statement
                       | storage_statement
                       | substrat_statement
+                      | rule_statement
                       )+ EOF
+                    ;
+
+rule_statement      : RULE name=ID
+                      ON stream_name=ID
+                      WHEN logic_expression
+                      DO action=ID IN '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL
                     ;
 
 storage_statement   : STORAGE folder_name=STRING
@@ -71,6 +78,11 @@ unary_op_expression : BIT_NOT expression
 
 asterisk            : (ID DOT)? STAR
                     ;
+
+logic_expression    : expression condition expression
+                    ;
+
+condition           : AND_C | OR_C | GREATER (EQUAL)? | LESS (EQUAL)? | EQUAL EQUAL ;
 
 expression          : expression_factor
                     ;
@@ -153,6 +165,12 @@ RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
+RULE:               'RULE'|'rule';
+ON:                 'ON'|'on';
+WHEN:               'WHEN'|'when';
+DO:                 'DO'|'do';
+IN:                 'IN'|'in';
+TO:                 'TO'|'to';
 
 MIN:                'MIN'|'min';
 MAX:                'MAX'|'max';
@@ -190,6 +208,9 @@ MINUS:              '-';
 BIT_NOT:            '~';
 BIT_OR:             '|';
 BIT_XOR:            '^';
+
+AND_C:              'AND'|'and'|AND;
+OR_C:               'OR'|'or'|BIT_OR;
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);

@@ -17,6 +17,9 @@ public:
   virtual void enterProg(RQLParser::ProgContext *ctx) = 0;
   virtual void exitProg(RQLParser::ProgContext *ctx) = 0;
 
+  virtual void enterRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
+  virtual void exitRule_statement(RQLParser::Rule_statementContext *ctx) = 0;
+
   virtual void enterStorage(RQLParser::StorageContext *ctx) = 0;
   virtual void exitStorage(RQLParser::StorageContext *ctx) = 0;
 
@@ -88,6 +91,12 @@ public:
 
   virtual void enterAsterisk(RQLParser::AsteriskContext *ctx) = 0;
   virtual void exitAsterisk(RQLParser::AsteriskContext *ctx) = 0;
+
+  virtual void enterLogic_expression(RQLParser::Logic_expressionContext *ctx) = 0;
+  virtual void exitLogic_expression(RQLParser::Logic_expressionContext *ctx) = 0;
+
+  virtual void enterCondition(RQLParser::ConditionContext *ctx) = 0;
+  virtual void exitCondition(RQLParser::ConditionContext *ctx) = 0;
 
   virtual void enterExpression(RQLParser::ExpressionContext *ctx) = 0;
   virtual void exitExpression(RQLParser::ExpressionContext *ctx) = 0;

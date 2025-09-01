@@ -19,6 +19,9 @@ public:
   virtual void enterProg(RQLParser::ProgContext * /*ctx*/) override { }
   virtual void exitProg(RQLParser::ProgContext * /*ctx*/) override { }
 
+  virtual void enterRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
+  virtual void exitRule_statement(RQLParser::Rule_statementContext * /*ctx*/) override { }
+
   virtual void enterStorage(RQLParser::StorageContext * /*ctx*/) override { }
   virtual void exitStorage(RQLParser::StorageContext * /*ctx*/) override { }
 
@@ -90,6 +93,12 @@ public:
 
   virtual void enterAsterisk(RQLParser::AsteriskContext * /*ctx*/) override { }
   virtual void exitAsterisk(RQLParser::AsteriskContext * /*ctx*/) override { }
+
+  virtual void enterLogic_expression(RQLParser::Logic_expressionContext * /*ctx*/) override { }
+  virtual void exitLogic_expression(RQLParser::Logic_expressionContext * /*ctx*/) override { }
+
+  virtual void enterCondition(RQLParser::ConditionContext * /*ctx*/) override { }
+  virtual void exitCondition(RQLParser::ConditionContext * /*ctx*/) override { }
 
   virtual void enterExpression(RQLParser::ExpressionContext * /*ctx*/) override { }
   virtual void exitExpression(RQLParser::ExpressionContext * /*ctx*/) override { }
