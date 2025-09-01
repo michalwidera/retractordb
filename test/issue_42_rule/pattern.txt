@@ -1,0 +1,9 @@
+:STORAGE	temp/
+str1(1/10)
+	:- PUSH_STREAM(core0)
+	str1_0: INTEGER
+		PUSH_ID(str1[0])
+core0(1/10)	datafile2.dat
+	a: INTEGER
+core1(1/5)	datafile3.dat
+	b: INTEGER
