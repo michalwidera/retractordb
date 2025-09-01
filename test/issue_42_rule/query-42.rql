@@ -1,5 +1,5 @@
-# Check if fields are identified correctly - Covering #issue_57
-# make install ; ctest -R issue57_timeshift -V
+# Check if fields are identified correctly - Covering #issue_42
+# make install ; ctest -R issue42_rule -V
 
 STORAGE 'temp'
 
