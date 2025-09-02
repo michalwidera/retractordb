@@ -19,6 +19,13 @@
 
 using boost::lexical_cast;
 
+boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
+boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
+boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");              // something[1]
+boost::regex xprFieldIdX("(\\w*)\\[_]");                     // something[_]
+boost::regex xprFieldId1("(\\w*).(\\w*)");                   // something.in_schema
+boost::regex xprFieldId3("(\\w*)");                          // field_of_corn
+
 /** This procedure computes time delays (delta) for generated streams */
 std::string compiler::intervalCounter() {
   while (true) {
@@ -415,6 +422,117 @@ std::string compiler::replicateIDX() {
   return std::string("OK");
 }
 
+void compiler::ftokenfix(std::list<token> &lProgram, query &q) {
+  for (auto &t : lProgram) {  // for each token in query field
+    const command_id cmd(t.getCommandID());
+    const std::string text(t.getStr_());
+    boost::cmatch what;
+    switch (cmd) {
+      case PUSH_ID1:
+        if (regex_search(text.c_str(), what, xprFieldId1)) {
+          assert(what.size() == 3);
+          const std::string schema(what[1]);
+          const std::string field(what[2]);
+          // aim of this procedure is found schema, next field in schema
+          // and then insert
+          for (auto &q1 : coreInstance) {
+            if (q1.id == schema) {
+              int offset1(0);
+              for (auto &f1 : q1.lSchema) {
+                if (f1.field_.rname == field) {
+                  t = token(PUSH_ID, std::make_pair(schema, offset1));
+                  break;
+                } else
+                  ++offset1;
+              }
+              if (offset1 == q1.lSchema.size())
+                throw std::out_of_range(
+                    "Failure during reference conversation - schema exist, "
+                    "no "
+                    "fields");
+              break;
+            }
+          }
+        } else
+          throw std::out_of_range("No mach on type conversion ID1");
+        break;
+      case PUSH_IDX:
+        if (regex_search(text.c_str(), what, xprFieldIdX)) {
+          assert(what.size() == 2);
+          const std::string schema(what[1]);
+          t = token(PUSH_IDX, std::make_pair(schema, 0));
+        } else
+          throw std::out_of_range("No mach on type conversion IDX");
+        break;
+      case PUSH_ID2:
+        if (regex_search(text.c_str(), what, xprFieldId2)) {
+          assert(what.size() == 3);
+          const std::string schema(what[1]);
+          const std::string sOffset1(what[2]);
+          const int offset1(atoi(sOffset1.c_str()));
+          t = token(PUSH_ID, std::make_pair(schema, offset1));
+        } else {
+          SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
+          throw std::out_of_range("No mach on type conversion");
+        }
+        break;
+      case PUSH_ID3:
+        if (regex_search(text.c_str(), what, xprFieldId3)) {
+          assert(what.size() == 2);
+          const std::string field(what[1]);
+          query *pQ1(nullptr), *pQ2(nullptr);
+          auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
+          pQ1 = &coreInstance.getQuery(schema1);
+          if (q.lProgram.size() == 3) pQ2 = &coreInstance.getQuery(schema2);
+          bool bFieldFound(false);
+          int offset1(0);
+          if (pQ1 != nullptr) {
+            offset1 = 0;
+            for (auto &f1 : (*pQ1).lSchema) {
+              if ((f1.field_).rname == field) {
+                t           = token(PUSH_ID, std::make_pair(schema1, offset1));
+                bFieldFound = true;
+              }
+              ++offset1;
+            }
+          }
+          if (pQ2 != nullptr && !bFieldFound) {
+            offset1 = 0;
+            for (auto &f2 : (*pQ2).lSchema) {
+              if (f2.field_.rname == field) {
+                t           = token(PUSH_ID, std::make_pair(schema2, offset1));
+                bFieldFound = true;
+              }
+              ++offset1;
+            }
+          }
+          if (!bFieldFound) throw std::logic_error("No field of given name in stream schema ID3");
+        } else
+          throw std::out_of_range("No mach on type conversion ID3");
+        break;
+      case PUSH_ID4:
+      case PUSH_ID5: {
+        if (regex_search(text.c_str(), what, xprFieldId4) || regex_search(text.c_str(), what, xprFieldId5)) {
+          assert(what.size() == 4);
+          const std::string schema(what[1]);
+          const std::string sOffset1(what[2]);
+          const std::string sOffset2(what[3]);
+          const int offset1(atoi(sOffset1.c_str()));
+          const int offset2(atoi(sOffset2.c_str()));
+
+          namespace ranges = std::ranges;
+          const bool foundSchema =
+              ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
+
+          if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
+          t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));
+        } else
+          throw std::out_of_range("No mach on type conversion ID4");
+        break;
+      }
+    }
+  }
+}
 /* Purpose of this function is to translate all references to fields
 to form schema_name[postion, time_offset]
 Command method of presentation aims simple data processing
@@ -422,125 +540,15 @@ Aim of this procedure is change all of push_idXXX to push_id
 note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction */
 std::string compiler::convertReferences() {
-  boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
-  boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
-  boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");              // something[1]
-  boost::regex xprFieldIdX("(\\w*)\\[_]");                     // something[_]
-  boost::regex xprFieldId1("(\\w*).(\\w*)");                   // something.in_schema
-  boost::regex xprFieldId3("(\\w*)");                          // field_of_corn
-  for (auto &q : coreInstance) {                               // for each query
+  for (auto &q : coreInstance) {  // for each query
     assert(!q.isReductionRequired());
-    for (auto &f : q.lSchema) {     // for each field in query
-      for (auto &t : f.lProgram) {  // for each token in query field
-        const command_id cmd(t.getCommandID());
-        const std::string text(t.getStr_());
-        boost::cmatch what;
-        switch (cmd) {
-          case PUSH_ID1:
-            if (regex_search(text.c_str(), what, xprFieldId1)) {
-              assert(what.size() == 3);
-              const std::string schema(what[1]);
-              const std::string field(what[2]);
-              // aim of this procedure is found schema, next field in schema
-              // and then insert
-              for (auto &q1 : coreInstance) {
-                if (q1.id == schema) {
-                  int offset1(0);
-                  for (auto &f1 : q1.lSchema) {
-                    if (f1.field_.rname == field) {
-                      t = token(PUSH_ID, std::make_pair(schema, offset1));
-                      break;
-                    } else
-                      ++offset1;
-                  }
-                  if (offset1 == q1.lSchema.size())
-                    throw std::out_of_range(
-                        "Failure during reference conversation - schema exist, "
-                        "no "
-                        "fields");
-                  break;
-                }
-              }
-            } else
-              throw std::out_of_range("No mach on type conversion ID1");
-            break;
-          case PUSH_IDX:
-            if (regex_search(text.c_str(), what, xprFieldIdX)) {
-              assert(what.size() == 2);
-              const std::string schema(what[1]);
-              t = token(PUSH_IDX, std::make_pair(schema, 0));
-            } else
-              throw std::out_of_range("No mach on type conversion IDX");
-            break;
-          case PUSH_ID2:
-            if (regex_search(text.c_str(), what, xprFieldId2)) {
-              assert(what.size() == 3);
-              const std::string schema(what[1]);
-              const std::string sOffset1(what[2]);
-              const int offset1(atoi(sOffset1.c_str()));
-              t = token(PUSH_ID, std::make_pair(schema, offset1));
-            } else {
-              SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
-              throw std::out_of_range("No mach on type conversion");
-            }
-            break;
-          case PUSH_ID3:
-            if (regex_search(text.c_str(), what, xprFieldId3)) {
-              assert(what.size() == 2);
-              const std::string field(what[1]);
-              query *pQ1(nullptr), *pQ2(nullptr);
-              auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
-              pQ1 = &coreInstance.getQuery(schema1);
-              if (q.lProgram.size() == 3) pQ2 = &coreInstance.getQuery(schema2);
-              bool bFieldFound(false);
-              int offset1(0);
-              if (pQ1 != nullptr) {
-                offset1 = 0;
-                for (auto &f1 : (*pQ1).lSchema) {
-                  if ((f1.field_).rname == field) {
-                    t           = token(PUSH_ID, std::make_pair(schema1, offset1));
-                    bFieldFound = true;
-                  }
-                  ++offset1;
-                }
-              }
-              if (pQ2 != nullptr && !bFieldFound) {
-                offset1 = 0;
-                for (auto &f2 : (*pQ2).lSchema) {
-                  if (f2.field_.rname == field) {
-                    t           = token(PUSH_ID, std::make_pair(schema2, offset1));
-                    bFieldFound = true;
-                  }
-                  ++offset1;
-                }
-              }
-              if (!bFieldFound) throw std::logic_error("No field of given name in stream schema ID3");
-            } else
-              throw std::out_of_range("No mach on type conversion ID3");
-            break;
-          case PUSH_ID4:
-          case PUSH_ID5: {
-            if (regex_search(text.c_str(), what, xprFieldId4) || regex_search(text.c_str(), what, xprFieldId5)) {
-              assert(what.size() == 4);
-              const std::string schema(what[1]);
-              const std::string sOffset1(what[2]);
-              const std::string sOffset2(what[3]);
-              const int offset1(atoi(sOffset1.c_str()));
-              const int offset2(atoi(sOffset2.c_str()));
-
-              namespace ranges = std::ranges;
-              const bool foundSchema =
-                  ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
-
-              if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
-              t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));
-            } else
-              throw std::out_of_range("No mach on type conversion ID4");
-            break;
-          }
-        }
-      }
-    }
+    for (auto &f : q.lSchema) {  // for each field in query
+      ftokenfix(f.lProgram, q);  // for each token in query field
+    }  // end for each field in query
+    for (auto &r : q.lRules) {        // for each rule in query
+      ftokenfix(r.leftConition, q);   // for each token in rule
+      ftokenfix(r.rightConition, q);  // for each token in rule
+    }  // end for each rule in query
   }
   return std::string("OK");
 }

@@ -259,7 +259,7 @@ void dumper::onlyCompileShowProgram() {
       else
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
 
-    for (auto f : q.lSchema) {  
+    for (auto f : q.lSchema) {
       std::cout << "\t";
       std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
       std::cout << std::endl;
@@ -285,7 +285,7 @@ void dumper::onlyCompileShowProgram() {
       }
 
       std::cout << "\t\t" << "CONDITION";
-  
+
       switch (r.type) {
         case rule::EQUAL:
           std::cout << " IS_EQUAL ";

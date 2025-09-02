@@ -56,12 +56,8 @@ struct rule {
   std::string name;
   std::list<token> leftConition;
   std::list<token> rightConition;
-  
-  enum actionType{
-    UNKNOWN_ACTION,
-    DUMP,
-    SYSTEM
-  } action{UNKNOWN_ACTION};
+
+  enum actionType { UNKNOWN_ACTION, DUMP, SYSTEM } action{UNKNOWN_ACTION};
 
   long int dump_left{0};
   long int dump_right{0};
@@ -69,20 +65,10 @@ struct rule {
 
   std::string systemCommand{};
 
-  enum ruleType{
-    UNKNOWN_RULE,
-    EQUAL,
-    LESS,
-    GREATER,
-    LESS_EQUAL,
-    GREATER_EQUAL,
-    NOT_EQUAL,
-    AND,
-    OR
-  } type{UNKNOWN_RULE};
+  enum ruleType { UNKNOWN_RULE, EQUAL, LESS, GREATER, LESS_EQUAL, GREATER_EQUAL, NOT_EQUAL, AND, OR } type{UNKNOWN_RULE};
 
   rule(std::string name, std::list<token> leftConition, std::list<token> rightConition, ruleType type)
-    : name(std::move(name)), leftConition(std::move(leftConition)), rightConition(std::move(rightConition)), type(type) {}
+      : name(std::move(name)), leftConition(std::move(leftConition)), rightConition(std::move(rightConition)), type(type) {}
 };
 
 class query {

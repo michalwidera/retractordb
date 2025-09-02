@@ -227,18 +227,19 @@ class ParserListener : public RQLBaseListener {
     std::string stream_name(ctx->stream_name->getText());
     rule ruleConstruct(rule(ctx->name->getText(), leftRuleCondition, rightRuleCondition, ruleType));
 
-    for( auto &i : coreInstance ) {
+    for (auto &i : coreInstance) {
       if (i.id == stream_name) {
         if (actionType == rule::DUMP) {
-          ruleConstruct.action      = rule::DUMP;
-          ruleConstruct.dump_left   = dump_left;
-          ruleConstruct.dump_right  = dump_right;
+          ruleConstruct.action         = rule::DUMP;
+          ruleConstruct.dump_left      = dump_left;
+          ruleConstruct.dump_right     = dump_right;
           ruleConstruct.dump_retention = dump_retention;
         } else if (actionType == rule::SYSTEM) {
-          ruleConstruct.action      = rule::SYSTEM;
+          ruleConstruct.action        = rule::SYSTEM;
           ruleConstruct.systemCommand = systemCommand;
         } else {
-          std::cerr << "Parser/Rule: Unknown action type:" << actionType << " stream_name:" << stream_name << " Rule:" << ctx->name->getText() << std::endl;
+          std::cerr << "Parser/Rule: Unknown action type:" << actionType << " stream_name:" << stream_name
+                    << " Rule:" << ctx->name->getText() << std::endl;
           abort();
         }
 
@@ -247,26 +248,24 @@ class ParserListener : public RQLBaseListener {
       }
     }
     program.clear();
-    dump_left = 0;
-    dump_right = 0;
+    dump_left      = 0;
+    dump_right     = 0;
     dump_retention = 0;
     systemCommand.clear();
     leftRuleCondition.clear();
     rightRuleCondition.clear();
-    ruleType = rule::UNKNOWN_RULE;
+    ruleType   = rule::UNKNOWN_RULE;
     actionType = rule::UNKNOWN_ACTION;
     qry.reset();
     fieldCount = 0;
   }
 
   void exitDumppart(RQLParser::DumppartContext *ctx) {
-    actionType   = rule::DUMP;
-    dump_left    = std::stoi(ctx->step_back->getText());
-    if (ctx->children[1]->getText() == "-")
-      dump_left = -dump_left;
-    dump_right   = std::stoi(ctx->step_forward->getText());
-    if (ctx->children[4]->getText() == "-" || ctx->children[3]->getText() == "−")
-      dump_right = -dump_right;
+    actionType = rule::DUMP;
+    dump_left  = std::stoi(ctx->step_back->getText());
+    if (ctx->children[1]->getText() == "-") dump_left = -dump_left;
+    dump_right = std::stoi(ctx->step_forward->getText());
+    if (ctx->children[4]->getText() == "-" || ctx->children[3]->getText() == "−") dump_right = -dump_right;
 
     if (ctx->rule_retnetion)
       dump_retention = std::stoi(ctx->rule_retnetion->getText());

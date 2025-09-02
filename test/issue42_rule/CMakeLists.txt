@@ -5,4 +5,3 @@ add_test(
   COMMAND bash -c "set -e ; \
     xretractor query-42.rql -c > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
-
