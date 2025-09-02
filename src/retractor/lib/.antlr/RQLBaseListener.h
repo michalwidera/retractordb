@@ -34,11 +34,11 @@ public:
   virtual void enterRulez(RQLParser::RulezContext * /*ctx*/) override { }
   virtual void exitRulez(RQLParser::RulezContext * /*ctx*/) override { }
 
-  virtual void enterDump_part(RQLParser::Dump_partContext * /*ctx*/) override { }
-  virtual void exitDump_part(RQLParser::Dump_partContext * /*ctx*/) override { }
+  virtual void enterDumppart(RQLParser::DumppartContext * /*ctx*/) override { }
+  virtual void exitDumppart(RQLParser::DumppartContext * /*ctx*/) override { }
 
-  virtual void enterSystem_part(RQLParser::System_partContext * /*ctx*/) override { }
-  virtual void exitSystem_part(RQLParser::System_partContext * /*ctx*/) override { }
+  virtual void enterSystempart(RQLParser::SystempartContext * /*ctx*/) override { }
+  virtual void exitSystempart(RQLParser::SystempartContext * /*ctx*/) override { }
 
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext * /*ctx*/) override { }
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext * /*ctx*/) override { }
@@ -102,6 +102,12 @@ public:
 
   virtual void enterLogic_expression(RQLParser::Logic_expressionContext * /*ctx*/) override { }
   virtual void exitLogic_expression(RQLParser::Logic_expressionContext * /*ctx*/) override { }
+
+  virtual void enterExpRuleLef(RQLParser::ExpRuleLefContext * /*ctx*/) override { }
+  virtual void exitExpRuleLef(RQLParser::ExpRuleLefContext * /*ctx*/) override { }
+
+  virtual void enterExpRuleRight(RQLParser::ExpRuleRightContext * /*ctx*/) override { }
+  virtual void exitExpRuleRight(RQLParser::ExpRuleRightContext * /*ctx*/) override { }
 
   virtual void enterCondition(RQLParser::ConditionContext * /*ctx*/) override { }
   virtual void exitCondition(RQLParser::ConditionContext * /*ctx*/) override { }

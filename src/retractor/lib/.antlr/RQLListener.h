@@ -32,11 +32,11 @@ public:
   virtual void enterRulez(RQLParser::RulezContext *ctx) = 0;
   virtual void exitRulez(RQLParser::RulezContext *ctx) = 0;
 
-  virtual void enterDump_part(RQLParser::Dump_partContext *ctx) = 0;
-  virtual void exitDump_part(RQLParser::Dump_partContext *ctx) = 0;
+  virtual void enterDumppart(RQLParser::DumppartContext *ctx) = 0;
+  virtual void exitDumppart(RQLParser::DumppartContext *ctx) = 0;
 
-  virtual void enterSystem_part(RQLParser::System_partContext *ctx) = 0;
-  virtual void exitSystem_part(RQLParser::System_partContext *ctx) = 0;
+  virtual void enterSystempart(RQLParser::SystempartContext *ctx) = 0;
+  virtual void exitSystempart(RQLParser::SystempartContext *ctx) = 0;
 
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
@@ -100,6 +100,12 @@ public:
 
   virtual void enterLogic_expression(RQLParser::Logic_expressionContext *ctx) = 0;
   virtual void exitLogic_expression(RQLParser::Logic_expressionContext *ctx) = 0;
+
+  virtual void enterExpRuleLef(RQLParser::ExpRuleLefContext *ctx) = 0;
+  virtual void exitExpRuleLef(RQLParser::ExpRuleLefContext *ctx) = 0;
+
+  virtual void enterExpRuleRight(RQLParser::ExpRuleRightContext *ctx) = 0;
+  virtual void exitExpRuleRight(RQLParser::ExpRuleRightContext *ctx) = 0;
 
   virtual void enterCondition(RQLParser::ConditionContext *ctx) = 0;
   virtual void exitCondition(RQLParser::ConditionContext *ctx) = 0;

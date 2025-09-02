@@ -52,6 +52,39 @@ struct field {
   friend std::ostream &operator<<(std::ostream &os, const field &s);
 };
 
+struct rule {
+  std::string name;
+  std::list<token> leftConition;
+  std::list<token> rightConition;
+  
+  enum actionType{
+    UNKNOWN_ACTION,
+    DUMP,
+    SYSTEM
+  } action{UNKNOWN_ACTION};
+
+  long int dump_left{0};
+  long int dump_right{0};
+  size_t dump_retention{0};
+
+  std::string systemCommand{};
+
+  enum ruleType{
+    UNKNOWN_RULE,
+    EQUAL,
+    LESS,
+    GREATER,
+    LESS_EQUAL,
+    GREATER_EQUAL,
+    NOT_EQUAL,
+    AND,
+    OR
+  } type{UNKNOWN_RULE};
+
+  rule(std::string name, std::list<token> leftConition, std::list<token> rightConition, ruleType type)
+    : name(std::move(name)), leftConition(std::move(leftConition)), rightConition(std::move(rightConition)), type(type) {}
+};
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -66,6 +99,8 @@ class query {
   boost::rational<int> rInterval = 0;
   std::list<field> lSchema;
   std::list<token> lProgram;
+
+  std::list<rule> lRules;
 
   rdb::retention_t retention                    = rdb::retention_t{0, 0};        // Retention segments and capacity
   std::pair<std::string, size_t> substratPolicy = std::make_pair("DEFAULT", 0);  // rdb::memoryFileAccessor::no_retention

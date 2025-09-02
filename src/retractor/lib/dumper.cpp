@@ -258,7 +258,8 @@ void dumper::onlyCompileShowProgram() {
         std::cout << "\t:- " << t << std::endl;
       else
         std::cout << "\t:- " << t.getStrCommandID() << std::endl;
-    for (auto f : q.lSchema) {
+
+    for (auto f : q.lSchema) {  
       std::cout << "\t";
       std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
       std::cout << std::endl;
@@ -269,6 +270,76 @@ void dumper::onlyCompileShowProgram() {
           std::cout << "\t\t" << tf << std::endl;
         } else
           std::cout << "\t\t" << tf.getStrCommandID() << std::endl;
+    }
+
+    for (auto r : q.lRules) {
+      std::cout << "\tRULE " << r.name << std::endl;
+
+      for (auto tf1 : r.leftConition) {
+        if (tf1.getStrCommandID() == "PUSH_ID") {
+          std::cout << "\t\t" << tf1 << std::endl;
+        } else if ((tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL")) {
+          std::cout << "\t\t" << tf1 << std::endl;
+        } else
+          std::cout << "\t\t" << tf1.getStrCommandID() << std::endl;
+      }
+
+      std::cout << "\t\t" << "CONDITION";
+  
+      switch (r.type) {
+        case rule::EQUAL:
+          std::cout << " IS_EQUAL ";
+          break;
+        case rule::LESS:
+          std::cout << " LESS ";
+          break;
+        case rule::GREATER:
+          std::cout << " GREATER ";
+          break;
+        case rule::LESS_EQUAL:
+          std::cout << " LESS_EQUAL ";
+          break;
+        case rule::GREATER_EQUAL:
+          std::cout << " GREATER_EQUAL ";
+          break;
+        case rule::NOT_EQUAL:
+          std::cout << " NOT_EQUAL ";
+          break;
+        case rule::AND:
+          std::cout << " AND ";
+          break;
+        case rule::OR:
+          std::cout << " OR ";
+          break;
+        default:
+          std::cout << " UNKNOWN_RULE ";
+          abort();
+      }
+      std::cout << std::endl;
+
+      for (auto tf2 : r.rightConition) {
+        if (tf2.getStrCommandID() == "PUSH_ID") {
+          std::cout << "\t\t" << tf2 << std::endl;
+        } else if ((tf2.getStrCommandID() == "CALL") || (tf2.getStrCommandID() == "PUSH_VAL")) {
+          std::cout << "\t\t" << tf2 << std::endl;
+        } else
+          std::cout << "\t\t" << tf2.getStrCommandID() << std::endl;
+      }
+
+      switch (r.action) {
+        case rule::DUMP:
+          std::cout << "\t\t" << "DO DUMP " << r.dump_left << " TO " << r.dump_right;
+          if (r.dump_retention != 0) std::cout << " RETENTION " << r.dump_retention;
+          break;
+        case rule::SYSTEM:
+          std::cout << "\t\t" << "DO SYSTEM \"" << r.systemCommand << "\"";
+          break;
+        default:
+          std::cout << "\t\t" << "UNKNOWN_ACTION";
+          abort();
+      }
+
+      std::cout << std::endl;
     }
   }
 }

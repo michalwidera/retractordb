@@ -33,14 +33,14 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
 rule_statement      : RULE name=ID
                       ON stream_name=ID
                       WHEN logic_expression
-                      DO ( dump_part | system_part )
+                      DO ( dumppart | systempart )
                     # Rulez
                     ;
 
-dump_part           : DUMP '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL (RETENTION rule_retnetion=DECIMAL)?
+dumppart            : DUMP '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL (RETENTION rule_retnetion=DECIMAL)?
                     ;
 
-system_part         : SYSTEM syscmd=STRING
+systempart          : SYSTEM syscmd=STRING
                     ;
 
 rational_se         : fraction_rule # RationalAsFraction_proforma
@@ -86,10 +86,16 @@ unary_op_expression : BIT_NOT expression
 asterisk            : (ID DOT)? STAR
                     ;
 
-logic_expression    : expression condition expression
+logic_expression    : left_rule_expr condition right_rule_expr 
                     ;
 
-condition           : AND_C | OR_C | GREATER (EQUAL)? | LESS (EQUAL)? | EQUAL EQUAL ;
+left_rule_expr      : expression_factor # ExpRuleLef
+                    ;
+
+right_rule_expr     : expression_factor # ExpRuleRight
+                    ;
+
+condition           : AND_C | OR_C | GREATER (EQUAL)? | LESS (EQUAL)? | IS_EQUAL ;
 
 expression          : expression_factor
                     ;
@@ -193,6 +199,7 @@ FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
+IS_EQUAL:           '==';
 EQUAL:              '=';
 GREATER:            '>';
 LESS:               '<';
@@ -217,8 +224,8 @@ BIT_NOT:            '~';
 BIT_OR:             '|';
 BIT_XOR:            '^';
 
-AND_C:              'AND'|'and'|AND;
-OR_C:               'OR'|'or'|BIT_OR;
+AND_C:              'AND'|'and';
+OR_C:               'OR'|'or';
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
