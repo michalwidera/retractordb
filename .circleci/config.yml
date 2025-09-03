@@ -24,13 +24,12 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-release
-      - build-release-ninja
       - build-debug:
           requires:
             - build-release
       - build-debug-ninja:
           requires:
-            - build-release-ninja
+            - build-release
       - build-ARM:
           requires:
             - build-release
