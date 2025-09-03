@@ -16,7 +16,7 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/QStruct.h"
 #include "lib/compiler.h"
-#include "lib/dumper.h"
+#include "lib/presenter.h"
 #include "lib/executorsm.h"
 #include "lockManager.hpp"
 #include "uxSysTermTools.hpp"
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
       desc.add_options()                                                          //
           ("help,h", "show help options")                                         //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
-          ("quiet,r", "no output on screen, skip dumper")                         //
+          ("quiet,r", "no output on screen, skip presenter")                         //
           ("dot,d", "create dot output")                                          //
           ("csv,m", "create csv output")                                          // c->m
           ("fields,f", "show fields in dot file")                                 //
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
 
     if (onlyCompile) {
       if (!vm.count("quiet")) {
-        dumper dm(coreInstance);
+        presenter dm(coreInstance);
         return dm.run(vm);
       }
       return system::errc::success;

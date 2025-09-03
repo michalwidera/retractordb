@@ -231,8 +231,11 @@ class ParserListener : public RQLBaseListener {
       if (i.id == stream_name) {
         if (actionType == rule::DUMP) {
           ruleConstruct.action         = rule::DUMP;
-          ruleConstruct.dump_left      = dump_left;
-          ruleConstruct.dump_right     = dump_right;
+          ruleConstruct.dumpRange      = std::make_pair(dump_left, dump_right);
+          if (dump_left > dump_right) {
+            std::cerr << "Parser/Rule: Dump left range cannot be greater than dump right range" << std::endl;
+            abort();
+          }
           ruleConstruct.dump_retention = dump_retention;
         } else if (actionType == rule::SYSTEM) {
           ruleConstruct.action        = rule::SYSTEM;

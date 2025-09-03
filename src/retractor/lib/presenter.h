@@ -4,9 +4,9 @@
 
 #include "QStruct.h"  // for query, token
 
-struct dumper {
-  explicit dumper(qTree &coreInstance) : coreInstance(coreInstance){};
-  dumper() = delete;
+struct presenter {
+  explicit presenter(qTree &coreInstance) : coreInstance(coreInstance){};
+  presenter() = delete;
 
   int run(boost::program_options::variables_map &vm);
 

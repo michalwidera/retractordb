@@ -180,6 +180,213 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, std::function<double(double)> fnNa
   return inVar;
 }
 
+bool expressionEvaluator::compare(std::list<token> left, std::list<token> right, rdb::payload *payload, rule::ruleType type) {
+  auto leftValue  = eval(left, payload);
+  auto rightValue = eval(right, payload);
+
+  auto [a, b] = normalize(leftValue, rightValue);
+
+  assert(typeid(a) == typeid(b));
+
+  bool retVal = false;
+
+  std::visit(Overload{
+                 [&retVal, type](uint8_t a, uint8_t b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal, type](int a, int b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal, type](unsigned a, unsigned b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal, type](const std::string &a, const std::string &b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal, type](double a, double b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal, type](float a, float b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal, type](boost::rational<int> a, boost::rational<int> b) {
+                   switch (type) {
+                     case rule::EQUAL:
+                       retVal = (a == b);
+                       break;
+                     case rule::NOT_EQUAL:
+                       retVal = (a != b);
+                       break;
+                     case rule::LESS:
+                       retVal = (a < b);
+                       break;
+                     case rule::LESS_EQUAL:
+                       retVal = (a <= b);
+                       break;
+                     case rule::GREATER:
+                       retVal = (a > b);
+                       break;
+                     case rule::GREATER_EQUAL:
+                       retVal = (a >= b);
+                       break;
+                     default:
+                       assert(false && "Unknown comparison type");
+                       break;
+                   }
+                 },
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
+                   // TODO - how to compare pairs ?
+                   SPDLOG_ERROR("Comparison of std::pair<int,int> is not defined.");
+                   assert(false && "Comparison of std::pair<int,int> is not defined.");
+                 },
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) {
+                   // TODO - how to compare pairs ?
+                   SPDLOG_ERROR("Comparison of std::pair<std::string,int> is not defined.");
+                   assert(false && "Comparison of std::pair<std::string,int> is not defined.");
+                 },
+                 [&retVal](auto a, auto b) {
+                   // TODO - how to compare other types ?
+                   SPDLOG_ERROR("Comparison of given type is not defined.");
+                   assert(false && "Comparison of given type is not defined.");
+                 }  //
+             },
+             a, b);
+
+  return retVal;
+}
+
 rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;

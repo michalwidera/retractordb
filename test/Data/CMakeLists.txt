@@ -14,11 +14,11 @@ add_test(
   COMMAND fail-if-file-exist.sh xrdb)
 
 add_test(
-  NAME ${TestID}-dumper
+  NAME ${TestID}-presenter
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND sh -c "xretractor query-lnx.rql -c")
 
-set_tests_properties(${TestID}-dumper PROPERTIES DEPENDS ${TestID}-on-query)
+set_tests_properties(${TestID}-presenter PROPERTIES DEPENDS ${TestID}-on-query)
 
 add_test(
   NAME ${TestID}-waterfall

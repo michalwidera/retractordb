@@ -11,4 +11,5 @@ class expressionEvaluator {
   ~expressionEvaluator();
 
   rdb::descFldVT eval(std::list<token> program, rdb::payload *payload = nullptr);
+  bool compare(std::list<token> left, std::list<token> right, rdb::payload *payload, rule::ruleType type);
 };

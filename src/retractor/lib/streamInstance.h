@@ -31,4 +31,11 @@ struct streamInstance {
    * inputPayload need to be filled first before this constructOutputPayload will be called.
    */
   void constructOutputPayload(const std::list<field> &fields);
+
+  /*
+   * This function will process all rules from query
+   * constructRules uses data from outputPayload 
+   * outputPayload need to be filled first before this constructRules will be called 
+   */
+  void constructRules(query &qry);
 };

@@ -1,4 +1,4 @@
-#include "dumper.h"
+#include "presenter.h"
 
 #include <boost/lexical_cast.hpp>  // for lexical_cast
 #include <boost/regex.hpp>         // IWYU pragma: keep
@@ -10,14 +10,7 @@
 
 using namespace boost;
 
-// Object coreInstance in QStruct.cpp
-
-//
-// 1. dumper.exe out_p.qry --dot >out.dot
-// 2. dot -Tjpg out.dot -o file.jpg
-// 3. start file.jgp
-//
-void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags) {
+void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
@@ -180,7 +173,7 @@ void dumper::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs
   xout << "}" << std::endl;
 }
 
-void dumper::qFieldsProgram() {
+void presenter::qFieldsProgram() {
   std::cout << std::endl;
   std::cout << "fcnt_ref\tid_ref\ttoken\tvalue" << std::endl;
   for (auto q : coreInstance) {
@@ -200,7 +193,7 @@ void dumper::qFieldsProgram() {
   }
 }
 
-void dumper::qFields() {
+void presenter::qFields() {
   std::cout << std::endl;
   std::cout << "fcnt\tid_ref\tfName" << std::endl;
   for (auto q : coreInstance) {
@@ -214,7 +207,7 @@ void dumper::qFields() {
   }
 }
 
-void dumper::qPrograms() {
+void presenter::qPrograms() {
   std::cout << std::endl;
   std::cout << "qcnt\tid_ref\ttoken\tvalue" << std::endl;
   for (auto q : coreInstance) {
@@ -229,7 +222,7 @@ void dumper::qPrograms() {
   }
 }
 
-void dumper::qSet() {
+void presenter::qSet() {
   std::cout << std::endl;
   std::cout << "id\tlen prg\tlen sch\tinterval\tfilename" << std::endl;
   for (auto q : coreInstance) {
@@ -242,7 +235,7 @@ void dumper::qSet() {
   }
 }
 
-void dumper::onlyCompileShowProgram() {
+void presenter::onlyCompileShowProgram() {
   for (auto q : coreInstance) {
     std::cout << q.id;
     if (q.id[0] != ':') std::cout << "(" << q.rInterval << ")";
@@ -328,7 +321,7 @@ void dumper::onlyCompileShowProgram() {
 
       switch (r.action) {
         case rule::DUMP:
-          std::cout << "\t\t" << "DO DUMP " << r.dump_left << " TO " << r.dump_right;
+          std::cout << "\t\t" << "DO DUMP " << r.dumpRange.first << " TO " << r.dumpRange.second;
           if (r.dump_retention != 0) std::cout << " RETENTION " << r.dump_retention;
           break;
         case rule::SYSTEM:
@@ -344,7 +337,7 @@ void dumper::onlyCompileShowProgram() {
   }
 }
 
-int dumper::run(boost::program_options::variables_map &vm) {
+int presenter::run(boost::program_options::variables_map &vm) {
   try {
     if (vm.count("tags") != 0 && vm.count("fields") == 0) {
       std::cerr << "Conflicting parameters." << std::endl;

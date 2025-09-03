@@ -59,8 +59,7 @@ struct rule {
 
   enum actionType { UNKNOWN_ACTION, DUMP, SYSTEM } action{UNKNOWN_ACTION};
 
-  long int dump_left{0};
-  long int dump_right{0};
+  std::pair< long int, long int> dumpRange{std::make_pair(0, 0)};
   size_t dump_retention{0};
 
   std::string systemCommand{};
