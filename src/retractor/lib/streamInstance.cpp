@@ -271,10 +271,10 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 }
 
 void streamInstance::constructRules(query &qry) {
-  for( auto &r : qry.lRules ) {
-    auto left = r.leftConition;
+  for (auto &r : qry.lRules) {
+    auto left  = r.leftConition;
     auto right = r.rightConition;
-    auto type = r.type;
+    auto type  = r.type;
     expressionEvaluator expression;
     bool result = expression.compare(left, right, outputPayload->getPayload(), type);
     if (result) {

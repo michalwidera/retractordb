@@ -34,8 +34,8 @@ struct streamInstance {
 
   /*
    * This function will process all rules from query
-   * constructRules uses data from outputPayload 
-   * outputPayload need to be filled first before this constructRules will be called 
+   * constructRules uses data from outputPayload
+   * outputPayload need to be filled first before this constructRules will be called
    */
   void constructRules(query &qry);
 };
