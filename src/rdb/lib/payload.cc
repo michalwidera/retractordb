@@ -11,7 +11,6 @@
 #include <cstring>  // std:memcpy
 #include <iomanip>
 #include <iostream>
-#include <numeric>  // itoa
 #include <sstream>
 
 #include "rdb/convertTypes.h"
