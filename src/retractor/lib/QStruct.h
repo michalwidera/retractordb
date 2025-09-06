@@ -54,8 +54,8 @@ struct field {
 
 struct rule {
   std::string name;
-  std::list<token> leftConition;
-  std::list<token> rightConition;
+  std::list<token> leftCondition;
+  std::list<token> rightCondition;
 
   enum actionType { UNKNOWN_ACTION, DUMP, SYSTEM } action{UNKNOWN_ACTION};
 
@@ -66,8 +66,8 @@ struct rule {
 
   enum ruleType { UNKNOWN_RULE, EQUAL, LESS, GREATER, LESS_EQUAL, GREATER_EQUAL, NOT_EQUAL, AND, OR } type{UNKNOWN_RULE};
 
-  rule(std::string name, std::list<token> leftConition, std::list<token> rightConition, ruleType type)
-      : name(std::move(name)), leftConition(std::move(leftConition)), rightConition(std::move(rightConition)), type(type) {}
+  rule(std::string name, std::list<token> leftCondition, std::list<token> rightCondition, ruleType type)
+      : name(std::move(name)), leftCondition(std::move(leftCondition)), rightCondition(std::move(rightCondition)), type(type) {}
 };
 
 class query {

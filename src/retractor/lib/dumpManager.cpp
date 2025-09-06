@@ -93,8 +93,8 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
     // TODO: tutaj trzea wypełnić zrzut istniejącymi danymi jeśli range określa zrzut wstecz
     size_t dumpHistoryCount   = abs(task.range.first);
     size_t currentStreamCount = pProc->getStreamCount(streamName);
-    for (auto i = 0; i < std::min(dumpHistoryCount, currentStreamCount); ++i) {
-      auto payLoadPtr = pProc->getPayload(streamName, currentStreamCount - dumpHistoryCount + i);
+    for (auto revOffset = std::min(dumpHistoryCount, currentStreamCount); revOffset >= 0 ; --revOffset) {
+      auto payLoadPtr = pProc->getPayload(streamName, revOffset);
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       assert(resultSeek != -1);
       ssize_t write_count_result = ::write(task.fd, payLoadPtr->get(), payLoadPtr->getDescriptor().getSizeInBytes());

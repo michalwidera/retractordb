@@ -229,6 +229,11 @@ class ParserListener : public RQLBaseListener {
 
     for (auto &i : coreInstance) {
       if (i.id == stream_name) {
+        if (i.isDeclaration()) {
+          std::cerr << "Parser/Rule: Cannot attach rule to declaration stream:" << stream_name << " Rule:" << ctx->name->getText()
+                    << std::endl;
+          abort();
+        }
         if (actionType == rule::DUMP) {
           ruleConstruct.action    = rule::DUMP;
           ruleConstruct.dumpRange = std::make_pair(dump_left, dump_right);

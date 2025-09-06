@@ -268,7 +268,7 @@ void presenter::onlyCompileShowProgram() {
     for (auto r : q.lRules) {
       std::cout << "\tRULE " << r.name << std::endl;
 
-      for (auto tf1 : r.leftConition) {
+      for (auto tf1 : r.leftCondition) {
         if (tf1.getStrCommandID() == "PUSH_ID") {
           std::cout << "\t\t" << tf1 << std::endl;
         } else if ((tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL")) {
@@ -310,7 +310,7 @@ void presenter::onlyCompileShowProgram() {
       }
       std::cout << std::endl;
 
-      for (auto tf2 : r.rightConition) {
+      for (auto tf2 : r.rightCondition) {
         if (tf2.getStrCommandID() == "PUSH_ID") {
           std::cout << "\t\t" << tf2 << std::endl;
         } else if ((tf2.getStrCommandID() == "CALL") || (tf2.getStrCommandID() == "PUSH_VAL")) {

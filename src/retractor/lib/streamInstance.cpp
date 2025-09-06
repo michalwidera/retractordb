@@ -268,8 +268,8 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 void streamInstance::constructRulesAndUpdate(query &qry) {
   // construct if rule is fired
   for (auto &r : qry.lRules) {
-    auto left  = r.leftConition;
-    auto right = r.rightConition;
+    auto left  = r.leftCondition;
+    auto right = r.rightCondition;
     auto type  = r.type;
     expressionEvaluator expression;
     bool result = expression.compare(left, right, outputPayload->getPayload(), type);
