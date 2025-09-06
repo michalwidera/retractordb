@@ -90,10 +90,12 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   bookOfTasks[streamName].push_back(task);
 
   if (task.range.first < 0) {
-    // TODO: tutaj trzea wypełnić zrzut istniejącymi danymi jeśli range określa zrzut wstecz
+    // Filling dump with data already in stream history
+    // we need to dump abs(range.first) records from history
+    // if range.first is 0 or positive - no history dump needed
     size_t dumpHistoryCount   = abs(task.range.first);
     size_t currentStreamCount = pProc->getStreamCount(streamName);
-    for (auto revOffset = std::min(dumpHistoryCount, currentStreamCount); revOffset >= 0 ; --revOffset) {
+    for (auto revOffset = std::min(dumpHistoryCount, currentStreamCount); revOffset >= 0; --revOffset) {
       auto payLoadPtr = pProc->getPayload(streamName, revOffset);
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       assert(resultSeek != -1);
@@ -134,7 +136,6 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 
     if (status) {
       std::cout << "Dump completed successfully for stream: " << task.taskName << std::endl;
-      // remove task form bookOfTasks
     } else {
       std::cerr << "Dump still in process: " << task.taskName << std::endl;
     }
@@ -159,9 +160,10 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
     ssize_t write_count_result = ::write(task.fd, payload->get(), payload->getDescriptor().getSizeInBytes());
     assert(write_count_result > 0);
     task.dumpedRecordsToGo--;
-    if (task.dumpedRecordsToGo == 0) {
+    if (task.dumpedRecordsToGo == 0) {  // remove task form bookOfTasks in processStreamChunk
       ::close(task.fd);
       task.fd = 0;
+      return true;  // task completed
     }
     return false;
   }
@@ -177,7 +179,7 @@ std::pair<std::string, int> dumpManager::createDumpFile(std::string streamName, 
     auto ret = (retentionCounter[streamName + taskName]++) % retentionSize[streamName + taskName];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
   }
-  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC | O_TRUNC, 0644);
   assert(fd >= 0);
   return std::make_pair(filename, fd);
 }

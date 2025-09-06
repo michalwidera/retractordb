@@ -545,7 +545,7 @@ std::string compiler::convertReferences() {
     for (auto &f : q.lSchema) {  // for each field in query
       ftokenfix(f.lProgram, q);  // for each token in query field
     }  // end for each field in query
-    for (auto &r : q.lRules) {        // for each rule in query
+    for (auto &r : q.lRules) {         // for each rule in query
       ftokenfix(r.leftCondition, q);   // for each token in rule
       ftokenfix(r.rightCondition, q);  // for each token in rule
     }  // end for each rule in query
@@ -662,13 +662,13 @@ std::map<std::string, int> compiler::countBuffersCapacity() {
     }
 
     // Bump capMap with dumpRange from rules (if they are negative and attached to query declaration)
-    for (const auto &rule: q.lRules) {
-      auto [l,r] = rule.dumpRange;
+    for (const auto &rule : q.lRules) {
+      auto [l, r] = rule.dumpRange;
       assert(l < r);
       if (l < 0) {
         auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
-        const auto nameSrc  = arg1;
-        capMap[nameSrc]   = std::max(capMap[nameSrc], abs(l));
+        const auto nameSrc = arg1;
+        capMap[nameSrc]    = std::max(capMap[nameSrc], abs(l));
       }
     }
   }

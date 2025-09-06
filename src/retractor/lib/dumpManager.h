@@ -17,9 +17,9 @@ class dumpManager {
 
   struct dumpTask {
     // from rule definition
-    std::string taskName;
-    std::pair<long int, long int> range;
-    size_t retentionSize{0};  // How many dumps to retain
+    std::string taskName;                                        // name of task
+    std::pair<long int, long int> range = std::make_pair(0, 0);  // first - from, second - to
+    size_t retentionSize{0};                                     // How many dumps to retain
 
     // configuration
     int dumpedRecordsToGo{0};      // How many records left to dump - 0 close task
@@ -28,15 +28,13 @@ class dumpManager {
     int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
   };
 
-  // Register a dump function
-  void registerTask(const std::string streamName, dumpTask task);
-
-  // Call all registered dump functions
-  void processStreamChunk(const std::string streamName);
+  void registerTask(const std::string streamName, dumpTask task);  // Register a dump function
+  void processStreamChunk(const std::string streamName);           // Call all registered dump functions
 
  private:
-  std::map<std::string, std::vector<dumpTask>> bookOfTasks;
+  std::map<std::string, std::vector<dumpTask>> bookOfTasks;  // streamName -> list of tasks
 
-  bool buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload);
+  bool buildDumpChunk(dumpTask &task,
+                      std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed
   std::pair<std::string, int> createDumpFile(std::string streamName, std::string taskName);
 };
