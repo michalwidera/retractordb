@@ -22,9 +22,10 @@ class dumpManager {
     size_t retentionSize{0};  // How many dumps to retain
 
     // configuration
-    int dumpedRecordsToGo{0};  // How many records left to dump - 0 close task
-    std::string dumpFilename{""};
-    int fd{0};  // file descriptor
+    int dumpedRecordsToGo{0};      // How many records left to dump - 0 close task
+    std::string dumpFilename{""};  // name of dump file
+    int fd{0};                     // file descriptor Linux posix file handle
+    int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
   };
 
   // Register a dump function

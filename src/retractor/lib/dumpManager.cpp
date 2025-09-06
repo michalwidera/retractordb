@@ -2,16 +2,18 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <spdlog/spdlog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <algorithm>  // std::min
+#include <cstdlib>    // std::abs
 #include <iostream>
 
 #include "dataModel.h"
 
 /** WORK IN PROGRESS - DO NOT USE **/
-
 
 /*
 std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
@@ -72,7 +74,6 @@ for (auto i = left; i <= right; ++i) {
 }
 */
 
-
 std::map<std::string, int> retentionCounter;  // first - streamName+taskName, second - counter
 std::map<std::string, int> retentionSize;     // first - streamName+taskName, second - retention size
 
@@ -81,13 +82,29 @@ extern dataModel *pProc;
 void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   assert(pProc != nullptr && "dumpManager::registerTask dataModel is not set");
   assert(pProc->qSet.find(streamName) != pProc->qSet.end() && "dumpManager::registerTask streamName not found in dataModel");
-  assert(task.range.first >= 0 && task.range.second >= 0 && "dumpManager::registerTask range values must be non-negative");
   assert(task.range.first <= task.range.second && "dumpManager::registerTask range.first must be <= range.second");
 
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
   task.dumpedRecordsToGo                    = abs(task.range.second - task.range.first);
   retentionSize[streamName + task.taskName] = task.retentionSize;
   bookOfTasks[streamName].push_back(task);
+
+  if (task.range.first < 0) {
+    // TODO: tutaj trzea wypełnić zrzut istniejącymi danymi jeśli range określa zrzut wstecz
+    size_t dumpHistoryCount   = abs(task.range.first);
+    size_t currentStreamCount = pProc->getStreamCount(streamName);
+    for (auto i = 0; i < std::min(dumpHistoryCount, currentStreamCount); ++i) {
+      auto payLoadPtr = pProc->getPayload(streamName, currentStreamCount - dumpHistoryCount + i);
+      auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
+      assert(resultSeek != -1);
+      ssize_t write_count_result = ::write(task.fd, payLoadPtr->get(), payLoadPtr->getDescriptor().getSizeInBytes());
+      assert(write_count_result > 0);
+    }
+    assert(task.dumpedRecordsToGo >= dumpHistoryCount);
+    task.dumpedRecordsToGo -= dumpHistoryCount;
+  } else {
+    task.delayDumpRecordsToGo = task.range.first;
+  }
 }
 
 void dumpManager::processStreamChunk(const std::string streamName) {
@@ -102,6 +119,7 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 
   auto payLoadPtr = pProc->getPayload(streamName);
 
+  // enumerate all tasks for this stream
   for (auto &task : bookOfTasks[streamName]) {
     // Here we would implement the actual dump logic
     // TODO: Implement dump logic
@@ -128,9 +146,18 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 }
 
 bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
+  // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
+  if (task.delayDumpRecordsToGo > 0) {
+    SPDLOG_INFO("DumpManager: delaying dump for task {} by {} records", task.taskName, task.delayDumpRecordsToGo);
+    task.delayDumpRecordsToGo--;
+    return false;
+  }
   // Here we would implement the actual dump logic
   if (task.dumpedRecordsToGo > 0) {
-    ssize_t write_result = ::write(task.fd, payload->get(), payload->getDescriptor().getSizeInBytes());
+    auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
+    assert(resultSeek != -1);
+    ssize_t write_count_result = ::write(task.fd, payload->get(), payload->getDescriptor().getSizeInBytes());
+    assert(write_count_result > 0);
     task.dumpedRecordsToGo--;
     if (task.dumpedRecordsToGo == 0) {
       ::close(task.fd);
