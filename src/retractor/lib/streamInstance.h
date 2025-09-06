@@ -3,7 +3,8 @@
 #include <memory>  // unique_ptr
 #include <string>
 
-#include "QStruct.h"         // qTree
+#include "QStruct.h"  // qTree
+#include "dumpManager.h"
 #include "rdb/descriptor.h"  // rdb::Descriptor
 #include "rdb/payload.h"     // rdb::payload
 #include "rdb/storageacc.h"  // rdb::storageAccessor
@@ -37,5 +38,8 @@ struct streamInstance {
    * constructRules uses data from outputPayload
    * outputPayload need to be filled first before this constructRules will be called
    */
-  void constructRules(query &qry);
+  void constructRulesAndUpdate(query &qry);
+
+ private:
+  dumpManager dumpMgr;
 };

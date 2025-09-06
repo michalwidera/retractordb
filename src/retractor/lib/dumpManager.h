@@ -19,12 +19,12 @@ class dumpManager {
     // from rule definition
     std::string taskName;
     std::pair<long int, long int> range;
-    int retentionSize{0};  // How many dumps to retain
+    size_t retentionSize{0};  // How many dumps to retain
 
     // configuration
     int dumpedRecordsToGo{0};  // How many records left to dump - 0 close task
     std::string dumpFilename{""};
-    int fd;  // file descriptor
+    int fd{0};  // file descriptor
   };
 
   // Register a dump function

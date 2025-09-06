@@ -19,6 +19,60 @@ std::string removeCRLF(std::string input) { return std::regex_replace(input, std
 std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
 */
 
+// dumpManager.cpp
+// dumpManager.h
+
+// musi dojść do wywołania dump managera - lub wysłania do niego zadania
+// musi nastąpić zrzut danych ze struminia do pliku (materializacja)
+// tworzone pliki zrzutów jeśli retencja > 0 muszą podlegać retencji
+// w obiekcie r.dump_retention jest informacja o retencji - ile plików zrzutów ma być zachowanych
+// w obiekcie r.dumpRange jest informacja o zakresie zrzutu
+// r.dumpRange.first - ile rekordów wstecz
+// r.dumpRange.second - ile rekordów w przód
+// etap kompilacji zapewnia że first <= second
+
+// dump manager - osobna klasa - singleton
+// dump manager - zarządza plikami zrzutów
+// dump manager - zarządza retencją plików zrzutów
+// dump manager - zapewnia unikalne nazwy plików zrzutów
+// dump manager - zapewnia miejsce na dysku dla plików zrzutów
+// dump manager - zapewnia format plików zrzutów (np. csv, json, binarny)
+// dump manager - zapewnia metadane plików zrzutów (np. nagłówki, typy danych)
+// dump manager - zapewnia indeksowanie plików zrzutów (np. po czasie, po kluczu)
+// dump manager - zapewnia wyszukiwanie plików zrzutów
+// dump manager - zapewnia usuwanie starych plików zrzutów
+// dump manager - zapewnia raportowanie stanu plików zrzutów
+// dump manager - zapewnia konfigurację (np. katalog zrzutów, format plików, retencja)
+// dump manager - zapewnia logowanie operacji zrzutów
+// dump manager - zapewnia obsługę błędów (np. brak miejsca na dysku, błędy zapisu)
+// dump manager - zapewnia testowanie (np. jednostkowe, integracyjne)
+// dump manager - zapewnia dokumentację
+// dump manager - zapewnia bezpieczeństwo (np. uprawnienia, szyfrowanie)
+// dump manager - zapewnia wydajność (np. buforowanie, asynchroniczność)
+// dump manager - zapewnia integrację (np. z innymi systemami, z chmurą)
+// dump manager - zapewnia rozwój (np. nowe funkcje, poprawki błędów)
+// dump manager - zapewnia wsparcie (np. techniczne, społecznościowe)
+// dump manager - zapewnia monitoring (np. metryki, alerty)
+
+/* szkicowy algorytm - do poprawy i optymalizacji
+auto recordsCount = outputPayload->getRecordsCount();
+auto left = r.dumpRange.first < 0 ? 0 : r.dumpRange.first;
+auto right = r.dumpRange.second < 0 ? 0 : r.dumpRange.second;
+left = std::min(left, recordsCount - 1);
+right = std::min(right, recordsCount - 1);
+if (left > right) {
+  SPDLOG_ERROR("Rule/Dump: Dump left range cannot be greater than dump right range");
+  abort();
+}
+SPDLOG_INFO("Rule/Dump: Dumping from {} to {} of stream {}", left, right, qry.id);
+for (auto i = left; i <= right; ++i) {
+  outputPayload->read(i);
+  // TODO - send to dump manager
+  // TODO - retention of dump files
+  std::cout << *(outputPayload->getPayload()) << std::endl;
+}
+*/
+
 streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string storagePathParam) : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
   assert(!qry.id.empty());
@@ -270,7 +324,8 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
   }
 }
 
-void streamInstance::constructRules(query &qry) {
+void streamInstance::constructRulesAndUpdate(query &qry) {
+  // construct if rule is fired
   for (auto &r : qry.lRules) {
     auto left  = r.leftConition;
     auto right = r.rightConition;
@@ -279,59 +334,18 @@ void streamInstance::constructRules(query &qry) {
     bool result = expression.compare(left, right, outputPayload->getPayload(), type);
     if (result) {
       if (r.action == rule::DUMP) {
-        // musi dojść do wywołania dump managera - lub wysłania do niego zadania
-        // musi nastąpić zrzut danych ze struminia do pliku (materializacja)
-        // tworzone pliki zrzutów jeśli retencja > 0 muszą podlegać retencji
-        // w obiekcie r.dump_retention jest informacja o retencji - ile plików zrzutów ma być zachowanych
-        // w obiekcie r.dumpRange jest informacja o zakresie zrzutu
-        // r.dumpRange.first - ile rekordów wstecz
-        // r.dumpRange.second - ile rekordów w przód
-        // etap kompilacji zapewnia że first <= second
-
-        // dump manager - osobna klasa - singleton
-        // dump manager - zarządza plikami zrzutów
-        // dump manager - zarządza retencją plików zrzutów
-        // dump manager - zapewnia unikalne nazwy plików zrzutów
-        // dump manager - zapewnia miejsce na dysku dla plików zrzutów
-        // dump manager - zapewnia format plików zrzutów (np. csv, json, binarny)
-        // dump manager - zapewnia metadane plików zrzutów (np. nagłówki, typy danych)
-        // dump manager - zapewnia indeksowanie plików zrzutów (np. po czasie, po kluczu)
-        // dump manager - zapewnia wyszukiwanie plików zrzutów
-        // dump manager - zapewnia usuwanie starych plików zrzutów
-        // dump manager - zapewnia raportowanie stanu plików zrzutów
-        // dump manager - zapewnia konfigurację (np. katalog zrzutów, format plików, retencja)
-        // dump manager - zapewnia logowanie operacji zrzutów
-        // dump manager - zapewnia obsługę błędów (np. brak miejsca na dysku, błędy zapisu)
-        // dump manager - zapewnia testowanie (np. jednostkowe, integracyjne)
-        // dump manager - zapewnia dokumentację
-        // dump manager - zapewnia bezpieczeństwo (np. uprawnienia, szyfrowanie)
-        // dump manager - zapewnia wydajność (np. buforowanie, asynchroniczność)
-        // dump manager - zapewnia integrację (np. z innymi systemami, z chmurą)
-        // dump manager - zapewnia rozwój (np. nowe funkcje, poprawki błędów)
-        // dump manager - zapewnia wsparcie (np. techniczne, społecznościowe)
-        // dump manager - zapewnia monitoring (np. metryki, alerty)
-
-        /* szkicowy algorytm - do poprawy i optymalizacji
-        auto recordsCount = outputPayload->getRecordsCount();
-        auto left = r.dumpRange.first < 0 ? 0 : r.dumpRange.first;
-        auto right = r.dumpRange.second < 0 ? 0 : r.dumpRange.second;
-        left = std::min(left, recordsCount - 1);
-        right = std::min(right, recordsCount - 1);
-        if (left > right) {
-          SPDLOG_ERROR("Rule/Dump: Dump left range cannot be greater than dump right range");
-          abort();
-        }
-        SPDLOG_INFO("Rule/Dump: Dumping from {} to {} of stream {}", left, right, qry.id);
-        for (auto i = left; i <= right; ++i) {
-          outputPayload->read(i);
-          // TODO - send to dump manager
-          // TODO - retention of dump files
-          std::cout << *(outputPayload->getPayload()) << std::endl;
-        }
-        */
+        dumpMgr.registerTask(qry.id, dumpManager::dumpTask{r.name, r.dumpRange, r.dump_retention});
       } else if (r.action == rule::SYSTEM) {
         system(r.systemCommand.c_str());
       }
+    }
+  }
+
+  // update rules on rule list
+  for (auto &r : qry.lRules) {
+    if (r.action == rule::DUMP) {
+      // Update dump rule
+      dumpMgr.processStreamChunk(qry.filename);
     }
   }
 }

@@ -131,7 +131,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     s << " QRY:[" << q.id << "]";                   //
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
-    qSet[q.id]->constructRules(q);                  // That will process all rules for this query
+    qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
   }
 
   SPDLOG_INFO("END PROCESS: {}", s.str());
