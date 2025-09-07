@@ -115,11 +115,7 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
 }
 
 void dumpManager::setDumpStorage(const std::string storagePathParam) {
-  storagePath = storagePath;
-  if (!std::filesystem::exists(storagePath)) {
-    std::filesystem::create_directories(storagePath);
-  }
-  assert(std::filesystem::is_directory(storagePath) && "dumpManager::setDumpStorage storagePath is not a directory");
+  storagePath = storagePathParam;
 }
 
 void dumpManager::processStreamChunk(const std::string streamName) {
