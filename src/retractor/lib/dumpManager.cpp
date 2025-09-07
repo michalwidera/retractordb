@@ -136,8 +136,6 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 }
 
 bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
-  assert(payload != nullptr && "dumpManager::buildDumpChunk payload is null");
-  assert(task.fd != 0 && "dumpManager::buildDumpChunk file descriptor is not set");
   assert(task.dumpedRecordsToGo >= 0 && "dumpManager::buildDumpChunk dumpedRecordsToGo is negative");
   assert(task.delayDumpRecordsToGo >= 0 && "dumpManager::buildDumpChunk delayDumpRecordsToGo is negative");
 
