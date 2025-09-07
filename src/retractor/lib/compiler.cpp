@@ -663,7 +663,9 @@ std::map<std::string, int> compiler::countBuffersCapacity() {
 
     // Bump capMap with dumpRange from rules (if they are negative and attached to query declaration)
     for (const auto &rule : q.lRules) {
+      if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
+      SPDLOG_DEBUG("Rule dumpRange: {}..{} for query: {}", l, r, q.id);
       assert(l < r);
       if (l < 0) {
         auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
