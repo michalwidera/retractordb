@@ -55,27 +55,6 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 // dump manager - zapewnia wsparcie (np. techniczne, społecznościowe)
 // dump manager - zapewnia monitoring (np. metryki, alerty)
 
-/* szkicowy algorytm - do poprawy i optymalizacji
-auto recordsCount = outputPayload->getRecordsCount();
-auto left = r.dumpRange.first < 0 ? 0 : r.dumpRange.first;
-auto right = r.dumpRange.second < 0 ? 0 : r.dumpRange.second;
-left = std::min(left, recordsCount - 1);
-right = std::min(right, recordsCount - 1);
-if (left > right) {
-  SPDLOG_ERROR("Rule/Dump: Dump left range cannot be greater than dump right range");
-  abort();
-}
-SPDLOG_INFO("Rule/Dump: Dumping from {} to {} of stream {}", left, right, qry.id);
-for (auto i = left; i <= right; ++i) {
-  outputPayload->read(i);
-  // TODO - send to dump manager
-  // TODO - retention of dump files
-  std::cout << *(outputPayload->getPayload()) << std::endl;
-}
-*/
-
-std::map<std::string, int> retentionCounter;  // first - streamName+taskName, second - counter
-std::map<std::string, int> retentionSize;     // first - streamName+taskName, second - retention size
 
 extern dataModel *pProc;
 
@@ -114,9 +93,7 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   }
 }
 
-void dumpManager::setDumpStorage(const std::string storagePathParam) {
-  storagePath = storagePathParam;
-}
+void dumpManager::setDumpStorage(const std::string storagePathParam) { storagePath = storagePathParam; }
 
 void dumpManager::processStreamChunk(const std::string streamName) {
   assert(pProc != nullptr && "dumpManager::processStreamChunk dataModel is not set");
@@ -130,23 +107,26 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 
   auto payLoadPtr = pProc->getPayload(streamName);
 
+  assert(payLoadPtr->getDescriptor().getSizeInBytes() > 0 && "dumpManager::processStreamChunk payload descriptor size is zero");
+  assert(payLoadPtr->get() != nullptr && "dumpManager::processStreamChunk payload data is null");
+
   // enumerate all tasks for this stream
   for (auto &task : bookOfTasks[streamName]) {
-    // Here we would implement the actual dump logic
-    // TODO: Implement dump logic
-    // For now, just print the task details
-    std::cout << "Dumping chunk stream: " << task.taskName  //
-              << " Range: [" << task.range.first            //
-              << ", " << task.range.second << "]"           //
-              << " Retention: " << task.retentionSize       //
-              << std::endl;
+    if (task.dumpedRecordsToGo == 0) continue;  // already completed task - will be removed later
 
-    auto status = buildDumpChunk(task, payLoadPtr);
+    if (task.fd == 0) {
+      SPDLOG_ERROR("dumpManager::processStreamChunk file descriptor is not set for stream: {}", streamName);
+      continue;
+    }
+    auto dumpTaskCompleted = buildDumpChunk(task, payLoadPtr);
 
-    if (status) {
-      std::cout << "Dump completed successfully for stream: " << task.taskName << std::endl;
+    if (dumpTaskCompleted) {
+      SPDLOG_INFO("DumpManager: completed dump task {} for stream {}", task.taskName, streamName);
+      ::close(task.fd);
+      task.fd = 0;  // mark fd in task as closed
     } else {
-      std::cerr << "Dump still in process: " << task.taskName << std::endl;
+      SPDLOG_DEBUG("DumpManager: continuing dump task {} for stream {}, records to go: {}", task.taskName, streamName,
+                   task.dumpedRecordsToGo);
     }
   }
 
@@ -177,12 +157,7 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
     task.dumpedRecordsToGo--;
   }
 
-  if (task.dumpedRecordsToGo == 0) {  // remove task form bookOfTasks in processStreamChunk
-    ::close(task.fd);
-    task.fd = 0;
-    return true;  // task completed
-  }
-  return false;
+  return (task.dumpedRecordsToGo == 0);
 }
 
 std::pair<std::string, int> dumpManager::createDumpFile(std::string streamName, std::string taskName) {

@@ -42,6 +42,8 @@ class dumpManager {
   void setDumpStorage(const std::string storagePathParam);         // Set storage path for dump files
 
  private:
+  std::map<std::string, int> retentionCounter;  // first - streamName+taskName, second - counter
+  std::map<std::string, int> retentionSize;     // first - streamName+taskName, second - retention size
   std::string storagePath{""};
   std::map<std::string, boost::circular_buffer<dumpTask>> bookOfTasks;  // streamName -> list of tasks
   // circular buffer to track retention - will set by .set_capacity(retentionSize)
