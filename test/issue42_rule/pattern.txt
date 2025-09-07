@@ -6,18 +6,18 @@ str1(1/10)
 	RULE testrule1
 		PUSH_ID(str1[0])
 		CONDITION GREATER 
-		PUSH_VAL(10)
+		PUSH_VAL(15)
 		DO DUMP -5 TO 5
 	RULE testrule2
 		PUSH_ID(str1[0])
 		CONDITION GREATER 
-		PUSH_VAL(10)
+		PUSH_VAL(15)
 		DO DUMP -5 TO 5 RETENTION 100
 	RULE testrule3
 		PUSH_ID(str1[0])
-		CONDITION GREATER 
-		PUSH_VAL(10)
-		DO SYSTEM "ls"
+		CONDITION IS_EQUAL 
+		PUSH_VAL(15)
+		DO SYSTEM 'echo "systemcall"'
 core0(1/10)	datafile2.dat
 	a: INTEGER
 core1(1/5)	datafile3.dat

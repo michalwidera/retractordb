@@ -8,6 +8,6 @@ DECLARE b INTEGER STREAM core1, 0.2 FILE 'datafile3.dat'
 
 SELECT str1[0] STREAM str1 FROM core0
 
-RULE testrule1 ON str1 WHEN str1[0] > 10 DO DUMP -5 TO 5
-RULE testrule2 ON str1 WHEN str1[0] > 10 DO DUMP -5 TO 5 RETENTION 100
-RULE testrule3 ON str1 WHEN str1[0] > 10 DO SYSTEM 'ls'
+RULE testrule1 ON str1 WHEN str1[0] > 15 DO DUMP -5 TO 5
+RULE testrule2 ON str1 WHEN str1[0] > 15 DO DUMP -5 TO 5 RETENTION 100
+RULE testrule3 ON str1 WHEN str1[0] == 15 DO SYSTEM 'echo "systemcall"'

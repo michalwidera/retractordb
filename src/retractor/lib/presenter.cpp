@@ -325,7 +325,7 @@ void presenter::onlyCompileShowProgram() {
           if (r.dump_retention != 0) std::cout << " RETENTION " << r.dump_retention;
           break;
         case rule::SYSTEM:
-          std::cout << "\t\t" << "DO SYSTEM \"" << r.systemCommand << "\"";
+          std::cout << "\t\t" << "DO SYSTEM '" << r.systemCommand << "'";
           break;
         default:
           std::cout << "\t\t" << "UNKNOWN_ACTION";
