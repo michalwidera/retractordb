@@ -1,7 +1,5 @@
 #include ".antlr/RQLParser.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
@@ -190,15 +188,11 @@ class ParserListener : public RQLBaseListener {
   void exitRetention(RQLParser::RetentionContext *ctx) {
     if (ctx->segments) {
       // retention {capacity} !{segments}
-      SPDLOG_INFO("Parser/Retention: {} {}",            //
-                  std::stoi(ctx->segments->getText()),  //
-                  std::stoi(ctx->capacity->getText()));
       qry.retention = std::pair<int, int>(      //
           std::stoi(ctx->segments->getText()),  //
           std::stoi(ctx->capacity->getText()));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
       qry.substratPolicy.second = std::stoi(ctx->capacity->getText());
     }
   }

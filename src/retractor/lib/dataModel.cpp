@@ -274,7 +274,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       }
     } break;
     default:
-      SPDLOG_ERROR("Undefined command_id:{}", cmd);
+      SPDLOG_ERROR("Undefined command_id:{}", static_cast<int>(cmd));
       assert(false && "Undefined command_id in constructInputPayload");
       abort();
   }

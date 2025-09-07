@@ -27,8 +27,7 @@ struct dumpTask {
   bool inBook{false};            // is task in bookOfTasks
 
   dumpTask(const std::string name, const std::pair<long int, long int> rangeParam, const size_t retention)
-      : taskName(name), range(rangeParam), retentionSize(retention), inBook(false) {
-  }
+      : taskName(name), range(rangeParam), retentionSize(retention), inBook(false) {}
   ~dumpTask();
 };
 

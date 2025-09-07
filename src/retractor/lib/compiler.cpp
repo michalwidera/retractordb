@@ -76,7 +76,7 @@ std::string compiler::intervalCounter() {
             delta = (delta1 * delta2) / abs(delta1 - delta2);  // deltaDivMod(delta1, delta2);
           }
           if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
+            SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
             throw std::out_of_range("You cannot make faster div from slower source");
           }
         } break;
@@ -94,7 +94,7 @@ std::string compiler::intervalCounter() {
             delta = (delta2 * delta1) / abs(delta2 - delta1);  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
           }
           if (delta1 > delta) {
-            SPDLOG_ERROR("Faster div from slower src q.id={},D1={}, D2={}", q.id, delta1, delta2);
+            SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
             throw std::out_of_range("You cannot make faster mod from slower source");
           }
         } break;
@@ -148,7 +148,7 @@ std::string compiler::intervalCounter() {
           delta = (coreDelta * step) / coreWindow;
         } break;
         default:
-          SPDLOG_ERROR("Undefined token: command={}, var={}, txt={}", op.getStrCommandID(), op.getRI(), op.getStr_());
+          SPDLOG_ERROR("Undefined token: command={}", op.getStrCommandID());
           throw std::out_of_range("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
       assert(delta != -1);

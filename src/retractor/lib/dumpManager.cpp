@@ -55,7 +55,6 @@ std::string removeSpc(std::string input) { return std::regex_replace(input, std:
 // dump manager - zapewnia wsparcie (np. techniczne, społecznościowe)
 // dump manager - zapewnia monitoring (np. metryki, alerty)
 
-
 extern dataModel *pProc;
 
 dumpTask::~dumpTask() {
@@ -81,7 +80,6 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   // This push_back will overwrite oldest task if retentionSize is exceeded
   // Task destructor will close file descriptor if still open
 
-
   if (task.range.first < 0) {
     // Filling dump with data already in stream history
     // we need to dump abs(range.first) records from history
@@ -90,7 +88,7 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
     // CHECK SEQUENCE IF THIS IS IN REVERSE ORDER
     size_t dumpHistoryCount   = abs(task.range.first);
     size_t currentStreamCount = pProc->getStreamCount(streamName);
-    for (auto i =  0 ; i < dumpHistoryCount; ++i) {
+    for (auto i = 0; i < dumpHistoryCount; ++i) {
       auto payLoadPtr = pProc->getPayload(streamName, i);
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       assert(resultSeek != -1);
@@ -102,13 +100,13 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   } else {
     task.delayDumpRecordsToGo = task.range.first;
   }
-  SPDLOG_INFO("DumpManager: registered dump task {} for stream {}, records to go: {}", task.taskName, streamName, task.dumpedRecordsToGo);
+  SPDLOG_INFO("DumpManager: registered dump task {} for stream {}, records to go: {}", task.taskName, streamName,
+              task.dumpedRecordsToGo);
 }
 
 void dumpManager::setDumpStorage(const std::string storagePathParam) { storagePath = storagePathParam; }
 
 void dumpManager::processStreamChunk(const std::string streamName) {
-
   SPDLOG_INFO("dumpManager::processStreamChunk for stream: {} task in book: {}", streamName, bookOfTasks[streamName].size());
 
   assert(pProc != nullptr && "dumpManager::processStreamChunk dataModel is not set");
@@ -141,7 +139,7 @@ void dumpManager::processStreamChunk(const std::string streamName) {
       task.fd = 0;  // mark fd in task as closed
     } else {
       SPDLOG_INFO("DumpManager: continuing dump task {} for stream {}, records to go: {}", task.taskName, streamName,
-                   task.dumpedRecordsToGo);
+                  task.dumpedRecordsToGo);
     }
   }
 

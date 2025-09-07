@@ -7,9 +7,9 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <iostream>
 
 #include <cstring>
+#include <iostream>
 #include <string>
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName, const std::string &lockDir)
