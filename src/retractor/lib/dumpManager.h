@@ -13,29 +13,29 @@
 
 #include "rdb/payload.h"
 
+struct dumpTask {
+  // from rule definition
+  std::string taskName;                                        // name of task
+  std::pair<long int, long int> range = std::make_pair(0, 0);  // first - from, second - to
+  size_t retentionSize{0};                                     // How many dumps to retain
+
+  // configuration
+  int dumpedRecordsToGo{0};      // How many records left to dump - 0 close task
+  std::string dumpFilename{""};  // name of dump file
+  int fd{0};                     // file descriptor Linux posix file handle
+  int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
+  bool inBook{false};            // is task in bookOfTasks
+
+  dumpTask(const std::string name, const std::pair<long int, long int> rangeParam, const size_t retention)
+      : taskName(name), range(rangeParam), retentionSize(retention), inBook(false) {
+  }
+  ~dumpTask();
+};
+
 class dumpManager {
  public:
   dumpManager()  = default;
   ~dumpManager() = default;
-
-  struct dumpTask {
-    // from rule definition
-    std::string taskName;                                        // name of task
-    std::pair<long int, long int> range = std::make_pair(0, 0);  // first - from, second - to
-    size_t retentionSize{0};                                     // How many dumps to retain
-
-    // configuration
-    int dumpedRecordsToGo{0};      // How many records left to dump - 0 close task
-    std::string dumpFilename{""};  // name of dump file
-    int fd{0};                     // file descriptor Linux posix file handle
-    int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
-
-    ~dumpTask() {
-      if (fd != 0) {
-        ::close(fd);
-      }
-    }
-  };
 
   void registerTask(const std::string streamName, dumpTask task);  // Register a dump function
   void processStreamChunk(const std::string streamName);           // Call all registered dump functions

@@ -7,6 +7,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <iostream>
 
 #include <cstring>
 #include <string>
@@ -36,6 +37,7 @@ bool FlockServiceGuard::acquireLock() {
   int flockResult = flock(lockFileDescriptor, LOCK_EX | LOCK_NB);
 
   if (flockResult == -1) {
+    std::cerr << "Another instance is running, errno: " << strerror(errno) << std::endl;
     if (errno == EWOULDBLOCK || errno == EAGAIN) {
       SPDLOG_WARN("Other instance is already running, cannot acquire lock on: {}", lockFilePath);
     } else {

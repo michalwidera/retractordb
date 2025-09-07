@@ -277,18 +277,14 @@ void streamInstance::constructRulesAndUpdate(query &qry) {
     bool result = expression.compare(left, right, outputPayload->getPayload(), type);
     if (result) {
       if (r.action == rule::DUMP) {
-        dumpMgr.registerTask(qry.id, dumpManager::dumpTask{r.name, r.dumpRange, r.dump_retention});
+        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);
+        dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
       } else if (r.action == rule::SYSTEM) {
+        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing system command: {}", r.systemCommand);
         system(r.systemCommand.c_str());
       }
     }
   }
 
-  // update rules on rule list
-  for (auto &r : qry.lRules) {
-    if (r.action == rule::DUMP) {
-      // Update dump rule
-      dumpMgr.processStreamChunk(qry.filename);
-    }
-  }
+  dumpMgr.processStreamChunk(qry.id);
 }
