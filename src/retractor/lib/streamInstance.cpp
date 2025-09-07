@@ -28,6 +28,8 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string stor
 
   auto requestedCapacity = coreInstance.maxCapacity[qry.id];
   outputPayload->setCapacity(requestedCapacity);
+
+  dumpMgr.setDumpStorage(storagePathParam);
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div

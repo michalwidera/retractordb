@@ -5,10 +5,10 @@
 #include <spdlog/spdlog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 #include <algorithm>  // std::min
 #include <cstdlib>    // std::abs
+#include <filesystem>
 #include <iostream>
 
 #include "dataModel.h"
@@ -87,6 +87,7 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
   task.dumpedRecordsToGo                    = abs(task.range.second - task.range.first);
   retentionSize[streamName + task.taskName] = task.retentionSize;
+  bookOfTasks[streamName].set_capacity(task.retentionSize > 0 ? task.retentionSize : 1);
   bookOfTasks[streamName].push_back(task);
 
   if (task.range.first < 0) {
@@ -107,6 +108,14 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   } else {
     task.delayDumpRecordsToGo = task.range.first;
   }
+}
+
+void dumpManager::setDumpStorage(const std::string storagePathParam) {
+  storagePath = storagePath;
+  if (!std::filesystem::exists(storagePath)) {
+    std::filesystem::create_directories(storagePath);
+  }
+  assert(std::filesystem::is_directory(storagePath) && "dumpManager::setDumpStorage storagePath is not a directory");
 }
 
 void dumpManager::processStreamChunk(const std::string streamName) {
@@ -147,37 +156,44 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 }
 
 bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
+  assert(payload != nullptr && "dumpManager::buildDumpChunk payload is null");
+  assert(task.fd != 0 && "dumpManager::buildDumpChunk file descriptor is not set");
+  assert(task.dumpedRecordsToGo >= 0 && "dumpManager::buildDumpChunk dumpedRecordsToGo is negative");
+  assert(task.delayDumpRecordsToGo >= 0 && "dumpManager::buildDumpChunk delayDumpRecordsToGo is negative");
+
   // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
-  if (task.delayDumpRecordsToGo > 0) {
+  if (task.delayDumpRecordsToGo != 0) {
     SPDLOG_INFO("DumpManager: delaying dump for task {} by {} records", task.taskName, task.delayDumpRecordsToGo);
     task.delayDumpRecordsToGo--;
     return false;
   }
-  // Here we would implement the actual dump logic
+
+  auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
+  assert(resultSeek != -1);
+  ssize_t write_count_result = ::write(task.fd, payload->get(), payload->getDescriptor().getSizeInBytes());
+  assert(write_count_result > 0);
+
   if (task.dumpedRecordsToGo > 0) {
-    auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
-    assert(resultSeek != -1);
-    ssize_t write_count_result = ::write(task.fd, payload->get(), payload->getDescriptor().getSizeInBytes());
-    assert(write_count_result > 0);
     task.dumpedRecordsToGo--;
-    if (task.dumpedRecordsToGo == 0) {  // remove task form bookOfTasks in processStreamChunk
-      ::close(task.fd);
-      task.fd = 0;
-      return true;  // task completed
-    }
-    return false;
   }
-  return true;
+
+  if (task.dumpedRecordsToGo == 0) {  // remove task form bookOfTasks in processStreamChunk
+    ::close(task.fd);
+    task.fd = 0;
+    return true;  // task completed
+  }
+  return false;
 }
 
 std::pair<std::string, int> dumpManager::createDumpFile(std::string streamName, std::string taskName) {
-  // Here we would implement the actual file creation logic
-  auto filename = streamName + "_" + taskName;
+  auto filename = std::filesystem::path(storagePath) / std::filesystem::path(streamName + "_" + taskName);
+  SPDLOG_DEBUG("Creating dump file: {}", filename);
   if (retentionSize[streamName + taskName] == 0) {
     filename += "_dump.tmp";
   } else {
     auto ret = (retentionCounter[streamName + taskName]++) % retentionSize[streamName + taskName];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
+    assert(ret < retentionSize[streamName + taskName]);
   }
   int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC | O_TRUNC, 0644);
   assert(fd >= 0);

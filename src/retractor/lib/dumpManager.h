@@ -2,6 +2,9 @@
 
 /** WORK IN PROGRESS - DO NOT USE **/
 
+#include <unistd.h>  // for ::lseek, ::write, ::close
+
+#include <boost/circular_buffer.hpp>
 #include <map>
 #include <memory>  // unique_ptr
 #include <string>
@@ -26,13 +29,22 @@ class dumpManager {
     std::string dumpFilename{""};  // name of dump file
     int fd{0};                     // file descriptor Linux posix file handle
     int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
+
+    ~dumpTask() {
+      if (fd != 0) {
+        ::close(fd);
+      }
+    }
   };
 
   void registerTask(const std::string streamName, dumpTask task);  // Register a dump function
   void processStreamChunk(const std::string streamName);           // Call all registered dump functions
+  void setDumpStorage(const std::string storagePathParam);         // Set storage path for dump files
 
  private:
-  std::map<std::string, std::vector<dumpTask>> bookOfTasks;  // streamName -> list of tasks
+  std::string storagePath{""};
+  std::map<std::string, boost::circular_buffer<dumpTask>> bookOfTasks;  // streamName -> list of tasks
+  // circular buffer to track retention - will set by .set_capacity(retentionSize)
 
   bool buildDumpChunk(dumpTask &task,
                       std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed
