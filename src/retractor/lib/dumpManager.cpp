@@ -87,8 +87,12 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
   task.dumpedRecordsToGo                    = abs(task.range.second - task.range.first);
   retentionSize[streamName + task.taskName] = task.retentionSize;
-  bookOfTasks[streamName].set_capacity(task.retentionSize > 0 ? task.retentionSize : 1);
+  if (bookOfTasks[streamName].capacity() == 0) {
+    bookOfTasks[streamName].set_capacity(task.retentionSize > 0 ? task.retentionSize : 1);
+  }
   bookOfTasks[streamName].push_back(task);
+  // This push_back will overwrite oldest task if retentionSize is exceeded
+  // Task destructor will close file descriptor if still open
 
   if (task.range.first < 0) {
     // Filling dump with data already in stream history
