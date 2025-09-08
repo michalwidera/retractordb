@@ -18,14 +18,14 @@ public:
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
     FILE = 32, STORAGE = 33, SUBSTRAT = 34, RULE = 35, ON = 36, WHEN = 37, 
-    DUMP = 38, SYSTEM = 39, DO = 40, TO = 41, MIN = 42, MAX = 43, AVG = 44, 
-    SUMC = 45, STRING_SUBSTRAT = 46, ID = 47, STRING = 48, FLOAT = 49, DECIMAL = 50, 
-    REAL = 51, IS_EQUAL = 52, EQUAL = 53, GREATER = 54, LESS = 55, EXCLAMATION = 56, 
-    DOUBLE_BAR = 57, DOT = 58, UNDERLINE = 59, AT = 60, SHARP = 61, AND = 62, 
-    MOD = 63, DOLLAR = 64, COMMA = 65, SEMI = 66, COLON = 67, DOUBLE_COLON = 68, 
-    STAR = 69, DIVIDE = 70, PLUS = 71, MINUS = 72, BIT_NOT = 73, BIT_OR = 74, 
-    BIT_XOR = 75, AND_C = 76, OR_C = 77, SPACE = 78, COMMENT = 79, LINE_COMMENT1 = 80, 
-    LINE_COMMENT2 = 81
+    DUMP = 38, SYSTEM = 39, DO = 40, TO = 41, AND_C = 42, OR_C = 43, NOT_C = 44, 
+    MIN = 45, MAX = 46, AVG = 47, SUMC = 48, STRING_SUBSTRAT = 49, ID = 50, 
+    STRING = 51, FLOAT = 52, DECIMAL = 53, REAL = 54, IS_EQ = 55, IS_NQ = 56, 
+    IS_GR = 57, IS_LS = 58, IS_GE = 59, IS_LE = 60, EXCLAMATION = 61, DOUBLE_BAR = 62, 
+    DOT = 63, UNDERLINE = 64, AT = 65, SHARP = 66, AND = 67, MOD = 68, DOLLAR = 69, 
+    COMMA = 70, SEMI = 71, COLON = 72, DOUBLE_COLON = 73, STAR = 74, DIVIDE = 75, 
+    PLUS = 76, MINUS = 77, BIT_NOT = 78, BIT_OR = 79, BIT_XOR = 80, SPACE = 81, 
+    COMMENT = 82, LINE_COMMENT1 = 83, LINE_COMMENT2 = 84
   };
 
   enum {
@@ -34,10 +34,9 @@ public:
     RuleDumppart = 6, RuleSystempart = 7, RuleRational_se = 8, RuleRetention_from = 9, 
     RuleFraction_rule = 10, RuleField_declaration = 11, RuleField_type = 12, 
     RuleSelect_list = 13, RuleField_id = 14, RuleUnary_op_expression = 15, 
-    RuleAsterisk = 16, RuleLogic_expression = 17, RuleLeft_rule_expr = 18, 
-    RuleRight_rule_expr = 19, RuleCondition = 20, RuleExpression = 21, RuleExpression_factor = 22, 
-    RuleTerm = 23, RuleStream_expression = 24, RuleStream_term = 25, RuleStream_factor = 26, 
-    RuleAgregator = 27, RuleFunction_call = 28
+    RuleAsterisk = 16, RuleExpression = 17, RuleLogic = 18, RuleExpression_logic = 19, 
+    RuleTerm_logic = 20, RuleExpression_factor = 21, RuleTerm = 22, RuleStream_expression = 23, 
+    RuleStream_term = 24, RuleStream_factor = 25, RuleAgregator = 26, RuleFunction_call = 27
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -74,11 +73,10 @@ public:
   class Field_idContext;
   class Unary_op_expressionContext;
   class AsteriskContext;
-  class Logic_expressionContext;
-  class Left_rule_exprContext;
-  class Right_rule_exprContext;
-  class ConditionContext;
   class ExpressionContext;
+  class LogicContext;
+  class Expression_logicContext;
+  class Term_logicContext;
   class Expression_factorContext;
   class TermContext;
   class Stream_expressionContext;
@@ -253,7 +251,7 @@ public:
     antlr4::tree::TerminalNode *RULE();
     antlr4::tree::TerminalNode *ON();
     antlr4::tree::TerminalNode *WHEN();
-    Logic_expressionContext *logic_expression();
+    LogicContext *logic();
     antlr4::tree::TerminalNode *DO();
     std::vector<antlr4::tree::TerminalNode *> ID();
     antlr4::tree::TerminalNode* ID(size_t i);
@@ -623,87 +621,6 @@ public:
 
   AsteriskContext* asterisk();
 
-  class  Logic_expressionContext : public antlr4::ParserRuleContext {
-  public:
-    Logic_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    Left_rule_exprContext *left_rule_expr();
-    ConditionContext *condition();
-    Right_rule_exprContext *right_rule_expr();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  Logic_expressionContext* logic_expression();
-
-  class  Left_rule_exprContext : public antlr4::ParserRuleContext {
-  public:
-    Left_rule_exprContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Left_rule_exprContext() = default;
-    void copyFrom(Left_rule_exprContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  ExpRuleLefContext : public Left_rule_exprContext {
-  public:
-    ExpRuleLefContext(Left_rule_exprContext *ctx);
-
-    Expression_factorContext *expression_factor();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Left_rule_exprContext* left_rule_expr();
-
-  class  Right_rule_exprContext : public antlr4::ParserRuleContext {
-  public:
-    Right_rule_exprContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Right_rule_exprContext() = default;
-    void copyFrom(Right_rule_exprContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  ExpRuleRightContext : public Right_rule_exprContext {
-  public:
-    ExpRuleRightContext(Right_rule_exprContext *ctx);
-
-    Expression_factorContext *expression_factor();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Right_rule_exprContext* right_rule_expr();
-
-  class  ConditionContext : public antlr4::ParserRuleContext {
-  public:
-    ConditionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *AND_C();
-    antlr4::tree::TerminalNode *OR_C();
-    antlr4::tree::TerminalNode *GREATER();
-    antlr4::tree::TerminalNode *EQUAL();
-    antlr4::tree::TerminalNode *LESS();
-    antlr4::tree::TerminalNode *IS_EQUAL();
-
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-   
-  };
-
-  ConditionContext* condition();
-
   class  ExpressionContext : public antlr4::ParserRuleContext {
   public:
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -717,6 +634,166 @@ public:
 
   ExpressionContext* expression();
 
+  class  LogicContext : public antlr4::ParserRuleContext {
+  public:
+    LogicContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    LogicContext() = default;
+    void copyFrom(LogicContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  LogicExpressionContext : public LogicContext {
+  public:
+    LogicExpressionContext(LogicContext *ctx);
+
+    Expression_logicContext *expression_logic();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  LogicContext* logic();
+
+  class  Expression_logicContext : public antlr4::ParserRuleContext {
+  public:
+    Expression_logicContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Expression_logicContext() = default;
+    void copyFrom(Expression_logicContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  ExpOrContext : public Expression_logicContext {
+  public:
+    ExpOrContext(Expression_logicContext *ctx);
+
+    std::vector<Expression_logicContext *> expression_logic();
+    Expression_logicContext* expression_logic(size_t i);
+    antlr4::tree::TerminalNode *OR_C();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpAndContext : public Expression_logicContext {
+  public:
+    ExpAndContext(Expression_logicContext *ctx);
+
+    std::vector<Expression_logicContext *> expression_logic();
+    Expression_logicContext* expression_logic(size_t i);
+    antlr4::tree::TerminalNode *AND_C();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpTermLogicContext : public Expression_logicContext {
+  public:
+    ExpTermLogicContext(Expression_logicContext *ctx);
+
+    Term_logicContext *term_logic();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Expression_logicContext* expression_logic();
+  Expression_logicContext* expression_logic(int precedence);
+  class  Term_logicContext : public antlr4::ParserRuleContext {
+  public:
+    Term_logicContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Term_logicContext() = default;
+    void copyFrom(Term_logicContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  ExpLsContext : public Term_logicContext {
+  public:
+    ExpLsContext(Term_logicContext *ctx);
+
+    std::vector<Term_logicContext *> term_logic();
+    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_LS();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpLeContext : public Term_logicContext {
+  public:
+    ExpLeContext(Term_logicContext *ctx);
+
+    std::vector<Term_logicContext *> term_logic();
+    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_LE();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpNqContext : public Term_logicContext {
+  public:
+    ExpNqContext(Term_logicContext *ctx);
+
+    std::vector<Term_logicContext *> term_logic();
+    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_NQ();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpGrContext : public Term_logicContext {
+  public:
+    ExpGrContext(Term_logicContext *ctx);
+
+    std::vector<Term_logicContext *> term_logic();
+    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_GR();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpFactorContext : public Term_logicContext {
+  public:
+    ExpFactorContext(Term_logicContext *ctx);
+
+    Expression_factorContext *expression_factor();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpEqContext : public Term_logicContext {
+  public:
+    ExpEqContext(Term_logicContext *ctx);
+
+    std::vector<Term_logicContext *> term_logic();
+    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_EQ();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  ExpGeContext : public Term_logicContext {
+  public:
+    ExpGeContext(Term_logicContext *ctx);
+
+    std::vector<Term_logicContext *> term_logic();
+    Term_logicContext* term_logic(size_t i);
+    antlr4::tree::TerminalNode *IS_GE();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Term_logicContext* term_logic();
+  Term_logicContext* term_logic(int precedence);
   class  Expression_factorContext : public antlr4::ParserRuleContext {
   public:
     Expression_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -852,6 +929,16 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpNotContext : public TermContext {
+  public:
+    ExpNotContext(TermContext *ctx);
+
+    antlr4::tree::TerminalNode *NOT_C();
+    TermContext *term();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpStringContext : public TermContext {
   public:
     ExpStringContext(TermContext *ctx);
@@ -921,7 +1008,7 @@ public:
     SExpTimeMoveContext(Stream_expressionContext *ctx);
 
     Stream_termContext *stream_term();
-    antlr4::tree::TerminalNode *GREATER();
+    antlr4::tree::TerminalNode *IS_GR();
     antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -1108,6 +1195,8 @@ public:
 
   bool sempred(antlr4::RuleContext *_localctx, size_t ruleIndex, size_t predicateIndex) override;
 
+  bool expression_logicSempred(Expression_logicContext *_localctx, size_t predicateIndex);
+  bool term_logicSempred(Term_logicContext *_localctx, size_t predicateIndex);
   bool expression_factorSempred(Expression_factorContext *_localctx, size_t predicateIndex);
   bool termSempred(TermContext *_localctx, size_t predicateIndex);
 

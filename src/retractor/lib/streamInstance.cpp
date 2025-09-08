@@ -266,16 +266,40 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
     i++;
   }
 }
+bool boolCast(const rdb::descFldVT &inVar) {
+  bool retVal(false);
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a) { retVal = (a != 0); },                                   //
+                 [&retVal](int a) { retVal = (a != 0); },                                       //
+                 [&retVal](unsigned a) { retVal = (a != 0); },                                  //
+                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                      //
+                 [&retVal](float a) { retVal = (a != 0); },                                     //
+                 [&retVal](double a) { retVal = (a != 0); },                                    //
+                 [&retVal](std::pair<int, int> a) { assert(false && "no support."); },          //
+                 [&retVal](std::pair<std::string, int> a) { assert(false && "no support."); },  //
+                 [&retVal](const std::string &a) { assert(false && "no support."); }            //
+             },
+             inVar);
+
+  return retVal;
+}
 
 void streamInstance::constructRulesAndUpdate(query &qry) {
+  bool debug = false;
   // construct if rule is fired
+  if (debug) std::cerr << qry.id << " rules: " << qry.lRules.size() << "\n";
+
+  rdb::payload payload(*outputPayload->getPayload());
+
   for (auto &r : qry.lRules) {
-    auto left  = r.leftCondition;
-    auto right = r.rightCondition;
-    auto type  = r.type;
+    if (debug) std::cerr << "rule: " << r.name << " condition size: " << r.condition.size() << "\n";
+    assert(!r.condition.empty());
+    assert(r.action == rule::DUMP || r.action == rule::SYSTEM);
+    auto condition = r.condition;
     expressionEvaluator expression;
-    bool result = expression.compare(left, right, outputPayload->getPayload(), type);
-    if (result) {
+    auto result = expression.eval(condition, &payload, debug);
+    if (boolCast(result)) {
       if (r.action == rule::DUMP) {
         SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));

@@ -147,6 +147,214 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   return retVal;
 }
 
+rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a == b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a == b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a == b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a == b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a == b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a == b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a == b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a != b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a != b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a != b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a != b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a != b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a != b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a != b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a < b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a < b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a < b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a < b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a < b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a < b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a < b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a > b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a > b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a > b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a > b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a > b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a > b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a > b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a >= b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a >= b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a >= b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a >= b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a >= b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a >= b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a >= b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a <= b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a <= b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a <= b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a <= b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a <= b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a <= b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a <= b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a || b) ? uint8_t(1) : uint8_t(0); },           //
+                 [&retVal](int a, int b) { retVal = (a || b) ? int(1) : int(0); },                           //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a || b) ? unsigned(1) : unsigned(0); },       //
+                 [&retVal](const std::string &a, const std::string &b) { assert(false && "no support."); },  //
+                 [&retVal](double a, double b) { retVal = (a || b) ? double(1) : double(0); },               //
+                 [&retVal](float a, float b) { retVal = (a || b) ? float(1) : float(0); },                   //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a || b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a && b) ? uint8_t(1) : uint8_t(0); },           //
+                 [&retVal](int a, int b) { retVal = (a && b) ? int(1) : int(0); },                           //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a && b) ? unsigned(1) : unsigned(0); },       //
+                 [&retVal](const std::string &a, const std::string &b) { assert(false && "no support."); },  //
+                 [&retVal](double a, double b) { retVal = (a && b) ? double(1) : double(0); },               //
+                 [&retVal](float a, float b) { retVal = (a && b) ? float(1) : float(0); },                   //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a && b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                            //
+                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
+                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
+                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+             },
+             a, b);
+
+  return retVal;
+}
+
 rdb::descFldVT neg(const rdb::descFldVT &inVar) {
   rdb::descFldVT retVal;
 
@@ -159,7 +367,7 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar) {
                  [&retVal](double a) { retVal = -a; },                                                             //
                  [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },               //
                  [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
-                 [&retVal](const std::string &a) { /* define neg of string ? */ }                                  //
+                 [&retVal](const std::string &a) { assert(false && "no support."); }                               //
              },
              inVar);
 
@@ -180,216 +388,11 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, std::function<double(double)> fnNa
   return inVar;
 }
 
-bool expressionEvaluator::compare(std::list<token> left, std::list<token> right, rdb::payload *payload, rule::ruleType type) {
-  auto leftValue  = eval(left, payload);
-  auto rightValue = eval(right, payload);
-
-  auto [a, b] = normalize(leftValue, rightValue);
-
-  assert(typeid(a) == typeid(b));
-
-  bool retVal = false;
-
-  std::visit(Overload{
-                 [&retVal, type](uint8_t a, uint8_t b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal, type](int a, int b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal, type](unsigned a, unsigned b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal, type](const std::string &a, const std::string &b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal, type](double a, double b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal, type](float a, float b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal, type](boost::rational<int> a, boost::rational<int> b) {
-                   switch (type) {
-                     case rule::EQUAL:
-                       retVal = (a == b);
-                       break;
-                     case rule::NOT_EQUAL:
-                       retVal = (a != b);
-                       break;
-                     case rule::LESS:
-                       retVal = (a < b);
-                       break;
-                     case rule::LESS_EQUAL:
-                       retVal = (a <= b);
-                       break;
-                     case rule::GREATER:
-                       retVal = (a > b);
-                       break;
-                     case rule::GREATER_EQUAL:
-                       retVal = (a >= b);
-                       break;
-                     default:
-                       assert(false && "Unknown comparison type");
-                       break;
-                   }
-                 },
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-                   // TODO - how to compare pairs ?
-                   SPDLOG_ERROR("Comparison of std::pair<int,int> is not defined.");
-                   assert(false && "Comparison of std::pair<int,int> is not defined.");
-                 },
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) {
-                   // TODO - how to compare pairs ?
-                   SPDLOG_ERROR("Comparison of std::pair<std::string,int> is not defined.");
-                   assert(false && "Comparison of std::pair<std::string,int> is not defined.");
-                 },
-                 [&retVal](auto a, auto b) {
-                   // TODO - how to compare other types ?
-                   SPDLOG_ERROR("Comparison of given type is not defined.");
-                   assert(false && "Comparison of given type is not defined.");
-                 }  //
-             },
-             a, b);
-
-  return retVal;
-}
-
-rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload) {
+rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload, bool debug) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;
+
+  if (debug) std::cerr << ">> eval expression program size=" << program.size() << "\n";
 
   for (auto tk : program) {
     auto tkStr = tk.getStr_();
@@ -398,6 +401,14 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
       case SUBTRACT:
       case MULTIPLY:
       case DIVIDE:
+      case CMP_EQUAL:
+      case CMP_NOT_EQUAL:
+      case CMP_LT:
+      case CMP_GT:
+      case CMP_LE:
+      case CMP_GE:
+      case OR:
+      case AND:
         a = rStack.top();
         rStack.pop();
       case CALL:
@@ -423,6 +434,61 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         break;
       case NEGATE:
         rStack.push(neg(b));
+        break;
+      case CMP_EQUAL: {
+        rStack.push(is_eq(b, a));
+
+        if (debug) {
+          std::cerr << " CMP_EQUAL: ";
+          std::visit(Overload{
+                         [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << v; },
+                         [](unsigned v) { std::cerr << v; }, [](float v) { std::cerr << v; }, [](double v) { std::cerr << v; },
+                         [](const std::string &v) { std::cerr << v; }, [](boost::rational<int> v) { std::cerr << v; },
+                         [](std::pair<int, int> v) { std::cerr << "(" << v.first << "," << v.second << ")"; },
+                         [](std::pair<std::string, int> v) { std::cerr << "(\"" << v.first << "\"," << v.second << ")"; }  //
+                     },
+                     rStack.top());
+          std::cerr << " b = ";
+          std::visit(Overload{
+                         [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << v; },
+                         [](unsigned v) { std::cerr << v; }, [](float v) { std::cerr << v; }, [](double v) { std::cerr << v; },
+                         [](const std::string &v) { std::cerr << v; }, [](boost::rational<int> v) { std::cerr << v; },
+                         [](std::pair<int, int> v) { std::cerr << "(" << v.first << "," << v.second << ")"; },
+                         [](std::pair<std::string, int> v) { std::cerr << "(\"" << v.first << "\"," << v.second << ")"; }  //
+                     },
+                     b);
+          std::cerr << " a = ";
+          std::visit(Overload{
+                         [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << v; },
+                         [](unsigned v) { std::cerr << v; }, [](float v) { std::cerr << v; }, [](double v) { std::cerr << v; },
+                         [](const std::string &v) { std::cerr << v; }, [](boost::rational<int> v) { std::cerr << v; },
+                         [](std::pair<int, int> v) { std::cerr << "(" << v.first << "," << v.second << ")"; },
+                         [](std::pair<std::string, int> v) { std::cerr << "(\"" << v.first << "\"," << v.second << ")"; }  //
+                     },
+                     a);
+          std::cerr << "\n";
+        };
+      }; break;
+      case CMP_NOT_EQUAL:
+        rStack.push(is_neq(b, a));
+        break;
+      case CMP_LT:
+        rStack.push(is_lt(b, a));
+        break;
+      case CMP_GT:
+        rStack.push(is_gt(b, a));
+        break;
+      case CMP_LE:
+        rStack.push(is_le(b, a));
+        break;
+      case CMP_GE:
+        rStack.push(is_ge(b, a));
+        break;
+      case OR:
+        rStack.push(is_logic_or(b, a));
+        break;
+      case AND:
+        rStack.push(is_logic_and(b, a));
         break;
       case CALL:
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
@@ -453,6 +519,21 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         const auto anyValue   = payload->getItem(instancePosition.second);
         rdb::descFldVT val    = any_to_variant_cast(anyValue);
         rStack.push(val);
+
+        if (debug) {
+          std::cerr << "PUSH_ID: " << instancePosition.first << "[" << instancePosition.second << "] = ";
+          std::visit(
+              Overload{
+                  [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << "BYTE " << v; },
+                  [](unsigned v) { std::cerr << "UINT " << v; }, [](float v) { std::cerr << "FLOAT " << v; },
+                  [](double v) { std::cerr << "DOUBLE " << v; }, [](const std::string &v) { std::cerr << "STRING " << v; },
+                  [](boost::rational<int> v) { std::cerr << "RATIONAL " << v; },
+                  [](std::pair<int, int> v) { std::cerr << "PAIR " << "(" << v.first << "," << v.second << ")"; },
+                  [](std::pair<std::string, int> v) { std::cerr << "PAIR " << "(\"" << v.first << "\"," << v.second << ")"; }  //
+              },
+              val);
+          std::cerr << "\n";
+        };
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");
@@ -482,4 +563,4 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
   };
 
   return rStack.top();
-}
+}  // end fn

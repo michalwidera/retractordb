@@ -268,55 +268,13 @@ void presenter::onlyCompileShowProgram() {
     for (auto r : q.lRules) {
       std::cout << "\tRULE " << r.name << std::endl;
 
-      for (auto tf1 : r.leftCondition) {
+      for (auto tf1 : r.condition) {
         if (tf1.getStrCommandID() == "PUSH_ID") {
           std::cout << "\t\t" << tf1 << std::endl;
         } else if ((tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL")) {
           std::cout << "\t\t" << tf1 << std::endl;
         } else
           std::cout << "\t\t" << tf1.getStrCommandID() << std::endl;
-      }
-
-      std::cout << "\t\t" << "CONDITION";
-
-      switch (r.type) {
-        case rule::EQUAL:
-          std::cout << " IS_EQUAL ";
-          break;
-        case rule::LESS:
-          std::cout << " LESS ";
-          break;
-        case rule::GREATER:
-          std::cout << " GREATER ";
-          break;
-        case rule::LESS_EQUAL:
-          std::cout << " LESS_EQUAL ";
-          break;
-        case rule::GREATER_EQUAL:
-          std::cout << " GREATER_EQUAL ";
-          break;
-        case rule::NOT_EQUAL:
-          std::cout << " NOT_EQUAL ";
-          break;
-        case rule::AND:
-          std::cout << " AND ";
-          break;
-        case rule::OR:
-          std::cout << " OR ";
-          break;
-        default:
-          std::cout << " UNKNOWN_RULE ";
-          abort();
-      }
-      std::cout << std::endl;
-
-      for (auto tf2 : r.rightCondition) {
-        if (tf2.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf2 << std::endl;
-        } else if ((tf2.getStrCommandID() == "CALL") || (tf2.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf2 << std::endl;
-        } else
-          std::cout << "\t\t" << tf2.getStrCommandID() << std::endl;
       }
 
       switch (r.action) {

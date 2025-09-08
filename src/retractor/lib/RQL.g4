@@ -32,7 +32,7 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
 
 rule_statement      : RULE name=ID
                       ON stream_name=ID
-                      WHEN logic_expression
+                      WHEN logic
                       DO ( dumppart | systempart )
                     # Rulez
                     ;
@@ -86,18 +86,25 @@ unary_op_expression : BIT_NOT expression
 asterisk            : (ID DOT)? STAR
                     ;
 
-logic_expression    : left_rule_expr condition right_rule_expr 
-                    ;
-
-left_rule_expr      : expression_factor # ExpRuleLef
-                    ;
-
-right_rule_expr     : expression_factor # ExpRuleRight
-                    ;
-
-condition           : AND_C | OR_C | GREATER (EQUAL)? | LESS (EQUAL)? | IS_EQUAL ;
-
 expression          : expression_factor
+                    ;
+
+logic               : expression_logic
+                    # LogicExpression
+                    ;
+
+expression_logic    : expression_logic AND_C expression_logic    # ExpAnd
+                    | expression_logic OR_C expression_logic     # ExpOr
+                    | term_logic                                 # ExpTermLogic
+                    ;
+
+term_logic          : term_logic IS_EQ term_logic                # ExpEq
+                    | term_logic IS_NQ term_logic                # ExpNq
+                    | term_logic IS_GR term_logic                # ExpGr
+                    | term_logic IS_LS term_logic                # ExpLs
+                    | term_logic IS_GE term_logic                # ExpGe
+                    | term_logic IS_LE term_logic                # ExpLe 
+                    | expression_factor                          # ExpFactor
                     ;
 
 expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
@@ -105,8 +112,7 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
                     | term                                       # ExpTerm
                     ;
 
-term
-                    : term STAR term               # ExpMult
+term                : term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
                     | fraction_rule                # ExpRational
                     | '(' expression_factor ')'    # ExpIn
@@ -117,9 +123,10 @@ term
                     | field_id                     # ExpField
                     | agregator                    # ExpAgg
                     | function_call                # ExpFnCall
+                    | NOT_C term                   # ExpNot
                     ;
 
-stream_expression   : stream_term GREATER DECIMAL   # SExpTimeMove
+stream_expression   : stream_term '>' DECIMAL       # SExpTimeMove
                     | stream_term MINUS rational_se # SExpMinus
                     | stream_term PLUS stream_term  # SExpPlus
                     | stream_term                   # SExpTerm
@@ -185,6 +192,9 @@ DUMP:               'DUMP'|'dump';
 SYSTEM:             'SYSTEM'|'system';
 DO:                 'DO'|'do';
 TO:                 'TO'|'to';
+AND_C:              'AND'|'and';
+OR_C:               'OR'|'or';
+NOT_C:              'NOT'|'not';
 
 MIN:                'MIN'|'min';
 MAX:                'MAX'|'max';
@@ -199,10 +209,12 @@ FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
-IS_EQUAL:           '==';
-EQUAL:              '=';
-GREATER:            '>';
-LESS:               '<';
+IS_EQ:              '=';
+IS_NQ:              '!=';
+IS_GR:              '>';
+IS_LS:              '<';
+IS_GE:              '>=';
+IS_LE:              '<=';
 EXCLAMATION:        '!';
 DOUBLE_BAR:         '||';
 DOT:                '.';
@@ -224,8 +236,7 @@ BIT_NOT:            '~';
 BIT_OR:             '|';
 BIT_XOR:            '^';
 
-AND_C:              'AND'|'and';
-OR_C:               'OR'|'or';
+
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);

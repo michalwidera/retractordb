@@ -75,8 +75,7 @@ class ParserListener : public RQLBaseListener {
   bool storageName_already_set  = false;
 
   /** Rule command support */
-  std::list<token> leftRuleCondition, rightRuleCondition;
-  rule::ruleType ruleType;
+  std::list<token> ruleCondition;
   long int dump_left;
   long int dump_right;
   size_t dump_retention;
@@ -104,6 +103,15 @@ class ParserListener : public RQLBaseListener {
   void exitExpMinus(RQLParser::ExpMinusContext *ctx) { recpToken(SUBTRACT); }
   void exitExpMult(RQLParser::ExpMultContext *ctx) { recpToken(MULTIPLY); }
   void exitExpDiv(RQLParser::ExpDivContext *ctx) { recpToken(DIVIDE); }
+  void exitExpAnd(RQLParser::ExpAndContext *ctx) { recpToken(AND); }
+  void exitExpOr(RQLParser::ExpOrContext *ctx) { recpToken(OR); }
+  void exitExpEq(RQLParser::ExpEqContext *ctx) { recpToken(CMP_EQUAL); }
+  void exitExpNq(RQLParser::ExpNqContext *ctx) { recpToken(CMP_NOT_EQUAL); }
+  void exitExpGr(RQLParser::ExpGrContext *ctx) { recpToken(CMP_GT); }
+  void exitExpLs(RQLParser::ExpLsContext *ctx) { recpToken(CMP_LT); }
+  void exitExpGe(RQLParser::ExpGeContext *ctx) { recpToken(CMP_GE); }
+  void exitExpLe(RQLParser::ExpLeContext *ctx) { recpToken(CMP_LE); }
+  void exitExpNot(RQLParser::ExpNotContext *ctx) { recpToken(NOT); }
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext *ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
@@ -219,7 +227,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitRulez(RQLParser::RulezContext *ctx) {
     std::string stream_name(ctx->stream_name->getText());
-    rule ruleConstruct(rule(ctx->name->getText(), leftRuleCondition, rightRuleCondition, ruleType));
+    rule ruleConstruct(rule(ctx->name->getText(), ruleCondition));
 
     for (auto &i : coreInstance) {
       if (i.id == stream_name) {
@@ -254,9 +262,7 @@ class ParserListener : public RQLBaseListener {
     dump_right     = 0;
     dump_retention = 0;
     systemCommand.clear();
-    leftRuleCondition.clear();
-    rightRuleCondition.clear();
-    ruleType   = rule::UNKNOWN_RULE;
+    ruleCondition.clear();
     actionType = rule::UNKNOWN_ACTION;
     qry.reset();
     fieldCount = 0;
@@ -281,44 +287,6 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     systemCommand.erase(systemCommand.size() - 1);
     systemCommand.erase(0, 1);
-  }
-
-  void exitExpRuleLef(RQLParser::ExpRuleLefContext *ctx) {
-    leftRuleCondition = program;
-    program.clear();
-  }
-
-  void exitExpRuleRight(RQLParser::ExpRuleRightContext *ctx) {
-    rightRuleCondition = program;
-    program.clear();
-  }
-
-  void exitLogic_expression(RQLParser::Logic_expressionContext *ctx) {
-    if (ctx->children.size() != 3) {
-      std::cerr << "Parser/Rule: Logical expression must have 3 children" << std::endl;
-      abort();
-    }
-
-    if (ctx->children[1]->getText() == "==")
-      ruleType = rule::EQUAL;
-    else if (ctx->children[1]->getText() == "<")
-      ruleType = rule::LESS;
-    else if (ctx->children[1]->getText() == ">")
-      ruleType = rule::GREATER;
-    else if (ctx->children[1]->getText() == "<=")
-      ruleType = rule::LESS_EQUAL;
-    else if (ctx->children[1]->getText() == ">=")
-      ruleType = rule::GREATER_EQUAL;
-    else if (ctx->children[1]->getText() == "!=")
-      ruleType = rule::NOT_EQUAL;
-    else if (ctx->children[1]->getText() == "AND")
-      ruleType = rule::AND;
-    else if (ctx->children[1]->getText() == "OR")
-      ruleType = rule::OR;
-    else {
-      std::cerr << "Parser/Rule: Unknown operator " << ctx->children[1]->getText() << std::endl;
-      abort();
-    }
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {
@@ -358,6 +326,11 @@ class ParserListener : public RQLBaseListener {
     recpToken(PUSH_TSCAN, ctx->getText());
     qry.lSchema.push_back(
         field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, 1, rdb::INTEGER), program));
+    program.clear();
+  }
+
+  void exitLogicExpression(RQLParser::LogicExpressionContext *ctx) {
+    ruleCondition = program;
     program.clear();
   }
 
