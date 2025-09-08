@@ -1,7 +1,5 @@
 #pragma once
 
-/** WORK IN PROGRESS - DO NOT USE **/
-
 #include <unistd.h>  // for ::lseek, ::write, ::close
 
 #include <boost/circular_buffer.hpp>

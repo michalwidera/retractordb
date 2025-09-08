@@ -13,48 +13,6 @@
 
 #include "dataModel.h"
 
-/** WORK IN PROGRESS - DO NOT USE **/
-
-/*
-std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
-std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
-*/
-
-// dumpManager.cpp
-// dumpManager.h
-
-// musi dojść do wywołania dump managera - lub wysłania do niego zadania
-// musi nastąpić zrzut danych ze struminia do pliku (materializacja)
-// tworzone pliki zrzutów jeśli retencja > 0 muszą podlegać retencji
-// w obiekcie r.dump_retention jest informacja o retencji - ile plików zrzutów ma być zachowanych
-// w obiekcie r.dumpRange jest informacja o zakresie zrzutu
-// r.dumpRange.first - ile rekordów wstecz
-// r.dumpRange.second - ile rekordów w przód
-// etap kompilacji zapewnia że first <= second
-
-// dump manager - osobna klasa - singleton
-// dump manager - zarządza plikami zrzutów
-// dump manager - zarządza retencją plików zrzutów
-// dump manager - zapewnia unikalne nazwy plików zrzutów
-// dump manager - zapewnia miejsce na dysku dla plików zrzutów
-// dump manager - zapewnia format plików zrzutów (np. csv, json, binarny)
-// dump manager - zapewnia metadane plików zrzutów (np. nagłówki, typy danych)
-// dump manager - zapewnia indeksowanie plików zrzutów (np. po czasie, po kluczu)
-// dump manager - zapewnia wyszukiwanie plików zrzutów
-// dump manager - zapewnia usuwanie starych plików zrzutów
-// dump manager - zapewnia raportowanie stanu plików zrzutów
-// dump manager - zapewnia konfigurację (np. katalog zrzutów, format plików, retencja)
-// dump manager - zapewnia logowanie operacji zrzutów
-// dump manager - zapewnia obsługę błędów (np. brak miejsca na dysku, błędy zapisu)
-// dump manager - zapewnia testowanie (np. jednostkowe, integracyjne)
-// dump manager - zapewnia dokumentację
-// dump manager - zapewnia bezpieczeństwo (np. uprawnienia, szyfrowanie)
-// dump manager - zapewnia wydajność (np. buforowanie, asynchroniczność)
-// dump manager - zapewnia integrację (np. z innymi systemami, z chmurą)
-// dump manager - zapewnia rozwój (np. nowe funkcje, poprawki błędów)
-// dump manager - zapewnia wsparcie (np. techniczne, społecznościowe)
-// dump manager - zapewnia monitoring (np. metryki, alerty)
-
 extern dataModel *pProc;
 
 dumpTask::~dumpTask() {
