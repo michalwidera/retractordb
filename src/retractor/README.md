@@ -39,7 +39,7 @@ Usage: xretractor queryfile [option]
 Available options:
   -h [ --help ]          show help options
   -q [ --queryfile ] arg query set file
-  -r [ --quiet ]         no output on screen, skip dumper
+  -r [ --quiet ]         no output on screen, skip presenter
   -d [ --dot ]           create dot output
   -m [ --csv ]           create csv output
   -f [ --fields ]        show fields in dot file

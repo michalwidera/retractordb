@@ -1,7 +1,5 @@
 #include ".antlr/RQLParser.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
@@ -76,6 +74,14 @@ class ParserListener : public RQLBaseListener {
   bool substratType_already_set = false;
   bool storageName_already_set  = false;
 
+  /** Rule command support */
+  std::list<token> ruleCondition;
+  long int dump_left;
+  long int dump_right;
+  size_t dump_retention;
+  std::string systemCommand;
+  rule::actionType actionType;
+
   void recpToken(command_id id) { program.push_back(token(id)); };
 
   template <typename T>
@@ -97,6 +103,15 @@ class ParserListener : public RQLBaseListener {
   void exitExpMinus(RQLParser::ExpMinusContext *ctx) { recpToken(SUBTRACT); }
   void exitExpMult(RQLParser::ExpMultContext *ctx) { recpToken(MULTIPLY); }
   void exitExpDiv(RQLParser::ExpDivContext *ctx) { recpToken(DIVIDE); }
+  void exitExpAnd(RQLParser::ExpAndContext *ctx) { recpToken(AND); }
+  void exitExpOr(RQLParser::ExpOrContext *ctx) { recpToken(OR); }
+  void exitExpEq(RQLParser::ExpEqContext *ctx) { recpToken(CMP_EQUAL); }
+  void exitExpNq(RQLParser::ExpNqContext *ctx) { recpToken(CMP_NOT_EQUAL); }
+  void exitExpGr(RQLParser::ExpGrContext *ctx) { recpToken(CMP_GT); }
+  void exitExpLs(RQLParser::ExpLsContext *ctx) { recpToken(CMP_LT); }
+  void exitExpGe(RQLParser::ExpGeContext *ctx) { recpToken(CMP_GE); }
+  void exitExpLe(RQLParser::ExpLeContext *ctx) { recpToken(CMP_LE); }
+  void exitExpNot(RQLParser::ExpNotContext *ctx) { recpToken(NOT); }
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext *ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
@@ -181,15 +196,11 @@ class ParserListener : public RQLBaseListener {
   void exitRetention(RQLParser::RetentionContext *ctx) {
     if (ctx->segments) {
       // retention {capacity} !{segments}
-      SPDLOG_INFO("Parser/Retention: {} {}",            //
-                  std::stoi(ctx->segments->getText()),  //
-                  std::stoi(ctx->capacity->getText()));
       qry.retention = std::pair<int, int>(      //
           std::stoi(ctx->segments->getText()),  //
           std::stoi(ctx->capacity->getText()));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      SPDLOG_INFO("Parser/Mem Retention: {}", ctx->capacity->getText());
       qry.substratPolicy.second = std::stoi(ctx->capacity->getText());
     }
   }
@@ -212,6 +223,70 @@ class ParserListener : public RQLBaseListener {
     program.clear();
     qry.reset();
     fieldCount = 0;
+  }
+
+  void exitRulez(RQLParser::RulezContext *ctx) {
+    std::string stream_name(ctx->stream_name->getText());
+    rule ruleConstruct(rule(ctx->name->getText(), ruleCondition));
+
+    for (auto &i : coreInstance) {
+      if (i.id == stream_name) {
+        if (i.isDeclaration()) {
+          std::cerr << "Parser/Rule: Cannot attach rule to declaration stream:" << stream_name
+                    << " Rule:" << ctx->name->getText() << std::endl;
+          abort();
+        }
+        if (actionType == rule::DUMP) {
+          ruleConstruct.action    = rule::DUMP;
+          ruleConstruct.dumpRange = std::make_pair(dump_left, dump_right);
+          if (dump_left > dump_right) {
+            std::cerr << "Parser/Rule: Dump left range cannot be greater than dump right range" << std::endl;
+            abort();
+          }
+          ruleConstruct.dump_retention = dump_retention;
+        } else if (actionType == rule::SYSTEM) {
+          ruleConstruct.action        = rule::SYSTEM;
+          ruleConstruct.systemCommand = systemCommand;
+        } else {
+          std::cerr << "Parser/Rule: Unknown action type:" << actionType << " stream_name:" << stream_name
+                    << " Rule:" << ctx->name->getText() << std::endl;
+          abort();
+        }
+
+        i.lRules.push_back(ruleConstruct);
+        break;
+      }
+    }
+    program.clear();
+    dump_left      = 0;
+    dump_right     = 0;
+    dump_retention = 0;
+    systemCommand.clear();
+    ruleCondition.clear();
+    actionType = rule::UNKNOWN_ACTION;
+    qry.reset();
+    fieldCount = 0;
+  }
+
+  void exitDumppart(RQLParser::DumppartContext *ctx) {
+    actionType = rule::DUMP;
+    dump_left  = std::stoi(ctx->step_back->getText());
+    if (ctx->children[1]->getText() == "-") dump_left = -dump_left;
+    dump_right = std::stoi(ctx->step_forward->getText());
+    if (ctx->children[4]->getText() == "-" || ctx->children[3]->getText() == "−") dump_right = -dump_right;
+
+    if (ctx->rule_retnetion)
+      dump_retention = std::stoi(ctx->rule_retnetion->getText());
+    else
+      dump_retention = 0;  // Default: no retention
+  }
+
+  void exitSystempart(RQLParser::SystempartContext *ctx) {
+    actionType    = rule::SYSTEM;
+    systemCommand = ctx->syscmd->getText();
+    // This removes ''
+    systemCommand.erase(systemCommand.size() - 1);
+    systemCommand.erase(0, 1);
   }
 
   void exitStorage(RQLParser::StorageContext *ctx) {
@@ -251,6 +326,11 @@ class ParserListener : public RQLBaseListener {
     recpToken(PUSH_TSCAN, ctx->getText());
     qry.lSchema.push_back(
         field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, 1, rdb::INTEGER), program));
+    program.clear();
+  }
+
+  void exitLogicExpression(RQLParser::LogicExpressionContext *ctx) {
+    ruleCondition = program;
     program.clear();
   }
 

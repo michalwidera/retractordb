@@ -21,6 +21,7 @@
 using namespace CRationalStreamMath;
 
 extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
+extern dataModel *pProc;
 
 qTree coreInstance;
 
@@ -113,6 +114,8 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   std::stringstream strstream;
 
   dataModel proc(coreInstance);
+  pProc = &proc;  // This need to be set for dumpManager
+
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
   boost::rational<int> prev_interval(0);
 
@@ -204,6 +207,8 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   std::stringstream strstream;
 
   dataModel proc(coreInstance);
+  pProc = &proc;  // This need to be set for dumpManager
+
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
   boost::rational<int> prev_interval(0);
 

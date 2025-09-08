@@ -52,6 +52,20 @@ struct field {
   friend std::ostream &operator<<(std::ostream &os, const field &s);
 };
 
+struct rule {
+  std::string name;
+  std::list<token> condition;
+
+  enum actionType { UNKNOWN_ACTION, DUMP, SYSTEM } action{UNKNOWN_ACTION};
+
+  std::pair<long int, long int> dumpRange{std::make_pair(0, 0)};
+  size_t dump_retention{0};
+
+  std::string systemCommand{};
+
+  rule(std::string name, std::list<token> condition) : name(std::move(name)), condition(std::move(condition)) {}
+};
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -66,6 +80,8 @@ class query {
   boost::rational<int> rInterval = 0;
   std::list<field> lSchema;
   std::list<token> lProgram;
+
+  std::list<rule> lRules;
 
   rdb::retention_t retention                    = rdb::retention_t{0, 0};        // Retention segments and capacity
   std::pair<std::string, size_t> substratPolicy = std::make_pair("DEFAULT", 0);  // rdb::memoryFileAccessor::no_retention

@@ -83,7 +83,7 @@ ssize_t textSourceAccessor::read(uint8_t *ptrData, const size_t position) {
             auto var = readFromFstream<unsigned>(myFile);
             payload->setItem(i + j, static_cast<uint8_t>(var));
           } else {
-            SPDLOG_ERROR("Unsupported type in text data source: {}", item.rtype);
+            SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(item.rtype));
             assert(false && "read - Unsupported type in text data source");
             abort();
           }

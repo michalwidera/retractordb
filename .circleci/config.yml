@@ -14,9 +14,9 @@ workflows:
   nightly:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_4_*_*_3
-          # At 4:00 on Wednesday.
-          cron: "0 4 * * 3,6"
+          # https://crontab.guru/#0_4_5,15_*_*
+          # At 04:00 on day-of-month 5 and 15.
+          cron: "0 4 5,15 * *"
           filters:
             branches:
               only:
@@ -24,34 +24,16 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-release
-      - build-release-ninja
       - build-debug:
           requires:
             - build-release
       - build-debug-ninja:
           requires:
-            - build-release-ninja
+            - build-release
       - build-ARM:
           requires:
             - build-release
-    
-  fix_dev_check:
-    triggers:
-      - schedule:
-          # https://crontab.guru/#0_4_*_*_6
-          # At 04:00 on Saturday.
-          cron: "0 4 * * 6"
-          filters:
-            branches:
-              only:
-                - /fix_.*/
-                - /dev_.*/
-                - /issue_.*/
-    jobs:
-      - build-release
-      - build-debug:
-          requires:
-            - build-release
+
 
 executors:
   ubuntu-docker-2204:

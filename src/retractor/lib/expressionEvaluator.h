@@ -10,5 +10,5 @@ class expressionEvaluator {
   expressionEvaluator(/* args */);
   ~expressionEvaluator();
 
-  rdb::descFldVT eval(std::list<token> program, rdb::payload *payload = nullptr);
+  rdb::descFldVT eval(std::list<token> program, rdb::payload *payload = nullptr, bool debug = false);
 };

@@ -14,11 +14,6 @@
 #include "expressionEvaluator.h"
 #include "rdb/convertTypes.h"
 
-/*
-std::string removeCRLF(std::string input) { return std::regex_replace(input, std::regex("\\r\\n|\\r|\\n"), ""); }
-std::string removeSpc(std::string input) { return std::regex_replace(input, std::regex(R"(\s+)"), " "); }
-*/
-
 streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string storagePathParam) : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
   assert(!qry.id.empty());
@@ -33,6 +28,8 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string stor
 
   auto requestedCapacity = coreInstance.maxCapacity[qry.id];
   outputPayload->setCapacity(requestedCapacity);
+
+  dumpMgr.setDumpStorage(storagePathParam);
 };
 
 // https://en.cppreference.com/w/cpp/numeric/math/div
@@ -268,4 +265,62 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 
     i++;
   }
+}
+bool boolCast(const rdb::descFldVT &inVar) {
+  bool retVal(false);
+
+  std::visit(Overload{
+                 [&retVal](uint8_t a) { retVal = (a != 0); },                                   //
+                 [&retVal](int a) { retVal = (a != 0); },                                       //
+                 [&retVal](unsigned a) { retVal = (a != 0); },                                  //
+                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                      //
+                 [&retVal](float a) { retVal = (a != 0); },                                     //
+                 [&retVal](double a) { retVal = (a != 0); },                                    //
+                 [&retVal](std::pair<int, int> a) { assert(false && "no support."); },          //
+                 [&retVal](std::pair<std::string, int> a) { assert(false && "no support."); },  //
+                 [&retVal](const std::string &a) { assert(false && "no support."); }            //
+             },
+             inVar);
+
+  return retVal;
+}
+
+void streamInstance::constructRulesAndUpdate(query &qry) {
+  bool debug = false;
+  // construct if rule is fired
+  if (debug) std::cerr << qry.id << " rules: " << qry.lRules.size() << "\n";
+
+  rdb::payload payload(*outputPayload->getPayload());
+
+  for (auto &r : qry.lRules) {
+    if (debug) std::cerr << "rule: " << r.name << " condition size: " << r.condition.size() << "\n";
+    assert(!r.condition.empty());
+    assert(r.action == rule::DUMP || r.action == rule::SYSTEM);
+    auto condition = r.condition;
+    expressionEvaluator expression;
+    auto result = expression.eval(condition, &payload, debug);
+    if (boolCast(result)) {
+      if (r.action == rule::DUMP) {
+        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);
+        dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
+      } else if (r.action == rule::SYSTEM) {
+        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing system command: {}", r.systemCommand);
+        auto ret = system(r.systemCommand.c_str());
+        if ( ret == -1 ) {
+          SPDLOG_ERROR("system() call failed");
+        } else {
+          if (WIFEXITED(ret)) {
+            auto exitStatus = WEXITSTATUS(ret);
+            if (exitStatus != 0) {
+              SPDLOG_ERROR("system() command exited with status: {}", exitStatus);
+            }
+          } else {
+            SPDLOG_ERROR("system() command did not terminate normally");
+          }
+        } 
+      }
+    }
+  }
+
+  dumpMgr.processStreamChunk(qry.id);
 }

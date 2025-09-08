@@ -297,14 +297,14 @@ boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6
 // based: https://stackoverflow.com/questions/61182946/convert-stdany-to-stdvariant
 rdb::descFldVT any_to_variant_cast(std::any a) {
   if (!a.has_value()) throw std::bad_any_cast();
-
-  if (a.type() == typeid(std::string)) return std::any_cast<std::string>(a);
-  if (a.type() == typeid(int)) return std::any_cast<int>(a);
-  if (a.type() == typeid(uint8_t)) return std::any_cast<uint8_t>(a);
-  if (a.type() == typeid(unsigned)) return std::any_cast<unsigned>(a);
-  if (a.type() == typeid(double)) return std::any_cast<double>(a);
-  if (a.type() == typeid(float)) return std::any_cast<float>(a);
-  if (a.type() == typeid(boost::rational<int>)) return std::any_cast<boost::rational<int>>(a);
+  cast<rdb::descFldVT> castRI;
+  if (a.type() == typeid(std::string)) return castRI(std::any_cast<std::string>(a), rdb::STRING);
+  if (a.type() == typeid(int)) return castRI(std::any_cast<int>(a), rdb::INTEGER);
+  if (a.type() == typeid(uint8_t)) return castRI(std::any_cast<uint8_t>(a), rdb::BYTE);
+  if (a.type() == typeid(unsigned)) return castRI(std::any_cast<unsigned>(a), rdb::UINT);
+  if (a.type() == typeid(double)) return castRI(std::any_cast<double>(a), rdb::DOUBLE);
+  if (a.type() == typeid(float)) return castRI(std::any_cast<float>(a), rdb::FLOAT);
+  if (a.type() == typeid(boost::rational<int>)) return castRI(std::any_cast<boost::rational<int>>(a), rdb::RATIONAL);
   throw std::bad_any_cast();
   return rdb::descFldVT(0);  // Proforma
 }

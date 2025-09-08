@@ -1,0 +1,26 @@
+:STORAGE	temp/
+str1(1/10)
+	:- PUSH_STREAM(core0)
+	str1_0: INTEGER
+		PUSH_ID(str1[0])
+	RULE testrule1
+		PUSH_ID(str1[0])
+		PUSH_VAL(15)
+		CMP_LT
+		DO DUMP -5 TO 5
+	RULE testrule2
+		PUSH_ID(str1[0])
+		PUSH_VAL(11)
+		CMP_GT
+		DO DUMP -5 TO 5 RETENTION 100
+	RULE testrule3
+		PUSH_ID(str1[0])
+		PUSH_VAL(13)
+		CMP_EQUAL
+		PUSH_ID(str1[0])
+		PUSH_VAL(11)
+		CMP_EQUAL
+		OR
+		DO SYSTEM 'echo "systemcall"'
+core0(1/10)	datafile2.dat
+	a: INTEGER

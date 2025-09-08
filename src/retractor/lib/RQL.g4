@@ -4,6 +4,7 @@ prog                : ( select_statement
                       | declare_statement
                       | storage_statement
                       | substrat_statement
+                      | rule_statement
                       )+ EOF
                     ;
 
@@ -27,6 +28,19 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
                     # Declare
+                    ;
+
+rule_statement      : RULE name=ID
+                      ON stream_name=ID
+                      WHEN logic
+                      DO ( dumppart | systempart )
+                    # Rulez
+                    ;
+
+dumppart            : DUMP '-'? step_back=DECIMAL TO '-'? step_forward=DECIMAL (RETENTION rule_retnetion=DECIMAL)?
+                    ;
+
+systempart          : SYSTEM syscmd=STRING
                     ;
 
 rational_se         : fraction_rule # RationalAsFraction_proforma
@@ -75,13 +89,30 @@ asterisk            : (ID DOT)? STAR
 expression          : expression_factor
                     ;
 
+logic               : expression_logic
+                    # LogicExpression
+                    ;
+
+expression_logic    : expression_logic AND_C expression_logic    # ExpAnd
+                    | expression_logic OR_C expression_logic     # ExpOr
+                    | term_logic                                 # ExpTermLogic
+                    ;
+
+term_logic          : term_logic IS_EQ term_logic                # ExpEq
+                    | term_logic IS_NQ term_logic                # ExpNq
+                    | term_logic IS_GR term_logic                # ExpGr
+                    | term_logic IS_LS term_logic                # ExpLs
+                    | term_logic IS_GE term_logic                # ExpGe
+                    | term_logic IS_LE term_logic                # ExpLe 
+                    | expression_factor                          # ExpFactor
+                    ;
+
 expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
                     | expression_factor MINUS expression_factor  # ExpMinus
                     | term                                       # ExpTerm
                     ;
 
-term
-                    : term STAR term               # ExpMult
+term                : term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
                     | fraction_rule                # ExpRational
                     | '(' expression_factor ')'    # ExpIn
@@ -92,9 +123,10 @@ term
                     | field_id                     # ExpField
                     | agregator                    # ExpAgg
                     | function_call                # ExpFnCall
+                    | NOT_C term                   # ExpNot
                     ;
 
-stream_expression   : stream_term GREATER DECIMAL   # SExpTimeMove
+stream_expression   : stream_term '>' DECIMAL       # SExpTimeMove
                     | stream_term MINUS rational_se # SExpMinus
                     | stream_term PLUS stream_term  # SExpPlus
                     | stream_term                   # SExpTerm
@@ -153,6 +185,16 @@ RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
+RULE:               'RULE'|'rule';
+ON:                 'ON'|'on';
+WHEN:               'WHEN'|'when';
+DUMP:               'DUMP'|'dump';
+SYSTEM:             'SYSTEM'|'system';
+DO:                 'DO'|'do';
+TO:                 'TO'|'to';
+AND_C:              'AND'|'and';
+OR_C:               'OR'|'or';
+NOT_C:              'NOT'|'not';
 
 MIN:                'MIN'|'min';
 MAX:                'MAX'|'max';
@@ -167,9 +209,12 @@ FLOAT:              DEC_DOT_DEC;
 DECIMAL:            DEC_DIGIT+;
 REAL:               (DECIMAL | DEC_DOT_DEC) ('E' [+-]? DEC_DIGIT+);
 
-EQUAL:              '=';
-GREATER:            '>';
-LESS:               '<';
+IS_EQ:              '=';
+IS_NQ:              '!=';
+IS_GR:              '>';
+IS_LS:              '<';
+IS_GE:              '>=';
+IS_LE:              '<=';
 EXCLAMATION:        '!';
 DOUBLE_BAR:         '||';
 DOT:                '.';
@@ -190,6 +235,8 @@ MINUS:              '-';
 BIT_NOT:            '~';
 BIT_OR:             '|';
 BIT_XOR:            '^';
+
+
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);

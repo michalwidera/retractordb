@@ -1,0 +1,13 @@
+.9 Record(s)
+4 Byte(s) per record.
+{	INTEGER str1_0
+}
+{ str1_0:10 }
+{ str1_0:11 }
+{ str1_0:12 }
+{ str1_0:13 }
+{ str1_0:14 }
+{ str1_0:15 }
+{ str1_0:16 }
+{ str1_0:17 }
+{ str1_0:10 }

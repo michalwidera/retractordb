@@ -8,8 +8,8 @@ digraph structs {
  core1	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core1\ninterval=1/5\nDeclaration|{<tag0>b(INTEGER)}"]
 str0 -> prg_str0
 str1 -> prg_str1
- str0_tag0	[shape=record,label="str0_0|{PUSH_ID(str0[0])|PUSH_VAL(10)|MULTIPLY(0)}"]
- str0_tag1	[shape=record,label="str0_1|{PUSH_ID(str0[1])|PUSH_VAL(10)|ADD(0)|PUSH_VAL(10)|MULTIPLY(0)}"]
+ str0_tag0	[shape=record,label="str0_0|{PUSH_ID(str0[0])|PUSH_VAL(10)|MULTIPLY}"]
+ str0_tag1	[shape=record,label="str0_1|{PUSH_ID(str0[1])|PUSH_VAL(10)|ADD|PUSH_VAL(10)|MULTIPLY}"]
  str1_tag0	[shape=record,label="str1_0|{PUSH_ID(str1[0])}"]
 prg_str0 -> core0
 prg_str0 -> core1

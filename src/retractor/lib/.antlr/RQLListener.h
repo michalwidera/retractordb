@@ -29,6 +29,15 @@ public:
   virtual void enterDeclare(RQLParser::DeclareContext *ctx) = 0;
   virtual void exitDeclare(RQLParser::DeclareContext *ctx) = 0;
 
+  virtual void enterRulez(RQLParser::RulezContext *ctx) = 0;
+  virtual void exitRulez(RQLParser::RulezContext *ctx) = 0;
+
+  virtual void enterDumppart(RQLParser::DumppartContext *ctx) = 0;
+  virtual void exitDumppart(RQLParser::DumppartContext *ctx) = 0;
+
+  virtual void enterSystempart(RQLParser::SystempartContext *ctx) = 0;
+  virtual void exitSystempart(RQLParser::SystempartContext *ctx) = 0;
+
   virtual void enterRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
   virtual void exitRationalAsFraction_proforma(RQLParser::RationalAsFraction_proformaContext *ctx) = 0;
 
@@ -92,6 +101,39 @@ public:
   virtual void enterExpression(RQLParser::ExpressionContext *ctx) = 0;
   virtual void exitExpression(RQLParser::ExpressionContext *ctx) = 0;
 
+  virtual void enterLogicExpression(RQLParser::LogicExpressionContext *ctx) = 0;
+  virtual void exitLogicExpression(RQLParser::LogicExpressionContext *ctx) = 0;
+
+  virtual void enterExpOr(RQLParser::ExpOrContext *ctx) = 0;
+  virtual void exitExpOr(RQLParser::ExpOrContext *ctx) = 0;
+
+  virtual void enterExpAnd(RQLParser::ExpAndContext *ctx) = 0;
+  virtual void exitExpAnd(RQLParser::ExpAndContext *ctx) = 0;
+
+  virtual void enterExpTermLogic(RQLParser::ExpTermLogicContext *ctx) = 0;
+  virtual void exitExpTermLogic(RQLParser::ExpTermLogicContext *ctx) = 0;
+
+  virtual void enterExpLs(RQLParser::ExpLsContext *ctx) = 0;
+  virtual void exitExpLs(RQLParser::ExpLsContext *ctx) = 0;
+
+  virtual void enterExpLe(RQLParser::ExpLeContext *ctx) = 0;
+  virtual void exitExpLe(RQLParser::ExpLeContext *ctx) = 0;
+
+  virtual void enterExpNq(RQLParser::ExpNqContext *ctx) = 0;
+  virtual void exitExpNq(RQLParser::ExpNqContext *ctx) = 0;
+
+  virtual void enterExpGr(RQLParser::ExpGrContext *ctx) = 0;
+  virtual void exitExpGr(RQLParser::ExpGrContext *ctx) = 0;
+
+  virtual void enterExpFactor(RQLParser::ExpFactorContext *ctx) = 0;
+  virtual void exitExpFactor(RQLParser::ExpFactorContext *ctx) = 0;
+
+  virtual void enterExpEq(RQLParser::ExpEqContext *ctx) = 0;
+  virtual void exitExpEq(RQLParser::ExpEqContext *ctx) = 0;
+
+  virtual void enterExpGe(RQLParser::ExpGeContext *ctx) = 0;
+  virtual void exitExpGe(RQLParser::ExpGeContext *ctx) = 0;
+
   virtual void enterExpPlus(RQLParser::ExpPlusContext *ctx) = 0;
   virtual void exitExpPlus(RQLParser::ExpPlusContext *ctx) = 0;
 
@@ -124,6 +166,9 @@ public:
 
   virtual void enterExpField(RQLParser::ExpFieldContext *ctx) = 0;
   virtual void exitExpField(RQLParser::ExpFieldContext *ctx) = 0;
+
+  virtual void enterExpNot(RQLParser::ExpNotContext *ctx) = 0;
+  virtual void exitExpNot(RQLParser::ExpNotContext *ctx) = 0;
 
   virtual void enterExpString(RQLParser::ExpStringContext *ctx) = 0;
   virtual void exitExpString(RQLParser::ExpStringContext *ctx) = 0;

@@ -52,7 +52,7 @@ using namespace CRationalStreamMath;
 // Map stores relations processId -> sended stream
 static std::map<const int, std::string> id2StreamName_Relation;
 
-static dataModel *pProc = nullptr;
+dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)

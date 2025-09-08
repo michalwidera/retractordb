@@ -131,6 +131,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     s << " QRY:[" << q.id << "]";                   //
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
+    qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
   }
 
   SPDLOG_INFO("END PROCESS: {}", s.str());
@@ -273,7 +274,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       }
     } break;
     default:
-      SPDLOG_ERROR("Undefined command_id:{}", cmd);
+      SPDLOG_ERROR("Undefined command_id:{}", static_cast<int>(cmd));
       assert(false && "Undefined command_id in constructInputPayload");
       abort();
   }
