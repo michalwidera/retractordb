@@ -305,7 +305,19 @@ void streamInstance::constructRulesAndUpdate(query &qry) {
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
       } else if (r.action == rule::SYSTEM) {
         SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing system command: {}", r.systemCommand);
-        system(r.systemCommand.c_str());
+        auto ret = system(r.systemCommand.c_str());
+        if ( ret == -1 ) {
+          SPDLOG_ERROR("system() call failed");
+        } else {
+          if (WIFEXITED(ret)) {
+            auto exitStatus = WEXITSTATUS(ret);
+            if (exitStatus != 0) {
+              SPDLOG_ERROR("system() command exited with status: {}", exitStatus);
+            }
+          } else {
+            SPDLOG_ERROR("system() command did not terminate normally");
+          }
+        } 
       }
     }
   }
