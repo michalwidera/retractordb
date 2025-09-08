@@ -13,10 +13,11 @@ struct presenter {
  private:
   qTree &coreInstance;
 
-  void graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags);
+  void graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules);
   void qFieldsProgram();
   void qFields();
   void qPrograms();
   void qSet();
+  void qRules();
   void onlyCompileShowProgram();
 };
