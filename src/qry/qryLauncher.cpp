@@ -31,9 +31,11 @@ int main(int argc, char *argv[]) {
     po::options_description desc("Allowed options");
     int timeLimit{0};
     std::string sInputStream{""};
+    std::string sAdHoc{""};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
         ("detail,t", po::value<std::string>(&sInputStream), "show details of this stream")                //
+        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode (not implemented)")                //
         ("tlimitqry,m", po::value<int>(&timeLimit)->default_value(0), "limit of elements, 0 - no limit")  //
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //
@@ -69,9 +71,11 @@ int main(int argc, char *argv[]) {
     else if (vm.count("kill")) {
       ptree pt = obj.netClient("kill", "");
       SPDLOG_INFO("kill sent to server");
-    } else if (vm.count("dir"))
+    } else if (vm.count("dir")) {
       std::cout << obj.dir();
-    else if (vm.count("detail")) {
+    } else if (vm.count("adhoc") && sAdHoc != "") {
+      if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
+    } else if (vm.count("detail")) {
       auto ret = obj.detailShow(sInputStream);
       if (ret != "")
         std::cout << ret;

@@ -17,6 +17,7 @@ class qry {
   formatMode outputFormatMode{formatMode::RAW};
 
   bool select(bool, const int, const std::string &);
+  bool adhoc(const std::string &);
   std::string dir();
   int hello();
   std::string detailShow(const std::string &);

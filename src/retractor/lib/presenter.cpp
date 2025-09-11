@@ -8,6 +8,8 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 
+// https://ref.pencilcode.net/turtle/colors.html
+
 using namespace boost;
 
 void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules) {
@@ -103,9 +105,6 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
         planStreamRelationsSet.insert(relation);
       }
       if (bShowRules && q.lRules.size() > 0) {
-        // https://ref.pencilcode.net/turtle/colors.html
-        //  [shape=record,label="str1_2|{PUSH_ID(str1[1])|PUSH_ID(str1[0])|MULTIPLY(0)|PUSH_VAL(20)|ADD(0)}"]
-
         for (auto r : q.lRules) {
           xout << " rule_" << r.name << "\t";
           xout << "[shape=record,style=filled,";

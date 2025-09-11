@@ -306,7 +306,7 @@ void streamInstance::constructRulesAndUpdate(query &qry) {
       } else if (r.action == rule::SYSTEM) {
         SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing system command: {}", r.systemCommand);
         auto ret = system(r.systemCommand.c_str());
-        if ( ret == -1 ) {
+        if (ret == -1) {
           SPDLOG_ERROR("system() call failed");
         } else {
           if (WIFEXITED(ret)) {
@@ -317,7 +317,7 @@ void streamInstance::constructRulesAndUpdate(query &qry) {
           } else {
             SPDLOG_ERROR("system() command did not terminate normally");
           }
-        } 
+        }
       }
     }
   }

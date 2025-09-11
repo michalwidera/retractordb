@@ -88,7 +88,7 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
     typedef IPC::allocator<char, segment_manager_t> CharAllocator;
     typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
-    typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
+    // typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
     typedef int KeyType;
     typedef std::pair<const int, IPCString> ValueType;
     typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
@@ -158,6 +158,11 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     throw;
   }
   return pt_response;
+}
+
+bool qry::adhoc(const std::string &sAdhoc) {
+  SPDLOG_ERROR("not implemented");
+  return false;
 }
 
 bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &input) {
