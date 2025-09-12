@@ -140,29 +140,13 @@ int main(int argc, char *argv[]) {
 
     std::string response;
     compiler cm(coreInstance);
-    response = cm.simplifyLProgram();
-    assert(response == "OK");
-    response = cm.prepareFields();
-    assert(response == "OK");
-    response = cm.intervalCounter();
-    assert(response == "OK");
-    response = cm.convertReferences();
-    assert(response == "OK");
-    response = cm.replicateIDX();
-    assert(response == "OK");
-    response = cm.convertRemotes();
-    assert(response == "OK");
+    response = cm.run();
 
-    coreInstance.maxCapacity = cm.countBuffersCapacity();
-
-    response = cm.applyConstraints();
     if (response != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //
                 << "Check result:" << response << std::endl;
       return system::errc::protocol_error;
     }
-
-    response = cm.fillSubstractsMemSize(coreInstance.maxCapacity);
     assert(response == "OK");
 
     if (onlyCompile) {

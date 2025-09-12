@@ -675,3 +675,35 @@ std::map<std::string, int> compiler::countBuffersCapacity() {
   }
   return capMap;
 }
+
+std::string compiler::run() {
+  std::string result;
+
+  result = simplifyLProgram();
+  if (result != "OK") return result;
+
+  result = prepareFields();
+  if (result != "OK") return result;
+
+  result = intervalCounter();
+  if (result != "OK") return result;
+
+  result = convertReferences();
+  if (result != "OK") return result;
+
+  result = replicateIDX();
+  if (result != "OK") return result;
+
+  result = convertRemotes();
+  if (result != "OK") return result;
+
+  coreInstance.maxCapacity = countBuffersCapacity();
+
+  result = applyConstraints();
+  if (result != "OK") return result;
+
+  result = fillSubstractsMemSize(coreInstance.maxCapacity);
+  if (result != "OK") return result;
+
+  return std::string("OK");
+}
