@@ -9,7 +9,7 @@
 #include "retractor/lib/QStruct.h"
 #include "retractor/lib/compiler.h"
 
-extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
 extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
@@ -25,7 +25,7 @@ bool check_compile_function() {
 
   if (!compiled) {
     coreInstance.clear();
-    compiled = parserRQLFile(coreInstance, "ut_compiler.rql") == "OK";
+    compiled = parserRQLFile_4Test(coreInstance, "ut_compiler.rql") == "OK";
   }
   return compiled;
 }

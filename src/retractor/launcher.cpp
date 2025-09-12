@@ -25,7 +25,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 static int iTimeLimitCntParam{0};
 
@@ -125,7 +125,21 @@ int main(int argc, char *argv[]) {
       return EPERM;  // ERROR defined in errno-base.h
     }
 
-    auto parseOut = parserRQLFile(coreInstance, sInputFile);
+    std::ifstream file(sInputFile);
+    if (!file.is_open()) {
+      std::cerr << "Error: Unable to open file!" << std::endl;
+      return system::errc::protocol_error;
+    }
+
+    std::string parseOut = "Empty file.";
+    std::string line;
+    while (std::getline(file, line)) {
+      if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
+      parseOut = parserRQLString(coreInstance, line);
+      if (parseOut != "OK") break;  // Return error if parsing fails
+    }
+
+    file.close();
 
     if (parseOut != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //
@@ -156,7 +170,6 @@ int main(int argc, char *argv[]) {
       }
       return system::errc::success;
     }
-
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
     return system::errc::interrupted;
@@ -169,7 +182,7 @@ int main(int argc, char *argv[]) {
   if (!guard.acquireLock()) {
     SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
     return system::errc::no_lock_available;
-  }
+  };
 
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());

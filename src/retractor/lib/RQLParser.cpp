@@ -376,31 +376,6 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parserRQLFile(qTree &coreInstance, std::string sInputFile) {
-  std::ifstream ins;
-  // Create the input stream.
-  ins.open(sInputFile.c_str());
-  ANTLRInputStream input(ins);
-  // Create a lexer which scans the input stream
-  // to create a token stream.
-  RQLLexer lexer(&input);
-  CommonTokenStream tokens(&lexer);
-  LexerErrorListener lexerErrorListener;
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(&lexerErrorListener);
-  // Create a parser which parses the token stream
-  // to create a parse tree.
-  RQLParser parser(&tokens);
-  ParserErrorListener parserErrorListener;
-  ParserListener parserListener(coreInstance);
-  parser.removeParseListeners();
-  parser.removeErrorListeners();
-  parser.addErrorListener(&parserErrorListener);
-  parser.addParseListener(&parserListener);
-  tree::ParseTree *tree = parser.prog();
-  return status;
-}
-
 std::string parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
@@ -421,4 +396,28 @@ std::string parserRQLString(qTree &coreInstance, std::string inlet) {
   parser.addParseListener(&parserListener);
   tree::ParseTree *tree = parser.prog();
   return status;
+}
+
+std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
+  std::ifstream file(sInputFile);
+  if (!file.is_open()) {
+    std::cerr << "Error: Unable to open file!" << std::endl;
+    return "Unable to open file.";  // Indicate an error
+  }
+
+  std::string status = "Empty file.";
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
+    status = parserRQLString(coreInstance, line);
+    if (status != "OK") {
+      std::cerr << "Error: Parsing failed." << std::endl << line << std::endl;
+      file.close();
+      return status;  // Return error if parsing fails
+    }
+  }
+
+  file.close();
+
+  return status;  // Indicate success
 }
