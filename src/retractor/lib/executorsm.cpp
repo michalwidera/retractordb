@@ -24,6 +24,7 @@
 #include <iostream>
 #include <memory>
 
+#include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
 #include "uxSysTermTools.hpp"
@@ -43,6 +44,8 @@ typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
 typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
+
+extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
@@ -97,6 +100,24 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     // This command return stream identifiers
     //
     if (command == "get" && pProc != nullptr) ptRetval = collectStreamsParameters();
+
+    if (command == "adhoc" && pProc != nullptr) {
+      qTree coreCopy;
+      SPDLOG_INFO("got adhoc.");
+      std::string adHocQuery = ptInval.get("db.argument", "");
+      assert(adHocQuery != "");
+      SPDLOG_INFO("got detail {} rcv.", adHocQuery);
+      // Here we set that for process of given id we send appropriate data stream
+      ptRetval.put(std::string("db"), parserRQLString(*coreInstancePtr, adHocQuery));
+      compiler cm(*coreInstancePtr);
+      std::string response = cm.run();
+      assert(response == "OK");
+      using boost::property_tree::ptree;
+      std::stringstream strstream;
+      write_info(strstream, ptRetval);
+      SPDLOG_INFO("reply: {}", strstream.str());
+      // *coreInstance = coreCopy;
+    }
 
     //
     // This command return what stream contains of
@@ -215,9 +236,10 @@ void executorsm::commandProcessorLoop() {
 std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
+  assert(coreInstancePtr != nullptr);
   ptree pt;
   pt.put("stream", query_name);
-  pt.put("count", boost::lexical_cast<std::string>(coreInstance.getQuery(query_name).lSchema.size()));
+  pt.put("count", boost::lexical_cast<std::string>(coreInstancePtr->getQuery(query_name).lSchema.size()));
   int i = 0;
   for (auto value : pProc->getRow(query_name, 0)) {
     //
@@ -257,12 +279,12 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {
-    dataModel proc(coreInstance);
+    dataModel proc(*coreInstancePtr);
     pProc = &proc;
 
-    if (verbose) coreInstance.dumpCore();
+    if (verbose) coreInstancePtr->dumpCore();
 
-    TimeLine tl(coreInstance.getAvailableTimeIntervals());
+    TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
     //
     // Main loop of data processing
     //
@@ -273,7 +295,7 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
     // ZERO-step
 
     std::set<std::string> initSet;
-    for (const auto &it : coreInstance)
+    for (const auto &it : *coreInstancePtr)
       if (it.isDeclaration()) initSet.insert(it.id);
 
     proc.processRows(initSet);
