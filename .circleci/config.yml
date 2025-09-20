@@ -78,6 +78,7 @@ commands:
             conan profile detect
             echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
             echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default
+            sed -i -e "s/gnu17/gnu20/g" ~/.conan2/profiles/default
             conan profile show
   conan-build:
     parameters:
