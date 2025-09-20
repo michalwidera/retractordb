@@ -13,6 +13,7 @@ extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFi
 extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
+int iTimeLimitCnt{0};
 
 bool compiled = false;
 
