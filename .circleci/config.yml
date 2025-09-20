@@ -73,7 +73,9 @@ commands:
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
             sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip valgrind cppcheck mold
-            pip3 install --upgrade pip
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip3 install --upgrade pip 
             pip3 install conan
             conan profile detect
             echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
