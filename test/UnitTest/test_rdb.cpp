@@ -11,6 +11,7 @@
 #include "rdb/storageacc.h"
 
 // ctest -R '^ut-test_rdb' -V
+int iTimeLimitCnt{0};
 
 const uint AREA_SIZE = 10;
 
