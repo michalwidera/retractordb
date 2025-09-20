@@ -26,7 +26,7 @@ set(LIBRARY_TEST_SET
 foreach(item ${V_GLOB})
   get_filename_component(OUTPUT_FILE_NOEXT ${item} NAME_WLE)
   set(SOURCES_${OUTPUT_FILE_NOEXT}_TEST
-      ${item} launch/main.cpp ${CMAKE_SOURCE_DIR}/src/retractor/lockManager.cpp)
+      ${item} launch/main.cpp)
   add_executable(${OUTPUT_FILE_NOEXT} ${SOURCES_${OUTPUT_FILE_NOEXT}_TEST})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   add_test(

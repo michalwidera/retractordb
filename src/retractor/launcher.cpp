@@ -18,7 +18,7 @@
 #include "lib/compiler.h"
 #include "lib/executorsm.h"
 #include "lib/presenter.h"
-#include "lockManager.hpp"
+#include "lib/lockManager.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
