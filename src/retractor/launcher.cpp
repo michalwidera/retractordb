@@ -27,7 +27,7 @@ using boost::lexical_cast;
 
 extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
-int iTimeLimitCnt{executorsm::inifitie_loop};
+extern int iTimeLimitCnt;
 
 static void handleSignal(int signum) {
   switch (signum) {

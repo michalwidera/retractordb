@@ -11,7 +11,7 @@
 
 typedef unsigned char BYTE;
 
-int iTimeLimitCnt{0};
+
 
 // cd build/Debug
 // make install ; ctest -R test_fileAccessor -V

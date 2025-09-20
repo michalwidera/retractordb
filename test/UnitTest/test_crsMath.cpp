@@ -24,7 +24,7 @@ extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFi
 extern dataModel *pProc;
 
 qTree coreInstance;
-int iTimeLimitCnt{0};
+
 
 const int TEST_COUNT = 15;
 

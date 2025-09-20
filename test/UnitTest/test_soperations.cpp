@@ -7,7 +7,7 @@
 #include "SOperations.hpp"
 
 // ctest -R '^ut-soperations' -V
-int iTimeLimitCnt{0};
+
 
 TEST(xSOperations, hash_operations) {
   std::vector<std::vector<int>> testdata{

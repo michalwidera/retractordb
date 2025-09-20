@@ -59,7 +59,7 @@ dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
-extern int iTimeLimitCnt;
+int iTimeLimitCnt{executorsm::inifitie_loop};
 
 qTree *executorsm::coreInstancePtr = nullptr;
 

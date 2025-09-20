@@ -21,7 +21,7 @@
 extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
-int iTimeLimitCnt{0};
+
 
 /*
 file path: test/UnitTest/Data/dataModel/ut_example_schema.rql

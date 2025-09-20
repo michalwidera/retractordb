@@ -6,7 +6,7 @@
 #include "retractor/lib/expressionEvaluator.h"
 
 // ctest -R '^ut-expeval' -V
-int iTimeLimitCnt{0};
+
 
 TEST(xExpressionEval, add_int_int) {
   /*
