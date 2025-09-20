@@ -19,9 +19,9 @@
 // ctest -R '^ut-test_dataModel' -V
 
 extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
-int iTimeLimitCnt{0};
 
 qTree coreInstance;
+int iTimeLimitCnt{0};
 
 /*
 file path: test/UnitTest/Data/dataModel/ut_example_schema.rql
