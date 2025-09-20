@@ -36,9 +36,9 @@ workflows:
 
 
 executors:
-  ubuntu-docker-2204:
+  ubuntu-docker:
     docker:
-      - image: cimg/base:edge
+      - image: cimg/base:2025.09
     resource_class: large
 
   ubuntu-machine:
@@ -78,7 +78,6 @@ commands:
             conan profile detect
             echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
             echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default
-            sed -i -e "s/gnu17/gnu20/g" ~/.conan2/profiles/default
             conan profile show
   conan-build:
     parameters:
@@ -149,7 +148,7 @@ commands:
 jobs:
   build-release:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
@@ -163,7 +162,7 @@ jobs:
 
   build-release-ninja:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
@@ -181,7 +180,7 @@ jobs:
 
   build-debug:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
@@ -199,7 +198,7 @@ jobs:
 
   build-debug-ninja:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
