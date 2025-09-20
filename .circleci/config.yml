@@ -77,7 +77,6 @@ commands:
             source .venv/bin/activate
             pip3 install --upgrade pip 
             pip3 install conan
-            ln -s .venv/bin/conan /usr/local/bin/conan
             conan profile detect
             echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
             echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default
@@ -97,6 +96,7 @@ commands:
       - run:
           name: Conan install and build; <<parameters.build_tool>> install
           command: |
+            source .venv/bin/activate
             conan source .
             conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
