@@ -161,8 +161,22 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
 }
 
 bool qry::adhoc(const std::string &sAdhoc) {
-  SPDLOG_ERROR("not implemented");
-  return false;
+  assert(sAdhoc != "");
+  ptree pt = netClient("adhoc", sAdhoc);
+  SPDLOG_INFO("snd: adhoc {}", sAdhoc.c_str());
+
+  std::string rcv("fail.");
+  for (auto &[first, second] : pt) {
+    rcv = second.get<std::string>("");
+    SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
+  }
+
+  if (rcv != "ok.") {
+    SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
+    return system::errc::protocol_error;
+  }
+
+  return system::errc::success;
 }
 
 bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &input) {

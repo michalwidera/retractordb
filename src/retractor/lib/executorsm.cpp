@@ -59,7 +59,7 @@ dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
-int iTimeLimitCnt(0);
+extern int iTimeLimitCnt;
 
 qTree *executorsm::coreInstancePtr = nullptr;
 
@@ -164,7 +164,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     //
     if (command == "kill") {
       SPDLOG_DEBUG("got kill rcv.");
-      iTimeLimitCnt = 1;
+      iTimeLimitCnt = executorsm::stop_now;
     }
     //
     // Diagnostic method
@@ -270,11 +270,10 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &guard) {
+int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard) {
   executorsm::coreInstancePtr = &coreInstance;
 
-  iTimeLimitCnt = iTimeLimitCntParam;
-  auto retVal   = system::errc::success;
+  auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
@@ -290,7 +289,7 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
+    if (iTimeLimitCnt == executorsm::inifitie_loop && verbose) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
 
@@ -305,9 +304,9 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
     // Loop of data processing
 
     boost::rational<int> prev_interval(0);
-    while (!_kbhit() && iTimeLimitCnt != 1) {
-      if (iTimeLimitCnt != 0) {
-        if (iTimeLimitCnt != 1)
+    while (!_kbhit() && iTimeLimitCnt != executorsm::stop_now) {
+      if (iTimeLimitCnt != executorsm::inifitie_loop) {
+        if (iTimeLimitCnt != executorsm::stop_now)
           iTimeLimitCnt--;
         else
           break;
@@ -375,7 +374,7 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
     //
     // End of data processing loop
     //
-    if (iTimeLimitCnt != 1) _getch();  // no wait ... feed key from kbhit
+    if (iTimeLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;
     retVal = system::errc::no_child_process;

@@ -12,14 +12,12 @@
 typedef boost::property_tree::ptree ptree;
 
 struct executorsm {
-  explicit executorsm(qTree &coreInstance) : coreInstance(coreInstance){};
-  executorsm() = delete;
+  int run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard);
 
-  int run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &guard);
+  enum : int { inifitie_loop = 0, stop_now = 1 };
 
  private:
   static qTree *coreInstancePtr;
-  qTree &coreInstance;
 
   static void commandProcessorLoop();
   static ptree commandProcessor(ptree ptInval);

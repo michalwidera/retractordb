@@ -27,9 +27,7 @@ using boost::lexical_cast;
 
 extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
-static int iTimeLimitCntParam{0};
-
-extern int iTimeLimitCnt;
+int iTimeLimitCnt{executorsm::inifitie_loop};
 
 static void handleSignal(int signum) {
   switch (signum) {
@@ -48,7 +46,7 @@ static void handleSignal(int signum) {
   }
 
   // This will cause the main loop to exit
-  iTimeLimitCnt = 1;
+  iTimeLimitCnt = executorsm::stop_now;
 }
 
 int main(int argc, char *argv[]) {
@@ -84,14 +82,14 @@ int main(int argc, char *argv[]) {
           ("rules,u", "show rules in dot file")                                   //
           ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
     } else {
-      desc.add_options()                                                          //
-          ("help,h", "Show program options")                                      //
-          ("status,s", "check service status")                                    //
-          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
-          ("verbose,v", "verbose mode (show stream params)")                      //
-          ("tlimitqry,m", po::value<int>(&iTimeLimitCntParam)->default_value(0),  //
-           "query limit, 0 - no limit")                                           //
-          ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
+      desc.add_options()                                                                             //
+          ("help,h", "Show program options")                                                         //
+          ("status,s", "check service status")                                                       //
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                     //
+          ("verbose,v", "verbose mode (show stream params)")                                         //
+          ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(executorsm::inifitie_loop),  //
+           "query limit, 0 - no limit")                                                              //
+          ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
     }
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
@@ -187,6 +185,6 @@ int main(int argc, char *argv[]) {
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
 
-  executorsm exec(coreInstance);
-  return exec.run(vm.count("verbose"), iTimeLimitCntParam, guard);
+  executorsm exec;
+  return exec.run(coreInstance, vm.count("verbose"), guard);
 }
