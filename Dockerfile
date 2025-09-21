@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y \
     linux-libc-dev \
     # Package management tools
     pkg-config \
+    apt-utils \
+    sudo \
     # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -40,6 +42,9 @@ RUN apt-get update && apt-get install -y \
 # Create a non-root user for development (optional but recommended)
 RUN useradd -m -s /bin/bash developer && \
     usermod -aG sudo developer
+
+# Allow passwordless sudo for the developer user
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 # Set working directory
 WORKDIR /home/developer/workspace
