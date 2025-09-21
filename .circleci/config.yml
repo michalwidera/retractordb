@@ -89,9 +89,7 @@ commands:
             source .venv/bin/activate
             pip3 install --upgrade pip 
             pip3 install conan
-            ! conan profile detect
-            echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
-            echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default
+            if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect && echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default && echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default ; fi
             conan profile show
   conan-build:
     parameters:
