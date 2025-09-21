@@ -37,6 +37,12 @@ workflows:
 
 
 executors:
+
+  ubuntu-my-docker:
+    docker:
+      - image: micwide/ubuntu-retractordb:latest
+    resource_class: large
+
   ubuntu-docker-2204:
     docker:
       - image: cimg/base:edge
@@ -157,7 +163,7 @@ commands:
 jobs:
   build-release-ninja-2204:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-my-docker
     steps:
       - checkout
       - prep-env:
