@@ -4,7 +4,7 @@ workflows:
 
   commit:
     jobs:
-      - build-release-ninja-2204:
+      - build-release-ninja-mydocker:
           filters:
             branches:
               only:
@@ -24,7 +24,7 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-release
-      - build-release-ninja-2204
+      - build-release-ninja-mydocker
       - build-debug:
           requires:
             - build-release
