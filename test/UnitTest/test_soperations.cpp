@@ -8,7 +8,6 @@
 
 // ctest -R '^ut-soperations' -V
 
-
 TEST(xSOperations, hash_operations) {
   std::vector<std::vector<int>> testdata{
       {0, 1, 0},  // B[0]

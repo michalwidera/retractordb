@@ -14,7 +14,6 @@ extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
-
 bool compiled = false;
 
 bool check_compile_function() {

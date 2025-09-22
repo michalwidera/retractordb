@@ -25,7 +25,6 @@ extern dataModel *pProc;
 
 qTree coreInstance;
 
-
 const int TEST_COUNT = 15;
 
 // std::unique_ptr<dataModel> dataArea;

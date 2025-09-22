@@ -11,8 +11,6 @@
 
 typedef unsigned char BYTE;
 
-
-
 // cd build/Debug
 // make install ; ctest -R test_fileAccessor -V
 

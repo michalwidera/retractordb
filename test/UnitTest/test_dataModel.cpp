@@ -22,7 +22,6 @@ extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFi
 
 qTree coreInstance;
 
-
 /*
 file path: test/UnitTest/Data/dataModel/ut_example_schema.rql
 

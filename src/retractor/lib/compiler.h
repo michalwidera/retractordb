@@ -11,6 +11,7 @@ struct compiler {
 
   // run compile chain
   std::string run();
+  bool mergeCore(qTree &coreInstanceSrc);
 
  private:
   qTree &coreInstance;

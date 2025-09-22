@@ -707,3 +707,11 @@ std::string compiler::run() {
 
   return std::string("OK");
 }
+
+bool compiler::mergeCore(qTree &coreInstanceSrc) {
+  for (auto &q : coreInstanceSrc) {
+    if (coreInstance.exists(q.id)) continue;
+    coreInstance.push_back(q);
+  }
+  return true;
+}

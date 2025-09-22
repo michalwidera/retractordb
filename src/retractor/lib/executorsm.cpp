@@ -55,6 +55,8 @@ extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 // Map stores relations processId -> sended stream
 static std::map<const int, std::string> id2StreamName_Relation;
 
+std::vector<std::string> processedLines;
+
 dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
@@ -62,6 +64,7 @@ dataModel *pProc = nullptr;
 int iTimeLimitCnt{executorsm::inifitie_loop};
 
 qTree *executorsm::coreInstancePtr = nullptr;
+compiler *executorsm::cmPtr        = nullptr;
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl) {
   assert(coreInstancePtr != nullptr);
@@ -108,10 +111,17 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       assert(adHocQuery != "");
       SPDLOG_INFO("got detail {} rcv.", adHocQuery);
       // Here we set that for process of given id we send appropriate data stream
-      ptRetval.put(std::string("db"), parserRQLString(*coreInstancePtr, adHocQuery));
-      compiler cm(*coreInstancePtr);
-      std::string response = cm.run();
+      auto coreInstanceCopy = *coreInstancePtr;
+      for (auto line : processedLines) {
+        std::string parseOut = parserRQLString(coreInstanceCopy, line);
+        assert(parseOut != "OK");
+      }
+      ptRetval.put(std::string("db"), parserRQLString(coreInstanceCopy, adHocQuery));
+      compiler cm2(coreInstanceCopy);
+      std::string response = cm2.run();
       assert(response == "OK");
+      cmPtr->mergeCore(coreInstanceCopy);
+
       using boost::property_tree::ptree;
       std::stringstream strstream;
       write_info(strstream, ptRetval);
@@ -270,8 +280,9 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard) {
+int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm) {
   executorsm::coreInstancePtr = &coreInstance;
+  executorsm::cmPtr           = &cm;
 
   auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread

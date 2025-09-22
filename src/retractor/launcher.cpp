@@ -12,13 +12,14 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <vector>
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/QStruct.h"
 #include "lib/compiler.h"
 #include "lib/executorsm.h"
-#include "lib/presenter.h"
 #include "lib/lockManager.hpp"
+#include "lib/presenter.h"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -28,6 +29,8 @@ using boost::lexical_cast;
 extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 extern int iTimeLimitCnt;
+
+extern std::vector<std::string> processedLines;
 
 static void handleSignal(int signum) {
   switch (signum) {
@@ -51,6 +54,7 @@ static void handleSignal(int signum) {
 
 int main(int argc, char *argv[]) {
   qTree coreInstance;
+  compiler cm(coreInstance);
 
   fixArgcv(argc, argv);
   const auto tempLocation = setupLoggerMain(std::string(argv[0]));
@@ -135,6 +139,7 @@ int main(int argc, char *argv[]) {
       if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
       parseOut = parserRQLString(coreInstance, line);
       if (parseOut != "OK") break;  // Return error if parsing fails
+      processedLines.push_back(line);
     }
 
     file.close();
@@ -151,7 +156,7 @@ int main(int argc, char *argv[]) {
     if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
 
     std::string response;
-    compiler cm(coreInstance);
+
     response = cm.run();
 
     if (response != "OK") {
@@ -186,5 +191,5 @@ int main(int argc, char *argv[]) {
   SPDLOG_INFO("Current process PID: {}", getpid());
 
   executorsm exec;
-  return exec.run(coreInstance, vm.count("verbose"), guard);
+  return exec.run(coreInstance, vm.count("verbose"), guard, cm);
 }

@@ -7,17 +7,19 @@
 
 #include "CRSMath.h"
 #include "QStruct.h"
+#include "compiler.h"
 #include "lockManager.hpp"
 
 typedef boost::property_tree::ptree ptree;
 
 struct executorsm {
-  int run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard);
+  int run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm);
 
   enum : int { inifitie_loop = 0, stop_now = 1 };
 
  private:
   static qTree *coreInstancePtr;
+  static compiler *cmPtr;
 
   static void commandProcessorLoop();
   static ptree commandProcessor(ptree ptInval);

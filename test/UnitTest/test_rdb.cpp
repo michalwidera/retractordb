@@ -12,7 +12,6 @@
 
 // ctest -R '^ut-test_rdb' -V
 
-
 const uint AREA_SIZE = 10;
 
 extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);

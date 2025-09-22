@@ -123,6 +123,7 @@ class qTree : public std::vector<query> {
 
   void sort() { std::sort(begin(), end()); };
   void topologicalSort();
+  bool exists(const std::string &query_name);
 
   boost::rational<int> getDelta(const std::string &query_name);
   void dumpCore();
