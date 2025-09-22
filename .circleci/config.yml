@@ -4,7 +4,7 @@ workflows:
 
   commit:
     jobs:
-      - ubuntu-docker-2204:
+      - build-release-ninja-2204:
           filters:
             branches:
               only:
@@ -162,6 +162,23 @@ jobs:
   build-release-ninja-mydocker:
     working_directory: ~/retractordb
     executor: ubuntu-mydocker
+    steps:
+      - checkout
+      - prep-env:
+          build_package: "ninja-build"
+          conan_profile1: "[conf]"
+          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+      - conan-build:
+          build_param: --build missing
+          build_tool: ninja
+      - run-test:
+          build_tool: ninja
+      - run-package:
+          build_tool: ninja
+
+  build-release-ninja-2204:
+    working_directory: ~/retractordb
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
