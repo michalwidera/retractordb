@@ -1,9 +1,17 @@
-# Use Ubuntu 24.04 LTS as base image
-FROM ubuntu:24.04
+# docker build -t ubuntu-retractordb .
+# docker run -it ubuntu-retractordb
+# docker login
+# docker tag ubuntu-retractordb micwide/ubuntu-retractordb:latest
+# docker push micwide/ubuntu-retractordb:latest
+
+# Use Ubuntu 24.04 LTS as base image, but we need modern compiler for C++20 - gcc 14 in ubuntu 25.04
+FROM ubuntu:25.04
 
 # Set environment variables to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
+
+RUN apt-get update && apt-get install -y apt-utils && apt-get upgrade -y && apt-get clean
 
 # Update package list and install essential packages
 RUN apt-get update && apt-get install -y \
@@ -33,7 +41,6 @@ RUN apt-get update && apt-get install -y \
     linux-libc-dev \
     # Package management tools
     pkg-config \
-    apt-utils \
     sudo \
     # Clean up to reduce image size
     && apt-get clean \
@@ -71,6 +78,7 @@ RUN python3 -m venv .venv \
     && conan install DockerConan.txt -s build_type=Release --build missing
 
 RUN echo "source .venv/bin/activate" >> ~/.bashrc
+RUN echo "cat /etc/lsb-release" >> ~/.bashrc
 
 # Set default command
 CMD ["/bin/bash"]
@@ -78,5 +86,3 @@ CMD ["/bin/bash"]
 # Optional: Expose ports if your application needs them
 # EXPOSE 8080
 
-# docker build -t ubuntu-retractordb .
-# docker run -it ubuntu-retractordb
