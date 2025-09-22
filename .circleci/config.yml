@@ -4,7 +4,7 @@ workflows:
 
   commit:
     jobs:
-      - build-release-ninja-2204:
+      - build-release-ninja:
           filters:
             branches:
               only:
