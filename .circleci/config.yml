@@ -4,7 +4,7 @@ workflows:
 
   commit:
     jobs:
-      - build-release-ninja-mydocker:
+      - ubuntu-docker-2204:
           filters:
             branches:
               only:
