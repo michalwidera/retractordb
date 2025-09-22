@@ -709,8 +709,12 @@ std::string compiler::run() {
 }
 
 bool compiler::mergeCore(qTree &coreInstanceSrc) {
+  SPDLOG_INFO("Merging core instances - current size: {}, new size: {}", coreInstance.size(), coreInstanceSrc.size());
   for (auto &q : coreInstanceSrc) {
+    if (q.id == ":SUBSTRAT") continue;
+    if (q.id == ":STORAGE") continue;
     if (coreInstance.exists(q.id)) continue;
+    SPDLOG_INFO("Merging query id: {}", q.id);
     coreInstance.push_back(q);
   }
   return true;

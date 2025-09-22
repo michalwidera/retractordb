@@ -114,20 +114,29 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       assert(adHocQuery != "");
       SPDLOG_INFO("got detail {} rcv.", adHocQuery);
       // Here we set that for process of given id we send appropriate data stream
-      auto coreInstanceCopy = *coreInstancePtr;
+      qTree coreInstanceCopy;
       for (auto line : processedLines) {
         std::string parseOut = parserRQLString(coreInstanceCopy, line);
-        assert(parseOut != "OK");
+        SPDLOG_INFO("line: {} , parseOut: {}", line, parseOut);
+        assert(parseOut == "OK");
       }
-      ptRetval.put(std::string("db"), parserRQLString(coreInstanceCopy, adHocQuery));
+
+      std::string parseOut = parserRQLString(coreInstanceCopy, adHocQuery);
+      SPDLOG_INFO("line: {} , parseOut: {}", adHocQuery, parseOut);
+      ptRetval.put(std::string("db"), parseOut);
       compiler cm2(coreInstanceCopy);
       std::string response = cm2.run();
+      SPDLOG_INFO("got response from cm {}", response);
       assert(response == "OK");
 
+      assert(cmPtr != nullptr);
       {
         boost::mutex::scoped_lock scoped_lock(core_mutex);
         cmPtr->mergeCore(coreInstanceCopy);
+        cmPtr->run();
       }
+
+      processedLines.push_back(adHocQuery);
 
       using boost::property_tree::ptree;
       std::stringstream strstream;

@@ -109,7 +109,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   {
     std::stringstream s;
     for (auto i : inSet) s << i << ":";
-    SPDLOG_INFO("PROCESS:{}", s.str());
+    SPDLOG_INFO("PROCESS inSet:= {}", s.str());
   }
 
   //
@@ -136,7 +136,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
   }
 
-  SPDLOG_INFO("END PROCESS: {}", s.str());
+  SPDLOG_INFO("END PROCESS inSet:= {}", s.str());
 }
 
 void dataModel::fetchDeclaredPayload(const std::string &instance) {
