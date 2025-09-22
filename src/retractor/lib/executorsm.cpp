@@ -20,6 +20,7 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -54,6 +55,8 @@ extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 // Map stores relations processId -> sended stream
 static std::map<const int, std::string> id2StreamName_Relation;
+
+extern boost::mutex core_mutex;
 
 std::vector<std::string> processedLines;
 
@@ -120,7 +123,11 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       compiler cm2(coreInstanceCopy);
       std::string response = cm2.run();
       assert(response == "OK");
-      cmPtr->mergeCore(coreInstanceCopy);
+
+      {
+        boost::mutex::scoped_lock scoped_lock(core_mutex);
+        cmPtr->mergeCore(coreInstanceCopy);
+      }
 
       using boost::property_tree::ptree;
       std::stringstream strstream;
