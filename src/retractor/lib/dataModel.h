@@ -13,6 +13,8 @@
 class dataModel {
  private:
   qTree &coreInstance;
+  std::string storagePath  = std::string{""};
+  std::string substratType = std::string{""};
 
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
@@ -21,6 +23,8 @@ class dataModel {
   ~dataModel();
 
   dataModel() = delete;
+
+  bool addQueryToModel(std::string id);
 
   std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
                                                     const int revOffset = 0);

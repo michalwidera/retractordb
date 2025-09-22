@@ -132,8 +132,9 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       assert(cmPtr != nullptr);
       {
         boost::mutex::scoped_lock scoped_lock(core_mutex);
-        cmPtr->mergeCore(coreInstanceCopy);
+        auto mergedIds = cmPtr->mergeCore(coreInstanceCopy);
         cmPtr->run();
+        for (const auto &id : mergedIds) pProc->addQueryToModel(id);
       }
 
       processedLines.push_back(adHocQuery);

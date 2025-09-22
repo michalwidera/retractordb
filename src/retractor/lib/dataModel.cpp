@@ -23,8 +23,6 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
-  auto storagePath  = std::string{""};
-  auto substratType = std::string{""};
 
   assert(!coreInstance.empty());
   for (const auto &it : coreInstance) SPDLOG_INFO("query.id {}", it.id);
@@ -63,6 +61,24 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
 }
 
 dataModel::~dataModel() {}
+
+bool dataModel::addQueryToModel(std::string id) {
+  if (qSet.find(id) != qSet.end()) {
+    SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
+    return false;
+  }
+
+  auto it = std::find_if(coreInstance.begin(), coreInstance.end(), [&](const auto &qry) { return qry.id == id; });
+  if (it == coreInstance.end()) {
+    SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
+    return false;
+  }
+
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, storagePath));
+  qSet[id]->outputPayload->setRemoveOnExit(false);
+
+  return true;
+}
 
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
