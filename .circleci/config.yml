@@ -45,7 +45,7 @@ executors:
 
   ubuntu-docker-2204:
     docker:
-      - image: cimg/current-22.04
+      - image: cimg/base:current-22.04
     resource_class: large
 
   ubuntu-docker:
