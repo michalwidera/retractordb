@@ -14,7 +14,8 @@ struct compiler {
   std::string run();
   std::vector<std::string> mergeCore(qTree &coreInstanceSrc);
 
-      private : qTree &coreInstance;
+ private:
+  qTree &coreInstance;
   std::list<field> combine(const std::string &sName1, const std::string &sName2, token &cmd_token);
   std::string generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd);
   void ftokenfix(std::list<token> &lProgram, query &q);
