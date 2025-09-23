@@ -88,7 +88,7 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
     typedef IPC::allocator<char, segment_manager_t> CharAllocator;
     typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
-    typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
+    // typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
     typedef int KeyType;
     typedef std::pair<const int, IPCString> ValueType;
     typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
@@ -158,6 +158,25 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     throw;
   }
   return pt_response;
+}
+
+bool qry::adhoc(const std::string &sAdhoc) {
+  assert(sAdhoc != "");
+  ptree pt = netClient("adhoc", sAdhoc);
+  SPDLOG_INFO("snd: adhoc {}", sAdhoc.c_str());
+
+  std::string rcv("fail.");
+  for (auto &[first, second] : pt) {
+    rcv = second.get<std::string>("");
+    SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
+  }
+
+  if (rcv != "OK") {
+    SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
+    return system::errc::protocol_error;
+  }
+
+  return system::errc::success;
 }
 
 bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &input) {

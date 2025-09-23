@@ -1,0 +1,9 @@
+# Check if fields are identified correctly - Covering #issue_42
+# make install ; ctest -R issue6_adhoc -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM core0, 0.2 FILE 'datafile2.dat'
+
+SELECT str1[0] STREAM str1 FROM core0
+

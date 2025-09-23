@@ -4,7 +4,7 @@ workflows:
 
   commit:
     jobs:
-      - build-release-ninja:
+      - build-release-ninja-2204:
           filters:
             branches:
               only:
@@ -24,6 +24,7 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-release
+      - build-release-ninja-mydocker
       - build-debug:
           requires:
             - build-release
@@ -36,9 +37,20 @@ workflows:
 
 
 executors:
+
+  ubuntu-mydocker:
+    docker:
+      - image: micwide/ubuntu-retractordb:latest
+    resource_class: large
+
   ubuntu-docker-2204:
     docker:
-      - image: cimg/base:edge
+      - image: cimg/base:current-22.04
+    resource_class: large
+
+  ubuntu-docker:
+    docker:
+      - image: cimg/base:2025.09
     resource_class: large
 
   ubuntu-machine:
@@ -72,16 +84,16 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip valgrind cppcheck mold
-            pip3 install --upgrade pip
+            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold 
+            python3 -m venv .venv
+            source .venv/bin/activate
+            pip3 install --upgrade pip 
             pip3 install conan
-            conan profile detect
-            echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default
-            echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default
+            if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect && echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default && echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default ; fi
             conan profile show
-  conan-build:
+  conan-install:
     parameters:
-      build_type:
+      build_type: 
         type: string
         default: "Release"
       build_param:
@@ -92,10 +104,27 @@ commands:
         default: "make"
     steps:
       - run:
-          name: Conan install and build; <<parameters.build_tool>> install
+          name: Conan install
           command: |
+            source .venv/bin/activate
             conan source .
             conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
+  conan-build:
+    parameters:
+      build_type: 
+        type: string
+        default: "Release"
+      build_param:
+        type: string
+        default: ""
+      build_tool:
+        type: string
+        default: "make"
+    steps:
+      - run:
+          name: Conan build; <<parameters.build_tool>> install
+          command: |
+            source .venv/bin/activate
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> install
   run-test:
@@ -146,21 +175,27 @@ commands:
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> packages
 
 jobs:
-  build-release:
+  build-release-ninja-mydocker:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-mydocker
     steps:
       - checkout
       - prep-env:
-          build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+          build_package: "ninja-build"
+          conan_profile1: "[conf]"
+          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+      - conan-install:
+          build_param: --build missing
+          build_tool: ninja
       - conan-build:
           build_param: --build missing
-      - run-test
-      - run-package
+          build_tool: ninja
+      - run-test:
+          build_tool: ninja
+      - run-package:
+          build_tool: ninja
 
-  build-release-ninja:
+  build-release-ninja-2204:
     working_directory: ~/retractordb
     executor: ubuntu-docker-2204
     steps:
@@ -169,6 +204,45 @@ jobs:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
           conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+      - conan-install:
+          build_param: --build missing
+          build_tool: ninja
+      - conan-build:
+          build_param: --build missing
+          build_tool: ninja
+      - run-test:
+          build_tool: ninja
+      - run-package:
+          build_tool: ninja
+
+  build-release:
+    working_directory: ~/retractordb
+    executor: ubuntu-docker
+    steps:
+      - checkout
+      - prep-env:
+          build_package: make
+          conan_profile1: ""
+          conan_profile2: ""
+      - conan-install:
+          build_param: --build missing
+      - conan-build:
+          build_param: --build missing
+      - run-test
+      - run-package
+
+  build-release-ninja:
+    working_directory: ~/retractordb
+    executor: ubuntu-docker
+    steps:
+      - checkout
+      - prep-env:
+          build_package: "ninja-build"
+          conan_profile1: "[conf]"
+          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+      - conan-install:
+          build_param: --build missing
+          build_tool: ninja
       - conan-build:
           build_param: --build missing
           build_tool: ninja
@@ -180,13 +254,16 @@ jobs:
 
   build-debug:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
           build_package: make
           conan_profile1: ""
           conan_profile2: ""
+      - conan-install:
+          build_type: Debug
+          build_param: --build missing
       - conan-build:
           build_type: Debug
           build_param: --build missing
@@ -198,13 +275,17 @@ jobs:
 
   build-debug-ninja:
     working_directory: ~/retractordb
-    executor: ubuntu-docker-2204
+    executor: ubuntu-docker
     steps:
       - checkout
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
           conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+      - conan-install:
+          build_type: Debug
+          build_param: --build missing
+          build_tool: ninja
       - conan-build:
           build_type: Debug
           build_param: --build missing
@@ -232,6 +313,9 @@ jobs:
           build_package: make
           conan_profile1: ""
           conan_profile2: ""
+      - conan-install:
+          build_type: <<parameters.build_type>>
+          build_param: --build missing
       - conan-build:
           build_type: <<parameters.build_type>>
           build_param: --build missing

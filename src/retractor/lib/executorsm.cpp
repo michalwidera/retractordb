@@ -20,13 +20,19 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 #include <filesystem>
 #include <iostream>
 #include <memory>
 
+#include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
 #include "uxSysTermTools.hpp"
+
+// #include "antlr4-runtime/tree/ParseTree.h"
+
+// extern antlr4::tree::ParseTree *pTree;
 
 namespace IPC = boost::interprocess;
 
@@ -44,6 +50,8 @@ typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
 
+extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
 // "RetractorShmemStr", 65536); const StringAllocator allocatorShmemStrInstance
@@ -52,13 +60,18 @@ using namespace CRationalStreamMath;
 // Map stores relations processId -> sended stream
 static std::map<const int, std::string> id2StreamName_Relation;
 
+extern boost::mutex core_mutex;
+
+std::vector<std::string> processedLines;
+
 dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
-int iTimeLimitCnt(0);
+int iTimeLimitCnt{executorsm::inifitie_loop};
 
 qTree *executorsm::coreInstancePtr = nullptr;
+compiler *executorsm::cmPtr        = nullptr;
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl) {
   assert(coreInstancePtr != nullptr);
@@ -88,6 +101,86 @@ ptree executorsm::collectStreamsParameters() {
   return ptRetval;
 }
 
+ptree executorsm::getAdHoc(std::string adHocQuery) {
+  qTree coreCopy;
+  ptree ptRetval;
+  SPDLOG_INFO("got adhoc {} rcv.", adHocQuery);
+
+  qTree coreInstanceCopy = *coreInstancePtr;
+
+  auto [parseOut, first_keyword] = parserRQLString(coreInstanceCopy, adHocQuery);
+
+  if (first_keyword == "UNRECOGNIZED") {
+    ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with DECLARE or SELECT");
+    SPDLOG_ERROR("Unrecognized command in AdHoc query");
+    return ptRetval;
+  }
+
+  if (first_keyword == "RULE") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc RULE not yet supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc RULE not yet supported");
+    return ptRetval;
+  }
+
+  if (first_keyword == "STORAGE" || first_keyword == "SUBSTRAT") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE or SUBSTRAT not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE or SUBSTRAT not supported");
+    return ptRetval;
+  }
+
+  assert(first_keyword == "SELECT" || first_keyword == "DECLARE");
+
+  if (parseOut != "OK") {
+    ptRetval.put(std::string("db"), "Fail parse:" + parseOut);
+    SPDLOG_ERROR("Parse adhoc query failed: {}", parseOut);
+    return ptRetval;
+  }
+
+  compiler localCompiler(coreInstanceCopy);
+  auto response = localCompiler.run();
+
+  if (response != "OK") {
+    ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
+    SPDLOG_ERROR("Compile chain of adhoc failed: {}", response);
+    return ptRetval;
+  }
+
+  std::vector<std::string> mergedIds;
+  auto compileChainResult = std::string{""};
+  assert(cmPtr != nullptr);
+
+  // These brackets are important - we need to lock coreInstancePtr as less as possible
+  {
+    boost::mutex::scoped_lock scoped_lock(core_mutex);
+    mergedIds          = cmPtr->mergeCore(coreInstanceCopy);
+    compileChainResult = cmPtr->run();
+  }
+
+  if (compileChainResult != "OK") {
+    ptRetval.put(std::string("db"), "Compile chain failed:" + response);
+    SPDLOG_ERROR("Compile chain failed: {}", compileChainResult);
+    return ptRetval;
+  }
+
+  SPDLOG_INFO("Compile chain OK, merged {} streams", mergedIds.size());
+
+  for (const auto &id : mergedIds) {
+    auto result = pProc->addQueryToModel(id);
+    if (!result) {
+      ptRetval.put(std::string("db"), "dataModel::addQueryToModel FAILED:" + id);
+      SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", id);
+      return ptRetval;
+    }
+  }
+
+  SPDLOG_INFO("Adding to model OK, merged {} streams", mergedIds.size());
+
+  processedLines.push_back(adHocQuery);
+
+  ptRetval.put(std::string("db"), "OK");
+  return ptRetval;
+}
+
 ptree executorsm::commandProcessor(ptree ptInval) {
   assert(coreInstancePtr != nullptr);
   ptree ptRetval;
@@ -98,6 +191,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     //
     if (command == "get" && pProc != nullptr) ptRetval = collectStreamsParameters();
 
+    if (command == "adhoc" && pProc != nullptr) ptRetval = getAdHoc(ptInval.get("db.argument", ""));
     //
     // This command return what stream contains of
     //
@@ -143,7 +237,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     //
     if (command == "kill") {
       SPDLOG_DEBUG("got kill rcv.");
-      iTimeLimitCnt = 1;
+      iTimeLimitCnt = executorsm::stop_now;
     }
     //
     // Diagnostic method
@@ -215,9 +309,10 @@ void executorsm::commandProcessorLoop() {
 std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
+  assert(coreInstancePtr != nullptr);
   ptree pt;
   pt.put("stream", query_name);
-  pt.put("count", boost::lexical_cast<std::string>(coreInstance.getQuery(query_name).lSchema.size()));
+  pt.put("count", boost::lexical_cast<std::string>(coreInstancePtr->getQuery(query_name).lSchema.size()));
   int i = 0;
   for (auto value : pProc->getRow(query_name, 0)) {
     //
@@ -248,32 +343,32 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &guard) {
+int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm) {
   executorsm::coreInstancePtr = &coreInstance;
+  executorsm::cmPtr           = &cm;
 
-  iTimeLimitCnt = iTimeLimitCntParam;
-  auto retVal   = system::errc::success;
+  auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
   boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
   try {
-    dataModel proc(coreInstance);
+    dataModel proc(*coreInstancePtr);
     pProc = &proc;
 
-    if (verbose) coreInstance.dumpCore();
+    if (verbose) coreInstancePtr->dumpCore();
 
-    TimeLine tl(coreInstance.getAvailableTimeIntervals());
+    TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
     //
     // Main loop of data processing
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (iTimeLimitCnt == 0 && verbose) std::cout << "Press any key to stop.\n";
+    if (iTimeLimitCnt == executorsm::inifitie_loop && verbose) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
 
     std::set<std::string> initSet;
-    for (const auto &it : coreInstance)
+    for (const auto &it : *coreInstancePtr)
       if (it.isDeclaration()) initSet.insert(it.id);
 
     proc.processRows(initSet);
@@ -283,9 +378,9 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
     // Loop of data processing
 
     boost::rational<int> prev_interval(0);
-    while (!_kbhit() && iTimeLimitCnt != 1) {
-      if (iTimeLimitCnt != 0) {
-        if (iTimeLimitCnt != 1)
+    while (!_kbhit() && iTimeLimitCnt != executorsm::stop_now) {
+      if (iTimeLimitCnt != executorsm::inifitie_loop) {
+        if (iTimeLimitCnt != executorsm::stop_now)
           iTimeLimitCnt--;
         else
           break;
@@ -353,7 +448,7 @@ int executorsm::run(bool verbose, int iTimeLimitCntParam, FlockServiceGuard &gua
     //
     // End of data processing loop
     //
-    if (iTimeLimitCnt != 1) _getch();  // no wait ... feed key from kbhit
+    if (iTimeLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;
     retVal = system::errc::no_child_process;

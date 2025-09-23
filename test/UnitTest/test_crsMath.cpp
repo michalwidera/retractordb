@@ -20,7 +20,7 @@
 
 using namespace CRationalStreamMath;
 
-extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
 extern dataModel *pProc;
 
 qTree coreInstance;
@@ -48,31 +48,12 @@ class crsMathTest : public ::testing::Test {
   virtual ~crsMathTest() {}
 
   virtual void SetUp() {
-    auto compiled = parserRQLFile(coreInstance, "ut_crsmath.rql") == "OK";
+    auto compiled = parserRQLFile_4Test(coreInstance, "ut_crsmath.rql") == "OK";
     assert(compiled && "Query set malformed according to grammar.");
 
     compiler cm(coreInstance);
-    std::string response;
-    response = cm.simplifyLProgram();
-    assert(response == "OK");
-    response = cm.prepareFields();
-    assert(response == "OK");
-    response = cm.intervalCounter();
-    assert(response == "OK");
-    response = cm.convertReferences();
-    assert(response == "OK");
-    response = cm.replicateIDX();
-    assert(response == "OK");
-    response = cm.convertRemotes();
-    assert(response == "OK");
-
-    coreInstance.maxCapacity = cm.countBuffersCapacity();
-
-    response = cm.applyConstraints();
-    assert(response == "OK");
-
-    response = cm.fillSubstractsMemSize(coreInstance.maxCapacity);
-    assert(response == "OK");
+    std::string response = cm.run();
+    ASSERT_TRUE(response == "OK");
   }
 
   virtual void TearDown() {

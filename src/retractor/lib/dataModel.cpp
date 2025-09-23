@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <boost/thread/mutex.hpp>
 #include <cassert>
 #include <cstdlib>  // std::div
 #include <iostream>
@@ -15,13 +16,13 @@
 
 // ctest -R '^ut-dataModel' -V
 
+boost::mutex core_mutex;
+
 dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
-  auto storagePath  = std::string{""};
-  auto substratType = std::string{""};
 
   assert(!coreInstance.empty());
   for (const auto &it : coreInstance) SPDLOG_INFO("query.id {}", it.id);
@@ -61,6 +62,24 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
 
 dataModel::~dataModel() {}
 
+bool dataModel::addQueryToModel(std::string id) {
+  if (qSet.find(id) != qSet.end()) {
+    SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
+    return false;
+  }
+
+  auto it = std::find_if(coreInstance.begin(), coreInstance.end(), [&](const auto &qry) { return qry.id == id; });
+  if (it == coreInstance.end()) {
+    SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
+    return false;
+  }
+
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, storagePath));
+  qSet[id]->outputPayload->setRemoveOnExit(false);
+
+  return true;
+}
+
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
@@ -79,10 +98,9 @@ bool dataModel::fetchPayload(const std::string &instance,                     //
   return qSet[instance]->outputPayload->revRead(revOffset, payload->get());
 }
 
-// TODO: work area
 void dataModel::processRows(const std::set<std::string> &inSet) {
   bool zeroStep{false};
-
+  boost::mutex::scoped_lock scoped_lock(core_mutex);
   // Move ALL armed device read to circular buffer. - no inSet dependent.
   for (auto q : coreInstance) {
     if (!q.isDeclaration()) continue;
@@ -107,7 +125,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   {
     std::stringstream s;
     for (auto i : inSet) s << i << ":";
-    SPDLOG_INFO("PROCESS:{}", s.str());
+    SPDLOG_INFO("PROCESS inSet:= {}", s.str());
   }
 
   //
@@ -134,7 +152,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
   }
 
-  SPDLOG_INFO("END PROCESS: {}", s.str());
+  SPDLOG_INFO("END PROCESS inSet:= {}", s.str());
 }
 
 void dataModel::fetchDeclaredPayload(const std::string &instance) {

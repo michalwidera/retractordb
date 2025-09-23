@@ -1,5 +1,7 @@
-#include ".antlr/RQLParser.h"
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
 
+// please note that the order of includes is important here
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/cerrno.hpp>
@@ -12,6 +14,7 @@
 
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"
+#include ".antlr/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/convertTypes.h"
@@ -207,8 +210,8 @@ class ParserListener : public RQLBaseListener {
 
   void exitSubstrat(RQLParser::SubstratContext *ctx) {
     if (substratType_already_set) {
-      std::cerr << "Parser/Storage: Substrat type is already set" << std::endl;
-      abort();
+      SPDLOG_ERROR("Parser/Storage: Substrat type is already set");
+      return;
     }
     substratType_already_set = true;
 
@@ -232,15 +235,14 @@ class ParserListener : public RQLBaseListener {
     for (auto &i : coreInstance) {
       if (i.id == stream_name) {
         if (i.isDeclaration()) {
-          std::cerr << "Parser/Rule: Cannot attach rule to declaration stream:" << stream_name
-                    << " Rule:" << ctx->name->getText() << std::endl;
+          SPDLOG_ERROR("Parser/Rule: Cannot attach rule to declaration stream: {} Rule: {}", stream_name, ctx->name->getText());
           abort();
         }
         if (actionType == rule::DUMP) {
           ruleConstruct.action    = rule::DUMP;
           ruleConstruct.dumpRange = std::make_pair(dump_left, dump_right);
           if (dump_left > dump_right) {
-            std::cerr << "Parser/Rule: Dump left range cannot be greater than dump right range" << std::endl;
+            SPDLOG_ERROR("Parser/Rule: Dump left range cannot be greater than dump right range");
             abort();
           }
           ruleConstruct.dump_retention = dump_retention;
@@ -248,8 +250,8 @@ class ParserListener : public RQLBaseListener {
           ruleConstruct.action        = rule::SYSTEM;
           ruleConstruct.systemCommand = systemCommand;
         } else {
-          std::cerr << "Parser/Rule: Unknown action type:" << actionType << " stream_name:" << stream_name
-                    << " Rule:" << ctx->name->getText() << std::endl;
+          SPDLOG_ERROR("Parser/Rule: Unknown action type: {} stream_name: {} Rule: {}", std::to_string(actionType), stream_name,
+                       ctx->name->getText());
           abort();
         }
 
@@ -291,8 +293,8 @@ class ParserListener : public RQLBaseListener {
 
   void exitStorage(RQLParser::StorageContext *ctx) {
     if (storageName_already_set) {
-      std::cerr << "Parser/Storage: Storage name is already set" << std::endl;
-      abort();
+      SPDLOG_ERROR("Parser/Storage: Storage name is already set");
+      return;
     }
     storageName_already_set = true;
 
@@ -376,32 +378,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parserRQLFile(qTree &coreInstance, std::string sInputFile) {
-  std::ifstream ins;
-  // Create the input stream.
-  ins.open(sInputFile.c_str());
-  ANTLRInputStream input(ins);
-  // Create a lexer which scans the input stream
-  // to create a token stream.
-  RQLLexer lexer(&input);
-  CommonTokenStream tokens(&lexer);
-  LexerErrorListener lexerErrorListener;
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(&lexerErrorListener);
-  // Create a parser which parses the token stream
-  // to create a parse tree.
-  RQLParser parser(&tokens);
-  ParserErrorListener parserErrorListener;
-  ParserListener parserListener(coreInstance);
-  parser.removeParseListeners();
-  parser.removeErrorListeners();
-  parser.addErrorListener(&parserErrorListener);
-  parser.addParseListener(&parserListener);
-  tree::ParseTree *tree = parser.prog();
-  return status;
-}
-
-std::string parserRQLString(qTree &coreInstance, std::string inlet) {
+std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -419,6 +396,35 @@ std::string parserRQLString(qTree &coreInstance, std::string inlet) {
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserListener);
-  tree::ParseTree *tree = parser.prog();
-  return status;
+  tree::ParseTree *tree  = parser.prog();
+  std::string firsttoken = "UNRECOGNIZED";
+  if (tree->children.size() > 0 && tree->children[0]->children.size() > 0)
+    firsttoken = tree->children[0]->children[0]->getText();
+  std::transform(firsttoken.begin(), firsttoken.end(), firsttoken.begin(), ::toupper);
+  return {status, firsttoken};
+}
+
+std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
+  std::ifstream file(sInputFile);
+  if (!file.is_open()) {
+    SPDLOG_ERROR("Error: Unable to open file!");
+    return "Unable to open file.";  // Indicate an error
+  }
+
+  std::string status = "Empty file.";
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
+    auto [result, first_keyword] = parserRQLString(coreInstance, line);
+    status                       = result;
+    if (status != "OK") {
+      SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, line);
+      file.close();
+      return status;  // Return error if parsing fails
+    }
+  }
+
+  file.close();
+
+  return status;  // Indicate success
 }

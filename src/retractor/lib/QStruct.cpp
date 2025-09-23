@@ -111,6 +111,13 @@ void qTree::topologicalSort() {
   coreInstance = tempInstance;
 }
 
+bool qTree::exists(const std::string &query_name) {
+  for (const auto &q : *this) {
+    if (q.id == query_name) return true;
+  }
+  return false;
+}
+
 boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }
 
 void qTree::dumpCore() {

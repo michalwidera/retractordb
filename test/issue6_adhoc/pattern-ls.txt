@@ -1,0 +1,5 @@
+core0.desc
+str1
+str1.desc
+stradhoc
+stradhoc.desc

@@ -675,3 +675,49 @@ std::map<std::string, int> compiler::countBuffersCapacity() {
   }
   return capMap;
 }
+
+std::string compiler::run() {
+  std::string result;
+
+  result = simplifyLProgram();
+  if (result != "OK") return result;
+
+  result = prepareFields();
+  if (result != "OK") return result;
+
+  result = intervalCounter();
+  if (result != "OK") return result;
+
+  result = convertReferences();
+  if (result != "OK") return result;
+
+  result = replicateIDX();
+  if (result != "OK") return result;
+
+  result = convertRemotes();
+  if (result != "OK") return result;
+
+  coreInstance.maxCapacity = countBuffersCapacity();
+
+  result = applyConstraints();
+  if (result != "OK") return result;
+
+  result = fillSubstractsMemSize(coreInstance.maxCapacity);
+  if (result != "OK") return result;
+
+  return std::string("OK");
+}
+
+std::vector<std::string> compiler::mergeCore(qTree &coreInstanceSrc) {
+  std::vector<std::string> retVal;
+  SPDLOG_INFO("Merging core instances - current size: {}, new size: {}", coreInstance.size(), coreInstanceSrc.size());
+  for (auto &q : coreInstanceSrc) {
+    if (q.id == ":SUBSTRAT") continue;
+    if (q.id == ":STORAGE") continue;
+    if (coreInstance.exists(q.id)) continue;
+    SPDLOG_INFO("Merging query id: {}", q.id);
+    coreInstance.push_back(q);
+    retVal.push_back(q.id);
+  }
+  return retVal;
+}

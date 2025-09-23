@@ -9,8 +9,10 @@
 #include "retractor/lib/QStruct.h"
 #include "retractor/lib/compiler.h"
 
-extern std::string parserRQLFile(qTree &coreInstance, std::string sInputFile);
-extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
+// ctest -R '^ut-test_compiler' -V
+
+extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
+extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
@@ -25,7 +27,7 @@ bool check_compile_function() {
 
   if (!compiled) {
     coreInstance.clear();
-    compiled = parserRQLFile(coreInstance, "ut_compiler.rql") == "OK";
+    compiled = parserRQLFile_4Test(coreInstance, "ut_compiler.rql") == "OK";
   }
   return compiled;
 }
@@ -53,7 +55,9 @@ TEST(xparser, check_compile_result) {
 }
 
 TEST(xparser, check_parserRQLString) {
-  ASSERT_TRUE(parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK");
+  auto [result, first_keyword] = parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'");
+  ASSERT_TRUE(result == "OK");
+  ASSERT_TRUE(first_keyword == "DECLARE");
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }
