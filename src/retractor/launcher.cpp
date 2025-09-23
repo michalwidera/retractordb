@@ -26,7 +26,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 extern int iTimeLimitCnt;
 
@@ -137,8 +137,9 @@ int main(int argc, char *argv[]) {
     std::string line;
     while (std::getline(file, line)) {
       if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
-      parseOut = parserRQLString(coreInstance, line);
-      if (parseOut != "OK") break;  // Return error if parsing fails
+      auto [status, first_keyword] = parserRQLString(coreInstance, line);
+      parseOut                     = status;
+      if (status != "OK") break;  // Return error if parsing fails
       processedLines.push_back(line);
     }
 

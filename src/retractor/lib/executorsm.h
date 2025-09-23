@@ -24,6 +24,7 @@ struct executorsm {
   static void commandProcessorLoop();
   static ptree commandProcessor(ptree ptInval);
   static ptree collectStreamsParameters();
+  static ptree getAdHoc(std::string adHocQuery);
 
   std::set<std::string> getAwaitedStreamsSet(CRationalStreamMath::TimeLine &tl);
   std::string printRowValue(const std::string &query_name);

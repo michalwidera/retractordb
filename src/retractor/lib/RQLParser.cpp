@@ -378,7 +378,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::string parserRQLString(qTree &coreInstance, std::string inlet) {
+std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -396,8 +396,12 @@ std::string parserRQLString(qTree &coreInstance, std::string inlet) {
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserListener);
-  tree::ParseTree *tree = parser.prog();
-  return status;
+  tree::ParseTree *tree  = parser.prog();
+  std::string firsttoken = "UNRECOGNIZED";
+  if (tree->children.size() > 0 && tree->children[0]->children.size() > 0)
+    firsttoken = tree->children[0]->children[0]->getText();
+  std::transform(firsttoken.begin(), firsttoken.end(), firsttoken.begin(), ::toupper);
+  return {status, firsttoken};
 }
 
 std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
@@ -411,9 +415,10 @@ std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
   std::string line;
   while (std::getline(file, line)) {
     if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
-    status = parserRQLString(coreInstance, line);
+    auto [result, first_keyword] = parserRQLString(coreInstance, line);
+    status                       = result;
     if (status != "OK") {
-      SPDLOG_ERROR("Error: Parsing failed.\n{}", line);
+      SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, line);
       file.close();
       return status;  // Return error if parsing fails
     }

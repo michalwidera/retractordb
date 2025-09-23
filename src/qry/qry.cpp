@@ -171,7 +171,7 @@ bool qry::adhoc(const std::string &sAdhoc) {
     SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
 
-  if (rcv != "ok.") {
+  if (rcv != "OK") {
     SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
     return system::errc::protocol_error;
   }

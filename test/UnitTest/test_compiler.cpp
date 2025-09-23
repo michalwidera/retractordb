@@ -9,8 +9,10 @@
 #include "retractor/lib/QStruct.h"
 #include "retractor/lib/compiler.h"
 
+// ctest -R '^ut-test_compiler' -V
+
 extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
-extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
@@ -53,7 +55,9 @@ TEST(xparser, check_compile_result) {
 }
 
 TEST(xparser, check_parserRQLString) {
-  ASSERT_TRUE(parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'") == "OK");
+  auto [result, first_keyword] = parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'");
+  ASSERT_TRUE(result == "OK");
+  ASSERT_TRUE(first_keyword == "DECLARE");
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }

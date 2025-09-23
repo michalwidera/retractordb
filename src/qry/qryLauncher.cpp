@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
         ("detail,t", po::value<std::string>(&sInputStream), "show details of this stream")                //
-        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode (not implemented)")                //
+        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
         ("tlimitqry,m", po::value<int>(&timeLimit)->default_value(0), "limit of elements, 0 - no limit")  //
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //

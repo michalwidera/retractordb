@@ -30,6 +30,10 @@
 #include "dataModel.h"
 #include "uxSysTermTools.hpp"
 
+// #include "antlr4-runtime/tree/ParseTree.h"
+
+// extern antlr4::tree::ParseTree *pTree;
+
 namespace IPC = boost::interprocess;
 
 // Define for IPC purposes - maps & strings (most important IPCString i IPCMap)
@@ -46,7 +50,7 @@ typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
 
-extern std::string parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
@@ -97,6 +101,86 @@ ptree executorsm::collectStreamsParameters() {
   return ptRetval;
 }
 
+ptree executorsm::getAdHoc(std::string adHocQuery) {
+  qTree coreCopy;
+  ptree ptRetval;
+  SPDLOG_INFO("got adhoc {} rcv.", adHocQuery);
+
+  qTree coreInstanceCopy = *coreInstancePtr;
+
+  auto [parseOut, first_keyword] = parserRQLString(coreInstanceCopy, adHocQuery);
+
+  if (first_keyword == "UNRECOGNIZED") {
+    ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with DECLARE or SELECT");
+    SPDLOG_ERROR("Unrecognized command in AdHoc query");
+    return ptRetval;
+  }
+
+  if (first_keyword == "RULE") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc RULE not yet supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc RULE not yet supported");
+    return ptRetval;
+  }
+
+  if (first_keyword == "STORAGE" || first_keyword == "SUBSTRAT") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE or SUBSTRAT not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE or SUBSTRAT not supported");
+    return ptRetval;
+  }
+
+  assert(first_keyword == "SELECT" || first_keyword == "DECLARE");
+
+  if (parseOut != "OK") {
+    ptRetval.put(std::string("db"), "Fail parse:" + parseOut);
+    SPDLOG_ERROR("Parse adhoc query failed: {}", parseOut);
+    return ptRetval;
+  }
+
+  compiler localCompiler(coreInstanceCopy);
+  auto response = localCompiler.run();
+
+  if (response != "OK") {
+    ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
+    SPDLOG_ERROR("Compile chain of adhoc failed: {}", response);
+    return ptRetval;
+  }
+
+  std::vector<std::string> mergedIds;
+  auto compileChainResult = std::string{""};
+  assert(cmPtr != nullptr);
+
+  // These brackets are important - we need to lock coreInstancePtr as less as possible
+  {
+    boost::mutex::scoped_lock scoped_lock(core_mutex);
+    mergedIds          = cmPtr->mergeCore(coreInstanceCopy);
+    compileChainResult = cmPtr->run();
+  }
+
+  if (compileChainResult != "OK") {
+    ptRetval.put(std::string("db"), "Compile chain failed:" + response);
+    SPDLOG_ERROR("Compile chain failed: {}", compileChainResult);
+    return ptRetval;
+  }
+
+  SPDLOG_INFO("Compile chain OK, merged {} streams", mergedIds.size());
+
+  for (const auto &id : mergedIds) {
+    auto result = pProc->addQueryToModel(id);
+    if (!result) {
+      ptRetval.put(std::string("db"), "dataModel::addQueryToModel FAILED:" + id);
+      SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", id);
+      return ptRetval;
+    }
+  }
+
+  SPDLOG_INFO("Adding to model OK, merged {} streams", mergedIds.size());
+
+  processedLines.push_back(adHocQuery);
+
+  ptRetval.put(std::string("db"), "OK");
+  return ptRetval;
+}
+
 ptree executorsm::commandProcessor(ptree ptInval) {
   assert(coreInstancePtr != nullptr);
   ptree ptRetval;
@@ -107,45 +191,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     //
     if (command == "get" && pProc != nullptr) ptRetval = collectStreamsParameters();
 
-    if (command == "adhoc" && pProc != nullptr) {
-      qTree coreCopy;
-      SPDLOG_INFO("got adhoc.");
-      std::string adHocQuery = ptInval.get("db.argument", "");
-      assert(adHocQuery != "");
-      SPDLOG_INFO("got detail {} rcv.", adHocQuery);
-      // Here we set that for process of given id we send appropriate data stream
-      qTree coreInstanceCopy;
-      for (auto line : processedLines) {
-        std::string parseOut = parserRQLString(coreInstanceCopy, line);
-        SPDLOG_INFO("line: {} , parseOut: {}", line, parseOut);
-        assert(parseOut == "OK");
-      }
-
-      std::string parseOut = parserRQLString(coreInstanceCopy, adHocQuery);
-      SPDLOG_INFO("line: {} , parseOut: {}", adHocQuery, parseOut);
-      ptRetval.put(std::string("db"), parseOut);
-      compiler cm2(coreInstanceCopy);
-      std::string response = cm2.run();
-      SPDLOG_INFO("got response from cm {}", response);
-      assert(response == "OK");
-
-      assert(cmPtr != nullptr);
-      {
-        boost::mutex::scoped_lock scoped_lock(core_mutex);
-        auto mergedIds = cmPtr->mergeCore(coreInstanceCopy);
-        cmPtr->run();
-        for (const auto &id : mergedIds) pProc->addQueryToModel(id);
-      }
-
-      processedLines.push_back(adHocQuery);
-
-      using boost::property_tree::ptree;
-      std::stringstream strstream;
-      write_info(strstream, ptRetval);
-      SPDLOG_INFO("reply: {}", strstream.str());
-      // *coreInstance = coreCopy;
-    }
-
+    if (command == "adhoc" && pProc != nullptr) ptRetval = getAdHoc(ptInval.get("db.argument", ""));
     //
     // This command return what stream contains of
     //
