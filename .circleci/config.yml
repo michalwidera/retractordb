@@ -1,21 +1,13 @@
 version: 2.1
 
 workflows:
-
-  commit:
-    jobs:
-      - build-release-ninja-2204:
-          filters:
-            branches:
-              only:
-                - master
-
   commit:
     jobs:
       - build-release-ninja-mydocker:
           filters:
             branches:
               only:
+                - master
                 - /issue_.*/
 
   nightly:
