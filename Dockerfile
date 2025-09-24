@@ -81,10 +81,6 @@ RUN python3 -m venv .venv \
     && echo '[conf]' >> ~/.conan2/profiles/default \
     && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default 
 
-RUN . .venv/bin/activate \ 
-    && conan install DockerConan.txt -s build_type=Debug --build missing \
-    && conan cache clean "*"
-
 RUN . .venv/bin/activate \
     && conan install DockerConan.txt -s build_type=Release --build missing \
     && conan cache clean "*"

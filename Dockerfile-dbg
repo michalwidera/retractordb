@@ -1,0 +1,35 @@
+# docker build -t buildenv-retractordb-dbg -f Dockerfile-dbg .
+# docker run -it buildenv-retractordb-dbg
+# docker login
+# docker tag buildenv-retractordb-dbg micwide/buildenv-retractordb-dbg:latest
+# docker push micwide/buildenv-retractordb-dbg:latest
+
+# clean up all dangling images
+# https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
+
+# https://hub.docker.com/_/debian
+# Use Ubuntu 24.04 LTS as base image, but we need modern compiler for C++20 - gcc 14 in ubuntu 25.04
+# neee experimental: FROM ubuntu:25.04
+# stable: FROM ubuntu:24.04
+FROM micwide/buildenv-retractordb:latest
+
+# Set environment variables to avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Set working directory
+WORKDIR /home/developer/workspace
+
+RUN . .venv/bin/activate \ 
+    && conan install DockerConan.txt -s build_type=Debug --build missing \
+    && conan cache clean "*"
+
+RUN echo "source .venv/bin/activate" >> ~/.bashrc
+# RUN echo "cat /etc/lsb-release" >> ~/.bashrc
+
+# Set default command
+CMD ["/bin/bash"]
+
+# Optional: Expose ports if your application needs them
+# EXPOSE 8080
+
