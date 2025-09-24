@@ -10,6 +10,8 @@ workflows:
                 - master
                 - /issue_.*/
       - build-release-ninja-mydocker:
+          requires:
+            - build-debug-ninja-mydocker
           filters:
             branches:
               only:
@@ -47,12 +49,6 @@ executors:
     docker:
       - image: micwide/buildenv-retractordb:latest
     resource_class: large
-
-  debian-mydocker-dbg:
-    docker:
-      - image: micwide/buildenv-retractordb-dbg:latest
-    resource_class: large
-
 
   ubuntu-docker-2204:
     docker:
@@ -208,7 +204,7 @@ jobs:
 
   build-debug-ninja-mydocker:
     working_directory: ~/retractordb
-    executor: debian-mydocker-dbg
+    executor: debian-mydocker
     steps:
       - checkout
       - prep-env:

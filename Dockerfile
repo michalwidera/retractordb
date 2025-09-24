@@ -1,26 +1,18 @@
-# docker build -t buildenv-retractordb .
-# docker run -it buildenv-retractordb
-# docker login
-# docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
-# docker push micwide/buildenv-retractordb:latest
-
-# clean up all dangling images
-# https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
-
 # https://hub.docker.com/_/debian
-# Use Ubuntu 24.04 LTS as base image, but we need modern compiler for C++20 - gcc 14 in ubuntu 25.04
-# neee experimental: FROM ubuntu:25.04
-# stable: FROM ubuntu:24.04
 FROM debian:trixie-slim
+
+LABEL com.retractordb.version="0.0.2"
+LABEL vendor1="Michal Widera"
+LABEL com.retractordb.release-date="2025-09-25"
+LABEL com.retractordb.description="Development environment for RetractorDB project"
+LABEL com.retractordb.url="https://retractordb.com"
 
 # Set environment variables to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-RUN apt-get update && apt-get install -y apt-utils && apt-get upgrade -y && apt-get clean
-
 # Update package list and install essential packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     # GCC toolchain and build essentials
     build-essential \
     gcc \
@@ -46,6 +38,7 @@ RUN apt-get update && apt-get install -y \
     libc6-dev \
     linux-libc-dev \
     # Package management tools
+    apt-utils \
     pkg-config \
     sudo \
     # Clean up to reduce image size
@@ -79,11 +72,10 @@ RUN python3 -m venv .venv \
     && conan profile detect \
     && sed -i -e "s/gnu17/gnu20/g" ~/.conan2/profiles/default \
     && echo '[conf]' >> ~/.conan2/profiles/default \
-    && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default 
-
-RUN . .venv/bin/activate \
+    && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default \
     && conan install DockerConan.txt -s build_type=Release --build missing \
-    && conan cache clean "*"
+    && conan install DockerConan.txt -s build_type=Debug --build missing \
+    && conan cache clean
 
 RUN echo "source .venv/bin/activate" >> ~/.bashrc
 # RUN echo "cat /etc/lsb-release" >> ~/.bashrc
@@ -94,3 +86,18 @@ CMD ["/bin/bash"]
 # Optional: Expose ports if your application needs them
 # EXPOSE 8080
 
+# How to check docker layers size - install https://github.com/wagoodman/dive
+# docker image ls
+# dive <IMAGE ID>
+
+# How to deploy to DockerHub
+# docker build -t buildenv-retractordb .
+# docker run -it buildenv-retractordb
+# docker login
+# docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
+# docker push micwide/buildenv-retractordb:latest
+
+# clean up all dangling images
+# https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
+
+# Current compressed image size: 773.93MB
