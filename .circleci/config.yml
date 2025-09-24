@@ -9,14 +9,6 @@ workflows:
               only:
                 - master
                 - /issue_.*/
-      - build-release-ninja-mydocker:
-          requires:
-            - build-debug-ninja-mydocker
-          filters:
-            branches:
-              only:
-                - master
-                - /issue_.*/
 
   nightly:
     triggers:
@@ -32,6 +24,7 @@ workflows:
     jobs:
       - build-release
       - build-release-ninja-mydocker
+      - build-debug-ninja-mydocker
       - build-debug:
           requires:
             - build-release
