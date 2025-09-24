@@ -9,6 +9,13 @@ workflows:
             branches:
               only:
                 - master
+
+  commit:
+    jobs:
+      - build-release-ninja-mydocker:
+          filters:
+            branches:
+              only:
                 - /issue_.*/
 
   nightly:
@@ -40,7 +47,7 @@ executors:
 
   ubuntu-mydocker:
     docker:
-      - image: micwide/ubuntu-retractordb:latest
+      - image: micwide/buildenv-retractordb:latest
     resource_class: large
 
   ubuntu-docker-2204:

@@ -1,11 +1,17 @@
-# docker build -t ubuntu-retractordb .
-# docker run -it ubuntu-retractordb
+# docker build -t buildenv-retractordb .
+# docker run -it buildenv-retractordb
 # docker login
-# docker tag ubuntu-retractordb micwide/ubuntu-retractordb:latest
-# docker push micwide/ubuntu-retractordb:latest
+# docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
+# docker push micwide/buildenv-retractordb:latest
 
+# clean up all dangling images
+# https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
+
+# https://hub.docker.com/_/debian
 # Use Ubuntu 24.04 LTS as base image, but we need modern compiler for C++20 - gcc 14 in ubuntu 25.04
-FROM ubuntu:25.04
+# neee experimental: FROM ubuntu:25.04
+# stable: FROM ubuntu:24.04
+FROM debian:trixie-slim
 
 # Set environment variables to avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -73,12 +79,18 @@ RUN python3 -m venv .venv \
     && conan profile detect \
     && sed -i -e "s/gnu17/gnu20/g" ~/.conan2/profiles/default \
     && echo '[conf]' >> ~/.conan2/profiles/default \
-    && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default \
+    && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default 
+
+RUN . .venv/bin/activate \ 
     && conan install DockerConan.txt -s build_type=Debug --build missing \
-    && conan install DockerConan.txt -s build_type=Release --build missing
+    && conan cache clean "*"
+
+RUN . .venv/bin/activate \
+    && conan install DockerConan.txt -s build_type=Release --build missing \
+    && conan cache clean "*"
 
 RUN echo "source .venv/bin/activate" >> ~/.bashrc
-RUN echo "cat /etc/lsb-release" >> ~/.bashrc
+# RUN echo "cat /etc/lsb-release" >> ~/.bashrc
 
 # Set default command
 CMD ["/bin/bash"]
