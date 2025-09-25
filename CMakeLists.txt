@@ -94,6 +94,23 @@ set(CPACK_SOURCE_PACKAGE_FILE_NAME
     "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-source-${CMAKE_SYSTEM_NAME}"
 )
 set(CPACK_SOURCE_IGNORE_FILES
-    "/build/;/CMakeFiles/;/CMakeCache.txt;/bin/;/src/UML/;/.vscode/;/scripts/.vim/;/scripts/dev-test/;/scripts/sublime/;/.circleci/;/.gitignore;/.gitattributes;/CMakeUserPresets.json;/examples/;/.git/;/test/;/embold.yaml;~$;${CPACK_SOURCE_IGNORE_FILES}"
-)
+    /build/
+    /CMakeFiles/
+    /CMakeCache.txt
+    /bin/
+    /src/UML/
+    /.vscode/
+    /scripts/.vim/
+    /scripts/dev-test/
+    /scripts/sublime/
+    /.circleci/
+    /.gitignore
+    /.gitattributes
+    /CMakeUserPresets.json
+    /examples/
+    /.git/
+    /test/
+    /embold.yaml
+    ~$
+    ${CPACK_SOURCE_IGNORE_FILES})
 include(CPack) # include after setting variables above to take effect

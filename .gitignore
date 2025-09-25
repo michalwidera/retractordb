@@ -43,3 +43,4 @@ graph_info.json
 .vscode/settings.json
 docs/
 bin/*
+.venv/
