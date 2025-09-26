@@ -20,7 +20,7 @@ esac
 echo "Note: Current folder is << $foldername >> and will start build in << $build_folder >>"
 
 PS3='Build RetractorDB, please enter your choice: '
-options=("Release" "Debug" "Reset (clean)" "Init Conan Profile" "setup gcc23" "setup ninja" "Quit")
+options=("Release" "Debug" "Reset (clean)" "Init Conan Profile" "setup gcc23" "setup ninja" "Toolchain" "Quit")
 select opt in "${options[@]}"
 do
     case $opt in
@@ -46,6 +46,18 @@ do
         "setup gcc23")
             sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
             cat ~/.conan2/profiles/default
+            break
+            ;;
+        "Toolchain")
+            sudo apt-get update
+            sudo apt-get upgrade -y
+            sudo apt-get -y install gcc g++ cmake make ninja-build build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz feh tmux gnuplot
+            python3 -m venv ~/.venv
+            source ~/.venv/bin/activate
+            pip3 install --upgrade pip 
+            pip3 install conan
+            if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect ; fi
+            conan profile show
             break
             ;;
         "Init Conan Profile")
