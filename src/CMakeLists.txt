@@ -44,6 +44,11 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
+  show-ninja-build
+  COMMAND ninja -t graph | dot -Tpng -o ninja-build.png && feh ninja-build.png
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+add_custom_target(
   simple-max-view
   COMMAND xretractor query-simple.rql -c -d -f -t -s > out.dot && dot -Tpng
           out.dot -o out.png && feh out.png

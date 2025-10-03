@@ -179,7 +179,7 @@ query &qTree::getQuery(const std::string &query_name) {
   auto it = std::find_if(begin(), end(), [query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {
     SPDLOG_ERROR("Missing - {}", query_name);
-    throw std::logic_error("Query not found.");
+    throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE.");
   }
   return (*it);
 }
@@ -208,6 +208,23 @@ rdb::descFldVT token::getVT() { return valueVT; };
 std::string token::getStr_() {
   if (valueVT.index() == rdb::STRING)
     return std::get<std::string>(valueVT);
+  else if (valueVT.index() == rdb::FLOAT)
+    return std::to_string(std::get<float>(valueVT));
+  else if (valueVT.index() == rdb::DOUBLE)
+    return std::to_string(std::get<double>(valueVT));
+  else if (valueVT.index() == rdb::INTEGER)
+    return std::to_string(std::get<int>(valueVT));
+  else if (valueVT.index() == rdb::UINT)
+    return std::to_string(std::get<unsigned>(valueVT));
+  else if (valueVT.index() == rdb::BYTE)
+    return std::to_string(unsigned(std::get<uint8_t>(valueVT)));
+  else if (valueVT.index() == rdb::RATIONAL) {
+    auto r = std::get<boost::rational<int>>(valueVT);
+    return std::to_string(r.numerator()) + "/" + std::to_string(r.denominator());
+  } else if (valueVT.index() == rdb::INTPAIR) {
+    auto r = std::get<std::pair<int, int>>(valueVT);
+    return std::to_string(r.first) + "," + std::to_string(r.second);
+  }
   else if (valueVT.index() == rdb::IDXPAIR) {
     auto r = std::get<std::pair<std::string, int>>(valueVT);
     return r.first;

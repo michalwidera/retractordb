@@ -1,0 +1,7 @@
+# Dokumentacja - wyjaśnienie zmiany nazwy pola
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.dat'
+DECLARE a INTEGER STREAM core1, 0.2 FILE 'datafile2.dat'
+
+SELECT core0[0] + core1[0] STREAM str1 FROM core0 + core1
+

@@ -3,7 +3,7 @@ digraph structs {
  str0	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str0\ninterval=1/10|{<tag0>str0_0(INTEGER)|<tag1>str0_1(INTEGER)}"]
  prg_str0	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core0\nPUSH_STREAM core1\nSTREAM_ADD \n"]
  str1	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str1\ninterval=1/10|{<tag0>str1_0(INTEGER)}"]
- prg_str1	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM str0\nSTREAM_MAX Error\n"]
+ prg_str1	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM str0\nSTREAM_MAX 0\n"]
  core0	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core0\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
  core1	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core1\ninterval=1/5\nDeclaration|{<tag0>b(INTEGER)}"]
 str0 -> prg_str0

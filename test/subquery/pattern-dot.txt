@@ -3,11 +3,11 @@ digraph structs {
  STREAM_HASH_core1_core2	[shape=record,style=filled,fillcolor=Sienna,color=Black,label="STREAM_HASH_core1_core2\ninterval=1/20\nAutogen|{<tag0>a(INTEGER)}"]
  prg_STREAM_HASH_core1_core2	[shape=box,style=filled,fillcolor=Yellow,color=Black,label="PUSH_STREAM core1\nPUSH_STREAM core2\nSTREAM_HASH \n"]
  str1	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str1\ninterval=1/20|{<tag0>a(INTEGER)}"]
- prg_str1	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM STREAM_HASH_core1_core2\nSTREAM_TIMEMOVE Error\n"]
+ prg_str1	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM STREAM_HASH_core1_core2\nSTREAM_TIMEMOVE 1\n"]
  str2	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str2\ninterval=1/20|{<tag0>a(INTEGER)}"]
  prg_str2	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM STREAM_TIMEMOVE_core1\nPUSH_STREAM core2\nSTREAM_HASH \n"]
  STREAM_TIMEMOVE_core1	[shape=record,style=filled,fillcolor=Sienna,color=Black,label="STREAM_TIMEMOVE_core1\ninterval=1/10\nAutogen|{<tag0>a(INTEGER)}"]
- prg_STREAM_TIMEMOVE_core1	[shape=box,style=filled,fillcolor=Yellow,color=Black,label="PUSH_STREAM core1\nSTREAM_TIMEMOVE Error\n"]
+ prg_STREAM_TIMEMOVE_core1	[shape=box,style=filled,fillcolor=Yellow,color=Black,label="PUSH_STREAM core1\nSTREAM_TIMEMOVE 1\n"]
  core1	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core1\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
  core2	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core2\ninterval=1/10\nDeclaration|{<tag0>b(INTEGER)}"]
 STREAM_HASH_core1_core2 -> prg_STREAM_HASH_core1_core2
