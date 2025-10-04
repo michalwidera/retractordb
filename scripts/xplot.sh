@@ -54,6 +54,4 @@ sleep 2
 
 echo "Type ctrl+c to stop."
 
-xqry -s $STREAM |\
-plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.01 |\
-gnuplot 2>/dev/null
+xqry -s $STREAM -p $XDIM,$YDIM | gnuplot 2>/dev/null

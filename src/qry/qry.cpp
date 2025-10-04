@@ -32,6 +32,7 @@ How xqry terminal works
 #include <chrono>
 #include <cstdio>
 #include <ctime>
+#include <deque>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -47,6 +48,8 @@ namespace IPC = boost::interprocess;
 boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
 static std::atomic<bool> done{false};
+
+std::vector<std::string> colors = {"red", "blue", "green", "orange", "purple", "brown", "pink", "yellow", "cyan", "magenta"};
 
 void qry::producer() {
   try {
@@ -179,7 +182,8 @@ bool qry::adhoc(const std::string &sAdhoc) {
   return system::errc::success;
 }
 
-bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &input) {
+bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
+                 std::pair<int, int> gnuplotDim) {
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
   ptree pt        = netClient("get", "");
 
@@ -204,9 +208,20 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
 
   ptree e_value;
 
+  if (outputFormatMode == formatMode::GNUPLOT) {
+    std::cout << "set term qt noraise\n";
+    std::cout << "set style fill transparent solid 0.5\n";
+    std::cout << "set xrange [0:" << gnuplotDim.first << "]\n";
+    std::cout << "set yrange [0:" << gnuplotDim.second << "]\n";
+    std::cout << "set ticslevel 0\n";
+    std::cout << "set hidden3d\n";
+    std::cout << "set view 60,30\n";
+  }
+
+  std::vector<std::deque<std::string>> output_lines;
   try {
     while (!done) {
-      if (noneedctrlc) {
+      if (vm.count("needctrlc")) {
         // If this option appear - any key will not stop process
       } else {
         if (_kbhit()) break;
@@ -221,6 +236,28 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
               const int count = std::stoi(e_value.get("count", ""));
               for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
               printf("\r\n");
+            } else if (outputFormatMode == formatMode::GNUPLOT) {
+              const int count = std::stoi(e_value.get("count", ""));
+              if (output_lines.size() < count) output_lines.resize(count);
+
+              std::cout << "plot";
+              for (int i = 0; i < count; i++) {
+                if (i != 0) std::cout << ",";
+                std::cout << " '-' u 1:2 t '[" << i << "]' w lines lc rgb '" << colors[i % colors.size()] << "'";
+              }
+              std::cout << "\r\n";
+
+              for (int i = 0; i < count; i++) {
+                output_lines[i].push_front(e_value.get(std::to_string(i), "").c_str());
+                if (output_lines[i].size() > gnuplotDim.second) output_lines[i].pop_back();
+              }
+
+              for (int i = 0; i < count; i++) {
+                for (int j = 0; j < output_lines[i].size(); j++) {
+                  printf("%d %s\r\n", j, output_lines[i][j].c_str());
+                }
+                printf("e\r\n");
+              }
             } else if (outputFormatMode == formatMode::GRAPHITE) {
               int i{0};
               const auto schema = netClient("detail", input);

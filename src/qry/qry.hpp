@@ -1,11 +1,12 @@
 #pragma once
 
 #include <atomic>
+#include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <map>
 #include <string>
 
-enum class formatMode { RAW, GRAPHITE, INFLUXDB };
+enum class formatMode { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 
 class qry {
   static void producer();
@@ -16,7 +17,7 @@ class qry {
  public:
   formatMode outputFormatMode{formatMode::RAW};
 
-  bool select(bool, const int, const std::string &);
+  bool select(boost::program_options::variables_map &vm, const int, const std::string &, std::pair<int, int>);
   bool adhoc(const std::string &);
   std::string dir();
   int hello();

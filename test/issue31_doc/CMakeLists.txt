@@ -1,5 +1,5 @@
-# cd build/Debug make install ; ctest -R issue31_doc -V
-# cmake . && ctest -R issue31_doc -V
+# cd build/Debug make install ; ctest -R issue31_doc -V cmake . && ctest -R
+# issue31_doc -V
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 

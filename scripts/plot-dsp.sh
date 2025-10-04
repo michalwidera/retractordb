@@ -5,7 +5,6 @@ trap control_c SIGINT
 control_c()
 {
     xqry -k
-    pkill plotblock
     pkill gnuplot
     stty sane
 }
@@ -34,4 +33,4 @@ if [ -z "$DISPLAY" ]
 then
 export DISPLAY=:0
 fi
-xqry -s $STREAM | plotblock.py 50 256 "output:red;source:blue" --sleep 0.05 | gnuplot 2>/dev/null
+xqry -s $STREAM -p 50,256 | gnuplot 2>/dev/null
