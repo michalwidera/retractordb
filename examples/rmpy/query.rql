@@ -1,5 +1,5 @@
 DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.txt'
 DECLARE a BYTE STREAM core1, 0.2 FILE '/dev/urandom'
 
-SELECT str1[0], str1[1]/10 STREAM str1 FROM core0 + core1
+SELECT str1[0], str1[0] + str1[1]/30 STREAM str1 FROM core0 + core1
 

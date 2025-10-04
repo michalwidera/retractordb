@@ -23,5 +23,3 @@ pkill xretractor ; true
 # Ensure that the script exits cleanly even if pkill fails
 # This is useful in CI environments where pkill might not find the process
 # and return a non-zero exit code.
-
-# xqry -s str1 | plotblock.py 50 50 "$STREAM[0]:red;$STREAM[1]:blue" --sleep 0.02 | gnuplot 2>/dev/null
