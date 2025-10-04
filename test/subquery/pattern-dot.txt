@@ -8,8 +8,8 @@ digraph structs {
  prg_str2	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM STREAM_TIMEMOVE_core1\nPUSH_STREAM core2\nSTREAM_HASH \n"]
  STREAM_TIMEMOVE_core1	[shape=record,style=filled,fillcolor=Sienna,color=Black,label="STREAM_TIMEMOVE_core1\ninterval=1/10\nAutogen|{<tag0>a(INTEGER)}"]
  prg_STREAM_TIMEMOVE_core1	[shape=box,style=filled,fillcolor=Yellow,color=Black,label="PUSH_STREAM core1\nSTREAM_TIMEMOVE 1\n"]
- core1	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core1\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
- core2	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core2\ninterval=1/10\nDeclaration|{<tag0>b(INTEGER)}"]
+ core1	[shape=record,style=filled,fillcolor="#FFF2CC",color=Black,label="core1\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
+ core2	[shape=record,style=filled,fillcolor="#FFF2CC",color=Black,label="core2\ninterval=1/10\nDeclaration|{<tag0>b(INTEGER)}"]
 STREAM_HASH_core1_core2 -> prg_STREAM_HASH_core1_core2
 STREAM_TIMEMOVE_core1 -> prg_STREAM_TIMEMOVE_core1
 str1 -> prg_str1
