@@ -180,6 +180,7 @@ jobs:
     executor: debian-mydocker
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -200,6 +201,7 @@ jobs:
     executor: debian-mydocker
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
@@ -224,6 +226,7 @@ jobs:
     executor: ubuntu-docker-2204
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -244,6 +247,7 @@ jobs:
     executor: ubuntu-docker
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -260,6 +264,7 @@ jobs:
     executor: ubuntu-docker
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -281,6 +286,7 @@ jobs:
     executor: ubuntu-docker
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -302,6 +308,7 @@ jobs:
     executor: ubuntu-docker
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
@@ -333,6 +340,7 @@ jobs:
     executor: ubuntu-machine-arm
     steps:
       - checkout
+          method: blobless
       - prep-env:
           build_package: make
           conan_profile1: ""
