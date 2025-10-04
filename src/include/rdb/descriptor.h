@@ -70,6 +70,13 @@ class Descriptor : public std::vector<rField> {
   std::optional<std::pair<int, int>> convert(int position);
   std::optional<int> convert(std::pair<int, int> position);
 
+  bool hasField(const std::string_view name) {
+    for (const auto &f : *this) {
+      if (f.rname == name) return true;
+    }
+    return false;
+  }
+
   template <typename T>
   std::string toString(const std::string_view name, T *ptr) {
     return std::string(reinterpret_cast<char *>(ptr + offsetBegArr(name)), len(name));

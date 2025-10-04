@@ -3,16 +3,24 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-set(XRETRACTOR_GRAPH_PARAM_0 "-d -p")
-set(XRETRACTOR_GRAPH_PARAM_1 "-d -f -t -s -p")
-set(XRETRACTOR_GRAPH_PARAM_2 "-d -f -t -s -u -p")
+# Graph parameters
+set(XRETRACTOR_GRAPH_PARAM_0 "-d ")
+set(XRETRACTOR_GRAPH_PARAM_1 "-d -f -t -s ")
+set(XRETRACTOR_GRAPH_PARAM_2 "-d -f -t -s -u ")
+
+# -p for transparent background
+# -u for rules
+# -t for tags
+# -s for stream programs
+# -f for fields
+# -d for dot output
+# -c for compile only mode
 
 file(
   GLOB V_GLOB_RQL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
   "*.rql")
 foreach(item ${V_GLOB_RQL})
-  # add_subdirectory(${item})
   add_test(
     NAME ${TestID}-${item}-graph
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

@@ -42,6 +42,6 @@ MINUS:              '-';
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
 DECIMAL:            DEC_DIGIT+;
-FILENAME:           ([A-Za-z_$0-9]|MINUS|DOT)+ ;
+FILENAME:           ([A-Za-z_$0-9]|MINUS|DOT|'/')+ ;
 
 SPACE:              [ \t\r\n]+    -> skip;

@@ -14,6 +14,11 @@ binaryDeviceAccessor::binaryDeviceAccessor(const std::string_view fileName,  //
                                            const size_t recSize)             //
     : filename(std::string(fileName)), recSize(recSize) {
   fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC, 0644);
+  // std::cerr << "Opening file: " << filename << std::endl;
+  // TODO: there is a need of support failure here
+  // sometimes /dev/random is not available
+  // of other file are not available
+  // only debug show someting wrong.
   assert(fd >= 0);
   assert(recSize != 0);
   // checking fd on read function.

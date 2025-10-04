@@ -1,7 +1,6 @@
 # Dokumentacja - wyjaśnienie zmiany nazwy pola
 
-DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.dat'
-DECLARE a INTEGER STREAM core1, 0.2 FILE 'datafile2.dat'
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.txt'
+DECLARE a BYTE STREAM core1, 0.2 FILE '/dev/urandom'
 
-SELECT core0[0] + core1[0] STREAM str1 FROM core0 + core1
-
+SELECT core0[0] + core1[0]/50 STREAM str1 FROM core0 + core1

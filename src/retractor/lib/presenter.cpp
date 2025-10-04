@@ -33,8 +33,15 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
     xout << " ";
     xout << q.id << "\t";
     xout << "[shape=record,";
-    if (q.isDeclaration())
-      xout << "style=filled,fillcolor=Skyblue,color=Black,";
+    if (q.isDeclaration()) {
+      auto desc = q.descriptorStorage();
+      if (desc.hasField("DEVICE"))
+        xout << "style=filled,fillcolor=Skyblue,color=Black,";
+      else if (desc.hasField("TEXTSOURCE"))
+        xout << "style=filled,fillcolor=\"#FFF2CC\",color=Black,";
+      else
+        xout << "style=filled,fillcolor=Red,color=Black,";  // something wrong here - declaration without DEVICE or TEXTSOURCE
+    }
     else if (q.isGenerated())
       xout << "style=filled,fillcolor=Sienna,color=Black,";
     else
