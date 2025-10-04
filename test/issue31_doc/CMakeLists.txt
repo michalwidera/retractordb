@@ -18,9 +18,9 @@ foreach(item ${V_GLOB_RQL})
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMAND bash -c "set -e ; \
       xretractor ${item} -c > ${item}.out.txt ; \
-      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_0} > ${item}.out.0.dot && dot -Tpng ${item}.out.0.dot -o ${item}.out.0.png ; \
-      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_1} > ${item}.out.1.dot && dot -Tpng ${item}.out.1.dot -o ${item}.out.1.png ; \
-      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_2} > ${item}.out.2.dot && dot -Tpng ${item}.out.2.dot -o ${item}.out.2.png ; \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_0} > ${item}.out.0.dot && dot -Tsvg ${item}.out.0.dot -o ${item}.out.0.svg ; \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_1} > ${item}.out.1.dot && dot -Tsvg ${item}.out.1.dot -o ${item}.out.1.svg ; \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_2} > ${item}.out.2.dot && dot -Tsvg ${item}.out.2.dot -o ${item}.out.2.svg ; \
       ")
 endforeach()
 

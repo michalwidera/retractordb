@@ -18,6 +18,7 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
   //
   xout << "digraph structs {" << std::endl;
   xout << " node\t[shape=record];" << std::endl;
+  xout << " bgcolor=\"transparent\";" << std::endl;
   xout << "";
   std::set<std::string> planStreamRelationsSet;
   for (auto q : coreInstance) {
