@@ -3,30 +3,26 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-add_test(
-  NAME ${TestID}-graph1
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash -c "set -e ; \
-    xretractor query-31.a.rql -c > out.a.txt ; \
-    xretractor query-31.a.rql -c -d -f -t -s > out.a.dot && dot -Tpng out.a.dot -o out.a.png ; \
-    ")
-# ${CMAKE_COMMAND} -E compare_files --ignore-eol dot-pattern.txt out.dot")
+set(XRETRACTOR_GRAPH_PARAM_0   "-d")
+set(XRETRACTOR_GRAPH_PARAM_1   "-d -f -t -s")
+set(XRETRACTOR_GRAPH_PARAM_2   "-d -f -t -s -u")
 
-add_test(
-  NAME ${TestID}-graph2
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash -c "set -e ; \
-    xretractor query-31.b.rql -c > out.b.txt ; \
-    xretractor query-31.b.rql -c -d -f -t -s > out.b.dot && dot -Tpng out.b.dot -o out.b.png ; \
-    ")
+file(
+  GLOB V_GLOB_RQL
+  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+  "*.rql")
+foreach(item ${V_GLOB_RQL})
+  # add_subdirectory(${item})
+  add_test(
+    NAME ${TestID}-${item}-graph
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND bash -c "set -e ; \
+      xretractor ${item} -c > ${item}.out.txt ; \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_0} > ${item}.out.0.dot && dot -Tpng ${item}.out.0.dot -o ${item}.out.0.png ; \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_1} > ${item}.out.1.dot && dot -Tpng ${item}.out.1.dot -o ${item}.out.1.png ; \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_2} > ${item}.out.2.dot && dot -Tpng ${item}.out.2.dot -o ${item}.out.2.png ; \
+      ")
+endforeach()
 
-add_test(
-  NAME ${TestID}-graph3
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash -c "set -e ; \
-    xretractor query-31.c.rql -c > out.c.txt ; \
-    xretractor query-31.c.rql -c -d -f -t -s > out.c.dot && dot -Tpng out.c.dot -o out.c.png ; \
-    ")
-
-set_tests_properties(${TestID}-graph1 PROPERTIES DEPENDS ${TestID}-graph2)
+# set_tests_properties(${TestID}-graph1 PROPERTIES DEPENDS ${TestID}-graph2)
 # feh out.png 

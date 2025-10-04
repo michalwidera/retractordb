@@ -1,0 +1,5 @@
+# Documentation - simple, first presentation
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.dat'
+
+SELECT str1[0]+1 STREAM str1 FROM core0>2
