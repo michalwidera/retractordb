@@ -179,7 +179,7 @@ jobs:
     working_directory: ~/retractordb
     executor: debian-mydocker
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: "ninja-build"
@@ -200,7 +200,7 @@ jobs:
     working_directory: ~/retractordb
     executor: debian-mydocker
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: ninja-build
@@ -225,7 +225,7 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker-2204
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: "ninja-build"
@@ -246,7 +246,7 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: make
@@ -263,7 +263,7 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: "ninja-build"
@@ -285,7 +285,7 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: make
@@ -307,7 +307,7 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: ninja-build
@@ -339,7 +339,7 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-machine-arm
     steps:
-      - checkout
+      - checkout:
           method: blobless
       - prep-env:
           build_package: make
