@@ -3,9 +3,9 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-set(XRETRACTOR_GRAPH_PARAM_0   "-d")
-set(XRETRACTOR_GRAPH_PARAM_1   "-d -f -t -s")
-set(XRETRACTOR_GRAPH_PARAM_2   "-d -f -t -s -u")
+set(XRETRACTOR_GRAPH_PARAM_0   "-d -p")
+set(XRETRACTOR_GRAPH_PARAM_1   "-d -f -t -s -p")
+set(XRETRACTOR_GRAPH_PARAM_2   "-d -f -t -s -u -p")
 
 file(
   GLOB V_GLOB_RQL

@@ -84,6 +84,7 @@ int main(int argc, char *argv[]) {
           ("tags,t", "show tags in dot file")                                     //
           ("streamprogs,s", "show stream programs in dot file")                   //
           ("rules,u", "show rules in dot file")                                   //
+          ("transparent,p", "make dot background transparent")                    //
           ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
     } else {
       desc.add_options()                                                                             //
