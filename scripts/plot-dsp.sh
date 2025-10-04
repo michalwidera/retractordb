@@ -16,7 +16,9 @@ if ! xretractor $QUERY -c -r ; then exit 1 ; fi
 
 if ! which gnuplot > /dev/null ; then echo "install gnuplot!" ; exit 1 ; fi
 
-\rm temp\*
+pwd
+\rm -rf temp
+mkdir -p temp
 nohup xretractor $QUERY </dev/null >/dev/null 2>&1 &
 
 sleep 2
