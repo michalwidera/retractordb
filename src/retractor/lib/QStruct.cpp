@@ -224,8 +224,7 @@ std::string token::getStr_() {
   } else if (valueVT.index() == rdb::INTPAIR) {
     auto r = std::get<std::pair<int, int>>(valueVT);
     return std::to_string(r.first) + "," + std::to_string(r.second);
-  }
-  else if (valueVT.index() == rdb::IDXPAIR) {
+  } else if (valueVT.index() == rdb::IDXPAIR) {
     auto r = std::get<std::pair<std::string, int>>(valueVT);
     return r.first;
   } else

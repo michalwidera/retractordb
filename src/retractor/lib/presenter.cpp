@@ -12,14 +12,14 @@
 
 using namespace boost;
 
-void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules, bool bTransparent) {
+void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules,
+                        bool bTransparent) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
   xout << "digraph structs {" << std::endl;
   xout << " node\t[shape=record];" << std::endl;
-  if (bTransparent)
-  {
+  if (bTransparent) {
     xout << " bgcolor=\"transparent\";" << std::endl;
   }
   xout << "";
@@ -384,7 +384,8 @@ int presenter::run(boost::program_options::variables_map &vm) {
       return system::errc::invalid_argument;
     }
     if (vm.count("dot")) {
-      graphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0, vm.count("rules") != 0, vm.count("transparent") != 0);
+      graphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0, vm.count("rules") != 0,
+              vm.count("transparent") != 0);
     } else if (vm.count("csv")) {
       qSet();
       qPrograms();
