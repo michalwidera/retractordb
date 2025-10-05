@@ -11,11 +11,13 @@ control_c()
 
 STREAM=${1:-str1}
 QUERY=${2:-query.rql}
+SIZE=${3:-50,200}
 
 if ! xretractor $QUERY -c -r ; then exit 1 ; fi
 
 if ! which gnuplot > /dev/null ; then echo "install gnuplot!" ; exit 1 ; fi
 
+\rm -rf temp && mkdir -p temp
 \rm -f nohup.out
 nohup xretractor $QUERY </dev/null >/dev/null 2>&1 &
 
@@ -25,4 +27,4 @@ if [ -z "$DISPLAY" ]
 then
 export DISPLAY=:0
 fi
-xqry -s $STREAM -p 50,200 | gnuplot 2>/dev/null
+xqry -s $STREAM -p $SIZE | gnuplot 2>/dev/null
