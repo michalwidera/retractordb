@@ -10,7 +10,7 @@ control_c()
 }
 
 STREAM=${1:-str1}
-QUERY=${2:-query-simple.rql}
+QUERY=${2:-query.rql}
 
 if ! xretractor $QUERY -c -r ; then exit 1 ; fi
 
