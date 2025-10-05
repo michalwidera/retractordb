@@ -7,7 +7,6 @@ add_subdirectory(rdb)
 add_subdirectory(qry)
 add_subdirectory(retractor)
 
-
 add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh
@@ -30,8 +29,8 @@ add_custom_target(
 
 add_custom_target(
   simple-view
-  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng
-          out.dot -o out.png && feh out.png
+  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
+          out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
@@ -41,8 +40,8 @@ add_custom_target(
 
 add_custom_target(
   simple-max-view
-  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng
-          out.dot -o out.png && feh out.png
+  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
+          out.png && feh out.png
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
 
 add_custom_target(
