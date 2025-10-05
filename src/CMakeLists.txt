@@ -10,22 +10,22 @@ add_subdirectory(retractor)
 
 add_custom_target(
   simple
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple)
 
 add_custom_target(
   simple-max
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str2
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
 
 add_custom_target(
   simple-timeshift
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str1 query-51.rql
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1 query-51.rql
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/issue56_timeshift)
 
 add_custom_target(
   dsp
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh outputAll query.rql 50:256
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh outputAll query.rql 50:256
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
 
 add_custom_target(

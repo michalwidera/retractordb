@@ -21,7 +21,8 @@ if ! which gnuplot > /dev/null ; then echo "install gnuplot!" ; exit 1 ; fi
 \rm -f nohup.out
 nohup xretractor $QUERY </dev/null >/dev/null 2>&1 &
 
-sleep 2
+# nohup needs a moment to start
+sleep  1
 
 if [ -z "$DISPLAY" ]
 then
