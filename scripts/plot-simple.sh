@@ -4,6 +4,7 @@ trap control_c SIGINT
 
 control_c()
 {
+    echo "Trapped CTRL-C"
     xqry -k
     stty sane
 }

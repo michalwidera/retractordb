@@ -44,11 +44,11 @@ int main(int argc, char *argv[]) {
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //
         ("dir,d", "list of queries")                                                                      //
+        ("raw,r", "raw output mode (default)")                                                            //
         ("graphite,g", "graphite output mode")                                                            //
         ("influxdb,f", "influxDB output mode")                                                            //
-        ("raw,r", "raw mode (default)")                                                                   //
-        ("help,h", "show options")                                                                        //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
+        ("help,h", "produce help message")                                                                //
         ("needctrlc,c", "force ctl+c for stop this tool");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
@@ -59,6 +59,10 @@ int main(int argc, char *argv[]) {
 
     qry obj;
 
+    if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
+      std::cout << "Only one output format could be selected." << std::endl;
+      return system::errc::invalid_argument;
+    }
     if (vm.count("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
     if (vm.count("raw")) obj.outputFormatMode = formatMode::RAW;
     if (vm.count("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
@@ -67,8 +71,8 @@ int main(int argc, char *argv[]) {
       std::stringstream ss(sGnuplotDim);
       char c;
       int x, y;
-      ss >> x >> c >> y;
-      if (ss.fail() || !ss.eof() || c != ',') {
+      ss >> x >> c >> y;  // expected format is x,y or x:y
+      if (ss.fail() || !ss.eof() || (c != ',' && c != ':')) {
         std::cout << "gnuplot mode need x and y parameters.";
         return system::errc::invalid_argument;
       }
