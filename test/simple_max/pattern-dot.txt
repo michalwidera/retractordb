@@ -4,17 +4,28 @@ digraph structs {
  prg_str0	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core0\nPUSH_STREAM core1\nSTREAM_ADD \n"]
  str1	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str1\ninterval=1/10|{<tag0>str1_0(INTEGER)}"]
  prg_str1	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM str0\nSTREAM_MAX 0\n"]
+ str2	[shape=record,style="filled",fillcolor=Gray,color=Black,label="str2\ninterval=1/10|{<tag0>str0_0(INTEGER)|<tag1>str0_1(INTEGER)|<tag2>str1_2(INTEGER)}"]
+ prg_str2	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM str0\nPUSH_STREAM str1\nSTREAM_ADD \n"]
  core0	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core0\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
  core1	[shape=record,style=filled,fillcolor=Skyblue,color=Black,label="core1\ninterval=1/5\nDeclaration|{<tag0>b(INTEGER)}"]
 str0 -> prg_str0
 str1 -> prg_str1
+str2 -> prg_str2
  str0_tag0	[shape=record,label="str0_0|{PUSH_ID(str0[0])|PUSH_VAL(10)|MULTIPLY}"]
  str0_tag1	[shape=record,label="str0_1|{PUSH_ID(str0[1])|PUSH_VAL(10)|ADD|PUSH_VAL(10)|MULTIPLY}"]
  str1_tag0	[shape=record,label="str1_0|{PUSH_ID(str1[0])}"]
+ str2_tag0	[shape=record,label="str0_0|{PUSH_ID(str2[0])}"]
+ str2_tag1	[shape=record,label="str0_1|{PUSH_ID(str2[1])}"]
+ str2_tag2	[shape=record,label="str1_2|{PUSH_ID(str2[2])}"]
 prg_str0 -> core0
 prg_str0 -> core1
 prg_str1 -> str0
+prg_str2 -> str0
+prg_str2 -> str1
 str0:tag0 -> str0_tag0 [style=dotted]
 str0:tag1 -> str0_tag1 [style=dotted]
 str1:tag0 -> str1_tag0 [style=dotted]
+str2:tag0 -> str2_tag0 [style=dotted]
+str2:tag1 -> str2_tag1 [style=dotted]
+str2:tag2 -> str2_tag2 [style=dotted]
 }

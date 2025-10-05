@@ -18,6 +18,16 @@ str1(1/10)
 	:- STREAM_MAX
 	str1_0: INTEGER
 		PUSH_ID(str1[0])
+str2(1/10)
+	:- PUSH_STREAM(str0)
+	:- PUSH_STREAM(str1)
+	:- STREAM_ADD
+	str0_0: INTEGER
+		PUSH_ID(str2[0])
+	str0_1: INTEGER
+		PUSH_ID(str2[1])
+	str1_2: INTEGER
+		PUSH_ID(str2[2])
 core0(1/10)	datafile2.dat
 	a: INTEGER
 core1(1/5)	datafile3.dat

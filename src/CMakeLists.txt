@@ -15,7 +15,7 @@ add_custom_target(
 
 add_custom_target(
   simple-max
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str2 query.rql
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/plot-simple.sh str2
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/simple_max)
 
 add_custom_target(
