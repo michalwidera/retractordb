@@ -246,14 +246,15 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
               int i{0};
               for (const auto &v : schema.get_child("db.field")) {
                 if (i != 0) std::cout << ",";
-                std::cout << " '-' u 1:2 t '[" << v.second.get<std::string>("").c_str() << "]' w lines lc rgb '"
-                          << colors[i % colors.size()] << "'";
+                auto columnName = v.second.get<std::string>("");
+                std::replace(columnName.begin(), columnName.end(), '_', '-');
+                std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors[i % colors.size()] << "'";
                 i++;
               }
               std::cout << "\r\n";
 
               for (int i = 0; i < count; i++) {
-                output_lines[i].push_front(e_value.get(std::to_string(i), "").c_str());
+                output_lines[i].push_front(e_value.get(std::to_string(i), ""));
                 if (output_lines[i].size() > gnuplotDim.second) output_lines[i].pop_back();
               }
 
