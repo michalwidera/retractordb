@@ -241,9 +241,14 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
               if (output_lines.size() < count) output_lines.resize(count);
 
               std::cout << "plot";
-              for (int i = 0; i < count; i++) {
+
+              const auto schema = netClient("detail", input);
+              int i{0};
+              for (const auto &v : schema.get_child("db.field")) {
                 if (i != 0) std::cout << ",";
-                std::cout << " '-' u 1:2 t '[" << i << "]' w lines lc rgb '" << colors[i % colors.size()] << "'";
+                std::cout << " '-' u 1:2 t '[" << v.second.get<std::string>("").c_str() << "]' w lines lc rgb '"
+                          << colors[i % colors.size()] << "'";
+                i++;
               }
               std::cout << "\r\n";
 
