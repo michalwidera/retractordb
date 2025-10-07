@@ -141,7 +141,9 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-            xretractor -h && xqry -h
+            ~/bin/xretractor -h
+            ~/bin/xqry -h
+            ~/bin/xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
