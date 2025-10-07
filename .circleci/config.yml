@@ -139,15 +139,14 @@ commands:
       - run:
           name: Smoke test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-            ~/retractordb/bin/xretractor -h
-            ~/retractordb/bin/xqry -h
-            ~/retractordb/bin/xtrdb -h
+            xretractor -h
+            xqry -h
+            xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>>/test && ctest -V
   run-cppcheck:
     parameters:
@@ -356,13 +355,12 @@ jobs:
       - run:
           name: Smoke test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-             ~/retractordb/bin/xretractor -h
-             ~/retractordb/bin/xqry -h
-             ~/retractordb/bin/xtrdb -h
+            xretractor -h
+            xqry -h
+            xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>>/test && ctest -V
