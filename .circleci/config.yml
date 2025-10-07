@@ -143,7 +143,7 @@ commands:
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
             ~/retractordb/bin/xretractor -h
             ~/retractordb/bin/xqry -h
-            ~/retractordb/retractordb/binbin/xtrdb -h
+            ~/retractordb/bin/xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
