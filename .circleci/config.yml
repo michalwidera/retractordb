@@ -356,7 +356,7 @@ jobs:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-            xretractor -h && xqry -h
+            build/<<parameters.build_type>>/xretractor -h && build/<<parameters.build_type>>/xqry -h
       - run:
           name: Regression & Unit test
           command: |
