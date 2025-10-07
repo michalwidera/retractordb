@@ -20,7 +20,7 @@ esac
 echo "Note: Current folder is << $foldername >> and will start build in << $build_folder >>"
 
 PS3='Build RetractorDB, please enter your choice: '
-options=("Release" "Debug" "Reset (clean)" "Init Conan Profile" "setup gcc23" "setup ninja" "Toolchain" "Quit")
+options=("Release" "Debug" "Reset (clean)" "Init Conan Profile" "setup ninja" "Toolchain" "setup bashrc" "Quit")
 select opt in "${options[@]}"
 do
     case $opt in
@@ -43,11 +43,6 @@ do
             rm $build_folder/CMakeCache.txt
             break
             ;;
-        "setup gcc23")
-            sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
-            cat ~/.conan2/profiles/default
-            break
-            ;;
         "Toolchain")
             sudo apt-get update
             sudo apt-get upgrade -y
@@ -62,6 +57,7 @@ do
             ;;
         "Init Conan Profile")
             conan profile detect -f
+            sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
             break
             ;;
         "setup ninja")
@@ -70,9 +66,21 @@ do
             cat ~/.conan2/profiles/default
             break
             ;;
+        "setup bashrc")
+            cd $build_folder
+            if [ "${PWD##*/}" != "retractordb" ] ; then echo "Error: Current folder is not retractordb" ; exit ; fi 
+            echo 'export PATH="'${PWD}'/bin:$PATH"' >> ~/.bashrc
+            echo 'source ~/.venv/bin/activate' >> ~/.bashrc
+            echo "-- Last two lines of ~/.bashrc are:"
+            tail -n 4 ~/.bashrc
+            break
+            ;;
         "Quit")
-            echo "Ok, quit - no action."
+            echo "-- Current conan profile is:"
             cat ~/.conan2/profiles/default
+            echo "-- Last two lines of ~/.bashrc are:"
+            tail -n 4 ~/.bashrc
+            echo "-- Ok, quit - no action."
             break
             ;;
         *) echo "invalid option $REPLY";;
