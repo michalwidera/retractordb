@@ -141,9 +141,9 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-            ~/bin/xretractor -h
-            ~/bin/xqry -h
-            ~/bin/xtrdb -h
+            ~/retractordb/bin/xretractor -h
+            ~/retractordb/bin/xqry -h
+            ~/retractordb/retractordb/binbin/xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
@@ -358,9 +358,9 @@ jobs:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-             ~/bin/xretractor -h
-             ~/bin/xqry -h
-             ~/bin/xtrdb -h
+             ~/retractordb/bin/xretractor -h
+             ~/retractordb/bin/xqry -h
+             ~/retractordb/bin/xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
