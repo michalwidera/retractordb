@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 project(
   retractordb
-  VERSION 0.1.2
+  VERSION 0.1.3
   LANGUAGES CXX)
 
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
