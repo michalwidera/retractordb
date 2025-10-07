@@ -1,0 +1,4 @@
+DECLARE a INTEGER, b INTEGER STREAM core0, 0.1 FILE 'file1.txt'
+DECLARE c INTEGER, d INTEGER STREAM core1, 0.2 FILE 'file2.txt'
+
+SELECT core0[_] * core1[_] STREAM pomnozone FROM core0+core1

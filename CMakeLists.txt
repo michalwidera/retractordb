@@ -99,6 +99,8 @@ set(CPACK_SOURCE_IGNORE_FILES
     /CMakeCache.txt
     /bin/
     /src/UML/
+    /src/retractor/UML/
+    /src/rdb/UML/
     /.vscode/
     /scripts/.vim/
     /scripts/dev-test/
@@ -111,6 +113,9 @@ set(CPACK_SOURCE_IGNORE_FILES
     /.git/
     /test/
     /embold.yaml
+    README.md
+    Dockerfile
+    DockerConan.txt
     ~$
     ${CPACK_SOURCE_IGNORE_FILES})
 include(CPack) # include after setting variables above to take effect

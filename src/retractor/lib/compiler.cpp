@@ -14,8 +14,6 @@
 
 #include "QStruct.h"
 #include "SOperations.hpp"
-#include "cmdID.hpp"
-#include "fldType.hpp"
 
 using boost::lexical_cast;
 
