@@ -56,28 +56,21 @@ link_directories(${Boost_LIBRARY_DIRS})
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compileCommands req. from
                                       # .vsccode/c_cpp_properties.json
-
 add_subdirectory(src)
 add_subdirectory(scripts)
 add_subdirectory(test)
 
-install(
-  DIRECTORY ${CMAKE_INSTALL_BINDIR}
-  DESTINATION $ENV{HOME}/.local
-  FILES_MATCHING
-  PATTERN
-    "*"
-    PERMISSIONS
-      OWNER_READ
-      OWNER_WRITE
-      OWNER_EXECUTE
-      GROUP_READ
-      GROUP_EXECUTE
-      WORLD_READ
-      WORLD_EXECUTE)
-
 include(InstallRequiredSystemLibraries)
-set(CPACK_GENERATOR "TGZ")
+
+set(CPACK_GENERATOR "DEB;TGZ")
+set(CPACK_SOURCE_GENERATOR "DEB;TGZ")
+
+IF (CPACK_GENERATOR MATCHES "DEB")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/opt")
+ELSEIF(CPACK_GENERATOR MATCHES "TGZ")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "")
+ENDIF()
+
 set(CPACK_PACKAGE_NAME "retractordb")
 set(CPACK_PACKAGE_VERSION
     "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
@@ -89,10 +82,10 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_FILE_NAME
     "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 
-set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_SOURCE_PACKAGE_FILE_NAME
     "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-source-${CMAKE_SYSTEM_NAME}"
 )
+
 set(CPACK_SOURCE_IGNORE_FILES
     /build/
     /CMakeFiles/
@@ -118,4 +111,5 @@ set(CPACK_SOURCE_IGNORE_FILES
     DockerConan.txt
     ~$
     ${CPACK_SOURCE_IGNORE_FILES})
+
 include(CPack) # include after setting variables above to take effect
