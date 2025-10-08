@@ -324,7 +324,7 @@ void presenter::qSet() {
 void presenter::onlyCompileShowProgram() {
   for (auto q : coreInstance) {
     std::cout << q.id;
-    if (q.isCompilerDirective()) std::cout << "(" << q.rInterval << ")";
+    if (!q.isCompilerDirective()) std::cout << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
