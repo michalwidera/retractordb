@@ -2,23 +2,13 @@ grammar RQL;
 
 prog                : ( select_statement
                       | declare_statement
-                      | storage_statement
-                      | substrat_statement
                       | compiler_option
                       | rule_statement
                       )+ EOF
                     ;
 
-compiler_option     : COPTION compiler_options=STRING
+compiler_option     : directive=( COPTION | STORAGE | SUBSTRAT ) value=( STRING_SUBSTRAT | STRING ) 
                     # Coption
-                    ;
-
-storage_statement   : STORAGE folder_name=STRING
-                    # Storage
-                    ;
-
-substrat_statement  : SUBSTRAT substrat_type=STRING_SUBSTRAT
-                    # Substrat
                     ;
 
 select_statement    : SELECT select_list

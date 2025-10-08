@@ -29,14 +29,13 @@ public:
   };
 
   enum {
-    RuleProg = 0, RuleCompiler_option = 1, RuleStorage_statement = 2, RuleSubstrat_statement = 3, 
-    RuleSelect_statement = 4, RuleDeclare_statement = 5, RuleRule_statement = 6, 
-    RuleDumppart = 7, RuleSystempart = 8, RuleRational_se = 9, RuleRetention_from = 10, 
-    RuleFraction_rule = 11, RuleField_declaration = 12, RuleField_type = 13, 
-    RuleSelect_list = 14, RuleField_id = 15, RuleUnary_op_expression = 16, 
-    RuleAsterisk = 17, RuleExpression = 18, RuleLogic = 19, RuleExpression_logic = 20, 
-    RuleTerm_logic = 21, RuleExpression_factor = 22, RuleTerm = 23, RuleStream_expression = 24, 
-    RuleStream_term = 25, RuleStream_factor = 26, RuleAgregator = 27, RuleFunction_call = 28
+    RuleProg = 0, RuleCompiler_option = 1, RuleSelect_statement = 2, RuleDeclare_statement = 3, 
+    RuleRule_statement = 4, RuleDumppart = 5, RuleSystempart = 6, RuleRational_se = 7, 
+    RuleRetention_from = 8, RuleFraction_rule = 9, RuleField_declaration = 10, 
+    RuleField_type = 11, RuleSelect_list = 12, RuleField_id = 13, RuleUnary_op_expression = 14, 
+    RuleAsterisk = 15, RuleExpression = 16, RuleLogic = 17, RuleExpression_logic = 18, 
+    RuleTerm_logic = 19, RuleExpression_factor = 20, RuleTerm = 21, RuleStream_expression = 22, 
+    RuleStream_term = 23, RuleStream_factor = 24, RuleAgregator = 25, RuleFunction_call = 26
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -58,8 +57,6 @@ public:
 
   class ProgContext;
   class Compiler_optionContext;
-  class Storage_statementContext;
-  class Substrat_statementContext;
   class Select_statementContext;
   class Declare_statementContext;
   class Rule_statementContext;
@@ -95,10 +92,6 @@ public:
     Select_statementContext* select_statement(size_t i);
     std::vector<Declare_statementContext *> declare_statement();
     Declare_statementContext* declare_statement(size_t i);
-    std::vector<Storage_statementContext *> storage_statement();
-    Storage_statementContext* storage_statement(size_t i);
-    std::vector<Substrat_statementContext *> substrat_statement();
-    Substrat_statementContext* substrat_statement(size_t i);
     std::vector<Compiler_optionContext *> compiler_option();
     Compiler_optionContext* compiler_option(size_t i);
     std::vector<Rule_statementContext *> rule_statement();
@@ -128,66 +121,18 @@ public:
   public:
     CoptionContext(Compiler_optionContext *ctx);
 
-    antlr4::Token *compiler_options = nullptr;
+    antlr4::Token *directive = nullptr;
+    antlr4::Token *value = nullptr;
     antlr4::tree::TerminalNode *COPTION();
+    antlr4::tree::TerminalNode *STORAGE();
+    antlr4::tree::TerminalNode *SUBSTRAT();
+    antlr4::tree::TerminalNode *STRING_SUBSTRAT();
     antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
   Compiler_optionContext* compiler_option();
-
-  class  Storage_statementContext : public antlr4::ParserRuleContext {
-  public:
-    Storage_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Storage_statementContext() = default;
-    void copyFrom(Storage_statementContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  StorageContext : public Storage_statementContext {
-  public:
-    StorageContext(Storage_statementContext *ctx);
-
-    antlr4::Token *folder_name = nullptr;
-    antlr4::tree::TerminalNode *STORAGE();
-    antlr4::tree::TerminalNode *STRING();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Storage_statementContext* storage_statement();
-
-  class  Substrat_statementContext : public antlr4::ParserRuleContext {
-  public:
-    Substrat_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-   
-    Substrat_statementContext() = default;
-    void copyFrom(Substrat_statementContext *context);
-    using antlr4::ParserRuleContext::copyFrom;
-
-    virtual size_t getRuleIndex() const override;
-
-   
-  };
-
-  class  SubstratContext : public Substrat_statementContext {
-  public:
-    SubstratContext(Substrat_statementContext *ctx);
-
-    antlr4::Token *substrat_type = nullptr;
-    antlr4::tree::TerminalNode *SUBSTRAT();
-    antlr4::tree::TerminalNode *STRING_SUBSTRAT();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
-  Substrat_statementContext* substrat_statement();
 
   class  Select_statementContext : public antlr4::ParserRuleContext {
   public:
