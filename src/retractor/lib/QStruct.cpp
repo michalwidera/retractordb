@@ -226,10 +226,6 @@ std::string token::getStr_() {
     return "Error";
 }
 
-bool query::isDeclaration() const { return lProgram.empty(); }
-
-bool query::isGenerated() { return !id.compare(0, 7, "STREAM_"); }
-
 /** Construktor set */
 
 field::field(rdb::rField field_, token lToken)

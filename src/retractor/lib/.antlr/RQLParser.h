@@ -17,26 +17,26 @@ public:
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
-    FILE = 32, STORAGE = 33, SUBSTRAT = 34, RULE = 35, ON = 36, WHEN = 37, 
-    DUMP = 38, SYSTEM = 39, DO = 40, TO = 41, AND_C = 42, OR_C = 43, NOT_C = 44, 
-    MIN = 45, MAX = 46, AVG = 47, SUMC = 48, STRING_SUBSTRAT = 49, ID = 50, 
-    STRING = 51, FLOAT = 52, DECIMAL = 53, REAL = 54, IS_EQ = 55, IS_NQ = 56, 
-    IS_GR = 57, IS_LS = 58, IS_GE = 59, IS_LE = 60, EXCLAMATION = 61, DOUBLE_BAR = 62, 
-    DOT = 63, UNDERLINE = 64, AT = 65, SHARP = 66, AND = 67, MOD = 68, DOLLAR = 69, 
-    COMMA = 70, SEMI = 71, COLON = 72, DOUBLE_COLON = 73, STAR = 74, DIVIDE = 75, 
-    PLUS = 76, MINUS = 77, BIT_NOT = 78, BIT_OR = 79, BIT_XOR = 80, SPACE = 81, 
-    COMMENT = 82, LINE_COMMENT1 = 83, LINE_COMMENT2 = 84
+    FILE = 32, STORAGE = 33, COPTION = 34, SUBSTRAT = 35, RULE = 36, ON = 37, 
+    WHEN = 38, DUMP = 39, SYSTEM = 40, DO = 41, TO = 42, AND_C = 43, OR_C = 44, 
+    NOT_C = 45, MIN = 46, MAX = 47, AVG = 48, SUMC = 49, STRING_SUBSTRAT = 50, 
+    ID = 51, STRING = 52, FLOAT = 53, DECIMAL = 54, REAL = 55, IS_EQ = 56, 
+    IS_NQ = 57, IS_GR = 58, IS_LS = 59, IS_GE = 60, IS_LE = 61, EXCLAMATION = 62, 
+    DOUBLE_BAR = 63, DOT = 64, UNDERLINE = 65, AT = 66, SHARP = 67, AND = 68, 
+    MOD = 69, DOLLAR = 70, COMMA = 71, SEMI = 72, COLON = 73, DOUBLE_COLON = 74, 
+    STAR = 75, DIVIDE = 76, PLUS = 77, MINUS = 78, BIT_NOT = 79, BIT_OR = 80, 
+    BIT_XOR = 81, SPACE = 82, COMMENT = 83, LINE_COMMENT1 = 84, LINE_COMMENT2 = 85
   };
 
   enum {
-    RuleProg = 0, RuleStorage_statement = 1, RuleSubstrat_statement = 2, 
-    RuleSelect_statement = 3, RuleDeclare_statement = 4, RuleRule_statement = 5, 
-    RuleDumppart = 6, RuleSystempart = 7, RuleRational_se = 8, RuleRetention_from = 9, 
-    RuleFraction_rule = 10, RuleField_declaration = 11, RuleField_type = 12, 
-    RuleSelect_list = 13, RuleField_id = 14, RuleUnary_op_expression = 15, 
-    RuleAsterisk = 16, RuleExpression = 17, RuleLogic = 18, RuleExpression_logic = 19, 
-    RuleTerm_logic = 20, RuleExpression_factor = 21, RuleTerm = 22, RuleStream_expression = 23, 
-    RuleStream_term = 24, RuleStream_factor = 25, RuleAgregator = 26, RuleFunction_call = 27
+    RuleProg = 0, RuleCompiler_option = 1, RuleStorage_statement = 2, RuleSubstrat_statement = 3, 
+    RuleSelect_statement = 4, RuleDeclare_statement = 5, RuleRule_statement = 6, 
+    RuleDumppart = 7, RuleSystempart = 8, RuleRational_se = 9, RuleRetention_from = 10, 
+    RuleFraction_rule = 11, RuleField_declaration = 12, RuleField_type = 13, 
+    RuleSelect_list = 14, RuleField_id = 15, RuleUnary_op_expression = 16, 
+    RuleAsterisk = 17, RuleExpression = 18, RuleLogic = 19, RuleExpression_logic = 20, 
+    RuleTerm_logic = 21, RuleExpression_factor = 22, RuleTerm = 23, RuleStream_expression = 24, 
+    RuleStream_term = 25, RuleStream_factor = 26, RuleAgregator = 27, RuleFunction_call = 28
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -57,6 +57,7 @@ public:
 
 
   class ProgContext;
+  class Compiler_optionContext;
   class Storage_statementContext;
   class Substrat_statementContext;
   class Select_statementContext;
@@ -98,6 +99,8 @@ public:
     Storage_statementContext* storage_statement(size_t i);
     std::vector<Substrat_statementContext *> substrat_statement();
     Substrat_statementContext* substrat_statement(size_t i);
+    std::vector<Compiler_optionContext *> compiler_option();
+    Compiler_optionContext* compiler_option(size_t i);
     std::vector<Rule_statementContext *> rule_statement();
     Rule_statementContext* rule_statement(size_t i);
 
@@ -107,6 +110,32 @@ public:
   };
 
   ProgContext* prog();
+
+  class  Compiler_optionContext : public antlr4::ParserRuleContext {
+  public:
+    Compiler_optionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Compiler_optionContext() = default;
+    void copyFrom(Compiler_optionContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  CoptionContext : public Compiler_optionContext {
+  public:
+    CoptionContext(Compiler_optionContext *ctx);
+
+    antlr4::Token *compiler_options = nullptr;
+    antlr4::tree::TerminalNode *COPTION();
+    antlr4::tree::TerminalNode *STRING();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Compiler_optionContext* compiler_option();
 
   class  Storage_statementContext : public antlr4::ParserRuleContext {
   public:

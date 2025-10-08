@@ -122,9 +122,11 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
     return ptRetval;
   }
 
-  if (first_keyword == "STORAGE" || first_keyword == "SUBSTRAT") {
+  if (first_keyword == "STORAGE" ||   //
+      first_keyword == "SUBSTRAT" ||  //
+      first_keyword == "COPTION") {
     ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE or SUBSTRAT not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE or SUBSTRAT not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or COPTION not supported");
     return ptRetval;
   }
 

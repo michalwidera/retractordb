@@ -76,6 +76,7 @@ class ParserListener : public RQLBaseListener {
 
   bool substratType_already_set = false;
   bool storageName_already_set  = false;
+  bool coptionName_already_set  = false;
 
   /** Rule command support */
   std::list<token> ruleCondition;
@@ -208,26 +209,6 @@ class ParserListener : public RQLBaseListener {
     }
   }
 
-  void exitSubstrat(RQLParser::SubstratContext *ctx) {
-    if (substratType_already_set) {
-      SPDLOG_ERROR("Parser/Storage: Substrat type is already set");
-      return;
-    }
-    substratType_already_set = true;
-
-    qry.id       = ":SUBSTRAT";
-    qry.filename = ctx->substrat_type->getText();
-
-    // This removes ''
-    qry.filename.erase(qry.filename.size() - 1);
-    qry.filename.erase(0, 1);
-
-    coreInstance.push_back(qry);
-    program.clear();
-    qry.reset();
-    fieldCount = 0;
-  }
-
   void exitRulez(RQLParser::RulezContext *ctx) {
     std::string stream_name(ctx->stream_name->getText());
     rule ruleConstruct(rule(ctx->name->getText(), ruleCondition));
@@ -298,7 +279,7 @@ class ParserListener : public RQLBaseListener {
     }
     storageName_already_set = true;
 
-    qry.id       = ":STORAGE";
+    qry.id       = ":STORAGE";  // storage -> :storage
     qry.filename = ctx->folder_name->getText();
 
     // This removes ''
@@ -309,6 +290,48 @@ class ParserListener : public RQLBaseListener {
 
     // Add / at the end of path
     if (qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
+
+    coreInstance.push_back(qry);
+    program.clear();
+    qry.reset();
+    fieldCount = 0;
+  }
+
+  void exitCoption(RQLParser::CoptionContext *ctx) {
+    if (coptionName_already_set) {
+      SPDLOG_ERROR("Parser/Coption: Coption name is already set");
+      return;
+    }
+    coptionName_already_set = true;
+
+    qry.id       = ":COPTION";  // coption -> :coption
+    qry.filename = ctx->compiler_options->getText();
+
+    // This removes ''
+    qry.filename.erase(qry.filename.size() - 1);
+    qry.filename.erase(0, 1);
+
+    assert(qry.filename.size() > 0 && "Coption name must not be empty");
+
+    coreInstance.push_back(qry);
+    program.clear();
+    qry.reset();
+    fieldCount = 0;
+  }
+
+  void exitSubstrat(RQLParser::SubstratContext *ctx) {
+    if (substratType_already_set) {
+      SPDLOG_ERROR("Parser/Storage: Substrat type is already set");
+      return;
+    }
+    substratType_already_set = true;
+
+    qry.id       = ":SUBSTRAT";  // substrat -> :substrat
+    qry.filename = ctx->substrat_type->getText();
+
+    // This removes ''
+    qry.filename.erase(qry.filename.size() - 1);
+    qry.filename.erase(0, 1);
 
     coreInstance.push_back(qry);
     program.clear();

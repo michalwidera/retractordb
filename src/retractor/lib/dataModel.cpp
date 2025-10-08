@@ -28,35 +28,28 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   for (const auto &it : coreInstance) SPDLOG_INFO("query.id {}", it.id);
 
   for (const auto &it : coreInstance)
-    if (it.id == ":STORAGE") {
-      storagePath = it.filename;
-      SPDLOG_INFO("Assert - Storage path set to {}", storagePath);
-      assert(!storagePath.empty());
-      break;
-    }
-
-  for (const auto &it : coreInstance)
-    if (it.id == ":SUBSTRAT") {
-      substratType = it.filename;
-      SPDLOG_INFO("Assert - substrat Type set to {}", substratType);
-      assert(!substratType.empty());
-      break;
+    if (it.isCompilerDirective()) {
+      directive[it.id] = it.filename;
+      SPDLOG_INFO("Assert - directive {}", directive[it.id]);
+      assert(!directive[it.id].empty());
     }
 
   auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
-                                [](const query &qry) { return qry.id[0] == ':'; });
+                                [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance.erase(new_end, coreInstance.end());
 
-  SPDLOG_INFO("!Storage path set to : {}", storagePath);
-  SPDLOG_INFO("!substratType is set: {}", substratType);
+  SPDLOG_INFO("!Storage path set to : {}", directive[":STORAGE"]);
+  SPDLOG_INFO("!Substrat type is set: {}", directive[":SUBSTRAT"]);
+  SPDLOG_INFO("!Coption type is set: {}", directive[":COPTION"]);
   for (auto &qry : coreInstance) {
-    if (substratType.empty())
+    if (directive[":SUBSTRAT"].empty())
       qry.substratPolicy = std::make_pair(
           "DEFAULT", rdb::memoryFileAccessor::no_retention);  // <- if substratType is empty - set substratPolicy to 0
   }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
-  for (auto &qry : coreInstance) qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry, storagePath));
+  for (auto &qry : coreInstance)
+    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry, directive[":STORAGE"]));
   for (auto const &[key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
 }
 
@@ -74,7 +67,7 @@ bool dataModel::addQueryToModel(std::string id) {
     return false;
   }
 
-  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, storagePath));
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, directive[":STORAGE"]));
   qSet[id]->outputPayload->setRemoveOnExit(false);
 
   return true;

@@ -13,8 +13,8 @@
 class dataModel {
  private:
   qTree &coreInstance;
-  std::string storagePath  = std::string{""};
-  std::string substratType = std::string{""};
+
+  std::map<std::string, std::string> directive{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":COPTION", ""}};
 
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;

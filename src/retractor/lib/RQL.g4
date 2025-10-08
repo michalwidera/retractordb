@@ -4,8 +4,13 @@ prog                : ( select_statement
                       | declare_statement
                       | storage_statement
                       | substrat_statement
+                      | compiler_option
                       | rule_statement
                       )+ EOF
+                    ;
+
+compiler_option     : COPTION compiler_options=STRING
+                    # Coption
                     ;
 
 storage_statement   : STORAGE folder_name=STRING
@@ -184,6 +189,7 @@ DECLARE:            'DECLARE'|'declare';
 RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
+COPTION:            'COPTION'|'coption';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
 RULE:               'RULE'|'rule';
 ON:                 'ON'|'on';

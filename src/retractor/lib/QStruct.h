@@ -86,9 +86,10 @@ class query {
   rdb::retention_t retention                    = rdb::retention_t{0, 0};        // Retention segments and capacity
   std::pair<std::string, size_t> substratPolicy = std::make_pair("DEFAULT", 0);  // rdb::memoryFileAccessor::no_retention
 
-  bool isDeclaration() const;
+  bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();
-  bool isGenerated();
+  bool isGenerated() const { return !id.compare(0, 7, "STREAM_"); }
+  bool isCompilerDirective() const { return id.size() > 0 && id[0] == ':'; }
   bool is(command_id command);
 
   std::vector<std::string> getDepStream();

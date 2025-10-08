@@ -25,8 +25,7 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
   xout << "";
   std::set<std::string> planStreamRelationsSet;
   for (auto q : coreInstance) {
-    if (q.id == ":STORAGE") continue;
-    if (q.id == ":SUBSTRAT") continue;
+    if (q.isCompilerDirective()) continue;
     //
     // Stream presentation
     //
@@ -325,7 +324,7 @@ void presenter::qSet() {
 void presenter::onlyCompileShowProgram() {
   for (auto q : coreInstance) {
     std::cout << q.id;
-    if (q.id[0] != ':') std::cout << "(" << q.rInterval << ")";
+    if (q.isCompilerDirective()) std::cout << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
