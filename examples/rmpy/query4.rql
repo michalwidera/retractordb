@@ -1,4 +1,4 @@
-COPTION '-c -d -f'
+COPTION 'test area'
 
 DECLARE a UINT STREAM core0, 0.1 FILE 'datafile1.txt'
 DECLARE b UINT STREAM core1, 0.2 FILE '/dev/urandom'
