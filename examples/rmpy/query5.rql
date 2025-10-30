@@ -4,3 +4,4 @@ DECLARE a UINT STREAM core1, 0.1 FILE 'datafile2.txt'
 SELECT str1[0] STREAM str1 FROM core0
 SELECT str2[0] STREAM str2 FROM core0 + core1
 SELECT str3[0] STREAM str3 FROM str1#str2
+SELECT str4[0] STREAM str4 FROM (core1+core0)>2

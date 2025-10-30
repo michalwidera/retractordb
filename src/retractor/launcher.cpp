@@ -73,19 +73,21 @@ int main(int argc, char *argv[]) {
 
   try {
     std::string sInputFile{""};
+    std::string sDiagram{""};
     if (onlyCompile) {
-      desc.add_options()                                                          //
-          ("help,h", "show help options")                                         //
-          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
-          ("quiet,r", "no output on screen, skip presenter")                      //
-          ("dot,d", "create dot output")                                          //
-          ("csv,m", "create csv output")                                          // c->m
-          ("fields,f", "show fields in dot file")                                 //
-          ("tags,t", "show tags in dot file")                                     //
-          ("streamprogs,s", "show stream programs in dot file")                   //
-          ("rules,u", "show rules in dot file")                                   //
-          ("transparent,p", "make dot background transparent")                    //
-          ("onlycompile,c", "compile only mode");                                 // linking inheritance from launcher
+      desc.add_options()                                                             //
+          ("help,h", "show help options")                                            //
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
+          ("quiet,r", "no output on screen, skip presenter")                         //
+          ("dot,d", "create dot output")                                             //
+          ("csv,m", "create csv output")                                             // c->m
+          ("fields,f", "show fields in dot file")                                    //
+          ("tags,t", "show tags in dot file")                                        //
+          ("streamprogs,s", "show stream programs in dot file")                      //
+          ("rules,u", "show rules in dot file")                                      //
+          ("transparent,p", "make dot background transparent")                       //
+          ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
+          ("onlycompile,c", "compile only mode");                                    // linking inheritance from launcher
     } else {
       desc.add_options()                                                                             //
           ("help,h", "Show program options")                                                         //

@@ -6,11 +6,13 @@
 #include <fstream>
 #include <iostream>  // for operator<<
 
+#include "CRSMath.h"
 #include "config.h"  // Add an automatically generated configuration file
 
 // https://ref.pencilcode.net/turtle/colors.html
 
 using namespace boost;
+using namespace CRationalStreamMath;
 
 void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules,
                         bool bTransparent) {
@@ -48,7 +50,7 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
     xout << q.id;
     xout << "\\ninterval=" << q.rInterval;
     if (q.isDeclaration()) xout << "\\nDeclaration";
-    if (q.isGenerated()) xout << "\\nAutogen";
+    if (q.isGenerated()) xout << ", Auto";
     // end stream specific
     //
     // fields in stream
@@ -381,6 +383,67 @@ void presenter::onlyCompileShowProgram() {
   }
 }
 
+void presenter::sequenceDiagram(std::ostream &out) {
+  const int msInSec = 1000;
+
+  // https://wavedrom.com/editor.html
+  auto minInterval = coreInstance.begin()->rInterval;
+  auto maxInterval = coreInstance.begin()->rInterval;
+  for (auto q : coreInstance) {
+    if (q.rInterval < minInterval) minInterval = q.rInterval;
+    if (q.rInterval > maxInterval) maxInterval = q.rInterval;
+  }
+  std::cout << "Minimum interval is " << minInterval << std::endl;
+  std::cout << "Maximum interval is " << maxInterval << std::endl;
+
+  auto fullCycleSteps = maxInterval / minInterval;
+  assert(fullCycleSteps.denominator() == 1);  // we want integer number here
+  auto cycleStepInt = fullCycleSteps.numerator();
+
+  auto grid = boost::rational_cast<int>(msInSec / fullCycleSteps);
+  std::cout << "Full cycle step count is " << cycleStepInt << std::endl;
+  std::cout << "Grid is " << grid << "ms" << std::endl;
+
+  out << std::defaultfloat;
+  out << "signal:" << std::endl;
+
+  TimeLine tl(coreInstance.getAvailableTimeIntervals());
+
+  struct proc_t {
+    std::set<std::string> procSet;
+    int interval;
+  };
+
+  std::vector<proc_t> proc;
+  boost::rational<int> prev_interval(0);
+
+  for (int i = 0; i < cycleStepInt * 4; i++) {
+    std::set<std::string> procSetVar;
+    for (const auto &it : coreInstance)
+      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSetVar.insert(it.id);
+
+    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
+    int period(boost::rational_cast<int>(interval - prev_interval));  // miliseconds
+    prev_interval = interval;
+
+    proc.push_back(proc_t{procSetVar, period});
+    int emptyCount = period / grid;
+
+    for (int j = 0; j < emptyCount - 1; j++) {
+      proc.push_back(proc_t{std::set<std::string>{}, grid});
+    }
+  }
+
+  for (const auto p : proc) {
+    std::cout << " " << p.interval << "ms ";
+    for (const auto s : p.procSet) {
+      std::cout << s << " ";
+    }
+    std::cout << std::endl;
+  }
+  return;
+}
+
 int presenter::run(boost::program_options::variables_map &vm) {
   try {
     if (vm.count("tags") != 0 && vm.count("fields") == 0) {
@@ -397,6 +460,15 @@ int presenter::run(boost::program_options::variables_map &vm) {
       qFields();
       qFieldsProgram();
       qRules();
+    } else if (vm.count("diagram")) {
+      std::string filename = vm["diagram"].as<std::string>();
+      std::cout << "Creating diagram output in file '" << filename << "'" << std::endl;
+      std::ofstream xout(filename);
+      if (!xout) {
+        std::cerr << "Cannot open file '" << filename << "' for write." << std::endl;
+        return system::errc::io_error;
+      }
+      sequenceDiagram(xout);
     } else {
       onlyCompileShowProgram();
     }

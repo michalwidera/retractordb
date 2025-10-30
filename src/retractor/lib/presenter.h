@@ -20,4 +20,5 @@ struct presenter {
   void qSet();
   void qRules();
   void onlyCompileShowProgram();
+  void sequenceDiagram(std::ostream &out);
 };

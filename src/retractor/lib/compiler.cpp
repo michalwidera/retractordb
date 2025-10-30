@@ -57,7 +57,7 @@ std::string compiler::intervalCounter() {
             bOnceAgain = true;
             continue;
           } else
-            delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
+            delta = (delta1 + delta2) / (delta1 * delta2);  // deltaHash(delta1, delta2);
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());

@@ -73,7 +73,7 @@ int iTimeLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 
-std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl) {
+std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
   assert(coreInstancePtr != nullptr);
   std::set<std::string> retVal;
   for (const auto &it : *coreInstancePtr)
@@ -408,7 +408,7 @@ int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard,
       //
       boost::this_thread::sleep_for(boost::chrono::milliseconds(period));
 
-      const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
+      const std::set<std::string> inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
 
       proc.processRows(inSet);
 
