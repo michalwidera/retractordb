@@ -50,7 +50,7 @@ typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
 
-extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
@@ -62,7 +62,7 @@ static std::map<const int, std::string> id2StreamName_Relation;
 
 extern boost::mutex core_mutex;
 
-std::vector<std::string> processedLines;
+std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
 
@@ -108,7 +108,7 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
 
   qTree coreInstanceCopy = *coreInstancePtr;
 
-  auto [parseOut, first_keyword] = parserRQLString(coreInstanceCopy, adHocQuery);
+  auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery);
 
   if (first_keyword == "UNRECOGNIZED") {
     ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with DECLARE or SELECT");
@@ -173,11 +173,10 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
       SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", id);
       return ptRetval;
     }
+    processedLines.push_back({id, adHocQuery});
   }
 
   SPDLOG_INFO("Adding to model OK, merged {} streams", mergedIds.size());
-
-  processedLines.push_back(adHocQuery);
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;

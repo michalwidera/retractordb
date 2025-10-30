@@ -350,7 +350,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string inlet) {
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -373,7 +373,18 @@ std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::st
   if (tree->children.size() > 0 && tree->children[0]->children.size() > 0)
     firsttoken = tree->children[0]->children[0]->getText();
   std::transform(firsttoken.begin(), firsttoken.end(), firsttoken.begin(), ::toupper);
-  return {status, firsttoken};
+
+  std::string streamName = "";  // tree->children[1]->children[0]->getText();
+  if (tree->children.size() > 0) {
+    if (auto selectCtx = dynamic_cast<RQLParser::SelectContext *>(tree->children[0])) {
+      streamName = selectCtx->ID()->getText();
+    } else if (auto declareCtx = dynamic_cast<RQLParser::DeclareContext *>(tree->children[0])) {
+      streamName = declareCtx->stream_name->getText();
+    } else if (auto ruleCtx = dynamic_cast<RQLParser::RulezContext *>(tree->children[0])) {
+      streamName = ruleCtx->stream_name->getText();
+    }
+  }
+  return {status, firsttoken, streamName};
 }
 
 std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
@@ -387,8 +398,8 @@ std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
   std::string line;
   while (std::getline(file, line)) {
     if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
-    auto [result, first_keyword] = parserRQLString(coreInstance, line);
-    status                       = result;
+    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, line);
+    status                                    = result;
     if (status != "OK") {
       SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, line);
       file.close();

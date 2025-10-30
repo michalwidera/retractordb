@@ -20,5 +20,5 @@ struct presenter {
   void qSet();
   void qRules();
   void onlyCompileShowProgram();
-  void sequenceDiagram(std::ostream &out);
+  void sequenceDiagram(std::ostream &out, int count_str);
 };

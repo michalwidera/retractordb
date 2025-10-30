@@ -14,6 +14,8 @@
 using namespace boost;
 using namespace CRationalStreamMath;
 
+extern std::vector<std::pair<std::string, std::string>> processedLines;
+
 void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules,
                         bool bTransparent) {
   //
@@ -383,7 +385,7 @@ void presenter::onlyCompileShowProgram() {
   }
 }
 
-void presenter::sequenceDiagram(std::ostream &out) {
+void presenter::sequenceDiagram(std::ostream &out, int count_str) {
   const int msInSec = 1000;
 
   // https://wavedrom.com/editor.html
@@ -393,19 +395,18 @@ void presenter::sequenceDiagram(std::ostream &out) {
     if (q.rInterval < minInterval) minInterval = q.rInterval;
     if (q.rInterval > maxInterval) maxInterval = q.rInterval;
   }
-  std::cout << "Minimum interval is " << minInterval << std::endl;
-  std::cout << "Maximum interval is " << maxInterval << std::endl;
+  // std::cout << "Minimum interval is " << minInterval << std::endl;
+  // std::cout << "Maximum interval is " << maxInterval << std::endl;
 
   auto fullCycleSteps = maxInterval / minInterval;
   assert(fullCycleSteps.denominator() == 1);  // we want integer number here
   auto cycleStepInt = fullCycleSteps.numerator();
 
   auto grid = boost::rational_cast<int>(msInSec / fullCycleSteps);
-  std::cout << "Full cycle step count is " << cycleStepInt << std::endl;
-  std::cout << "Grid is " << grid << "ms" << std::endl;
+  // std::cout << "Full cycle step count is " << cycleStepInt << std::endl;
+  // std::cout << "Grid is " << grid << "ms" << std::endl;
 
   out << std::defaultfloat;
-  out << "signal:" << std::endl;
 
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
 
@@ -417,7 +418,7 @@ void presenter::sequenceDiagram(std::ostream &out) {
   std::vector<proc_t> proc;
   boost::rational<int> prev_interval(0);
 
-  for (int i = 0; i < cycleStepInt * 4; i++) {
+  for (int i = 0; i < cycleStepInt * count_str; i++) {
     std::set<std::string> procSetVar;
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSetVar.insert(it.id);
@@ -433,14 +434,64 @@ void presenter::sequenceDiagram(std::ostream &out) {
       proc.push_back(proc_t{std::set<std::string>{}, grid});
     }
   }
-
-  for (const auto p : proc) {
-    std::cout << " " << p.interval << "ms ";
-    for (const auto s : p.procSet) {
-      std::cout << s << " ";
+  /*
+    for (const auto p : proc) {
+      std::cout << " " << p.interval << "ms ";
+      for (const auto s : p.procSet) {
+        std::cout << s << " ";
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
+  */
+  char stateChar = '-';
+  char objChar   = 'a';
+  for (auto q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    if (!q.isDeclaration()) continue;
+    out << stateChar;
+    for (const auto p : proc) {
+      if (p.procSet.find(q.id) != p.procSet.end())
+        out << objChar;
+      else
+        out << stateChar;
+    }
+    out << stateChar;
+    out << std::endl;
+    out << "title = " << q.id << std::endl;
+    objChar++;
+    out << std::endl;
   }
+
+  out << std::endl;
+  for (auto q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    if (q.isDeclaration()) continue;
+
+    auto it = std::find_if(processedLines.begin(), processedLines.end(),
+                           [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
+    if (it != processedLines.end()) {
+      out << "> " << it->second << std::endl;
+    }
+  }
+  out << std::endl;
+
+  for (auto q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    if (q.isDeclaration()) continue;
+    out << stateChar;
+    for (const auto p : proc) {
+      if (p.procSet.find(q.id) != p.procSet.end())
+        out << objChar;
+      else
+        out << stateChar;
+    }
+    out << stateChar;
+    out << std::endl;
+    out << "title = " << q.id << std::endl;
+    objChar++;
+    out << std::endl;
+  }
+
   return;
 }
 
@@ -462,13 +513,21 @@ int presenter::run(boost::program_options::variables_map &vm) {
       qRules();
     } else if (vm.count("diagram")) {
       std::string filename = vm["diagram"].as<std::string>();
-      std::cout << "Creating diagram output in file '" << filename << "'" << std::endl;
-      std::ofstream xout(filename);
+
+      std::string::size_type const p(filename.find_last_of(':'));
+      std::string file_without_count = filename.substr(0, p);
+      int count_str{1};
+      if (p != std::string::npos) {
+        count_str = atoi(filename.substr(p + 1).c_str());
+      }
+
+      std::cout << "Creating diagram output in file '" << file_without_count << "' count=" << count_str << std::endl;
+      std::ofstream xout(file_without_count);
       if (!xout) {
-        std::cerr << "Cannot open file '" << filename << "' for write." << std::endl;
+        std::cerr << "Cannot open file '" << file_without_count << "' for write." << std::endl;
         return system::errc::io_error;
       }
-      sequenceDiagram(xout);
+      sequenceDiagram(xout, count_str);
     } else {
       onlyCompileShowProgram();
     }
