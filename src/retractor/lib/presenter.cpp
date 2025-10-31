@@ -385,29 +385,35 @@ void presenter::onlyCompileShowProgram() {
   }
 }
 
-void presenter::sequenceDiagram(std::ostream &out, int count_str) {
+void presenter::sequenceDiagram(int gridType, int cycleCount) {
   const int msInSec = 1000;
+  bool isGridOn = (gridType != 0);
 
-  // https://wavedrom.com/editor.html
+  std::cout << "% Creating diagram output grid is " << (isGridOn ? "on" : "off") << ", cycle count:" << cycleCount << std::endl;
+  // https://swirly.dev
   auto minInterval = coreInstance.begin()->rInterval;
   auto maxInterval = coreInstance.begin()->rInterval;
   for (auto q : coreInstance) {
+    // std::cout << "% Stream " << q.id << " interval " << boost::rational_cast<int>(q.rInterval * msInSec) << "ms" << std::endl;
     if (q.rInterval < minInterval) minInterval = q.rInterval;
     if (q.rInterval > maxInterval) maxInterval = q.rInterval;
   }
-  // std::cout << "Minimum interval is " << minInterval << std::endl;
-  // std::cout << "Maximum interval is " << maxInterval << std::endl;
+  std::cout << "% Minimum interval is " << boost::rational_cast<int>(minInterval * msInSec) << "ms" << std::endl;
+  std::cout << "% Maximum interval is " << boost::rational_cast<int>(maxInterval * msInSec) << "ms" << std::endl;
 
-  auto fullCycleSteps = maxInterval / minInterval;
-  assert(fullCycleSteps.denominator() == 1);  // we want integer number here
-  auto cycleStepInt = fullCycleSteps.numerator();
+  auto divider = boost::rational_cast<int>(maxInterval/minInterval) ;
+  if (divider > 2) divider --;
 
-  auto grid = boost::rational_cast<int>(msInSec / fullCycleSteps);
-  // std::cout << "Full cycle step count is " << cycleStepInt << std::endl;
-  // std::cout << "Grid is " << grid << "ms" << std::endl;
+  auto grid = boost::rational_cast<int>(minInterval * msInSec / divider) ;
+  std::cout << "% Grid time is " << grid << "ms, divider:" << divider << std::endl;
 
-  out << std::defaultfloat;
+  auto cycleStepInt = boost::rational_cast<int>((maxInterval * msInSec) / grid) ;
+  std::cout << "% Full cycle step count in grid is " << cycleStepInt << std::endl;
 
+  if (cycleStepInt <= 0) {
+    std::cerr << "Error: Cycle step is zero or negative." << std::endl;
+    return;
+  }
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
 
   struct proc_t {
@@ -418,78 +424,95 @@ void presenter::sequenceDiagram(std::ostream &out, int count_str) {
   std::vector<proc_t> proc;
   boost::rational<int> prev_interval(0);
 
-  for (int i = 0; i < cycleStepInt * count_str; i++) {
+  int stepCounter = 0;
+  int stepLimit = cycleCount * cycleStepInt;
+  while (true) {
     std::set<std::string> procSetVar;
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSetVar.insert(it.id);
 
-    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
-    int period(boost::rational_cast<int>(interval - prev_interval));  // miliseconds
+    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec);
+    int period(boost::rational_cast<int>(interval - prev_interval));
     prev_interval = interval;
 
     proc.push_back(proc_t{procSetVar, period});
+    stepCounter++;
+    if (stepCounter >= stepLimit) break;
     int emptyCount = period / grid;
 
     for (int j = 0; j < emptyCount - 1; j++) {
       proc.push_back(proc_t{std::set<std::string>{}, grid});
+      stepCounter++;
+      if (stepCounter >= stepLimit) break;
     }
-  }
-  /*
-    for (const auto p : proc) {
-      std::cout << " " << p.interval << "ms ";
-      for (const auto s : p.procSet) {
-        std::cout << s << " ";
-      }
-      std::cout << std::endl;
-    }
-  */
-  char stateChar = '-';
-  char objChar   = 'a';
-  for (auto q : coreInstance) {
-    if (q.isCompilerDirective()) continue;
-    if (!q.isDeclaration()) continue;
-    out << stateChar;
-    for (const auto p : proc) {
-      if (p.procSet.find(q.id) != p.procSet.end())
-        out << objChar;
-      else
-        out << stateChar;
-    }
-    out << stateChar;
-    out << std::endl;
-    out << "title = " << q.id << std::endl;
-    objChar++;
-    out << std::endl;
+    if (stepCounter >= stepLimit) break;
   }
 
-  out << std::endl;
+  /*
+  for (const auto &p : proc) {
+    std::cout << "% Step interval is " << p.interval << "ms, streams active: ";
+    for (const auto &s : p.procSet) std::cout << s << " ";
+    std::cout << std::endl;
+  }
+  */
+
+  char objChar   = 'a';
+  const char stateChar = '-';
+  const char gridChar  = '|';
+
   for (auto q : coreInstance) {
+    int gridCount = 0;
+    if (q.isCompilerDirective()) continue;
+    if (!q.isDeclaration()) continue;
+    std::cout << stateChar;
+    if (isGridOn) std::cout << gridChar;
+    for (const auto p : proc) {
+      if (p.procSet.find(q.id) != p.procSet.end())
+        std::cout << objChar;
+      else
+        std::cout << stateChar;
+      gridCount++;
+      if (isGridOn && (gridCount % cycleStepInt == 0)) std::cout << gridChar;
+    }
+    std::cout << stateChar;
+    std::cout << std::endl;
+    if ( q.rInterval.denominator() == 1 )
+      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
+    else
+      std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
+    objChar++;
+    std::cout << std::endl;
+  }
+
+  for (auto q : coreInstance) {
+    int gridCount = 0;
     if (q.isCompilerDirective()) continue;
     if (q.isDeclaration()) continue;
 
     auto it = std::find_if(processedLines.begin(), processedLines.end(),
                            [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
     if (it != processedLines.end()) {
-      out << "> " << it->second << std::endl;
+      std::cout << "> " << it->second << std::endl;
+      std::cout << std::endl;
     }
-  }
-  out << std::endl;
-
-  for (auto q : coreInstance) {
-    if (q.isCompilerDirective()) continue;
-    if (q.isDeclaration()) continue;
-    out << stateChar;
+    std::cout << stateChar;
+    if (isGridOn) std::cout << gridChar;
     for (const auto p : proc) {
       if (p.procSet.find(q.id) != p.procSet.end())
-        out << objChar;
+        std::cout << objChar;
       else
-        out << stateChar;
+        std::cout << stateChar;
+      gridCount++;
+      if (isGridOn && (gridCount % cycleStepInt == 0)) std::cout << gridChar;
     }
-    out << stateChar;
-    out << std::endl;
-    out << "title = " << q.id << std::endl;
+    std::cout << stateChar;
+    std::cout << std::endl;
+    if ( q.rInterval.denominator() == 1 )
+      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
+    else
+      std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
     objChar++;
-    out << std::endl;
+    std::cout << std::endl;
   }
 
   return;
@@ -512,22 +535,25 @@ int presenter::run(boost::program_options::variables_map &vm) {
       qFieldsProgram();
       qRules();
     } else if (vm.count("diagram")) {
-      std::string filename = vm["diagram"].as<std::string>();
+      std::string sDiagramArgument = vm["diagram"].as<std::string>();
 
-      std::string::size_type const p(filename.find_last_of(':'));
-      std::string file_without_count = filename.substr(0, p);
-      int count_str{1};
-      if (p != std::string::npos) {
-        count_str = atoi(filename.substr(p + 1).c_str());
+      std::string::size_type const secondArgLocation(sDiagramArgument.find_last_of(':'));
+      std::string gridArg = sDiagramArgument.substr(0, secondArgLocation);
+      int cycleCount{1};
+      if (secondArgLocation != std::string::npos) {
+        cycleCount = atoi(sDiagramArgument.substr(secondArgLocation + 1).c_str());
       }
 
-      std::cout << "Creating diagram output in file '" << file_without_count << "' count=" << count_str << std::endl;
-      std::ofstream xout(file_without_count);
-      if (!xout) {
-        std::cerr << "Cannot open file '" << file_without_count << "' for write." << std::endl;
-        return system::errc::io_error;
+      if (gridArg.empty()) {
+        std::cerr << "Diagram grid type not specified." << std::endl;
+        return system::errc::invalid_argument;
       }
-      sequenceDiagram(xout, count_str);
+      int gridType = atoi(gridArg.c_str());
+      if (gridType < 0 || gridType > 1) {
+        std::cerr << "Diagram grid type is invalid." << std::endl;
+        return system::errc::invalid_argument;
+      }
+      sequenceDiagram(gridType, cycleCount);
     } else {
       onlyCompileShowProgram();
     }
