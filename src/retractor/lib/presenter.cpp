@@ -387,13 +387,15 @@ void presenter::onlyCompileShowProgram() {
 
 void presenter::sequenceDiagram(int gridType, int cycleCount) {
   const int msInSec = 1000;
-  bool isGridOn = (gridType != 0);
+  bool isGridOn     = (gridType != 0);
 
   std::cout << "% Creating diagram output grid is " << (isGridOn ? "on" : "off") << ", cycle count:" << cycleCount << std::endl;
   // https://swirly.dev
-  auto minInterval = coreInstance.begin()->rInterval;
-  auto maxInterval = coreInstance.begin()->rInterval;
+
+  auto minInterval = boost::rational<int>(std::numeric_limits<int>::max());
+  auto maxInterval = boost::rational<int>(std::numeric_limits<int>::min());
   for (auto q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
     // std::cout << "% Stream " << q.id << " interval " << boost::rational_cast<int>(q.rInterval * msInSec) << "ms" << std::endl;
     if (q.rInterval < minInterval) minInterval = q.rInterval;
     if (q.rInterval > maxInterval) maxInterval = q.rInterval;
@@ -401,13 +403,13 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   std::cout << "% Minimum interval is " << boost::rational_cast<int>(minInterval * msInSec) << "ms" << std::endl;
   std::cout << "% Maximum interval is " << boost::rational_cast<int>(maxInterval * msInSec) << "ms" << std::endl;
 
-  auto divider = boost::rational_cast<int>(maxInterval/minInterval) ;
-  if (divider > 2) divider --;
+  auto divider = boost::rational_cast<int>(maxInterval / minInterval);
+  if (divider > 2) divider--;
 
-  auto grid = boost::rational_cast<int>(minInterval * msInSec / divider) ;
+  auto grid = boost::rational_cast<int>(minInterval * msInSec / divider);
   std::cout << "% Grid time is " << grid << "ms, divider:" << divider << std::endl;
 
-  auto cycleStepInt = boost::rational_cast<int>((maxInterval * msInSec) / grid) ;
+  auto cycleStepInt = boost::rational_cast<int>((maxInterval * msInSec) / grid);
   std::cout << "% Full cycle step count in grid is " << cycleStepInt << std::endl;
 
   if (cycleStepInt <= 0) {
@@ -425,7 +427,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   boost::rational<int> prev_interval(0);
 
   int stepCounter = 0;
-  int stepLimit = cycleCount * cycleStepInt;
+  int stepLimit   = cycleCount * cycleStepInt;
   while (true) {
     std::set<std::string> procSetVar;
     for (const auto &it : coreInstance)
@@ -456,7 +458,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   }
   */
 
-  char objChar   = 'a';
+  char objChar         = 'a';
   const char stateChar = '-';
   const char gridChar  = '|';
 
@@ -476,7 +478,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     }
     std::cout << stateChar;
     std::cout << std::endl;
-    if ( q.rInterval.denominator() == 1 )
+    if (q.rInterval.denominator() == 1)
       std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
     else
       std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
@@ -507,7 +509,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     }
     std::cout << stateChar;
     std::cout << std::endl;
-    if ( q.rInterval.denominator() == 1 )
+    if (q.rInterval.denominator() == 1)
       std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
     else
       std::cout << "title = " << q.id << "," << q.rInterval << std::endl;

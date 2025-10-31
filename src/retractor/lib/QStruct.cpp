@@ -163,6 +163,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
     assert(it.rInterval != 0);  // :STORAGE has created ugly error here
+    if (it.isCompilerDirective()) continue;
     lstTimeIntervals.insert(it.rInterval);
   }
   return lstTimeIntervals;
