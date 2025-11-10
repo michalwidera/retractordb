@@ -204,24 +204,25 @@ ptree executorsm::commandProcessor(ptree ptInval) {
         ptRetval.put(std::string("db.field.") + s.field_.rname, s.field_.rname);
         ptRetval.put(std::string("db.field_type.") + s.field_.rname, GetStringdescFld(s.field_.rtype));
       }
-      ptRetval.put(std::string("db.stream"), streamName); 
-      ptRetval.put(std::string("db.count"),
-                   boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lSchema.size()));
-      ptRetval.put(std::string("db.duration"),
-                   boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].rInterval));
+      ptRetval.put(std::string("db.stream"), streamName);
+      ptRetval.put(std::string("db.count"), boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lSchema.size()));
+
+      auto duration = (*coreInstancePtr)[streamName].rInterval;
+      if (duration.denominator() == 1)
+        ptRetval.put(std::string("db.duration"), boost::lexical_cast<std::string>(duration.numerator()));
+      else
+        ptRetval.put(std::string("db.duration"), boost::lexical_cast<std::string>(duration));
+
       ptRetval.put(std::string("db.location"), (*coreInstancePtr)[streamName].filename);
       ptRetval.put(std::string("db.cap"), (*coreInstancePtr).maxCapacity[streamName]);
       ptRetval.put(std::string("db.size"), boost::lexical_cast<std::string>(pProc->streamStoredSize(streamName)));
-      ptRetval.put(std::string("db.count_records"),
-                   boost::lexical_cast<std::string>(pProc->getStreamCount(streamName)));
-      ptRetval.put(std::string("db.is_declaration"),
-                   ((*coreInstancePtr)[streamName].isDeclaration() ? "true" : "false"));
-      ptRetval.put(std::string("db.is_generated"),
-                   ((*coreInstancePtr)[streamName].isGenerated() ? "true" : "false"));
+      ptRetval.put(std::string("db.count_records"), boost::lexical_cast<std::string>(pProc->getStreamCount(streamName)));
+      ptRetval.put(std::string("db.is_declaration"), ((*coreInstancePtr)[streamName].isDeclaration() ? "true" : "false"));
+      ptRetval.put(std::string("db.is_generated"), ((*coreInstancePtr)[streamName].isGenerated() ? "true" : "false"));
       ptRetval.put(std::string("db.query"),
                    boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lProgram.size()) + " tokens");
-      auto it = std::find_if(processedLines.begin(), processedLines.end(),
-                           [&streamName](const std::pair<std::string, std::string> &p) { return p.first == streamName; });
+      auto it               = std::find_if(processedLines.begin(), processedLines.end(),
+                                           [&streamName](const std::pair<std::string, std::string> &p) { return p.first == streamName; });
       std::string queryLine = (it != processedLines.end()) ? it->second : "{not found}";
       ptRetval.put(std::string("db.processed_line"), queryLine);
     }

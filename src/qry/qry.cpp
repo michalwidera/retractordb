@@ -358,6 +358,8 @@ std::string qry::dir() {
   return retval.str();
 }
 
+const std::string indent = "  ";
+
 std::string qry::detailShow(const std::string &input) {
   std::stringstream retval;
 
@@ -371,15 +373,24 @@ std::string qry::detailShow(const std::string &input) {
 
   if (found) {
     ptree ptsh = netClient("detail", input);
-    retval << "Fields:\n";
-    for (const auto &v : ptsh.get_child("db.field")) {
-      retval << "\t" << input << "." << v.second.get<std::string>("") << " (" << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << ")\n";
-    }
     auto delta = ptsh.get_child("db.duration");
     auto query = ptsh.get_child("db.processed_line");
-    auto id = ptsh.get_child("db.stream");
-    retval << "Query:\n\t" << query.get_value<std::string>() << "\n";
-    retval << "Stream:\n\t" << id.get_value<std::string>() << "," << delta.get_value<std::string>() << "\n";
+    auto id    = ptsh.get_child("db.stream");
+
+    retval << "---\napiVersion: xqry/v1\n";
+
+    retval << "stream:\n";
+    retval << indent << "name: " << id.get_value<std::string>() << "\n";
+    retval << indent << "delta: " << delta.get_value<std::string>() << "\n";
+
+    retval << "query: " << query.get_value<std::string>() << "\n";
+
+    retval << "fields:\n";
+    for (const auto &v : ptsh.get_child("db.field")) {
+      retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
+      retval << indent << indent << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
+    }
+
   } else
     SPDLOG_ERROR("not found");
 

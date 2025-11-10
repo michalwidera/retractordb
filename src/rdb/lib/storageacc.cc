@@ -57,9 +57,7 @@ void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
     if (descriptorParam != nullptr && *descriptorParam != descriptor) {
       SPDLOG_ERROR("Descriptors do not match.");
       std::cerr << "Error in data descriptor file: " << storageFile << ".desc\n";
-      std::cerr << "Provided Descriptor:\n"
-                << *descriptorParam << "\nExisting Descriptor:\n"
-                << descriptor << std::endl;
+      std::cerr << "Provided Descriptor:\n" << *descriptorParam << "\nExisting Descriptor:\n" << descriptor << std::endl;
       assert(false && "Descriptors dont match - previous one have different schema? remove&restart.");
       abort();
     }

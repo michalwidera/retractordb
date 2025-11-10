@@ -27,6 +27,7 @@ int main(int argc, char *argv[]) {
   /* const int result_atexit = */
   std::atexit(cleanup);
 
+  bool supressok = false;
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
@@ -102,9 +103,10 @@ int main(int argc, char *argv[]) {
       if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.count("detail")) {
       auto ret = obj.detailShow(sDetailStream);
-      if (ret != "")
+      if (ret != "") {
         std::cout << ret;
-      else
+        supressok = true;
+      } else
         return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
       if (!obj.select(vm, timeLimit, sInputStream, gnuplotDim)) return system::errc::no_such_file_or_directory;
@@ -119,7 +121,7 @@ int main(int argc, char *argv[]) {
     SPDLOG_ERROR("Std: {}", e.what());
     return system::errc::interrupted;
   }
-  SPDLOG_INFO("ok.");
+  if (!supressok) SPDLOG_INFO("ok.");
 
   return system::errc::success;
 }
