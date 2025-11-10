@@ -49,12 +49,17 @@ void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
 
     if (descriptor.getSizeInBytes() == 0) {
       SPDLOG_ERROR("Empty descriptor in file.");
+      std::cerr << "Error, empty descriptor file:" << storageFile << ".desc\n";
       assert(false && "Empty descriptor in file.");
       abort();
     }
 
     if (descriptorParam != nullptr && *descriptorParam != descriptor) {
       SPDLOG_ERROR("Descriptors do not match.");
+      std::cerr << "Error in data descriptor file: " << storageFile << ".desc\n";
+      std::cerr << "Provided Descriptor:\n"
+                << *descriptorParam << "\nExisting Descriptor:\n"
+                << descriptor << std::endl;
       assert(false && "Descriptors dont match - previous one have different schema? remove&restart.");
       abort();
     }

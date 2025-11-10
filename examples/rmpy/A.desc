@@ -1,0 +1,4 @@
+{	BYTE a
+	REF "data1.txt"
+	TYPE TEXTSOURCE
+}
