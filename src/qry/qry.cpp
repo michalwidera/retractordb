@@ -334,11 +334,14 @@ std::string qry::dirYaml() {
   retval << "---\napiVersion: xqry/v1\n";
   retval << "streams:\n";
   for (const auto &v : pt.get_child("db.stream")) {
+    auto location = v.second.get<std::string>("location");
+    auto size     = v.second.get<std::string>("size");
+
     retval << "  - name: " << v.second.get<std::string>("") << "\n";
     retval << "    delta: " << v.second.get<std::string>("duration") << "\n";
-    retval << "    size: " << v.second.get<std::string>("size") << "\n";
+    if (size != "-1") retval << "    size: " << size << "\n";
     retval << "    count: " << v.second.get<std ::string>("count") << "\n";
-    retval << "    location: " << v.second.get<std::string>("location") << "\n";
+    if (location != "") retval << "    location: " << location << "\n";
   }
 
   return retval.str();

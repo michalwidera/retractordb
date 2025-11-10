@@ -89,7 +89,14 @@ ptree executorsm::collectStreamsParameters() {
   SPDLOG_DEBUG("get cmd rcv.");
   for (auto &q : *coreInstancePtr) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
-    ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
+
+    auto duration = q.rInterval;
+    if (duration.denominator() == 1)
+      ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"),
+                   boost::lexical_cast<std::string>(duration.numerator()));
+    else
+      ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(duration));
+
     long recordsCount = -1;
     if (!q.isDeclaration()) recordsCount = pProc->streamStoredSize(q.id);
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
