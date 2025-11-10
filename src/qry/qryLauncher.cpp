@@ -45,6 +45,7 @@ int main(int argc, char *argv[]) {
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //
         ("dir,d", "list of queries")                                                                      //
+        ("diryaml,y", "list of queries in yaml format")                                                   //
         ("raw,r", "raw output mode (default)")                                                            //
         ("graphite,g", "graphite output mode")                                                            //
         ("influxdb,f", "influxDB output mode")                                                            //
@@ -99,6 +100,9 @@ int main(int argc, char *argv[]) {
       SPDLOG_INFO("kill sent to server");
     } else if (vm.count("dir")) {
       std::cout << obj.dir();
+    } else if (vm.count("diryaml")) {
+      supressok = true;
+      std::cout << obj.dirYaml();
     } else if (vm.count("adhoc") && sAdHoc != "") {
       if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.count("detail")) {

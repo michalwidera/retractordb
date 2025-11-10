@@ -327,6 +327,23 @@ int qry::hello() {
   // catches in regressions
 }
 
+std::string qry::dirYaml() {
+  std::stringstream retval;
+  ptree pt = netClient("get", "");
+
+  retval << "---\napiVersion: xqry/v1\n";
+  retval << "streams:\n";
+  for (const auto &v : pt.get_child("db.stream")) {
+    retval << "  - name: " << v.second.get<std::string>("") << "\n";
+    retval << "    delta: " << v.second.get<std::string>("duration") << "\n";
+    retval << "    size: " << v.second.get<std::string>("size") << "\n";
+    retval << "    count: " << v.second.get<std ::string>("count") << "\n";
+    retval << "    location: " << v.second.get<std::string>("location") << "\n";
+  }
+
+  return retval.str();
+}
+
 std::string qry::dir() {
   std::stringstream retval;
   ptree pt                       = netClient("get", "");

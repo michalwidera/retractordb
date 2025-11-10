@@ -20,6 +20,7 @@ class qry {
   bool select(boost::program_options::variables_map &vm, const int, const std::string &, std::pair<int, int>);
   bool adhoc(const std::string &);
   std::string dir();
+  std::string dirYaml();
   int hello();
   std::string detailShow(const std::string &);
   virtual boost::property_tree::ptree netClient(const std::string &, const std::string &);
