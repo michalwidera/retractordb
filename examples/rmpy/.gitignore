@@ -1,7 +1,6 @@
 core*
 str*
-A.desc
-B.desc
+*.desc
 out.*
 *.json
 *.svg
