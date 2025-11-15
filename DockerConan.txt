@@ -1,9 +1,9 @@
 [requires]
-boost/1.88.0
+boost/1.89.0
 gtest/1.17.0
 antlr4-cppruntime/4.13.2
 antlr4/4.13.1
-spdlog/1.15.3
+spdlog/1.16.0
 openjdk/21.0.1
 magic_enum/0.9.7
 [options]
