@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
-install(PROGRAMS plotblock.py buildrdb.sh DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 add_custom_target(
   vimconf
   COMMAND cp -r .vim ~

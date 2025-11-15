@@ -1,0 +1,2 @@
+DECLARE a BYTE, b BYTE STREAM A, 1 FILE 'data3.txt'
+SELECT * STREAM str3 FROM A@(1,1)

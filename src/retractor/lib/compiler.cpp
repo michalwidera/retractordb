@@ -14,8 +14,6 @@
 
 #include "QStruct.h"
 #include "SOperations.hpp"
-#include "cmdID.hpp"
-#include "fldType.hpp"
 
 using boost::lexical_cast;
 
@@ -712,8 +710,7 @@ std::vector<std::string> compiler::mergeCore(qTree &coreInstanceSrc) {
   std::vector<std::string> retVal;
   SPDLOG_INFO("Merging core instances - current size: {}, new size: {}", coreInstance.size(), coreInstanceSrc.size());
   for (auto &q : coreInstanceSrc) {
-    if (q.id == ":SUBSTRAT") continue;
-    if (q.id == ":STORAGE") continue;
+    if (q.isCompilerDirective()) continue;
     if (coreInstance.exists(q.id)) continue;
     SPDLOG_INFO("Merging query id: {}", q.id);
     coreInstance.push_back(q);

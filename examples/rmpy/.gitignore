@@ -1,0 +1,6 @@
+core*
+str*
+*.desc
+out.*
+*.json
+*.svg

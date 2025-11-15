@@ -6,6 +6,7 @@
 #include <boost/system/error_code.hpp>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "qry.hpp"
@@ -26,24 +27,30 @@ int main(int argc, char *argv[]) {
   /* const int result_atexit = */
   std::atexit(cleanup);
 
+  bool supressok = false;
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     int timeLimit{0};
     std::string sInputStream{""};
+    std::string sDetailStream{""};
     std::string sAdHoc{""};
+    std::string sGnuplotDim{""};
+    std::pair<int, int> gnuplotDim{0, 0};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
-        ("detail,t", po::value<std::string>(&sInputStream), "show details of this stream")                //
+        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
         ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
         ("tlimitqry,m", po::value<int>(&timeLimit)->default_value(0), "limit of elements, 0 - no limit")  //
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //
         ("dir,d", "list of queries")                                                                      //
+        ("diryaml,y", "list of queries in yaml format")                                                   //
+        ("raw,r", "raw output mode (default)")                                                            //
         ("graphite,g", "graphite output mode")                                                            //
         ("influxdb,f", "influxDB output mode")                                                            //
-        ("raw,r", "raw mode (default)")                                                                   //
-        ("help,h", "show options")                                                                        //
+        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
+        ("help,h", "produce help message")                                                                //
         ("needctrlc,c", "force ctl+c for stop this tool");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
@@ -54,9 +61,29 @@ int main(int argc, char *argv[]) {
 
     qry obj;
 
+    if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
+      std::cout << "Only one output format could be selected." << std::endl;
+      return system::errc::invalid_argument;
+    }
     if (vm.count("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
     if (vm.count("raw")) obj.outputFormatMode = formatMode::RAW;
     if (vm.count("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
+    if (vm.count("gnuplot")) {
+      obj.outputFormatMode = formatMode::GNUPLOT;
+      std::stringstream ss(sGnuplotDim);
+      char c;
+      int x, y;
+      ss >> x >> c >> y;  // expected format is x,y or x:y
+      if (ss.fail() || !ss.eof() || (c != ',' && c != ':')) {
+        std::cout << "gnuplot mode need x and y parameters.";
+        return system::errc::invalid_argument;
+      }
+      if (x <= 0 || y <= 0) {
+        std::cout << "gnuplot mode need x and y > 0.";
+        return system::errc::invalid_argument;
+      }
+      gnuplotDim = {x, y};
+    }
     if (vm.count("help")) {
       std::cout << argv[0] << " - data query tool." << std::endl << std::endl;
       std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
@@ -73,16 +100,20 @@ int main(int argc, char *argv[]) {
       SPDLOG_INFO("kill sent to server");
     } else if (vm.count("dir")) {
       std::cout << obj.dir();
+    } else if (vm.count("diryaml")) {
+      supressok = true;
+      std::cout << obj.dirYaml();
     } else if (vm.count("adhoc") && sAdHoc != "") {
       if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.count("detail")) {
-      auto ret = obj.detailShow(sInputStream);
-      if (ret != "")
+      auto ret = obj.detailShow(sDetailStream);
+      if (ret != "") {
         std::cout << ret;
-      else
+        supressok = true;
+      } else
         return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
-      if (!obj.select(vm.count("needctrlc"), timeLimit, sInputStream)) return system::errc::no_such_file_or_directory;
+      if (!obj.select(vm, timeLimit, sInputStream, gnuplotDim)) return system::errc::no_such_file_or_directory;
     } else {
       SPDLOG_ERROR("no argument.");
       return EPERM;  // ERROR defined in errno-base.h
@@ -94,7 +125,7 @@ int main(int argc, char *argv[]) {
     SPDLOG_ERROR("Std: {}", e.what());
     return system::errc::interrupted;
   }
-  SPDLOG_INFO("ok.");
+  if (!supressok) SPDLOG_INFO("ok.");
 
   return system::errc::success;
 }

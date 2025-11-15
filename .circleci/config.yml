@@ -84,7 +84,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold 
+            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz
             python3 -m venv .venv
             source .venv/bin/activate
             pip3 install --upgrade pip 
@@ -139,13 +139,15 @@ commands:
       - run:
           name: Smoke test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-            xretractor -h && xqry -h
+            xretractor -h
+            xqry -h
+            xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<<parameters.build_type>>/test && ctest -V
   run-cppcheck:
     parameters:
@@ -179,7 +181,8 @@ jobs:
     working_directory: ~/retractordb
     executor: debian-mydocker
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -199,7 +202,8 @@ jobs:
     working_directory: ~/retractordb
     executor: debian-mydocker
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
@@ -223,7 +227,8 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker-2204
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -243,7 +248,8 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -259,7 +265,8 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -280,7 +287,8 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -301,7 +309,8 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-docker
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
@@ -332,7 +341,8 @@ jobs:
     working_directory: ~/retractordb
     executor: ubuntu-machine-arm
     steps:
-      - checkout
+      - checkout:
+          method: blobless
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -346,11 +356,13 @@ jobs:
       - run:
           name: Smoke test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
-            xretractor -h && xqry -h
+            xretractor -h
+            xqry -h
+            xtrdb -h
       - run:
           name: Regression & Unit test
           command: |
-            export PATH="$HOME/.local/bin:$PATH"
+            export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<<parameters.build_type>>/test && ctest -V

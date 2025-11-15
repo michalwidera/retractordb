@@ -17,11 +17,8 @@ public:
   virtual void enterProg(RQLParser::ProgContext *ctx) = 0;
   virtual void exitProg(RQLParser::ProgContext *ctx) = 0;
 
-  virtual void enterStorage(RQLParser::StorageContext *ctx) = 0;
-  virtual void exitStorage(RQLParser::StorageContext *ctx) = 0;
-
-  virtual void enterSubstrat(RQLParser::SubstratContext *ctx) = 0;
-  virtual void exitSubstrat(RQLParser::SubstratContext *ctx) = 0;
+  virtual void enterCoption(RQLParser::CoptionContext *ctx) = 0;
+  virtual void exitCoption(RQLParser::CoptionContext *ctx) = 0;
 
   virtual void enterSelect(RQLParser::SelectContext *ctx) = 0;
   virtual void exitSelect(RQLParser::SelectContext *ctx) = 0;

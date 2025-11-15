@@ -33,14 +33,14 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot(0) {
   }
 }
 
-bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDelta) {
+const bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDelta) {
   boost::rational<int> value = ctSlot / inDelta;
   return (value.denominator() == 1);
 }
 
 // MAGIC Warning
 
-boost::rational<int> &TimeLine::getNextTimeSlot() {
+const boost::rational<int> &TimeLine::getNextTimeSlot() {
   assert(sr.size() > 0);
   // In constructor we were set deltas and indexes
   // Take first value from tje edge

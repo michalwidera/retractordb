@@ -74,9 +74,6 @@ class ParserListener : public RQLBaseListener {
   /* Type of field - eq.1-atomic, >1 - array */
   int fTypeSizeArray = 1;
 
-  bool substratType_already_set = false;
-  bool storageName_already_set  = false;
-
   /** Rule command support */
   std::list<token> ruleCondition;
   long int dump_left;
@@ -208,26 +205,6 @@ class ParserListener : public RQLBaseListener {
     }
   }
 
-  void exitSubstrat(RQLParser::SubstratContext *ctx) {
-    if (substratType_already_set) {
-      SPDLOG_ERROR("Parser/Storage: Substrat type is already set");
-      return;
-    }
-    substratType_already_set = true;
-
-    qry.id       = ":SUBSTRAT";
-    qry.filename = ctx->substrat_type->getText();
-
-    // This removes ''
-    qry.filename.erase(qry.filename.size() - 1);
-    qry.filename.erase(0, 1);
-
-    coreInstance.push_back(qry);
-    program.clear();
-    qry.reset();
-    fieldCount = 0;
-  }
-
   void exitRulez(RQLParser::RulezContext *ctx) {
     std::string stream_name(ctx->stream_name->getText());
     rule ruleConstruct(rule(ctx->name->getText(), ruleCondition));
@@ -291,24 +268,19 @@ class ParserListener : public RQLBaseListener {
     systemCommand.erase(0, 1);
   }
 
-  void exitStorage(RQLParser::StorageContext *ctx) {
-    if (storageName_already_set) {
-      SPDLOG_ERROR("Parser/Storage: Storage name is already set");
-      return;
-    }
-    storageName_already_set = true;
-
-    qry.id       = ":STORAGE";
-    qry.filename = ctx->folder_name->getText();
+  void exitCoption(RQLParser::CoptionContext *ctx) {
+    qry.id = ":" + ctx->directive->getText();
+    std::transform(qry.id.begin(), qry.id.end(), qry.id.begin(), ::toupper);  // to upper case
+    qry.filename = ctx->value->getText();
 
     // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    assert(qry.filename.size() > 0 && "Storage name must not be empty");
+    assert(qry.filename.size() > 0 && "Directive must not be empty!");
 
-    // Add / at the end of path
-    if (qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
+    // Add / at the end of path, if not present in case of STORAGE
+    if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
 
     coreInstance.push_back(qry);
     program.clear();
@@ -378,7 +350,7 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string inlet) {
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -401,7 +373,18 @@ std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::st
   if (tree->children.size() > 0 && tree->children[0]->children.size() > 0)
     firsttoken = tree->children[0]->children[0]->getText();
   std::transform(firsttoken.begin(), firsttoken.end(), firsttoken.begin(), ::toupper);
-  return {status, firsttoken};
+
+  std::string streamName = "";  // tree->children[1]->children[0]->getText();
+  if (tree->children.size() > 0) {
+    if (auto selectCtx = dynamic_cast<RQLParser::SelectContext *>(tree->children[0])) {
+      streamName = selectCtx->ID()->getText();
+    } else if (auto declareCtx = dynamic_cast<RQLParser::DeclareContext *>(tree->children[0])) {
+      streamName = declareCtx->stream_name->getText();
+    } else if (auto ruleCtx = dynamic_cast<RQLParser::RulezContext *>(tree->children[0])) {
+      streamName = ruleCtx->stream_name->getText();
+    }
+  }
+  return {status, firsttoken, streamName};
 }
 
 std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
@@ -415,8 +398,8 @@ std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile) {
   std::string line;
   while (std::getline(file, line)) {
     if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
-    auto [result, first_keyword] = parserRQLString(coreInstance, line);
-    status                       = result;
+    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, line);
+    status                                    = result;
     if (status != "OK") {
       SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, line);
       file.close();

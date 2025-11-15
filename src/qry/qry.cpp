@@ -32,6 +32,7 @@ How xqry terminal works
 #include <chrono>
 #include <cstdio>
 #include <ctime>
+#include <deque>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -47,6 +48,8 @@ namespace IPC = boost::interprocess;
 boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
 
 static std::atomic<bool> done{false};
+
+std::vector<std::string> colors = {"red", "blue", "green", "orange", "purple", "brown", "pink", "yellow", "cyan", "magenta"};
 
 void qry::producer() {
   try {
@@ -179,7 +182,8 @@ bool qry::adhoc(const std::string &sAdhoc) {
   return system::errc::success;
 }
 
-bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &input) {
+bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
+                 std::pair<int, int> gnuplotDim) {
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
   ptree pt        = netClient("get", "");
 
@@ -204,9 +208,20 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
 
   ptree e_value;
 
+  if (outputFormatMode == formatMode::GNUPLOT) {
+    std::cout << "set term qt noraise\n";
+    std::cout << "set style fill transparent solid 0.5\n";
+    std::cout << "set xrange [0:" << gnuplotDim.first << "]\n";
+    std::cout << "set yrange [0:" << gnuplotDim.second << "]\n";
+    std::cout << "set ticslevel 0\n";
+    std::cout << "set hidden3d\n";
+    std::cout << "set view 60,30\n";
+  }
+
+  std::vector<std::deque<std::string>> output_lines;
   try {
     while (!done) {
-      if (noneedctrlc) {
+      if (vm.count("needctrlc")) {
         // If this option appear - any key will not stop process
       } else {
         if (_kbhit()) break;
@@ -221,6 +236,34 @@ bool qry::select(bool noneedctrlc, const int iTimeLimit, const std::string &inpu
               const int count = std::stoi(e_value.get("count", ""));
               for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
               printf("\r\n");
+            } else if (outputFormatMode == formatMode::GNUPLOT) {
+              const int count = std::stoi(e_value.get("count", ""));
+              if (output_lines.size() < count) output_lines.resize(count);
+
+              std::cout << "plot";
+
+              const auto schema = netClient("detail", input);
+              int i{0};
+              for (const auto &v : schema.get_child("db.field")) {
+                if (i != 0) std::cout << ",";
+                auto columnName = v.second.get<std::string>("");
+                std::replace(columnName.begin(), columnName.end(), '_', '-');
+                std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors[i % colors.size()] << "'";
+                i++;
+              }
+              std::cout << "\r\n";
+
+              for (int i = 0; i < count; i++) {
+                output_lines[i].push_front(e_value.get(std::to_string(i), ""));
+                if (output_lines[i].size() > gnuplotDim.second) output_lines[i].pop_back();
+              }
+
+              for (int i = 0; i < count; i++) {
+                for (int j = 0; j < output_lines[i].size(); j++) {
+                  printf("%d %s\r\n", j, output_lines[i][j].c_str());
+                }
+                printf("e\r\n");
+              }
             } else if (outputFormatMode == formatMode::GRAPHITE) {
               int i{0};
               const auto schema = netClient("detail", input);
@@ -284,6 +327,26 @@ int qry::hello() {
   // catches in regressions
 }
 
+std::string qry::dirYaml() {
+  std::stringstream retval;
+  ptree pt = netClient("get", "");
+
+  retval << "---\napiVersion: xqry/v1\n";
+  retval << "streams:\n";
+  for (const auto &v : pt.get_child("db.stream")) {
+    auto location = v.second.get<std::string>("location");
+    auto size     = v.second.get<std::string>("size");
+
+    retval << "  - name: " << v.second.get<std::string>("") << "\n";
+    retval << "    delta: " << v.second.get<std::string>("duration") << "\n";
+    if (size != "-1") retval << "    size: " << size << "\n";
+    retval << "    count: " << v.second.get<std ::string>("count") << "\n";
+    if (location != "") retval << "    location: " << location << "\n";
+  }
+
+  return retval.str();
+}
+
 std::string qry::dir() {
   std::stringstream retval;
   ptree pt                       = netClient("get", "");
@@ -315,11 +378,12 @@ std::string qry::dir() {
   return retval.str();
 }
 
+const std::string indent = "  ";
+
 std::string qry::detailShow(const std::string &input) {
   std::stringstream retval;
 
   ptree pt = netClient("get", "");
-  SPDLOG_INFO("got answer");
 
   const auto streams = pt.get_child("db.stream");
   bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto &node) {
@@ -329,7 +393,24 @@ std::string qry::detailShow(const std::string &input) {
 
   if (found) {
     ptree ptsh = netClient("detail", input);
-    for (const auto &v : ptsh.get_child("db.field")) retval << input << "." << v.second.get<std::string>("") << "\n";
+    auto delta = ptsh.get_child("db.duration");
+    auto query = ptsh.get_child("db.processed_line");
+    auto id    = ptsh.get_child("db.stream");
+
+    retval << "---\napiVersion: xqry/v1\n";
+
+    retval << "stream:\n";
+    retval << indent << "name: " << id.get_value<std::string>() << "\n";
+    retval << indent << "delta: " << delta.get_value<std::string>() << "\n";
+
+    retval << "query: " << query.get_value<std::string>() << "\n";
+
+    retval << "fields:\n";
+    for (const auto &v : ptsh.get_child("db.field")) {
+      retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
+      retval << indent << indent << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
+    }
+
   } else
     SPDLOG_ERROR("not found");
 

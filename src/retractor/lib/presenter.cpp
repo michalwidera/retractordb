@@ -6,32 +6,45 @@
 #include <fstream>
 #include <iostream>  // for operator<<
 
+#include "CRSMath.h"
 #include "config.h"  // Add an automatically generated configuration file
 
 // https://ref.pencilcode.net/turtle/colors.html
 
 using namespace boost;
+using namespace CRationalStreamMath;
 
-void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules) {
+extern std::vector<std::pair<std::string, std::string>> processedLines;
+
+void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules,
+                        bool bTransparent) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
   xout << "digraph structs {" << std::endl;
   xout << " node\t[shape=record];" << std::endl;
+  if (bTransparent) {
+    xout << " bgcolor=\"transparent\";" << std::endl;
+  }
   xout << "";
   std::set<std::string> planStreamRelationsSet;
   for (auto q : coreInstance) {
-    if (q.id == ":STORAGE") continue;
-    if (q.id == ":SUBSTRAT") continue;
+    if (q.isCompilerDirective()) continue;
     //
     // Stream presentation
     //
     xout << " ";
     xout << q.id << "\t";
     xout << "[shape=record,";
-    if (q.isDeclaration())
-      xout << "style=filled,fillcolor=Skyblue,color=Black,";
-    else if (q.isGenerated())
+    if (q.isDeclaration()) {
+      auto desc = q.descriptorStorage();
+      if (desc.hasField("DEVICE"))
+        xout << "style=filled,fillcolor=Skyblue,color=Black,";
+      else if (desc.hasField("TEXTSOURCE"))
+        xout << "style=filled,fillcolor=\"#FFF2CC\",color=Black,";
+      else
+        xout << "style=filled,fillcolor=Red,color=Black,";  // something wrong here - declaration without DEVICE or TEXTSOURCE
+    } else if (q.isGenerated())
       xout << "style=filled,fillcolor=Sienna,color=Black,";
     else
       xout << "style=\"filled\",fillcolor=Gray,color=Black,";
@@ -39,7 +52,7 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
     xout << q.id;
     xout << "\\ninterval=" << q.rInterval;
     if (q.isDeclaration()) xout << "\\nDeclaration";
-    if (q.isGenerated()) xout << "\\nAutogen";
+    if (q.isGenerated()) xout << ", Auto";
     // end stream specific
     //
     // fields in stream
@@ -315,7 +328,7 @@ void presenter::qSet() {
 void presenter::onlyCompileShowProgram() {
   for (auto q : coreInstance) {
     std::cout << q.id;
-    if (q.id[0] != ':') std::cout << "(" << q.rInterval << ")";
+    if (!q.isCompilerDirective()) std::cout << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << std::endl;
     for (auto t : q.lProgram)
@@ -372,6 +385,141 @@ void presenter::onlyCompileShowProgram() {
   }
 }
 
+void presenter::sequenceDiagram(int gridType, int cycleCount) {
+  const int msInSec = 1000;
+  bool isGridOn     = (gridType != 0);
+
+  std::cout << "% Creating diagram output grid is " << (isGridOn ? "on" : "off") << ", cycle count:" << cycleCount << std::endl;
+  // https://swirly.dev
+
+  auto minInterval = boost::rational<int>(std::numeric_limits<int>::max());
+  auto maxInterval = boost::rational<int>(std::numeric_limits<int>::min());
+  for (auto q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    // std::cout << "% Stream " << q.id << " interval " << boost::rational_cast<int>(q.rInterval * msInSec) << "ms" << std::endl;
+    if (q.rInterval < minInterval) minInterval = q.rInterval;
+    if (q.rInterval > maxInterval) maxInterval = q.rInterval;
+  }
+  std::cout << "% Minimum interval is " << boost::rational_cast<int>(minInterval * msInSec) << "ms" << std::endl;
+  std::cout << "% Maximum interval is " << boost::rational_cast<int>(maxInterval * msInSec) << "ms" << std::endl;
+
+  auto divider = boost::rational_cast<int>(maxInterval / minInterval);
+  if (divider > 2) divider--;
+
+  auto grid = boost::rational_cast<int>(minInterval * msInSec / divider);
+  std::cout << "% Grid time is " << grid << "ms, divider:" << divider << std::endl;
+
+  auto cycleStepInt = boost::rational_cast<int>((maxInterval * msInSec) / grid);
+  std::cout << "% Full cycle step count in grid is " << cycleStepInt << std::endl;
+
+  if (cycleStepInt <= 0) {
+    std::cerr << "Error: Cycle step is zero or negative." << std::endl;
+    return;
+  }
+  TimeLine tl(coreInstance.getAvailableTimeIntervals());
+
+  struct proc_t {
+    std::set<std::string> procSet;
+    int interval;
+  };
+
+  std::vector<proc_t> proc;
+  boost::rational<int> prev_interval(0);
+
+  int stepCounter = 0;
+  int stepLimit   = cycleCount * cycleStepInt;
+  while (true) {
+    std::set<std::string> procSetVar;
+    for (const auto &it : coreInstance)
+      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSetVar.insert(it.id);
+
+    boost::rational<int> interval(tl.getNextTimeSlot() * msInSec);
+    int period(boost::rational_cast<int>(interval - prev_interval));
+    prev_interval = interval;
+
+    proc.push_back(proc_t{procSetVar, period});
+    stepCounter++;
+    if (stepCounter >= stepLimit) break;
+    int emptyCount = period / grid;
+
+    for (int j = 0; j < emptyCount - 1; j++) {
+      proc.push_back(proc_t{std::set<std::string>{}, grid});
+      stepCounter++;
+      if (stepCounter >= stepLimit) break;
+    }
+    if (stepCounter >= stepLimit) break;
+  }
+
+  /*
+  for (const auto &p : proc) {
+    std::cout << "% Step interval is " << p.interval << "ms, streams active: ";
+    for (const auto &s : p.procSet) std::cout << s << " ";
+    std::cout << std::endl;
+  }
+  */
+
+  char objChar         = 'a';
+  const char stateChar = '-';
+  const char gridChar  = '|';
+
+  for (auto q : coreInstance) {
+    int gridCount = 0;
+    if (q.isCompilerDirective()) continue;
+    if (!q.isDeclaration()) continue;
+    std::cout << stateChar;
+    if (isGridOn) std::cout << gridChar;
+    for (const auto p : proc) {
+      if (p.procSet.find(q.id) != p.procSet.end())
+        std::cout << objChar;
+      else
+        std::cout << stateChar;
+      gridCount++;
+      if (isGridOn && (gridCount % cycleStepInt == 0)) std::cout << gridChar;
+    }
+    std::cout << stateChar;
+    std::cout << std::endl;
+    if (q.rInterval.denominator() == 1)
+      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
+    else
+      std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
+    objChar++;
+    std::cout << std::endl;
+  }
+
+  for (auto q : coreInstance) {
+    int gridCount = 0;
+    if (q.isCompilerDirective()) continue;
+    if (q.isDeclaration()) continue;
+
+    auto it = std::find_if(processedLines.begin(), processedLines.end(),
+                           [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
+    if (it != processedLines.end()) {
+      std::cout << "> " << it->second << std::endl;
+      std::cout << std::endl;
+    }
+    std::cout << stateChar;
+    if (isGridOn) std::cout << gridChar;
+    for (const auto p : proc) {
+      if (p.procSet.find(q.id) != p.procSet.end())
+        std::cout << objChar;
+      else
+        std::cout << stateChar;
+      gridCount++;
+      if (isGridOn && (gridCount % cycleStepInt == 0)) std::cout << gridChar;
+    }
+    std::cout << stateChar;
+    std::cout << std::endl;
+    if (q.rInterval.denominator() == 1)
+      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
+    else
+      std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
+    objChar++;
+    std::cout << std::endl;
+  }
+
+  return;
+}
+
 int presenter::run(boost::program_options::variables_map &vm) {
   try {
     if (vm.count("tags") != 0 && vm.count("fields") == 0) {
@@ -380,13 +528,34 @@ int presenter::run(boost::program_options::variables_map &vm) {
       return system::errc::invalid_argument;
     }
     if (vm.count("dot")) {
-      graphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0, vm.count("rules") != 0);
+      graphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0, vm.count("rules") != 0,
+              vm.count("transparent") != 0);
     } else if (vm.count("csv")) {
       qSet();
       qPrograms();
       qFields();
       qFieldsProgram();
       qRules();
+    } else if (vm.count("diagram")) {
+      std::string sDiagramArgument = vm["diagram"].as<std::string>();
+
+      std::string::size_type const secondArgLocation(sDiagramArgument.find_last_of(':'));
+      std::string gridArg = sDiagramArgument.substr(0, secondArgLocation);
+      int cycleCount{1};
+      if (secondArgLocation != std::string::npos) {
+        cycleCount = atoi(sDiagramArgument.substr(secondArgLocation + 1).c_str());
+      }
+
+      if (gridArg.empty()) {
+        std::cerr << "Diagram grid type not specified." << std::endl;
+        return system::errc::invalid_argument;
+      }
+      int gridType = atoi(gridArg.c_str());
+      if (gridType < 0 || gridType > 1) {
+        std::cerr << "Diagram grid type is invalid." << std::endl;
+        return system::errc::invalid_argument;
+      }
+      sequenceDiagram(gridType, cycleCount);
     } else {
       onlyCompileShowProgram();
     }

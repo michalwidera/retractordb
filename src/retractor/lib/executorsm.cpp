@@ -50,7 +50,7 @@ typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
 
-extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
@@ -62,7 +62,7 @@ static std::map<const int, std::string> id2StreamName_Relation;
 
 extern boost::mutex core_mutex;
 
-std::vector<std::string> processedLines;
+std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
 
@@ -73,7 +73,7 @@ int iTimeLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 
-std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl) {
+std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
   assert(coreInstancePtr != nullptr);
   std::set<std::string> retVal;
   for (const auto &it : *coreInstancePtr)
@@ -89,7 +89,14 @@ ptree executorsm::collectStreamsParameters() {
   SPDLOG_DEBUG("get cmd rcv.");
   for (auto &q : *coreInstancePtr) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
-    ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(q.rInterval));
+
+    auto duration = q.rInterval;
+    if (duration.denominator() == 1)
+      ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"),
+                   boost::lexical_cast<std::string>(duration.numerator()));
+    else
+      ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(duration));
+
     long recordsCount = -1;
     if (!q.isDeclaration()) recordsCount = pProc->streamStoredSize(q.id);
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
@@ -108,7 +115,7 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
 
   qTree coreInstanceCopy = *coreInstancePtr;
 
-  auto [parseOut, first_keyword] = parserRQLString(coreInstanceCopy, adHocQuery);
+  auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery);
 
   if (first_keyword == "UNRECOGNIZED") {
     ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with DECLARE or SELECT");
@@ -122,9 +129,11 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
     return ptRetval;
   }
 
-  if (first_keyword == "STORAGE" || first_keyword == "SUBSTRAT") {
+  if (first_keyword == "STORAGE" ||   //
+      first_keyword == "SUBSTRAT" ||  //
+      first_keyword == "COPTION") {
     ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE or SUBSTRAT not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE or SUBSTRAT not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or COPTION not supported");
     return ptRetval;
   }
 
@@ -171,11 +180,10 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
       SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", id);
       return ptRetval;
     }
+    processedLines.push_back({id, adHocQuery});
   }
 
   SPDLOG_INFO("Adding to model OK, merged {} streams", mergedIds.size());
-
-  processedLines.push_back(adHocQuery);
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;
@@ -199,8 +207,31 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       std::string streamName = ptInval.get("db.argument", "");
       assert(streamName != "");
       SPDLOG_DEBUG("got detail {} rcv.", streamName);
-      for (const auto &s : (*coreInstancePtr)[streamName].lSchema)
+      for (const auto &s : (*coreInstancePtr)[streamName].lSchema) {
         ptRetval.put(std::string("db.field.") + s.field_.rname, s.field_.rname);
+        ptRetval.put(std::string("db.field_type.") + s.field_.rname, GetStringdescFld(s.field_.rtype));
+      }
+      ptRetval.put(std::string("db.stream"), streamName);
+      ptRetval.put(std::string("db.count"), boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lSchema.size()));
+
+      auto duration = (*coreInstancePtr)[streamName].rInterval;
+      if (duration.denominator() == 1)
+        ptRetval.put(std::string("db.duration"), boost::lexical_cast<std::string>(duration.numerator()));
+      else
+        ptRetval.put(std::string("db.duration"), boost::lexical_cast<std::string>(duration));
+
+      ptRetval.put(std::string("db.location"), (*coreInstancePtr)[streamName].filename);
+      ptRetval.put(std::string("db.cap"), (*coreInstancePtr).maxCapacity[streamName]);
+      ptRetval.put(std::string("db.size"), boost::lexical_cast<std::string>(pProc->streamStoredSize(streamName)));
+      ptRetval.put(std::string("db.count_records"), boost::lexical_cast<std::string>(pProc->getStreamCount(streamName)));
+      ptRetval.put(std::string("db.is_declaration"), ((*coreInstancePtr)[streamName].isDeclaration() ? "true" : "false"));
+      ptRetval.put(std::string("db.is_generated"), ((*coreInstancePtr)[streamName].isGenerated() ? "true" : "false"));
+      ptRetval.put(std::string("db.query"),
+                   boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lProgram.size()) + " tokens");
+      auto it               = std::find_if(processedLines.begin(), processedLines.end(),
+                                           [&streamName](const std::pair<std::string, std::string> &p) { return p.first == streamName; });
+      std::string queryLine = (it != processedLines.end()) ? it->second : "{not found}";
+      ptRetval.put(std::string("db.processed_line"), queryLine);
     }
     //
     // This command will add stream to list of transmitted streams
@@ -406,7 +437,7 @@ int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard,
       //
       boost::this_thread::sleep_for(boost::chrono::milliseconds(period));
 
-      const std::set<std::string> inSet = getAwaitedStreamsSet(tl);
+      const std::set<std::string> inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
 
       proc.processRows(inSet);
 

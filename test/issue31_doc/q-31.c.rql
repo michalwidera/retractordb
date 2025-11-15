@@ -1,0 +1,6 @@
+# Documentation - substraty
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.dat'
+DECLARE a INTEGER STREAM core1, 0.2 FILE 'datafile2.dat'
+
+SELECT str1[0] STREAM str1 FROM (core0>2)+core1

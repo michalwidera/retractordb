@@ -4,56 +4,28 @@ trap control_c SIGINT
 
 control_c()
 {
-    stty sane
+    echo "Trapped CTRL-C"
     xqry -k
+    stty sane
 }
 
-me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+STREAM=${1:-str1}
+QUERY=${2:-query.rql}
+SIZE=${3:-50,200}
 
-if [ "$1" == "-h" ] ; then
-    echo "Usage: $me query-file.rql streamName x-dimension y-dimension"
-    echo "Example: $me query.rql str1 100 256"
-    echo "When no parameters given - defaults are used."
-    exit
+if ! xretractor $QUERY -c -r ; then exit 1 ; fi
+
+if ! which gnuplot > /dev/null ; then echo "install gnuplot!" ; exit 1 ; fi
+
+\rm -rf temp && mkdir -p temp
+\rm -f nohup.out
+nohup xretractor $QUERY </dev/null >/dev/null 2>&1 &
+
+# nohup needs a moment to start
+sleep  1
+
+if [ -z "$DISPLAY" ]
+then
+export DISPLAY=:0
 fi
-
-if [ "$1" != "" ] ; then
-FILE=$1
-else
-FILE=query.rql
-fi
-
-if [ "$2" != "" ] ; then
-STREAM=$2
-else
-STREAM=str1
-fi
-
-if [ "$3" != "" ] ; then
-XDIM=$3
-else
-XDIM=100
-fi
-
-if [ "$4" != "" ] ; then
-YDIM=$4
-else
-YDIM=256
-fi
-
-echo 'FILE:' $FILE
-echo 'STREAM:' $STREAM
-echo 'XDIM:' $XDIM
-echo 'YDIM:' $YDIM
-
-if ! xretractor $FILE -c; then exit 1 ; fi
-
-nohup xretractor $FILE  &
-
-sleep 2
-
-echo "Type ctrl+c to stop."
-
-xqry -s $STREAM |\
-plotblock.py $XDIM $YDIM "$STREAM[0]:red;$STREAM[1]:blue;$STREAM[2]:green;$STREAM[3]:black" --sleep 0.01 |\
-gnuplot 2>/dev/null
+xqry -s $STREAM -p $SIZE | gnuplot 2>/dev/null

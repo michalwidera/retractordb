@@ -40,14 +40,14 @@ class TimeLine : private boost::noncopyable {
   /** Function return true if given delta is in current time slot
    * Note: This is not trivial
    */
-  bool isThisDeltaAwaitCurrentTimeSlot(const rational<int> &inDelta);
+  const bool isThisDeltaAwaitCurrentTimeSlot(const rational<int> &inDelta);
 
   /** This function computes next ctSlot value.
    * This value describe what is next time interval
    * that depends of series of deltas of time series data
    * Note: This is HARD
    */
-  rational<int> &getNextTimeSlot();
+  const rational<int> &getNextTimeSlot();
 };
 
 }  // namespace CRationalStreamMath

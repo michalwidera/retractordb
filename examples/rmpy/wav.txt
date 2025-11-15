@@ -1,0 +1,12 @@
+-a-a-a-a-a-a-a-a-
+title = core0
+
+-b---b---b---b---
+title = core1
+
+
+> SELECT str3[0] STREAM str3 FROM core0#core1
+
+-c--c--c--c--c---
+title = str3
+

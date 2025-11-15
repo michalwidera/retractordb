@@ -1,0 +1,5 @@
+DECLARE a BYTE STREAM core1, 0.1 FILE 'datafile1.dat'
+DECLARE b INTEGER, c FLOAT STREAM core2, 0.2 FILE 'datafile2.txt'
+
+SELECT * STREAM str1 FROM core1+core2
+SELECT str2[1] STREAM str2 FROM str1

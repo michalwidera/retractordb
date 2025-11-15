@@ -12,7 +12,7 @@
 // ctest -R '^ut-test_compiler' -V
 
 extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
-extern std::pair<std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
 qTree coreInstance;
 
@@ -55,9 +55,11 @@ TEST(xparser, check_compile_result) {
 }
 
 TEST(xparser, check_parserRQLString) {
-  auto [result, first_keyword] = parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'");
+  auto [result, first_keyword, stream_name] =
+      parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'");
   ASSERT_TRUE(result == "OK");
   ASSERT_TRUE(first_keyword == "DECLARE");
+  ASSERT_TRUE(stream_name == "core0");
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }

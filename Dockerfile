@@ -41,6 +41,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     apt-utils \
     pkg-config \
     sudo \
+    graphviz \
     # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
