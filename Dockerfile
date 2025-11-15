@@ -1,9 +1,9 @@
 # https://hub.docker.com/_/debian
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.0.2"
+LABEL com.retractordb.version="0.0.3"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2025-09-25"
+LABEL com.retractordb.release-date="2025-11-15"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -88,6 +88,7 @@ CMD ["/bin/bash"]
 # EXPOSE 8080
 
 # How to check docker layers size - install https://github.com/wagoodman/dive
+# First: start docker desktop app on windows
 # docker image ls
 # dive <IMAGE ID>
 
