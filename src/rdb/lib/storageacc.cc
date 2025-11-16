@@ -170,9 +170,9 @@ void storageAccessor::initializeAccessor() {
   } else if (storageType == "GENERIC") {
     accessor = std::make_unique<rdb::genericBinaryFileAccessor>(storageFile, size);
   } else if (storageType == "DEVICE") {
-    accessor = std::make_unique<rdb::binaryDeviceAccessor>(storageFile, size);
+    accessor = std::make_unique<rdb::binaryDeviceAccessorRO>(storageFile, size);
   } else if (storageType == "TEXTSOURCE") {
-    accessor = std::make_unique<rdb::textSourceAccessor>(storageFile, size, descriptor);
+    accessor = std::make_unique<rdb::textSourceAccessorRO>(storageFile, size, descriptor);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType);
     assert(false && "Unsupported storage type");

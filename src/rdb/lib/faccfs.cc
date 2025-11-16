@@ -19,6 +19,8 @@ genericBinaryFileAccessor::genericBinaryFileAccessor(  //
     const size_t size)                                 //
     : filename(std::string(fileName)), size(size) {}
 
+genericBinaryFileAccessor::~genericBinaryFileAccessor() {}
+
 auto genericBinaryFileAccessor::name() const -> const std::string & { return filename; }
 
 auto genericBinaryFileAccessor::name() -> std::string & { return filename; }
