@@ -7,15 +7,14 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <filesystem>
 
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
-FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
-    : lockFileDescriptor(-1), isLocked(false) {
-  lockFilePath = std::filesystem::temp_directory_path() / ( serviceName + ".lock" );
+FlockServiceGuard::FlockServiceGuard(const std::string &serviceName) : lockFileDescriptor(-1), isLocked(false) {
+  lockFilePath = std::filesystem::temp_directory_path() / (serviceName + ".lock");
   SPDLOG_INFO("Service guard for {} initialized", serviceName);
   SPDLOG_INFO("Lock file path: {}", lockFilePath);
 }
