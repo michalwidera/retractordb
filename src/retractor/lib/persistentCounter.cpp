@@ -1,11 +1,16 @@
 #include "persistentCounter.h"
 
+#include <filesystem>
 #include <fstream>
-persistentCounter::persistentCounter() : count_(0) { load(); }
-persistentCounter::~persistentCounter() { save(); }
-int persistentCounter::getCount() const { return count_; }
-void persistentCounter::increment() { ++count_; }
-void persistentCounter::load() {
+
+PersistentCounter::PersistentCounter() : count_(0) { load(); }
+PersistentCounter::~PersistentCounter() {
+  increment();
+  save();
+}
+int PersistentCounter::getCount() const { return count_; }
+void PersistentCounter::increment() { ++count_; }
+void PersistentCounter::load() {
   std::ifstream infile(filename_);
   if (infile.is_open()) {
     infile >> count_;
@@ -15,7 +20,7 @@ void persistentCounter::load() {
   }
 }
 
-void persistentCounter::save() const {
+void PersistentCounter::save() {
   std::ofstream outfile(filename_);
   if (outfile.is_open()) {
     outfile << count_;

@@ -19,6 +19,7 @@
 #include "lib/compiler.h"
 #include "lib/executorsm.h"
 #include "lib/lockManager.hpp"
+#include "lib/persistentCounter.h"
 #include "lib/presenter.h"
 #include "uxSysTermTools.hpp"
 
@@ -70,6 +71,7 @@ int main(int argc, char *argv[]) {
 
   const std::string serviceName = std::string(argv[0]) + "_service";
   FlockServiceGuard guard(serviceName);
+  PersistentCounter perCounter;
 
   try {
     std::string sInputFile{""};

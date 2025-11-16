@@ -1,15 +1,24 @@
 #include <string>
 
-class persistentCounter {
+/* This is specific persistent counter dedicated for stream management.
+   It stores it's value in file "rdb_counter.dat" in current working directory.
+   Each time an object of this class is created it loads value from file,
+   and on destruction
+   It increases it's value after each destruction.
+   On creation it loads value from file.
+   On destruction it saves current value to file.
+*/
+
+class PersistentCounter {
  public:
-  persistentCounter();
-  ~persistentCounter();
+  PersistentCounter();
+  ~PersistentCounter();
   int getCount() const;
-  void increment();
 
  private:
   const std::string filename_ = "rdb_counter.dat";
   int count_;
   void load();
-  void save() const;
+  void save();
+  void increment();
 };
