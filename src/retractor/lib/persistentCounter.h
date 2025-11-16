@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 
 /* This is specific persistent counter dedicated for stream management.
