@@ -9,7 +9,7 @@ class FlockServiceGuard {
   bool isLocked;
 
  public:
-  FlockServiceGuard(const std::string &serviceName, const std::string &lockDir = "/tmp");
+  FlockServiceGuard(const std::string &serviceName);
   ~FlockServiceGuard();
 
   bool acquireLock();

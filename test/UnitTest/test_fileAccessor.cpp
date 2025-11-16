@@ -18,7 +18,7 @@ typedef unsigned char BYTE;
 // /home/michal/GitHub/retractordb/src/rdb/lib/fagrp.cc
 // /home/michal/GitHub/retractordb/src/include/rdb/fagrp.h
 
-const std::filesystem::path sandBoxFolder = "/tmp/test_fileAccessor";
+const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_fileAccessor";
 
 std::ifstream::pos_type filesize(const std::string &filename) {
   std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
