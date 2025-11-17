@@ -28,6 +28,7 @@
 #include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
+#include "persistentCounter.h"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -377,6 +378,8 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
+
+  PersistentCounter perCounter;
 
   auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread

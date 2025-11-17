@@ -11,7 +11,7 @@ PersistentCounter::~PersistentCounter() {
 int PersistentCounter::getCount() const { return count_; }
 void PersistentCounter::increment() { ++count_; }
 void PersistentCounter::load() {
-  std::ifstream infile(filename_);
+  std::ifstream infile(persistentCounterFilename_);
   if (infile.is_open()) {
     infile >> count_;
     infile.close();
@@ -21,7 +21,7 @@ void PersistentCounter::load() {
 }
 
 void PersistentCounter::save() {
-  std::ofstream outfile(filename_);
+  std::ofstream outfile(persistentCounterFilename_);
   if (outfile.is_open()) {
     outfile << count_;
     outfile.close();
