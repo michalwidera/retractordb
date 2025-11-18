@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <fstream>
 
+static const char *persistentCounterFilename_ = "rdb.cnt";
+
 PersistentCounter::PersistentCounter() : count_(0) { load(); }
 PersistentCounter::~PersistentCounter() {
   increment();

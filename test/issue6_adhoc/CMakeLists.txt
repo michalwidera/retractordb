@@ -7,7 +7,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-  rm -f temp/str* temp/core* out-ls.txt ; \
   chmod +x ./xlaunch.sh ; \
   ./xlaunch.sh ; \
   ls temp > out-ls.txt ; \

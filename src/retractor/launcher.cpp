@@ -19,6 +19,7 @@
 #include "lib/compiler.h"
 #include "lib/executorsm.h"
 #include "lib/lockManager.hpp"
+#include "lib/persistentCounter.h"
 #include "lib/presenter.h"
 #include "uxSysTermTools.hpp"
 
@@ -50,6 +51,20 @@ static void handleSignal(int signum) {
 
   // This will cause the main loop to exit
   iTimeLimitCnt = executorsm::stop_now;
+}
+
+void dropArtifactFile(std::string artifact_filename) {
+  if (std::filesystem::exists(artifact_filename)) {
+    std::error_code ec;
+    std::filesystem::remove(artifact_filename, ec);
+    if (ec) {
+      SPDLOG_INFO("Info - Failed to remove file {}: {}", artifact_filename, ec.message());
+    } else {
+      SPDLOG_INFO("Removed file: {}", artifact_filename);
+    }
+  } else {
+    SPDLOG_INFO("No file found {}", artifact_filename);
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -94,6 +109,7 @@ int main(int argc, char *argv[]) {
           ("status,s", "check service status")                                                       //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                     //
           ("verbose,v", "verbose mode (show stream params)")                                         //
+          ("cleanup,l", "cleanup mode (remove artifact files)")                                      //
           ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                              //
           ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
@@ -193,6 +209,29 @@ int main(int argc, char *argv[]) {
 
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
+
+  if (vm.count("cleanup")) {
+    SPDLOG_INFO("Cleanup mode activated, removing artifact files.");
+    std::string storage_location{""};
+
+    for (const auto &it : coreInstance)
+      if (it.isCompilerDirective()) {
+        if (it.id == ":STORAGE") {
+          storage_location = it.filename;
+        }
+      }
+
+    for (const auto &[stream_id, query_text] : processedLines) {
+      if (stream_id == "") continue;
+      if (coreInstance[stream_id].isDeclaration()) continue;
+      if (coreInstance[stream_id].isCompilerDirective()) continue;
+      dropArtifactFile(std::filesystem::path(storage_location) / stream_id);
+      dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".desc"));
+    }
+
+    dropArtifactFile(PersistentCounter::persistentCounterFilename_);
+    SPDLOG_INFO("Cleanup completed.");
+  }
 
   executorsm exec;
   return exec.run(coreInstance, vm.count("verbose"), guard, cm);
