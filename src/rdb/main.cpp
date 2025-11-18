@@ -110,7 +110,11 @@ int main(int argc, char *argv[]) {
         std::cout << RED << "unrecognized or missing file:" << file << "\n" << RESET;
         continue;
       }
-      dacc = std::make_unique<rdb::storageAccessor>(file, file, storageParam);
+      auto oldPos = file.find(".old");
+      if (oldPos != std::string::npos) {
+        dacc = std::make_unique<rdb::storageAccessor>(file.substr(0, oldPos), file, storageParam);
+      } else
+        dacc = std::make_unique<rdb::storageAccessor>(file, file, storageParam);
       assert(dacc != nullptr);
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
