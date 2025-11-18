@@ -4,8 +4,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    rm -f serial* ; \
-    rm -f core* ; \
-    xretractor query.rql -m 15 -v > verbose.txt ; \
+    xretractor query.rql -m 15 -v -l> verbose.txt ; \
     xtrdb < term.script > out.txt ;  \
     ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
