@@ -73,13 +73,13 @@ void rqlParserInitialize() {
       "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 
       "", "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", "FLOAT_T", 
       "DOUBLE_T", "SELECT", "STREAM", "FROM", "DECLARE", "RETENTION", "FILE", 
-      "STORAGE", "COPTION", "SUBSTRAT", "RULE", "ON", "WHEN", "DUMP", "SYSTEM", 
-      "DO", "TO", "AND_C", "OR_C", "NOT_C", "MIN", "MAX", "AVG", "SUMC", 
-      "STRING_SUBSTRAT", "ID", "STRING", "FLOAT", "DECIMAL", "REAL", "IS_EQ", 
-      "IS_NQ", "IS_GR", "IS_LS", "IS_GE", "IS_LE", "EXCLAMATION", "DOUBLE_BAR", 
-      "DOT", "UNDERLINE", "AT", "SHARP", "AND", "MOD", "DOLLAR", "COMMA", 
-      "SEMI", "COLON", "DOUBLE_COLON", "STAR", "DIVIDE", "PLUS", "MINUS", 
-      "BIT_NOT", "BIT_OR", "BIT_XOR", "SPACE", "COMMENT", "LINE_COMMENT1", 
+      "STORAGE", "PERCOUNTER", "SUBSTRAT", "RULE", "ON", "WHEN", "DUMP", 
+      "SYSTEM", "DO", "TO", "AND_C", "OR_C", "NOT_C", "MIN", "MAX", "AVG", 
+      "SUMC", "STRING_SUBSTRAT", "ID", "STRING", "FLOAT", "DECIMAL", "REAL", 
+      "IS_EQ", "IS_NQ", "IS_GR", "IS_LS", "IS_GE", "IS_LE", "EXCLAMATION", 
+      "DOUBLE_BAR", "DOT", "UNDERLINE", "AT", "SHARP", "AND", "MOD", "DOLLAR", 
+      "COMMA", "SEMI", "COLON", "DOUBLE_COLON", "STAR", "DIVIDE", "PLUS", 
+      "MINUS", "BIT_NOT", "BIT_OR", "BIT_XOR", "SPACE", "COMMENT", "LINE_COMMENT1", 
       "LINE_COMMENT2"
     }
   );
@@ -346,7 +346,7 @@ RQLParser::ProgContext* RQLParser::prog() {
         }
 
         case RQLParser::STORAGE:
-        case RQLParser::COPTION:
+        case RQLParser::PERCOUNTER:
         case RQLParser::SUBSTRAT: {
           setState(56);
           compiler_option();
@@ -397,8 +397,8 @@ void RQLParser::Compiler_optionContext::copyFrom(Compiler_optionContext *ctx) {
 
 //----------------- CoptionContext ------------------------------------------------------------------
 
-tree::TerminalNode* RQLParser::CoptionContext::COPTION() {
-  return getToken(RQLParser::COPTION, 0);
+tree::TerminalNode* RQLParser::CoptionContext::PERCOUNTER() {
+  return getToken(RQLParser::PERCOUNTER, 0);
 }
 
 tree::TerminalNode* RQLParser::CoptionContext::STORAGE() {

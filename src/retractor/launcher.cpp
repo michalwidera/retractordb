@@ -227,7 +227,6 @@ int main(int argc, char *argv[]) {
       dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".desc"));
     }
 
-    dropArtifactFile(PersistentCounter::persistentCounterFilename_);
     SPDLOG_INFO("Cleanup completed.");
   } else {
     SPDLOG_INFO("Percounter mode - data rotation on exit, no cleanup");

@@ -134,9 +134,9 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
 
   if (first_keyword == "STORAGE" ||   //
       first_keyword == "SUBSTRAT" ||  //
-      first_keyword == "COPTION") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE or SUBSTRAT not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or COPTION not supported");
+      first_keyword == "PERCOUTNER") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
     return ptRetval;
   }
 
@@ -381,7 +381,13 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
 
-  if (percount) pCounterPtr = std::make_unique<PersistentCounter>();
+  std::string percounterFilename{"rdb.cnt"};
+  for (const auto &it : coreInstance)
+    if (it.id == ":PERCOUNTER") {
+      percounterFilename = it.filename;
+    }
+
+  if (percount) pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread

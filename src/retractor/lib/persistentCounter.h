@@ -12,13 +12,13 @@
 
 class PersistentCounter {
  public:
-  PersistentCounter();
+  explicit PersistentCounter(std::string initFilename);
   ~PersistentCounter();
   int getCount() const;
-  constexpr static const char *persistentCounterFilename_ = "rdb.cnt";
 
  private:
   int count_;
+  std::string persistentCounterFilename_;
   void load();
   void save();
   void increment();
