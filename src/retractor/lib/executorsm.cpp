@@ -375,11 +375,13 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm) {
+int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
 
-  PersistentCounter perCounter;
+  std::unique_ptr<PersistentCounter> pCounterPtr;
+
+  if (percount) pCounterPtr = std::make_unique<PersistentCounter>();
 
   auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread

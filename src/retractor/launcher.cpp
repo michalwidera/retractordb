@@ -231,8 +231,10 @@ int main(int argc, char *argv[]) {
 
     dropArtifactFile(PersistentCounter::persistentCounterFilename_);
     SPDLOG_INFO("Cleanup completed.");
+  } else {
+    SPDLOG_INFO("Percounter mode - data rotation on exit, no cleanup");
   }
 
   executorsm exec;
-  return exec.run(coreInstance, vm.count("verbose"), guard, cm);
+  return exec.run(coreInstance, !vm.count("cleanup"), vm.count("verbose"), guard, cm);
 }
