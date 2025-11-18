@@ -215,10 +215,8 @@ int main(int argc, char *argv[]) {
     std::string storage_location{""};
 
     for (const auto &it : coreInstance)
-      if (it.isCompilerDirective()) {
-        if (it.id == ":STORAGE") {
-          storage_location = it.filename;
-        }
+      if (it.id == ":STORAGE") {
+        storage_location = it.filename;
       }
 
     for (const auto &[stream_id, query_text] : processedLines) {

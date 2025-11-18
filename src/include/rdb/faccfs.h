@@ -15,9 +15,10 @@ namespace rdb {
 struct genericBinaryFileAccessor : public FileAccessorInterface {
   std::string filename;
   const std::size_t size;
+  int percounter_;
 
  public:
-  explicit genericBinaryFileAccessor(const std::string_view fileName, const size_t size);
+  explicit genericBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
   ~genericBinaryFileAccessor();
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;

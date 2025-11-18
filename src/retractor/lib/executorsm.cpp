@@ -53,6 +53,8 @@ using namespace CRationalStreamMath;
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
+std::unique_ptr<PersistentCounter> pCounterPtr;
+
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
 // "RetractorShmemStr", 65536); const StringAllocator allocatorShmemStrInstance
@@ -378,8 +380,6 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
-
-  std::unique_ptr<PersistentCounter> pCounterPtr;
 
   if (percount) pCounterPtr = std::make_unique<PersistentCounter>();
 

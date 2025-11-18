@@ -1,9 +1,9 @@
 #include "rdb/faccfs.h"
 
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <limits>
-
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -16,10 +16,17 @@ namespace rdb {
 
 genericBinaryFileAccessor::genericBinaryFileAccessor(  //
     const std::string_view fileName,                   //
-    const size_t size)                                 //
-    : filename(std::string(fileName)), size(size) {}
+    const size_t size,                                 //
+    int percounter)                                    //
+    : filename(std::string(fileName)), size(size), percounter_(percounter) {}
 
-genericBinaryFileAccessor::~genericBinaryFileAccessor() {}
+genericBinaryFileAccessor::~genericBinaryFileAccessor() {
+  if (percounter_ >= 0) {
+    std::string rotated_filename = filename + ".old" + std::to_string(percounter_);
+    std::error_code ec;
+    std::filesystem::rename(filename, rotated_filename, ec);
+  }
+}
 
 auto genericBinaryFileAccessor::name() const -> const std::string & { return filename; }
 

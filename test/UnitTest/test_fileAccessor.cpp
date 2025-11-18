@@ -150,7 +150,7 @@ TEST(FileAccessorTest, test_fagrp_dir) {
   rdb::segments_t silos_count = 0;
   rdb::capacity_t silos_size  = 0;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention);
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
   record.data                 = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
   record.data = 12;
@@ -210,7 +210,7 @@ TEST(FileAccessorTest, test_fagrp_one_read_and_retention) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention);
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
 
   // Write records
   record.data = 1;
