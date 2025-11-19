@@ -7,12 +7,10 @@ if [ -z "$1" ]
 fi
 
 pkill xretractor
-rm -f str*
-rm -f core*
 
 if ! xretractor $1 -c ; then exit 1 ; fi
 
-xretractor $1 -m 8000 -l &
+xretractor $1 -m 8000 &
 
 sleep 1
 

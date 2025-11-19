@@ -109,7 +109,6 @@ int main(int argc, char *argv[]) {
           ("status,s", "check service status")                                                       //
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                     //
           ("verbose,v", "verbose mode (show stream params)")                                         //
-          ("cleanup,l", "cleanup mode (remove artifact files)")                                      //
           ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                              //
           ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
@@ -210,7 +209,14 @@ int main(int argc, char *argv[]) {
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
 
-  if (vm.count("cleanup")) {
+  bool rotation_enabled = false;
+  for (const auto &it : coreInstance)
+    if (it.id == ":ROTATION") {
+      rotation_enabled = true;
+      break;
+    }
+
+  if (!rotation_enabled) {
     SPDLOG_INFO("Cleanup mode activated, removing artifact files.");
     std::string storage_location{""};
 

@@ -7,7 +7,7 @@ prog                : ( select_statement
                       )+ EOF
                     ;
 
-compiler_option     : directive=( PERCOUNTER | STORAGE | SUBSTRAT ) value=( STRING_SUBSTRAT | STRING ) 
+compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING_SUBSTRAT | STRING ) 
                     # Coption
                     ;
 
@@ -179,7 +179,7 @@ DECLARE:            'DECLARE'|'declare';
 RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
 STORAGE:            'STORAGE'|'storage';
-PERCOUNTER:         'PERCOUNTER'|'percounter';
+ROTATION:           'ROTATION'|'rotation';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
 RULE:               'RULE'|'rule';
 ON:                 'ON'|'on';

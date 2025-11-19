@@ -381,13 +381,13 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
 
-  std::string percounterFilename{"rdb.cnt"};
+  std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)
-    if (it.id == ":PERCOUNTER") {
+    if (it.id == ":ROTATION") {
       percounterFilename = it.filename;
     }
 
-  if (percount) pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
+  if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread

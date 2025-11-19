@@ -10,7 +10,7 @@ control_c()
 
 if ! xretractor query-6.rql -c; then exit 1 ; fi
 
-nohup xretractor query-6.rql -l </dev/null >/dev/null 2>&1 &
+nohup xretractor query-6.rql </dev/null >/dev/null 2>&1 &
 echo $! > xretractor.pid
 sleep 1
 xqry -a 'select * stream stradhoc from core0'
