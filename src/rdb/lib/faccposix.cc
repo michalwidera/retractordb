@@ -7,11 +7,13 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <filesystem>
 namespace rdb {
 
 posixBinaryFileAccessor::posixBinaryFileAccessor(const std::string_view fileName,  //
-                                                 const size_t size)                //
-    : filename(std::string(fileName)), size(size) {
+                                                 const size_t size,                //
+                                                 int percounter)                   //
+    : filename(std::string(fileName)), size(size), percounter_(percounter) {
   fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename, fd);
@@ -20,7 +22,20 @@ posixBinaryFileAccessor::posixBinaryFileAccessor(const std::string_view fileName
   assert(fd >= 0);
 }
 
-posixBinaryFileAccessor::~posixBinaryFileAccessor() { ::close(fd); }
+posixBinaryFileAccessor::~posixBinaryFileAccessor() {
+  ::close(fd);
+  if (percounter_ >= 0) {
+    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename);
+    std::string rotated_filename = filename + ".old" + std::to_string(percounter_);
+    std::error_code ec;
+    std::filesystem::rename(filename, rotated_filename, ec);
+    if (ec) {
+      SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename, rotated_filename, ec.message());
+    } else {
+      SPDLOG_INFO("Rotated file {} to {}", filename, rotated_filename);
+    }
+  }
+}
 
 auto posixBinaryFileAccessor::name() const -> const std::string & { return filename; }
 

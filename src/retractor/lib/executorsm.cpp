@@ -28,6 +28,7 @@
 #include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
+#include "persistentCounter.h"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -51,6 +52,8 @@ typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 using namespace CRationalStreamMath;
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+
+std::unique_ptr<PersistentCounter> pCounterPtr;
 
 // Segment and allocator for string exchange
 // IPC::managed_shared_memory strSegment(IPC::open_or_create,
@@ -131,9 +134,9 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
 
   if (first_keyword == "STORAGE" ||   //
       first_keyword == "SUBSTRAT" ||  //
-      first_keyword == "COPTION") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE or SUBSTRAT not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or COPTION not supported");
+      first_keyword == "PERCOUTNER") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
     return ptRetval;
   }
 
@@ -374,9 +377,17 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm) {
+int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
+
+  std::string percounterFilename{"{notinitialized}"};
+  for (const auto &it : coreInstance)
+    if (it.id == ":ROTATION") {
+      percounterFilename = it.filename;
+    }
+
+  if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
   thread bt(executorsm::commandProcessorLoop);  // Sending service in thread

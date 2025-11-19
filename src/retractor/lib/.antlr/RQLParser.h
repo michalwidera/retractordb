@@ -17,7 +17,7 @@ public:
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
-    FILE = 32, STORAGE = 33, COPTION = 34, SUBSTRAT = 35, RULE = 36, ON = 37, 
+    FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, ON = 37, 
     WHEN = 38, DUMP = 39, SYSTEM = 40, DO = 41, TO = 42, AND_C = 43, OR_C = 44, 
     NOT_C = 45, MIN = 46, MAX = 47, AVG = 48, SUMC = 49, STRING_SUBSTRAT = 50, 
     ID = 51, STRING = 52, FLOAT = 53, DECIMAL = 54, REAL = 55, IS_EQ = 56, 
@@ -123,7 +123,7 @@ public:
 
     antlr4::Token *directive = nullptr;
     antlr4::Token *value = nullptr;
-    antlr4::tree::TerminalNode *COPTION();
+    antlr4::tree::TerminalNode *ROTATION();
     antlr4::tree::TerminalNode *STORAGE();
     antlr4::tree::TerminalNode *SUBSTRAT();
     antlr4::tree::TerminalNode *STRING_SUBSTRAT();

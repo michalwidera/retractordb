@@ -29,6 +29,7 @@ class storageAccessor {
   std::string descriptorFile = "";
   std::string storageFile    = "";
   std::string storageType    = "DEFAULT";
+  int percounter_            = -1;
 
   void moveRef();
   void attachStorage();
@@ -44,7 +45,10 @@ class storageAccessor {
 
  public:
   storageAccessor() = delete;
-  explicit storageAccessor(const std::string qryID, const std::string fileName = "", const std::string_view storageParam = "");
+  explicit storageAccessor(const std::string qryID,                   //
+                           const std::string fileName          = "",  //
+                           const std::string_view storageParam = "",  //
+                           int percounter                      = -1);
   virtual ~storageAccessor();
 
   storageState dataFileStatus = storageState::noDescriptor;

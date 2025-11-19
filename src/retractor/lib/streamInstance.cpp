@@ -12,7 +12,10 @@
 #include "QStruct.h"  // coreInstance
 #include "SOperations.hpp"
 #include "expressionEvaluator.h"
+#include "persistentCounter.h"
 #include "rdb/convertTypes.h"
+
+extern std::unique_ptr<PersistentCounter> pCounterPtr;
 
 streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string storagePathParam) : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
@@ -20,8 +23,11 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string stor
 
   const auto storageName{qry.filename == "" ? qry.id : qry.filename};
 
+  int percounter = -1;
+  if (pCounterPtr) percounter = pCounterPtr->getCount();
+
   inputPayload  = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
-  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName, storagePathParam);
+  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName, storagePathParam, percounter);
 
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);

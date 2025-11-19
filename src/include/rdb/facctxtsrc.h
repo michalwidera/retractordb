@@ -9,11 +9,11 @@
 
 namespace rdb {
 /**
- * @brief Object that implements data source interface via fstream
+ * @brief Object that implements READ ONLY data source interface via fstream
  *
  * Type: TEXTSOURCE
  */
-class textSourceAccessor : public FileAccessorInterface {
+class textSourceAccessorRO : public FileAccessorInterface {
   std::string filename;
   const std::size_t sizeRec;
 
@@ -26,14 +26,16 @@ class textSourceAccessor : public FileAccessorInterface {
   size_t readCount = 0;
 
  public:
-  ~textSourceAccessor();
+  ~textSourceAccessorRO();
 
-  explicit textSourceAccessor(const std::string_view fileName,  //
-                              const size_t sizeRec,             //
-                              const rdb::Descriptor &descriptor);
+  explicit textSourceAccessorRO(const std::string_view fileName,  //
+                                const size_t sizeRec,             //
+                                const rdb::Descriptor &descriptor);
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {
+    return EXIT_FAILURE;
+  }
 
   auto name() const -> const std::string & override;
   auto name() -> std::string & override;

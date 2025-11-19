@@ -19,6 +19,7 @@
 #include "lib/compiler.h"
 #include "lib/executorsm.h"
 #include "lib/lockManager.hpp"
+#include "lib/persistentCounter.h"
 #include "lib/presenter.h"
 #include "uxSysTermTools.hpp"
 
@@ -50,6 +51,20 @@ static void handleSignal(int signum) {
 
   // This will cause the main loop to exit
   iTimeLimitCnt = executorsm::stop_now;
+}
+
+void dropArtifactFile(std::string artifact_filename) {
+  if (std::filesystem::exists(artifact_filename)) {
+    std::error_code ec;
+    std::filesystem::remove(artifact_filename, ec);
+    if (ec) {
+      SPDLOG_INFO("Info - Failed to remove file {}: {}", artifact_filename, ec.message());
+    } else {
+      SPDLOG_INFO("Removed file: {}", artifact_filename);
+    }
+  } else {
+    SPDLOG_INFO("No file found {}", artifact_filename);
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -194,6 +209,35 @@ int main(int argc, char *argv[]) {
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
 
+  bool rotation_enabled = false;
+  for (const auto &it : coreInstance)
+    if (it.id == ":ROTATION") {
+      rotation_enabled = true;
+      break;
+    }
+
+  if (!rotation_enabled) {
+    SPDLOG_INFO("Cleanup mode activated, removing artifact files.");
+    std::string storage_location{""};
+
+    for (const auto &it : coreInstance)
+      if (it.id == ":STORAGE") {
+        storage_location = it.filename;
+      }
+
+    for (const auto &[stream_id, query_text] : processedLines) {
+      if (stream_id == "") continue;
+      if (coreInstance[stream_id].isDeclaration()) continue;
+      if (coreInstance[stream_id].isCompilerDirective()) continue;
+      dropArtifactFile(std::filesystem::path(storage_location) / stream_id);
+      dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".desc"));
+    }
+
+    SPDLOG_INFO("Cleanup completed.");
+  } else {
+    SPDLOG_INFO("Percounter mode - data rotation on exit, no cleanup");
+  }
+
   executorsm exec;
-  return exec.run(coreInstance, vm.count("verbose"), guard, cm);
+  return exec.run(coreInstance, !vm.count("cleanup"), vm.count("verbose"), guard, cm);
 }

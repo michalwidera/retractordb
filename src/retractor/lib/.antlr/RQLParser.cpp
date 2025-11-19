@@ -73,7 +73,7 @@ void rqlParserInitialize() {
       "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 
       "", "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", "FLOAT_T", 
       "DOUBLE_T", "SELECT", "STREAM", "FROM", "DECLARE", "RETENTION", "FILE", 
-      "STORAGE", "COPTION", "SUBSTRAT", "RULE", "ON", "WHEN", "DUMP", "SYSTEM", 
+      "STORAGE", "ROTATION", "SUBSTRAT", "RULE", "ON", "WHEN", "DUMP", "SYSTEM", 
       "DO", "TO", "AND_C", "OR_C", "NOT_C", "MIN", "MAX", "AVG", "SUMC", 
       "STRING_SUBSTRAT", "ID", "STRING", "FLOAT", "DECIMAL", "REAL", "IS_EQ", 
       "IS_NQ", "IS_GR", "IS_LS", "IS_GE", "IS_LE", "EXCLAMATION", "DOUBLE_BAR", 
@@ -346,7 +346,7 @@ RQLParser::ProgContext* RQLParser::prog() {
         }
 
         case RQLParser::STORAGE:
-        case RQLParser::COPTION:
+        case RQLParser::ROTATION:
         case RQLParser::SUBSTRAT: {
           setState(56);
           compiler_option();
@@ -397,8 +397,8 @@ void RQLParser::Compiler_optionContext::copyFrom(Compiler_optionContext *ctx) {
 
 //----------------- CoptionContext ------------------------------------------------------------------
 
-tree::TerminalNode* RQLParser::CoptionContext::COPTION() {
-  return getToken(RQLParser::COPTION, 0);
+tree::TerminalNode* RQLParser::CoptionContext::ROTATION() {
+  return getToken(RQLParser::ROTATION, 0);
 }
 
 tree::TerminalNode* RQLParser::CoptionContext::STORAGE() {

@@ -18,7 +18,7 @@ typedef unsigned char BYTE;
 // /home/michal/GitHub/retractordb/src/rdb/lib/fagrp.cc
 // /home/michal/GitHub/retractordb/src/include/rdb/fagrp.h
 
-const std::filesystem::path sandBoxFolder = "/tmp/test_fileAccessor";
+const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_fileAccessor";
 
 std::ifstream::pos_type filesize(const std::string &filename) {
   std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
@@ -150,7 +150,7 @@ TEST(FileAccessorTest, test_fagrp_dir) {
   rdb::segments_t silos_count = 0;
   rdb::capacity_t silos_size  = 0;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention);
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
   record.data                 = 11;
   gfa->write(reinterpret_cast<uint8_t *>(&record));
   record.data = 12;
@@ -210,7 +210,7 @@ TEST(FileAccessorTest, test_fagrp_one_read_and_retention) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention);
+  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
 
   // Write records
   record.data = 1;

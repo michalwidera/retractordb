@@ -25,10 +25,13 @@ class groupFileAccessor : public FileAccessorInterface {
 
   size_t removedSegments = 0;
 
+  int percounter_;
+
  public:
   ~groupFileAccessor();
 
-  explicit groupFileAccessor(const std::string_view fileName, const size_t recSize, const retention_t &retention);
+  explicit groupFileAccessor(const std::string_view fileName, const size_t recSize, const retention_t &retention,
+                             int percounter);
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

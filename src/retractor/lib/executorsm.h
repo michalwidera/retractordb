@@ -13,7 +13,7 @@
 typedef boost::property_tree::ptree ptree;
 
 struct executorsm {
-  int run(qTree &coreInstance, bool verbose, FlockServiceGuard &guard, compiler &cm);
+  int run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm);
 
   enum : int { inifitie_loop = 0, stop_now = 1 };
 

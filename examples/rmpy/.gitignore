@@ -4,3 +4,4 @@ str*
 out.*
 *.json
 *.svg
+test/*

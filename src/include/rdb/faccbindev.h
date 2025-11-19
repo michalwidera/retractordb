@@ -6,12 +6,12 @@
 
 namespace rdb {
 /**
- * @brief Object that implements data source interface via posix calls
+ * @brief Object that implements READ ONLY data source interface via posix calls
  *
  * Type: BINARY
  */
 
-class binaryDeviceAccessor : public FileAccessorInterface {
+class binaryDeviceAccessorRO : public FileAccessorInterface {
   std::string filename;
   const std::size_t recSize;
   /**
@@ -22,12 +22,14 @@ class binaryDeviceAccessor : public FileAccessorInterface {
   size_t cnt = 0;
 
  public:
-  ~binaryDeviceAccessor();
+  ~binaryDeviceAccessorRO();
 
-  explicit binaryDeviceAccessor(const std::string_view fileName, const size_t recSize);
+  explicit binaryDeviceAccessorRO(const std::string_view fileName, const size_t recSize);
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {
+    return EXIT_FAILURE;
+  };
 
   auto name() const -> const std::string & override;
   auto name() -> std::string & override;

@@ -29,7 +29,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    rm temp/str1 temp/str1.desc ; \
   xretractor query.rql -m 10 ; \
   xtrdb < term.script > out.txt ;  \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out.txt")

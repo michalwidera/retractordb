@@ -18,7 +18,8 @@ extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
 
 template <typename T, typename K>
 bool test_1() {
-  K binaryAccessor1("testfile-fstream", AREA_SIZE);
+  const int noPerCounter = -1;
+  K binaryAccessor1("testfile-fstream", AREA_SIZE, noPerCounter);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
@@ -40,7 +41,8 @@ bool test_1() {
 
 template <typename T, typename K>
 bool test_2() {
-  K dataStore("testfile-fstream", AREA_SIZE);
+  const int noPerCounter = -1;
+  K dataStore("testfile-fstream", AREA_SIZE, noPerCounter);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
@@ -63,7 +65,8 @@ bool test_2() {
 
 template <typename T, typename K>
 bool test_3() {
-  K dataStore("testfile-fstream", AREA_SIZE);
+  const int noPerCounter = -1;
+  K dataStore("testfile-fstream", AREA_SIZE, noPerCounter);
   {
     T xData[AREA_SIZE];
 

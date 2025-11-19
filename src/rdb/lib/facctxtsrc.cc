@@ -24,9 +24,9 @@ K readFromFstream(std::fstream &myFile) {
   return var;
 }
 
-textSourceAccessor::textSourceAccessor(const std::string_view fileName,  //
-                                       const size_t sizeRec,             //
-                                       const rdb::Descriptor &descriptor)
+textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,  //
+                                           const size_t sizeRec,             //
+                                           const rdb::Descriptor &descriptor)
     : filename(std::string(fileName)), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename, std::ios::in);
@@ -35,18 +35,13 @@ textSourceAccessor::textSourceAccessor(const std::string_view fileName,  //
   payload = std::make_unique<rdb::payload>(descriptor);
 }
 
-textSourceAccessor::~textSourceAccessor() { myFile.close(); }
+textSourceAccessorRO::~textSourceAccessorRO() { myFile.close(); }
 
-auto textSourceAccessor::name() const -> const std::string & { return filename; }
+auto textSourceAccessorRO::name() const -> const std::string & { return filename; }
 
-auto textSourceAccessor::name() -> std::string & { return filename; }
+auto textSourceAccessorRO::name() -> std::string & { return filename; }
 
-ssize_t textSourceAccessor::write(const uint8_t *ptrData, const size_t position) {
-  // no write on data source supported
-  return EXIT_FAILURE;
-}
-
-ssize_t textSourceAccessor::read(uint8_t *ptrData, const size_t position) {
+ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
   assert(sizeRec != 0);
 
@@ -101,6 +96,6 @@ ssize_t textSourceAccessor::read(uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-size_t textSourceAccessor::count() { return readCount; }
+size_t textSourceAccessorRO::count() { return readCount; }
 
 }  // namespace rdb
