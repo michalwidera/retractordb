@@ -40,7 +40,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
 
   SPDLOG_INFO("!Storage path set to : {}", directive[":STORAGE"]);
   SPDLOG_INFO("!Substrat type is set: {}", directive[":SUBSTRAT"]);
-  SPDLOG_INFO("!Percounter type is set: {}", directive[":PERCOUTNER"]);
+  SPDLOG_INFO("!Rotation file is set: {}", directive[":ROTATION"]);
   for (auto &qry : coreInstance) {
     if (directive[":SUBSTRAT"].empty())
       qry.substratPolicy = std::make_pair(

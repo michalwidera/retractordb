@@ -14,7 +14,7 @@ class dataModel {
  private:
   qTree &coreInstance;
 
-  std::map<std::string, std::string> directive{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":PERCOUTNER", ""}};
+  std::map<std::string, std::string> directive{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":ROTATION", ""}};
 
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
