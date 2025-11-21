@@ -7,6 +7,8 @@ if [ -z "$1" ]
 fi
 
 pkill xretractor
+rm -f core*
+rm -f str*
 
 if ! xretractor $1 -c ; then exit 1 ; fi
 

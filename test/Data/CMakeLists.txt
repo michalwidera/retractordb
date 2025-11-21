@@ -16,19 +16,19 @@ add_test(
 add_test(
   NAME ${TestID}-presenter
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND sh -c "xretractor query-lnx.rql -c")
+  COMMAND bash -c "xretractor query-lnx.rql -c")
 
 set_tests_properties(${TestID}-presenter PROPERTIES DEPENDS ${TestID}-on-query)
 
 add_test(
   NAME ${TestID}-waterfall
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND sh -c "xretractor query-lnx.rql -m 10")
+  COMMAND bash -c "xretractor query-lnx.rql -m 10; rm -f core* ; rm -f str*")
 
 add_test(
   NAME ${TestID}-workflow
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND test-workflow.sh query-lnx.rql)
+  COMMAND ./test-workflow.sh query-lnx.rql)
 
 add_test(
   NAME ${TestID}-all-operators
