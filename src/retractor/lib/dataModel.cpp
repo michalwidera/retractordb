@@ -50,7 +50,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive[":STORAGE"]));
-  for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(false);
+  for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
 dataModel::~dataModel() {}
@@ -68,7 +68,7 @@ bool dataModel::addQueryToModel(std::string id) {
   }
 
   qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive[":STORAGE"]));
-  qSet[id]->outputPayload->setDisposable(false);
+  qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
 
   return true;
 }

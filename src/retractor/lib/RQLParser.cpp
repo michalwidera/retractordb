@@ -158,6 +158,7 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(0, 1);
     qry.id        = ctx->ID()->getText();
     qry.rInterval = rationalResult;
+    qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
     coreInstance.push_back(qry);
     qry.reset();
     fieldCount = 0;

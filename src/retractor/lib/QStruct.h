@@ -81,6 +81,8 @@ class query {
   std::list<field> lSchema;
   std::list<token> lProgram;
 
+  bool isDisposable = false;
+
   std::list<rule> lRules;
 
   rdb::retention_t retention                    = rdb::retention_t{0, 0};        // Retention segments and capacity
