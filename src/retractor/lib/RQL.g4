@@ -23,6 +23,7 @@ declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
                       (DISPOSABLE)?
+                      (ONESHOT)?
                     # Declare
                     ;
 
@@ -184,6 +185,7 @@ ROTATION:           'ROTATION'|'rotation';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
 RULE:               'RULE'|'rule';
 DISPOSABLE:         'DISPOSABLE'|'disposable';
+ONESHOT:            'ONESHOT'|'oneshot';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';

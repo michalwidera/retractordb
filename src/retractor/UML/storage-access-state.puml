@@ -11,11 +11,11 @@ state Storage as "One-Time Data Source accessor State Machine" {
   }
 
   state MainLoop as "Main Processing Loop" {
-    state Armed : data in chamber ready
-    state Flux : chamber moved to payload
+    state Armed : data in chamber_ ready
+    state Flux : chamber_ moved to payload
     state Lock : data in circural buffer 
-    Flux ---> Armed : freeze data in chamber
-    Armed ---> Lock : fire chamber data into c-buf
+    Flux ---> Armed : freeze data in chamber_
+    Armed ---> Lock : fire chamber_ data into c-buf
     Lock ---> Flux : read data from source
   }
 
@@ -23,21 +23,21 @@ state Storage as "One-Time Data Source accessor State Machine" {
 
   note right of Flux
   read data from data source 
-  data placed in chamber
+  data placed in chamber_
   end note
   
   note right of Armed
-  new readed data waits in chamber
+  new readed data waits in chamber_
   read from storage gets data from circural buffer
   end note
   
   note right of Lock
-  data moved from chamber into circual buffer
+  data moved from chamber_ into circual buffer
   read from storage gets from circural buffer
   end note
 
   note left of Empty
-  chamber & payload is empty 
+  chamber_ & payload is empty 
   no data has been readed from source
   end note
 

@@ -104,7 +104,7 @@ class xschema : public ::testing::Test {
 
 TEST_F(xschema, check_construct_payload) {
   streamInstance data{coreInstance, coreInstance["str1"]};
-  data.outputPayload->setRemoveOnExit(false);
+  data.outputPayload->setDisposable(false);
 
   // str1
   // [0] [1]
@@ -129,7 +129,7 @@ TEST_F(xschema, check_construct_payload) {
 
 TEST_F(xschema, check_construct_payload_mirror) {
   streamInstance data{coreInstance, coreInstance["str1"]};
-  data.outputPayload->setRemoveOnExit(false);
+  data.outputPayload->setDisposable(false);
 
   // str1
   // [0] [1]
@@ -155,11 +155,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
 
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance, coreInstance["str1"]};
-  dataStr1.outputPayload->setRemoveOnExit(false);
+  dataStr1.outputPayload->setDisposable(false);
   dataStr1.outputPayload->revRead(0);
 
   streamInstance dataStr2{coreInstance, coreInstance["str2"]};
-  dataStr2.outputPayload->setRemoveOnExit(false);
+  dataStr2.outputPayload->setDisposable(false);
   dataStr2.outputPayload->revRead(0);
 
   // str1

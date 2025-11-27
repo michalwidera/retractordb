@@ -20,28 +20,29 @@ enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
 enum class sourceState { empty, flux, lock, armed };
 
 class storageAccessor {
-  std::unique_ptr<FileAccessorInterface> accessor;
-  std::unique_ptr<rdb::payload> storagePayload;
-  std::unique_ptr<rdb::payload> chamber;
-  Descriptor descriptor;
-  bool removeOnExit          = true;
-  size_t recordsCount        = 0;
-  std::string descriptorFile = "";
-  std::string storageFile    = "";
-  std::string storageType    = "DEFAULT";
-  int percounter_            = -1;
+  std::unique_ptr<FileAccessorInterface> accessor_;
+  std::unique_ptr<rdb::payload> storagePayload_;
+  std::unique_ptr<rdb::payload> chamber_;
+  Descriptor descriptor_;
+  bool isDisposable_          = true;
+  bool isOneShot_             = true;  // if true - storage will be looped when end is reached
+  size_t recordsCount_        = 0;
+  std::string descriptorFile_ = "";
+  std::string storageFile_    = "";
+  std::string storageType_    = "DEFAULT";
+  int percounter_             = -1;
 
   void moveRef();
   void attachStorage();
 
-  boost::circular_buffer<rdb::payload> circularBuffer{0};
+  boost::circular_buffer<rdb::payload> circularBuffer_{0};
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
 
   // Read data from storage described as accessor
   // if var:destination is null read into storageAccessor payload
-  bool read_();  // read from device into chamber
+  bool readStraightFromSource();  // read from device into chamber_
 
  public:
   storageAccessor() = delete;
@@ -65,7 +66,7 @@ class storageAccessor {
   Descriptor &getDescriptor();
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
-  void setRemoveOnExit(bool value);
+  void setDisposable(bool value);
   size_t getRecordsCount();
   bool descriptorFileExist();
 

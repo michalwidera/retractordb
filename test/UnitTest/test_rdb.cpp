@@ -207,7 +207,7 @@ TEST(xrdb, test_storage) {
   rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2");
 
   dAcc2.attachDescriptor(&dataDescriptor);
-  dAcc2.setRemoveOnExit(true);
+  dAcc2.setDisposable(true);
 
   dataPayload *payload1 = reinterpret_cast<dataPayload *>(dAcc2.getPayload()->get());
 

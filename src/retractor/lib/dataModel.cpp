@@ -50,7 +50,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
   SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry, directive[":STORAGE"]));
-  for (auto const &[key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
+  for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(false);
 }
 
 dataModel::~dataModel() {}
@@ -68,7 +68,7 @@ bool dataModel::addQueryToModel(std::string id) {
   }
 
   qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, directive[":STORAGE"]));
-  qSet[id]->outputPayload->setRemoveOnExit(false);
+  qSet[id]->outputPayload->setDisposable(false);
 
   return true;
 }
@@ -104,7 +104,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
       zeroStep = true;
     }
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
-      qSet[q.id]->outputPayload->fire();                                      // chamber -> outputPayload
+      qSet[q.id]->outputPayload->fire();                                      // chamber_ -> outputPayload
       assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
     }
   }
@@ -122,7 +122,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   }
 
   //
-  // Process expected declarations - if found - read from device and move to chamber
+  // Process expected declarations - if found - read from device and move to chamber_
   //
   std::stringstream s;
   for (auto q : coreInstance) {
