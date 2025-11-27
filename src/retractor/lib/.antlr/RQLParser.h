@@ -17,7 +17,7 @@ public:
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
-    FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, LOOP = 37, 
+    FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, DISPOSABLE = 37, 
     ON = 38, WHEN = 39, DUMP = 40, SYSTEM = 41, DO = 42, TO = 43, AND_C = 44, 
     OR_C = 45, NOT_C = 46, MIN = 47, MAX = 48, AVG = 49, SUMC = 50, STRING_SUBSTRAT = 51, 
     ID = 52, STRING = 53, FLOAT = 54, DECIMAL = 55, REAL = 56, IS_EQ = 57, 
@@ -197,7 +197,7 @@ public:
     antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
-    antlr4::tree::TerminalNode *LOOP();
+    antlr4::tree::TerminalNode *DISPOSABLE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

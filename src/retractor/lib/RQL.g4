@@ -22,7 +22,7 @@ select_statement    : SELECT select_list
 declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       FILE file_name=STRING
-                      (LOOP)?
+                      (DISPOSABLE)?
                     # Declare
                     ;
 
@@ -183,7 +183,7 @@ STORAGE:            'STORAGE'|'storage';
 ROTATION:           'ROTATION'|'rotation';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
 RULE:               'RULE'|'rule';
-LOOP:               'LOOP'|'loop';
+DISPOSABLE:         'DISPOSABLE'|'disposable';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';

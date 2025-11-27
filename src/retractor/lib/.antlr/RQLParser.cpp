@@ -73,10 +73,10 @@ void rqlParserInitialize() {
       "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 
       "", "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", "FLOAT_T", 
       "DOUBLE_T", "SELECT", "STREAM", "FROM", "DECLARE", "RETENTION", "FILE", 
-      "STORAGE", "ROTATION", "SUBSTRAT", "RULE", "LOOP", "ON", "WHEN", "DUMP", 
-      "SYSTEM", "DO", "TO", "AND_C", "OR_C", "NOT_C", "MIN", "MAX", "AVG", 
-      "SUMC", "STRING_SUBSTRAT", "ID", "STRING", "FLOAT", "DECIMAL", "REAL", 
-      "IS_EQ", "IS_NQ", "IS_GR", "IS_LS", "IS_GE", "IS_LE", "EXCLAMATION", 
+      "STORAGE", "ROTATION", "SUBSTRAT", "RULE", "DISPOSABLE", "ON", "WHEN", 
+      "DUMP", "SYSTEM", "DO", "TO", "AND_C", "OR_C", "NOT_C", "MIN", "MAX", 
+      "AVG", "SUMC", "STRING_SUBSTRAT", "ID", "STRING", "FLOAT", "DECIMAL", 
+      "REAL", "IS_EQ", "IS_NQ", "IS_GR", "IS_LS", "IS_GE", "IS_LE", "EXCLAMATION", 
       "DOUBLE_BAR", "DOT", "UNDERLINE", "AT", "SHARP", "AND", "MOD", "DOLLAR", 
       "COMMA", "SEMI", "COLON", "DOUBLE_COLON", "STAR", "DIVIDE", "PLUS", 
       "MINUS", "BIT_NOT", "BIT_OR", "BIT_XOR", "SPACE", "COMMENT", "LINE_COMMENT1", 
@@ -656,8 +656,8 @@ tree::TerminalNode* RQLParser::DeclareContext::STRING() {
   return getToken(RQLParser::STRING, 0);
 }
 
-tree::TerminalNode* RQLParser::DeclareContext::LOOP() {
-  return getToken(RQLParser::LOOP, 0);
+tree::TerminalNode* RQLParser::DeclareContext::DISPOSABLE() {
+  return getToken(RQLParser::DISPOSABLE, 0);
 }
 
 RQLParser::DeclareContext::DeclareContext(Declare_statementContext *ctx) { copyFrom(ctx); }
@@ -719,9 +719,9 @@ RQLParser::Declare_statementContext* RQLParser::declare_statement() {
     _errHandler->sync(this);
 
     _la = _input->LA(1);
-    if (_la == RQLParser::LOOP) {
+    if (_la == RQLParser::DISPOSABLE) {
       setState(95);
-      match(RQLParser::LOOP);
+      match(RQLParser::DISPOSABLE);
     }
    
   }
