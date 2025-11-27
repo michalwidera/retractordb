@@ -1,0 +1,4 @@
+{	INTEGER coef[25]
+	REF "filterremez.txt"
+	TYPE TEXTSOURCE
+}

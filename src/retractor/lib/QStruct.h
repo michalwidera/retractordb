@@ -110,9 +110,9 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
 class qTree : public std::vector<query> {
   /* Topological sort vars */
-  std::map<std::string, bool> visited;
-  std::map<std::string, vector<std::string>> adj;  // adjacency list of graph
-  vector<std::string> ans;
+  std::map<std::string, bool> visited_;
+  std::map<std::string, std::vector<std::string>> adj_;  // adjacency list of graph
+  std::vector<std::string> ans_;
 
   void dfs(const std::string &v);  // Depth First Traversal
   int getSeqNr(const std::string &query_name);

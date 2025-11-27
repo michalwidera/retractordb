@@ -78,11 +78,11 @@ bool isThere(const std::vector<query> &v, const std::string &query_name) {
 }
 
 void qTree::dfs(const std::string &v) {
-  visited[v] = true;
-  for (auto u : adj[v]) {
-    if (!visited[u]) dfs(u);
+  visited_[v] = true;
+  for (auto u : adj_[v]) {
+    if (!visited_[u]) dfs(u);
   }
-  ans.push_back(v);
+  ans_.push_back(v);
 }
 
 // https://en.wikipedia.org/wiki/Topological_sorting
@@ -92,15 +92,15 @@ void qTree::topologicalSort() {
 
   qTree &coreInstance{*this};
 
-  ans.clear();
-  for (auto q : coreInstance) visited[q.id] = false;
-  for (auto q : coreInstance) adj[q.id] = q.getDepStream();
+  ans_.clear();
+  for (auto q : coreInstance) visited_[q.id] = false;
+  for (auto q : coreInstance) adj_[q.id] = q.getDepStream();
   for (auto q : coreInstance)
-    if (!visited[q.id]) dfs(q.id);
+    if (!visited_[q.id]) dfs(q.id);
 
   qTree tempInstance;
-  // for (auto qname : ans) tempInstance.push_back(coreInstance[qname]); -> same:
-  std::for_each(ans.begin(), ans.end(),
+  // for (auto qname : ans_) tempInstance.push_back(coreInstance[qname]); -> same:
+  std::for_each(ans_.begin(), ans_.end(),
                 [&tempInstance, &coreInstance](const std::string &qname)  //
                 { tempInstance.push_back(coreInstance[qname]); });
   coreInstance = tempInstance;

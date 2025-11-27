@@ -1,0 +1,4 @@
+{	BYTE data
+	REF "/dev/urandom"
+	TYPE DEVICE
+}
