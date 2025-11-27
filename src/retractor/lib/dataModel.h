@@ -12,7 +12,7 @@
 #include "streamInstance.h"  // streamInstance
 class dataModel {
  private:
-  qTree &coreInstance;
+  qTree &coreInstance_;
 
   std::map<std::string, std::string> directive{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":ROTATION", ""}};
 

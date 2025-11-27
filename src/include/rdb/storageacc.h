@@ -24,7 +24,7 @@ class storageAccessor {
   std::unique_ptr<rdb::payload> storagePayload_;
   std::unique_ptr<rdb::payload> chamber_;
   Descriptor descriptor_;
-  bool isDisposable_          = true;
+  bool isDisposable_          = false;
   bool isOneShot_             = true;  // if true - storage will be looped when end is reached
   size_t recordsCount_        = 0;
   std::string descriptorFile_ = "";

@@ -18,38 +18,38 @@
 
 boost::mutex core_mutex;
 
-dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
+dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
 
-  assert(!coreInstance.empty());
-  for (const auto &it : coreInstance) SPDLOG_INFO("query.id {}", it.id);
+  assert(!coreInstance_.empty());
+  for (const auto &it : coreInstance_) SPDLOG_INFO("query.id {}", it.id);
 
-  for (const auto &it : coreInstance)
+  for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
       directive[it.id] = it.filename;
       SPDLOG_INFO("Assert - directive {}", directive[it.id]);
       assert(!directive[it.id].empty());
     }
 
-  auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
+  auto new_end = std::remove_if(coreInstance_.begin(), coreInstance_.end(),  //
                                 [](const query &qry) { return qry.isCompilerDirective(); });
-  coreInstance.erase(new_end, coreInstance.end());
+  coreInstance_.erase(new_end, coreInstance_.end());
 
   SPDLOG_INFO("!Storage path set to : {}", directive[":STORAGE"]);
   SPDLOG_INFO("!Substrat type is set: {}", directive[":SUBSTRAT"]);
   SPDLOG_INFO("!Rotation file is set: {}", directive[":ROTATION"]);
-  for (auto &qry : coreInstance) {
+  for (auto &qry : coreInstance_) {
     if (directive[":SUBSTRAT"].empty())
       qry.substratPolicy = std::make_pair(
           "DEFAULT", rdb::memoryFileAccessor::no_retention);  // <- if substratType is empty - set substratPolicy to 0
   }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
-  for (auto &qry : coreInstance)
-    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry, directive[":STORAGE"]));
+  for (auto &qry : coreInstance_)
+    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive[":STORAGE"]));
   for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(false);
 }
 
@@ -61,13 +61,13 @@ bool dataModel::addQueryToModel(std::string id) {
     return false;
   }
 
-  auto it = std::find_if(coreInstance.begin(), coreInstance.end(), [&](const auto &qry) { return qry.id == id; });
-  if (it == coreInstance.end()) {
+  auto it = std::find_if(coreInstance_.begin(), coreInstance_.end(), [&](const auto &qry) { return qry.id == id; });
+  if (it == coreInstance_.end()) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
     return false;
   }
 
-  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, directive[":STORAGE"]));
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive[":STORAGE"]));
   qSet[id]->outputPayload->setDisposable(false);
 
   return true;
@@ -95,7 +95,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   bool zeroStep{false};
   boost::mutex::scoped_lock scoped_lock(core_mutex);
   // Move ALL armed device read to circular buffer. - no inSet dependent.
-  for (auto q : coreInstance) {
+  for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
@@ -125,7 +125,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   // Process expected declarations - if found - read from device and move to chamber_
   //
   std::stringstream s;
-  for (auto q : coreInstance) {
+  for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;                             // Drop off rows that not computed now
     if (!q.isDeclaration()) continue;                                          // Skip non declarations.
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
@@ -135,7 +135,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
   }
 
-  for (auto q : coreInstance) {
+  for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Skip declarations.
     constructInputPayload(q.id);                    // That will create 'from' clause data set
@@ -149,7 +149,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
 }
 
 void dataModel::fetchDeclaredPayload(const std::string &instance) {
-  auto qry = coreInstance[instance];
+  auto qry = coreInstance_[instance];
 
   assert(qry.isDeclaration());  // lProgram is empty()
 
@@ -162,7 +162,7 @@ void dataModel::fetchDeclaredPayload(const std::string &instance) {
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {
-  auto qry = coreInstance[instance];
+  auto qry = coreInstance_[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
   assert(qry.lProgram.size() > 0 && "constructInputPayload does not process declarations");
@@ -232,7 +232,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset       = Subtract(coreInstance.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      const auto timeOffset       = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -272,8 +272,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc1     = arg[0].getStr_();
       const auto nameSrc2     = arg[1].getStr_();
-      const auto intervalSrc1 = coreInstance.getQuery(nameSrc1).rInterval;
-      const auto intervalSrc2 = coreInstance.getQuery(nameSrc2).rInterval;
+      const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
+      const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
       const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount();
 
