@@ -239,5 +239,5 @@ int main(int argc, char *argv[]) {
   }
 
   executorsm exec;
-  return exec.run(coreInstance, !vm.count("cleanup"), vm.count("verbose"), guard, cm);
+  return exec.run(coreInstance, guard, cm, vm);
 }

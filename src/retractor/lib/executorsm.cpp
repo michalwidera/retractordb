@@ -336,7 +336,7 @@ void executorsm::commandProcessorLoop() {
       boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cout << ex.what() << std::endl << "catch on server" << std::endl;
+    std::cout << "Exception on server." << std::endl << ex.what() << std::endl;
   }
 }
 
@@ -377,7 +377,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm) {
+int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
 
@@ -397,7 +397,7 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
     dataModel proc(*coreInstancePtr);
     pProc = &proc;
 
-    if (verbose) coreInstancePtr->dumpCore();
+    if (vm.count("verbose")) coreInstancePtr->dumpCore();
 
     TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
     //
@@ -405,7 +405,7 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (iTimeLimitCnt == executorsm::inifitie_loop && verbose) std::cout << "Press any key to stop.\n";
+    if (iTimeLimitCnt == executorsm::inifitie_loop && vm.count("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
 

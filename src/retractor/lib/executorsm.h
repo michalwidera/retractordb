@@ -1,5 +1,6 @@
 #pragma once
 
+#include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <map>
 #include <set>
@@ -11,9 +12,9 @@
 #include "lockManager.hpp"
 
 typedef boost::property_tree::ptree ptree;
-
+typedef boost::program_options::variables_map vm_map;
 struct executorsm {
-  int run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm);
+  int run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm);
 
   enum : int { inifitie_loop = 0, stop_now = 1 };
 
