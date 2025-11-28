@@ -29,27 +29,27 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
-      directive[it.id] = it.filename;
-      SPDLOG_INFO("Assert - directive {}", directive[it.id]);
-      assert(!directive[it.id].empty());
+      directive_[it.id] = it.filename;
+      SPDLOG_INFO("Assert - directive {}", directive_[it.id]);
+      assert(!directive_[it.id].empty());
     }
 
   auto new_end = std::remove_if(coreInstance_.begin(), coreInstance_.end(),  //
                                 [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance_.erase(new_end, coreInstance_.end());
 
-  SPDLOG_INFO("!Storage path set to : {}", directive[":STORAGE"]);
-  SPDLOG_INFO("!Substrat type is set: {}", directive[":SUBSTRAT"]);
-  SPDLOG_INFO("!Rotation file is set: {}", directive[":ROTATION"]);
+  SPDLOG_INFO("!Storage path set to : {}", directive_[":STORAGE"]);
+  SPDLOG_INFO("!Substrat type is set: {}", directive_[":SUBSTRAT"]);
+  SPDLOG_INFO("!Rotation file is set: {}", directive_[":ROTATION"]);
   for (auto &qry : coreInstance_) {
-    if (directive[":SUBSTRAT"].empty())
+    if (directive_[":SUBSTRAT"].empty())
       qry.substratPolicy = std::make_pair(
           "DEFAULT", rdb::memoryFileAccessor::no_retention);  // <- if substratType is empty - set substratPolicy to 0
   }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)
-    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive[":STORAGE"]));
+    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
   for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
@@ -67,7 +67,7 @@ bool dataModel::addQueryToModel(std::string id) {
     return false;
   }
 
-  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive[":STORAGE"]));
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
   qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
 
   return true;
@@ -275,7 +275,11 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount();
+      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() - 1;  // TODO: techdebt -1 ?
+
+      // This -1 is here becasue math equations are connecting hash operation on inproper order
+      // I've tryed to fix this in getRecordsCount() - but it broke to many unit tests
+      // looks like techdebt that need to be adressed in future refactor
 
       int retPos;
       if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {

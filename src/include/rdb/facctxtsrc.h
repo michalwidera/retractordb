@@ -25,12 +25,15 @@ class textSourceAccessorRO : public FileAccessorInterface {
 
   size_t readCount = 0;
 
+  bool loopToBeginningIfEOF_ = true;
+
  public:
   ~textSourceAccessorRO();
 
-  explicit textSourceAccessorRO(const std::string_view fileName,  //
-                                const size_t sizeRec,             //
-                                const rdb::Descriptor &descriptor);
+  explicit textSourceAccessorRO(const std::string_view fileName,    //
+                                const size_t sizeRec,               //
+                                const rdb::Descriptor &descriptor,  //
+                                bool loopToBeginningIfEOF);
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {

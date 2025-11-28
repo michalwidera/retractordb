@@ -22,13 +22,13 @@
 class qTree;
 
 class token {
-  command_id command;
-  rdb::descFldVT valueVT;
+  command_id command_;
+  rdb::descFldVT valueVT_;
 
  public:
   std::string getStr_();
   boost::rational<int> getRI();
-  rdb::descFldVT getVT();
+  constexpr rdb::descFldVT getVT() const { return valueVT_; };
 
   explicit token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0);
 
@@ -78,10 +78,11 @@ class query {
   std::string id                 = "";
   std::string filename           = "";
   boost::rational<int> rInterval = 0;
+  bool isDisposable              = false;
+  bool isOneShot                 = false;
+
   std::list<field> lSchema;
   std::list<token> lProgram;
-
-  bool isDisposable = false;
 
   std::list<rule> lRules;
 

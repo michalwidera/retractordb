@@ -90,7 +90,7 @@ class ParserListener : public RQLBaseListener {
   };
 
  public:
-  ParserListener(qTree &coreInstance) : coreInstance(coreInstance){};
+  ParserListener(qTree &coreInstance) : coreInstance(coreInstance) {};
 
   void enterProg(RQLParser::ProgContext *ctx) {}
 
@@ -156,9 +156,10 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
-    qry.id        = ctx->ID()->getText();
-    qry.rInterval = rationalResult;
+    qry.id           = ctx->ID()->getText();
+    qry.rInterval    = rationalResult;
     qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
+    qry.isOneShot    = (ctx->ONESHOT() != nullptr);
     coreInstance.push_back(qry);
     qry.reset();
     fieldCount = 0;

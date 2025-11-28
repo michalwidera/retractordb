@@ -16,8 +16,9 @@ bool isOpen(const storageState val) { return (val == storageState::openAndCreate
 storageAccessor::storageAccessor(const std::string qryID,              //
                                  const std::string fileName,           //
                                  const std::string_view storageParam,  //
+                                 bool oneShot,                         //
                                  int percounter)
-    : descriptorFile_(qryID + ".desc"), storageFile_(fileName), percounter_(percounter) {
+    : descriptorFile_(qryID + ".desc"), storageFile_(fileName), percounter_(percounter), isOneShot_(oneShot) {
   assert(!qryID.empty());
   assert(!fileName.empty());
 
@@ -151,7 +152,7 @@ storageAccessor::~storageAccessor() {
   if (isDisposable_) {
     if (storageFile_ != "") auto statusRemove1 = remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
-    SPDLOG_INFO("drop storage, drop descriptor");
+    SPDLOG_INFO("Disposable - drop storage, drop descriptor");
   }
 }
 
@@ -171,9 +172,9 @@ void storageAccessor::initializeAccessor() {
   } else if (storageType_ == "GENERIC") {
     accessor_ = std::make_unique<rdb::genericBinaryFileAccessor>(storageFile_, size, percounter_);
   } else if (storageType_ == "DEVICE") {
-    accessor_ = std::make_unique<rdb::binaryDeviceAccessorRO>(storageFile_, size);
+    accessor_ = std::make_unique<rdb::binaryDeviceAccessorRO>(storageFile_, size, !isOneShot_);
   } else if (storageType_ == "TEXTSOURCE") {
-    accessor_ = std::make_unique<rdb::textSourceAccessorRO>(storageFile_, size, descriptor_);
+    accessor_ = std::make_unique<rdb::textSourceAccessorRO>(storageFile_, size, descriptor_, !isOneShot_);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType_);
     assert(false && "Unsupported storage type");
@@ -223,12 +224,7 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setDisposable(bool value) { isDisposable_ = value; }
 
-size_t storageAccessor::getRecordsCount() {
-  // assert(recordsCount_ == accessor_->count());
-
-  // if (accessor_->count() != 0) assert(recordsCount_ == accessor_->count());
-  return recordsCount_;
-}
+size_t storageAccessor::getRecordsCount() { return recordsCount_; }
 
 std::string storageAccessor::getStorageName() { return storageFile_; }
 

@@ -204,7 +204,7 @@ TEST(xrdb, test_storage) {
   // This assert will fail is structure is not packed.
   ASSERT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
-  rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2");
+  rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2", "");
 
   dAcc2.attachDescriptor(&dataDescriptor);
   dAcc2.setDisposable(true);
