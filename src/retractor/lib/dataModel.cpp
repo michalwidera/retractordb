@@ -3,12 +3,12 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <boost/thread/mutex.hpp>
 #include <cassert>
 #include <cstdlib>  // std::div
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <regex>
+#include <thread>
 
 #include "SOperations.hpp"
 #include "expressionEvaluator.h"
@@ -16,7 +16,7 @@
 
 // ctest -R '^ut-dataModel' -V
 
-boost::mutex core_mutex;
+std::mutex core_mutex;
 
 dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
@@ -93,7 +93,7 @@ bool dataModel::fetchPayload(const std::string &instance,                     //
 
 void dataModel::processRows(const std::set<std::string> &inSet) {
   bool zeroStep{false};
-  boost::mutex::scoped_lock scoped_lock(core_mutex);
+  std::lock_guard<std::mutex> scoped_lock(core_mutex);
   // Move ALL armed device read to circular buffer. - no inSet dependent.
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
