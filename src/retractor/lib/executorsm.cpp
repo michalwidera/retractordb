@@ -73,6 +73,14 @@ std::atomic<int> iTimeLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 
+void cleanup() {
+  if (iTimeLimitCnt != executorsm::stop_now) {
+    SPDLOG_INFO("Cleanup: Setting iTimeLimitCnt to stop_now.");
+    iTimeLimitCnt = executorsm::stop_now;
+    std::cout << "Cleanup!" << std::endl;
+  }
+}
+
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
   assert(coreInstancePtr != nullptr);
   std::set<std::string> retVal;
@@ -388,6 +396,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
 
+  std::atexit(cleanup);
+
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)
     if (it.id == ":ROTATION") {
@@ -427,17 +437,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     if (iTimeLimitCnt == executorsm::inifitie_loop && vm.count("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
-
     std::set<std::string> initSet;
-    for (const auto &it : *coreInstancePtr)
-      if (it.isDeclaration()) initSet.insert(it.id);
-
     proc.processRows(initSet);
-
     // End of ZERO-step
 
     // Loop of data processing
-
     boost::rational<int> prev_interval(0);
     while (!_kbhit() && iTimeLimitCnt != executorsm::stop_now) {
       if (iTimeLimitCnt != executorsm::inifitie_loop) {
