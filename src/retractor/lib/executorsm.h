@@ -16,7 +16,7 @@ typedef boost::program_options::variables_map vm_map;
 struct executorsm {
   int run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm);
 
-  enum : int { inifitie_loop = 0, stop_now = 1 };
+  enum : int { inifitie_loop = 0, stop_now = 1, waitForXqry = 2 };
 
  private:
   static qTree *coreInstancePtr;

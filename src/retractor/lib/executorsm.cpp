@@ -60,7 +60,7 @@ static std::map<const int, std::string> id2StreamName_Relation;
 
 extern std::mutex core_mutex;
 
-std::condition_variable mt_condition;  // multithreading condition variable
+std::condition_variable cv;  // multithreading condition variable
 
 std::vector<std::pair<std::string, std::string>> processedLines;
 
@@ -316,6 +316,12 @@ void executorsm::commandProcessorLoop() {
     bool loopRunning = true;
     while (loopRunning) {
       while (mq.try_receive(message.data(), 1000, recvd_size, priority)) {
+        if (iTimeLimitCnt == executorsm::waitForXqry) {
+          // Notify main thread that first query is received
+          iTimeLimitCnt = executorsm::inifitie_loop;
+          cv.notify_all();
+        }
+
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
@@ -395,19 +401,20 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   // This line - delay is ugly fix for slow machine on CI !
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-  if (vm.count("xqrywait")) {
-    SPDLOG_INFO("Waiting for first query to process.");
-    //
-    // Wait for first query to process
-    //
-    std::unique_lock<std::mutex> scoped_lock(core_mutex);
-    mt_condition.wait(scoped_lock);
-    SPDLOG_INFO("First query received, starting processing loop.");
-  }
-
   try {
     dataModel proc(*coreInstancePtr);
     pProc = &proc;
+
+    if (vm.count("xqrywait")) {
+      SPDLOG_INFO("Waiting for first query to process.");
+      if ( vm.count("verbose") ) std::cout << "Waiting for first query to start process.\n";
+      std::unique_lock<std::mutex> scoped_lock(core_mutex);
+      iTimeLimitCnt = executorsm::waitForXqry;
+      cv.wait(scoped_lock, [this] { return iTimeLimitCnt != executorsm::waitForXqry; });
+      SPDLOG_INFO("First query received, starting processing loop.");
+      assert( iTimeLimitCnt == executorsm::inifitie_loop);
+      if ( vm.count("verbose") ) std::cout << "First query received, starting processing loop.\n";
+    }
 
     if (vm.count("verbose")) coreInstancePtr->dumpCore();
 
