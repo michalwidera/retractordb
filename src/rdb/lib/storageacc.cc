@@ -276,19 +276,16 @@ bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destinati
   auto size   = descriptor_.getSizeInBytes();
   auto result = 0;
 
-  auto recordIndexRv{0};
-
-  recordIndexRv = recordIndexFromFront;
-
   assert(recordsCount_ == accessor_->count());
 
-  if (recordsCount_ > 0 && recordIndexRv < recordsCount_) {
-    result = accessor_->read(destination, recordIndexRv * size);
+  if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
+    result = accessor_->read(destination, recordIndexFromFront * size);
     assert(result == 0);
-    SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor_->name(), recordIndexRv, recordsCount_);
+    SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront, recordsCount_);
   } else {
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexRv, recordsCount_);
+    SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
+                recordsCount_);
   }
   return result == 0;
 }
