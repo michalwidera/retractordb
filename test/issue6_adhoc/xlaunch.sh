@@ -21,4 +21,4 @@ then
     kill -9 $(cat xretractor.pid)
 fi
 rm -f xretractor.pid
-while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ;
+rm -f /tmp/xretractor_service.lock
