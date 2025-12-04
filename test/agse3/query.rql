@@ -1,7 +1,7 @@
 # ctest -R '^agse3' -V
 # this test set covers faster source, slower output
 
-DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
+DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, .1 FILE 'datafile.txt'
 
 SELECT * STREAM serial4 FROM core@(3,2)
 SELECT * STREAM serial5 FROM core@(3,3)

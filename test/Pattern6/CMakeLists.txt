@@ -7,6 +7,6 @@ add_test(
     ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
 
 add_test(
-  NAME ${TestID}-vg
+  NAME ${TestID}-vg-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor query.rql -c)

@@ -1,7 +1,7 @@
 # declaration of input time series
-DECLARE a i16 ,b i16 STREAM core0, 3 FILE datafile1.dat
-DECLARE c i8 ,d i8 STREAM core1, 1 file /dev/urandom
-DECLARE e INTEGER,f INTEGER STREAM core2, 3 file /dev/urandom
+DECLARE a i16 ,b i16 STREAM core0, 0.3 FILE datafile1.dat
+DECLARE c i8 ,d i8 STREAM core1, 0.1 file /dev/urandom
+DECLARE e INTEGER,f INTEGER STREAM core2, 0.3 file /dev/urandom
 
 # time series junction queries
 SELECT core0[1,1],a+1,core1.c STREAM str1 FROM core0#(core1>1)
