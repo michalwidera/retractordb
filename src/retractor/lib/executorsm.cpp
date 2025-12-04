@@ -437,8 +437,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     if (iTimeLimitCnt == executorsm::inifitie_loop && vm.count("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
-    std::set<std::string> initSet;
-    proc.processRows(initSet);
+    proc.processZeroStep();
     // End of ZERO-step
 
     // Loop of data processing

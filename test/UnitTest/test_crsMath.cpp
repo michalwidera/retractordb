@@ -113,7 +113,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   for (const auto &it : coreInstance)
     if (it.isDeclaration()) initSet.insert(it.id);
 
-  proc.processRows(initSet);
+  proc.processZeroStep();
 
   strstream << std::setw(colSize) << " 000:";
   for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << (initSet.contains(x) ? x : "") << "}";
@@ -209,7 +209,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   for (const auto &it : coreInstance)
     if (it.isDeclaration()) initSet.insert(it.id);
 
-  proc.processRows(initSet);
+  proc.processZeroStep();
 
   strstream << std::setw(4) << " 000 ";
   for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");

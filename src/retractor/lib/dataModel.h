@@ -41,6 +41,7 @@ class dataModel {
   void fetchDeclaredPayload(const std::string &instance);
 
   void processRows(const std::set<std::string> &inSet);
+  void processZeroStep();
 
   std::vector<rdb::descFldVT> getRow(const std::string &instance, const int timeOffset);
 

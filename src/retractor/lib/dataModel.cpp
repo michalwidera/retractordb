@@ -91,28 +91,30 @@ bool dataModel::fetchPayload(const std::string &instance,                     //
   return qSet[instance]->outputPayload->revRead(revOffset, payload->get());
 }
 
-void dataModel::processRows(const std::set<std::string> &inSet) {
-  bool zeroStep{false};
+void dataModel::processZeroStep() {
   std::lock_guard<std::mutex> scoped_lock(core_mutex);
-  // Move ALL armed device read to circular buffer. - no inSet dependent.
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
       fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
-      zeroStep = true;
+      qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
+      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
     }
+  }
+}
+
+void dataModel::processRows(const std::set<std::string> &inSet) {
+  std::lock_guard<std::mutex> scoped_lock(core_mutex);
+  // Move ALL armed device read to circular buffer. - no inSet dependent.
+  for (auto q : coreInstance_) {
+    if (!q.isDeclaration()) continue;
+    assert(qSet[q.id]->outputPayload->bufferState != rdb::sourceState::empty);
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
       qSet[q.id]->outputPayload->fire();                                      // chamber_ -> outputPayload
       assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
     }
   }
-
-  // If we find at least one empty state in declarations
-  // - we need fill only buffers and do not expect any streams in this moment
-
-  if (zeroStep) return;
 
   // Report all processed inSet
   {
