@@ -5,6 +5,7 @@ add_test(
   COMMAND
     bash -c "set -e ; \
     rm -f str* ; \
+    while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     xretractor query.rql -m 2 ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     xretractor query.rql -m 2 ; \

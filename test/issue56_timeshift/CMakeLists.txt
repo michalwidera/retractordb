@@ -12,5 +12,6 @@ add_test(
   COMMAND
     bash -c "set -e ; \
   xretractor query-51.rql -m 10 ; \
+  while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
   xtrdb < term.script > out-run.txt ;  \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out-run.txt")
