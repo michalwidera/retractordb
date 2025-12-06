@@ -76,15 +76,9 @@ bool dataModel::addQueryToModel(std::string id) {
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    fetchPayload(instance, nullptr, revOffset);
+    qSet[instance]->outputPayload->revRead(revOffset, 0);
   }
   return qSet[instance]->outputPayload->getPayload();
-}
-
-bool dataModel::fetchPayload(const std::string &instance,                     //
-                             std::unique_ptr<rdb::payload>::pointer payload,  //
-                             const int revOffset) {
-  return qSet[instance]->outputPayload->revRead(revOffset, payload ? payload->get() : nullptr);
 }
 
 void dataModel::processZeroStep() {
@@ -93,8 +87,8 @@ void dataModel::processZeroStep() {
     if (!q.isDeclaration()) continue;
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-      fetchPayload(q.id);                                               // Declarations need to process in separate&first
-      qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
+      qSet[q.id]->outputPayload->revRead(0);
+      qSet[q.id]->outputPayload->fire();  // chamber_ -> outputPayload
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::lock;
     }
   }
@@ -112,24 +106,15 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     }
   }
 
-  // Report all processed inSet
-  {
-    std::stringstream s;
-    for (auto i : inSet) s << i << ":";
-    SPDLOG_INFO("PROCESS inSet:= {}", s.str());
-  }
-
   //
   // Process expected declarations - if found - read from device and move to chamber_
   //
-  std::stringstream s;
   for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;                             // Drop off rows that not computed now
     if (!q.isDeclaration()) continue;                                          // Skip non declarations.
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    s << " DECL:{" << q.id << "}";                                    //
-    fetchPayload(q.id);                                               // Declarations need to process in separate&first
+    qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
   }
 
@@ -137,13 +122,10 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Skip declarations.
     constructInputPayload(q.id);                    // That will create 'from' clause data set
-    s << " QRY:[" << q.id << "]";                   //
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
     qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
   }
-
-  SPDLOG_INFO("END PROCESS inSet:= {}", s.str());
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {
@@ -286,7 +268,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto success = fetchPayload(instance, payload.get(), timeOffset);
+    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->get());
     assert(success);
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());
