@@ -76,12 +76,8 @@ bool dataModel::addQueryToModel(std::string id) {
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto revOffsetMutable(revOffset);
-    auto success = qSet[instance]->outputPayload->revRead(revOffsetMutable);
-    assert(success);
+    fetchPayload(instance, nullptr, revOffset);
   }
-  // else
-  // This data should be in outputPayload after dataModel::fetchPayload call already
   return qSet[instance]->outputPayload->getPayload();
 }
 
