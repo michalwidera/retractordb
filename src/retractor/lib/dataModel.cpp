@@ -81,14 +81,14 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
     assert(success);
   }
   // else
-  // This data should be in outputPayload after dataModel::fetchDeclaredPayload call already
+  // This data should be in outputPayload after dataModel::fetchPayload call already
   return qSet[instance]->outputPayload->getPayload();
 }
 
 bool dataModel::fetchPayload(const std::string &instance,                     //
                              std::unique_ptr<rdb::payload>::pointer payload,  //
                              const int revOffset) {
-  return qSet[instance]->outputPayload->revRead(revOffset, payload->get());
+  return qSet[instance]->outputPayload->revRead(revOffset, payload ? payload->get() : nullptr);
 }
 
 void dataModel::processZeroStep() {
@@ -97,7 +97,7 @@ void dataModel::processZeroStep() {
     if (!q.isDeclaration()) continue;
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-      fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
+      fetchPayload(q.id);                                               // Declarations need to process in separate&first
       qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::lock;
     }
@@ -133,7 +133,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     s << " DECL:{" << q.id << "}";                                    //
-    fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
+    fetchPayload(q.id);                                               // Declarations need to process in separate&first
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
   }
 
@@ -148,12 +148,6 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   }
 
   SPDLOG_INFO("END PROCESS inSet:= {}", s.str());
-}
-
-void dataModel::fetchDeclaredPayload(const std::string &instance) {
-  assert(coreInstance_[instance].isDeclaration());  // lProgram is empty()
-  auto success = qSet[instance]->outputPayload->revRead(0);
-  assert(success);
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {
