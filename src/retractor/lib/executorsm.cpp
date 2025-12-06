@@ -470,13 +470,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     if (iTimeLimitCnt == executorsm::inifitie_loop && vm.count("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
-    proc.processZeroStep();
-
     std::set<std::string> inSet;
-    for (const auto &it : *coreInstancePtr) {
-      if (it.isDeclaration()) inSet.insert(it.id);
-    }
-
+    for (const auto &it : *coreInstancePtr) if (it.isDeclaration()) inSet.insert(it.id);
+    proc.processZeroStep();
     boradcast(inSet);
     // End of ZERO-step
 
