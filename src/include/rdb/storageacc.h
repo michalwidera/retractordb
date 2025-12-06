@@ -39,7 +39,6 @@ class storageAccessor {
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
-  void readToChamber();
 
  public:
   storageAccessor() = delete;

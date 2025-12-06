@@ -253,8 +253,6 @@ void storageAccessor::fire() {
   circularBuffer_.push_front(*storagePayload_.get());  // only one place when buffer is feed.
 }
 
-void storageAccessor::readToChamber() { accessor_->read(static_cast<uint8_t *>(chamber_->get()), 0); }
-
 void storageAccessor::purge() { accessor_->write(nullptr, 0); }
 
 bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destination) {
@@ -306,7 +304,7 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
     //
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
-    readToChamber();
+    accessor_->read(static_cast<uint8_t *>(chamber_->get()), 0);
     bufferState = sourceState::armed;
   }
   assert(recordIndexFromBack >= 0);
