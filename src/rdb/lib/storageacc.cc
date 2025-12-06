@@ -256,9 +256,8 @@ void storageAccessor::fire() {
 
 bool storageAccessor::readStraightFromSource() {
   assert(isDeclared());
-  uint8_t *destination = static_cast<uint8_t *>(chamber_->get());
 
-  auto size   = descriptor_.getSizeInBytes();
+  uint8_t *destination = static_cast<uint8_t *>(chamber_->get());
   auto result = accessor_->read(destination, 0);
   return result == 0;
 }
