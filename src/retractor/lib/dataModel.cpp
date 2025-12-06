@@ -99,7 +99,7 @@ void dataModel::processZeroStep() {
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
       fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
       qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
+      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::lock;
     }
   }
 }
@@ -112,7 +112,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     assert(qSet[q.id]->outputPayload->bufferState != rdb::sourceState::empty);
     if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
       qSet[q.id]->outputPayload->fire();                                      // chamber_ -> outputPayload
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
+      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::lock;
     }
   }
 
@@ -151,16 +151,9 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
 }
 
 void dataModel::fetchDeclaredPayload(const std::string &instance) {
-  auto qry = coreInstance_[instance];
-
-  assert(qry.isDeclaration());  // lProgram is empty()
-
-  assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::flux);
-
+  assert(coreInstance_[instance].isDeclaration());  // lProgram is empty()
   auto success = qSet[instance]->outputPayload->revRead(0);
   assert(success);
-
-  assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::armed);
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {

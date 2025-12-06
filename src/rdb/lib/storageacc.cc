@@ -251,7 +251,6 @@ void storageAccessor::fire() {
   *storagePayload_ = *chamber_;
   recordsCount_++;
   circularBuffer_.push_front(*storagePayload_.get());  // only one place when buffer is feed.
-  bufferState = sourceState::lock;
 }
 
 bool storageAccessor::readStraightFromSource() {
