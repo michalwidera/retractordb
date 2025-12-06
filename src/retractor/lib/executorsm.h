@@ -26,7 +26,7 @@ struct executorsm {
   static ptree commandProcessor(ptree ptInval);
   static ptree collectStreamsParameters();
   static ptree getAdHoc(std::string adHocQuery);
-
+  void boradcast(const std::set<std::string> &inSet);
   std::set<std::string> getAwaitedStreamsSet(CRationalStreamMath::TimeLine &tl, qTree *coreInstancePtr);
   std::string printRowValue(const std::string &query_name);
 };

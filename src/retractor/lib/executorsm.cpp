@@ -392,6 +392,39 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
+void executorsm::boradcast(const std::set<std::string> &inSet) {
+  assert(executorsm::coreInstancePtr != nullptr);
+  for (const auto queryName : inSet) {
+    std::string row = printRowValue(queryName);
+    std::list<int> eraseList;
+    for (const auto &element : id2StreamName_Relation) {
+      if (element.second == queryName) {
+        using namespace boost::interprocess;
+        //
+        // Query discovery. queues are created by show command
+        //
+        std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
+        IPC::message_queue mq(IPC::open_only, queueName.c_str());
+        //
+        // If send queue is full - means no one is listening and queue is
+        // going to remove
+        //
+        if (!mq.try_send(row.c_str(), row.length(), 0)) {
+          message_queue::remove(queueName.c_str());
+          eraseList.push_back(element.first);
+        }
+      }
+    }
+    //
+    // cleaning form clients map that are not receiving data from queue
+    //
+    for (const auto &element : eraseList) {
+      id2StreamName_Relation.erase(element);
+      SPDLOG_WARN("queue erased on timeout, procId={}", element);
+    }
+  }
+}
+
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
@@ -438,6 +471,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
     // ZERO-step
     proc.processZeroStep();
+
+    std::set<std::string> inSet;
+    for (const auto &it : *coreInstancePtr) {
+      if (it.isDeclaration()) inSet.insert(it.id);
+    }
+
+    boradcast(inSet);
     // End of ZERO-step
 
     // Loop of data processing
@@ -470,42 +510,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       //
       std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
-      const std::set<std::string> inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-
+      inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
       proc.processRows(inSet);
-
-      //
-      // Data broadcast - main loop
-      //
-      for (const auto queryName : inSet) {
-        std::string row = printRowValue(queryName);
-        std::list<int> eraseList;
-        for (const auto &element : id2StreamName_Relation) {
-          if (element.second == queryName) {
-            using namespace boost::interprocess;
-            //
-            // Query discovery. queues are created by show command
-            //
-            std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-            IPC::message_queue mq(IPC::open_only, queueName.c_str());
-            //
-            // If send queue is full - means no one is listening and queue is
-            // going to remove
-            //
-            if (!mq.try_send(row.c_str(), row.length(), 0)) {
-              message_queue::remove(queueName.c_str());
-              eraseList.push_back(element.first);
-            }
-          }
-        }
-        //
-        // cleaning form clients map that are not receiving data from queue
-        //
-        for (const auto &element : eraseList) {
-          id2StreamName_Relation.erase(element);
-          SPDLOG_WARN("queue erased on timeout, procId={}", element);
-        }
-      }
+      boradcast(inSet);
 
       // End of loop while( ! _kbhit() )
     }
