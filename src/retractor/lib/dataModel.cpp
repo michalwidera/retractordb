@@ -85,33 +85,23 @@ void dataModel::processZeroStep() {
   std::lock_guard<std::mutex> scoped_lock(core_mutex);
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
-    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
-      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-      qSet[q.id]->outputPayload->revRead(0);
-      qSet[q.id]->outputPayload->fire();  // chamber_ -> outputPayload
-      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::lock;
-    }
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty);
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+    qSet[q.id]->outputPayload->revRead(0);                            // state -> armed
+    qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);
   }
 }
 
 void dataModel::processRows(const std::set<std::string> &inSet) {
   std::lock_guard<std::mutex> scoped_lock(core_mutex);
-  // Move ALL armed device read to circular buffer. - no inSet dependent.
-  for (auto q : coreInstance_) {
-    if (!q.isDeclaration()) continue;
-    assert(qSet[q.id]->outputPayload->bufferState != rdb::sourceState::empty);
-    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
-      qSet[q.id]->outputPayload->fire();                                      // chamber_ -> outputPayload
-      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::lock;
-    }
-  }
-
   for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) {
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
+      if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
       qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
       qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
+      qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
       assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
     } else {
       constructInputPayload(q.id);                    // That will create 'from' clause data set

@@ -17,7 +17,7 @@
 
 namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
-enum class sourceState { empty, flux, lock, armed };
+enum class sourceState { empty, flux, armed };
 
 class storageAccessor {
   std::unique_ptr<FileAccessorInterface> accessor_;

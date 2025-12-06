@@ -189,20 +189,7 @@ TEST_F(xschema, check_sum) {
   }
 }
 
-TEST_F(xschema, getRow_1) {
-  /* datafile1.txt contents:
-  20 31
-  21 32
-  22 33
-  */
-  dataArea->qSet["core0"]->outputPayload->reset();
-
-  std::set<std::string> rowSet = {"core0"};
-  dataArea->processZeroStep();
-  dataArea->processRows(rowSet);
-
-  auto row = dataArea->getRow("core0", 0);
-
+auto print(const std::vector<rdb::descFldVT> &row) {
   std::string res("{ ");
   for (auto &v : row) {
     std::stringstream coutstring;
@@ -223,9 +210,28 @@ TEST_F(xschema, getRow_1) {
     res.append(coutstring.str());
   }
   res.append("}");
+  return res;
+}
 
-  std::cerr << res << std::endl;
-  ASSERT_TRUE("{ 20 31 }" == res);
+TEST_F(xschema, getRow_1) {
+  /* datafile1.txt contents:
+  20 31
+  21 32
+  22 33
+  */
+  dataArea->qSet["core0"]->outputPayload->reset();
+
+  std::set<std::string> rowSet = {"core0"};
+  dataArea->processZeroStep();
+  auto row1 = dataArea->getRow("core0", 0);
+  dataArea->processRows(rowSet);
+  auto row2 = dataArea->getRow("core0", 1);
+
+  std::string res1 = print(row1);
+  std::string res2 = print(row2);
+
+  ASSERT_TRUE("{ 20 31 }" == res1);
+  ASSERT_TRUE("{ 21 32 }" == res2);
 
   dataArea->qSet["core0"]->outputPayload->reset();
 }

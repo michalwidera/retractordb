@@ -313,7 +313,7 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
   // - only for declared data sources
   // - only for data sources that have buffer declared
   // - only for recordIndex > 0 if sourceState::flux
-  // - also for recordIndex == 0 if sourceState::lock
+  // - also for recordIndex == 0
 
   SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer_.capacity(), recordIndexFromBack,
               storageFile_);

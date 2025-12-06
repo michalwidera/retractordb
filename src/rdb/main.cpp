@@ -208,7 +208,6 @@ int main(int argc, char *argv[]) {
       auto returnStatus = (cmd == "read") ? dacc->read(record) : dacc->revRead(record);
       if (dacc->isDeclared()) {
         dacc->fire();
-        dacc->bufferState = rdb::sourceState::lock;
       }
       payloadStatus = returnStatus ? fetched : error;
 
@@ -265,7 +264,7 @@ int main(int argc, char *argv[]) {
       std::cin >> backCapacityValue;
       dacc->setCapacity(backCapacityValue);
     } else if (cmd == "lock") {
-      dacc->bufferState = rdb::sourceState::lock;
+      std::cout << "deprecated\n" << std::endl;
     } else if (cmd == "flux") {
       dacc->bufferState = rdb::sourceState::flux;
     } else if (cmd == "rox") {
