@@ -39,10 +39,7 @@ class storageAccessor {
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
-
-  // Read data from storage described as accessor
-  // if var:destination is null read into storageAccessor payload
-  bool readStraightFromSource();  // read from device into chamber_
+  void readToChamber();
 
  public:
   storageAccessor() = delete;
