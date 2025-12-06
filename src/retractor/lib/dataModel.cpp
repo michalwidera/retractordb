@@ -106,25 +106,19 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     }
   }
 
-  //
-  // Process expected declarations - if found - read from device and move to chamber_
-  //
-  for (auto q : coreInstance_) {
-    if (inSet.find(q.id) == inSet.end()) continue;                             // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                                          // Skip non declarations.
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
-    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
-  }
-
   for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) continue;                // Skip declarations.
-    constructInputPayload(q.id);                    // That will create 'from' clause data set
-    qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
-    qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
-    qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
+    if (q.isDeclaration()) {
+      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
+      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+      qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
+      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
+    } else {
+      constructInputPayload(q.id);                    // That will create 'from' clause data set
+      qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
+      qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
+      qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
+    }
   }
 }
 
