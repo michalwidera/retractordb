@@ -11,53 +11,52 @@
 namespace rdb {
 
 binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName,  //
-                                               const size_t recSize)             //
-    : filename(std::string(fileName)), recSize(recSize) {
-  fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC, 0644);
-  // std::cerr << "Opening file: " << filename << std::endl;
+                                               const size_t recSize,             //
+                                               bool loopToBeginningIfEOF)        //
+    : filename_(std::string(fileName)), recSize_(recSize), loopToBeginningIfEOF_(loopToBeginningIfEOF) {
+  fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC, 0644);
   // TODO: there is a need of support failure here
   // sometimes /dev/random is not available
   // of other file are not available
   // only debug show someting wrong.
-  assert(fd >= 0);
-  assert(recSize != 0);
+  assert(fd_ >= 0);
+  assert(recSize_ != 0);
   // checking fd on read function.
 }
 
-binaryDeviceAccessorRO::~binaryDeviceAccessorRO() { ::close(fd); }
+binaryDeviceAccessorRO::~binaryDeviceAccessorRO() { ::close(fd_); }
 
-auto binaryDeviceAccessorRO::name() const -> const std::string & { return filename; }
+auto binaryDeviceAccessorRO::name() const -> const std::string & { return filename_; }
 
-auto binaryDeviceAccessorRO::name() -> std::string & { return filename; }
+auto binaryDeviceAccessorRO::name() -> std::string & { return filename_; }
 
 ssize_t binaryDeviceAccessorRO::read(uint8_t *ptrData, const size_t position) {
-  if (fd < 0) return EXIT_FAILURE;
-  if (recSize == 0) return EXIT_FAILURE;  // No read on data source supported
+  if (fd_ < 0) return EXIT_FAILURE;
+  if (recSize_ == 0) return EXIT_FAILURE;  // No read on data source supported
 
-  assert(recSize != 0);
+  assert(recSize_ != 0);
   assert(position == 0);
   if (position != 0) {
     return EXIT_FAILURE;
   }
-  assert(fd >= 0);
-  if (fd < 0) {
-    return fd;  // <- Error status
+  assert(fd_ >= 0);
+  if (fd_ < 0) {
+    return fd_;  // <- Error status
   }
-  size_t read_size = ::read(fd, ptrData, recSize);  // /dev/random no seek supported
-  if (read_size != recSize) {                       // dev/random has no seek - but binary files should loop?
-    ::lseek(fd, 0, SEEK_SET);
-    size_t read_size_sh = ::read(fd, ptrData, recSize);
-    if (read_size_sh != recSize) return EXIT_FAILURE;
+  size_t read_size = ::read(fd_, ptrData, recSize_);  // /dev/random no seek supported
+  if (read_size != recSize_) {                        // dev/random has no seek - but binary files should loop?
+    if (loopToBeginningIfEOF_) {
+      ::lseek(fd_, 0, SEEK_SET);
+      size_t read_size_sh = ::read(fd_, ptrData, recSize_);
+      if (read_size_sh != recSize_) return EXIT_FAILURE;
+    } else {
+      std::memset(ptrData, 0, recSize_);  // zero the rest of data
+    }
   }
-  cnt++;
+  cnt_++;
   return EXIT_SUCCESS;
 }
 
-size_t binaryDeviceAccessorRO::count() {
-  // struct stat stat_buf;
-  // int rc = stat(filename.c_str(), &stat_buf);
-  // return rc == 0 ? stat_buf.st_size / recSize : -1;
-  return cnt;
-}
+size_t binaryDeviceAccessorRO::count() { return cnt_; }
 
 }  // namespace rdb

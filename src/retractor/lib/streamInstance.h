@@ -38,7 +38,7 @@ struct streamInstance {
    * constructRules uses data from outputPayload
    * outputPayload need to be filled first before this constructRules will be called
    */
-  void constructRulesAndUpdate(query &qry);
+  void constructRulesAndUpdate(const query &qry);
 
  private:
   dumpManager dumpMgr;

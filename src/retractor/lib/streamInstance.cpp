@@ -27,7 +27,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string stor
   if (pCounterPtr) percounter = pCounterPtr->getCount();
 
   inputPayload  = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
-  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName, storagePathParam, percounter);
+  outputPayload = std::make_unique<rdb::storageAccessor>(qry.id, storageName, storagePathParam, qry.isOneShot, percounter);
 
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
@@ -254,7 +254,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
 
 void streamInstance::constructOutputPayload(const std::list<field> &fields) {
   auto i{0};
-  for (auto program : fields) {
+  for (const auto &program : fields) {
     expressionEvaluator expression;
     rdb::descFldVT retVal = expression.eval(program.lProgram, inputPayload.get());
 
@@ -272,6 +272,7 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
     i++;
   }
 }
+
 bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
@@ -291,7 +292,7 @@ bool boolCast(const rdb::descFldVT &inVar) {
   return retVal;
 }
 
-void streamInstance::constructRulesAndUpdate(query &qry) {
+void streamInstance::constructRulesAndUpdate(const query &qry) {
   bool debug = false;
   // construct if rule is fired
   if (debug) std::cerr << qry.id << " rules: " << qry.lRules.size() << "\n";

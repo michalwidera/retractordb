@@ -3,12 +3,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <boost/thread/mutex.hpp>
+#include <boost/lexical_cast.hpp>
 #include <cassert>
 #include <cstdlib>  // std::div
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <regex>
+#include <thread>
 
 #include "SOperations.hpp"
 #include "expressionEvaluator.h"
@@ -16,41 +17,41 @@
 
 // ctest -R '^ut-dataModel' -V
 
-boost::mutex core_mutex;
+std::mutex core_mutex;
 
-dataModel::dataModel(qTree &coreInstance) : coreInstance(coreInstance) {
+dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
 
-  assert(!coreInstance.empty());
-  for (const auto &it : coreInstance) SPDLOG_INFO("query.id {}", it.id);
+  assert(!coreInstance_.empty());
+  for (const auto &it : coreInstance_) SPDLOG_INFO("query.id {}", it.id);
 
-  for (const auto &it : coreInstance)
+  for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
-      directive[it.id] = it.filename;
-      SPDLOG_INFO("Assert - directive {}", directive[it.id]);
-      assert(!directive[it.id].empty());
+      directive_[it.id] = it.filename;
+      SPDLOG_INFO("Assert - directive {}", directive_[it.id]);
+      assert(!directive_[it.id].empty());
     }
 
-  auto new_end = std::remove_if(coreInstance.begin(), coreInstance.end(),  //
+  auto new_end = std::remove_if(coreInstance_.begin(), coreInstance_.end(),  //
                                 [](const query &qry) { return qry.isCompilerDirective(); });
-  coreInstance.erase(new_end, coreInstance.end());
+  coreInstance_.erase(new_end, coreInstance_.end());
 
-  SPDLOG_INFO("!Storage path set to : {}", directive[":STORAGE"]);
-  SPDLOG_INFO("!Substrat type is set: {}", directive[":SUBSTRAT"]);
-  SPDLOG_INFO("!Percounter type is set: {}", directive[":PERCOUTNER"]);
-  for (auto &qry : coreInstance) {
-    if (directive[":SUBSTRAT"].empty())
+  SPDLOG_INFO("!Storage path set to : {}", directive_[":STORAGE"]);
+  SPDLOG_INFO("!Substrat type is set: {}", directive_[":SUBSTRAT"]);
+  SPDLOG_INFO("!Rotation file is set: {}", directive_[":ROTATION"]);
+  for (auto &qry : coreInstance_) {
+    if (directive_[":SUBSTRAT"].empty())
       qry.substratPolicy = std::make_pair(
           "DEFAULT", rdb::memoryFileAccessor::no_retention);  // <- if substratType is empty - set substratPolicy to 0
   }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
-  for (auto &qry : coreInstance)
-    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance, qry, directive[":STORAGE"]));
-  for (auto const &[key, val] : qSet) val->outputPayload->setRemoveOnExit(false);
+  for (auto &qry : coreInstance_)
+    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
+  for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
 dataModel::~dataModel() {}
@@ -61,14 +62,14 @@ bool dataModel::addQueryToModel(std::string id) {
     return false;
   }
 
-  auto it = std::find_if(coreInstance.begin(), coreInstance.end(), [&](const auto &qry) { return qry.id == id; });
-  if (it == coreInstance.end()) {
+  auto it = std::find_if(coreInstance_.begin(), coreInstance_.end(), [&](const auto &qry) { return qry.id == id; });
+  if (it == coreInstance_.end()) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
     return false;
   }
 
-  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance, *it, directive[":STORAGE"]));
-  qSet[id]->outputPayload->setRemoveOnExit(false);
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
+  qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
 
   return true;
 }
@@ -76,93 +77,53 @@ bool dataModel::addQueryToModel(std::string id) {
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto revOffsetMutable(revOffset);
-    auto success = qSet[instance]->outputPayload->revRead(revOffsetMutable);
-    assert(success);
+    qSet[instance]->outputPayload->revRead(revOffset);
   }
-  // else
-  // This data should be in outputPayload after dataModel::fetchDeclaredPayload call already
   return qSet[instance]->outputPayload->getPayload();
 }
 
-bool dataModel::fetchPayload(const std::string &instance,                     //
-                             std::unique_ptr<rdb::payload>::pointer payload,  //
-                             const int revOffset) {
-  return qSet[instance]->outputPayload->revRead(revOffset, payload->get());
+void dataModel::processZeroStep() {
+  std::lock_guard<std::mutex> scoped_lock(core_mutex);
+  for (auto q : coreInstance_) {
+    if (!q.isDeclaration()) continue;
+
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty);
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+    qSet[q.id]->outputPayload->revRead(0);                            // state -> armed
+    qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);
+  }
 }
 
 void dataModel::processRows(const std::set<std::string> &inSet) {
-  bool zeroStep{false};
-  boost::mutex::scoped_lock scoped_lock(core_mutex);
-  // Move ALL armed device read to circular buffer. - no inSet dependent.
-  for (auto q : coreInstance) {
-    if (!q.isDeclaration()) continue;
-    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty) {
-      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-      fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
-      zeroStep = true;
-    }
-    if (qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed) {  // move from fetched bucket to circle buffer.
-      qSet[q.id]->outputPayload->fire();                                      // chamber -> outputPayload
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);
-    }
-  }
+  std::lock_guard<std::mutex> scoped_lock(core_mutex);
 
-  // If we find at least one empty state in declarations
-  // - we need fill only buffers and do not expect any streams in this moment
-
-  if (zeroStep) return;
-
-  // Report all processed inSet
-  {
-    std::stringstream s;
-    for (auto i : inSet) s << i << ":";
-    SPDLOG_INFO("PROCESS inSet:= {}", s.str());
-  }
-
-  //
-  // Process expected declarations - if found - read from device and move to chamber
-  //
-  std::stringstream s;
-  for (auto q : coreInstance) {
-    if (inSet.find(q.id) == inSet.end()) continue;                             // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;                                          // Skip non declarations.
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::lock);  //
-    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    s << " DECL:{" << q.id << "}";                                    //
-    fetchDeclaredPayload(q.id);                                       // Declarations need to process in separate&first
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
-  }
-
-  for (auto q : coreInstance) {
+  // first - process all non-declaration queries
+  for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) continue;                // Skip declarations.
+    if (q.isDeclaration()) continue;                // Declarations already processed
+
     constructInputPayload(q.id);                    // That will create 'from' clause data set
-    s << " QRY:[" << q.id << "]";                   //
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
     qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
   }
 
-  SPDLOG_INFO("END PROCESS inSet:= {}", s.str());
-}
+  // Then - process all declarations to unlock them for next step
+  for (auto q : coreInstance_) {
+    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;               // first declarations need to be processed
 
-void dataModel::fetchDeclaredPayload(const std::string &instance) {
-  auto qry = coreInstance[instance];
-
-  assert(qry.isDeclaration());  // lProgram is empty()
-
-  assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::flux);
-
-  auto success = qSet[instance]->outputPayload->revRead(0);
-  assert(success);
-
-  assert(qSet[instance]->outputPayload->bufferState == rdb::sourceState::armed);
+    if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+    qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
+    qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
+  }
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {
-  auto qry = coreInstance[instance];
+  auto qry = coreInstance_[instance];
 
   assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
   assert(qry.lProgram.size() > 0 && "constructInputPayload does not process declarations");
@@ -232,7 +193,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset       = Subtract(coreInstance.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      const auto timeOffset       = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -272,17 +233,24 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc1     = arg[0].getStr_();
       const auto nameSrc2     = arg[1].getStr_();
-      const auto intervalSrc1 = coreInstance.getQuery(nameSrc1).rInterval;
-      const auto intervalSrc2 = coreInstance.getQuery(nameSrc2).rInterval;
+      const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
+      const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount();
+      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
 
-      int retPos;
-      if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
-        *(qSet[instance]->inputPayload) = *getPayload(nameSrc2, retPos);
-      } else {
-        *(qSet[instance]->inputPayload) = *getPayload(nameSrc1, retPos);
-      }
+      SPDLOG_INFO("STREAM_HASH a:{}|{} b:{}|{} recordOffset {}",                       //
+                  nameSrc1,                                                            
+                  boost::lexical_cast<std::string>(intervalSrc1),                      //
+                  nameSrc2,                                                            //
+                  boost::lexical_cast<std::string>(intervalSrc2),                      //
+                  recordOffset);
+
+      int retPosValue                 = 0;
+      bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
+      *(qSet[instance]->inputPayload) = *getPayload(direction ? nameSrc1 : nameSrc2, retPosValue);
+
+      SPDLOG_INFO("STREAM_HASH retPos:{} direction:{}", retPosValue, direction ? nameSrc1 : nameSrc2);
+
     } break;
     default:
       SPDLOG_ERROR("Undefined command_id:{}", static_cast<int>(cmd));
@@ -297,7 +265,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto success = fetchPayload(instance, payload.get(), timeOffset);
+    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->get());
     assert(success);
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());

@@ -12,9 +12,9 @@
 #include "streamInstance.h"  // streamInstance
 class dataModel {
  private:
-  qTree &coreInstance;
+  qTree &coreInstance_;
 
-  std::map<std::string, std::string> directive{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":PERCOUTNER", ""}};
+  std::map<std::string, std::string> directive_{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":ROTATION", ""}};
 
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
@@ -29,18 +29,14 @@ class dataModel {
   std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
                                                     const int revOffset = 0);
 
-  bool fetchPayload(const std::string &instance,                     //
-                    std::unique_ptr<rdb::payload>::pointer payload,  //
-                    const int revOffset = 0);
   /*
    * This function creates Input payload for ConstructOutputPayload data source
    * function need to be here because it access different streams from qSet
    */
   void constructInputPayload(const std::string &instance);
 
-  void fetchDeclaredPayload(const std::string &instance);
-
   void processRows(const std::set<std::string> &inSet);
+  void processZeroStep();
 
   std::vector<rdb::descFldVT> getRow(const std::string &instance, const int timeOffset);
 

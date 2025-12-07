@@ -18,6 +18,7 @@ sleep 1
 xqry -k
 if ps -p $(cat xretractor.pid) > /dev/null 2>&1
 then
-    kill $(cat xretractor.pid)
+    kill -9 $(cat xretractor.pid)
 fi
 rm -f xretractor.pid
+rm -f /tmp/xretractor_service.lock

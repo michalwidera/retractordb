@@ -29,7 +29,7 @@ using boost::lexical_cast;
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
 
-extern int iTimeLimitCnt;
+extern std::atomic<int> iTimeLimitCnt;
 
 extern std::vector<std::pair<std::string, std::string>> processedLines;
 
@@ -86,6 +86,7 @@ int main(int argc, char *argv[]) {
   const std::string serviceName = std::string(argv[0]) + "_service";
   FlockServiceGuard guard(serviceName);
 
+  int timeLimitVar{executorsm::inifitie_loop};
   try {
     std::string sInputFile{""};
     std::string sDiagram{""};
@@ -104,13 +105,14 @@ int main(int argc, char *argv[]) {
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
           ("onlycompile,c", "compile only mode");                                    // linking inheritance from launcher
     } else {
-      desc.add_options()                                                                             //
-          ("help,h", "Show program options")                                                         //
-          ("status,s", "check service status")                                                       //
-          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                     //
-          ("verbose,v", "verbose mode (show stream params)")                                         //
-          ("tlimitqry,m", po::value<int>(&iTimeLimitCnt)->default_value(executorsm::inifitie_loop),  //
-           "query limit, 0 - no limit")                                                              //
+      desc.add_options()                                                                            //
+          ("help,h", "Show program options")                                                        //
+          ("status,s", "check service status")                                                      //
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                    //
+          ("verbose,v", "verbose mode (show stream params)")                                        //
+          ("xqrywait,x", "wait with processing for first query")                                    //
+          ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
+           "query limit, 0 - no limit")                                                             //
           ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
     }
     po::positional_options_description p;  // Assume that infile is the first option
@@ -118,6 +120,8 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    iTimeLimitCnt = timeLimitVar;  // std::atomic assignment
 
     if (vm.count("status")) {
       std::cout << "Checking service status." << std::endl;
@@ -239,5 +243,5 @@ int main(int argc, char *argv[]) {
   }
 
   executorsm exec;
-  return exec.run(coreInstance, !vm.count("cleanup"), vm.count("verbose"), guard, cm);
+  return exec.run(coreInstance, guard, cm, vm);
 }

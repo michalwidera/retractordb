@@ -12,19 +12,21 @@ namespace rdb {
  */
 
 class binaryDeviceAccessorRO : public FileAccessorInterface {
-  std::string filename;
-  const std::size_t recSize;
+  std::string filename_;
+  const std::size_t recSize_;
   /**
    * @brief Posix File Descriptor
    */
-  int fd;
+  int fd_;
 
-  size_t cnt = 0;
+  size_t cnt_ = 0;
+
+  bool loopToBeginningIfEOF_ = true;
 
  public:
   ~binaryDeviceAccessorRO();
 
-  explicit binaryDeviceAccessorRO(const std::string_view fileName, const size_t recSize);
+  explicit binaryDeviceAccessorRO(const std::string_view fileName, const size_t recSize, bool loopToBeginningIfEOF);
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {

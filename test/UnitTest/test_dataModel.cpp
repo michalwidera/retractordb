@@ -104,7 +104,7 @@ class xschema : public ::testing::Test {
 
 TEST_F(xschema, check_construct_payload) {
   streamInstance data{coreInstance, coreInstance["str1"]};
-  data.outputPayload->setRemoveOnExit(false);
+  data.outputPayload->setDisposable(false);
 
   // str1
   // [0] [1]
@@ -129,7 +129,7 @@ TEST_F(xschema, check_construct_payload) {
 
 TEST_F(xschema, check_construct_payload_mirror) {
   streamInstance data{coreInstance, coreInstance["str1"]};
-  data.outputPayload->setRemoveOnExit(false);
+  data.outputPayload->setDisposable(false);
 
   // str1
   // [0] [1]
@@ -155,11 +155,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
 
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance, coreInstance["str1"]};
-  dataStr1.outputPayload->setRemoveOnExit(false);
+  dataStr1.outputPayload->setDisposable(false);
   dataStr1.outputPayload->revRead(0);
 
   streamInstance dataStr2{coreInstance, coreInstance["str2"]};
-  dataStr2.outputPayload->setRemoveOnExit(false);
+  dataStr2.outputPayload->setDisposable(false);
   dataStr2.outputPayload->revRead(0);
 
   // str1
@@ -188,48 +188,8 @@ TEST_F(xschema, check_sum) {
     ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }
-/*
-TEST_F(xschema, compute_instance_1) {
-// SELECT str7[0] STREAM str7 FROM core0.max
 
-// datafile1.txt
-// 20 31
-// 21 32
-// 22 33
-
-{
-  auto payload = *(dataArea->qSet["str7"]->inputPayload);
-  std::stringstream coutstring;
-  coutstring << rdb::flat << payload;
-  std::cerr << coutstring.str() << std::endl;
-  ASSERT_TRUE("{ str7_0:31 }" == coutstring.str());
-}
-
-std::set<std::string> rowSet = {"str7"};
-dataArea->processRows(rowSet);
-{
-  auto payload = *(dataArea->qSet["str7"]->inputPayload);
-  std::stringstream coutstring;
-  coutstring << rdb::flat << payload;
-  std::cerr << coutstring.str() << std::endl;
-  ASSERT_TRUE("{ str7_0:32 }" == coutstring.str());
-}
-}
-  */
-
-TEST_F(xschema, getRow_1) {
-  /* datafile1.txt contents:
-  20 31
-  21 32
-  22 33
-  */
-  dataArea->qSet["core0"]->outputPayload->reset();
-
-  std::set<std::string> rowSet = {"core0"};
-  dataArea->processRows(rowSet);
-
-  auto row = dataArea->getRow("core0", 0);
-
+auto print(const std::vector<rdb::descFldVT> &row) {
   std::string res("{ ");
   for (auto &v : row) {
     std::stringstream coutstring;
@@ -250,9 +210,28 @@ TEST_F(xschema, getRow_1) {
     res.append(coutstring.str());
   }
   res.append("}");
+  return res;
+}
 
-  std::cerr << res << std::endl;
-  ASSERT_TRUE("{ 20 31 }" == res);
+TEST_F(xschema, getRow_1) {
+  /* datafile1.txt contents:
+  20 31
+  21 32
+  22 33
+  */
+  dataArea->qSet["core0"]->outputPayload->reset();
+
+  std::set<std::string> rowSet = {"core0"};
+  dataArea->processZeroStep();
+  auto row1 = dataArea->getRow("core0", 0);
+  dataArea->processRows(rowSet);
+  auto row2 = dataArea->getRow("core0", 1);
+
+  std::string res1 = print(row1);
+  std::string res2 = print(row2);
+
+  ASSERT_TRUE("{ 20 31 }" == res1);
+  ASSERT_TRUE("{ 21 32 }" == res2);
 
   dataArea->qSet["core0"]->outputPayload->reset();
 }

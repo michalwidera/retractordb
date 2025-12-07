@@ -22,13 +22,13 @@
 class qTree;
 
 class token {
-  command_id command;
-  rdb::descFldVT valueVT;
+  command_id command_;
+  rdb::descFldVT valueVT_;
 
  public:
   std::string getStr_();
   boost::rational<int> getRI();
-  rdb::descFldVT getVT();
+  constexpr rdb::descFldVT getVT() const { return valueVT_; };
 
   explicit token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0);
 
@@ -78,6 +78,9 @@ class query {
   std::string id                 = "";
   std::string filename           = "";
   boost::rational<int> rInterval = 0;
+  bool isDisposable              = false;
+  bool isOneShot                 = false;
+
   std::list<field> lSchema;
   std::list<token> lProgram;
 
@@ -110,9 +113,9 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
 
 class qTree : public std::vector<query> {
   /* Topological sort vars */
-  std::map<std::string, bool> visited;
-  std::map<std::string, vector<std::string>> adj;  // adjacency list of graph
-  vector<std::string> ans;
+  std::map<std::string, bool> visited_;
+  std::map<std::string, std::vector<std::string>> adj_;  // adjacency list of graph
+  std::vector<std::string> ans_;
 
   void dfs(const std::string &v);  // Depth First Traversal
   int getSeqNr(const std::string &query_name);

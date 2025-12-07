@@ -56,9 +56,9 @@ bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.
 //  }
 //}
 
-command_id token::getCommandID() { return command; }
+command_id token::getCommandID() { return command_; }
 
-std::string token::getStrCommandID() { return std::string(GetStringcommand_id(command)); }
+std::string token::getStrCommandID() { return std::string(GetStringcommand_id(command_)); }
 
 void query::reset() {
   id.clear();
@@ -78,11 +78,11 @@ bool isThere(const std::vector<query> &v, const std::string &query_name) {
 }
 
 void qTree::dfs(const std::string &v) {
-  visited[v] = true;
-  for (auto u : adj[v]) {
-    if (!visited[u]) dfs(u);
+  visited_[v] = true;
+  for (auto u : adj_[v]) {
+    if (!visited_[u]) dfs(u);
   }
-  ans.push_back(v);
+  ans_.push_back(v);
 }
 
 // https://en.wikipedia.org/wiki/Topological_sorting
@@ -92,15 +92,15 @@ void qTree::topologicalSort() {
 
   qTree &coreInstance{*this};
 
-  ans.clear();
-  for (auto q : coreInstance) visited[q.id] = false;
-  for (auto q : coreInstance) adj[q.id] = q.getDepStream();
+  ans_.clear();
+  for (auto q : coreInstance) visited_[q.id] = false;
+  for (auto q : coreInstance) adj_[q.id] = q.getDepStream();
   for (auto q : coreInstance)
-    if (!visited[q.id]) dfs(q.id);
+    if (!visited_[q.id]) dfs(q.id);
 
   qTree tempInstance;
-  // for (auto qname : ans) tempInstance.push_back(coreInstance[qname]); -> same:
-  std::for_each(ans.begin(), ans.end(),
+  // for (auto qname : ans_) tempInstance.push_back(coreInstance[qname]); -> same:
+  std::for_each(ans_.begin(), ans_.end(),
                 [&tempInstance, &coreInstance](const std::string &qname)  //
                 { tempInstance.push_back(coreInstance[qname]); });
   coreInstance = tempInstance;
@@ -195,33 +195,31 @@ int qTree::getSeqNr(const std::string &query_name) {
 
 boost::rational<int> token::getRI() {
   cast<rdb::descFldVT> castRI;
-  auto ret = castRI(valueVT, rdb::RATIONAL);
+  auto ret = castRI(getVT(), rdb::RATIONAL);
   return std::get<boost::rational<int>>(ret);
 }
 
-rdb::descFldVT token::getVT() { return valueVT; };
-
 std::string token::getStr_() {
-  if (valueVT.index() == rdb::STRING)
-    return std::get<std::string>(valueVT);
-  else if (valueVT.index() == rdb::FLOAT)
-    return std::to_string(std::get<float>(valueVT));
-  else if (valueVT.index() == rdb::DOUBLE)
-    return std::to_string(std::get<double>(valueVT));
-  else if (valueVT.index() == rdb::INTEGER)
-    return std::to_string(std::get<int>(valueVT));
-  else if (valueVT.index() == rdb::UINT)
-    return std::to_string(std::get<unsigned>(valueVT));
-  else if (valueVT.index() == rdb::BYTE)
-    return std::to_string(unsigned(std::get<uint8_t>(valueVT)));
-  else if (valueVT.index() == rdb::RATIONAL) {
-    auto r = std::get<boost::rational<int>>(valueVT);
+  if (getVT().index() == rdb::STRING)
+    return std::get<std::string>(getVT());
+  else if (getVT().index() == rdb::FLOAT)
+    return std::to_string(std::get<float>(getVT()));
+  else if (getVT().index() == rdb::DOUBLE)
+    return std::to_string(std::get<double>(getVT()));
+  else if (getVT().index() == rdb::INTEGER)
+    return std::to_string(std::get<int>(getVT()));
+  else if (getVT().index() == rdb::UINT)
+    return std::to_string(std::get<unsigned>(getVT()));
+  else if (getVT().index() == rdb::BYTE)
+    return std::to_string(unsigned(std::get<uint8_t>(getVT())));
+  else if (getVT().index() == rdb::RATIONAL) {
+    auto r = std::get<boost::rational<int>>(getVT());
     return std::to_string(r.numerator()) + "/" + std::to_string(r.denominator());
-  } else if (valueVT.index() == rdb::INTPAIR) {
-    auto r = std::get<std::pair<int, int>>(valueVT);
+  } else if (getVT().index() == rdb::INTPAIR) {
+    auto r = std::get<std::pair<int, int>>(getVT());
     return std::to_string(r.first) + "," + std::to_string(r.second);
-  } else if (valueVT.index() == rdb::IDXPAIR) {
-    auto r = std::get<std::pair<std::string, int>>(valueVT);
+  } else if (getVT().index() == rdb::IDXPAIR) {
+    auto r = std::get<std::pair<std::string, int>>(getVT());
     return r.first;
   } else
     return "Error";
@@ -250,8 +248,8 @@ token field::getFirstFieldToken() {
 
 token::token(command_id id, rdb::descFldVT value)
     :  //
-      command(id),
-      valueVT(value) {}
+      command_(id),
+      valueVT_(value) {}
 
 /** Construktor set */
 
@@ -475,8 +473,8 @@ std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
 }
 
 std::ostream &operator<<(std::ostream &os, const token &rhs) {
-  os << GetStringcommand_id(rhs.command) << "(";
-  os << rhs.valueVT;
+  os << GetStringcommand_id(rhs.command_) << "(";
+  os << rhs.getVT();
   os << ")";
   return os;
 }

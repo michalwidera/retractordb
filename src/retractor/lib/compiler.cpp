@@ -595,10 +595,11 @@ std::string compiler::applyConstraints() {
     auto i{0};
     switch (cmd.getCommandID()) {
       case STREAM_HASH: {
-        SPDLOG_ERROR("Hash operations need to work on two schemas with the same size.");
         if (coreInstance.getQuery(arg1).descriptorStorage().sizeFlat() !=
-            coreInstance.getQuery(arg2).descriptorStorage().sizeFlat())
+            coreInstance.getQuery(arg2).descriptorStorage().sizeFlat()) {
+          SPDLOG_ERROR("Hash operations need to work on two schemas with the same size. q.id={}", q.id);
           return std::string("HASH operation constraint failed on " + q.id);
+        }
       } break;
       default:
         break;

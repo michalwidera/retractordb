@@ -14,12 +14,12 @@ add_test(
     ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out.dot")
 
 add_test(
-  NAME ${TestID}-vg-1
+  NAME ${TestID}-vg-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor query.rql -c)
 
 add_test(
-  NAME ${TestID}-vg-2
+  NAME ${TestID}-vg-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND valgrind --error-exitcode=1 --leak-check=full xretractor query.rql -m
           5)

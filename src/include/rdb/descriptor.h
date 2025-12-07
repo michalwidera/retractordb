@@ -25,10 +25,10 @@ void setFlat(bool);
 //
 
 class Descriptor : public std::vector<rField> {
-  std::vector<std::pair<int, int>> convMap;
-  std::map<std::pair<int, int>, int> convReMap;
-  std::vector<int> offsetMap;
-  int clen = 0;
+  std::vector<std::pair<int, int>> convMap_;
+  std::map<std::pair<int, int>, int> convReMap_;
+  std::vector<int> offsetMap_;
+  int clen_ = 0;
   void updateConvMaps();
 
  public:

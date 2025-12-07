@@ -13,21 +13,35 @@
 namespace rdb {
 
 template <typename K>
-K readFromFstream(std::fstream &myFile) {
-  K var;
-  myFile >> var;
+K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
+  K var{0};
   if (myFile.eof()) {
-    myFile.clear();
-    myFile.seekg(0, std::ios::beg);
+    if (loopToBeginningIfEOF) {
+      myFile.clear();
+      myFile.seekg(0, std::ios::beg);
+      myFile >> var;
+    }
+  } else {
+    assert((myFile.rdstate() & std::ifstream::failbit) == 0);
     myFile >> var;
-  };
+    if (myFile.eof() && loopToBeginningIfEOF) {
+      myFile.clear();
+      myFile.seekg(0, std::ios::beg);
+      myFile >> var;
+    }
+  }
   return var;
 }
 
-textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,  //
-                                           const size_t sizeRec,             //
-                                           const rdb::Descriptor &descriptor)
-    : filename(std::string(fileName)), descriptor(descriptor), sizeRec(sizeRec), readCount(0) {
+textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    //
+                                           const size_t sizeRec,               //
+                                           const rdb::Descriptor &descriptor,  //
+                                           bool loopToBeginningIfEOF)
+    : filename(std::string(fileName)),
+      descriptor(descriptor),
+      sizeRec(sizeRec),
+      readCount(0),
+      loopToBeginningIfEOF_(loopToBeginningIfEOF) {
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename, std::ios::in);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
@@ -44,6 +58,18 @@ auto textSourceAccessorRO::name() -> std::string & { return filename; }
 ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
   assert(sizeRec != 0);
+
+  if (!loopToBeginningIfEOF_) {
+    if (myFile.eof()) {
+      std::memset(reinterpret_cast<char *>(ptrData), 0, descriptor.getSizeInBytes());
+      readCount++;
+
+      return EXIT_SUCCESS;
+    }
+
+    // all assertions releated to failbit are after read operations
+    // on the end of file should not block here
+  }
 
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
@@ -63,19 +89,19 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
       } else
         for (auto j = 0; j < item.rarray; j++) {
           if (item.rtype == rdb::INTEGER) {
-            auto var = readFromFstream<int>(myFile);
+            auto var = readFromFstream<int>(myFile, loopToBeginningIfEOF_);
             payload->setItem(i + j, var);
           } else if (item.rtype == rdb::UINT) {
-            auto var = readFromFstream<unsigned>(myFile);
+            auto var = readFromFstream<unsigned>(myFile, loopToBeginningIfEOF_);
             payload->setItem(i + j, var);
           } else if (item.rtype == rdb::FLOAT) {
-            auto var = readFromFstream<float>(myFile);
+            auto var = readFromFstream<float>(myFile, loopToBeginningIfEOF_);
             payload->setItem(i + j, var);
           } else if (item.rtype == rdb::DOUBLE) {
-            auto var = readFromFstream<double>(myFile);
+            auto var = readFromFstream<double>(myFile, loopToBeginningIfEOF_);
             payload->setItem(i + j, var);
           } else if (item.rtype == rdb::BYTE) {  // This is different!
-            auto var = readFromFstream<unsigned>(myFile);
+            auto var = readFromFstream<unsigned>(myFile, loopToBeginningIfEOF_);
             payload->setItem(i + j, static_cast<uint8_t>(var));
           } else {
             SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(item.rtype));
@@ -88,8 +114,10 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
       i++;
     }
   }
+
   std::memcpy(reinterpret_cast<char *>(ptrData), payload->get(), descriptor.getSizeInBytes());
-  assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+
+  if (loopToBeginningIfEOF_) assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
   readCount++;
 

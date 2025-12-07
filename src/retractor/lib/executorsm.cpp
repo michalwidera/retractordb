@@ -11,19 +11,14 @@
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/program_options.hpp>
 #include <boost/property_tree/info_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <thread>
 
 #include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
@@ -63,7 +58,9 @@ std::unique_ptr<PersistentCounter> pCounterPtr;
 // Map stores relations processId -> sended stream
 static std::map<const int, std::string> id2StreamName_Relation;
 
-extern boost::mutex core_mutex;
+extern std::mutex core_mutex;
+
+std::condition_variable cv;  // multithreading condition variable
 
 std::vector<std::pair<std::string, std::string>> processedLines;
 
@@ -71,10 +68,18 @@ dataModel *pProc = nullptr;
 
 // variable connected with tlimitqry (-m) parameter
 // when it will be set thread will exit by given time (testing purposes)
-int iTimeLimitCnt{executorsm::inifitie_loop};
+std::atomic<int> iTimeLimitCnt{executorsm::inifitie_loop};
 
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
+
+void cleanup() {
+  if (iTimeLimitCnt != executorsm::stop_now) {
+    SPDLOG_INFO("Cleanup: Setting iTimeLimitCnt to stop_now.");
+    iTimeLimitCnt = executorsm::stop_now;
+    std::cout << "Cleanup!" << std::endl;
+  }
+}
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
   assert(coreInstancePtr != nullptr);
@@ -163,7 +168,7 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
 
   // These brackets are important - we need to lock coreInstancePtr as less as possible
   {
-    boost::mutex::scoped_lock scoped_lock(core_mutex);
+    std::lock_guard<std::mutex> scoped_lock(core_mutex);
     mergedIds          = cmPtr->mergeCore(coreInstanceCopy);
     compileChainResult = cmPtr->run();
   }
@@ -264,7 +269,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
                             maxElements,          // max message number
                             1024                  // max message size
       );
-      boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     //
     // This command stop (kills) server process
@@ -315,8 +320,16 @@ void executorsm::commandProcessorLoop() {
     std::array<char, 1000> message;
     unsigned int priority;
     IPC::message_queue::size_type recvd_size;
-    while (true) {
+
+    bool loopRunning = true;
+    while (loopRunning) {
       while (mq.try_receive(message.data(), 1000, recvd_size, priority)) {
+        if (iTimeLimitCnt == executorsm::waitForXqry) {
+          // Notify main thread that first query is received
+          iTimeLimitCnt = executorsm::inifitie_loop;
+          cv.notify_all();
+        }
+
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
@@ -333,10 +346,12 @@ void executorsm::commandProcessorLoop() {
         // cppcheck-suppress danglingTemporaryLifetime
         mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
       }
-      boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+      if (iTimeLimitCnt == executorsm::stop_now) loopRunning = false;
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cout << ex.what() << std::endl << "catch on server" << std::endl;
+    std::cout << "Exception on server." << std::endl << ex.what() << std::endl;
   }
 }
 
@@ -377,9 +392,44 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServiceGuard &guard, compiler &cm) {
+void executorsm::boradcast(const std::set<std::string> &inSet) {
+  assert(executorsm::coreInstancePtr != nullptr);
+  for (const auto queryName : inSet) {
+    std::string row = printRowValue(queryName);
+    std::list<int> eraseList;
+    for (const auto &element : id2StreamName_Relation) {
+      if (element.second == queryName) {
+        using namespace boost::interprocess;
+        //
+        // Query discovery. queues are created by show command
+        //
+        std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
+        IPC::message_queue mq(IPC::open_only, queueName.c_str());
+        //
+        // If send queue is full - means no one is listening and queue is
+        // going to remove
+        //
+        if (!mq.try_send(row.c_str(), row.length(), 0)) {
+          message_queue::remove(queueName.c_str());
+          eraseList.push_back(element.first);
+        }
+      }
+    }
+    //
+    // cleaning form clients map that are not receiving data from queue
+    //
+    for (const auto &element : eraseList) {
+      id2StreamName_Relation.erase(element);
+      SPDLOG_WARN("queue erased on timeout, procId={}", element);
+    }
+  }
+}
+
+int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
+
+  std::atexit(cleanup);
 
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)
@@ -390,14 +440,26 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
   if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
-  thread bt(executorsm::commandProcessorLoop);  // Sending service in thread
+  std::thread bt(executorsm::commandProcessorLoop);  // Sending service in thread
   // This line - delay is ugly fix for slow machine on CI !
-  boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
   try {
     dataModel proc(*coreInstancePtr);
     pProc = &proc;
 
-    if (verbose) coreInstancePtr->dumpCore();
+    if (vm.count("xqrywait")) {
+      SPDLOG_INFO("Waiting for first query to process.");
+      if (vm.count("verbose")) std::cout << "Waiting for first query to start process.\n";
+      std::unique_lock<std::mutex> scoped_lock(core_mutex);
+      iTimeLimitCnt = executorsm::waitForXqry;
+      cv.wait(scoped_lock, [this] { return iTimeLimitCnt != executorsm::waitForXqry; });
+      SPDLOG_INFO("First query received, starting processing loop.");
+      assert(iTimeLimitCnt == executorsm::inifitie_loop);
+      if (vm.count("verbose")) std::cout << "First query received, starting processing loop.\n";
+    }
+
+    if (vm.count("verbose")) coreInstancePtr->dumpCore();
 
     TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
     //
@@ -405,20 +467,23 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (iTimeLimitCnt == executorsm::inifitie_loop && verbose) std::cout << "Press any key to stop.\n";
+    if (iTimeLimitCnt == executorsm::inifitie_loop && vm.count("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
-
-    std::set<std::string> initSet;
+    std::set<std::string> inSet;
     for (const auto &it : *coreInstancePtr)
-      if (it.isDeclaration()) initSet.insert(it.id);
+      if (it.isDeclaration()) inSet.insert(it.id);
+    proc.processZeroStep();
+    boradcast(inSet);
 
-    proc.processRows(initSet);
-
+    {
+      std::stringstream dummy;
+      for (const auto &p : inSet) dummy << p << " ";
+      SPDLOG_INFO("ZERO-step processed for streams: {}", dummy.str());
+    }
     // End of ZERO-step
 
     // Loop of data processing
-
     boost::rational<int> prev_interval(0);
     while (!_kbhit() && iTimeLimitCnt != executorsm::stop_now) {
       if (iTimeLimitCnt != executorsm::inifitie_loop) {
@@ -446,45 +511,17 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
       //
       // Waiting given miliseconds time that is computed
       //
-      boost::this_thread::sleep_for(boost::chrono::milliseconds(period));
+      std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
-      const std::set<std::string> inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-
+      inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
       proc.processRows(inSet);
+      boradcast(inSet);
 
-      //
-      // Data broadcast - main loop
-      //
-      for (const auto queryName : inSet) {
-        std::string row = printRowValue(queryName);
-        std::list<int> eraseList;
-        for (const auto &element : id2StreamName_Relation) {
-          if (element.second == queryName) {
-            using namespace boost::interprocess;
-            //
-            // Query discovery. queues are created by show command
-            //
-            std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-            IPC::message_queue mq(IPC::open_only, queueName.c_str());
-            //
-            // If send queue is full - means no one is listening and queue is
-            // going to remove
-            //
-            if (!mq.try_send(row.c_str(), row.length(), 0)) {
-              message_queue::remove(queueName.c_str());
-              eraseList.push_back(element.first);
-            }
-          }
-        }
-        //
-        // cleaning form clients map that are not receiving data from queue
-        //
-        for (const auto &element : eraseList) {
-          id2StreamName_Relation.erase(element);
-          SPDLOG_WARN("queue erased on timeout, procId={}", element);
-        }
+      {
+        std::stringstream dummy;
+        for (const auto &p : inSet) dummy << p << " ";
+        SPDLOG_INFO("NEXT-step processed for streams: {}", dummy.str());
       }
-
       // End of loop while( ! _kbhit() )
     }
     //
@@ -500,7 +537,7 @@ int executorsm::run(qTree &coreInstance, bool percount, bool verbose, FlockServi
     SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
   }
-  bt.interrupt();
+  iTimeLimitCnt = executorsm::stop_now;
   bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");

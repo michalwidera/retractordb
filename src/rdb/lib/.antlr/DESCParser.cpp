@@ -63,11 +63,11 @@ void descParserInitialize() {
       "", "", "", "", "", "", "BYTE_T", "STRING_T", "UNSIGNED_T", "INTEGER_T", 
       "FLOAT_T", "DOUBLE_T", "RATIONAL_T", "INTPAIR_T", "IDXPAIR_T", "TYPE_T", 
       "REF_T", "RETENTION_T", "RETMEMORY_T", "DOT", "MINUS", "ID", "STRING", 
-      "DECIMAL", "FILENAME", "SPACE"
+      "DECIMAL", "FILENAME", "SPACE", "COMMENT", "LINE_COMMENT1", "LINE_COMMENT2"
     }
   );
   static const int32_t serializedATNSegment[] = {
-  	4,1,25,74,2,0,7,0,2,1,7,1,1,0,1,0,5,0,7,8,0,10,0,12,0,10,9,0,1,0,1,0,
+  	4,1,28,74,2,0,7,0,2,1,7,1,1,0,1,0,5,0,7,8,0,10,0,12,0,10,9,0,1,0,1,0,
   	1,1,1,1,1,1,1,1,1,1,3,1,19,8,1,1,1,1,1,1,1,1,1,1,1,3,1,26,8,1,1,1,1,1,
   	1,1,1,1,1,1,3,1,33,8,1,1,1,1,1,1,1,1,1,1,1,3,1,40,8,1,1,1,1,1,1,1,1,1,
   	1,1,3,1,47,8,1,1,1,1,1,1,1,1,1,1,1,3,1,54,8,1,1,1,1,1,1,1,1,1,1,1,1,1,

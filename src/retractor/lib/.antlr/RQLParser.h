@@ -17,15 +17,16 @@ public:
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
-    FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, ON = 37, 
-    WHEN = 38, DUMP = 39, SYSTEM = 40, DO = 41, TO = 42, AND_C = 43, OR_C = 44, 
-    NOT_C = 45, MIN = 46, MAX = 47, AVG = 48, SUMC = 49, STRING_SUBSTRAT = 50, 
-    ID = 51, STRING = 52, FLOAT = 53, DECIMAL = 54, REAL = 55, IS_EQ = 56, 
-    IS_NQ = 57, IS_GR = 58, IS_LS = 59, IS_GE = 60, IS_LE = 61, EXCLAMATION = 62, 
-    DOUBLE_BAR = 63, DOT = 64, UNDERLINE = 65, AT = 66, SHARP = 67, AND = 68, 
-    MOD = 69, DOLLAR = 70, COMMA = 71, SEMI = 72, COLON = 73, DOUBLE_COLON = 74, 
-    STAR = 75, DIVIDE = 76, PLUS = 77, MINUS = 78, BIT_NOT = 79, BIT_OR = 80, 
-    BIT_XOR = 81, SPACE = 82, COMMENT = 83, LINE_COMMENT1 = 84, LINE_COMMENT2 = 85
+    FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, DISPOSABLE = 37, 
+    ONESHOT = 38, ON = 39, WHEN = 40, DUMP = 41, SYSTEM = 42, DO = 43, TO = 44, 
+    AND_C = 45, OR_C = 46, NOT_C = 47, MIN = 48, MAX = 49, AVG = 50, SUMC = 51, 
+    STRING_SUBSTRAT = 52, ID = 53, STRING = 54, FLOAT = 55, DECIMAL = 56, 
+    REAL = 57, IS_EQ = 58, IS_NQ = 59, IS_GR = 60, IS_LS = 61, IS_GE = 62, 
+    IS_LE = 63, EXCLAMATION = 64, DOUBLE_BAR = 65, DOT = 66, UNDERLINE = 67, 
+    AT = 68, SHARP = 69, AND = 70, MOD = 71, DOLLAR = 72, COMMA = 73, SEMI = 74, 
+    COLON = 75, DOUBLE_COLON = 76, STAR = 77, DIVIDE = 78, PLUS = 79, MINUS = 80, 
+    BIT_NOT = 81, BIT_OR = 82, BIT_XOR = 83, SPACE = 84, COMMENT = 85, LINE_COMMENT1 = 86, 
+    LINE_COMMENT2 = 87
   };
 
   enum {
@@ -197,6 +198,8 @@ public:
     antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
+    antlr4::tree::TerminalNode *DISPOSABLE();
+    antlr4::tree::TerminalNode *ONESHOT();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

@@ -18,15 +18,15 @@ using std::set;
  */
 class TimeLine : private boost::noncopyable {
   /** Set of _SORTED_ deltas */
-  set<rational<int>> sr;
+  set<rational<int>> sr_;
 
   /** Here is multiplier for time values */
-  map<rational<int>, long> counter;
+  map<rational<int>, long> counter_;
 
   /** Here is actual value of time slot
    *  ctslot = current time slot
    */
-  rational<int> ctSlot;
+  rational<int> ctSlot_;
 
  public:
   /** This constructor fills inherited set of values filtered

@@ -1,6 +1,6 @@
 # ctest -R '^agse2' -V
 
-DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, 1 FILE 'datafile.txt'
+DECLARE a INTEGER, b INTEGER, c INTEGER STREAM core, .1 FILE 'datafile.txt'
 
 SELECT * STREAM serial1 FROM core@(1,1)
 SELECT * STREAM serial2 FROM core@(2,2)

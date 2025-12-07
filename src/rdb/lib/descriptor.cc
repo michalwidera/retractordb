@@ -42,12 +42,12 @@ Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
 void Descriptor::updateConvMaps() {
   if (!dirtyMap) return;
 
-  convMap.clear();
-  convReMap.clear();
-  offsetMap.clear();
+  convMap_.clear();
+  convReMap_.clear();
+  offsetMap_.clear();
 
-  clen = 0;
-  for (auto it : *this) clen += (it.rtype == rdb::STRING) ? 1 : it.rarray;
+  clen_ = 0;
+  for (auto it : *this) clen_ += (it.rtype == rdb::STRING) ? 1 : it.rarray;
 
   std::vector<rField>::iterator it = this->begin();
   int fieldCounter{0};
@@ -55,7 +55,7 @@ void Descriptor::updateConvMaps() {
   int counterArray{(*it).rarray};
   int offset{0};
   int clen_alignment{0};
-  for (int i = 0; i < clen; ++i) {
+  for (int i = 0; i < clen_; ++i) {
     if (isConfigurationField((*it).rtype)) {
       ++it;
       ++clen_alignment;
@@ -68,10 +68,10 @@ void Descriptor::updateConvMaps() {
     }
 
     if (counterArray > 0) {
-      convMap.push_back(std::make_pair(fieldCounter, backCounterArray));
-      convReMap[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
+      convMap_.push_back(std::make_pair(fieldCounter, backCounterArray));
+      convReMap_[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
 
-      offsetMap.push_back(offset);
+      offsetMap_.push_back(offset);
       if ((*it).rtype == rdb::STRING)
         offset += len(*it);
       else
@@ -89,14 +89,14 @@ void Descriptor::updateConvMaps() {
       counterArray = (*it).rarray;
     }
   }
-  clen -= clen_alignment;
+  clen_ -= clen_alignment;
   dirtyMap = false;
 }
 
 std::optional<std::pair<int, int>> Descriptor::convert(int position) {
   updateConvMaps();
-  if (position < clen) {
-    return convMap[position];
+  if (position < clen_) {
+    return convMap_[position];
   } else {
     assert(false);
     return {};
@@ -105,8 +105,8 @@ std::optional<std::pair<int, int>> Descriptor::convert(int position) {
 
 std::optional<int> Descriptor::convert(std::pair<int, int> position) {
   updateConvMaps();
-  if (convReMap.find(position) != convReMap.end())
-    return convReMap[position];
+  if (convReMap_.find(position) != convReMap_.end())
+    return convReMap_[position];
   else {
     assert(false);
     return {};
@@ -117,13 +117,13 @@ bool Descriptor::isEmpty() const { return this->size() == 0; }
 
 int Descriptor::sizeFlat() {
   updateConvMaps();
-  return clen;
+  return clen_;
 };
 
 std::vector<rField> Descriptor::fieldsFlat() {
   updateConvMaps();
   std::vector<rField> ret;
-  ret.reserve(clen);
+  ret.reserve(clen_);
   for (const auto &i : (*this)) {
     if (isConfigurationField(i.rtype)) continue;  // skip configuration fields
     ret.push_back(i);
@@ -143,8 +143,6 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
   if (this != &rhs) {
     insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
   } else {
-    // Descriptor b(*this);
-    // insert(end(), b.begin(), b.end());
     assert(false && "can not merge same to same");
     // can't do safe: data | data
     // due one name policy
@@ -302,7 +300,7 @@ size_t Descriptor::offsetBegArr(const std::string_view name) {
 
 int Descriptor::offset(const int position) {
   updateConvMaps();
-  return offsetMap[position];
+  return offsetMap_[position];
 }
 
 std::string_view Descriptor::type(const std::string_view name) {  //

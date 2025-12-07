@@ -1,0 +1,6 @@
+temp/*.desc
+temp/acc*
+temp/out*
+temp/fil*
+temp/sig*
+temp/sou*

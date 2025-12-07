@@ -45,3 +45,6 @@ DECIMAL:            DEC_DIGIT+;
 FILENAME:           ([A-Za-z_$0-9]|MINUS|DOT|'/')+ ;
 
 SPACE:              [ \t\r\n]+    -> skip;
+COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
+LINE_COMMENT1:      '# ' ~[\r\n]* -> channel(HIDDEN);
+LINE_COMMENT2:      '//' ~[\r\n]* -> channel(HIDDEN);
