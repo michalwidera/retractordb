@@ -17,7 +17,7 @@ static int ceilR(boost::rational<int> const &num) {
 bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {
   assert(deltaA > 0);
   assert(deltaB > 0);
-  const rational<int> delta = deltaB / (deltaA + deltaB);
+  const rational<int> delta = (deltaA * deltaB) / (deltaA + deltaB);
   bool ret                  = floorR(delta * i) == floorR(delta * (i + 1));
   if (ret) {
     retPos = i - (floorR((i + 1) * delta));  // B

@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <boost/lexical_cast.hpp>
 #include <cassert>
 #include <cstdlib>  // std::div
 #include <iostream>
@@ -76,7 +77,7 @@ bool dataModel::addQueryToModel(std::string id) {
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    qSet[instance]->outputPayload->revRead(revOffset, 0);
+    qSet[instance]->outputPayload->revRead(revOffset);
   }
   return qSet[instance]->outputPayload->getPayload();
 }
@@ -85,6 +86,7 @@ void dataModel::processZeroStep() {
   std::lock_guard<std::mutex> scoped_lock(core_mutex);
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
+
     assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty);
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     qSet[q.id]->outputPayload->revRead(0);                            // state -> armed
@@ -95,20 +97,28 @@ void dataModel::processZeroStep() {
 
 void dataModel::processRows(const std::set<std::string> &inSet) {
   std::lock_guard<std::mutex> scoped_lock(core_mutex);
+
+  // first - process all non-declaration queries
   for (auto q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) {
-      if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
-      qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-      qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
-      qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
-      assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
-    } else {
-      constructInputPayload(q.id);                    // That will create 'from' clause data set
-      qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
-      qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
-      qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
-    }
+    if (q.isDeclaration()) continue;                // Declarations already processed
+
+    constructInputPayload(q.id);                    // That will create 'from' clause data set
+    qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
+    qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
+    qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
+  }
+
+  // Then - process all declarations to unlock them for next step
+  for (auto q : coreInstance_) {
+    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;               // first declarations need to be processed
+
+    if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
+    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+    qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
+    qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
+    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
   }
 }
 
@@ -226,18 +236,21 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() - 1;  // TODO: techdebt -1 ?
+      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
 
-      // This -1 is here becasue math equations are connecting hash operation on inproper order
-      // I've tryed to fix this in getRecordsCount() - but it broke to many unit tests
-      // looks like techdebt that need to be adressed in future refactor
+      SPDLOG_INFO("STREAM_HASH a:{}|{} b:{}|{} recordOffset {}",                       //
+                  nameSrc1,                                                            
+                  boost::lexical_cast<std::string>(intervalSrc1),                      //
+                  nameSrc2,                                                            //
+                  boost::lexical_cast<std::string>(intervalSrc2),                      //
+                  recordOffset);
 
-      int retPos;
-      if (Hash(intervalSrc1, intervalSrc2, recordOffset, retPos)) {
-        *(qSet[instance]->inputPayload) = *getPayload(nameSrc2, retPos);
-      } else {
-        *(qSet[instance]->inputPayload) = *getPayload(nameSrc1, retPos);
-      }
+      int retPosValue                 = 0;
+      bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
+      *(qSet[instance]->inputPayload) = *getPayload(direction ? nameSrc1 : nameSrc2, retPosValue);
+
+      SPDLOG_INFO("STREAM_HASH retPos:{} direction:{}", retPosValue, direction ? nameSrc1 : nameSrc2);
+
     } break;
     default:
       SPDLOG_ERROR("Undefined command_id:{}", static_cast<int>(cmd));
