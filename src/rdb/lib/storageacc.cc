@@ -304,8 +304,12 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
     //
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
-    accessor_->read(static_cast<uint8_t *>(chamber_->get()), 0);
-    bufferState = sourceState::armed;
+    auto result = accessor_->read(static_cast<uint8_t *>(chamber_->get()), 0);
+    SPDLOG_INFO("Physical read from source {} into chamber_ result={}", accessor_->name(), result);
+    assert(result == EXIT_SUCCESS && "read failure from data source");
+    bufferState              = sourceState::armed;
+    *(storagePayload_.get()) = *chamber_;
+    return true;
   }
   assert(recordIndexFromBack >= 0);
 
@@ -329,8 +333,8 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
     assert(destination != nullptr);
     auto size = descriptor_.getSizeInBytes();
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read buffer fn {} - non existing data from pos:{} capacity:{}", accessor_->name(), recordIndexFromBack,
-                circularBuffer_.capacity());
+    SPDLOG_WARN("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
+                circularBuffer_.capacity(), circularBuffer_.size());
     return true;
   }
 

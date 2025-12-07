@@ -471,9 +471,16 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
     // ZERO-step
     std::set<std::string> inSet;
-    for (const auto &it : *coreInstancePtr) if (it.isDeclaration()) inSet.insert(it.id);
+    for (const auto &it : *coreInstancePtr)
+      if (it.isDeclaration()) inSet.insert(it.id);
     proc.processZeroStep();
     boradcast(inSet);
+
+    {
+      std::stringstream dummy;
+      for (const auto &p : inSet) dummy << p << " ";
+      SPDLOG_INFO("ZERO-step processed for streams: {}", dummy.str());
+    }
     // End of ZERO-step
 
     // Loop of data processing
@@ -510,6 +517,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       proc.processRows(inSet);
       boradcast(inSet);
 
+      {
+        std::stringstream dummy;
+        for (const auto &p : inSet) dummy << p << " ";
+        SPDLOG_INFO("NEXT-step processed for streams: {}", dummy.str());
+      }
       // End of loop while( ! _kbhit() )
     }
     //
