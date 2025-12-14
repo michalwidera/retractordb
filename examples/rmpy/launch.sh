@@ -20,9 +20,8 @@ xqry -d
 echo "--------------------------------"
 xqry -s str1 -m 20
 echo "--------------------------------"
-xqry -s str1 -m 5 -p 49,49
+xqry -s str1 -m 5 -p 49,49 -k
 echo "--------------------------------"
-xqry -k
 
 pkill xretractor ; true
 # Ensure that the script exits cleanly even if pkill fails

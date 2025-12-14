@@ -454,8 +454,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       std::unique_lock<std::mutex> scoped_lock(core_mutex);
       iTimeLimitCnt = executorsm::waitForXqry;
       cv.wait(scoped_lock, [this] { return iTimeLimitCnt != executorsm::waitForXqry; });
-      SPDLOG_INFO("First query received, starting processing loop.");
-      assert(iTimeLimitCnt == executorsm::inifitie_loop);
+      SPDLOG_INFO("First query received, starting processing loop. timeLimit:{}", static_cast<int>(iTimeLimitCnt));
       if (vm.count("verbose")) std::cout << "First query received, starting processing loop.\n";
     }
 
