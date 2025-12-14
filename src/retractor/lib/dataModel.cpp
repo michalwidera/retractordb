@@ -238,11 +238,11 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
 
-      SPDLOG_INFO("STREAM_HASH a:{}|{} b:{}|{} recordOffset {}",                       //
-                  nameSrc1,                                                            
-                  boost::lexical_cast<std::string>(intervalSrc1),                      //
-                  nameSrc2,                                                            //
-                  boost::lexical_cast<std::string>(intervalSrc2),                      //
+      SPDLOG_INFO("STREAM_HASH a:{}|{} b:{}|{} recordOffset {}",  //
+                  nameSrc1,
+                  boost::lexical_cast<std::string>(intervalSrc1),  //
+                  nameSrc2,                                        //
+                  boost::lexical_cast<std::string>(intervalSrc2),  //
                   recordOffset);
 
       int retPosValue                 = 0;

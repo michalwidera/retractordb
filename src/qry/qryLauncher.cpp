@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     }
     if (vm.count("hello"))
       return obj.hello();
-    else if (vm.count("kill")) {
+    else if (vm.count("kill") && timeLimit == 0) {
       ptree pt = obj.netClient("kill", "");
       SPDLOG_INFO("kill sent to server");
     } else if (vm.count("dir")) {

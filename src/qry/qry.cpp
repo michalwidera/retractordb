@@ -226,8 +226,14 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       } else {
         if (_kbhit()) break;
       }
-      if (timeLimitCntQry == 1) break;
-
+      if (timeLimitCntQry == 1) {
+        if (vm.count("kill")) {
+          ptree pt = netClient("kill", "");
+          SPDLOG_INFO("Time limit reached - exiting (kill on end).");
+          done = true;
+        }
+        break;
+      }
       while (spsc_queue.pop(e_value)) {
         const std::string streamN = e_value.get("stream", "");
         for (auto &[w, k] : streamTable)
