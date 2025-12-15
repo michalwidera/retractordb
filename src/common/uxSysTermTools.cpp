@@ -12,7 +12,8 @@
 #include <iostream>  //remove it with std::
 #include <string>
 
-int _kbhit(void) {
+int _kbhit(bool ignoreAnyKey) {
+  if (ignoreAnyKey) return 0;
   struct termios oldt;
   struct termios newt;
   int ch;

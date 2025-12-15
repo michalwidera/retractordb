@@ -1,0 +1,11 @@
+20 
+21 
+100 
+22 
+23 
+110 
+24 
+25 
+120 
+Time limit reached - exiting (kill on end).
+ok.

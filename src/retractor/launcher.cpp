@@ -111,6 +111,7 @@ int main(int argc, char *argv[]) {
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                    //
           ("verbose,v", "verbose mode (show stream params)")                                        //
           ("xqrywait,x", "wait with processing for first query")                                    //
+          ("noanykey,k", "do not wait for any key to terminate")                                    //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
           ("onlycompile,c", "compile only mode");  // linking inheritance from launcher

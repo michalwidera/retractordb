@@ -483,8 +483,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     // End of ZERO-step
 
     // Loop of data processing
+    bool ignoreanykey = vm.count("noanykey") > 0;
     boost::rational<int> prev_interval(0);
-    while (!_kbhit() && iTimeLimitCnt != executorsm::stop_now) {
+    while (!_kbhit(ignoreanykey) && iTimeLimitCnt != executorsm::stop_now) {
       if (iTimeLimitCnt != executorsm::inifitie_loop) {
         if (iTimeLimitCnt != executorsm::stop_now)
           iTimeLimitCnt--;
@@ -521,7 +522,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         for (const auto &p : inSet) dummy << p << " ";
         SPDLOG_INFO("NEXT-step processed for streams: {}", dummy.str());
       }
-      // End of loop while( ! _kbhit() )
+      // End of loop while( ! _kbhit(ignoreanykey) )
     }
     //
     // End of data processing loop
