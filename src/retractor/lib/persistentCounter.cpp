@@ -9,10 +9,12 @@ PersistentCounter::PersistentCounter(std::string initFilename)
 {
   load();
 }
+
 PersistentCounter::~PersistentCounter() {
   increment();
   save();
 }
+
 int PersistentCounter::getCount() const { return count_; }
 void PersistentCounter::increment() { ++count_; }
 void PersistentCounter::load() {

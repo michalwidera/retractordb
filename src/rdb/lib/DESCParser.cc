@@ -44,7 +44,7 @@ class ParserDESCListener : public DESCBaseListener {
   rdb::Descriptor &desc;
 
  public:
-  ParserDESCListener(rdb::Descriptor &desc) : desc(desc) {};
+  ParserDESCListener(rdb::Descriptor &desc) : desc(desc){};
 
   void enterDesc(DESCParser::DescContext *ctx) {
     // std::cerr << "enterDesc" << std::endl;

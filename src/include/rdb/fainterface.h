@@ -48,7 +48,7 @@ struct FileAccessorInterface {
 
   // following: https://stackoverflow.com/questions/51615363/how-to-write-c-getters-and-setters
   virtual auto name() const -> const std::string & = 0;
-  virtual auto name() -> std::string &             = 0;
+  virtual auto name() -> std::string             & = 0;
 
   /**
    * @brief data count in storage

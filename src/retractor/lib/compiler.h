@@ -7,7 +7,7 @@
 #include "QStruct.h"  // for query, token
 
 struct compiler {
-  explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
+  explicit compiler(qTree &coreInstance) : coreInstance(coreInstance){};
   compiler() = delete;
 
   // run compile chain

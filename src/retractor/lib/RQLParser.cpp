@@ -90,7 +90,7 @@ class ParserListener : public RQLBaseListener {
   };
 
  public:
-  ParserListener(qTree &coreInstance) : coreInstance(coreInstance) {};
+  ParserListener(qTree &coreInstance) : coreInstance(coreInstance){};
 
   void enterProg(RQLParser::ProgContext *ctx) {}
 
