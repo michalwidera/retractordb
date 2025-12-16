@@ -13,7 +13,7 @@ constexpr auto config_line = "Branch: @GIT_CURRENT_BRANCH@:@GIT_PREV_COMMIT@, "
 
 constexpr auto build_id = "@GIT_CURRENT_BUILDTIME@";
 
-constexpr auto warranty = "This is free software; see the source for copying conditions.\n"
-                          "There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.";
+constexpr auto warranty = "This software is licensed under the MIT License and is provided ‘as is’,\n"
+                          "without warranty of any kind. For more information, see the LICENSE file.";
 
 #endif // CONFIG_H_IN

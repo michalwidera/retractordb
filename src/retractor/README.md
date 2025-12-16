@@ -12,20 +12,23 @@ The tool also provides methods to dump compiled query execution plans in text fo
 
 This process is called from command prompt with:
 ```
-$xretractor -h
-xretractor - compiler & data processing tool.
+$xretractor - compiler & data processing tool.
 
 Usage: xretractor queryfile [option]
 
 Available options:
   -h [ --help ]               Show program options
+  -s [ --status ]             check service status
   -q [ --queryfile ] arg      query set file
   -v [ --verbose ]            verbose mode (show stream params)
+  -x [ --xqrywait ]           wait with processing for first query
+  -k [ --noanykey ]           do not wait for any key to terminate
   -m [ --tlimitqry ] arg (=0) query limit, 0 - no limit
   -c [ --onlycompile ]        compile only mode
-Branch: master:b38fb68, Code compiler: GNU Ver. 13.2.0, Build time: 2308192116, Type: Debug
-This is free software; see the source for copying conditions.
-There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+Branch: issue_31-doc:eb1aba1, Code compiler: GNU Ver. 13.3.0, Build time: 2512170028, Type: Debug
+Log: /tmp/xretractor.log
+This software is licensed under the MIT License and is provided ‘as is’,
+without warranty of any kind. For more information, see the LICENSE file.
 ```
 
 Please notice that this tool has second face when you call it with "only compile" option. This face is required for _Show Diagram_ or _Show query Plan_ actions.
@@ -45,10 +48,14 @@ Available options:
   -f [ --fields ]        show fields in dot file
   -t [ --tags ]          show tags in dot file
   -s [ --streamprogs ]   show stream programs in dot file
+  -u [ --rules ]         show rules in dot file
+  -p [ --transparent ]   make dot background transparent
+  -w [ --diagram ] arg   create diagram output
   -c [ --onlycompile ]   compile only mode
-Branch: master:b38fb68, Code compiler: GNU Ver. 13.2.0, Build time: 2308192116, Type: Debug
-This is free software; see the source for copying conditions.
-There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+Branch: issue_31-doc:eb1aba1, Code compiler: GNU Ver. 13.3.0, Build time: 2512170028, Type: Debug
+Log: /tmp/xretractor.log
+This software is licensed under the MIT License and is provided ‘as is’,
+without warranty of any kind. For more information, see the LICENSE file.
 ```
 
 ## Storage state machine
