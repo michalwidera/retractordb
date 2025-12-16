@@ -51,9 +51,7 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/dsp)
 
 # python -m pip install clang-format cmakelang
-# https://zed0.co.uk/clang-format-configurator/
-
-# clang-format --version
+# https://zed0.co.uk/clang-format-configurator/ | $clang-format --version
 # clang-format version 21.1.7
 
 set(CSTYLE
