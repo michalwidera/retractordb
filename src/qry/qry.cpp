@@ -221,11 +221,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
   std::vector<std::deque<std::string>> output_lines;
   try {
     while (!done) {
-      if (vm.count("needctrlc")) {
-        // If this option appear - any key will not stop process
-      } else {
-        if (_kbhit()) break;
-      }
+      if (_kbhit(vm.count("needctrlc"))) break;
       if (timeLimitCntQry == 1) {
         if (vm.count("kill")) {
           ptree pt = netClient("kill", "");

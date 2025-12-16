@@ -17,18 +17,22 @@ Usage: xqry [option]
 Allowed options:
   -s [ --select ] arg         show this stream
   -t [ --detail ] arg         show details of this stream
+  -a [ --adhoc ] arg          adhoc query mode
   -m [ --tlimitqry ] arg (=0) limit of elements, 0 - no limit
   -l [ --hello ]              diagnostic - hello db world
   -k [ --kill ]               kill xretractor server
   -d [ --dir ]                list of queries
+  -y [ --diryaml ]            list of queries in yaml format
+  -r [ --raw ]                raw output mode (default)
   -g [ --graphite ]           graphite output mode
   -f [ --influxdb ]           influxDB output mode
-  -r [ --raw ]                raw mode (default)
-  -h [ --help ]               show options
+  -p [ --gnuplot ] arg        x,y - gnuplot output mode
+  -h [ --help ]               produce help message
   -c [ --needctrlc ]          force ctl+c for stop this tool
-Branch: master:b38fb68, Code compiler: GNU Ver. 13.2.0, Build time: 2308192116, Type: Debug
-This is free software; see the source for copying conditions.
-There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+Branch: issue_31-doc:eb1aba1, Code compiler: GNU Ver. 13.3.0, Build time: 2512170028, Type: Debug
+Log: /tmp/xqry.log
+This software is licensed under the MIT License and is provided ‘as is’,
+without warranty of any kind. For more information, see the LICENSE file.
 ```
 
 > ## Before you call xqry ... 

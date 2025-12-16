@@ -1,4 +1,4 @@
-DECLARE a UINT STREAM core0, 0.5 FILE 'datafile1.txt'
-DECLARE a UINT STREAM core1, 1 FILE 'datafile2.txt' ONESHOT
+DECLARE a UINT STREAM core0, 1/16 FILE 'datafile1.txt'
+DECLARE a UINT STREAM core1, 1/8 FILE 'datafile2.txt' ONESHOT
 
 SELECT str3[0] STREAM str3 FROM core0#core1
