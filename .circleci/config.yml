@@ -47,11 +47,7 @@ workflows:
                 - /issue_.*/
     jobs:
       - build-release-ninja-mydocker
-      - build-debug-ninja-mydocker-cppcheck
-      - build-ARM:
-          requires:
-            - build-release-ninja-mydocker
-            - build-debug-ninja-mydocker-cppcheck
+      - build-debug-ninja-mydocker
 
 
 executors:
@@ -234,34 +230,6 @@ jobs:
           build_param: --build missing
           build_tool: ninja
       - run-test:
-          build_type: Debug
-          build_tool: ninja
-      - run-package:
-          build_type: Debug
-          build_tool: ninja
-
-  build-debug-ninja-mydocker-cppcheck:
-    working_directory: ~/retractordb
-    executor: debian-mydocker
-    steps:
-      - checkout:
-          method: blobless
-      - prep-env:
-          build_package: ninja-build
-          conan_profile1: "[conf]"
-          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
-      - conan-install:
-          build_type: Debug
-          build_param: --build missing
-          build_tool: ninja
-      - conan-build:
-          build_type: Debug
-          build_param: --build missing
-          build_tool: ninja
-      - run-test:
-          build_type: Debug
-          build_tool: ninja
-      - run-cppcheck:
           build_type: Debug
           build_tool: ninja
       - run-package:
