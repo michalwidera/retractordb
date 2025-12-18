@@ -17,7 +17,8 @@
 
 extern std::unique_ptr<PersistentCounter> pCounterPtr;
 
-streamInstance::streamInstance(qTree &coreInstance, query &qry, std::string storagePathParam) : coreInstance(coreInstance) {
+streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
+    : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
   assert(!qry.id.empty());
 

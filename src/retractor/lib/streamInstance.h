@@ -18,7 +18,7 @@ struct streamInstance {
                                                         // clause - created by from clause.
 
   // This constructor will create data based on QStruct query
-  explicit streamInstance(qTree &coreInstance, query &qry, std::string storagePathParam = "");
+  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
 
   rdb::payload constructAgsePayload(const int length,             //  _@(_,length)
                                     const int step,               //  _@(step,_)

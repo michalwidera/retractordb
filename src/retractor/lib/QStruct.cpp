@@ -257,7 +257,7 @@ query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(
 
 query::query() {}
 
-int query::getFieldIndex(field f_arg) {
+int query::getFieldIndex(const field &f_arg) {
   int idx(0);
   for (auto f : lSchema) {
     if (f.field_.rname == f_arg.field_.rname)  // Todo

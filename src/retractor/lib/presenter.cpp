@@ -396,7 +396,6 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   auto maxInterval = boost::rational<int>(std::numeric_limits<int>::min());
   for (auto q : coreInstance) {
     if (q.isCompilerDirective()) continue;
-    // std::cout << "% Stream " << q.id << " interval " << boost::rational_cast<int>(q.rInterval * msInSec) << "ms" << std::endl;
     if (q.rInterval < minInterval) minInterval = q.rInterval;
     if (q.rInterval > maxInterval) maxInterval = q.rInterval;
   }
@@ -449,14 +448,6 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     }
     if (stepCounter >= stepLimit) break;
   }
-
-  /*
-  for (const auto &p : proc) {
-    std::cout << "% Step interval is " << p.interval << "ms, streams active: ";
-    for (const auto &s : p.procSet) std::cout << s << " ";
-    std::cout << std::endl;
-  }
-  */
 
   char objChar         = 'a';
   const char stateChar = '-';

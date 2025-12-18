@@ -97,7 +97,7 @@ class query {
 
   std::vector<std::string> getDepStream();
 
-  int getFieldIndex(field f);
+  int getFieldIndex(const field &f);
 
   void reset();
 
