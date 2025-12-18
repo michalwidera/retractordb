@@ -18,7 +18,7 @@ struct genericBinaryFileAccessor : public FileAccessorInterface {
   int percounter_;
 
  public:
-  explicit genericBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
+  genericBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
   ~genericBinaryFileAccessor();
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;

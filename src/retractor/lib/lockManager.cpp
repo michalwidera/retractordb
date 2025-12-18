@@ -1,6 +1,5 @@
 #include "lockManager.hpp"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
@@ -8,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <iostream>

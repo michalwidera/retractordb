@@ -1,12 +1,13 @@
-#include <signal.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 #include <boost/system/error_code.hpp>
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -214,12 +215,8 @@ int main(int argc, char *argv[]) {
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
 
-  bool rotation_enabled = false;
-  for (const auto &it : coreInstance)
-    if (it.id == ":ROTATION") {
-      rotation_enabled = true;
-      break;
-    }
+  bool rotation_enabled =
+      std::any_of(coreInstance.begin(), coreInstance.end(), [](const auto &it) { return it.id == ":ROTATION"; });
 
   if (!rotation_enabled) {
     SPDLOG_INFO("Cleanup mode activated, removing artifact files.");
