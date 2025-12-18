@@ -47,8 +47,7 @@ struct FileAccessorInterface {
   virtual ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) = 0;
 
   // following: https://stackoverflow.com/questions/51615363/how-to-write-c-getters-and-setters
-  virtual auto name() const -> const std::string & = 0;
-  virtual auto name() -> std::string &             = 0;
+  virtual auto name() -> std::string & = 0;
 
   /**
    * @brief data count in storage

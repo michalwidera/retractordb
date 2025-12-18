@@ -60,11 +60,6 @@ groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
 
 groupFileAccessor::~groupFileAccessor() {}
 
-auto groupFileAccessor::name() const -> const std::string & {
-  if (retention.noRetention()) return filename;
-  return currentFilename;
-}
-
 auto groupFileAccessor::name() -> std::string & {
   if (retention.noRetention()) {
     // pottenially consider change filename storage file here.

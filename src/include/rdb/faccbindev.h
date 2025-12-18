@@ -33,7 +33,6 @@ class binaryDeviceAccessorRO : public FileAccessorInterface {
     return EXIT_FAILURE;
   };
 
-  auto name() const -> const std::string & override;
   auto name() -> std::string & override;
   size_t count() override;
 };

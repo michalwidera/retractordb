@@ -51,8 +51,6 @@ textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    /
 
 textSourceAccessorRO::~textSourceAccessorRO() { myFile.close(); }
 
-auto textSourceAccessorRO::name() const -> const std::string & { return filename; }
-
 auto textSourceAccessorRO::name() -> std::string & { return filename; }
 
 ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {

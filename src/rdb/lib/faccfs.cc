@@ -28,8 +28,6 @@ genericBinaryFileAccessor::~genericBinaryFileAccessor() {
   }
 }
 
-auto genericBinaryFileAccessor::name() const -> const std::string & { return filename; }
-
 auto genericBinaryFileAccessor::name() -> std::string & { return filename; }
 
 ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
