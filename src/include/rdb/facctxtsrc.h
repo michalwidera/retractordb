@@ -28,12 +28,12 @@ class textSourceAccessorRO : public FileAccessorInterface {
   bool loopToBeginningIfEOF_ = true;
 
  public:
-  ~textSourceAccessorRO();
-
   textSourceAccessorRO(const std::string_view fileName,    //
                        const size_t sizeRec,               //
                        const rdb::Descriptor &descriptor,  //
                        bool loopToBeginningIfEOF);
+
+  ~textSourceAccessorRO() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {
