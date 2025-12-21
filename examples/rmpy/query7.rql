@@ -1,0 +1,6 @@
+DECLARE a UINT STREAM core0, 1 FILE 'datafile1.txt'
+DECLARE a UINT STREAM core1, 2 FILE 'datafile2.txt' ONESHOT
+
+SELECT str3[0] STREAM str3 FROM core0#core1
+
+RULE regulation1 ON str3 when str[3] = 20 or str[3] = 23 DO SYSTEM 'echo "test"'

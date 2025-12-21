@@ -161,7 +161,7 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
           xout << "]";   // end shape
           xout << std::endl;
 
-          std::string relation("prg_" + q.id + " -> rule_" + r.name);
+          std::string relation( q.id + " -> rule_" + r.name + " [color=\"red\" dir=none]");
           planStreamRelationsSet.insert(relation);
         }
       }
