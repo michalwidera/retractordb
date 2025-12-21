@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
           ("tags,t", "show tags in dot file")                                        //
           ("streamprogs,s", "show stream programs in dot file")                      //
           ("rules,u", "show rules in dot file")                                      //
+          ("hideruleprog,i", "hide rule program in rules (-u) output")               //
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
           ("onlycompile,c", "compile only mode");                                    // linking inheritance from launcher
@@ -115,6 +116,14 @@ int main(int argc, char *argv[]) {
           ("noanykey,k", "do not wait for any key to terminate")                                    //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
+          ("dot,d", "create dot output")                                                            //
+          ("csv,c", "create csv output")                                                            //
+          ("fields,f", "show fields in dot file")                                                   //
+          ("tags,t", "show tags in dot file")                                                       //
+          ("streamprogs,s", "show stream programs in dot file")                                     //
+          ("rules,u", "show rules in dot file")                                                     //
+          ("transparent,p", "make dot background transparent")                                      //
+          ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")                 //
           ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
     }
     po::positional_options_description p;  // Assume that infile is the first option

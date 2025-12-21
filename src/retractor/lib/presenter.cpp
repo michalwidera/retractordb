@@ -16,11 +16,17 @@ using namespace CRationalStreamMath;
 
 extern std::vector<std::pair<std::string, std::string>> processedLines;
 
-void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamProgs, bool bShowTags, bool bShowRules,
-                        bool bTransparent) {
+void presenter::graphiz(std::ostream &xout, const boost::program_options::variables_map &vm) {
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
+  bool bShowFileds      = (vm.count("fields") != 0);
+  bool bShowStreamProgs = (vm.count("streamprogs") != 0);
+  bool bShowTags        = (vm.count("tags") != 0);
+  bool bShowRules       = (vm.count("rules") != 0);
+  bool bTransparent     = (vm.count("transparent") != 0);
+  bool bShowRuleProgram = !(vm.count("hideruleprog") != 0);
+
   xout << "digraph structs {" << std::endl;
   xout << " node\t[shape=record];" << std::endl;
   if (bTransparent) {
@@ -137,31 +143,34 @@ void presenter::graphiz(std::ostream &xout, bool bShowFileds, bool bShowStreamPr
             xout << "UNKNOWN_ACTION";
           };
 
-          xout << "}|{";
-
-          bool isFirst(true);
-          for (auto t : r.condition) {
-            if (isFirst)
-              isFirst = false;
-            else
-              xout << "|";
-            std::string sTokenName(t.getStrCommandID());
-            if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
-              xout << t;
-            else {
-              std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
-              std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
-              xout << sTokenName;
-            }
-          }
-
           xout << "}";
+
+          if (bShowRuleProgram) {
+            xout << "|{";
+            bool isFirst(true);
+            for (auto t : r.condition) {
+              if (isFirst)
+                isFirst = false;
+              else
+                xout << "|";
+              std::string sTokenName(t.getStrCommandID());
+              if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
+                xout << t;
+              else {
+                std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
+                std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
+                xout << sTokenName;
+              }
+            }
+
+            xout << "}";
+          }
 
           xout << "\"";  // end label
           xout << "]";   // end shape
           xout << std::endl;
 
-          std::string relation( q.id + " -> rule_" + r.name + " [color=\"red\" dir=none]");
+          std::string relation(q.id + " -> rule_" + r.name + " [color=\"red\" dir=none]");
           planStreamRelationsSet.insert(relation);
         }
       }
@@ -511,7 +520,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   return;
 }
 
-int presenter::run(boost::program_options::variables_map &vm) {
+int presenter::run(const boost::program_options::variables_map &vm) {
   try {
     if (vm.count("tags") != 0 && vm.count("fields") == 0) {
       std::cerr << "Conflicting parameters." << std::endl;
@@ -519,8 +528,7 @@ int presenter::run(boost::program_options::variables_map &vm) {
       return system::errc::invalid_argument;
     }
     if (vm.count("dot")) {
-      graphiz(std::cout, vm.count("fields") != 0, vm.count("streamprogs") != 0, vm.count("tags") != 0, vm.count("rules") != 0,
-              vm.count("transparent") != 0);
+      graphiz(std::cout, vm);
     } else if (vm.count("csv")) {
       qSet();
       qPrograms();
