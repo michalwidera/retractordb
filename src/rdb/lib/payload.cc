@@ -183,6 +183,7 @@ std::any payload::getItem(const int positionFlat) {
     std::stringstream message;
     message << boost::stacktrace::stacktrace();
     SPDLOG_ERROR("Stack: {}", message.str());
+    std::cerr << message.str() << std::endl;
     assert(false && "getItem - Read out of descriptor");
     abort();
   }
