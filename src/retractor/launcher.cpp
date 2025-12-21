@@ -94,6 +94,7 @@ int main(int argc, char *argv[]) {
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
+          ("onlycompile,c", "compile only mode")                                     // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
           ("dot,d", "create dot output")                                             //
@@ -105,15 +106,17 @@ int main(int argc, char *argv[]) {
           ("hideruleprog,i", "hide rule program in rules (-u) output")               //
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
-          ("onlycompile,c", "compile only mode");                                    // linking inheritance from launcher
+          ;
     } else {
-      desc.add_options()                                                                            //
-          ("help,h", "Show program options")                                                        //
-          ("status,s", "check service status")                                                      //
-          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                    //
-          ("verbose,v", "verbose mode (show stream params)")                                        //
-          ("xqrywait,x", "wait with processing for first query")                                    //
-          ("noanykey,k", "do not wait for any key to terminate")                                    //
+      desc.add_options()                                                          //
+          ("help,h", "Show program options")                                      //
+          ("onlycompile,c", "compile only mode")                                  // linking inheritance from launcher
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
+          ("quiet,r", "no output on screen, skip presenter")                      //
+          ("status,s", "check service status")                                    //
+          ("verbose,v", "verbose mode (show stream params)")                      //
+          ("xqrywait,x", "wait with processing for first query")                  //
+          ("noanykey,k", "do not wait for any key to terminate")                  //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
           ("dot,d", "create dot output")                                                            //
@@ -124,7 +127,7 @@ int main(int argc, char *argv[]) {
           ("rules,u", "show rules in dot file")                                                     //
           ("transparent,p", "make dot background transparent")                                      //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")                 //
-          ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
+          ;
     }
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
@@ -143,7 +146,9 @@ int main(int argc, char *argv[]) {
 
     if (vm.count("help")) {
       std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
-      std::cout << "Usage: " << argv[0] << " queryfile [option]" << std::endl << std::endl;
+      std::cout << "Usage: " << argv[0];
+      if (onlyCompile) std::cout << " -c";
+      std::cout << " queryfile [option]" << std::endl << std::endl;
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << "Log: " << tempLocation << std::endl;
