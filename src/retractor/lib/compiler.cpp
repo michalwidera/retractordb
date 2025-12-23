@@ -17,12 +17,16 @@
 
 using boost::lexical_cast;
 
+namespace localContext {
 boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
 boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
 boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");              // something[1]
 boost::regex xprFieldIdX("(\\w*)\\[_]");                     // something[_]
 boost::regex xprFieldId1("(\\w*).(\\w*)");                   // something.in_schema
 boost::regex xprFieldId3("(\\w*)");                          // field_of_corn
+}  // namespace localContext
+
+using namespace localContext;
 
 /** This procedure computes time delays (delta) for generated streams */
 std::string compiler::intervalCounter() {

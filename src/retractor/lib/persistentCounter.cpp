@@ -4,15 +4,23 @@
 #include <fstream>
 
 PersistentCounter::PersistentCounter(std::string initFilename)
-    : count_(0),                                //
-      persistentCounterFilename_(initFilename)  //
+    : count_(0),                                           //
+      persistentCounterFilename_(std::move(initFilename))  //
 {
-  load();
+  try {
+    load();
+  } catch (...) {
+    count_ = 0;  // Default to 0 if loading fails
+  }
 }
 
 PersistentCounter::~PersistentCounter() {
-  increment();
-  save();
+  try {
+    increment();
+    save();
+  } catch (...) {
+    // Destructor must not throw
+  }
 }
 
 int PersistentCounter::getCount() const { return count_; }

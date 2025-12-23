@@ -15,8 +15,6 @@ static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 
 namespace rdb {
 
-auto memoryFileAccessor::name() const -> const std::string & { return filename; }
-
 auto memoryFileAccessor::name() -> std::string & { return filename; }
 
 ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position) {

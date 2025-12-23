@@ -26,8 +26,6 @@ binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName, 
 
 binaryDeviceAccessorRO::~binaryDeviceAccessorRO() { ::close(fd_); }
 
-auto binaryDeviceAccessorRO::name() const -> const std::string & { return filename_; }
-
 auto binaryDeviceAccessorRO::name() -> std::string & { return filename_; }
 
 ssize_t binaryDeviceAccessorRO::read(uint8_t *ptrData, const size_t position) {

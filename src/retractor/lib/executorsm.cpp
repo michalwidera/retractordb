@@ -163,8 +163,9 @@ ptree executorsm::getAdHoc(std::string adHocQuery) {
   }
 
   std::vector<std::string> mergedIds;
-  auto compileChainResult = std::string{""};
+  std::string compileChainResult;
   assert(cmPtr != nullptr);
+  assert(compileChainResult.empty());
 
   // These brackets are important - we need to lock coreInstancePtr as less as possible
   {

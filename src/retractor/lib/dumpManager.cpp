@@ -1,13 +1,13 @@
 #include "dumpManager.h"
 
-#include <assert.h>
 #include <fcntl.h>
 #include <spdlog/spdlog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include <algorithm>  // std::min
-#include <cstdlib>    // std::abs
+#include <cassert>
+#include <cstdlib>  // std::abs
 #include <filesystem>
 #include <iostream>
 

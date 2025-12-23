@@ -18,13 +18,12 @@ struct genericBinaryFileAccessor : public FileAccessorInterface {
   int percounter_;
 
  public:
-  explicit genericBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
-  ~genericBinaryFileAccessor();
+  genericBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
+  ~genericBinaryFileAccessor() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
 
-  auto name() const -> const std::string & override;
   auto name() -> std::string & override;
   size_t count() override;
 

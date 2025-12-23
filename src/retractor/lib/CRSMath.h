@@ -40,7 +40,7 @@ class TimeLine : private boost::noncopyable {
   /** Function return true if given delta is in current time slot
    * Note: This is not trivial
    */
-  const bool isThisDeltaAwaitCurrentTimeSlot(const rational<int> &inDelta);
+  bool isThisDeltaAwaitCurrentTimeSlot(const rational<int> &inDelta);
 
   /** This function computes next ctSlot value.
    * This value describe what is next time interval

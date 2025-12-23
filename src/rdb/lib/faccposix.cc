@@ -37,8 +37,6 @@ posixBinaryFileAccessor::~posixBinaryFileAccessor() {
   }
 }
 
-auto posixBinaryFileAccessor::name() const -> const std::string & { return filename; }
-
 auto posixBinaryFileAccessor::name() -> std::string & { return filename; }
 
 ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {

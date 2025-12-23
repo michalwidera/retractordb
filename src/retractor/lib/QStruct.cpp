@@ -228,8 +228,8 @@ std::string token::getStr_() {
 /** Construktor set */
 
 field::field(rdb::rField field_, token lToken)
-    :                 //
-      field_(field_)  //
+    :                            //
+      field_(std::move(field_))  //
 {
   lProgram.push_back(lToken);
 }
@@ -237,7 +237,7 @@ field::field(rdb::rField field_, token lToken)
 field::field(rdb::rField field_, std::list<token> lProgram)
     :                      //
       lProgram(lProgram),  //
-      field_(field_) {}
+      field_(std::move(field_)) {}
 
 token field::getFirstFieldToken() {
   assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
@@ -249,7 +249,7 @@ token field::getFirstFieldToken() {
 token::token(command_id id, rdb::descFldVT value)
     :  //
       command_(id),
-      valueVT_(value) {}
+      valueVT_(std::move(value)) {}
 
 /** Construktor set */
 
@@ -257,7 +257,7 @@ query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(
 
 query::query() {}
 
-int query::getFieldIndex(field f_arg) {
+int query::getFieldIndex(const field &f_arg) {
   int idx(0);
   for (auto f : lSchema) {
     if (f.field_.rname == f_arg.field_.rname)  // Todo

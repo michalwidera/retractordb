@@ -1,12 +1,13 @@
-#include <signal.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 #include <boost/system/error_code.hpp>
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -93,6 +94,7 @@ int main(int argc, char *argv[]) {
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
+          ("onlycompile,c", "compile only mode")                                     // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
           ("dot,d", "create dot output")                                             //
@@ -101,20 +103,23 @@ int main(int argc, char *argv[]) {
           ("tags,t", "show tags in dot file")                                        //
           ("streamprogs,s", "show stream programs in dot file")                      //
           ("rules,u", "show rules in dot file")                                      //
+          ("hideruleprog,i", "hide rule program in rules (-u) output")               //
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
-          ("onlycompile,c", "compile only mode");                                    // linking inheritance from launcher
+          ;
     } else {
-      desc.add_options()                                                                            //
-          ("help,h", "Show program options")                                                        //
-          ("status,s", "check service status")                                                      //
-          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")                    //
-          ("verbose,v", "verbose mode (show stream params)")                                        //
-          ("xqrywait,x", "wait with processing for first query")                                    //
-          ("noanykey,k", "do not wait for any key to terminate")                                    //
+      desc.add_options()                                                          //
+          ("help,h", "Show program options")                                      //
+          ("onlycompile,c", "compile only mode")                                  // linking inheritance from launcher
+          ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
+          ("quiet,r", "no output on screen, skip presenter")                      //
+          ("status,s", "check service status")                                    //
+          ("verbose,v", "verbose mode (show stream params)")                      //
+          ("xqrywait,x", "wait with processing for first query")                  //
+          ("noanykey,k", "do not wait for any key to terminate")                  //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
-          ("onlycompile,c", "compile only mode");  // linking inheritance from launcher
+          ;
     }
     po::positional_options_description p;  // Assume that infile is the first option
     p.add("queryfile", -1);
@@ -133,7 +138,9 @@ int main(int argc, char *argv[]) {
 
     if (vm.count("help")) {
       std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
-      std::cout << "Usage: " << argv[0] << " queryfile [option]" << std::endl << std::endl;
+      std::cout << "Usage: " << argv[0];
+      if (onlyCompile) std::cout << " -c";
+      std::cout << " queryfile [option]" << std::endl << std::endl;
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << "Log: " << tempLocation << std::endl;
@@ -214,12 +221,8 @@ int main(int argc, char *argv[]) {
   SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
 
-  bool rotation_enabled = false;
-  for (const auto &it : coreInstance)
-    if (it.id == ":ROTATION") {
-      rotation_enabled = true;
-      break;
-    }
+  bool rotation_enabled =
+      std::any_of(coreInstance.begin(), coreInstance.end(), [](const auto &it) { return it.id == ":ROTATION"; });
 
   if (!rotation_enabled) {
     SPDLOG_INFO("Cleanup mode activated, removing artifact files.");
