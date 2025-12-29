@@ -76,6 +76,11 @@ bool dataModel::addQueryToModel(std::string id) {
 
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
+  // This gePayload is called by constructInputPayload algebraic functions
+  // that need to access different streams from qSet
+  // this also need to release HOLD state if set for each stream before read
+  qSet[instance]->outputPayload->releaseOnHold();
+
   if (!qSet[instance]->outputPayload->isDeclared()) {
     qSet[instance]->outputPayload->revRead(revOffset);
   }

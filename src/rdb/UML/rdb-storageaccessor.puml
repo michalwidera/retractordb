@@ -7,7 +7,7 @@ title Storage Accessor - Activty Diagram
 start
 
 partition "construct" {
-:storageAccessor(descriptorname, storagename, storageParam, oneShot, percounter) ;
+:storageAccessor(descriptorname, storagename, storageParam, oneShot, onHold, percounter) ;
 note right: Crete storageAccessor class instance;
 
 :assume descriptor filename

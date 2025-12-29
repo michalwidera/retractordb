@@ -17,10 +17,15 @@ storageAccessor::storageAccessor(const std::string qryID,              //
                                  const std::string fileName,           //
                                  const std::string_view storageParam,  //
                                  bool oneShot,                         //
+                                 bool isHold,                          //
                                  int percounter)
-    : descriptorFile_(qryID + ".desc"), storageFile_(fileName), percounter_(percounter), isOneShot_(oneShot) {
+    : descriptorFile_(qryID + ".desc"), storageFile_(fileName), percounter_(percounter), isOneShot_(oneShot), isHold_(isHold) {
   assert(!qryID.empty());
   assert(!fileName.empty());
+
+  if (isHold_) {
+    SPDLOG_INFO("Stream file '{}' created in HOLD state", storageFile_);
+  }
 
   if (storageParam.empty()) {
     SPDLOG_INFO("That's OK. Storage path is empty - no change of storageFile");
@@ -224,6 +229,13 @@ bool storageAccessor::descriptorFileExist() { return std::filesystem::exists(des
 
 void storageAccessor::setDisposable(bool value) { isDisposable_ = value; }
 
+void storageAccessor::releaseOnHold() {
+  if (isHold_ == true) {
+    SPDLOG_INFO("RELEASE stream file '{}' from HOLD state", storageFile_);
+  }
+  isHold_ = false;
+}
+
 size_t storageAccessor::getRecordsCount() { return recordsCount_; }
 
 std::string storageAccessor::getStorageName() { return storageFile_; }
@@ -269,6 +281,12 @@ bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destinati
 
   assert(recordsCount_ == accessor_->count());
 
+  if (isHold_) {
+    std::memset(destination, 0, size);
+    SPDLOG_INFO("read on HOLD {} - fake data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront, recordsCount_);
+    return true;
+  }
+
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     assert(result == 0);
@@ -286,6 +304,20 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
     SPDLOG_INFO("revRead {}: recordsCount:{} ->count():{}", storageFile_, recordsCount_, accessor_->count());
   else
     SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", storageFile_, recordsCount_, accessor_->count());
+
+  if (isHold_) {
+    SPDLOG_INFO("revRead on HOLD {} - fake data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromBack,
+                recordsCount_);
+    destination = (destination == nullptr)                              //
+                      ? static_cast<uint8_t *>(storagePayload_->get())  //
+                      : destination;
+
+    assert(destination != nullptr);
+    auto size = descriptor_.getSizeInBytes();
+    std::memset(destination, 0, size);
+    bufferState = sourceState::armed;  // fake armed on hold position
+    return true;
+  }
 
   if (!isDeclared()) {
     assert(recordsCount_ == accessor_->count());
