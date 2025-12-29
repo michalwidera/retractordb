@@ -26,6 +26,7 @@ class storageAccessor {
   Descriptor descriptor_;
   bool isDisposable_          = false;  // if true - storage and descriptor will be deleted after use
   bool isOneShot_             = false;  // if false - storage will be looped when end is reached
+  bool isHold_                = false;  // if true - no processing until first query appear
   size_t recordsCount_        = 0;
   std::string descriptorFile_ = "";
   std::string storageFile_    = "";
@@ -46,6 +47,7 @@ class storageAccessor {
                            const std::string fileName,           //
                            const std::string_view storageParam,  //
                            bool oneShot   = false,               //
+                           bool isHold    = false,               //
                            int percounter = -1                   //
   );
   virtual ~storageAccessor();
@@ -65,6 +67,7 @@ class storageAccessor {
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);
+  void releaseOnHold();
   size_t getRecordsCount();
   bool descriptorFileExist();
 

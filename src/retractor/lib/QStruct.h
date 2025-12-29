@@ -80,6 +80,7 @@ class query {
   boost::rational<int> rInterval = 0;
   bool isDisposable              = false;
   bool isOneShot                 = false;
+  bool isHold                    = false;
 
   std::list<field> lSchema;
   std::list<token> lProgram;

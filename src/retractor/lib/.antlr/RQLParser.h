@@ -18,15 +18,15 @@ public:
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
     FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, DISPOSABLE = 37, 
-    ONESHOT = 38, ON = 39, WHEN = 40, DUMP = 41, SYSTEM = 42, DO = 43, TO = 44, 
-    AND_C = 45, OR_C = 46, NOT_C = 47, MIN = 48, MAX = 49, AVG = 50, SUMC = 51, 
-    STRING_SUBSTRAT = 52, ID = 53, STRING = 54, FLOAT = 55, DECIMAL = 56, 
-    REAL = 57, IS_EQ = 58, IS_NQ = 59, IS_GR = 60, IS_LS = 61, IS_GE = 62, 
-    IS_LE = 63, EXCLAMATION = 64, DOUBLE_BAR = 65, DOT = 66, UNDERLINE = 67, 
-    AT = 68, SHARP = 69, AND = 70, MOD = 71, DOLLAR = 72, COMMA = 73, SEMI = 74, 
-    COLON = 75, DOUBLE_COLON = 76, STAR = 77, DIVIDE = 78, PLUS = 79, MINUS = 80, 
-    BIT_NOT = 81, BIT_OR = 82, BIT_XOR = 83, SPACE = 84, COMMENT = 85, LINE_COMMENT1 = 86, 
-    LINE_COMMENT2 = 87
+    ONESHOT = 38, HOLD = 39, ON = 40, WHEN = 41, DUMP = 42, SYSTEM = 43, 
+    DO = 44, TO = 45, AND_C = 46, OR_C = 47, NOT_C = 48, MIN = 49, MAX = 50, 
+    AVG = 51, SUMC = 52, STRING_SUBSTRAT = 53, ID = 54, STRING = 55, FLOAT = 56, 
+    DECIMAL = 57, REAL = 58, IS_EQ = 59, IS_NQ = 60, IS_GR = 61, IS_LS = 62, 
+    IS_GE = 63, IS_LE = 64, EXCLAMATION = 65, DOUBLE_BAR = 66, DOT = 67, 
+    UNDERLINE = 68, AT = 69, SHARP = 70, AND = 71, MOD = 72, DOLLAR = 73, 
+    COMMA = 74, SEMI = 75, COLON = 76, DOUBLE_COLON = 77, STAR = 78, DIVIDE = 79, 
+    PLUS = 80, MINUS = 81, BIT_NOT = 82, BIT_OR = 83, BIT_XOR = 84, SPACE = 85, 
+    COMMENT = 86, LINE_COMMENT1 = 87, LINE_COMMENT2 = 88
   };
 
   enum {
@@ -200,6 +200,7 @@ public:
     antlr4::tree::TerminalNode *STRING();
     antlr4::tree::TerminalNode *DISPOSABLE();
     antlr4::tree::TerminalNode *ONESHOT();
+    antlr4::tree::TerminalNode *HOLD();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

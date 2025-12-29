@@ -39,8 +39,6 @@ graph_info.json
 .project
 .cmake
 .settings/*
-.vscode/*
-.vscode/settings.json
 docs/
 bin/*
 .venv/

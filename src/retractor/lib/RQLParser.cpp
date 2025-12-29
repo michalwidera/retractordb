@@ -160,6 +160,7 @@ class ParserListener : public RQLBaseListener {
     qry.rInterval    = rationalResult;
     qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
     qry.isOneShot    = (ctx->ONESHOT() != nullptr);
+    qry.isHold       = (ctx->HOLD() != nullptr);
     coreInstance.push_back(qry);
     qry.reset();
     fieldCount = 0;
