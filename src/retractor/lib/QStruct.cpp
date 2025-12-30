@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include "rdb/convertTypes.h"
+#include "rdb/faccmemory.h"
 #include "rdb/retention.h"
 
 using namespace boost;
@@ -66,6 +67,11 @@ void query::reset() {
   rInterval = 0;
   lSchema.clear();
   lProgram.clear();
+  isDisposable = false;
+  isOneShot    = false;
+  isHold       = false;
+  policy       = std::make_pair("DEFAULT", 0);
+  retention    = rdb::retention_t{0, 0};
   return;
 }
 
@@ -316,10 +322,10 @@ rdb::Descriptor query::descriptorStorage() {
     } else {
       SPDLOG_INFO("descriptorStorage/Retention: Empty");
     }
-    if (substratPolicy.second != 0) {
-      SPDLOG_INFO("descriptorStorage/Retention memory: {}", substratPolicy.second);
-      retVal += rdb::Descriptor("", substratPolicy.second, 0, rdb::RETMEMORY);
-      retVal += rdb::Descriptor(substratPolicy.first, 0, 0, rdb::TYPE);
+    if (policy.second != 0) {
+      SPDLOG_INFO("descriptorStorage/Retention memory: {}", policy.second);
+      retVal += rdb::Descriptor("", policy.second, 0, rdb::RETMEMORY);
+      retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
     } else {
       SPDLOG_INFO("descriptorStorage/Retention memory: Empty");
     }

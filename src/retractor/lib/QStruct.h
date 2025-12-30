@@ -17,6 +17,7 @@
 #include "cmdID.hpp"
 #include "fldType.hpp"
 #include "rdb/descriptor.h"
+#include "rdb/faccmemory.h"
 #include "rdb/retention.h"
 
 class qTree;
@@ -87,8 +88,8 @@ class query {
 
   std::list<rule> lRules;
 
-  rdb::retention_t retention                    = rdb::retention_t{0, 0};        // Retention segments and capacity
-  std::pair<std::string, size_t> substratPolicy = std::make_pair("DEFAULT", 0);  // rdb::memoryFileAccessor::no_retention
+  rdb::retention_t retention            = rdb::retention_t{0, 0};  // Retention segments and capacity
+  std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFileAccessor::no_retention);
 
   bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();

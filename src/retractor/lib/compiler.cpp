@@ -225,8 +225,8 @@ std::string compiler::simplifyLProgram() {
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
           newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
-          newQuery.substratPolicy = std::make_pair(substratType_C, 1);
-          newQuery.id             = generateStreamName(arg1, arg2, cmd);
+          newQuery.policy = std::make_pair(substratType_C, 1);
+          newQuery.id     = generateStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           it = coreInstance.begin();
@@ -613,10 +613,10 @@ std::string compiler::applyConstraints() {
 }
 
 std::string compiler::fillSubstractsMemSize(const std::map<std::string, int> &capMap) {
-  for (const auto &q : capMap) {                                     // for each query
-    if (coreInstance[q.first].substratPolicy.second == 0) continue;  // do not check declaration in constraints.
-    assert(!coreInstance[q.first].isReductionRequired());            // process data only with two or less arguments
-    coreInstance[q.first].substratPolicy.second = q.second;          // set memory size
+  for (const auto &q : capMap) {                             // for each query
+    if (coreInstance[q.first].policy.second == 0) continue;  // do not check declaration in constraints.
+    assert(!coreInstance[q.first].isReductionRequired());    // process data only with two or less arguments
+    coreInstance[q.first].policy.second = q.second;          // set memory size
   }
   return std::string("OK");
 }

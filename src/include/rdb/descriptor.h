@@ -63,7 +63,7 @@ class Descriptor : public std::vector<rField> {
   std::vector<rField> fieldsFlat();
 
   rdb::retention_t retention();
-  std::pair<std::string, size_t> substratPolicy();
+  std::pair<std::string, size_t> policy();
 
   std::pair<rdb::descFld, int> getMaxType();
 

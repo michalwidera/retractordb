@@ -18,15 +18,15 @@ public:
     BYTE_T = 21, STRING_T = 22, UNSIGNED_T = 23, INTEGER_T = 24, FLOAT_T = 25, 
     DOUBLE_T = 26, SELECT = 27, STREAM = 28, FROM = 29, DECLARE = 30, RETENTION = 31, 
     FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, DISPOSABLE = 37, 
-    ONESHOT = 38, HOLD = 39, ON = 40, WHEN = 41, DUMP = 42, SYSTEM = 43, 
-    DO = 44, TO = 45, AND_C = 46, OR_C = 47, NOT_C = 48, MIN = 49, MAX = 50, 
-    AVG = 51, SUMC = 52, STRING_SUBSTRAT = 53, ID = 54, STRING = 55, FLOAT = 56, 
-    DECIMAL = 57, REAL = 58, IS_EQ = 59, IS_NQ = 60, IS_GR = 61, IS_LS = 62, 
-    IS_GE = 63, IS_LE = 64, EXCLAMATION = 65, DOUBLE_BAR = 66, DOT = 67, 
-    UNDERLINE = 68, AT = 69, SHARP = 70, AND = 71, MOD = 72, DOLLAR = 73, 
-    COMMA = 74, SEMI = 75, COLON = 76, DOUBLE_COLON = 77, STAR = 78, DIVIDE = 79, 
-    PLUS = 80, MINUS = 81, BIT_NOT = 82, BIT_OR = 83, BIT_XOR = 84, SPACE = 85, 
-    COMMENT = 86, LINE_COMMENT1 = 87, LINE_COMMENT2 = 88
+    ONESHOT = 38, HOLD = 39, VOLATILE = 40, ON = 41, WHEN = 42, DUMP = 43, 
+    SYSTEM = 44, DO = 45, TO = 46, AND_C = 47, OR_C = 48, NOT_C = 49, MIN = 50, 
+    MAX = 51, AVG = 52, SUMC = 53, STRING_PROFILE = 54, ID = 55, STRING = 56, 
+    FLOAT = 57, DECIMAL = 58, REAL = 59, IS_EQ = 60, IS_NQ = 61, IS_GR = 62, 
+    IS_LS = 63, IS_GE = 64, IS_LE = 65, EXCLAMATION = 66, DOUBLE_BAR = 67, 
+    DOT = 68, UNDERLINE = 69, AT = 70, SHARP = 71, AND = 72, MOD = 73, DOLLAR = 74, 
+    COMMA = 75, SEMI = 76, COLON = 77, DOUBLE_COLON = 78, STAR = 79, DIVIDE = 80, 
+    PLUS = 81, MINUS = 82, BIT_NOT = 83, BIT_OR = 84, BIT_XOR = 85, SPACE = 86, 
+    COMMENT = 87, LINE_COMMENT1 = 88, LINE_COMMENT2 = 89
   };
 
   enum {
@@ -127,7 +127,7 @@ public:
     antlr4::tree::TerminalNode *ROTATION();
     antlr4::tree::TerminalNode *STORAGE();
     antlr4::tree::TerminalNode *SUBSTRAT();
-    antlr4::tree::TerminalNode *STRING_SUBSTRAT();
+    antlr4::tree::TerminalNode *STRING_PROFILE();
     antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -162,6 +162,7 @@ public:
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FILE();
     Retention_fromContext *retention_from();
+    antlr4::tree::TerminalNode *VOLATILE();
     antlr4::tree::TerminalNode *STRING();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

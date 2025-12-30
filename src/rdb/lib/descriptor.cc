@@ -244,7 +244,7 @@ rdb::retention_t Descriptor::retention() {
   return retval;
 }
 
-std::pair<std::string, size_t> Descriptor::substratPolicy() {
+std::pair<std::string, size_t> Descriptor::policy() {
   int retval{0};
 
   auto it1 = std::find_if(begin(), end(),                                                //
