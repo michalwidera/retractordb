@@ -107,6 +107,8 @@ set(CPACK_SOURCE_IGNORE_FILES
     /test/
     /embold.yaml
     README.md
+    CONTRIBUTING.md
+    CODE_OF_CONDUCT.md
     Dockerfile
     DockerConan.txt
     ~$
