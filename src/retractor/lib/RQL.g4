@@ -7,7 +7,7 @@ prog                : ( select_statement
                       )+ EOF
                     ;
 
-compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING_SUBSTRAT | STRING ) 
+compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING_PROFILE | STRING ) 
                     # Coption
                     ;
 
@@ -16,6 +16,7 @@ select_statement    : SELECT select_list
                       FROM stream_expression
                       (FILE name=STRING)?
                       (retention_from)?
+                      (VOLATILE)?
                     # Select
                     ;
 
@@ -188,6 +189,7 @@ RULE:               'RULE'|'rule';
 DISPOSABLE:         'DISPOSABLE'|'disposable';
 ONESHOT:            'ONESHOT'|'oneshot';
 HOLD:               'HOLD'|'hold';
+VOLATILE:           'VOLATILE'|'volatile';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';
@@ -203,7 +205,7 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-STRING_SUBSTRAT:    '\'' ('MEMORY'|'memory'|'DEFAULT'|'default'|'POSIX'|'posix'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource') '\'';
+STRING_PROFILE:    '\'' ('MEMORY'|'memory'|'DEFAULT'|'default'|'POSIX'|'posix'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource') '\'';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';

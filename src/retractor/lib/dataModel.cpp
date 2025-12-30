@@ -42,11 +42,6 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   SPDLOG_INFO("!Storage path set to : {}", directive_[":STORAGE"]);
   SPDLOG_INFO("!Substrat type is set: {}", directive_[":SUBSTRAT"]);
   SPDLOG_INFO("!Rotation file is set: {}", directive_[":ROTATION"]);
-  for (auto &qry : coreInstance_) {
-    if (directive_[":SUBSTRAT"].empty())
-      qry.substratPolicy = std::make_pair(
-          "DEFAULT", rdb::memoryFileAccessor::no_retention);  // <- if substratType is empty - set substratPolicy to 0
-  }
 
   SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)

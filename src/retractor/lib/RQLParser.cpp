@@ -190,6 +190,9 @@ class ParserListener : public RQLBaseListener {
 
     qry.id       = ctx->ID()->getText();
     qry.lProgram = program;
+    if (ctx->VOLATILE()) {
+      qry.policy = std::make_pair("MEMORY", 1);
+    }
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
@@ -204,7 +207,7 @@ class ParserListener : public RQLBaseListener {
           std::stoi(ctx->capacity->getText()));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      qry.substratPolicy.second = std::stoi(ctx->capacity->getText());
+      qry.policy.second = std::stoi(ctx->capacity->getText());
     }
   }
 
