@@ -18,6 +18,7 @@
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/convertTypes.h"
+#include "constants.hpp"
 
 using namespace antlrcpp;
 using namespace antlr4;
@@ -190,9 +191,9 @@ class ParserListener : public RQLBaseListener {
 
     qry.id       = ctx->ID()->getText();
 
-    if (qry.id == "OUT_OF_BUSSINESS") {
-      std::cerr<< "Error: OUT_OF_BUSSINESS is reserved stream name." << std::endl;
-      SPDLOG_ERROR("OUT_OF_BUSSINESS is reserved stream name.");
+    if (qry.id == constants::Reserved_id_oob) {
+      std::cerr<< "Error: " << constants::Reserved_id_oob << " is reserved stream name." << std::endl;
+      SPDLOG_ERROR("{} is reserved stream name.",constants::Reserved_id_oob);
       abort();
     }
 

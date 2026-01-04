@@ -38,6 +38,7 @@ How xqry terminal works
 #include <thread>
 
 #include "uxSysTermTools.hpp"
+#include "constants.hpp"
 
 using namespace boost;
 
@@ -232,7 +233,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
       while (spsc_queue.pop(e_value)) {
         const std::string streamN = e_value.get("stream", "");
-        if ( streamN == "OUT_OF_BUSSINESS") {
+        if ( streamN == constants::Reserved_id_oob) {
           done = true;
           break;
         }

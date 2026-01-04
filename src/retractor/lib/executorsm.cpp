@@ -24,6 +24,8 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "dataModel.h"
 #include "persistentCounter.h"
+
+#include "constants.hpp"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -408,7 +410,7 @@ void executorsm::boradcastOutOfBussiness() {
     //
  
     ptree pt;
-    pt.put("stream", "OUT_OF_BUSSINESS");
+    pt.put("stream", constants::Reserved_id_oob);
     std::stringstream strstream;
     write_info(strstream, pt);
     std::string row = strstream.str();
