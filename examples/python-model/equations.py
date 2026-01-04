@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 """Time Series Algebra Equations Implementations - Python 3.x
-   2025 Michal Widera
+   Michal Widera
 """
 
 from fractions import Fraction
