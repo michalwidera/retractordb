@@ -232,6 +232,10 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
       while (spsc_queue.pop(e_value)) {
         const std::string streamN = e_value.get("stream", "");
+        if ( streamN == "OUT_OF_BUSSINESS") {
+          done = true;
+          break;
+        }
         for (auto &[w, k] : streamTable)
           if (w == streamN) {
             if (outputFormatMode == formatMode::RAW) {
@@ -295,7 +299,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    while (spsc_queue.pop(e_value)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while (spsc_queue.pop(e_value) && !done) std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     if (timeLimitCntQry != 1 && !done) {
       _getch();  // no wait ... feed key from kbhit

@@ -277,6 +277,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     //
     if (command == "kill") {
       SPDLOG_DEBUG("got kill rcv.");
+      boradcastOutOfBussiness();
       iTimeLimitCnt = executorsm::stop_now;
     }
     //
@@ -391,6 +392,36 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   std::stringstream strstream;
   write_info(strstream, pt);
   return strstream.str();
+}
+
+void executorsm::boradcastOutOfBussiness() {
+  assert(executorsm::coreInstancePtr != nullptr);
+  for (const auto &element : id2StreamName_Relation) {
+    using namespace boost::interprocess;
+    //
+    // Query discovery. queues are created by show command
+    //
+    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
+    IPC::message_queue mq(IPC::open_only, queueName.c_str());
+    //
+    // Sending out-of-bussiness message
+    //
+ 
+    ptree pt;
+    pt.put("stream", "OUT_OF_BUSSINESS");
+    std::stringstream strstream;
+    write_info(strstream, pt);
+    std::string row = strstream.str();
+
+    if (!mq.try_send(row.c_str(), row.length(), 0)) {
+      message_queue::remove(queueName.c_str());
+    }
+    //
+    // cleaning form clients map that are not receiving data from queue
+    //
+    SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
+  }
+  id2StreamName_Relation.clear();
 }
 
 void executorsm::boradcast(const std::set<std::string> &inSet) {
@@ -543,6 +574,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
   for (const auto &element : id2StreamName_Relation) {
+
     std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
     IPC::message_queue::remove(queueName.c_str());
   }

@@ -189,6 +189,13 @@ class ParserListener : public RQLBaseListener {
     }
 
     qry.id       = ctx->ID()->getText();
+
+    if (qry.id == "OUT_OF_BUSSINESS") {
+      std::cerr<< "Error: OUT_OF_BUSSINESS is reserved stream name." << std::endl;
+      SPDLOG_ERROR("OUT_OF_BUSSINESS is reserved stream name.");
+      abort();
+    }
+
     qry.lProgram = program;
     if (ctx->VOLATILE()) {
       qry.policy = std::make_pair("MEMORY", 1);
@@ -218,6 +225,8 @@ class ParserListener : public RQLBaseListener {
     for (auto &i : coreInstance) {
       if (i.id == stream_name) {
         if (i.isDeclaration()) {
+          std::cerr << "Error: Cannot attach rule to declaration stream: " << stream_name << " Rule: " << ctx->name->getText()
+                    << std::endl;
           SPDLOG_ERROR("Parser/Rule: Cannot attach rule to declaration stream: {} Rule: {}", stream_name, ctx->name->getText());
           abort();
         }
@@ -225,6 +234,7 @@ class ParserListener : public RQLBaseListener {
           ruleConstruct.action    = rule::DUMP;
           ruleConstruct.dumpRange = std::make_pair(dump_left, dump_right);
           if (dump_left > dump_right) {
+            std::cerr << "Error: Dump left range cannot be greater than dump right range" << std::endl;
             SPDLOG_ERROR("Parser/Rule: Dump left range cannot be greater than dump right range");
             abort();
           }
@@ -233,6 +243,8 @@ class ParserListener : public RQLBaseListener {
           ruleConstruct.action        = rule::SYSTEM;
           ruleConstruct.systemCommand = systemCommand;
         } else {
+          std::cerr << "Error: Unknown action type: " << std::to_string(actionType) << " stream_name: " << stream_name
+                    << " Rule: " << ctx->name->getText() << std::endl;
           SPDLOG_ERROR("Parser/Rule: Unknown action type: {} stream_name: {} Rule: {}", std::to_string(actionType), stream_name,
                        ctx->name->getText());
           abort();
