@@ -1,0 +1,5 @@
+DECLARE a BYTE STREAM coreRnd, 0.1 FILE '/dev/urandom'
+
+SELECT * STREAM str3 FROM coreRnd@(2,2)
+SELECT str4[1]-str4[0] STREAM str4 FROM str3
+

@@ -22,6 +22,7 @@
 
 #include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
+#include "constants.hpp"
 #include "dataModel.h"
 #include "persistentCounter.h"
 #include "uxSysTermTools.hpp"
@@ -393,6 +394,36 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
+void executorsm::boradcastOutOfBussiness() {
+  assert(executorsm::coreInstancePtr != nullptr);
+  for (const auto &element : id2StreamName_Relation) {
+    using namespace boost::interprocess;
+    //
+    // Query discovery. queues are created by show command
+    //
+    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
+    IPC::message_queue mq(IPC::open_only, queueName.c_str());
+    //
+    // Sending out-of-bussiness message
+    //
+
+    ptree pt;
+    pt.put("stream", constants::Reserved_id_oob);
+    std::stringstream strstream;
+    write_info(strstream, pt);
+    std::string row = strstream.str();
+
+    if (!mq.try_send(row.c_str(), row.length(), 0)) {
+      message_queue::remove(queueName.c_str());
+    }
+    //
+    // cleaning form clients map that are not receiving data from queue
+    //
+    SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
+  }
+  id2StreamName_Relation.clear();
+}
+
 void executorsm::boradcast(const std::set<std::string> &inSet) {
   assert(executorsm::coreInstancePtr != nullptr);
   for (const auto queryName : inSet) {
@@ -539,6 +570,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     retVal = system::errc::interrupted;
   }
   iTimeLimitCnt = executorsm::stop_now;
+  boradcastOutOfBussiness();
   bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");

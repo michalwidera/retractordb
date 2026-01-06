@@ -17,7 +17,7 @@ class qry {
  public:
   formatMode outputFormatMode{formatMode::RAW};
 
-  bool select(boost::program_options::variables_map &vm, const int, const std::string &, std::pair<int, int>);
+  bool select(boost::program_options::variables_map &vm, const int, const std::string &, std::tuple<int, int, int>);
   bool adhoc(const std::string &);
   std::string dir();
   std::string dirYaml();
