@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 
 LABEL com.retractordb.version="0.0.3"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2025-11-15"
+LABEL com.retractordb.release-date="2026-01-06"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
