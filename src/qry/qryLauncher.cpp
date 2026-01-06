@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
         return system::errc::invalid_argument;
       }
       gnuplotDim = {x, y};
+      supressok = true;
     }
     if (vm.count("help")) {
       std::cout << argv[0] << " - data query tool." << std::endl << std::endl;
