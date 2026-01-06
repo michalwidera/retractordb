@@ -7,7 +7,7 @@ if exists("b:current_syntax")
 endif
 
 " basic
-syn keyword rqlKey DECLARE FILE SELECT STREAM FROM STORAGE
+syn keyword rqlKey DECLARE FILE SELECT STREAM FROM STORAGE RULE VOLATILE ON WHEN DO DUMP SYSTEM
 
 " comment
 syn match  rqlComment       "^#.*$"
