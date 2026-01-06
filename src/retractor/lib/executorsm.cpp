@@ -279,7 +279,6 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     //
     if (command == "kill") {
       SPDLOG_DEBUG("got kill rcv.");
-      boradcastOutOfBussiness();
       iTimeLimitCnt = executorsm::stop_now;
     }
     //
@@ -572,6 +571,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     retVal = system::errc::interrupted;
   }
   iTimeLimitCnt = executorsm::stop_now;
+  boradcastOutOfBussiness();
   bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
