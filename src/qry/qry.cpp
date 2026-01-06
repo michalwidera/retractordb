@@ -37,8 +37,8 @@ How xqry terminal works
 #include <sstream>
 #include <thread>
 
-#include "uxSysTermTools.hpp"
 #include "constants.hpp"
+#include "uxSysTermTools.hpp"
 
 using namespace boost;
 
@@ -184,7 +184,7 @@ bool qry::adhoc(const std::string &sAdhoc) {
 }
 
 bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
-                 std::pair<int, int> gnuplotDim) {
+                 std::tuple<int, int, int> gnuplotDim) {
   timeLimitCntQry = iTimeLimit;  // set value from Launcher.
   ptree pt        = netClient("get", "");
 
@@ -212,8 +212,8 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
   if (outputFormatMode == formatMode::GNUPLOT) {
     std::cout << "set term qt noraise\n";
     std::cout << "set style fill transparent solid 0.5\n";
-    std::cout << "set xrange [0:" << gnuplotDim.first << "]\n";
-    std::cout << "set yrange [0:" << gnuplotDim.second << "]\n";
+    std::cout << "set xrange [0:" << std::get<0>(gnuplotDim) << "]\n";
+    std::cout << "set yrange [" << std::get<1>(gnuplotDim) << ":" << std::get<2>(gnuplotDim) << "]\n";
     std::cout << "set ticslevel 0\n";
     std::cout << "set hidden3d\n";
     std::cout << "set view 60,30\n";
@@ -233,7 +233,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
       while (spsc_queue.pop(e_value)) {
         const std::string streamN = e_value.get("stream", "");
-        if ( streamN == constants::Reserved_id_oob) {
+        if (streamN == constants::Reserved_id_oob) {
           done = true;
           break;
         }
@@ -262,7 +262,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
 
               for (int i = 0; i < count; i++) {
                 output_lines[i].push_front(e_value.get(std::to_string(i), ""));
-                if (output_lines[i].size() > gnuplotDim.second) output_lines[i].pop_back();
+                if (output_lines[i].size() > std::get<0>(gnuplotDim)) output_lines[i].pop_back();
               }
 
               for (int i = 0; i < count; i++) {

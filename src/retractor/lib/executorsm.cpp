@@ -22,10 +22,9 @@
 
 #include "compiler.h"
 #include "config.h"  // Add an automatically generated configuration file
+#include "constants.hpp"
 #include "dataModel.h"
 #include "persistentCounter.h"
-
-#include "constants.hpp"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -407,7 +406,7 @@ void executorsm::boradcastOutOfBussiness() {
     //
     // Sending out-of-bussiness message
     //
- 
+
     ptree pt;
     pt.put("stream", constants::Reserved_id_oob);
     std::stringstream strstream;
@@ -576,7 +575,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
   for (const auto &element : id2StreamName_Relation) {
-
     std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
     IPC::message_queue::remove(queueName.c_str());
   }

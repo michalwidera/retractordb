@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     std::string sDetailStream{""};
     std::string sAdHoc{""};
     std::string sGnuplotDim{""};
-    std::pair<int, int> gnuplotDim{0, 0};
+    std::tuple<int, int, int> gnuplotDim{0, 0, 0};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
         ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
@@ -71,19 +71,35 @@ int main(int argc, char *argv[]) {
     if (vm.count("gnuplot")) {
       obj.outputFormatMode = formatMode::GNUPLOT;
       std::stringstream ss(sGnuplotDim);
+
+      auto delimetersCnt = std::count_if(sGnuplotDim.begin(), sGnuplotDim.end(), [](char c) { return c == ',' || c == ':'; });
+
       char c;
-      int x, y;
-      ss >> x >> c >> y;  // expected format is x,y or x:y
-      if (ss.fail() || !ss.eof() || (c != ',' && c != ':')) {
-        std::cout << "gnuplot mode need x and y parameters.";
+      int x = 0, ymax = 0, ymin = 0;
+
+      if (delimetersCnt == 1) {
+        ss >> x >> c >> ymax;  // expected format is x,y or x:y
+      } else if (delimetersCnt == 2) {
+        ss >> x >> c >> ymin >> c >> ymax;  // expected format is x,ymin,ymax or x:ymin:ymax
+      } else {
+        std::cerr << "gnuplot mode need {x,y} or {x,ymin,ymax} parameters.";
         return system::errc::invalid_argument;
       }
-      if (x <= 0 || y <= 0) {
-        std::cout << "gnuplot mode need x and y > 0.";
+
+      if (ss.fail() || !ss.eof()) {
+        std::cerr << "gnuplot mode need {x,y} or {x,ymin,ymax} parameters.";
         return system::errc::invalid_argument;
       }
-      gnuplotDim = {x, y};
-      supressok = true;
+      if (x <= 0) {
+        std::cout << "gnuplot mode need x > 0.";
+        return system::errc::invalid_argument;
+      }
+      if (ymin >= ymax) {
+        std::cout << "gnuplot mode need ymin < ymax.";
+        return system::errc::invalid_argument;
+      }
+      gnuplotDim = std::make_tuple(x, ymin, ymax);
+      supressok  = true;
     }
     if (vm.count("help")) {
       std::cout << argv[0] << " - data query tool." << std::endl << std::endl;

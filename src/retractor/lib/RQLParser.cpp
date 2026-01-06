@@ -17,8 +17,8 @@
 #include ".antlr/RQLParser.h"
 #include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
-#include "rdb/convertTypes.h"
 #include "constants.hpp"
+#include "rdb/convertTypes.h"
 
 using namespace antlrcpp;
 using namespace antlr4;
@@ -189,11 +189,11 @@ class ParserListener : public RQLBaseListener {
       if ((i.field_.rname).substr(0, 1) == "_") (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
     }
 
-    qry.id       = ctx->ID()->getText();
+    qry.id = ctx->ID()->getText();
 
     if (qry.id == constants::Reserved_id_oob) {
-      std::cerr<< "Error: " << constants::Reserved_id_oob << " is reserved stream name." << std::endl;
-      SPDLOG_ERROR("{} is reserved stream name.",constants::Reserved_id_oob);
+      std::cerr << "Error: " << constants::Reserved_id_oob << " is reserved stream name." << std::endl;
+      SPDLOG_ERROR("{} is reserved stream name.", constants::Reserved_id_oob);
       abort();
     }
 
