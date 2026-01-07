@@ -393,19 +393,14 @@ bool boolCast(const rdb::descFldVT &inVar) {
 }
 
 void streamInstance::constructRulesAndUpdate(const query &qry) {
-  bool debug = false;
-  // construct if rule is fired
-  if (debug) std::cerr << qry.id << " rules: " << qry.lRules.size() << "\n";
-
   rdb::payload payload(*outputPayload->getPayload());
 
   for (auto &r : qry.lRules) {
-    if (debug) std::cerr << "rule: " << r.name << " condition size: " << r.condition.size() << "\n";
     assert(!r.condition.empty());
     assert(r.action == rule::DUMP || r.action == rule::SYSTEM);
     auto condition = r.condition;
     expressionEvaluator expression;
-    auto result = expression.eval(condition, &payload, debug);
+    auto result = expression.eval(condition, &payload);
     if (boolCast(result)) {
       if (r.action == rule::DUMP) {
         SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);

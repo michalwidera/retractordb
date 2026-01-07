@@ -221,8 +221,7 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
 Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
-  if (field.rtype == rdb::RETENTION) return 0;
-  if (field.rtype == rdb::RETMEMORY) return 0;
+  if (isConfigurationField(field.rtype)) return 0;
   return field.rlen * field.rarray;
 }
 

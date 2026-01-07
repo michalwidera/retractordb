@@ -388,11 +388,9 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, std::function<double(double)> fnNa
   return inVar;
 }
 
-rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload, bool debug) {
+rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload) {
   std::stack<rdb::descFldVT> rStack;
   rdb::descFldVT a, b;
-
-  if (debug) std::cerr << ">> eval expression program size=" << program.size() << "\n";
 
   for (auto tk : program) {
     auto tkStr = tk.getStr_();
@@ -437,37 +435,6 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         break;
       case CMP_EQUAL: {
         rStack.push(is_eq(b, a));
-
-        if (debug) {
-          std::cerr << " CMP_EQUAL: ";
-          std::visit(Overload{
-                         [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << v; },
-                         [](unsigned v) { std::cerr << v; }, [](float v) { std::cerr << v; }, [](double v) { std::cerr << v; },
-                         [](const std::string &v) { std::cerr << v; }, [](boost::rational<int> v) { std::cerr << v; },
-                         [](std::pair<int, int> v) { std::cerr << "(" << v.first << "," << v.second << ")"; },
-                         [](std::pair<std::string, int> v) { std::cerr << "(\"" << v.first << "\"," << v.second << ")"; }  //
-                     },
-                     rStack.top());
-          std::cerr << " b = ";
-          std::visit(Overload{
-                         [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << v; },
-                         [](unsigned v) { std::cerr << v; }, [](float v) { std::cerr << v; }, [](double v) { std::cerr << v; },
-                         [](const std::string &v) { std::cerr << v; }, [](boost::rational<int> v) { std::cerr << v; },
-                         [](std::pair<int, int> v) { std::cerr << "(" << v.first << "," << v.second << ")"; },
-                         [](std::pair<std::string, int> v) { std::cerr << "(\"" << v.first << "\"," << v.second << ")"; }  //
-                     },
-                     b);
-          std::cerr << " a = ";
-          std::visit(Overload{
-                         [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << v; },
-                         [](unsigned v) { std::cerr << v; }, [](float v) { std::cerr << v; }, [](double v) { std::cerr << v; },
-                         [](const std::string &v) { std::cerr << v; }, [](boost::rational<int> v) { std::cerr << v; },
-                         [](std::pair<int, int> v) { std::cerr << "(" << v.first << "," << v.second << ")"; },
-                         [](std::pair<std::string, int> v) { std::cerr << "(\"" << v.first << "\"," << v.second << ")"; }  //
-                     },
-                     a);
-          std::cerr << "\n";
-        };
       }; break;
       case CMP_NOT_EQUAL:
         rStack.push(is_neq(b, a));
@@ -519,21 +486,6 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         const auto anyValue   = payload->getItem(instancePosition.second);
         rdb::descFldVT val    = any_to_variant_cast(anyValue);
         rStack.push(val);
-
-        if (debug) {
-          std::cerr << "PUSH_ID: " << instancePosition.first << "[" << instancePosition.second << "] = ";
-          std::visit(
-              Overload{
-                  [](uint8_t v) { std::cerr << static_cast<int>(v); }, [](int v) { std::cerr << "BYTE " << v; },
-                  [](unsigned v) { std::cerr << "UINT " << v; }, [](float v) { std::cerr << "FLOAT " << v; },
-                  [](double v) { std::cerr << "DOUBLE " << v; }, [](const std::string &v) { std::cerr << "STRING " << v; },
-                  [](boost::rational<int> v) { std::cerr << "RATIONAL " << v; },
-                  [](std::pair<int, int> v) { std::cerr << "PAIR " << "(" << v.first << "," << v.second << ")"; },
-                  [](std::pair<std::string, int> v) { std::cerr << "PAIR " << "(\"" << v.first << "\"," << v.second << ")"; }  //
-              },
-              val);
-          std::cerr << "\n";
-        };
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");
