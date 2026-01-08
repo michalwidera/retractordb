@@ -13,7 +13,7 @@
 #include <typeinfo>
 #include <utility>
 
-extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 
 namespace rdb {
 
@@ -377,7 +377,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   std::string str;
   while (is >> str) strstream << " " << str;
 
-  auto result = parserDESCString(rhs, strstream.str().c_str());
+  auto result = parserDESCString(rhs, strstream.str());
   assert(result == "OK");
 
   return is;

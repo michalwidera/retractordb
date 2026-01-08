@@ -14,7 +14,7 @@
 
 const uint AREA_SIZE = 10;
 
-extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 
 template <typename T, typename K>
 bool test_1() {

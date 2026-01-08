@@ -115,7 +115,7 @@ class ParserDESCListener : public DESCBaseListener {
   }
 };
 
-std::string parserDESCString(rdb::Descriptor &desc, std::string inlet) {
+std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
