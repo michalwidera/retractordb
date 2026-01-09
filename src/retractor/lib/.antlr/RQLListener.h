@@ -143,9 +143,6 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext *ctx) = 0;
   virtual void exitExpIn(RQLParser::ExpInContext *ctx) = 0;
 
-  virtual void enterExpRational(RQLParser::ExpRationalContext *ctx) = 0;
-  virtual void exitExpRational(RQLParser::ExpRationalContext *ctx) = 0;
-
   virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
   virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
 

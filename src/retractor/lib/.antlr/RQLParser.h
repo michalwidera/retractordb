@@ -841,15 +841,6 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
-  class  ExpRationalContext : public TermContext {
-  public:
-    ExpRationalContext(TermContext *ctx);
-
-    Fraction_ruleContext *fraction_rule();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
   class  ExpFloatContext : public TermContext {
   public:
     ExpFloatContext(TermContext *ctx);
