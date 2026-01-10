@@ -181,7 +181,7 @@ query &qTree::getQuery(const std::string &query_name) {
   auto it = std::find_if(begin(), end(), [query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {
     SPDLOG_ERROR("Missing - {}", query_name);
-    throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE.");
+    throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE. (check log)");
   }
   return (*it);
 }

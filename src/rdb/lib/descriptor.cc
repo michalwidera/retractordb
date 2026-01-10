@@ -13,7 +13,7 @@
 #include <typeinfo>
 #include <utility>
 
-extern std::string parserDESCString(rdb::Descriptor &desc, std::string inlet);
+extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 
 namespace rdb {
 
@@ -221,8 +221,7 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
 Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {  //
-  if (field.rtype == rdb::RETENTION) return 0;
-  if (field.rtype == rdb::RETMEMORY) return 0;
+  if (isConfigurationField(field.rtype)) return 0;
   return field.rlen * field.rarray;
 }
 
@@ -378,7 +377,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   std::string str;
   while (is >> str) strstream << " " << str;
 
-  auto result = parserDESCString(rhs, strstream.str().c_str());
+  auto result = parserDESCString(rhs, strstream.str());
   assert(result == "OK");
 
   return is;

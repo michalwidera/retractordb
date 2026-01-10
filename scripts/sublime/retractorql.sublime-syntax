@@ -3,11 +3,11 @@
 # http://www.sublimetext.com/docs/3/syntax.html
 
 # https://github.com/sharkdp/bat#adding-new-syntaxes--language-definitions
-# mkdir -p "$(bat --config-dir)/syntaxes"
-# cd "$(bat --config-dir)/syntaxes"
+# mkdir -p "$(batcat --config-dir)/syntaxes"
+# cd "$(batcat --config-dir)/syntaxes"
 # cp thisfilefolder/retractorql.sublime-syntax .
-# bat cache --build
-# bat cache --clear
+# batcat cache --build
+# batcat cache --clear
 
 name: RetractorQL
 file_extensions:
@@ -17,7 +17,7 @@ scope: source.rql
 
 contexts:
   main:
-    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|STORAGE|storage|FILE|file)\b
+    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|STORAGE|storage|FILE|file|VOLATILE|volatile|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|SYSTEM|system)\b
       scope: keyword.control.rql
     - match: "'"
       push: string
@@ -42,11 +42,11 @@ contexts:
       scope: comment.line.rql
 
   types:
-    - match: \b(INTEGER|Integer|BYTE|Byte|CHAR|Char|UINT|Uint|STRING|String|FLOAT|Float|DOUBLE|Double)\b
+    - match: \b(INTEGER|Integer|BYTE|Byte|CHAR|Char|UINT|Uint|STRING|String|FLOAT|Float|DOUBLE|Double|DISPOSABLE|disposable|RETENTION|retention|SUBSTRAT|substrat|ONESHOT|oneshot|HOLD|hold|STORAGE|storage|OR|or|AND|and)\b
       scope: storage.type.rql
   
   desc:
-    - match: \b(REF|TYPE)\b
+    - match: \b(REF|TYPE|RETENTION|RETMEMORY)\b
       scope: constant.other.rql
 
   functions:

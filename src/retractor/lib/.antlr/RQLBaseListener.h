@@ -145,9 +145,6 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
   virtual void exitExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
 
-  virtual void enterExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
-  virtual void exitExpRational(RQLParser::ExpRationalContext * /*ctx*/) override { }
-
   virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
   virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
 

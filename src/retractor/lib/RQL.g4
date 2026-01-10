@@ -113,7 +113,6 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
 
 term                : term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
-                    | fraction_rule                # ExpRational
                     | '(' expression_factor ')'    # ExpIn
                     | '-'? FLOAT                   # ExpFloat
                     | '-'? DECIMAL                 # ExpDec

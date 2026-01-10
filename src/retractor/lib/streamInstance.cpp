@@ -140,7 +140,11 @@ void fnOp(opType op, std::any value, std::any &valueRet) {
       if (val1 > val2) valueRet = value;
       break;
     case sumop:
-      valueRet = val1 + val2;
+      try {
+        valueRet = val1 + val2;
+      } catch (...) {
+        valueRet = std::numeric_limits<T>::max();
+      }
       break;
     case avgop:
       valueRet = val1 / val2;
@@ -157,7 +161,8 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   // First construct descriptor
   outputPayload->revRead(0);
 
-  auto [maxType, maxLen] = outputPayload->getDescriptor().getMaxType();
+  auto [maxType_, maxLen] = outputPayload->getDescriptor().getMaxType();
+  auto const maxType      = maxType_;
   rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
   rdb::Descriptor descriptor{x};
   // same as core[instance].descriptorFrom()
@@ -173,45 +178,99 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
 
   // choose aggregate operation
   cast<std::any> castAny;
-  std::any valueRet = castAny(0, maxType);
-
+  std::any valueRet;  // ok for sum,avg
   opType op;
 
-  if (cmd == STREAM_MAX)
-    op = maxop;
-  else if (cmd == STREAM_MIN)
+  if (cmd == STREAM_MIN) {
     op = minop;
-  else if (cmd == STREAM_SUM || cmd == STREAM_AVG)
+    switch (maxType) {
+      case rdb::BYTE:
+      case rdb::INTEGER:
+      case rdb::UINT:
+      case rdb::RATIONAL:
+        valueRet = boost::rational<int>(std::numeric_limits<int>::max(), 1);
+        maxType_ = rdb::RATIONAL;
+        break;
+      case rdb::FLOAT:
+        valueRet = float(std::numeric_limits<float>::max());
+        break;
+      case rdb::DOUBLE:
+        valueRet = double(std::numeric_limits<double>::max());
+        break;
+      default:
+        SPDLOG_ERROR("Not supported aggregation type");
+        assert(false);
+        break;
+    }
+  }
+  if (cmd == STREAM_MAX) {
+    op = maxop;
+    switch (maxType) {
+      case rdb::BYTE:
+      case rdb::INTEGER:
+      case rdb::UINT:
+      case rdb::RATIONAL:
+        valueRet = boost::rational<int>(std::numeric_limits<int>::min(), 1);
+        maxType_ = rdb::RATIONAL;
+        break;
+      case rdb::FLOAT:
+        valueRet = float(std::numeric_limits<float>::min());
+        break;
+      case rdb::DOUBLE:
+        valueRet = double(std::numeric_limits<double>::min());
+        break;
+      default:
+        SPDLOG_ERROR("Not supported aggregation type");
+        assert(false);
+        break;
+    }
+  }
+  if (cmd == STREAM_SUM || cmd == STREAM_AVG) {
     op = sumop;  // <- STREAM_AVG: this is not an error
-  else
-    assert(false);
+    switch (maxType) {
+      case rdb::BYTE:
+      case rdb::INTEGER:
+      case rdb::UINT:
+      case rdb::RATIONAL:
+        valueRet = boost::rational<int>(0, 1);
+        maxType_ = rdb::RATIONAL;
+        break;
+      case rdb::FLOAT:
+        valueRet = float(0);
+        break;
+      case rdb::DOUBLE:
+        valueRet = double(0);
+        break;
+      default:
+        SPDLOG_ERROR("Not supported aggregation type");
+        assert(false);
+        break;
+    }
+  }
 
-  auto i{0};
+  assert(valueRet.has_value());
+
+  auto item{0};
   for (auto const it : outputPayload->getDescriptor()) {
     if (it.rtype == rdb::REF) continue;
     if (it.rtype == rdb::TYPE) continue;
     if (it.rtype == rdb::RETENTION) continue;
     if (it.rtype == rdb::RETMEMORY) continue;
 
-    std::any value = castAny(outputPayload->getPayload()->getItem(i++), maxType);
-    switch (maxType) {
+    std::any value = castAny(outputPayload->getPayload()->getItem(item++), maxType_);
+    switch (maxType_) {
       case rdb::BYTE:
-        fnOp<uint8_t>(op, value, valueRet);
-        break;
       case rdb::INTEGER:
-        fnOp<int>(op, value, valueRet);
-        break;
       case rdb::UINT:
-        fnOp<unsigned>(op, value, valueRet);
+        assert(false && "Should be casted to RATIONAL");
+      case rdb::RATIONAL:
+        fnOp<boost::rational<int>>(op, value, valueRet);
         break;
       case rdb::FLOAT:
         fnOp<float>(op, value, valueRet);
         break;
       case rdb::DOUBLE:
         fnOp<double>(op, value, valueRet);
-        break;
-      case rdb::RATIONAL:
-        fnOp<boost::rational<int>>(op, value, valueRet);
         break;
       default:
         SPDLOG_ERROR("Not supported aggregation type");
@@ -221,25 +280,20 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   }
 
   if (cmd == STREAM_AVG) {
-    std::any value = castAny(outputPayload->getPayload()->getDescriptor().size(), maxType);
-    switch (maxType) {
+    std::any value = castAny((uint8_t)(outputPayload->getPayload()->getDescriptor().size()), maxType_);
+    switch (maxType_) {
       case rdb::BYTE:
-        fnOp<uint8_t>(avgop, value, valueRet);  // <- valueRet/value
-        break;
       case rdb::INTEGER:
-        fnOp<int>(avgop, value, valueRet);
-        break;
       case rdb::UINT:
-        fnOp<unsigned>(avgop, value, valueRet);
+        assert(false && "Should be casted to RATIONAL");
+      case rdb::RATIONAL:
+        fnOp<boost::rational<int>>(avgop, value, valueRet);
         break;
       case rdb::FLOAT:
         fnOp<float>(avgop, value, valueRet);
         break;
       case rdb::DOUBLE:
         fnOp<double>(avgop, value, valueRet);
-        break;
-      case rdb::RATIONAL:
-        fnOp<boost::rational<int>>(avgop, value, valueRet);
         break;
       default:
         SPDLOG_ERROR("Not supported aggregation type");
@@ -248,6 +302,50 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
     }
   }
 
+  switch (maxType) {
+    case rdb::BYTE: {
+      assert(valueRet.type() == typeid(boost::rational<int>));
+      auto tobyte = std::any_cast<boost::rational<int>>(valueRet);
+      if (tobyte > boost::rational<int>(std::numeric_limits<uint8_t>::max(), 1)) {
+        valueRet = uint8_t(std::numeric_limits<uint8_t>::max());
+      } else if (tobyte < boost::rational<int>(std::numeric_limits<uint8_t>::min(), 1))
+        valueRet = uint8_t(std::numeric_limits<uint8_t>::min());
+      else
+        valueRet = uint8_t(rational_cast<int>(tobyte));
+    } break;
+
+    case rdb::INTEGER: {
+      assert(valueRet.type() == typeid(boost::rational<int>));
+      auto toint = std::any_cast<boost::rational<int>>(valueRet);
+      if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
+        valueRet = int(std::numeric_limits<int>::max());
+      else if (toint < boost::rational<int>(std::numeric_limits<int>::min(), 1))
+        valueRet = int(std::numeric_limits<int>::min());
+      else
+        valueRet = int(rational_cast<int>(toint));
+    } break;
+
+    case rdb::UINT: {
+      assert(valueRet.type() == typeid(boost::rational<int>));
+      auto touint = std::any_cast<boost::rational<int>>(valueRet);
+      if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
+        valueRet = unsigned(std::numeric_limits<unsigned>::max());
+      else if (touint < boost::rational<int>(0, 1))
+        valueRet = unsigned(0);
+      else
+        valueRet = rational_cast<unsigned>(std::any_cast<boost::rational<int>>(valueRet));
+    } break;
+
+    case rdb::RATIONAL:
+      break;
+    case rdb::FLOAT:
+    case rdb::DOUBLE:
+      break;
+    default:
+      SPDLOG_ERROR("Not supported aggregation type");
+      assert(false);
+      break;
+  }
   auto postion{0};
   localPayload->setItem(postion, valueRet);
 
@@ -295,19 +393,14 @@ bool boolCast(const rdb::descFldVT &inVar) {
 }
 
 void streamInstance::constructRulesAndUpdate(const query &qry) {
-  bool debug = false;
-  // construct if rule is fired
-  if (debug) std::cerr << qry.id << " rules: " << qry.lRules.size() << "\n";
-
   rdb::payload payload(*outputPayload->getPayload());
 
   for (auto &r : qry.lRules) {
-    if (debug) std::cerr << "rule: " << r.name << " condition size: " << r.condition.size() << "\n";
     assert(!r.condition.empty());
     assert(r.action == rule::DUMP || r.action == rule::SYSTEM);
     auto condition = r.condition;
     expressionEvaluator expression;
-    auto result = expression.eval(condition, &payload, debug);
+    auto result = expression.eval(condition, &payload);
     if (boolCast(result)) {
       if (r.action == rule::DUMP) {
         SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);
