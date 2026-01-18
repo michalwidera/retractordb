@@ -36,7 +36,7 @@ class Descriptor : public std::vector<rField> {
   bool isEmpty() const;
 
   Descriptor(std::initializer_list<rField> l);
-  Descriptor(const std::string &n, int l, int a, rdb::descFld t);
+  Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type);
 
   Descriptor() = default;
   Descriptor(const Descriptor &init);

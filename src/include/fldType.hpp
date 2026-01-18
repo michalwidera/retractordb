@@ -46,7 +46,8 @@ struct rField {
   int rlen;
   int rarray;
   descFld rtype;
-  rField(std::string n, int s, int c, descFld t) : rname(std::move(n)), rlen(s), rarray(c), rtype(t) {}
+  rField(std::string name, int length, int arrayCount, descFld type)
+      : rname(std::move(name)), rlen(length), rarray(arrayCount), rtype(type) {}
 };
 
 }  // namespace rdb

@@ -35,8 +35,8 @@ constexpr auto isConfigurationField(const rdb::descFld index) {
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
-Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
-  emplace_back(std::move(n), l, a, t);                                        //
+Descriptor::Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type) {  //
+  emplace_back(std::move(name), length, arrayCount, type);                                        //
 }
 
 void Descriptor::updateConvMaps() {
