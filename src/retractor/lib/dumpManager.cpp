@@ -50,7 +50,7 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
       auto payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       assert(resultSeek != -1);
-      ssize_t write_count_result = ::write(task.fd, payLoadPtr->get(), payLoadPtr->getDescriptor().getSizeInBytes());
+      ssize_t write_count_result = ::write(task.fd, payLoadPtr->get(), payLoadPtr->descriptor.getSizeInBytes());
       assert(write_count_result > 0);
     }
     assert(task.dumpedRecordsToGo >= dumpHistoryCount);
@@ -78,7 +78,7 @@ void dumpManager::processStreamChunk(const std::string streamName) {
 
   auto payLoadPtr = pProc->getPayload(streamName);
 
-  assert(payLoadPtr->getDescriptor().getSizeInBytes() > 0 && "dumpManager::processStreamChunk payload descriptor size is zero");
+  assert(payLoadPtr->descriptor.getSizeInBytes() > 0 && "dumpManager::processStreamChunk payload descriptor size is zero");
   assert(payLoadPtr->get() != nullptr && "dumpManager::processStreamChunk payload data is null");
 
   // enumerate all tasks for this stream
@@ -123,7 +123,7 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
   assert(resultSeek != -1);
 
   SPDLOG_INFO("::write dump with fd: {}", task.fd);
-  ssize_t write_count_result = ::write(task.fd, payload->get(), payload->getDescriptor().getSizeInBytes());
+  ssize_t write_count_result = ::write(task.fd, payload->get(), payload->descriptor.getSizeInBytes());
   assert(write_count_result > 0);
 
   if (task.dumpedRecordsToGo > 0) {

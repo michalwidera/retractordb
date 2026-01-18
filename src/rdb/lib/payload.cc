@@ -30,7 +30,7 @@ payload::payload(const Descriptor &descriptor)
 
 payload::payload(const payload &other) {
   payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
-  descriptor  = other.getDescriptor();
+  descriptor  = other.descriptor;
   std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
 }
 
@@ -39,7 +39,7 @@ payload::payload(const payload &other) {
 payload &payload::operator=(const payload &other) {
   if (this == &other) return *this;  // assure not a self-assignment
 
-  *this = other.getDescriptor();  // call operator=(const Descriptor
+  *this = other.descriptor;  // call operator=(const Descriptor
   std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
   return *this;
 }
@@ -69,13 +69,13 @@ payload &payload::operator=(const Descriptor &other) {
 
 payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
-  descSum += other.getDescriptor();               // ! moving this into constructor fails
+  descSum += other.descriptor;                    // ! moving this into constructor fails
   descSum.cleanRef();                             //
   payload result(descSum);                        //
   SPDLOG_INFO("operator+ {} {} {}",               //
               descriptor.getSizeInBytes(),        //
               other.descriptor.getSizeInBytes(),  //
-              result.getDescriptor().getSizeInBytes());
+              result.descriptor.getSizeInBytes());
   std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
   std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
   descSum.dirtyMap = true;
@@ -88,13 +88,11 @@ template <typename T, typename K>
 void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arroffset) {
   T data;
   is >> data;
-  Descriptor desc(rhs.getDescriptor());
+  Descriptor desc(rhs.descriptor);
   std::memcpy(rhs.get() + desc.offsetBegArr(fieldName) + arroffset, &data, sizeof(T));
 }
 
 void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
-
-Descriptor payload::getDescriptor() const { return descriptor; }
 
 uint8_t *payload::get() const { return payloadData.get(); }
 
@@ -271,7 +269,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
     is >> std::hex;
   else
     is >> std::dec;
-  Descriptor desc(rhs.getDescriptor());
+  Descriptor desc(rhs.descriptor);
 
   if (desc.type(fieldName) == "STRING") {
     std::string record;
@@ -309,7 +307,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   if (rhs.specialDebug) {
     os << "[ ";
-    for (auto i = 0; i < rhs.getDescriptor().getSizeInBytes(); i++) {
+    for (auto i = 0; i < rhs.descriptor.getSizeInBytes(); i++) {
       os << std::hex;
       os << std::setfill('0');
       os << std::setw(2);
@@ -326,7 +324,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << std::dec;
   os << "{";
 
-  for (auto const &r : rhs.getDescriptor()) {
+  for (auto const &r : rhs.descriptor) {
     if ((r.rtype == rdb::TYPE) ||       //
         (r.rtype == rdb::REF) ||        //
         (r.rtype == rdb::RETENTION) ||  //
@@ -338,7 +336,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << " ";
     os << r.rname;
     os << ":";
-    auto desc    = rhs.getDescriptor();
+    auto desc    = rhs.descriptor;
     auto offset_ = desc.offsetBegArr(r.rname);
     if (r.rtype == STRING) {
       char *charData = reinterpret_cast<char *>(rhs.get() + offset_);
@@ -395,7 +393,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
     if (!getFlat()) os << std::endl;
   }
-  if (rhs.getDescriptor().isEmpty()) {
+  if (rhs.descriptor.isEmpty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }

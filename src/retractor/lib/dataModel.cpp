@@ -262,7 +262,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
-  auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
+  auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->descriptor);
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->get());
@@ -271,14 +271,14 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }
   auto i{0};
-  for (auto f : payload->getDescriptor().fieldsFlat()) {
+  for (auto f : payload->descriptor.fieldsFlat()) {
     retVal.push_back(any_to_variant_cast(payload->getItem(i++)));
   }
   return retVal;
 }
 
 size_t dataModel::streamStoredSize(const std::string &instance) {
-  return qSet[instance]->outputPayload->getDescriptor().getSizeInBytes() * getStreamCount(instance);
+  return qSet[instance]->outputPayload->descriptor.getSizeInBytes() * getStreamCount(instance);
 }
 
 size_t dataModel::getStreamCount(const std::string &instance) { return qSet[instance]->outputPayload->getRecordsCount(); }

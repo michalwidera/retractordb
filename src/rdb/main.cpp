@@ -190,10 +190,10 @@ int main(int argc, char *argv[]) {
       std::cout << RED << "unconnected\n" << RESET;
       continue;
     } else if (cmd == "desc") {
-      std::cout << YELLOW << dacc->getDescriptor() << RESET << std::endl;
+      std::cout << YELLOW << dacc->descriptor << RESET << std::endl;
       continue;
     } else if (cmd == "descc") {
-      std::cout << YELLOW << rdb::flat << dacc->getDescriptor() << RESET << std::endl;
+      std::cout << YELLOW << rdb::flat << dacc->descriptor << RESET << std::endl;
       continue;
     } else if (cmd == "read" || cmd == "rread") {
       int record;
@@ -218,20 +218,20 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "setpos") {
       int position{0};
       std::cin >> position;
-      auto fieldName = dacc->getDescriptor().fieldName(position);
-      if (dacc->getDescriptor().type(fieldName) == "INTEGER") {
+      auto fieldName = dacc->descriptor.fieldName(position);
+      if (dacc->descriptor.type(fieldName) == "INTEGER") {
         int value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->getDescriptor().type(fieldName) == "DOUBLE") {
+      } else if (dacc->descriptor.type(fieldName) == "DOUBLE") {
         double value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->getDescriptor().type(fieldName) == "BYTE") {
+      } else if (dacc->descriptor.type(fieldName) == "BYTE") {
         uint8_t value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->getDescriptor().type(fieldName) == "STRING") {
+      } else if (dacc->descriptor.type(fieldName) == "STRING") {
         std::string record{""};
         std::cin >> record;
         dacc->getPayload()->setItem(position, record);
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "getpos") {
       int position;
       std::cin >> position;
-      auto fieldName = dacc->getDescriptor().fieldName(position);
+      auto fieldName = dacc->descriptor.fieldName(position);
       std::any value = dacc->getPayload()->getItem(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
@@ -295,7 +295,7 @@ int main(int argc, char *argv[]) {
       }
       continue;
     } else if (cmd == "input") {
-      for (auto i : dacc->getDescriptor()) std::cin >> *(dacc->getPayload());
+      for (auto i : dacc->descriptor) std::cin >> *(dacc->getPayload());
       continue;
     } else if (cmd == "write") {
       size_t record{0};
@@ -331,7 +331,7 @@ int main(int argc, char *argv[]) {
       }
     } else if (cmd == "size") {
       std::cout << dacc->getRecordsCount() << " Record(s)\n";
-      std::cout << dacc->getDescriptor().getSizeInBytes() << " Byte(s) per record.\n";
+      std::cout << dacc->descriptor.getSizeInBytes() << " Byte(s) per record.\n";
       continue;
     } else if (cmd == "hex") {
       dacc->getPayload()->setHex(true);
@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
       dacc->getPayload()->setHex(false);
     } else if (cmd == "dump") {
       auto *ptr = reinterpret_cast<uint8_t *>(dacc->getPayload()->get());
-      for (auto i = 0; i < dacc->getDescriptor().getSizeInBytes(); i++) {
+      for (auto i = 0; i < dacc->descriptor.getSizeInBytes(); i++) {
         std::cout << std::hex;
         std::cout << std::setfill('0');
         std::cout << std::setw(2);

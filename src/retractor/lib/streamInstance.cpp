@@ -73,8 +73,8 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   auto lengthAbs = abs(length);
 
   auto recordsCountSrc   = source->getRecordsCount();
-  auto descriptorSrcSize = source->getDescriptor().sizeFlat();
-  auto [maxType, maxLen] = source->getDescriptor().getMaxType();
+  auto descriptorSrcSize = source->descriptor.sizeFlat();
+  auto [maxType, maxLen] = source->descriptor.getMaxType();
   for (auto i = 0; i < lengthAbs; ++i) {
     rdb::rField x(instance + "_" + std::to_string(i),  //
                   maxLen,                              //
@@ -161,7 +161,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   // First construct descriptor
   outputPayload->revRead(0);
 
-  auto [maxType_, maxLen] = outputPayload->getDescriptor().getMaxType();
+  auto [maxType_, maxLen] = outputPayload->descriptor.getMaxType();
   auto const maxType      = maxType_;
   rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
   rdb::Descriptor descriptor{x};
@@ -251,7 +251,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   assert(valueRet.has_value());
 
   auto item{0};
-  for (auto const it : outputPayload->getDescriptor()) {
+  for (auto const it : outputPayload->descriptor) {
     if (it.rtype == rdb::REF) continue;
     if (it.rtype == rdb::TYPE) continue;
     if (it.rtype == rdb::RETENTION) continue;
@@ -280,7 +280,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   }
 
   if (cmd == STREAM_AVG) {
-    std::any value = castAny((uint8_t)(outputPayload->getPayload()->getDescriptor().size()), maxType_);
+    std::any value = castAny((uint8_t)(outputPayload->getPayload()->descriptor.size()), maxType_);
     switch (maxType_) {
       case rdb::BYTE:
       case rdb::INTEGER:
@@ -362,10 +362,10 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 
     assert(result.has_value());
 
-    assert(program.field_.rtype == (outputPayload->getDescriptor()[i]).rtype);
+    assert(program.field_.rtype == (outputPayload->descriptor[i]).rtype);
 
     cast<std::any> castAny;
-    std::any value = castAny(result, (outputPayload->getDescriptor()[i]).rtype);
+    std::any value = castAny(result, (outputPayload->descriptor[i]).rtype);
 
     outputPayload->getPayload()->setItem(i, value);
 

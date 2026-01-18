@@ -22,7 +22,7 @@ class storageAccessor {
   std::unique_ptr<FileAccessorInterface> accessor_;
   std::unique_ptr<rdb::payload> storagePayload_;
   std::unique_ptr<rdb::payload> chamber_;
-  Descriptor descriptor_;
+
   bool isDisposable_          = false;  // if true - storage and descriptor will be deleted after use
   bool isOneShot_             = false;  // if false - storage will be looped when end is reached
   bool isHold_                = false;  // if true - no processing until first query appear
@@ -51,6 +51,8 @@ class storageAccessor {
   );
   virtual ~storageAccessor();
 
+  Descriptor descriptor;
+
   storageState dataFileStatus = storageState::noDescriptor;
   sourceState bufferState     = sourceState::empty;  // ? test lock
 
@@ -62,7 +64,6 @@ class storageAccessor {
   void fire();
   void purge();
 
-  Descriptor &getDescriptor();
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);

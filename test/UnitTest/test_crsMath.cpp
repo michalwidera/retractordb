@@ -147,7 +147,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
 std::string print(std::string query_name, dataModel &proc) {
   std::stringstream coutstring;
-  auto cnt = proc.getPayload(query_name)->getDescriptor().sizeFlat();
+  auto cnt = proc.getPayload(query_name)->descriptor.sizeFlat();
   for (auto value : proc.getRow(query_name, 0)) {
     std::visit(Overload{                                                                                                    //
                         [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //

@@ -52,27 +52,27 @@ void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
     std::fstream myFile;
     myFile.rdbuf()->pubsetbuf(nullptr, 0);
     myFile.open(descriptorFile_, std::ios::in);  // Open existing descriptor
-    if (myFile.good()) myFile >> descriptor_;
+    if (myFile.good()) myFile >> descriptor;
     myFile.close();
 
-    if (descriptor_.getSizeInBytes() == 0) {
+    if (descriptor.getSizeInBytes() == 0) {
       SPDLOG_ERROR("Empty descriptor in file.");
       std::cerr << "Error, empty descriptor file:" << storageFile_ << ".desc\n";
       assert(false && "Empty descriptor in file.");
       abort();
     }
 
-    if (descriptorParam != nullptr && *descriptorParam != descriptor_) {
+    if (descriptorParam != nullptr && *descriptorParam != descriptor) {
       SPDLOG_ERROR("Descriptors do not match.");
       std::cerr << "Error in data descriptor file: " << storageFile_ << ".desc\n";
-      std::cerr << "Provided Descriptor:\n" << *descriptorParam << "\nExisting Descriptor:\n" << descriptor_ << std::endl;
+      std::cerr << "Provided Descriptor:\n" << *descriptorParam << "\nExisting Descriptor:\n" << descriptor << std::endl;
       assert(false && "Descriptors dont match - previous one have different schema? remove&restart.");
       abort();
     }
 
     moveRef();
-    storagePayload_ = std::make_unique<rdb::payload>(descriptor_);
-    chamber_        = std::make_unique<rdb::payload>(descriptor_);
+    storagePayload_ = std::make_unique<rdb::payload>(descriptor);
+    chamber_        = std::make_unique<rdb::payload>(descriptor);
 
     SPDLOG_INFO("Payload created, Descriptor from file used.");
 
@@ -86,33 +86,33 @@ void storageAccessor::attachDescriptor(const Descriptor *descriptorParam) {
     abort();
   }
 
-  descriptor_ = *descriptorParam;
+  descriptor = *descriptorParam;
 
   // Create descriptor file instance
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(nullptr, 0);
   descFile.open(descriptorFile_, std::ios::out);
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
-  descFile << descriptor_;
+  descFile << descriptor;
   assert((descFile.rdstate() & std::ofstream::failbit) == 0);
   descFile.close();
 
   moveRef();
-  storagePayload_ = std::make_unique<rdb::payload>(descriptor_);
-  chamber_        = std::make_unique<rdb::payload>(descriptor_);
+  storagePayload_ = std::make_unique<rdb::payload>(descriptor);
+  chamber_        = std::make_unique<rdb::payload>(descriptor);
 
   SPDLOG_INFO("Payload & Descriptor created.");
   attachStorage();
 }
 
 void storageAccessor::moveRef() {
-  auto it = std::find_if(descriptor_.begin(),
-                         descriptor_.end(),                                       //
+  auto it = std::find_if(descriptor.begin(),
+                         descriptor.end(),                                        //
                          [](const auto &item) { return item.rtype == rdb::REF; }  //
   );
 
   // Descriptor changes storageFile location
-  if (it != descriptor_.end()) {
+  if (it != descriptor.end()) {
     storageFile_ = (*it).rname;
     SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile_);
   }
@@ -130,12 +130,12 @@ void storageAccessor::moveRef() {
 void storageAccessor::attachStorage() {
   assert(storageFile_ != "");
 
-  auto it1 = std::find_if(descriptor_.begin(),
-                          descriptor_.end(),                                        //
+  auto it1 = std::find_if(descriptor.begin(),
+                          descriptor.end(),                                         //
                           [](const auto &item) { return item.rtype == rdb::TYPE; }  //
   );
 
-  if (it1 != descriptor_.end()) {
+  if (it1 != descriptor.end()) {
     storageType_ = (*it1).rname;
     SPDLOG_INFO("Storage type from descriptor {}", storageType_);
   }
@@ -166,12 +166,12 @@ bool storageAccessor::isDeclared() { return (storageType_ == "DEVICE") || (stora
 void storageAccessor::initializeAccessor() {
   assert(storageFile_ != "");
   assert(storageType_ != "");
-  auto size = descriptor_.getSizeInBytes();
+  auto size = descriptor.getSizeInBytes();
 
   if (storageType_ == "DEFAULT") {
-    accessor_ = std::make_unique<rdb::groupFileAccessor>(storageFile_, size, descriptor_.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFileAccessor>(storageFile_, size, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
-    accessor_ = std::make_unique<rdb::memoryFileAccessor>(storageFile_, size, descriptor_.policy());
+    accessor_ = std::make_unique<rdb::memoryFileAccessor>(storageFile_, size, descriptor.policy());
   } else if (storageType_ == "POSIX") {
     accessor_ = std::make_unique<rdb::posixBinaryFileAccessor>(storageFile_, size, percounter_);
   } else if (storageType_ == "GENERIC") {
@@ -179,7 +179,7 @@ void storageAccessor::initializeAccessor() {
   } else if (storageType_ == "DEVICE") {
     accessor_ = std::make_unique<rdb::binaryDeviceAccessorRO>(storageFile_, size, !isOneShot_);
   } else if (storageType_ == "TEXTSOURCE") {
-    accessor_ = std::make_unique<rdb::textSourceAccessorRO>(storageFile_, size, descriptor_, !isOneShot_);
+    accessor_ = std::make_unique<rdb::textSourceAccessorRO>(storageFile_, size, descriptor, !isOneShot_);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType_);
     assert(false && "Unsupported storage type");
@@ -210,11 +210,9 @@ void storageAccessor::cleanPayload(uint8_t *destination) {
   destination = (destination == nullptr)                              //
                     ? static_cast<uint8_t *>(storagePayload_->get())  //
                     : destination;
-  auto size   = descriptor_.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   std::memset(destination, 0, size);
 }
-
-Descriptor &storageAccessor::getDescriptor() { return descriptor_; }
 
 std::unique_ptr<rdb::payload>::pointer storageAccessor::getPayload() {
   if (!storagePayload_) {
@@ -241,7 +239,7 @@ size_t storageAccessor::getRecordsCount() { return recordsCount_; }
 std::string storageAccessor::getStorageName() { return storageFile_; }
 
 void storageAccessor::abortIfStorageNotPrepared() {
-  if (descriptor_.isEmpty()) {
+  if (descriptor.isEmpty()) {
     SPDLOG_ERROR("descriptor is Empty");
     assert(false && "Empty descriptor");
     abort();
@@ -276,7 +274,7 @@ bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destinati
   }
 
   assert(destination != nullptr);
-  auto size   = descriptor_.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   auto result = 0;
 
   assert(recordsCount_ == accessor_->count());
@@ -313,7 +311,7 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
                       : destination;
 
     assert(destination != nullptr);
-    auto size = descriptor_.getSizeInBytes();
+    auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     bufferState = sourceState::armed;  // fake armed on hold position
     return true;
@@ -363,7 +361,7 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
                       : destination;
 
     assert(destination != nullptr);
-    auto size = descriptor_.getSizeInBytes();
+    auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     SPDLOG_WARN("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
                 circularBuffer_.capacity(), circularBuffer_.size());
@@ -385,7 +383,7 @@ bool storageAccessor::write(const size_t recordIndex) {
 
   assert(recordsCount_ == accessor_->count());
 
-  auto size   = descriptor_.getSizeInBytes();
+  auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(static_cast<uint8_t *>(storagePayload_->get()));  // <- Call to append Function

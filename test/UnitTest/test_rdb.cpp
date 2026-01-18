@@ -215,7 +215,7 @@ TEST(xrdb, test_storage) {
   payload1->TLen    = 0x66;
   payload1->Control = 0x22;
 
-  ASSERT_TRUE(payload1->TLen == dAcc2.getDescriptor().cast<int>("TLen", payload1->ptr));
+  ASSERT_TRUE(payload1->TLen == dAcc2.descriptor.cast<int>("TLen", payload1->ptr));
 
   dAcc2.write();
   dAcc2.write();
@@ -230,13 +230,13 @@ TEST(xrdb, test_storage) {
   dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
   {
     std::stringstream coutstring;
-    coutstring << dAcc2.getDescriptor().toString("Name", payload1->ptr);
+    coutstring << dAcc2.descriptor.toString("Name", payload1->ptr);
     ASSERT_TRUE(strcmp(coutstring.str().c_str(), "xxxx xxxx") == 0);
   }
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << dAcc2.getDescriptor().cast<int>("TLen", payload1->ptr);
+    coutstring << dAcc2.descriptor.cast<int>("TLen", payload1->ptr);
     coutstring << std::dec;
     ASSERT_TRUE(strcmp(coutstring.str().c_str(), "67") == 0);
   }
@@ -244,7 +244,7 @@ TEST(xrdb, test_storage) {
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << (uint)dAcc2.getDescriptor().cast<uint8_t>("Control", payload1->ptr);
+    coutstring << (uint)dAcc2.descriptor.cast<uint8_t>("Control", payload1->ptr);
     coutstring << std::dec;
     ASSERT_TRUE(strcmp(coutstring.str().c_str(), "33") == 0);
   }

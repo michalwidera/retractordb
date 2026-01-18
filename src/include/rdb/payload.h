@@ -9,9 +9,6 @@ namespace rdb {
 /// @brief This class define accessing method to payload (memory area)
 /// This is accessor for payload memory area that supports applying descriptor type over memory area.
 class payload {
-  /// @brief Descriptor of managed payload area
-  Descriptor descriptor;
-
   /// @brief Payload memory area
   std::unique_ptr<uint8_t[]> payloadData;
 
@@ -25,9 +22,8 @@ class payload {
   /// @brief binary dump
   bool specialDebug = false;
 
-  /// @brief Accessor to descriptor object
-  /// @return Descriptor
-  Descriptor getDescriptor() const;
+  /// @brief Descriptor of managed payload area
+  Descriptor descriptor;
 
   /// @brief Accessor to pointer to payload
   /// @return  T* pointer to payload
