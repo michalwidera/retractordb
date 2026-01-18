@@ -166,14 +166,10 @@ Descriptor &Descriptor::operator=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),  //
-                                    [](const rField &i) {    //
-                                     return isConfigurationField(i.rtype);
-                                   });
-  auto refCountThis = std::count_if(begin(), end(),        //
-                                    [](const rField &i) {  //
-                                      return isConfigurationField(i.rtype);
-                                    });
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                                          //
+                                    [](const rField &i) { return isConfigurationField(i.rtype); });  //
+  auto refCountThis = std::count_if(begin(), end(),                                                  //
+                                    [](const rField &i) { return isConfigurationField(i.rtype); });  //
   auto i{0};
   for (const rField &f : *this) {
     if (isConfigurationField(f.rtype) || isConfigurationField(rhs[i].rtype)) {
@@ -220,7 +216,7 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
 
 Descriptor::Descriptor(const Descriptor &init) { *this += init; }
 
-constexpr int Descriptor::len(const rdb::rField &field) const {  //
+constexpr int Descriptor::len(const rdb::rField &field) const {
   if (isConfigurationField(field.rtype)) return 0;
   return field.rlen * field.rarray;
 }
@@ -263,11 +259,8 @@ std::pair<std::string, size_t> Descriptor::policy() {
 }
 
 size_t Descriptor::position(const std::string_view name) {
-  auto it = std::find_if(begin(), end(),               //
-                         [name](const auto &item) {    //
-                           return item.rname == name;  //
-                         }  //
-  );
+  auto it = std::find_if(begin(), end(),                                            //
+                         [name](const auto &item) { return item.rname == name; });  //
 
   if (it != end())
     return std::distance(begin(), it);
@@ -328,7 +321,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     if (r.rtype == rdb::RETENTION)
-      if (r.rtype == 0 && r.rarray == 0) continue;  // skip retention 0,0
+      if (r.rlen == 0 && r.rarray == 0) continue;  // skip retention 0,0
     if (r.rtype == rdb::RETMEMORY)
       if (r.rlen == 0) continue;  // skip retention memory 0
     if (!flatOutput)
