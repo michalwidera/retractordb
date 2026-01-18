@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCBINDEV_H_
-#define STORAGE_RDB_INCLUDE_FACCBINDEV_H_
+#pragma once
 
 #include "descriptor.h"
 #include "fainterface.h"
@@ -36,5 +35,3 @@ class binaryDeviceAccessorRO : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCBINDEV_H_

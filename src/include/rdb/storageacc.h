@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_DACC_H_
-#define STORAGE_RDB_INCLUDE_DACC_H_
+#pragma once
 
 #include <boost/circular_buffer.hpp>
 #include <memory>  // std::unique_ptr
@@ -82,5 +81,3 @@ class storageAccessor {
   void reset();
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_DACC_H_

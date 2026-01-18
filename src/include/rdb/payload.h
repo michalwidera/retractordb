@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_PAYLOADACC_H_
-#define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
+#pragma once
 
 #include <any>
 #include <memory>  // std::unique_ptr
@@ -69,5 +68,3 @@ class payload {
   payload operator+(const payload &other);
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_PAYLOADACC_H_

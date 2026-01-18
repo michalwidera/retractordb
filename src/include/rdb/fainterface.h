@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FAINTERFACE_H_
-#define STORAGE_RDB_INCLUDE_FAINTERFACE_H_
+#pragma once
 
 #include <cstdint>  // uint8_t
 #include <limits>
@@ -59,5 +58,3 @@ struct FileAccessorInterface {
   virtual ~FileAccessorInterface() = default;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FAINTERFACE_H_

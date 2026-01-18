@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCFS_H_
-#define STORAGE_RDB_INCLUDE_FACCFS_H_
+#pragma once
 
 #include "fainterface.h"
 
@@ -33,5 +32,3 @@ struct genericBinaryFileAccessor : public FileAccessorInterface {
 };
 
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCFS_H_

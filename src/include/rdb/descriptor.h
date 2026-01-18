@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_DESC_H_
-#define STORAGE_RDB_INCLUDE_DESC_H_
+#pragma once
 
 #include <initializer_list>
 #include <map>
@@ -108,5 +107,3 @@ Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
 std::ostream &flat(std::ostream &os);
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_DESC_H_

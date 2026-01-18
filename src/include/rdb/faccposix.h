@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCPOSIX_H_
-#define STORAGE_RDB_INCLUDE_FACCPOSIX_H_
+#pragma once
 
 #include "descriptor.h"
 #include "fainterface.h"
@@ -33,5 +32,3 @@ class posixBinaryFileAccessor : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCPOSIX_H_

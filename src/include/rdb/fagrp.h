@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FAGRP_H_
-#define STORAGE_RDB_INCLUDE_FAGRP_H_
+#pragma once
 
 #include <memory>
 #include <utility>
@@ -38,5 +37,3 @@ class groupFileAccessor : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FAGRP_H_
