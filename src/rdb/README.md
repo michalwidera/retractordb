@@ -689,12 +689,120 @@ xtrdb complements the RetractorDB ecosystem:
 
 ## Original UML Diagrams
 
-### UML Sequence Diagram of :Rdb communication process
+### RDB Communication Process - Sequence Diagram
 
+This diagram shows the interaction between components during storage operations.
+
+```mermaid
+sequenceDiagram
+    participant Client as Client Application
+    participant Payload as Payload Buffer
+    participant Rdb as RDB Library
+    participant Description as .desc File
+    participant Storage as Binary Storage
+    
+    Note over Client,Storage: Create Connection
+    Client->>Rdb: storageAccessor()
+    activate Rdb
+    Rdb->>Rdb: Open data file
+    activate Description
+    Rdb->>Description: Fetch .desc file
+    Rdb->>Rdb: create FileAccessor()
+    Client->>Payload: Create payload area
+    activate Payload
+    deactivate Rdb
+    
+    Note over Client,Storage: Read Data
+    Client->>Rdb: get()
+    activate Rdb
+    Description-->>Rdb: Get Size of Payload
+    Rdb->>Storage: FileAccessor.read()
+    Storage-->>Payload: Read data from disk
+    Rdb-->>Client: Status
+    deactivate Rdb
+    Payload-->>Client: Read payload area
+    
+    Note over Client,Storage: Write Data
+    Client->>Payload: Fill Payload area
+    Client->>Rdb: put()
+    activate Rdb
+    Description-->>Rdb: Get Size of Payload
+    Rdb->>Storage: FileAccessor.write()
+    Payload->>Storage: Write data to disk
+    Rdb-->>Client: Status
+    deactivate Rdb
+```
+
+**Key interactions:**
+1. **Create Connection**: Initialize RDB accessor, load schema from .desc file, create payload buffer
+2. **Read Data**: Fetch record from binary storage into payload buffer
+3. **Write Data**: Commit payload buffer contents to binary storage
+
+### Storage Accessor - Activity Diagram
+
+This diagram illustrates the initialization process for storage accessor.
+
+```mermaid
+flowchart TD
+    Start([Start]) --> A[storageAccessor<br/>descriptorname, storagename, params]
+    
+    A --> B[Assume descriptor filename<br/>as storagename.desc]
+    
+    B --> C{Descriptor file<br/>exists?}
+    
+    C -->|Yes| D[Read descriptor file]
+    C -->|No| E[Create descriptor<br/>and descriptor file]
+    
+    D --> F{Descriptor matches<br/>descriptorParam?}
+    F -->|Yes| G[Set storage location]
+    F -->|No| H[LOG: Descriptors not match]
+    H --> Stop1([Stop])
+    
+    G --> I[LOG: Descriptor from file used]
+    E --> J[LOG: Descriptor created]
+    
+    I --> K[Descriptor is ready]
+    J --> K
+    
+    K --> L[Assume storage filename<br/>as storagename]
+    
+    L --> M{Storage file<br/>exists?}
+    
+    M -->|Yes| N[Attach storage<br/>Compute storage size]
+    M -->|No| O[Create storage]
+    
+    N --> P[LOG: record count on storage]
+    O --> Q[LOG: Storage created]
+    
+    P --> R[Storage is ready]
+    Q --> R
+    
+    R --> S[Attach payload]
+    S --> Stop2([Stop])
+    
+    style K fill:#90EE90
+    style R fill:#90EE90
+    style H fill:#FFB6C1
+    style Stop1 fill:#FFB6C1
+```
+
+**Process steps:**
+1. **Initialization**: Create storage accessor with parameters
+2. **Descriptor Resolution**: Load or create .desc metadata file
+3. **Descriptor Validation**: Verify schema matches expectations
+4. **Storage Attachment**: Open or create binary data file
+5. **Payload Setup**: Attach in-memory buffer for operations
+
+These diagrams show the low-level implementation details of RetractorDB's storage layer.
+
+### Original PlantUML Diagrams
+
+For reference, the original PlantUML diagrams are also available:
+
+**Communication Sequence:**
 ![Sequence Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/rdb/UML/rdb-comunication.puml)
 
-### UML Storage Accessor - Activity Diagram
-
+**Storage Accessor Activity:**
 ![Activity Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/rdb/UML/rdb-storageaccessor.puml)
 
 ## Summary
