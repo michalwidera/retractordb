@@ -3,14 +3,12 @@
 
 // please note that the order of includes is important here
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
-#include <boost/cerrno.hpp>
-#include <boost/json.hpp>
-#include <boost/lexical_cast.hpp>
 #include <cstdlib>
-#include <filesystem>
 #include <iostream>
 #include <string>
+
+#include <boost/cerrno.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"

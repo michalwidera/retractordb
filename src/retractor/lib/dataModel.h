@@ -1,15 +1,10 @@
 #pragma once
 
-#include <any>
 #include <map>
 #include <memory>  // unique_ptr
-#include <string>
 #include <vector>
 
-#include "QStruct.h"         // qTree
-#include "rdb/descriptor.h"  // rdb::Descriptor
-#include "rdb/payload.h"     // rdb::payload
-#include "streamInstance.h"  // streamInstance
+#include "streamInstance.h"  // streamInstance (transitively includes QStruct.h, rdb/payload.h)
 class dataModel {
  private:
   qTree &coreInstance_;

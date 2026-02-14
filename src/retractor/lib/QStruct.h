@@ -1,24 +1,17 @@
 #pragma once
 
-// Standard template library
 #include <algorithm>
 #include <iostream>
 #include <list>
 #include <map>
 #include <set>
-#include <sstream>
-#include <stack>
 #include <string>
 #include <variant>
 
-// Boost libraries
 #include <boost/rational.hpp>
 
-#include "cmdID.hpp"
-#include "fldType.hpp"
 #include "rdb/descriptor.h"
 #include "rdb/faccmemory.h"
-#include "rdb/retention.h"
 
 class qTree;
 

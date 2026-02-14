@@ -1,7 +1,6 @@
 #include "lockManager.hpp"
 
 #include <fcntl.h>
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -11,7 +10,6 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
-#include <string>
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
     : lockFileDescriptor(-1), isLocked(false), lockFilePath("") {

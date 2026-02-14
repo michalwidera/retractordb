@@ -3,16 +3,14 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <boost/lexical_cast.hpp>
 #include <cassert>
-#include <cstdlib>  // std::div
 #include <iostream>
 #include <memory>  // unique_ptr
-#include <regex>
-#include <thread>
+#include <mutex>
+
+#include <boost/lexical_cast.hpp>
 
 #include "SOperations.hpp"
-#include "expressionEvaluator.h"
 #include "rdb/convertTypes.h"
 
 // ctest -R '^ut-dataModel' -V

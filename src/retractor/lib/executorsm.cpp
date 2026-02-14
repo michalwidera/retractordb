@@ -4,7 +4,13 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
-#include <boost/chrono.hpp>
+#include <atomic>
+#include <condition_variable>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <thread>
+
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -12,16 +18,8 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
-#include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
-#include <filesystem>
-#include <iostream>
-#include <memory>
-#include <thread>
 
-#include "compiler.h"
-#include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "dataModel.h"
 #include "persistentCounter.h"

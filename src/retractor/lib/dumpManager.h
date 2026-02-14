@@ -2,12 +2,11 @@
 
 #include <unistd.h>  // for ::lseek, ::write, ::close
 
-#include <boost/circular_buffer.hpp>
 #include <map>
 #include <memory>  // unique_ptr
 #include <string>
-#include <utility>  // pair
-#include <vector>
+
+#include <boost/circular_buffer.hpp>
 
 #include "rdb/payload.h"
 

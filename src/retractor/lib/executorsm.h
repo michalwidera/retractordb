@@ -1,13 +1,12 @@
 #pragma once
 
-#include <boost/program_options.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <map>
 #include <set>
 #include <string>
 
+#include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 #include "CRSMath.h"
-#include "QStruct.h"
 #include "compiler.h"
 #include "lockManager.hpp"
 

@@ -2,15 +2,10 @@
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <cassert>
 #include <cstdlib>  // std::div
-#include <iostream>
 #include <memory>  // unique_ptr
-#include <regex>
 
-#include "QStruct.h"  // coreInstance
-#include "SOperations.hpp"
 #include "expressionEvaluator.h"
 #include "persistentCounter.h"
 #include "rdb/convertTypes.h"
