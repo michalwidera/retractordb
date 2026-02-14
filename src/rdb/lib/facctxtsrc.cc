@@ -74,8 +74,10 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
         std::string var;
         auto strLen = item.rlen * item.rarray;
         char c;
-        while (myFile.get(c) && c != '"');
-        while (myFile.get(c) && c != '"') var += c;
+        while (myFile.get(c) && c != '"')
+          ;
+        while (myFile.get(c) && c != '"')
+          var += c;
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
         // SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());

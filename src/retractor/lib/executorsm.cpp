@@ -507,7 +507,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
     {
       std::stringstream dummy;
-      for (const auto &p : inSet) dummy << p << " ";
+      for (const auto &p : inSet)
+        dummy << p << " ";
       SPDLOG_INFO("ZERO-step processed for streams: {}", dummy.str());
     }
     // End of ZERO-step
@@ -549,7 +550,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
       {
         std::stringstream dummy;
-        for (const auto &p : inSet) dummy << p << " ";
+        for (const auto &p : inSet)
+          dummy << p << " ";
         SPDLOG_INFO("NEXT-step processed for streams: {}", dummy.str());
       }
       // End of loop while( ! _kbhit(ignoreanykey) )

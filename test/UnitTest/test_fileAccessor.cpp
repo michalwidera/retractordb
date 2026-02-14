@@ -164,7 +164,8 @@ TEST(FileAccessorTest, test_fagrp_dir) {
     GTEST_LOG_(INFO) << "filename:" << entry.first;
     GTEST_LOG_(INFO) << "filesize:" << entry.second.sizeFromSystem;
     std::stringstream ss;
-    for (auto &d : entry.second.fileContents) ss << "[" << static_cast<int>(d) << "]";
+    for (auto &d : entry.second.fileContents)
+      ss << "[" << static_cast<int>(d) << "]";
     GTEST_LOG_(INFO) << "contents:" << ss.str();
   }
 
@@ -234,7 +235,8 @@ TEST(FileAccessorTest, test_fagrp_one_read_and_retention) {
     GTEST_LOG_(INFO) << "filename:" << entry.first;
     GTEST_LOG_(INFO) << "filesize:" << entry.second.sizeFromSystem;
     std::stringstream ss;
-    for (auto &d : entry.second.fileContents) ss << "[" << static_cast<int>(d) << "]";
+    for (auto &d : entry.second.fileContents)
+      ss << "[" << static_cast<int>(d) << "]";
     GTEST_LOG_(INFO) << "contents:" << ss.str();
   }
 

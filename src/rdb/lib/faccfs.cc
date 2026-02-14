@@ -18,7 +18,9 @@ genericBinaryFileAccessor::genericBinaryFileAccessor(  //
     const std::string_view fileName,                   //
     const size_t size,                                 //
     int percounter)                                    //
-    : filename(std::string(fileName)), size(size), percounter_(percounter) {}
+    : filename(std::string(fileName)),
+      size(size),
+      percounter_(percounter) {}
 
 genericBinaryFileAccessor::~genericBinaryFileAccessor() {
   if (percounter_ >= 0) {

@@ -43,7 +43,8 @@ void Descriptor::updateConvMaps() {
   offsetMap_.clear();
 
   clen_ = 0;
-  for (auto it : *this) clen_ += (it.rtype == rdb::STRING) ? 1 : it.rarray;
+  for (auto it : *this)
+    clen_ += (it.rtype == rdb::STRING) ? 1 : it.rarray;
 
   std::vector<rField>::iterator it = this->begin();
   int fieldCounter{0};
@@ -219,7 +220,8 @@ constexpr int Descriptor::len(const rdb::rField &field) const {
 
 size_t Descriptor::getSizeInBytes() const {
   auto size{0};
-  for (auto const i : *this) size += len(i);
+  for (auto const i : *this)
+    size += len(i);
   return size;
 }
 
@@ -364,7 +366,8 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   std::stringstream strstream;
   std::string str;
-  while (is >> str) strstream << " " << str;
+  while (is >> str)
+    strstream << " " << str;
 
   auto result = parserDESCString(rhs, strstream.str());
   assert(result == "OK");

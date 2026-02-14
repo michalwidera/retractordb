@@ -10,8 +10,8 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include "SOperations.hpp"
 #include "rdb/convertTypes.h"
+#include "SOperations.hpp"
 
 // ctest -R '^ut-dataModel' -V
 
@@ -24,7 +24,8 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
 
   assert(!coreInstance_.empty());
-  for (const auto &it : coreInstance_) SPDLOG_INFO("query.id {}", it.id);
+  for (const auto &it : coreInstance_)
+    SPDLOG_INFO("query.id {}", it.id);
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
@@ -44,7 +45,8 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
-  for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
+  for (auto const &[key, val] : qSet)
+    val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
 dataModel::~dataModel() {}

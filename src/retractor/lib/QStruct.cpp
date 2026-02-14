@@ -94,8 +94,10 @@ void qTree::topologicalSort() {
   qTree &coreInstance{*this};
 
   ans_.clear();
-  for (auto q : coreInstance) visited_[q.id] = false;
-  for (auto q : coreInstance) adj_[q.id] = q.getDepStream();
+  for (auto q : coreInstance)
+    visited_[q.id] = false;
+  for (auto q : coreInstance)
+    adj_[q.id] = q.getDepStream();
   for (auto q : coreInstance)
     if (!visited_[q.id]) dfs(q.id);
 
@@ -144,7 +146,8 @@ void qTree::dumpCore() {
     ss << "s";
 
     sp << "|";
-    for (auto i = 0; i < maxSize; ++i) sp << "_";
+    for (auto i = 0; i < maxSize; ++i)
+      sp << "_";
   }
   ss << "|\n";
   sp << "|\n";
@@ -429,7 +432,8 @@ std::ostream &operator<<(std::ostream &os, const field &s) {
   os << "name:" << s.field_.rname << ",";
   os << "type:" << s.field_.rtype << ",";
   os << "prog:";
-  for (auto &i : s.lProgram) os << i << ",";
+  for (auto &i : s.lProgram)
+    os << i << ",";
   return os;
 }
 
@@ -439,9 +443,11 @@ std::ostream &operator<<(std::ostream &os, const query &s) {
   os << "filename:" << s.filename << ",";
   os << "rInterval:" << s.rInterval << ",";
   os << "lSchema:";
-  for (auto &i : s.lSchema) os << i << ",";
+  for (auto &i : s.lSchema)
+    os << i << ",";
   os << "lProgram:";
-  for (auto &i : s.lProgram) os << i << ",";
+  for (auto &i : s.lProgram)
+    os << i << ",";
   return os;
 }
 

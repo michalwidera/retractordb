@@ -19,7 +19,11 @@ storageAccessor::storageAccessor(const std::string qryID,              //
                                  bool oneShot,                         //
                                  bool isHold,                          //
                                  int percounter)
-    : descriptorFile_(qryID + ".desc"), storageFile_(fileName), percounter_(percounter), isOneShot_(oneShot), isHold_(isHold) {
+    : descriptorFile_(qryID + ".desc"),
+      storageFile_(fileName),
+      percounter_(percounter),
+      isOneShot_(oneShot),
+      isHold_(isHold) {
   assert(!qryID.empty());
   assert(!fileName.empty());
 

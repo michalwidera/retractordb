@@ -9,10 +9,10 @@
 #include "rdb/fainterface.h"
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
-#include "retractor/lib/CRSMath.h"
-#include "retractor/lib/QStruct.h"  // coreInstance
 #include "retractor/lib/compiler.h"
+#include "retractor/lib/CRSMath.h"
 #include "retractor/lib/dataModel.h"
+#include "retractor/lib/QStruct.h"  // coreInstance
 
 // ctest -R '^ut-test_crsMath' -V
 
@@ -33,7 +33,8 @@ struct crsMathTestInit {
   crsMathTestInit() {
     assert(std::filesystem::exists("ut_crsmath.rql") && "file ut_crsmath.rql does not exist!");
     std::ifstream infl("ut_crsmath.rql");
-    for (std::string line; std::getline(infl, line);) std::cout << line << std::endl;
+    for (std::string line; std::getline(infl, line);)
+      std::cout << line << std::endl;
   }
 
   ~crsMathTestInit() {}
@@ -104,7 +105,8 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
   // Delta presentation
 
-  for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << coreInstance.getDelta(x) << "}";
+  for (const auto &x : allStreams)
+    strstream << "{" << std::setw(colSize) << coreInstance.getDelta(x) << "}";
   strstream << std::endl;
 
   // Init row - process all declaration
@@ -116,7 +118,8 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   proc.processZeroStep();
 
   strstream << std::setw(colSize) << " 000:";
-  for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << (initSet.contains(x) ? x : "") << "}";
+  for (const auto &x : allStreams)
+    strstream << "{" << std::setw(colSize) << (initSet.contains(x) ? x : "") << "}";
 
   strstream << std::endl;
 
@@ -135,7 +138,8 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
 
-    for (const auto &x : allStreams) strstream << "{" << std::setw(colSize) << (procSet.contains(x) ? x : "") << "}";
+    for (const auto &x : allStreams)
+      strstream << "{" << std::setw(colSize) << (procSet.contains(x) ? x : "") << "}";
 
     strstream << std::endl;
 
@@ -195,12 +199,14 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
   // Delta presentation
   strstream << std::setw(4) << " Dlt:";
-  for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << coreInstance.getDelta(x);
+  for (const auto &x : allStreams)
+    strstream << "|" << std::setw(colSize) << coreInstance.getDelta(x);
   strstream << "|" << std::endl;
 
   // Names
   strstream << std::setw(4) << "Name:";
-  for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << x;
+  for (const auto &x : allStreams)
+    strstream << "|" << std::setw(colSize) << x;
   strstream << "|" << std::endl;
 
   // Init row - process all declaration
@@ -212,7 +218,8 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   proc.processZeroStep();
 
   strstream << std::setw(4) << " 000 ";
-  for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");
+  for (const auto &x : allStreams)
+    strstream << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");
 
   strstream << "|" << std::endl;
 
@@ -233,7 +240,8 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
     proc.processRows(procSet);
 
-    for (const auto &x : allStreams) strstream << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
+    for (const auto &x : allStreams)
+      strstream << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
     strstream << "|" << std::endl;
   }
 

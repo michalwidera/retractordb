@@ -6,8 +6,8 @@
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 
-#include "CRSMath.h"
 #include "compiler.h"
+#include "CRSMath.h"
 #include "lockManager.hpp"
 
 typedef boost::property_tree::ptree ptree;

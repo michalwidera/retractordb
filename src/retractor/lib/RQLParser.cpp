@@ -13,9 +13,9 @@
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"
 #include ".antlr/RQLParser.h"
-#include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "constants.hpp"
+#include "QStruct.h"
 #include "rdb/convertTypes.h"
 
 using namespace antlrcpp;

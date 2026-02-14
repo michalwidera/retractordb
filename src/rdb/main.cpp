@@ -295,7 +295,8 @@ int main(int argc, char *argv[]) {
       }
       continue;
     } else if (cmd == "input") {
-      for (auto i : dacc->descriptor) std::cin >> *(dacc->getPayload());
+      for (auto i : dacc->descriptor)
+        std::cin >> *(dacc->getPayload());
       continue;
     } else if (cmd == "write") {
       size_t record{0};

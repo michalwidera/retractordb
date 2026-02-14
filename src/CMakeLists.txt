@@ -54,9 +54,62 @@ add_custom_target(
 # https://zed0.co.uk/clang-format-configurator/ | $clang-format --version
 # clang-format version 21.1.7
 
+# cmake-format: off
 set(CSTYLE
-    '{BasedOnStyle: Google, ColumnLimit: 129, AlignConsecutiveAssignments: true, DerivePointerAlignment: false, PointerAlignment: Right}'
+    '{
+    BasedOnStyle: Google, 
+    Standard: c++17,
+    ColumnLimit: 129,
+    IndentWidth: 2,
+    TabWidth: 2,
+    UseTab: Never,
+    AccessModifierOffset: -1,
+    ConstructorInitializerIndentWidth: 4,
+    ContinuationIndentWidth: 4,
+    DerivePointerAlignment: false,
+    PointerAlignment: Right,
+    ReferenceAlignment: Right,
+    QualifierAlignment: Leave,
+    AlignAfterOpenBracket: Align,
+    AlignConsecutiveAssignments: true,
+    AlignConsecutiveDeclarations: false,
+    AlignConsecutiveMacros: true,
+    AlignEscapedNewlines: Left,
+    AlignOperands: Align,
+    AlignTrailingComments: true,
+    AllowShortBlocksOnASingleLine: Empty,
+    AllowShortEnumsOnASingleLine: true,
+    AllowShortFunctionsOnASingleLine: All,
+    AllowShortIfStatementsOnASingleLine: WithoutElse,
+    AllowShortLambdasOnASingleLine: All,
+    AllowShortLoopsOnASingleLine: false,
+    BinPackArguments: true,
+    BinPackParameters: true,
+    BreakBeforeBraces: Attach,
+    BreakBeforeTernaryOperators: true,
+    BreakConstructorInitializers: BeforeColon,
+    PackConstructorInitializers: CurrentLine,
+    Cpp11BracedListStyle: true,
+    EmptyLineAfterAccessModifier: Never,
+    EmptyLineBeforeAccessModifier: LogicalBlock,
+    FixNamespaceComments: true,
+    IncludeBlocks: Preserve,
+    IndentCaseBlocks: false,
+    IndentCaseLabels: true,
+    InsertNewlineAtEOF: true,
+    KeepEmptyLinesAtTheStartOfBlocks: false,
+    MaxEmptyLinesToKeep: 1,
+    NamespaceIndentation: None,
+    ReflowComments: true,
+    SeparateDefinitionBlocks: Leave,
+    SortIncludes: CaseInsensitive,
+    SpaceAfterTemplateKeyword: true,
+    SpaceBeforeCpp11BracedList: false,
+    SpaceBeforeParens: ControlStatements,
+    SpacesBeforeTrailingComments: 2
+    }'
 )
+# cmake-format: on
 
 add_custom_target(
   cformat

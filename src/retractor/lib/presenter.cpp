@@ -175,7 +175,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       }
     }
   }
-  for (auto s : planStreamRelationsSet) xout << s << std::endl;
+  for (auto s : planStreamRelationsSet)
+    xout << s << std::endl;
   //
   // Due this variable we eleminate redundant relation on schema
   //
@@ -245,7 +246,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       }
     }
   }
-  for (auto s : streamRelationsSet) xout << s << std::endl;
+  for (auto s : streamRelationsSet)
+    xout << s << std::endl;
   xout << "}" << std::endl;
 }  // presenter::graphiz
 

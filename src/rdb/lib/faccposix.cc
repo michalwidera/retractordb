@@ -12,7 +12,9 @@ namespace rdb {
 posixBinaryFileAccessor::posixBinaryFileAccessor(const std::string_view fileName,  //
                                                  const size_t size,                //
                                                  int percounter)                   //
-    : filename(std::string(fileName)), size(size), percounter_(percounter) {
+    : filename(std::string(fileName)),
+      size(size),
+      percounter_(percounter) {
   fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename, fd);

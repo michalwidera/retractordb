@@ -16,12 +16,12 @@
 #include <vector>
 
 #include "config.h"  // Add an automatically generated configuration file
-#include "lib/QStruct.h"
 #include "lib/compiler.h"
 #include "lib/executorsm.h"
 #include "lib/lockManager.hpp"
 #include "lib/persistentCounter.h"
 #include "lib/presenter.h"
+#include "lib/QStruct.h"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;

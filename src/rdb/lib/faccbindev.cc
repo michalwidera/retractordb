@@ -12,7 +12,9 @@ namespace rdb {
 binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName,  //
                                                const size_t recSize,             //
                                                bool loopToBeginningIfEOF)        //
-    : filename_(std::string(fileName)), recSize_(recSize), loopToBeginningIfEOF_(loopToBeginningIfEOF) {
+    : filename_(std::string(fileName)),
+      recSize_(recSize),
+      loopToBeginningIfEOF_(loopToBeginningIfEOF) {
   fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC, 0644);
   // TODO: there is a need of support failure here
   // sometimes /dev/random is not available

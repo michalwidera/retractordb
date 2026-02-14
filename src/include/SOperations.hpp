@@ -1,7 +1,7 @@
 #pragma once
 
 #include <boost/rational.hpp>
-#include <cassert>    // for assert
+#include <cassert>  // for assert
 
 using namespace boost;
 
@@ -37,6 +37,8 @@ constexpr int Mod(const boost::rational<int> &deltaA, const boost::rational<int>
   return i + floorR(i * deltaB / deltaA);
 }
 
-constexpr int Subtract(const rational<int> &deltaA, const rational<int> &deltaB, const int i) { return ceilR(i * deltaA / deltaB); }
+constexpr int Subtract(const rational<int> &deltaA, const rational<int> &deltaB, const int i) {
+  return ceilR(i * deltaA / deltaB);
+}
 
 constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(offset) / boost::rational<int>(step)); }

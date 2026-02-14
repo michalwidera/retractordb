@@ -4,7 +4,7 @@
 
 #include <cassert>
 #include <cstdlib>  // std::div
-#include <memory>  // unique_ptr
+#include <memory>   // unique_ptr
 
 #include "expressionEvaluator.h"
 #include "persistentCounter.h"

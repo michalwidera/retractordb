@@ -370,7 +370,8 @@ std::string compiler::prepareFields() {
         }
         ++it;
       }
-      for (auto eraseIt : eraseList) q.lSchema.erase(eraseIt);
+      for (auto eraseIt : eraseList)
+        q.lSchema.erase(eraseIt);
     }
   }
   coreInstance.sort();
@@ -566,7 +567,8 @@ std::string compiler::convertRemotes() {
         offset += coreInstance[f.getStr_()].descriptorStorage().sizeFlat();
       }
       if (f.getCommandID() == STREAM_HASH) {
-        for (auto &i : offsetItem) i.second = 0;
+        for (auto &i : offsetItem)
+          i.second = 0;
       }
     }
     offsetMap[q.id] = offsetItem;

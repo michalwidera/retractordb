@@ -20,7 +20,10 @@ groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
                                      const size_t recSize,             //
                                      const retention_t &retention,     //
                                      int percounter)                   //
-    : filename(std::string(fileName)), recSize(recSize), retention(retention), percounter_(percounter) {
+    : filename(std::string(fileName)),
+      recSize(recSize),
+      retention(retention),
+      percounter_(percounter) {
   writeCount      = 0;
   currentFilename = filename + "_segment_" + std::to_string(currentSegment);
   if (retention.noRetention()) {
@@ -74,7 +77,8 @@ ssize_t groupFileAccessor::write(const uint8_t *ptrData, const size_t position) 
 
   // Purge operation
   if (ptrData == nullptr && position == 0) {
-    for (auto &v : vec) std::filesystem::remove(v->name());
+    for (auto &v : vec)
+      std::filesystem::remove(v->name());
     vec.clear();
 
     // Reset state
@@ -142,7 +146,8 @@ ssize_t groupFileAccessor::read(uint8_t *ptrData, const size_t position) {
 
 size_t groupFileAccessor::count() {
   size_t sumCount = 0;
-  for (auto &v : vec) sumCount += v->count();
+  for (auto &v : vec)
+    sumCount += v->count();
   return sumCount + removedSegments * retention.capacity;  // compensate for removed segments
 }
 
