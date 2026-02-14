@@ -1,11 +1,9 @@
 #pragma once
 
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "faccposix.h"
-#include "fainterface.h"
 #include "retention.h"
 
 namespace rdb {

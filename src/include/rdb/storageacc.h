@@ -1,8 +1,9 @@
 #pragma once
 
-#include <boost/circular_buffer.hpp>
 #include <memory>  // std::unique_ptr
 #include <string>
+
+#include <boost/circular_buffer.hpp>
 
 #include "descriptor.h"
 #include "faccbindev.h"
@@ -11,7 +12,6 @@
 #include "faccposix.h"
 #include "facctxtsrc.h"
 #include "fagrp.h"
-#include "fainterface.h"
 #include "payload.h"
 
 namespace rdb {

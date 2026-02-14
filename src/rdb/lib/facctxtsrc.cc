@@ -1,14 +1,10 @@
 #include "rdb/facctxtsrc.h"
 
-#include <fcntl.h>
 #include <spdlog/spdlog.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include <cassert>
 #include <cstring>  // memcpy
-#include <memory>   // make_uniqe
-#include <ratio>
+#include <memory>   // make_unique
 
 namespace rdb {
 

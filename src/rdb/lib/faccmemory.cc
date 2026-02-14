@@ -1,12 +1,9 @@
 #include "rdb/faccmemory.h"
 
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
-#include <algorithm>  // for std::copy, std::min
-#include <array>
+#include <algorithm>  // for std::copy
 #include <cassert>
-#include <fstream>
 #include <limits>
 #include <map>
 #include <vector>

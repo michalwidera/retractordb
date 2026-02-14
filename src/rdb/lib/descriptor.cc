@@ -3,15 +3,11 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <array>
 #include <cassert>
-#include <cctype>
 #include <iostream>
-#include <limits>
-#include <locale>
+#include <sstream>
+
 #include <magic_enum/magic_enum.hpp>
-#include <typeinfo>
-#include <utility>
 
 extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 

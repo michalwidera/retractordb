@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <spdlog/spdlog.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>  // ::read, ::open ...
 
 #include <cassert>

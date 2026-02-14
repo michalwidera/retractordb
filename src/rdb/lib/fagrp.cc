@@ -1,15 +1,10 @@
 #include "rdb/fagrp.h"
 
-#include <fcntl.h>
 #include <spdlog/spdlog.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include <boost/json.hpp>
 #include <cassert>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <regex>
 
 namespace rdb {

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "descriptor.h"
 #include "fainterface.h"
 
 namespace rdb {
