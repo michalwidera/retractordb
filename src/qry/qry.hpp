@@ -1,10 +1,10 @@
 #pragma once
 
-#include <atomic>
-#include <boost/program_options.hpp>
-#include <boost/property_tree/ptree.hpp>
 #include <map>
 #include <string>
+
+#include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 enum class formatMode { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 

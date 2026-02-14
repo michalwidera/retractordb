@@ -9,25 +9,11 @@ How xqry terminal works
 */
 #include "qry.hpp"
 
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/spdlog.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <array>
-#include <boost/config.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/map.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
-#include <boost/process/environment.hpp>
-#include <boost/property_tree/info_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/system/system_error.hpp>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
@@ -36,6 +22,16 @@ How xqry terminal works
 #include <iostream>
 #include <sstream>
 #include <thread>
+
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/containers/map.hpp>
+#include <boost/interprocess/containers/string.hpp>
+#include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
+#include <boost/property_tree/info_parser.hpp>
+#include <boost/system/system_error.hpp>
+#include <spdlog/spdlog.h>
 
 #include "constants.hpp"
 #include "uxSysTermTools.hpp"
