@@ -78,7 +78,7 @@ payload payload::operator+(const payload &other) {
               result.descriptor.getSizeInBytes());
   std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
   std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
-  descSum.dirtyMap = true;
+  descSum.invalidateCache();
   return result;
 }
 

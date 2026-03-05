@@ -27,10 +27,11 @@ class Descriptor : public std::vector<rField> {
   std::map<std::pair<int, int>, int> convReMap_;
   std::vector<int> offsetMap_;
   int clen_ = 0;
+  bool dirtyMap{true};
   void updateConvMaps();
 
  public:
-  bool dirtyMap{true};
+  void invalidateCache() { dirtyMap = true; }
   bool isEmpty() const;
 
   Descriptor(std::initializer_list<rField> l);
@@ -66,7 +67,6 @@ class Descriptor : public std::vector<rField> {
   std::pair<rdb::descFld, int> getMaxType();
 
   std::optional<std::pair<int, int>> convert(int position);
-  std::optional<int> convert(std::pair<int, int> position);
 
   bool hasField(const std::string_view name) {
     for (const auto &f : *this) {
@@ -74,25 +74,6 @@ class Descriptor : public std::vector<rField> {
     }
     return false;
   }
-
-  template <typename T>
-  std::string toString(const std::string_view name, T *ptr) {
-    return std::string(reinterpret_cast<char *>(ptr + offsetBegArr(name)), len(name));
-  }
-
-  /**
-   * @brief Reads data from binary package via tuple-data from inner container
-   *
-   * @param T Type that data should be converted (returned)
-   * @param name name of given field
-   * @param ptr pointer to beginning of package
-   * @return auto Value from binary package that corresponds to field from
-   * container
-   */
-  template <typename T, typename K>
-  auto cast(const std::string_view name, K *ptr) {
-    return *(reinterpret_cast<T *>(ptr + offsetBegArr(name)));
-  };
 
   // Operators that enables read and write Descriptor to file/screen i Human
   // Readable Form.
