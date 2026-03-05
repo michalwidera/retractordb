@@ -230,7 +230,8 @@ TEST(xrdb, test_storage) {
   dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
   {
     std::stringstream coutstring;
-    coutstring << std::string(reinterpret_cast<char *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("Name")), dAcc2.descriptor.len("Name"));
+    coutstring << std::string(reinterpret_cast<char *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("Name")),
+                              dAcc2.descriptor.len("Name"));
     ASSERT_TRUE(strcmp(coutstring.str().c_str(), "xxxx xxxx") == 0);
   }
   {
@@ -244,7 +245,7 @@ TEST(xrdb, test_storage) {
   {
     std::stringstream coutstring;
     coutstring << std::hex;
-    coutstring << (uint) *(reinterpret_cast<uint8_t *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("Control")));
+    coutstring << (uint) * (reinterpret_cast<uint8_t *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("Control")));
     coutstring << std::dec;
     ASSERT_TRUE(strcmp(coutstring.str().c_str(), "33") == 0);
   }

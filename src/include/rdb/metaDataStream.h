@@ -22,9 +22,11 @@ namespace rdb {
 /// - The meta index shall count the number of records in the indexed data stream that share the same null bit-set values.
 /// - The meta index shall store records in the form of bit fields indicating which fields are nulls in the indexed data stream.
 /// - The meta index shall contain, in each bit field, information about which fields are nulls.
-/// - The meta index shall contain a counter alongside each bit field indicating the number of records with the same null bit-set values.
+/// - The meta index shall contain a counter alongside each bit field indicating the number of records with the same null bit-set
+/// values.
 /// - The meta index shall create a new entry when the null bit-set value changes and restart counting from one for that entry.
-/// - The meta index shall, when there are no records containing null values, contain only a single entry counting all records in the indexed stream.
+/// - The meta index shall, when there are no records containing null values, contain only a single entry counting all records in
+/// the indexed stream.
 /// - The meta index shall be a data structure that grows with the number of records in the indexed data stream.
 /// - The meta index shall be stored on disk together with the indexed data stream.
 /// - The meta index shall update itself automatically when the indexed data stream changes, without manual intervention.
@@ -33,7 +35,8 @@ namespace rdb {
 /// - The meta index shall provide information about records containing null values in the indexed data stream.
 /// - The meta index shall save itself to disk when work with the indexed data stream is finished.
 /// - The meta index shall be loaded from disk when the program is restarted.
-/// - The meta index shall write an Entry to disk (counting the number of records in the indexed data stream) when the null bit-set value changes.
+/// - The meta index shall write an Entry to disk (counting the number of records in the indexed data stream) when the null
+/// bit-set value changes.
 /// - The meta index shall not update the Entry on disk when a record with the same null bit-set values is appended.
 
 class metaDataStream {
@@ -141,7 +144,5 @@ class metaDataStream {
   /// @brief Run-length encoded sequence of null bit-set entries.
   std::vector<Entry> entries_;
 };  // class metaDataStream
-
-
 
 }  // namespace rdb
