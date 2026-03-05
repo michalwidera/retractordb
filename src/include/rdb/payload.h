@@ -18,10 +18,9 @@ class payload {
   template <typename T>
   void setItemBy(const int position, std::any value);
 
- public:
-  /// @brief binary dump
-  bool specialDebug = false;
+  payload &operator=(const Descriptor &other);
 
+ public:
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;
 
@@ -59,7 +58,6 @@ class payload {
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
 
-  payload &operator=(const Descriptor &other);
   payload &operator=(const payload &other);
   payload operator+(const payload &other);
 };

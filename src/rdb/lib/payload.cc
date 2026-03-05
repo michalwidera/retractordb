@@ -304,25 +304,13 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
 }
 
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
-  if (rhs.specialDebug) {
-    os << "[ ";
-    for (auto i = 0; i < rhs.descriptor.getSizeInBytes(); i++) {
-      os << std::hex;
-      os << std::setfill('0');
-      os << std::setw(2);
-      os << static_cast<int>(*(rhs.get() + i));
-      os << " ";
-    }
-    os << "]";
-    return os;
-  }
-
   if (rhs.hexFormat)
     os << std::hex;
   else
     os << std::dec;
   os << "{";
 
+  Descriptor desc(rhs.descriptor);
   for (auto const &r : rhs.descriptor) {
     if ((r.rtype == rdb::TYPE) ||       //
         (r.rtype == rdb::REF) ||        //
@@ -335,7 +323,6 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << " ";
     os << r.rname;
     os << ":";
-    auto desc    = rhs.descriptor;
     auto offset_ = desc.offsetBegArr(r.rname);
     if (r.rtype == STRING) {
       char *charData = reinterpret_cast<char *>(rhs.get() + offset_);
