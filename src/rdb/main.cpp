@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "setpos") {
       int position{0};
       std::cin >> position;
-      auto fieldName = dacc->descriptor.fieldName(position);
+      auto fieldName = dacc->descriptor[position].rname;
       if (dacc->descriptor.type(fieldName) == "INTEGER") {
         int value{0};
         std::cin >> value;
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "getpos") {
       int position;
       std::cin >> position;
-      auto fieldName = dacc->descriptor.fieldName(position);
+      auto fieldName = dacc->descriptor[position].rname;
       std::any value = dacc->getPayload()->getItem(position);
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;

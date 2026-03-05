@@ -1,7 +1,7 @@
 #pragma once
 
+#include <algorithm>
 #include <initializer_list>
-#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -24,26 +24,22 @@ void setFlat(bool);
 
 class Descriptor : public std::vector<rField> {
   std::vector<std::pair<int, int>> convMap_;
-  std::map<std::pair<int, int>, int> convReMap_;
   std::vector<int> offsetMap_;
   int clen_ = 0;
   bool dirtyMap{true};
   void updateConvMaps();
 
  public:
-  void invalidateCache() { dirtyMap = true; }
-  bool isEmpty() const;
-
   Descriptor(std::initializer_list<rField> l);
   Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type);
 
   Descriptor() = default;
-  Descriptor(const Descriptor &init);
+  Descriptor(const Descriptor &init) = default;
 
   void append(std::initializer_list<rField> l);
 
   Descriptor &operator+=(const Descriptor &rhs);
-  Descriptor &operator=(const Descriptor &rhs);
+  Descriptor &operator=(const Descriptor &rhs) = default;
   bool operator==(const Descriptor &rhs) const;
 
   Descriptor &createHash(const std::string &name, Descriptor lhs, Descriptor rhs);
@@ -51,12 +47,10 @@ class Descriptor : public std::vector<rField> {
 
   size_t getSizeInBytes() const;
   size_t position(const std::string_view name);
-  std::string fieldName(int fieldPosition);
   int len(const std::string_view name);
   constexpr int len(const rdb::rField &field) const;
   size_t offsetBegArr(const std::string_view name);
   int offset(int position);
-  int arraySize(const std::string_view name);
   std::string_view type(const std::string_view name);
   int sizeFlat();
   std::vector<rField> fieldsFlat();
@@ -68,11 +62,8 @@ class Descriptor : public std::vector<rField> {
 
   std::optional<std::pair<int, int>> convert(int position);
 
-  bool hasField(const std::string_view name) {
-    for (const auto &f : *this) {
-      if (f.rname == name) return true;
-    }
-    return false;
+  bool hasField(const std::string_view name) const {
+    return std::any_of(begin(), end(), [name](const auto &f) { return f.rname == name; });
   }
 
   // Operators that enables read and write Descriptor to file/screen i Human

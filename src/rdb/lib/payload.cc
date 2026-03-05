@@ -78,7 +78,6 @@ payload payload::operator+(const payload &other) {
               result.descriptor.getSizeInBytes());
   std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
   std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
-  descSum.invalidateCache();
   return result;
 }
 
@@ -278,7 +277,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
     std::memset(rhs.get() + desc.offsetBegArr(fieldName), 0, desc.len(fieldName));
     std::memcpy(rhs.get() + desc.offsetBegArr(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
   } else
-    for (auto i = 0; i < desc.arraySize(fieldName); i++) {
+    for (auto i = 0; i < desc[desc.position(fieldName)].rarray; i++) {
       if (desc.type(fieldName) == "BYTE") {
         int data;
         is >> data;
@@ -393,7 +392,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
     if (!getFlat()) os << std::endl;
   }
-  if (rhs.descriptor.isEmpty()) {
+  if (rhs.descriptor.empty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }

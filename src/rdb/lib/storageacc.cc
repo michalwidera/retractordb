@@ -245,7 +245,7 @@ size_t storageAccessor::getRecordsCount() { return recordsCount_; }
 std::string storageAccessor::getStorageName() { return storageFile_; }
 
 void storageAccessor::abortIfStorageNotPrepared() {
-  if (descriptor.isEmpty()) {
+  if (descriptor.empty()) {
     SPDLOG_ERROR("descriptor is Empty");
     assert(false && "Empty descriptor");
     abort();

@@ -39,7 +39,6 @@ void Descriptor::updateConvMaps() {
   if (!dirtyMap) return;
 
   convMap_.clear();
-  convReMap_.clear();
   offsetMap_.clear();
 
   clen_ = 0;
@@ -66,8 +65,6 @@ void Descriptor::updateConvMaps() {
 
     if (counterArray > 0) {
       convMap_.push_back(std::make_pair(fieldCounter, backCounterArray));
-      convReMap_[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
-
       offsetMap_.push_back(offset);
       if ((*it).rtype == rdb::STRING)
         offset += len(*it);
@@ -100,8 +97,6 @@ std::optional<std::pair<int, int>> Descriptor::convert(int position) {
   }
 }
 
-bool Descriptor::isEmpty() const { return this->size() == 0; }
-
 int Descriptor::sizeFlat() {
   updateConvMaps();
   return clen_;
@@ -118,7 +113,10 @@ std::vector<rField> Descriptor::fieldsFlat() {
   return ret;
 }
 
-void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
+void Descriptor::append(std::initializer_list<rField> l) {
+  insert(end(), l.begin(), l.end());
+  dirtyMap = true;
+}
 
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
   Descriptor ret(lhs);
@@ -135,15 +133,6 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
     // due one name policy
   }
 
-  dirtyMap = true;
-  return *this;
-}
-
-Descriptor &Descriptor::operator=(const Descriptor &rhs) {
-  if (this == &rhs) return *this;
-
-  clear();
-  insert(end(), rhs.begin(), rhs.end());
   dirtyMap = true;
   return *this;
 }
@@ -201,8 +190,6 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
   return *this;
 }
 
-Descriptor::Descriptor(const Descriptor &init) { *this += init; }
-
 constexpr int Descriptor::len(const rdb::rField &field) const {
   if (isConfigurationField(field.rtype)) return 0;
   return field.rlen * field.rarray;
@@ -258,15 +245,7 @@ size_t Descriptor::position(const std::string_view name) {
   return 0;  // ProForma Error
 }
 
-std::string Descriptor::fieldName(int fieldPosition) {  //
-  return ((*this)[fieldPosition]).rname;                //
-}
-
 int Descriptor::len(const std::string_view name) { return len((*this)[position(name)]); }
-
-int Descriptor::arraySize(const std::string_view name) {  //
-  return ((*this)[position(name)]).rarray;                //
-}
 
 size_t Descriptor::offsetBegArr(const std::string_view name) {
   auto offset{0};
@@ -343,7 +322,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << r.rlen << "]";
     if (!flatOutput) os << std::endl;
   }
-  if (rhs.isEmpty())
+  if (rhs.empty())
     os << "Empty";
   else if (flatOutput)
     os << " ";
