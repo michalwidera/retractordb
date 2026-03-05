@@ -15,9 +15,6 @@ namespace rdb {
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
 enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
-
-bool getFlat();
-void setFlat(bool);
 //
 // Creates ability to create descriptions of binary frames using types and arrays
 //
@@ -29,7 +26,11 @@ class Descriptor : public std::vector<rField> {
   bool dirtyMap{true};
   void updateConvMaps();
 
+  static bool flatOutput_;
+
  public:
+  static bool getFlat() { return flatOutput_; }
+  static void setFlat(bool val) { flatOutput_ = val; }
   Descriptor(std::initializer_list<rField> l);
   Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type);
 

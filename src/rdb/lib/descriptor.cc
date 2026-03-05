@@ -13,10 +13,7 @@ extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_vie
 
 namespace rdb {
 
-static bool flatOutput = false;
-
-bool getFlat() { return flatOutput; }
-void setFlat(bool var) { flatOutput = var; }
+bool Descriptor::flatOutput_ = false;
 
 constexpr auto GetFieldType(const std::string_view name) { return magic_enum::enum_cast<rdb::descFld>(name); }
 
@@ -280,7 +277,7 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
 }
 
 std::ostream &flat(std::ostream &os) {
-  flatOutput = true;
+  Descriptor::setFlat(true);
   return os;
 }
 
@@ -291,7 +288,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       if (r.rlen == 0 && r.rarray == 0) continue;  // skip retention 0,0
     if (r.rtype == rdb::RETMEMORY)
       if (r.rlen == 0) continue;  // skip retention memory 0
-    if (!flatOutput)
+    if (!Descriptor::flatOutput_)
       os << "\t";
     else
       os << " ";
@@ -320,14 +317,14 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << r.rarray << "]";
     else if (r.rtype == rdb::STRING)
       os << "[" << r.rlen << "]";
-    if (!flatOutput) os << std::endl;
+    if (!Descriptor::flatOutput_) os << std::endl;
   }
   if (rhs.empty())
     os << "Empty";
-  else if (flatOutput)
+  else if (Descriptor::flatOutput_)
     os << " ";
   os << "}";
-  flatOutput = false;
+  Descriptor::flatOutput_ = false;
 
   return os;
 }

@@ -329,7 +329,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         (r.rtype == rdb::RETENTION) ||  //
         (r.rtype == rdb::RETMEMORY))    // skip these types
       break;
-    if (!getFlat())
+    if (!Descriptor::getFlat())
       os << "\t";
     else
       os << " ";
@@ -390,16 +390,16 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
 
         if (i < r.rarray - 1) os << " ";
       }
-    if (!getFlat()) os << std::endl;
+    if (!Descriptor::getFlat()) os << std::endl;
   }
   if (rhs.descriptor.empty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  if (getFlat()) os << " ";
+  if (Descriptor::getFlat()) os << " ";
   os << "}";
-  if (!getFlat()) os << std::endl;
-  setFlat(false);
+  if (!Descriptor::getFlat()) os << std::endl;
+  Descriptor::setFlat(false);
   return os;
 }
 
