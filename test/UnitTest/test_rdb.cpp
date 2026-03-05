@@ -209,46 +209,34 @@ TEST(xrdb, test_storage) {
   dAcc2.attachDescriptor(&dataDescriptor);
   dAcc2.setDisposable(true);
 
-  dataPayload *payload1 = reinterpret_cast<dataPayload *>(dAcc2.getPayload()->get());
+  auto *pl = dAcc2.getPayload();
 
-  std::memcpy(payload1->Name, "test data", AREA_SIZE);
-  payload1->TLen    = 0x66;
-  payload1->Control = 0x22;
+  pl->setItem(0, std::string("test data"));
+  pl->setItem(1, static_cast<uint8_t>(0x22));
+  pl->setItem(2, 0x66);
 
-  ASSERT_TRUE(payload1->TLen == *(reinterpret_cast<int *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("TLen"))));
+  // Verify offsetBegArr("TLen") points to the correct location in raw memory
+  {
+    int tlenViaOffset;
+    std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.offsetBegArr("TLen"), sizeof(int));
+    ASSERT_EQ(std::any_cast<int>(pl->getItem(2)), tlenViaOffset);
+  }
 
   dAcc2.write();
   dAcc2.write();
   dAcc2.write();
 
-  std::memcpy(payload1->Name, "xxxx xxxx", AREA_SIZE);
-  payload1->TLen    = 0x67;
-  payload1->Control = 0x33;
+  pl->setItem(0, std::string("xxxx xxxx"));
+  pl->setItem(1, static_cast<uint8_t>(0x33));
+  pl->setItem(2, 0x67);
 
   dAcc2.write(1);
 
   dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
-  {
-    std::stringstream coutstring;
-    coutstring << std::string(reinterpret_cast<char *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("Name")),
-                              dAcc2.descriptor.len("Name"));
-    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "xxxx xxxx") == 0);
-  }
-  {
-    std::stringstream coutstring;
-    coutstring << std::hex;
-    coutstring << *(reinterpret_cast<int *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("TLen")));
-    coutstring << std::dec;
-    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "67") == 0);
-  }
 
-  {
-    std::stringstream coutstring;
-    coutstring << std::hex;
-    coutstring << (uint) * (reinterpret_cast<uint8_t *>(payload1->ptr + dAcc2.descriptor.offsetBegArr("Control")));
-    coutstring << std::dec;
-    ASSERT_TRUE(strcmp(coutstring.str().c_str(), "33") == 0);
-  }
+  ASSERT_EQ(std::any_cast<std::string>(pl->getItem(0)), "xxxx xxxx");
+  ASSERT_EQ(std::any_cast<int>(pl->getItem(2)), 0x67);
+  ASSERT_EQ(std::any_cast<uint8_t>(pl->getItem(1)), 0x33);
 }
 
 TEST(xrdb, test_descriptor_compare) {
@@ -340,7 +328,7 @@ TEST(crdb, payload_add_operator) {
 
   dataPayload var;
 
-  std::memcpy(&var, data1Payload.get(), 19);
+  std::memcpy(&var, data1Payload.span().data(), 19);
 
   ASSERT_TRUE(var.ll == std::any_cast<int>(ll_));
   ASSERT_TRUE(var.TLen == std::any_cast<int>(TLen_));

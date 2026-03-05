@@ -339,12 +339,12 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "dec") {
       dacc->getPayload()->setHex(false);
     } else if (cmd == "dump") {
-      auto *ptr = reinterpret_cast<uint8_t *>(dacc->getPayload()->get());
-      for (auto i = 0; i < dacc->descriptor.getSizeInBytes(); i++) {
+      auto payloadSpan = dacc->getPayload()->span();
+      for (auto byte : payloadSpan) {
         std::cout << std::hex;
         std::cout << std::setfill('0');
         std::cout << std::setw(2);
-        std::cout << static_cast<unsigned>(*(ptr + i));
+        std::cout << static_cast<unsigned>(byte);
         std::cout << std::dec;
         std::cout << " ";
       }

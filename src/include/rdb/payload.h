@@ -2,6 +2,7 @@
 
 #include <any>
 #include <memory>  // std::unique_ptr
+#include <span>
 
 #include "descriptor.h"
 
@@ -24,9 +25,9 @@ class payload {
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;
 
-  /// @brief Accessor to pointer to payload
-  /// @return  T* pointer to payload
-  uint8_t *get() const;
+  /// @brief Span accessor to payload (modern, bounds-aware)
+  /// @return  std::span over the payload memory
+  std::span<uint8_t> span() const;
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area

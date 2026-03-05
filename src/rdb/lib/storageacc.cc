@@ -213,8 +213,8 @@ void storageAccessor::reset() {
 }
 
 void storageAccessor::cleanPayload(uint8_t *destination) {
-  destination = (destination == nullptr)                              //
-                    ? static_cast<uint8_t *>(storagePayload_->get())  //
+  destination = (destination == nullptr)              //
+                    ? storagePayload_->span().data()  //
                     : destination;
   auto size   = descriptor.getSizeInBytes();
   std::memset(destination, 0, size);
@@ -276,7 +276,7 @@ bool storageAccessor::read(const size_t recordIndexFromFront, uint8_t *destinati
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {
-    destination = static_cast<uint8_t *>(storagePayload_->get());
+    destination = storagePayload_->span().data();
   }
 
   assert(destination != nullptr);
@@ -312,8 +312,8 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
   if (isHold_) {
     SPDLOG_INFO("revRead on HOLD {} - fake data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromBack,
                 recordsCount_);
-    destination = (destination == nullptr)                              //
-                      ? static_cast<uint8_t *>(storagePayload_->get())  //
+    destination = (destination == nullptr)              //
+                      ? storagePayload_->span().data()  //
                       : destination;
 
     assert(destination != nullptr);
@@ -340,7 +340,7 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
     //
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
-    auto result = accessor_->read(static_cast<uint8_t *>(chamber_->get()), 0);
+    auto result = accessor_->read(chamber_->span().data(), 0);
     SPDLOG_INFO("Physical read from source {} into chamber_ result={}", accessor_->name(), result);
     assert(result == EXIT_SUCCESS && "read failure from data source");
     bufferState              = sourceState::armed;
@@ -362,8 +362,8 @@ bool storageAccessor::revRead(const size_t recordIndexFromBack, uint8_t *destina
   // in case of accessing buffer that has no data yet - zeros are returned
 
   if (recordIndexFromBack >= circularBuffer_.size()) {
-    destination = (destination == nullptr)                              //
-                      ? static_cast<uint8_t *>(storagePayload_->get())  //
+    destination = (destination == nullptr)              //
+                      ? storagePayload_->span().data()  //
                       : destination;
 
     assert(destination != nullptr);
@@ -392,7 +392,7 @@ bool storageAccessor::write(const size_t recordIndex) {
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount_) {
-    result = accessor_->write(static_cast<uint8_t *>(storagePayload_->get()));  // <- Call to append Function
+    result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount_++;
 
@@ -401,7 +401,7 @@ bool storageAccessor::write(const size_t recordIndex) {
   }
 
   if (recordsCount_ > 0 && recordIndex < recordsCount_) {
-    result = accessor_->write(static_cast<uint8_t *>(storagePayload_->get()), recordIndex * size);
+    result = accessor_->write(storagePayload_->span().data(), recordIndex * size);
     assert(result == 0);
     SPDLOG_INFO("write {}", recordIndex);
   }

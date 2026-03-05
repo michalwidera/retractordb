@@ -265,7 +265,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->descriptor);
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->get());
+    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data());
     assert(success);
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());

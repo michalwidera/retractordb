@@ -111,7 +111,7 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
     }
   }
 
-  std::memcpy(reinterpret_cast<char *>(ptrData), payload->get(), descriptor.getSizeInBytes());
+  std::memcpy(reinterpret_cast<char *>(ptrData), payload->span().data(), descriptor.getSizeInBytes());
 
   if (loopToBeginningIfEOF_) assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 
