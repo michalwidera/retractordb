@@ -155,6 +155,8 @@ void storageAccessor::attachStorage() {
   SPDLOG_INFO("record count {} on {}", recordsCount_, storageFile_);
 
   dataFileStatus = storageState::openAndCreate;
+
+  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor);
 }
 
 storageAccessor::~storageAccessor() {

@@ -13,6 +13,7 @@
 #include "facctxtsrc.h"
 #include "fagrp.h"
 #include "payload.h"
+#include "metaDataStream.h"
 
 namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
@@ -39,6 +40,8 @@ class storageAccessor {
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
+
+  std::unique_ptr<rdb::metaDataStream> metaDataStream_;
 
  public:
   storageAccessor() = delete;
