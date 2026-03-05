@@ -56,7 +56,7 @@ ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t po
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   }
-  myFile.write(reinterpret_cast<const char *>(ptrData), size);
+  myFile.write(static_cast<const char *>(static_cast<const void *>(ptrData)), size);
   assert((myFile.rdstate() & std::ofstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
@@ -79,7 +79,7 @@ ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position)
   // Therefore +1 appears.
   // Last byte was omitted.
   // Look's like some inconsistency is here.
-  myFile.get(reinterpret_cast<char *>(ptrData), size + 1);
+  myFile.read(static_cast<char *>(static_cast<void *>(ptrData)), size);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();

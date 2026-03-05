@@ -55,7 +55,7 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
 
   if (!loopToBeginningIfEOF_) {
     if (myFile.eof()) {
-      std::memset(reinterpret_cast<char *>(ptrData), 0, descriptor.getSizeInBytes());
+      std::memset(ptrData, 0, descriptor.getSizeInBytes());
       readCount++;
 
       return EXIT_SUCCESS;
@@ -111,7 +111,7 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
     }
   }
 
-  std::memcpy(reinterpret_cast<char *>(ptrData), payload->span().data(), descriptor.getSizeInBytes());
+  std::memcpy(ptrData, payload->span().data(), descriptor.getSizeInBytes());
 
   if (loopToBeginningIfEOF_) assert((myFile.rdstate() & std::ifstream::failbit) == 0);
 

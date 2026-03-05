@@ -26,12 +26,12 @@ bool test_1() {
 
     binaryAccessor1.write(xData);
 
-    if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
+    if (std::memcmp(xData, "test data", AREA_SIZE) != 0) return false;
 
     T yData[AREA_SIZE];
     binaryAccessor1.read(yData, 0);
 
-    if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
+    if (std::memcmp(yData, "test data", AREA_SIZE) != 0) return false;
   }
   auto statusRemove1 = remove(binaryAccessor1.name().c_str());
   if (statusRemove1 != 0) return false;
@@ -50,12 +50,12 @@ bool test_2() {
     dataStore.write(xData);
     dataStore.write(xData);  // Add one extra record
 
-    if (strcmp(reinterpret_cast<char *>(xData), "test data") != 0) return false;
+    if (std::memcmp(xData, "test data", AREA_SIZE) != 0) return false;
 
     T yData[AREA_SIZE];
     dataStore.read(yData, 0);
 
-    if (strcmp(reinterpret_cast<char *>(yData), "test data") != 0) return false;
+    if (std::memcmp(yData, "test data", AREA_SIZE) != 0) return false;
   }
   auto statusRemove1 = remove(dataStore.name().c_str());
   if (statusRemove1 != 0) return false;
@@ -89,11 +89,11 @@ bool test_3() {
 
     dataStore.read(yData, 0);
 
-    if (strcmp(reinterpret_cast<char *>(yData), "test aaaa") != 0) return false;
+    if (std::memcmp(yData, "test aaaa", AREA_SIZE) != 0) return false;
 
     dataStore.read(yData, AREA_SIZE);
 
-    if (strcmp(reinterpret_cast<char *>(yData), "test xxxx") != 0) return false;
+    if (std::memcmp(yData, "test xxxx", AREA_SIZE) != 0) return false;
   }
   auto statusRemove1 = remove(dataStore.name().c_str());
   if (statusRemove1 != 0) return false;

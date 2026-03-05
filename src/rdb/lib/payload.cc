@@ -212,7 +212,7 @@ std::any payload::getItem(const int positionFlat) {
           len = i;
           break;
         }
-      std::string s(reinterpret_cast<const char *>(fieldSpan.data()), len);
+      std::string s(fieldSpan.begin(), fieldSpan.begin() + len);
 
       return s;
     }
@@ -340,7 +340,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           break;
         }
 
-      os << std::string(reinterpret_cast<const char *>(fieldSpan.data()), len);
+      os << std::string(fieldSpan.begin(), fieldSpan.begin() + len);
     } else
       for (auto i = 0; i < r.rarray; i++) {
         if (r.rtype == rdb::BYTE) {
