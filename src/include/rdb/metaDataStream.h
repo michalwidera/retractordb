@@ -4,9 +4,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
-
 namespace rdb {
 
 /// @brief Meta index for an indexed data stream.
@@ -52,13 +52,18 @@ class metaDataStream {
 
   /// @brief Construct meta index for the given descriptor.
   /// @param descriptor descriptor of the indexed data stream
-  explicit metaDataStream(const Descriptor &descriptor) : descriptor_(descriptor) {};
+  explicit metaDataStream(const Descriptor &descriptor);
 
   /// @brief Default destructor.
   ~metaDataStream() = default;
 
-#ifdef RDB_WORK_IN_PROGRESS
   // ── Core update interface ──────────────────────────────────────────
+
+  /// @brief Notify the meta index that the record at @p recordIndex has
+  ///        been modified.
+  /// @param recordIndex  position of the modified record in the stream
+  /// @param nullBitset   new null bit-set pattern of the modified record
+  void onRecordModified(size_t recordIndex, std::vector<bool> &nullBitset);
 
   /// @brief Notify the meta index that a record has been appended.
   ///
@@ -66,14 +71,9 @@ class metaDataStream {
   /// last entry the counter is incremented; otherwise a new entry is
   /// created and counting restarts from one.
   /// @param nullBitset bit pattern indicating which fields are null
-  void onRecordAppended(const std::vector<bool> &nullBitset);
+  void onRecordAppended(std::vector<bool> &nullBitset);
 
-  /// @brief Notify the meta index that the record at @p recordIndex has
-  ///        been modified.
-  /// @param recordIndex  position of the modified record in the stream
-  /// @param nullBitset   new null bit-set pattern of the modified record
-  void onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset);
-
+#ifdef RDB_WORK_IN_PROGRESS
   /// @brief Notify the meta index that the record at @p recordIndex has
   ///        been deleted.
   /// @param recordIndex position of the deleted record in the stream
@@ -138,7 +138,7 @@ class metaDataStream {
   // ── Data members ───────────────────────────────────────────────────
 #endif
   /// @brief Descriptor of the indexed data stream.
-  Descriptor descriptor_;
+  std::shared_ptr<Descriptor> descriptorRef_;
 
  private:
   /// @brief Run-length encoded sequence of null bit-set entries.
