@@ -13,22 +13,22 @@ namespace rdb {
  * Type: TEXTSOURCE
  */
 class textSourceAccessorRO : public FileAccessorInterface {
-  std::string filename;
-  const ssize_t sizeRec;
+  std::string filename_;
+  const ssize_t recSize_;
 
-  Descriptor descriptor;
+  Descriptor descriptor_;
 
-  std::unique_ptr<rdb::payload> payload;
+  std::unique_ptr<rdb::payload> payload_;
 
-  std::fstream myFile;
+  std::fstream myFile_;
 
-  size_t readCount = 0;
+  size_t readCount_ = 0;
 
   bool loopToBeginningIfEOF_ = true;
 
  public:
   textSourceAccessorRO(const std::string_view fileName,    //
-                       const ssize_t sizeRec,              //
+                       const ssize_t recSize,              //
                        const rdb::Descriptor &descriptor,  //
                        bool loopToBeginningIfEOF);
 

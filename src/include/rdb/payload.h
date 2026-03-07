@@ -11,10 +11,10 @@ namespace rdb {
 /// This is accessor for payload memory area that supports applying descriptor type over memory area.
 class payload {
   /// @brief Payload memory area
-  std::unique_ptr<uint8_t[]> payloadData;
+  std::unique_ptr<uint8_t[]> payloadData_;
 
   /// @brief Type of dumped or read numeric formats
-  bool hexFormat = false;
+  bool hexFormat_ = false;
 
   template <typename T>
   void setItemBy(const int position, std::any value);

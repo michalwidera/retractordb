@@ -9,18 +9,18 @@
 namespace rdb {
 
 class groupFileAccessor : public FileAccessorInterface {
-  std::string filename;
-  std::string currentFilename;
-  const ssize_t recSize;
+  std::string filename_;
+  std::string currentFilename_;
+  const ssize_t recSize_;
 
-  retention_t retention{0, 0};
+  retention_t retention_{0, 0};
 
-  std::vector<std::unique_ptr<posixBinaryFileAccessor>> vec;
+  std::vector<std::unique_ptr<posixBinaryFileAccessor>> vec_;
 
-  size_t writeCount     = 0;
-  size_t currentSegment = 0;
+  size_t writeCount_     = 0;
+  size_t currentSegment_ = 0;
 
-  size_t removedSegments = 0;
+  size_t removedSegments_ = 0;
 
   int percounter_;
 

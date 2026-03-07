@@ -12,8 +12,8 @@ namespace rdb {
  * Type: DEFAULT
  */
 class posixBinaryFileAccessor : public FileAccessorInterface {
-  std::string filename;
-  const ssize_t size;
+  std::string filename_;
+  const ssize_t recordSize_;
   /**
    * @brief Posix File Descriptor
    */
@@ -21,7 +21,7 @@ class posixBinaryFileAccessor : public FileAccessorInterface {
   int percounter_;
 
  public:
-  posixBinaryFileAccessor(const std::string_view fileName, const ssize_t size, int percounter = -1);
+  posixBinaryFileAccessor(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
   ~posixBinaryFileAccessor() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;

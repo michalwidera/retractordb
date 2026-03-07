@@ -21,16 +21,16 @@ namespace rdb {
 
 payload::payload(const Descriptor &descriptor)
     : descriptor(descriptor),  //
-      hexFormat(false) {
-  payloadData = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
+      hexFormat_(false) {
+  payloadData_ = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
   std::fill(span().begin(), span().end(), 0);
 }
 
 // copy constructor
 
 payload::payload(const payload &other) {
-  payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
-  descriptor  = other.descriptor;
+  payloadData_ = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
+  descriptor   = other.descriptor;
   std::copy(other.span().begin(), other.span().end(), span().begin());
 }
 
@@ -53,8 +53,8 @@ payload &payload::operator=(const Descriptor &other) {
   // * if non empty - this goes strange
   if (descriptor.size() == 0) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
-    descriptor  = other;
-    payloadData = std::make_unique<uint8_t[]>(other.getSizeInBytes());
+    descriptor   = other;
+    payloadData_ = std::make_unique<uint8_t[]>(other.getSizeInBytes());
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
@@ -92,9 +92,9 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arr
   std::memcpy(dest.data(), &data, sizeof(T));
 }
 
-void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
+void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 
-std::span<uint8_t> payload::span() const { return {payloadData.get(), descriptor.getSizeInBytes()}; }
+std::span<uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
 void payload::setItemBy(const int positionFlat, std::any value) {
@@ -268,7 +268,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   std::string fieldName;
   is >> fieldName;
   if (is.eof()) return is;
-  if (rhs.hexFormat)
+  if (rhs.hexFormat_)
     is >> std::hex;
   else
     is >> std::dec;
@@ -311,7 +311,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
 }
 
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
-  if (rhs.hexFormat)
+  if (rhs.hexFormat_)
     os << std::hex;
   else
     os << std::dec;
@@ -347,7 +347,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           uint8_t data{0};
           auto src = rhs.span().subspan(offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
           std::memcpy(&data, src.data(), sizeof(uint8_t));
-          if (rhs.hexFormat) {
+          if (rhs.hexFormat_) {
             os << std::setfill('0');
             os << std::setw(2);
           }
@@ -356,7 +356,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           int data{0};
           auto src = rhs.span().subspan(offset_ + i * sizeof(int), sizeof(int));
           std::memcpy(&data, src.data(), sizeof(int));
-          if (rhs.hexFormat) {
+          if (rhs.hexFormat_) {
             os << std::setfill('0');
             os << std::setw(8);
           }
@@ -365,7 +365,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
           unsigned int data{0};
           auto src = rhs.span().subspan(offset_ + i * sizeof(unsigned), sizeof(unsigned int));
           std::memcpy(&data, src.data(), sizeof(unsigned int));
-          if (rhs.hexFormat) {
+          if (rhs.hexFormat_) {
             os << std::setfill('0');
             os << std::setw(8);
           }

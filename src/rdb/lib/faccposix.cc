@@ -10,38 +10,38 @@
 namespace rdb {
 
 posixBinaryFileAccessor::posixBinaryFileAccessor(const std::string_view fileName,  //
-                                                 const ssize_t size,               //
+                                                 const ssize_t recordSize,         //
                                                  int percounter)                   //
-    : filename(std::string(fileName)),
-      size(size),
+    : filename_(std::string(fileName)),
+      recordSize_(recordSize),
       percounter_(percounter) {
-  fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
-    SPDLOG_ERROR("::open {} -> {}", filename, fd);
+    SPDLOG_ERROR("::open {} -> {}", filename_, fd);
   else
-    SPDLOG_INFO("::open {} -> {}", filename, fd);
+    SPDLOG_INFO("::open {} -> {}", filename_, fd);
   assert(fd >= 0);
 }
 
 posixBinaryFileAccessor::~posixBinaryFileAccessor() {
   ::close(fd);
   if (percounter_ >= 0) {
-    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename);
-    std::string rotated_filename = filename + ".old" + std::to_string(percounter_);
+    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
+    std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
-    std::filesystem::rename(filename, rotated_filename, ec);
+    std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
-      SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename, rotated_filename, ec.message());
+      SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
     } else {
-      SPDLOG_INFO("Rotated file {} to {}", filename, rotated_filename);
+      SPDLOG_INFO("Rotated file {} to {}", filename_, rotated_filename);
     }
   }
 }
 
-auto posixBinaryFileAccessor::name() -> std::string & { return filename; }
+auto posixBinaryFileAccessor::name() -> std::string & { return filename_; }
 
 ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;  // Error status
 
@@ -59,7 +59,7 @@ ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t posi
     assert(result != -1);
     if (result == -1) return errno;  // Error status
   }
-  size_t sizesh(size);
+  ssize_t sizesh(recordSize_);
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd, ptrData, sizesh);
     if (write_result < 0) {
@@ -75,18 +75,18 @@ ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t posi
 }
 
 ssize_t posixBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return fd;  // <- Error status
 
-  ssize_t read_size = ::pread(fd, ptrData, size, static_cast<off_t>(position));
+  ssize_t read_size = ::pread(fd, ptrData, recordSize_, static_cast<off_t>(position));
   return EXIT_SUCCESS;
 }
 
 size_t posixBinaryFileAccessor::count() {
   struct stat stat_buf;
-  int rc = stat(filename.c_str(), &stat_buf);
-  return rc == 0 ? stat_buf.st_size / size : -1;
+  int rc = stat(filename_.c_str(), &stat_buf);
+  return rc == 0 ? stat_buf.st_size / recordSize_ : -1;
 }
 
 }  // namespace rdb
