@@ -10,7 +10,7 @@
 namespace rdb {
 
 binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName,  //
-                                               const size_t recSize,             //
+                                               const ssize_t recSize,            //
                                                bool loopToBeginningIfEOF)        //
     : filename_(std::string(fileName)),
       recSize_(recSize),
@@ -42,11 +42,11 @@ ssize_t binaryDeviceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   if (fd_ < 0) {
     return fd_;  // <- Error status
   }
-  size_t read_size = ::read(fd_, ptrData, recSize_);  // /dev/random no seek supported
-  if (read_size != recSize_) {                        // dev/random has no seek - but binary files should loop?
+  auto read_size = ::read(fd_, ptrData, recSize_);  // /dev/random no seek supported
+  if (read_size != recSize_) {                      // dev/random has no seek - but binary files should loop?
     if (loopToBeginningIfEOF_) {
       ::lseek(fd_, 0, SEEK_SET);
-      size_t read_size_sh = ::read(fd_, ptrData, recSize_);
+      auto read_size_sh = ::read(fd_, ptrData, recSize_);
       if (read_size_sh != recSize_) return EXIT_FAILURE;
     } else {
       std::memset(ptrData, 0, recSize_);  // zero the rest of data

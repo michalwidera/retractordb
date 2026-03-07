@@ -30,7 +30,7 @@ K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
 }
 
 textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    //
-                                           const size_t sizeRec,               //
+                                           const ssize_t sizeRec,              //
                                            const rdb::Descriptor &descriptor,  //
                                            bool loopToBeginningIfEOF)
     : filename(std::string(fileName)),

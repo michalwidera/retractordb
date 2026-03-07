@@ -14,7 +14,7 @@ namespace rdb {
  */
 class textSourceAccessorRO : public FileAccessorInterface {
   std::string filename;
-  const std::size_t sizeRec;
+  const ssize_t sizeRec;
 
   Descriptor descriptor;
 
@@ -28,7 +28,7 @@ class textSourceAccessorRO : public FileAccessorInterface {
 
  public:
   textSourceAccessorRO(const std::string_view fileName,    //
-                       const size_t sizeRec,               //
+                       const ssize_t sizeRec,              //
                        const rdb::Descriptor &descriptor,  //
                        bool loopToBeginningIfEOF);
 

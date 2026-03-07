@@ -16,7 +16,7 @@ namespace rdb {
 
 genericBinaryFileAccessor::genericBinaryFileAccessor(  //
     const std::string_view fileName,                   //
-    const size_t size,                                 //
+    const ssize_t size,                                //
     int percounter)                                    //
     : filename(std::string(fileName)),
       size(size),

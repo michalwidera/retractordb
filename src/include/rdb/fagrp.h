@@ -11,7 +11,7 @@ namespace rdb {
 class groupFileAccessor : public FileAccessorInterface {
   std::string filename;
   std::string currentFilename;
-  const std::size_t recSize;
+  const ssize_t recSize;
 
   retention_t retention{0, 0};
 
@@ -25,7 +25,7 @@ class groupFileAccessor : public FileAccessorInterface {
   int percounter_;
 
  public:
-  groupFileAccessor(const std::string_view fileName, const size_t recSize, const retention_t &retention, int percounter);
+  groupFileAccessor(const std::string_view fileName, const ssize_t recSize, const retention_t &retention, int percounter);
   ~groupFileAccessor() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;

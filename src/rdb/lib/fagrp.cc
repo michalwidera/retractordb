@@ -17,7 +17,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 // fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
 
 groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
-                                     const size_t recSize,             //
+                                     const ssize_t recSize,            //
                                      const retention_t &retention,     //
                                      int percounter)                   //
     : filename(std::string(fileName)),

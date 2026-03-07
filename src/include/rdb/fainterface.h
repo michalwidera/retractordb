@@ -19,7 +19,8 @@ namespace rdb {
 /// 1. read ::= read(data, position)
 /// 2. append :== write(data, position == max_possible_value )
 /// 3. update :== write(data, position)
-/// Note: position is in bytes and size of data is determined by descriptor of storageAccessor class and is not part of this interface.
+/// Note: position is in bytes and size of data is determined by descriptor of storageAccessor class and is not part of this
+/// interface.
 struct FileAccessorInterface {
   /// @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
   /// @param ptrData pointer to data in memory where data will be fetched from storage
