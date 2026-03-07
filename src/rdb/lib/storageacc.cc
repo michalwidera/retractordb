@@ -394,33 +394,27 @@ bool storageAccessor::write(const size_t recordIndex) {
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount_) {
+    SPDLOG_INFO("append");
+
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount_++;
 
-    // -- Index support is not implemented yet, so we are treating all writes as appends for metaDataStream
+    if (metaDataStream_) metaDataStream_->onRecordAppended(nullInfo);  // TODO: pass real null bitset
 
-    if (metaDataStream_)
-    metaDataStream_->onRecordAppended(nullInfo);  // TODO: pass real null bitset
+  } else {
+    SPDLOG_INFO("write {}", recordIndex);
 
-    SPDLOG_INFO("append");
-    return result == 0;
-  }
+    assert(recordsCount_ > 0);
+    assert(recordIndex < recordsCount_);
 
-  if (recordsCount_ > 0 && recordIndex < recordsCount_) {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * size);
     assert(result == 0);
 
-    // -- Index support is not implemented yet, so we are treating all writes as appends for metaDataStream
+    if (metaDataStream_) metaDataStream_->onRecordModified(recordIndex, nullInfo);  // TODO: pass real null bitset
 
-    if (metaDataStream_)
-    metaDataStream_->onRecordModified(recordIndex, nullInfo);  // TODO: pass real null bitset
-
-    SPDLOG_INFO("write {}", recordIndex);
+    assert(recordsCount_ == accessor_->count());
   }
-
-  assert(recordsCount_ == accessor_->count());
-
   return result == 0;
 };
 
