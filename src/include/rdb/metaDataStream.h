@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
 namespace rdb {
 
 /// @brief Meta index for an indexed data stream.
@@ -40,10 +41,15 @@ namespace rdb {
 /// - The meta index shall not update the Entry on disk when a record with the same null bit-set values is appended.
 
 class metaDataStream {
+  void createNullBitsetTemplate();
+  std::vector<bool> nullBitset_;  ///< one bit per descriptor field (true = null)
+  std::string metaFilePath_{};    ///< file path for saving/loading the meta index
+  std::fstream indexFile_;  ///< file stream for reading/writing the meta index
+
  public:
   /// @brief Single entry in the meta index – a null bit-set pattern and count
   ///        of consecutive records sharing that pattern.
-  struct Entry {
+  struct IndexRecord {
     std::vector<bool> nullBitset;  ///< one bit per descriptor field (true = null)
     size_t recordCount{0};         ///< number of consecutive records with this pattern
   };
@@ -52,10 +58,11 @@ class metaDataStream {
 
   /// @brief Construct meta index for the given descriptor.
   /// @param descriptor descriptor of the indexed data stream
-  explicit metaDataStream(const Descriptor &descriptor);
+  /// @param metaFilePath path of the file to save/load the meta index
+  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath);
 
-  /// @brief Default destructor.
-  ~metaDataStream() = default;
+  /// @brief Destructor - closes artifacts.
+  virtual ~metaDataStream();
 
   // ── Core update interface ──────────────────────────────────────────
 
@@ -105,7 +112,7 @@ class metaDataStream {
   // ── Query interface ────────────────────────────────────────────────
 
   /// @brief Return the current list of entries.
-  const std::vector<Entry> &entries() const;
+  const std::vector<IndexRecord> &entries() const;
 
   /// @brief Return the total number of indexed records (sum of all
   ///        entry counters).
@@ -133,16 +140,12 @@ class metaDataStream {
 
   /// @brief Return the entry at the given index.
   /// @param index zero-based index into the entries vector
-  const Entry &operator[](size_t index) const;
+  const IndexRecord &operator[](size_t index) const;
 
   // ── Data members ───────────────────────────────────────────────────
 #endif
   /// @brief Descriptor of the indexed data stream.
   std::shared_ptr<Descriptor> descriptorRef_;
-
- private:
-  /// @brief Run-length encoded sequence of null bit-set entries.
-  std::vector<Entry> entries_;
 };  // class metaDataStream
 
 }  // namespace rdb

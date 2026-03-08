@@ -47,6 +47,9 @@ storageAccessor::storageAccessor(const std::string qryID,              //
 
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
   storageFile_    = std::filesystem::path(storageParam) / std::filesystem::path(storageFile_);
+  metaIndexFile_  = std::filesystem::path(storageParam) / std::filesystem::path(storageFile_ + ".meta");
+
+  SPDLOG_INFO("Meta index path {}", metaIndexFile_);
   SPDLOG_INFO("Storage path changed to {}", storageFile_);
   SPDLOG_INFO("Descriptor path changed to {}", descriptorFile_);
 }
@@ -148,6 +151,7 @@ void storageAccessor::attachStorage() {
 
   if (isDeclared()) {
     SPDLOG_INFO("records declared source on {}", storageFile_);
+    // Note: no meta index on declared sources, as they are read-only and not expected to have null values.
     return;
   }
 
@@ -156,7 +160,7 @@ void storageAccessor::attachStorage() {
 
   dataFileStatus = storageState::openAndCreate;
 
-  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor);
+  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
 }
 
 storageAccessor::~storageAccessor() {

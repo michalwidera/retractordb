@@ -30,6 +30,7 @@ class storageAccessor {
   size_t recordsCount_        = 0;
   std::string descriptorFile_ = "";
   std::string storageFile_    = "";
+  std::string metaIndexFile_  = "";  // file path for saving/loading the meta index
   std::string storageType_    = "DEFAULT";
   int percounter_             = -1;
 
