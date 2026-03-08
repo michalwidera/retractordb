@@ -42,7 +42,6 @@ namespace rdb {
 
 class metaDataStream {
   void createNullBitsetTemplate();
-  std::vector<bool> nullBitset_;  ///< one bit per descriptor field (true = null)
   std::string metaFilePath_{};    ///< file path for saving/loading the meta index
   std::fstream indexFile_;        ///< file stream for reading/writing the meta index
 
@@ -53,7 +52,7 @@ class metaDataStream {
     std::vector<bool> nullBitset;              ///< one bit per descriptor field (true = null)
     size_t recordCount{0};                     ///< number of consecutive records with this pattern
     std::vector<std::byte> serialize() const;  ///< serialize the entry to a vector of bytes
-    static IndexRecord deserialize(std::span<const std::byte> data);
+    static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
   };
 
   IndexRecord entry;

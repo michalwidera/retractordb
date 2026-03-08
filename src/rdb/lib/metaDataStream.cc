@@ -69,22 +69,22 @@ metaDataStream::~metaDataStream() {
 }
 
 void metaDataStream::createNullBitsetTemplate() {
-  nullBitset_.resize(descriptorRef_->size());
-  std::fill(nullBitset_.begin(), nullBitset_.end(), false);
+  entry.nullBitset.resize(descriptorRef_->size());
+  std::fill(entry.nullBitset.begin(), entry.nullBitset.end(), false);
 }
 
-void metaDataStream::onRecordModified(size_t recordIndex, std::vector<bool> &nullBitset) {
+void metaDataStream::onRecordModified(size_t recordIndex, std::vector<bool> &nullBitsetParam) {
   // TODO: Implement logic to update the meta index when a record is modified.
   // Create a redo log entry for the modification and update the meta index accordingly.
 };
 
-void metaDataStream::onRecordAppended(std::vector<bool> &nullBitset) {
-  if (nullBitset == nullBitset_) {
+void metaDataStream::onRecordAppended(std::vector<bool> &nullBitsetParam) {
+  if (entry.nullBitset == nullBitsetParam) {
     entry.recordCount++;
   } else {
     indexFile_.write(reinterpret_cast<const char *>(entry.serialize().data()), entry.serialize().size());
     entry.recordCount = 1;
-    entry.nullBitset  = nullBitset;
+    entry.nullBitset  = nullBitsetParam;
   }
 };
 
