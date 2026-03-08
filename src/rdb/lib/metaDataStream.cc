@@ -82,7 +82,8 @@ void metaDataStream::onRecordAppended(std::vector<bool> &nullBitsetParam) {
   if (entry.nullBitset == nullBitsetParam) {
     entry.recordCount++;
   } else {
-    indexFile_.write(reinterpret_cast<const char *>(entry.serialize().data()), entry.serialize().size());
+    auto bitstream = entry.serialize();
+    indexFile_.write(reinterpret_cast<const char *>(bitstream.data()), bitstream.size());
     entry.recordCount = 1;
     entry.nullBitset  = nullBitsetParam;
   }
