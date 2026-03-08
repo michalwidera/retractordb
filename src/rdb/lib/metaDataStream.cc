@@ -63,7 +63,8 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &
 
 metaDataStream::~metaDataStream() {
   if (indexFile_.is_open()) {
-    indexFile_.write(reinterpret_cast<const char *>(entry.serialize().data()), entry.serialize().size());
+    auto bitstream = entry.serialize();
+    indexFile_.write(reinterpret_cast<const char *>(bitstream.data()), bitstream.size());
     indexFile_.close();
   }
 }
