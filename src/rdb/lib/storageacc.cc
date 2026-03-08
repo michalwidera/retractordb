@@ -47,7 +47,7 @@ storageAccessor::storageAccessor(const std::string qryID,              //
 
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
   storageFile_    = std::filesystem::path(storageParam) / std::filesystem::path(storageFile_);
-  metaIndexFile_  = std::filesystem::path(storageParam) / std::filesystem::path(storageFile_ + ".meta");
+  metaIndexFile_  = std::filesystem::path(storageFile_ + ".meta");
 
   SPDLOG_INFO("Meta index path {}", metaIndexFile_);
   SPDLOG_INFO("Storage path changed to {}", storageFile_);
@@ -161,6 +161,7 @@ void storageAccessor::attachStorage() {
   dataFileStatus = storageState::openAndCreate;
 
   metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
+  SPDLOG_INFO("metaIndex file {}", metaIndexFile_);
 }
 
 storageAccessor::~storageAccessor() {
@@ -390,6 +391,7 @@ void storageAccessor::setCapacity(const int capacity) {
 
 bool storageAccessor::write(const size_t recordIndex) {
   std::vector<bool> nullInfo;  // TODO: pass real null bitset
+  nullInfo.resize(descriptor.size(), false);
 
   abortIfStorageNotPrepared();
 

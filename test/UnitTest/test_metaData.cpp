@@ -17,14 +17,12 @@ TEST(MetaDataStreamTest, test_metaDataStream_construction) {
   */
 }
 
-
 TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
-
   rdb::metaDataStream::IndexRecord original;
   original.recordCount = 42;
-  original.nullBitset = {true, false, true, true, false};
+  original.nullBitset  = {true, false, true, true, false};
 
-  std::vector<std::byte> serialized = original.serialize();
+  std::vector<std::byte> serialized             = original.serialize();
   rdb::metaDataStream::IndexRecord deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
   EXPECT_EQ(deserialized.recordCount, original.recordCount);
   EXPECT_EQ(deserialized.nullBitset, original.nullBitset);
