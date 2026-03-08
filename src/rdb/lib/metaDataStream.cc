@@ -24,7 +24,7 @@ std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
     return buf;
 }
 
-metaDataStream::IndexRecord deserialize(std::span<const std::byte> data) {
+metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<const std::byte> data) {
     const std::byte* ptr = data.data();
     const std::byte* end = ptr + data.size();
 
@@ -50,6 +50,7 @@ metaDataStream::IndexRecord deserialize(std::span<const std::byte> data) {
     for (size_t i = 0; i < bitsetSize; ++i)
         rec.nullBitset[i] = (std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1u;
 
+    ptr += byteCount;
     return rec;
 }
 
