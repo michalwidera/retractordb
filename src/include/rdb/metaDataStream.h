@@ -52,6 +52,8 @@ class metaDataStream {
   struct IndexRecord {
     std::vector<bool> nullBitset;  ///< one bit per descriptor field (true = null)
     size_t recordCount{0};         ///< number of consecutive records with this pattern
+    std::vector<std::byte> serialize() const;  ///< serialize the entry to a vector of bytes
+    static IndexRecord deserialize(std::span<const std::byte> data);
   };
 
   // ── Construction / destruction ──────────────────────────────────────
