@@ -21,7 +21,7 @@ class Retractor(ConanFile):
     description = "RetractorDB - time series database and data processing engine"
     homepage = "https://retractordb.com"
     requires = (
-        "boost/1.89.0",
+        "boost/1.90.0",
         "gtest/1.17.0",
         "antlr4-cppruntime/4.13.2",
         "antlr4/4.13.1",
