@@ -8,6 +8,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <span>
+
 namespace rdb {
 
 /// @brief Meta index for an indexed data stream.
