@@ -30,9 +30,9 @@ boost::property_tree::ptree qry_fake::netClient(const std::string &arg1, const s
   return retval;
 }
 
-TEST(xqry, test_hello) { ASSERT_TRUE(obj.hello() == boost::system::errc::success); }
+TEST(xqry, test_hello) { EXPECT_TRUE(obj.hello() == boost::system::errc::success); }
 
-TEST(xqry, test_dir) { ASSERT_TRUE(obj.dir() == "|core0|1|123|345|/dev/location|789|\n"); }
+TEST(xqry, test_dir) { EXPECT_TRUE(obj.dir() == "|core0|1|123|345|/dev/location|789|\n"); }
 
-// TEST(xqry, test_detail) { ASSERT_TRUE(obj.detailShow("core0") == "core0.rname1\ncore0.rname2\n"); }
+// TEST(xqry, test_detail) { EXPECT_TRUE(obj.detailShow("core0") == "core0.rname1\ncore0.rname2\n"); }
 // now it works as yaml

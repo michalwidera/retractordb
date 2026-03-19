@@ -54,7 +54,7 @@ class crsMathTest : public ::testing::Test {
 
     compiler cm(coreInstance);
     std::string response = cm.run();
-    ASSERT_TRUE(response == "OK");
+    EXPECT_TRUE(response == "OK");
   }
 
   virtual void TearDown() {
@@ -69,7 +69,7 @@ class crsMathTest : public ::testing::Test {
   }
 };
 
-TEST_F(crsMathTest, Only_nine_items_in_query) { ASSERT_TRUE(coreInstance.size() == 9); }
+TEST_F(crsMathTest, Only_nine_items_in_query) { EXPECT_TRUE(coreInstance.size() == 9); }
 
 const std::vector<std::string> allStreams = {"cx", "s1x", "s2x", "s3x", "s4x", "s5x", "s6x", "s7x", "s8x"};
 
@@ -146,7 +146,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
     proc.processRows(procSet);
   }
 
-  ASSERT_TRUE(strstream.str() == expectedResult);
+  EXPECT_TRUE(strstream.str() == expectedResult);
 }
 
 std::string print(std::string query_name, dataModel &proc) {
@@ -247,7 +247,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
   std::cerr << strstream.str().c_str() << std::endl;
   std::cerr << expectedResult << std::endl;
-  ASSERT_TRUE(strstream.str() == expectedResult);
+  EXPECT_TRUE(strstream.str() == expectedResult);
 }
 
 }  // Namespace

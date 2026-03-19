@@ -122,8 +122,8 @@ TEST_F(xschema, check_construct_payload) {
     coutstring2 << rdb::flat << *(payload.get());
     std::cerr << rdb::flat << *(payload.get()) << std::endl;
 
-    ASSERT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:-1 str1_2:-1 str1_3:-1 }");
-    ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:-1 str1_2:-1 str1_3:-1 }");
+    EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
 
@@ -148,8 +148,8 @@ TEST_F(xschema, check_construct_payload_mirror) {
     coutstring2 << rdb::flat << *(payload.get());
     std::cout << rdb::flat << *(payload.get()) << std::endl;
 
-    ASSERT_TRUE(coutstring2.str() == "{ str1_0:-1 str1_1:-1 str1_2:-1 str1_3:11 }");
-    ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:-1 str1_1:-1 str1_2:-1 str1_3:11 }");
+    EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
 
@@ -184,8 +184,8 @@ TEST_F(xschema, check_sum) {
     coutstring2 << rdb::flat << payload;
     std::cout << "!" << coutstring2.str() << std::endl;
 
-    ASSERT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:16 str2_0:333 }");
-    ASSERT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:16 str2_0:333 }");
+    EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
   }
 }
 
@@ -230,8 +230,8 @@ TEST_F(xschema, getRow_1) {
   std::string res1 = print(row1);
   std::string res2 = print(row2);
 
-  ASSERT_TRUE("{ 20 31 }" == res1);
-  ASSERT_TRUE("{ 21 32 }" == res2);
+  EXPECT_TRUE("{ 20 31 }" == res1);
+  EXPECT_TRUE("{ 21 32 }" == res2);
 
   dataArea->qSet["core0"]->outputPayload->reset();
 }

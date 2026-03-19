@@ -21,9 +21,9 @@ TEST(xExpressionEval, add_int_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::INTEGER);  // int in Token
+  EXPECT_TRUE(result.index() == rdb::INTEGER);  // int in Token
 
-  ASSERT_TRUE(std::get<int>(result) == 3);  // (int)3 in Token
+  EXPECT_TRUE(std::get<int>(result) == 3);  // (int)3 in Token
 }
 
 TEST(xExpressionEval, add_int_int_new_token) {
@@ -40,9 +40,9 @@ TEST(xExpressionEval, add_int_int_new_token) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::INTEGER);  // int in Token
+  EXPECT_TRUE(result.index() == rdb::INTEGER);  // int in Token
 
-  ASSERT_TRUE(std::get<int>(result) == 3);
+  EXPECT_TRUE(std::get<int>(result) == 3);
 }
 
 TEST(xExpressionEval, add_double_int) {
@@ -59,9 +59,9 @@ TEST(xExpressionEval, add_double_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
 
-  ASSERT_TRUE(std::get<double>(result) == 3.1);
+  EXPECT_TRUE(std::get<double>(result) == 3.1);
 }
 
 TEST(xExpressionEval, add_string_int) {
@@ -73,9 +73,9 @@ TEST(xExpressionEval, add_string_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::STRING);
+  EXPECT_TRUE(result.index() == rdb::STRING);
 
-  ASSERT_TRUE(std::get<std::string>(result) == "data11");
+  EXPECT_TRUE(std::get<std::string>(result) == "data11");
 }
 
 TEST(xExpressionEval, add_rational_int) {
@@ -87,9 +87,9 @@ TEST(xExpressionEval, add_rational_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::RATIONAL);
+  EXPECT_TRUE(result.index() == rdb::RATIONAL);
 
-  ASSERT_TRUE(std::get<boost::rational<int>>(result) == boost::rational<int>(3, 2));
+  EXPECT_TRUE(std::get<boost::rational<int>>(result) == boost::rational<int>(3, 2));
 }
 
 TEST(xExpressionEval, add_rational_string) {
@@ -101,9 +101,9 @@ TEST(xExpressionEval, add_rational_string) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::STRING);
+  EXPECT_TRUE(result.index() == rdb::STRING);
 
-  ASSERT_TRUE(std::get<std::string>(result) == "1/2test");
+  EXPECT_TRUE(std::get<std::string>(result) == "1/2test");
 }
 
 TEST(xExpressionEval, sub_int_int) {
@@ -115,9 +115,9 @@ TEST(xExpressionEval, sub_int_int) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::INTEGER);
+  EXPECT_TRUE(result.index() == rdb::INTEGER);
 
-  ASSERT_TRUE(std::get<int>(result) == 1);
+  EXPECT_TRUE(std::get<int>(result) == 1);
 }
 
 TEST(xExpressionEval, sub_int_dobule) {
@@ -129,9 +129,9 @@ TEST(xExpressionEval, sub_int_dobule) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
 
-  ASSERT_TRUE(std::get<double>(result) == 1.1);
+  EXPECT_TRUE(std::get<double>(result) == 1.1);
 }
 
 TEST(xExpressionEval, mul_int_dobule) {
@@ -143,9 +143,9 @@ TEST(xExpressionEval, mul_int_dobule) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
   // std::cerr << std::get<double>(result) << std::endl;
-  ASSERT_TRUE(std::get<double>(result) == 4.2);
+  EXPECT_TRUE(std::get<double>(result) == 4.2);
 }
 
 TEST(xExpressionEval, div_int_dobule) {
@@ -157,9 +157,9 @@ TEST(xExpressionEval, div_int_dobule) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
   // std::cerr << std::get<double>(result) << std::endl;
-  ASSERT_TRUE(std::get<double>(result) == 0.8);  // 2 / 2.5 = 0.8
+  EXPECT_TRUE(std::get<double>(result) == 0.8);  // 2 / 2.5 = 0.8
 }
 
 TEST(xExpressionEval, neg_dobule) {
@@ -170,8 +170,8 @@ TEST(xExpressionEval, neg_dobule) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
-  ASSERT_TRUE(std::get<double>(result) == -2.1);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(std::get<double>(result) == -2.1);
 }
 
 TEST(xExpressionEval, neg_byte_as_xor_ff) {
@@ -182,8 +182,8 @@ TEST(xExpressionEval, neg_byte_as_xor_ff) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::BYTE);
-  ASSERT_TRUE(std::get<uint8_t>(result) == 0xf0);
+  EXPECT_TRUE(result.index() == rdb::BYTE);
+  EXPECT_TRUE(std::get<uint8_t>(result) == 0xf0);
 }
 
 TEST(xExpressionEval, call_floor_function_double) {
@@ -194,8 +194,8 @@ TEST(xExpressionEval, call_floor_function_double) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
-  ASSERT_TRUE(std::get<double>(result) == 1);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(std::get<double>(result) == 1);
 }
 
 TEST(xExpressionEval, call_floor_function_rational) {
@@ -206,8 +206,8 @@ TEST(xExpressionEval, call_floor_function_rational) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::RATIONAL);
-  ASSERT_TRUE(std::get<boost::rational<int>>(result) == 1);
+  EXPECT_TRUE(result.index() == rdb::RATIONAL);
+  EXPECT_TRUE(std::get<boost::rational<int>>(result) == 1);
 }
 
 TEST(xExpressionEval, call_ceil_function_double) {
@@ -218,8 +218,8 @@ TEST(xExpressionEval, call_ceil_function_double) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
-  ASSERT_TRUE(std::get<double>(result) == 2);
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(std::get<double>(result) == 2);
 }
 
 TEST(xExpressionEval, long_program) {
@@ -234,6 +234,6 @@ TEST(xExpressionEval, long_program) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(result.index() == rdb::DOUBLE);
-  ASSERT_TRUE(std::get<double>(result) == 4);  // ceil ( (1 + 2) * 1.25 ) == ceil( 3.75 ) == 4
+  EXPECT_TRUE(result.index() == rdb::DOUBLE);
+  EXPECT_TRUE(std::get<double>(result) == 4);  // ceil ( (1 + 2) * 1.25 ) == ceil( 3.75 ) == 4
 }

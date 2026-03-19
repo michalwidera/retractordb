@@ -176,9 +176,9 @@ bool test_descriptor_read() {
   return true;
 }
 
-TEST(xrdb, test_descriptor_read) { ASSERT_TRUE(test_descriptor_read()); }
+TEST(xrdb, test_descriptor_read) { EXPECT_TRUE(test_descriptor_read()); }
 
-TEST(xrdb, test_descriptor) { ASSERT_TRUE(test_descriptor()); }
+TEST(xrdb, test_descriptor) { EXPECT_TRUE(test_descriptor()); }
 
 TEST(xrdb, test_storage) {
   // This structure is tricky
@@ -202,7 +202,7 @@ TEST(xrdb, test_storage) {
                       rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
 
   // This assert will fail is structure is not packed.
-  ASSERT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
+  EXPECT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
   rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2", "");
 
@@ -219,7 +219,7 @@ TEST(xrdb, test_storage) {
   {
     int tlenViaOffset;
     std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.offsetBegArr("TLen"), sizeof(int));
-    ASSERT_EQ(std::any_cast<int>(pl->getItem(2)), tlenViaOffset);
+    EXPECT_EQ(std::any_cast<int>(pl->getItem(2)), tlenViaOffset);
   }
 
   dAcc2.write();
@@ -234,9 +234,9 @@ TEST(xrdb, test_storage) {
 
   dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
 
-  ASSERT_EQ(std::any_cast<std::string>(pl->getItem(0)), "xxxx xxxx");
-  ASSERT_EQ(std::any_cast<int>(pl->getItem(2)), 0x67);
-  ASSERT_EQ(std::any_cast<uint8_t>(pl->getItem(1)), 0x33);
+  EXPECT_EQ(std::any_cast<std::string>(pl->getItem(0)), "xxxx xxxx");
+  EXPECT_EQ(std::any_cast<int>(pl->getItem(2)), 0x67);
+  EXPECT_EQ(std::any_cast<uint8_t>(pl->getItem(1)), 0x33);
 }
 
 TEST(xrdb, test_descriptor_compare) {
@@ -252,27 +252,27 @@ TEST(xrdb, test_descriptor_compare) {
   rdb::Descriptor dataDescriptorDiff2{rdb::Descriptor("Name", 1, 11, rdb::STRING) +  //
                                       rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
                                       rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  ASSERT_TRUE(dataDescriptor1 == dataDescriptor2);
-  ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
-  ASSERT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
+  EXPECT_TRUE(dataDescriptor1 == dataDescriptor2);
+  EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
+  EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
 TEST(crdb, genericBinaryFileAccessor_byte) {
   auto result1 = test_1<uint8_t, rdb::genericBinaryFileAccessor>();
-  ASSERT_TRUE(result1);
+  EXPECT_TRUE(result1);
   auto result2 = test_2<uint8_t, rdb::genericBinaryFileAccessor>();
-  ASSERT_TRUE(result2);
+  EXPECT_TRUE(result2);
   auto result3 = test_3<uint8_t, rdb::genericBinaryFileAccessor>();
-  ASSERT_TRUE(result3);
+  EXPECT_TRUE(result3);
 }
 
 TEST(crdb, posixBinaryFileAccessor_byte) {
   auto result1 = test_1<uint8_t, rdb::posixBinaryFileAccessor>();
-  ASSERT_TRUE(result1);
+  EXPECT_TRUE(result1);
   auto result2 = test_2<uint8_t, rdb::posixBinaryFileAccessor>();
-  ASSERT_TRUE(result2);
+  EXPECT_TRUE(result2);
   auto result3 = test_3<uint8_t, rdb::posixBinaryFileAccessor>();
-  ASSERT_TRUE(result3);
+  EXPECT_TRUE(result3);
 }
 
 TEST(crdb, payload_assign_operator) {
@@ -281,9 +281,9 @@ TEST(crdb, payload_assign_operator) {
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2;
   data2 = data1;
-  ASSERT_TRUE(data2.position("Control") == data1.position("Control"));
-  ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
-  ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
+  EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
+  EXPECT_TRUE(data2.len("Control") == data1.len("Control"));
+  EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
 
 TEST(crdb, payload_copy_constructor) {
@@ -291,9 +291,9 @@ TEST(crdb, payload_copy_constructor) {
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2{data1};
-  ASSERT_TRUE(data2.position("Control") == data1.position("Control"));
-  ASSERT_TRUE(data2.len("Control") == data1.len("Control"));
-  ASSERT_TRUE(data2.position("TLen") == data1.position("TLen"));
+  EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
+  EXPECT_TRUE(data2.len("Control") == data1.len("Control"));
+  EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
 
 TEST(crdb, payload_add_operator) {
@@ -330,23 +330,23 @@ TEST(crdb, payload_add_operator) {
 
   std::memcpy(&var, data1Payload.span().data(), 19);
 
-  ASSERT_TRUE(var.ll == std::any_cast<int>(ll_));
-  ASSERT_TRUE(var.TLen == std::any_cast<int>(TLen_));
+  EXPECT_TRUE(var.ll == std::any_cast<int>(ll_));
+  EXPECT_TRUE(var.TLen == std::any_cast<int>(TLen_));
 
   rdb::payload data2Payload(data2);
   data2Payload.setItem(0, 4004);
 
-  ASSERT_TRUE(std::any_cast<int>(data1Payload.getItem(2)) == 2000);
+  EXPECT_TRUE(std::any_cast<int>(data1Payload.getItem(2)) == 2000);
 
   rdb::payload data3Payload;
 
   data3Payload = data1Payload + data2Payload;
 
-  ASSERT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
-  ASSERT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
-  ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
-  ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
-  ASSERT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
+  EXPECT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
+  EXPECT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
 }
 
 TEST(crdb, position_conversion_test1) {
@@ -354,11 +354,11 @@ TEST(crdb, position_conversion_test1) {
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
 
-  ASSERT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
-  ASSERT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
-  ASSERT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
-  ASSERT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
-  ASSERT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
+  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
+  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
 }
 
 TEST(crdb, position_conversion_test2) {
@@ -366,11 +366,11 @@ TEST(crdb, position_conversion_test2) {
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
 
-  ASSERT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
-  ASSERT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
-  ASSERT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
-  ASSERT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
-  ASSERT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
+  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
+  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
 }
 
 TEST(crdb, position_conversion_test3) {
@@ -388,22 +388,22 @@ TEST(crdb, position_conversion_test3) {
   payload.setItem(4, 2000);
   payload.setItem(5, std::string("test"));
 
-  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(0)) == 145);
-  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(1)) == 24);
-  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
-  ASSERT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
-  ASSERT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
-  ASSERT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0)) == 145);
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1)) == 24);
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
+  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
+  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
 
   std::stringstream coutstring;
   coutstring << rdb::flat << payload;
-  ASSERT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
+  EXPECT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
 }
 
 TEST(crdb, descriptor_parser_test) {
   rdb::Descriptor out;
-  ASSERT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
-  ASSERT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
-  ASSERT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
-  ASSERT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
 }
