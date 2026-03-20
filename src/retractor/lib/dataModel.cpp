@@ -51,7 +51,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
 
 dataModel::~dataModel() {}
 
-bool dataModel::addQueryToModel(std::string id) {
+bool dataModel::addQueryToModel(const std::string &id) {
   if (qSet.find(id) != qSet.end()) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
     return false;

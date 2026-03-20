@@ -19,7 +19,7 @@ class dataModel {
 
   dataModel() = delete;
 
-  bool addQueryToModel(std::string id);
+  bool addQueryToModel(const std::string &id);
 
   std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
                                                     const int revOffset = 0);

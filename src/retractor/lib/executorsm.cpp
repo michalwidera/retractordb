@@ -115,7 +115,7 @@ ptree executorsm::collectStreamsParameters() {
   return ptRetval;
 }
 
-ptree executorsm::getAdHoc(std::string adHocQuery) {
+ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   qTree coreCopy;
   ptree ptRetval;
   SPDLOG_INFO("got adhoc {} rcv.", adHocQuery);

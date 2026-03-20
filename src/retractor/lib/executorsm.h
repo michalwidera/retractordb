@@ -24,7 +24,7 @@ struct executorsm {
   static void commandProcessorLoop();
   static ptree commandProcessor(ptree ptInval);
   static ptree collectStreamsParameters();
-  static ptree getAdHoc(std::string adHocQuery);
+  static ptree getAdHoc(const std::string &adHocQuery);
   static void boradcastOutOfBussiness();
 
   void boradcast(const std::set<std::string> &inSet);

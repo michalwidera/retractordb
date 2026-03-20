@@ -54,17 +54,17 @@ static void handleSignal(int signum) {
   iTimeLimitCnt = executorsm::stop_now;
 }
 
-void dropArtifactFile(std::string artifact_filename) {
+void dropArtifactFile(const std::filesystem::path &artifact_filename) {
   if (std::filesystem::exists(artifact_filename)) {
     std::error_code ec;
     std::filesystem::remove(artifact_filename, ec);
     if (ec) {
-      SPDLOG_INFO("Info - Failed to remove file {}: {}", artifact_filename, ec.message());
+      SPDLOG_INFO("Info - Failed to remove file {}: {}", artifact_filename.string(), ec.message());
     } else {
-      SPDLOG_INFO("Removed file: {}", artifact_filename);
+      SPDLOG_INFO("Removed file: {}", artifact_filename.string());
     }
   } else {
-    SPDLOG_INFO("No file found {}", artifact_filename);
+    SPDLOG_INFO("No file found {}", artifact_filename.string());
   }
 }
 

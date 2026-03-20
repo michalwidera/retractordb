@@ -20,7 +20,7 @@ dumpTask::~dumpTask() {
   }
 }
 
-void dumpManager::registerTask(const std::string streamName, dumpTask task) {
+void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   assert(pProc != nullptr && "dumpManager::registerTask dataModel is not set");
   assert(pProc->qSet.find(streamName) != pProc->qSet.end() && "dumpManager::registerTask streamName not found in dataModel");
   assert(task.range.first <= task.range.second && "dumpManager::registerTask range.first must be <= range.second");
@@ -60,9 +60,9 @@ void dumpManager::registerTask(const std::string streamName, dumpTask task) {
               task.dumpedRecordsToGo);
 }
 
-void dumpManager::setDumpStorage(const std::string storagePathParam) { storagePath = storagePathParam; }
+void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
 
-void dumpManager::processStreamChunk(const std::string streamName) {
+void dumpManager::processStreamChunk(const std::string &streamName) {
   SPDLOG_INFO("dumpManager::processStreamChunk for stream: {} task in book: {}", streamName, bookOfTasks[streamName].size());
 
   assert(pProc != nullptr && "dumpManager::processStreamChunk dataModel is not set");
@@ -131,14 +131,15 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
   return (task.dumpedRecordsToGo == 0);
 }
 
-std::pair<std::string, int> dumpManager::createDumpFile(std::string streamName, std::string taskName) {
-  auto filename = std::filesystem::path(storagePath) / std::filesystem::path(streamName + "_" + taskName);
-  if (retentionSize[streamName + taskName] == 0) {
+std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view streamName, const std::string_view taskName) {
+  std::string key = std::string(streamName) + std::string(taskName);
+  auto filename   = std::filesystem::path(storagePath) / std::filesystem::path(std::string(streamName) + "_" + std::string(taskName));
+  if (retentionSize[key] == 0) {
     filename += "_dump.tmp";
   } else {
-    auto ret = (retentionCounter[streamName + taskName]++) % retentionSize[streamName + taskName];
+    auto ret = (retentionCounter[key]++) % retentionSize[key];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
-    assert(ret < retentionSize[streamName + taskName]);
+    assert(ret < retentionSize[key]);
   }
   int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
   assert(fd >= 0);

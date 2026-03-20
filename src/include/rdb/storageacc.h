@@ -46,8 +46,8 @@ class storageAccessor {
 
  public:
   storageAccessor() = delete;
-  explicit storageAccessor(const std::string qryID,              //
-                           const std::string fileName,           //
+  explicit storageAccessor(const std::string_view qryID,              //
+                           const std::string_view fileName,           //
                            const std::string_view storageParam,  //
                            bool oneShot   = false,               //
                            bool isHold    = false,               //
