@@ -30,12 +30,12 @@ K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
 }
 
 textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    //
-                                           const ssize_t sizeRec,              //
+                                           const ssize_t recordSize,              //
                                            const rdb::Descriptor &descriptor,  //
                                            bool loopToBeginningIfEOF)
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
-      recSize_(sizeRec),
+      recordSize_(recordSize),
       readCount_(0),
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
   myFile_.rdbuf()->pubsetbuf(nullptr, 0);
@@ -51,7 +51,7 @@ auto textSourceAccessorRO::name() -> std::string & { return filename_; }
 
 ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
-  assert(recSize_ != 0);
+  assert(recordSize_ != 0);
 
   if (!loopToBeginningIfEOF_) {
     if (myFile_.eof()) {
