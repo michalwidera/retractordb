@@ -276,10 +276,10 @@ THEN DUMP 5:5
 
 ### Stream Algebra Operations
 
-- **Interleaving** (`+`): Combines two streams by alternating their elements
-- **Sum/Difference** (`+`, `-`): Mathematical operations on stream elements
-- **Time Shifting** (`[n]`): Access past values (e.g., `stream[2]` - 2 samples ago)
-- **Aggregation** (`@`): Moving window operations (e.g., `stream@10:100` - window of 100, step 10)
+- **Interleaving** (`#`, `&`, `%`): Combines or splits two streams by alternating their elements
+- **Sum/Difference** (`+`, `-`): Connection and disconnection operations on stream elements
+- **Time Shifting** (`[n]`): Access schema values (e.g., `stream[2]` - 2nd sample in schema)
+- **Aggregation** (`@`): Moving window operations (e.g., `stream@(10:100)` - window of 100, step 10)
 - **Serialization**: Flattening aggregated windows
 
 ### Supported Data Types
