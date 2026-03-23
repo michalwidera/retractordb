@@ -3,17 +3,15 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <boost/lexical_cast.hpp>
 #include <cassert>
-#include <cstdlib>  // std::div
 #include <iostream>
 #include <memory>  // unique_ptr
-#include <regex>
-#include <thread>
+#include <mutex>
 
-#include "SOperations.hpp"
-#include "expressionEvaluator.h"
+#include <boost/lexical_cast.hpp>
+
 #include "rdb/convertTypes.h"
+#include "SOperations.hpp"
 
 // ctest -R '^ut-dataModel' -V
 
@@ -26,7 +24,8 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
 
   assert(!coreInstance_.empty());
-  for (const auto &it : coreInstance_) SPDLOG_INFO("query.id {}", it.id);
+  for (const auto &it : coreInstance_)
+    SPDLOG_INFO("query.id {}", it.id);
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
@@ -46,12 +45,13 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
-  for (auto const &[key, val] : qSet) val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
+  for (auto const &[key, val] : qSet)
+    val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
 dataModel::~dataModel() {}
 
-bool dataModel::addQueryToModel(std::string id) {
+bool dataModel::addQueryToModel(const std::string &id) {
   if (qSet.find(id) != qSet.end()) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
     return false;
@@ -262,23 +262,23 @@ void dataModel::constructInputPayload(const std::string &instance) {
 std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
-  auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->getDescriptor());
+  auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->descriptor);
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->get());
+    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data());
     assert(success);
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }
   auto i{0};
-  for (auto f : payload->getDescriptor().fieldsFlat()) {
+  for (auto f : payload->descriptor.fieldsFlat()) {
     retVal.push_back(any_to_variant_cast(payload->getItem(i++)));
   }
   return retVal;
 }
 
 size_t dataModel::streamStoredSize(const std::string &instance) {
-  return qSet[instance]->outputPayload->getDescriptor().getSizeInBytes() * getStreamCount(instance);
+  return qSet[instance]->outputPayload->descriptor.getSizeInBytes() * getStreamCount(instance);
 }
 
 size_t dataModel::getStreamCount(const std::string &instance) { return qSet[instance]->outputPayload->getRecordsCount(); }

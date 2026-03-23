@@ -12,7 +12,7 @@ rm -f str*
 
 if ! xretractor $1 -c ; then exit 1 ; fi
 
-xretractor $1 -m 8000 &
+nohup xretractor $1 -m 7000 -k -r  &
 
 sleep 1
 

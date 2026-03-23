@@ -1,13 +1,12 @@
 #include "presenter.h"
 
+#include <iostream>  // for operator<<
+
 #include <boost/lexical_cast.hpp>  // for lexical_cast
 #include <boost/regex.hpp>         // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
-#include <fstream>
-#include <iostream>  // for operator<<
 
 #include "CRSMath.h"
-#include "config.h"  // Add an automatically generated configuration file
 
 // https://ref.pencilcode.net/turtle/colors.html
 
@@ -176,7 +175,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       }
     }
   }
-  for (auto s : planStreamRelationsSet) xout << s << std::endl;
+  for (auto s : planStreamRelationsSet)
+    xout << s << std::endl;
   //
   // Due this variable we eleminate redundant relation on schema
   //
@@ -246,7 +246,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       }
     }
   }
-  for (auto s : streamRelationsSet) xout << s << std::endl;
+  for (auto s : streamRelationsSet)
+    xout << s << std::endl;
   xout << "}" << std::endl;
 }  // presenter::graphiz
 

@@ -2,12 +2,12 @@
 
 #include <unistd.h>  // for ::lseek, ::write, ::close
 
-#include <boost/circular_buffer.hpp>
 #include <map>
 #include <memory>  // unique_ptr
 #include <string>
-#include <utility>  // pair
-#include <vector>
+#include <string_view>
+
+#include <boost/circular_buffer.hpp>
 
 #include "rdb/payload.h"
 
@@ -24,8 +24,11 @@ struct dumpTask {
   int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
   bool inBook{false};            // is task in bookOfTasks
 
-  dumpTask(const std::string name, const std::pair<long int, long int> rangeParam, const size_t retention)
-      : taskName(name), range(rangeParam), retentionSize(retention), inBook(false) {}
+  dumpTask(std::string name, const std::pair<long int, long int> rangeParam, const size_t retention)
+      : taskName(std::move(name)),
+        range(rangeParam),
+        retentionSize(retention),
+        inBook(false) {}
   ~dumpTask();
 };
 
@@ -34,9 +37,9 @@ class dumpManager {
   dumpManager()  = default;
   ~dumpManager() = default;
 
-  void registerTask(const std::string streamName, dumpTask task);  // Register a dump function
-  void processStreamChunk(const std::string streamName);           // Call all registered dump functions
-  void setDumpStorage(const std::string storagePathParam);         // Set storage path for dump files
+  void registerTask(const std::string &streamName, dumpTask task);  // Register a dump function
+  void processStreamChunk(const std::string &streamName);           // Call all registered dump functions
+  void setDumpStorage(std::string storagePathParam);                // Set storage path for dump files
 
  private:
   std::map<std::string, int> retentionCounter;  // first - streamName+taskName, second - counter
@@ -47,5 +50,5 @@ class dumpManager {
 
   bool buildDumpChunk(dumpTask &task,
                       std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed
-  std::pair<std::string, int> createDumpFile(std::string streamName, std::string taskName);
+  std::pair<std::string, int> createDumpFile(const std::string_view streamName, const std::string_view taskName);
 };

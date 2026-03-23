@@ -16,45 +16,47 @@ namespace rdb {
 
 genericBinaryFileAccessor::genericBinaryFileAccessor(  //
     const std::string_view fileName,                   //
-    const size_t size,                                 //
+    const ssize_t recordSize,                          //
     int percounter)                                    //
-    : filename(std::string(fileName)), size(size), percounter_(percounter) {}
+    : filename_(std::string(fileName)),
+      recordSize_(recordSize),
+      percounter_(percounter) {}
 
 genericBinaryFileAccessor::~genericBinaryFileAccessor() {
   if (percounter_ >= 0) {
-    std::string rotated_filename = filename + ".old" + std::to_string(percounter_);
+    std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
-    std::filesystem::rename(filename, rotated_filename, ec);
+    std::filesystem::rename(filename_, rotated_filename, ec);
   }
 }
 
-auto genericBinaryFileAccessor::name() -> std::string & { return filename; }
+auto genericBinaryFileAccessor::name() -> std::string & { return filename_; }
 
 ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recordSize_ != 0);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  if (ptrData == nullptr && size == 0 && position == 0) {
-    myFile.open(filename, std::ofstream::out | std::ofstream::trunc);
+  if (ptrData == nullptr && recordSize_ == 0 && position == 0) {
+    myFile.open(filename_, std::ofstream::out | std::ofstream::trunc);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.close();
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
-    myFile.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
+    myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     // Note: no seekp here!
   } else {
-    myFile.open(filename, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+    myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.seekp(position);
     assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   }
-  myFile.write(reinterpret_cast<const char *>(ptrData), size);
+  myFile.write(static_cast<const char *>(static_cast<const void *>(ptrData)), recordSize_);
   assert((myFile.rdstate() & std::ofstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
@@ -62,10 +64,10 @@ ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t po
 }
 
 ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
-  assert(size != 0);
+  assert(recordSize_ != 0);
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(filename, std::ios::in | std::ios::binary);
+  myFile.open(filename_, std::ios::in | std::ios::binary);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.seekg(position);
@@ -77,7 +79,7 @@ ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position)
   // Therefore +1 appears.
   // Last byte was omitted.
   // Look's like some inconsistency is here.
-  myFile.get(reinterpret_cast<char *>(ptrData), size + 1);
+  myFile.read(static_cast<char *>(static_cast<void *>(ptrData)), recordSize_);
   assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
@@ -85,8 +87,8 @@ ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position)
 }
 
 size_t genericBinaryFileAccessor::count() {
-  std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
-  return in.tellg() / size;
+  std::ifstream in(filename_, std::ifstream::ate | std::ifstream::binary);
+  return in.tellg() / recordSize_;
 }
 
 }  // namespace rdb

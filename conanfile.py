@@ -40,6 +40,7 @@ class Retractor(ConanFile):
         "boost/*:without_system": False,
         "boost/*:without_filesystem": False,
         "spdlog/*:header_only": True,
+        "boost/*:without_cobalt": True,
     }
 
     def layout(self):

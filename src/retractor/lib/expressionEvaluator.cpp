@@ -2,11 +2,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <cassert>
 #include <cmath>       // sqrt
 #include <functional>  // std::function
-#include <iostream>
 #include <regex>
 #include <stack>
 #include <string>
@@ -14,7 +12,6 @@
 #include <variant>
 
 #include "rdb/convertTypes.h"
-#include "rdb/payload.h"
 
 static cast<rdb::descFldVT> castFldVT;
 

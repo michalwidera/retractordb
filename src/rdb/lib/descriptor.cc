@@ -3,24 +3,17 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <array>
 #include <cassert>
-#include <cctype>
 #include <iostream>
-#include <limits>
-#include <locale>
+#include <sstream>
+
 #include <magic_enum/magic_enum.hpp>
-#include <typeinfo>
-#include <utility>
 
 extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 
 namespace rdb {
 
-static bool flatOutput = false;
-
-bool getFlat() { return flatOutput; }
-void setFlat(bool var) { flatOutput = var; }
+bool Descriptor::flatOutput_ = false;
 
 constexpr auto GetFieldType(const std::string_view name) { return magic_enum::enum_cast<rdb::descFld>(name); }
 
@@ -35,19 +28,19 @@ constexpr auto isConfigurationField(const rdb::descFld index) {
 
 Descriptor::Descriptor(std::initializer_list<rField> l) : std::vector<rField>(l) {}
 
-Descriptor::Descriptor(const std::string &n, int l, int a, rdb::descFld t) {  //
-  emplace_back(std::move(n), l, a, t);                                        //
+Descriptor::Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type) {  //
+  emplace_back(std::move(name), length, arrayCount, type);                                        //
 }
 
 void Descriptor::updateConvMaps() {
   if (!dirtyMap) return;
 
   convMap_.clear();
-  convReMap_.clear();
   offsetMap_.clear();
 
   clen_ = 0;
-  for (auto it : *this) clen_ += (it.rtype == rdb::STRING) ? 1 : it.rarray;
+  for (auto it : *this)
+    clen_ += (it.rtype == rdb::STRING) ? 1 : it.rarray;
 
   std::vector<rField>::iterator it = this->begin();
   int fieldCounter{0};
@@ -69,8 +62,6 @@ void Descriptor::updateConvMaps() {
 
     if (counterArray > 0) {
       convMap_.push_back(std::make_pair(fieldCounter, backCounterArray));
-      convReMap_[std::pair<int, int>(fieldCounter, backCounterArray)] = i;
-
       offsetMap_.push_back(offset);
       if ((*it).rtype == rdb::STRING)
         offset += len(*it);
@@ -103,18 +94,6 @@ std::optional<std::pair<int, int>> Descriptor::convert(int position) {
   }
 }
 
-std::optional<int> Descriptor::convert(std::pair<int, int> position) {
-  updateConvMaps();
-  if (convReMap_.find(position) != convReMap_.end())
-    return convReMap_[position];
-  else {
-    assert(false);
-    return {};
-  }
-}
-
-bool Descriptor::isEmpty() const { return this->size() == 0; }
-
 int Descriptor::sizeFlat() {
   updateConvMaps();
   return clen_;
@@ -131,7 +110,10 @@ std::vector<rField> Descriptor::fieldsFlat() {
   return ret;
 }
 
-void Descriptor::append(std::initializer_list<rField> l) { insert(end(), l.begin(), l.end()); }
+void Descriptor::append(std::initializer_list<rField> l) {
+  insert(end(), l.begin(), l.end());
+  dirtyMap = true;
+}
 
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
   Descriptor ret(lhs);
@@ -152,28 +134,15 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
   return *this;
 }
 
-Descriptor &Descriptor::operator=(const Descriptor &rhs) {
-  if (this == &rhs) return *this;
-
-  clear();
-  insert(end(), rhs.begin(), rhs.end());
-  dirtyMap = true;
-  return *this;
-}
-
 // this      rhs
 // 4,INT  == 1,BYTE   1
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),  //
-                                    [](const rField &i) {    //
-                                     return isConfigurationField(i.rtype);
-                                   });
-  auto refCountThis = std::count_if(begin(), end(),        //
-                                    [](const rField &i) {  //
-                                      return isConfigurationField(i.rtype);
-                                    });
+  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                                          //
+                                    [](const rField &i) { return isConfigurationField(i.rtype); });  //
+  auto refCountThis = std::count_if(begin(), end(),                                                  //
+                                    [](const rField &i) { return isConfigurationField(i.rtype); });  //
   auto i{0};
   for (const rField &f : *this) {
     if (isConfigurationField(f.rtype) || isConfigurationField(rhs[i].rtype)) {
@@ -218,16 +187,15 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
   return *this;
 }
 
-Descriptor::Descriptor(const Descriptor &init) { *this += init; }
-
-constexpr int Descriptor::len(const rdb::rField &field) const {  //
+constexpr int Descriptor::len(const rdb::rField &field) const {
   if (isConfigurationField(field.rtype)) return 0;
   return field.rlen * field.rarray;
 }
 
 size_t Descriptor::getSizeInBytes() const {
   auto size{0};
-  for (auto const i : *this) size += len(i);
+  for (auto const i : *this)
+    size += len(i);
   return size;
 }
 
@@ -263,11 +231,8 @@ std::pair<std::string, size_t> Descriptor::policy() {
 }
 
 size_t Descriptor::position(const std::string_view name) {
-  auto it = std::find_if(begin(), end(),               //
-                         [name](const auto &item) {    //
-                           return item.rname == name;  //
-                         }  //
-  );
+  auto it = std::find_if(begin(), end(),                                            //
+                         [name](const auto &item) { return item.rname == name; });  //
 
   if (it != end())
     return std::distance(begin(), it);
@@ -277,15 +242,7 @@ size_t Descriptor::position(const std::string_view name) {
   return 0;  // ProForma Error
 }
 
-std::string Descriptor::fieldName(int fieldPosition) {  //
-  return ((*this)[fieldPosition]).rname;                //
-}
-
 int Descriptor::len(const std::string_view name) { return len((*this)[position(name)]); }
-
-int Descriptor::arraySize(const std::string_view name) {  //
-  return ((*this)[position(name)]).rarray;                //
-}
 
 size_t Descriptor::offsetBegArr(const std::string_view name) {
   auto offset{0};
@@ -320,7 +277,7 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
 }
 
 std::ostream &flat(std::ostream &os) {
-  flatOutput = true;
+  Descriptor::setFlat(true);
   return os;
 }
 
@@ -328,10 +285,10 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   os << "{";
   for (auto const &r : rhs) {
     if (r.rtype == rdb::RETENTION)
-      if (r.rtype == 0 && r.rarray == 0) continue;  // skip retention 0,0
+      if (r.rlen == 0 && r.rarray == 0) continue;  // skip retention 0,0
     if (r.rtype == rdb::RETMEMORY)
       if (r.rlen == 0) continue;  // skip retention memory 0
-    if (!flatOutput)
+    if (!Descriptor::flatOutput_)
       os << "\t";
     else
       os << " ";
@@ -360,14 +317,14 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << r.rarray << "]";
     else if (r.rtype == rdb::STRING)
       os << "[" << r.rlen << "]";
-    if (!flatOutput) os << std::endl;
+    if (!Descriptor::flatOutput_) os << std::endl;
   }
-  if (rhs.isEmpty())
+  if (rhs.empty())
     os << "Empty";
-  else if (flatOutput)
+  else if (Descriptor::flatOutput_)
     os << " ";
   os << "}";
-  flatOutput = false;
+  Descriptor::flatOutput_ = false;
 
   return os;
 }
@@ -375,7 +332,8 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   std::stringstream strstream;
   std::string str;
-  while (is >> str) strstream << " " << str;
+  while (is >> str)
+    strstream << " " << str;
 
   auto result = parserDESCString(rhs, strstream.str());
   assert(result == "OK");

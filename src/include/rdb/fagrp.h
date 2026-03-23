@@ -1,34 +1,31 @@
-#ifndef STORAGE_RDB_INCLUDE_FAGRP_H_
-#define STORAGE_RDB_INCLUDE_FAGRP_H_
+#pragma once
 
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "faccposix.h"
-#include "fainterface.h"
 #include "retention.h"
 
 namespace rdb {
 
 class groupFileAccessor : public FileAccessorInterface {
-  std::string filename;
-  std::string currentFilename;
-  const std::size_t recSize;
+  std::string filename_;
+  std::string currentFilename_;
+  const ssize_t recordSize_;
 
-  retention_t retention{0, 0};
+  retention_t retention_{0, 0};
 
-  std::vector<std::unique_ptr<posixBinaryFileAccessor>> vec;
+  std::vector<std::unique_ptr<posixBinaryFileAccessor>> vec_;
 
-  size_t writeCount     = 0;
-  size_t currentSegment = 0;
+  size_t writeCount_     = 0;
+  size_t currentSegment_ = 0;
 
-  size_t removedSegments = 0;
+  size_t removedSegments_ = 0;
 
   int percounter_;
 
  public:
-  groupFileAccessor(const std::string_view fileName, const size_t recSize, const retention_t &retention, int percounter);
+  groupFileAccessor(const std::string_view fileName, const ssize_t recordSize, const retention_t &retention, int percounter);
   ~groupFileAccessor() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
@@ -38,5 +35,3 @@ class groupFileAccessor : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FAGRP_H_

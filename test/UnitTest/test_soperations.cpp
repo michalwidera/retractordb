@@ -28,8 +28,8 @@ TEST(xSOperations, hash_operations) {
   int retPos{0};
   for (int i = 0; i < 10; i++) {
     auto leftOrRight = Hash(deltaA, deltaB, i, retPos);
-    ASSERT_TRUE(testdata[i][1] == leftOrRight ? 1 : 0);
-    ASSERT_TRUE(testdata[i][2] == retPos);
+    EXPECT_TRUE(testdata[i][1] == leftOrRight ? 1 : 0);
+    EXPECT_TRUE(testdata[i][2] == retPos);
   }
 }
 
@@ -54,7 +54,7 @@ TEST(xSOperations, divmod_operations) {
     auto retPosDiv = Div(deltaA, deltaB, i);
     auto retPosMod = Mod(deltaA, deltaB, i);
     std::cout << "{" << i << ", " << retPosDiv << ", " << retPosMod << "},  //" << std::endl;
-    ASSERT_TRUE(testdata[i][1] == retPosDiv);
-    ASSERT_TRUE(testdata[i][2] == retPosMod);
+    EXPECT_TRUE(testdata[i][1] == retPosDiv);
+    EXPECT_TRUE(testdata[i][2] == retPosMod);
   }
 }

@@ -1,9 +1,9 @@
-#ifndef STORAGE_RDB_INCLUDE_DACC_H_
-#define STORAGE_RDB_INCLUDE_DACC_H_
+#pragma once
 
-#include <boost/circular_buffer.hpp>
 #include <memory>  // std::unique_ptr
 #include <string>
+
+#include <boost/circular_buffer.hpp>
 
 #include "descriptor.h"
 #include "faccbindev.h"
@@ -12,7 +12,7 @@
 #include "faccposix.h"
 #include "facctxtsrc.h"
 #include "fagrp.h"
-#include "fainterface.h"
+#include "metaDataStream.h"
 #include "payload.h"
 
 namespace rdb {
@@ -23,13 +23,14 @@ class storageAccessor {
   std::unique_ptr<FileAccessorInterface> accessor_;
   std::unique_ptr<rdb::payload> storagePayload_;
   std::unique_ptr<rdb::payload> chamber_;
-  Descriptor descriptor_;
+
   bool isDisposable_          = false;  // if true - storage and descriptor will be deleted after use
   bool isOneShot_             = false;  // if false - storage will be looped when end is reached
   bool isHold_                = false;  // if true - no processing until first query appear
   size_t recordsCount_        = 0;
   std::string descriptorFile_ = "";
   std::string storageFile_    = "";
+  std::string metaIndexFile_  = "";  // file path for saving/loading the meta index
   std::string storageType_    = "DEFAULT";
   int percounter_             = -1;
 
@@ -41,16 +42,20 @@ class storageAccessor {
   void abortIfStorageNotPrepared();
   void initializeAccessor();
 
+  std::unique_ptr<rdb::metaDataStream> metaDataStream_;
+
  public:
   storageAccessor() = delete;
-  explicit storageAccessor(const std::string qryID,              //
-                           const std::string fileName,           //
+  explicit storageAccessor(const std::string_view qryID,              //
+                           const std::string_view fileName,           //
                            const std::string_view storageParam,  //
                            bool oneShot   = false,               //
                            bool isHold    = false,               //
                            int percounter = -1                   //
   );
   virtual ~storageAccessor();
+
+  Descriptor descriptor;
 
   storageState dataFileStatus = storageState::noDescriptor;
   sourceState bufferState     = sourceState::empty;  // ? test lock
@@ -63,7 +68,6 @@ class storageAccessor {
   void fire();
   void purge();
 
-  Descriptor &getDescriptor();
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);
@@ -82,5 +86,3 @@ class storageAccessor {
   void reset();
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_DACC_H_

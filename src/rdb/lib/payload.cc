@@ -4,11 +4,11 @@
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>  // std::min
+#include <algorithm>  // std::min, std::copy, std::fill
 #include <boost/rational.hpp>
 #include <boost/stacktrace.hpp>
 #include <cassert>
-#include <cstring>  // std:memcpy
+#include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -21,17 +21,17 @@ namespace rdb {
 
 payload::payload(const Descriptor &descriptor)
     : descriptor(descriptor),  //
-      hexFormat(false) {
-  payloadData = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
-  std::memset(payloadData.get(), 0, descriptor.getSizeInBytes());
+      hexFormat_(false) {
+  payloadData_ = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
+  std::fill(span().begin(), span().end(), 0);
 }
 
 // copy constructor
 
 payload::payload(const payload &other) {
-  payloadData = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
-  descriptor  = other.getDescriptor();
-  std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
+  payloadData_ = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
+  descriptor   = other.descriptor;
+  std::copy(other.span().begin(), other.span().end(), span().begin());
 }
 
 // Copy & assignment operator
@@ -39,8 +39,8 @@ payload::payload(const payload &other) {
 payload &payload::operator=(const payload &other) {
   if (this == &other) return *this;  // assure not a self-assignment
 
-  *this = other.getDescriptor();  // call operator=(const Descriptor
-  std::memcpy(get(), other.get(), other.descriptor.getSizeInBytes());
+  *this = other.descriptor;  // call operator=(const Descriptor
+  std::copy(other.span().begin(), other.span().end(), span().begin());
   return *this;
 }
 
@@ -53,8 +53,8 @@ payload &payload::operator=(const Descriptor &other) {
   // * if non empty - this goes strange
   if (descriptor.size() == 0) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
-    descriptor  = other;
-    payloadData = std::make_unique<uint8_t[]>(other.getSizeInBytes());
+    descriptor   = other;
+    payloadData_ = std::make_unique<uint8_t[]>(other.getSizeInBytes());
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
@@ -69,16 +69,15 @@ payload &payload::operator=(const Descriptor &other) {
 
 payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
-  descSum += other.getDescriptor();               // ! moving this into constructor fails
+  descSum += other.descriptor;                    // ! moving this into constructor fails
   descSum.cleanRef();                             //
   payload result(descSum);                        //
   SPDLOG_INFO("operator+ {} {} {}",               //
               descriptor.getSizeInBytes(),        //
               other.descriptor.getSizeInBytes(),  //
-              result.getDescriptor().getSizeInBytes());
-  std::memcpy(result.get(), get(), descriptor.getSizeInBytes());
-  std::memcpy(result.get() + descriptor.getSizeInBytes(), other.get(), other.descriptor.getSizeInBytes());
-  descSum.dirtyMap = true;
+              result.descriptor.getSizeInBytes());
+  std::copy(span().begin(), span().end(), result.span().begin());
+  std::copy(other.span().begin(), other.span().end(), result.span().subspan(descriptor.getSizeInBytes()).begin());
   return result;
 }
 
@@ -88,22 +87,22 @@ template <typename T, typename K>
 void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arroffset) {
   T data;
   is >> data;
-  Descriptor desc(rhs.getDescriptor());
-  std::memcpy(rhs.get() + desc.offsetBegArr(fieldName) + arroffset, &data, sizeof(T));
+  Descriptor desc(rhs.descriptor);
+  auto dest = rhs.span().subspan(desc.offsetBegArr(fieldName) + arroffset, sizeof(T));
+  std::memcpy(dest.data(), &data, sizeof(T));
 }
 
-void payload::setHex(bool hexFormatVal) { hexFormat = hexFormatVal; }
+void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 
-Descriptor payload::getDescriptor() const { return descriptor; }
-
-uint8_t *payload::get() const { return payloadData.get(); }
+std::span<uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
 void payload::setItemBy(const int positionFlat, std::any value) {
   T data          = std::any_cast<T>(value);
   auto position   = descriptor.convert(positionFlat).value().first;
   auto offsetFlat = descriptor.offset(positionFlat);
-  std::memcpy(payloadData.get() + offsetFlat, &data, descriptor[position].rlen);
+  auto dest       = span().subspan(offsetFlat, descriptor[position].rlen);
+  std::memcpy(dest.data(), &data, descriptor[position].rlen);
 }
 
 void payload::setItem(const int positionFlat, std::any valueParam) {
@@ -126,10 +125,10 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
         std::string data(std::any_cast<std::string>(value));
         auto lenr       = std::min(len, static_cast<int>(data.length()));
         auto destOffset = descriptor.offset(positionFlat);
-        auto addr       = payloadData.get() + destOffset;
+        auto dest       = span().subspan(destOffset, len);
         assert(position + len <= descriptor.getSizeInBytes());
-        std::memcpy(addr, data.c_str(), lenr);
-        if (lenr != len) addr[lenr] = '\0';
+        std::copy_n(data.c_str(), lenr, dest.begin());
+        if (lenr != len) dest[lenr] = '\0';
       } break;
       case rdb::BYTE:
         setItemBy<uint8_t>(positionFlat, value);
@@ -173,8 +172,10 @@ void payload::setItem(const int positionFlat, std::any valueParam) {
 }
 
 template <typename T>
-T getVal(void *ptr, int offset) {
-  return *(reinterpret_cast<T *>(reinterpret_cast<std::uint8_t *>(ptr) + offset));
+T getVal(std::span<uint8_t> s, int offset) {
+  T val;
+  std::memcpy(&val, s.subspan(offset, sizeof(T)).data(), sizeof(T));
+  return val;
 }
 
 std::any payload::getItem(const int positionFlat) {
@@ -201,42 +202,42 @@ std::any payload::getItem(const int positionFlat) {
   switch (descriptor[position].rtype) {
     case rdb::STRING: {
       auto len       = descriptor[position].rlen * descriptor[position].rarray;
-      char *charData = reinterpret_cast<char *>(payloadData.get()) + descriptor.offset(positionFlat);
+      auto fieldSpan = span().subspan(descriptor.offset(positionFlat), len);
 
       auto descLen  = descriptor.getSizeInBytes();
       auto startPos = descriptor.offset(positionFlat);
       assert(startPos + len <= descLen);
       for (auto i = 0; i < len; i++)
-        if (charData[i] == 0) {
+        if (fieldSpan[i] == 0) {
           len = i;
           break;
         }
-      std::string s(charData, len);
+      std::string s(fieldSpan.begin(), fieldSpan.begin() + len);
 
       return s;
     }
     case rdb::BYTE: {
-      uint8_t data = getVal<uint8_t>(payloadData.get(), descriptor.offset(positionFlat));
+      uint8_t data = getVal<uint8_t>(span(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::INTEGER: {
-      int data = getVal<int>(payloadData.get(), descriptor.offset(positionFlat));
+      int data = getVal<int>(span(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::UINT: {
-      uint data = getVal<uint>(payloadData.get(), descriptor.offset(positionFlat));
+      uint data = getVal<uint>(span(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::DOUBLE: {
-      double data = getVal<double>(payloadData.get(), descriptor.offset(positionFlat));
+      double data = getVal<double>(span(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::FLOAT: {
-      float data = getVal<float>(payloadData.get(), descriptor.offset(positionFlat));
+      float data = getVal<float>(span(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::RATIONAL: {
-      boost::rational<int> data = getVal<boost::rational<int>>(payloadData.get(), descriptor.offset(positionFlat));
+      boost::rational<int> data = getVal<boost::rational<int>>(span(), descriptor.offset(positionFlat));
       return data;
     }
     case rdb::REF: {
@@ -267,25 +268,28 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   std::string fieldName;
   is >> fieldName;
   if (is.eof()) return is;
-  if (rhs.hexFormat)
+  if (rhs.hexFormat_)
     is >> std::hex;
   else
     is >> std::dec;
-  Descriptor desc(rhs.getDescriptor());
+  Descriptor desc(rhs.descriptor);
 
   if (desc.type(fieldName) == "STRING") {
     std::string record;
     // std::getline(is >> std::ws, record);
     is >> record;
-    std::memset(rhs.get() + desc.offsetBegArr(fieldName), 0, desc.len(fieldName));
-    std::memcpy(rhs.get() + desc.offsetBegArr(fieldName), record.c_str(), std::min((size_t)desc.len(fieldName), record.size()));
+    auto fieldLen  = desc.len(fieldName);
+    auto fieldSpan = rhs.span().subspan(desc.offsetBegArr(fieldName), fieldLen);
+    std::fill(fieldSpan.begin(), fieldSpan.end(), 0);
+    std::copy_n(record.c_str(), std::min((size_t)fieldLen, record.size()), fieldSpan.begin());
   } else
-    for (auto i = 0; i < desc.arraySize(fieldName); i++) {
+    for (auto i = 0; i < desc[desc.position(fieldName)].rarray; i++) {
       if (desc.type(fieldName) == "BYTE") {
         int data;
         is >> data;
         uint8_t data8 = static_cast<uint8_t>(data);
-        std::memcpy(rhs.get() + desc.offsetBegArr(fieldName) + i * sizeof(uint8_t), &data8, sizeof(uint8_t));
+        auto dest     = rhs.span().subspan(desc.offsetBegArr(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
+        std::memcpy(dest.data(), &data8, sizeof(uint8_t));
       } else if (desc.type(fieldName) == "UINT")
         copyToMemory<uint, payload>(is, rhs, fieldName.c_str(), i * sizeof(unsigned));
       else if (desc.type(fieldName) == "INTEGER")
@@ -307,82 +311,74 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
 }
 
 std::ostream &operator<<(std::ostream &os, const payload &rhs) {
-  if (rhs.specialDebug) {
-    os << "[ ";
-    for (auto i = 0; i < rhs.getDescriptor().getSizeInBytes(); i++) {
-      os << std::hex;
-      os << std::setfill('0');
-      os << std::setw(2);
-      os << static_cast<int>(*(rhs.get() + i));
-      os << " ";
-    }
-    os << "]";
-    return os;
-  }
-
-  if (rhs.hexFormat)
+  if (rhs.hexFormat_)
     os << std::hex;
   else
     os << std::dec;
   os << "{";
 
-  for (auto const &r : rhs.getDescriptor()) {
+  Descriptor desc(rhs.descriptor);
+  for (auto const &r : rhs.descriptor) {
     if ((r.rtype == rdb::TYPE) ||       //
         (r.rtype == rdb::REF) ||        //
         (r.rtype == rdb::RETENTION) ||  //
         (r.rtype == rdb::RETMEMORY))    // skip these types
       break;
-    if (!getFlat())
+    if (!Descriptor::getFlat())
       os << "\t";
     else
       os << " ";
     os << r.rname;
     os << ":";
-    auto desc    = rhs.getDescriptor();
     auto offset_ = desc.offsetBegArr(r.rname);
     if (r.rtype == STRING) {
-      char *charData = reinterpret_cast<char *>(rhs.get() + offset_);
+      auto fieldSpan = rhs.span().subspan(offset_, desc.len(r.rname));
       auto len       = desc.len(r.rname);
       for (auto i = 0; i < len; i++)
-        if (charData[i] == 0) {
+        if (fieldSpan[i] == 0) {
           len = i;
           break;
         }
 
-      os << std::string(charData, len);
+      os << std::string(fieldSpan.begin(), fieldSpan.begin() + len);
     } else
       for (auto i = 0; i < r.rarray; i++) {
         if (r.rtype == rdb::BYTE) {
           uint8_t data{0};
-          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
-          if (rhs.hexFormat) {
+          auto src = rhs.span().subspan(offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
+          std::memcpy(&data, src.data(), sizeof(uint8_t));
+          if (rhs.hexFormat_) {
             os << std::setfill('0');
             os << std::setw(2);
           }
           os << (int)data;
         } else if (r.rtype == rdb::INTEGER) {
           int data{0};
-          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(int), sizeof(int));
-          if (rhs.hexFormat) {
+          auto src = rhs.span().subspan(offset_ + i * sizeof(int), sizeof(int));
+          std::memcpy(&data, src.data(), sizeof(int));
+          if (rhs.hexFormat_) {
             os << std::setfill('0');
             os << std::setw(8);
           }
           os << data;
         } else if (r.rtype == rdb::UINT) {
           unsigned int data{0};
-          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(unsigned), sizeof(unsigned int));
-          if (rhs.hexFormat) {
+          auto src = rhs.span().subspan(offset_ + i * sizeof(unsigned), sizeof(unsigned int));
+          std::memcpy(&data, src.data(), sizeof(unsigned int));
+          if (rhs.hexFormat_) {
             os << std::setfill('0');
             os << std::setw(8);
           }
           os << data;
         } else if (r.rtype == rdb::FLOAT) {
           float data{0};
-          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(float), sizeof(float));
+          auto src = rhs.span().subspan(offset_ + i * sizeof(float), sizeof(float));
+          std::memcpy(&data, src.data(), sizeof(float));
           os << data;
         } else if (r.rtype == rdb::DOUBLE) {
           double data{0};
-          std::memcpy(&data, rhs.get() + offset_ + i * sizeof(double), sizeof(double));
+          auto src = rhs.span().subspan(offset_ + i * sizeof(double), sizeof(double));
+          std::memcpy(&data, src.data(), sizeof(double));
           os << data;
         } else if (r.rtype == rdb::RETENTION) {
           ;
@@ -393,16 +389,16 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
 
         if (i < r.rarray - 1) os << " ";
       }
-    if (!getFlat()) os << std::endl;
+    if (!Descriptor::getFlat()) os << std::endl;
   }
-  if (rhs.getDescriptor().isEmpty()) {
+  if (rhs.descriptor.empty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  if (getFlat()) os << " ";
+  if (Descriptor::getFlat()) os << " ";
   os << "}";
-  if (!getFlat()) os << std::endl;
-  setFlat(false);
+  if (!Descriptor::getFlat()) os << std::endl;
+  Descriptor::setFlat(false);
   return os;
 }
 

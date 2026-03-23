@@ -9,25 +9,11 @@ How xqry terminal works
 */
 #include "qry.hpp"
 
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/spdlog.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <array>
-#include <boost/config.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/map.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
-#include <boost/process/environment.hpp>
-#include <boost/property_tree/info_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/system/system_error.hpp>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdio>
@@ -36,6 +22,16 @@ How xqry terminal works
 #include <iostream>
 #include <sstream>
 #include <thread>
+
+#include <spdlog/spdlog.h>
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/containers/map.hpp>
+#include <boost/interprocess/containers/string.hpp>
+#include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
+#include <boost/property_tree/info_parser.hpp>
+#include <boost/system/system_error.hpp>
 
 #include "constants.hpp"
 #include "uxSysTermTools.hpp"
@@ -75,7 +71,8 @@ void qry::producer() {
       // read_json(strstream, pt) ;
       // read_xml(strstream, pt);
       read_info(strstream, pt);
-      while (!spsc_queue.push(pt)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      while (!spsc_queue.push(pt))
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   } catch (IPC::interprocess_exception &e) {
     SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(getpid()));
@@ -241,7 +238,8 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
           if (w == streamN) {
             if (outputFormatMode == formatMode::RAW) {
               const int count = std::stoi(e_value.get("count", ""));
-              for (int i = 0; i < count; i++) printf("%s ", e_value.get(std::to_string(i), "").c_str());
+              for (int i = 0; i < count; i++)
+                printf("%s ", e_value.get(std::to_string(i), "").c_str());
               printf("\r\n");
             } else if (outputFormatMode == formatMode::GNUPLOT) {
               const int count = std::stoi(e_value.get("count", ""));
@@ -300,7 +298,8 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    while (spsc_queue.pop(e_value) && !done) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while (spsc_queue.pop(e_value) && !done)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     if (timeLimitCntQry != 1 && !done) {
       _getch();  // no wait ... feed key from kbhit

@@ -1,7 +1,5 @@
 #pragma once
-#include <list>
-#include <map>
-#include <string>
+
 #include <vector>
 
 #include "QStruct.h"  // for query, token

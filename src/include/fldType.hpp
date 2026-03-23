@@ -12,15 +12,15 @@
 
 namespace rdb {
 
-typedef std::variant<uint8_t,                      //
-                     int,                          //
-                     unsigned,                     //
-                     boost::rational<int>,         //
-                     float,                        //
-                     double,                       //
-                     std::pair<int, int>,          //
-                     std::pair<std::string, int>,  //
-                     std::string>
+typedef std::variant<uint8_t,                      // BYTE
+                     int,                          // INTEGER
+                     unsigned,                     // UINT
+                     boost::rational<int>,         // RATIONAL
+                     float,                        // FLOAT
+                     double,                       // DOUBLE
+                     std::pair<int, int>,          // INTPAIR
+                     std::pair<std::string, int>,  // IDXPAIR
+                     std::string>                  // STRING
     descFldVT;
 
 enum descFld {
@@ -46,7 +46,11 @@ struct rField {
   int rlen;
   int rarray;
   descFld rtype;
-  rField(std::string n, int s, int c, descFld t) : rname(std::move(n)), rlen(s), rarray(c), rtype(t) {}
+  rField(std::string name, int length, int arrayCount, descFld type)
+      : rname(std::move(name)),
+        rlen(length),
+        rarray(arrayCount),
+        rtype(type) {}
 };
 
 }  // namespace rdb

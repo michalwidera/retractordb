@@ -1,14 +1,10 @@
 #include "rdb/facctxtsrc.h"
 
-#include <fcntl.h>
 #include <spdlog/spdlog.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include <cassert>
 #include <cstring>  // memcpy
-#include <memory>   // make_uniqe
-#include <ratio>
+#include <memory>   // make_unique
 
 namespace rdb {
 
@@ -34,33 +30,33 @@ K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
 }
 
 textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    //
-                                           const size_t sizeRec,               //
+                                           const ssize_t recordSize,              //
                                            const rdb::Descriptor &descriptor,  //
                                            bool loopToBeginningIfEOF)
-    : filename(std::string(fileName)),
-      descriptor(descriptor),
-      sizeRec(sizeRec),
-      readCount(0),
+    : filename_(std::string(fileName)),
+      descriptor_(descriptor),
+      recordSize_(recordSize),
+      readCount_(0),
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
-  myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(filename, std::ios::in);
-  assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+  myFile_.rdbuf()->pubsetbuf(nullptr, 0);
+  myFile_.open(filename_, std::ios::in);
+  assert((myFile_.rdstate() & std::ifstream::failbit) == 0);
 
-  payload = std::make_unique<rdb::payload>(descriptor);
+  payload_ = std::make_unique<rdb::payload>(descriptor_);
 }
 
-textSourceAccessorRO::~textSourceAccessorRO() { myFile.close(); }
+textSourceAccessorRO::~textSourceAccessorRO() { myFile_.close(); }
 
-auto textSourceAccessorRO::name() -> std::string & { return filename; }
+auto textSourceAccessorRO::name() -> std::string & { return filename_; }
 
 ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
-  assert(sizeRec != 0);
+  assert(recordSize_ != 0);
 
   if (!loopToBeginningIfEOF_) {
-    if (myFile.eof()) {
-      std::memset(reinterpret_cast<char *>(ptrData), 0, descriptor.getSizeInBytes());
-      readCount++;
+    if (myFile_.eof()) {
+      std::memset(ptrData, 0, descriptor_.getSizeInBytes());
+      readCount_++;
 
       return EXIT_SUCCESS;
     }
@@ -69,38 +65,40 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
     // on the end of file should not block here
   }
 
-  assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+  assert((myFile_.rdstate() & std::ifstream::failbit) == 0);
 
   auto i = 0;
-  for (auto item : descriptor) {
+  for (auto item : descriptor_) {
     if (item.rlen != 0) {
       if (item.rtype == rdb::STRING) {
         std::string var;
         auto strLen = item.rlen * item.rarray;
         char c;
-        while (myFile.get(c) && c != '"');
-        while (myFile.get(c) && c != '"') var += c;
+        while (myFile_.get(c) && c != '"')
+          ;
+        while (myFile_.get(c) && c != '"')
+          var += c;
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
         // SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
-        payload->setItem(i, var);
+        payload_->setItem(i, var);
       } else
         for (auto j = 0; j < item.rarray; j++) {
           if (item.rtype == rdb::INTEGER) {
-            auto var = readFromFstream<int>(myFile, loopToBeginningIfEOF_);
-            payload->setItem(i + j, var);
+            auto var = readFromFstream<int>(myFile_, loopToBeginningIfEOF_);
+            payload_->setItem(i + j, var);
           } else if (item.rtype == rdb::UINT) {
-            auto var = readFromFstream<unsigned>(myFile, loopToBeginningIfEOF_);
-            payload->setItem(i + j, var);
+            auto var = readFromFstream<unsigned>(myFile_, loopToBeginningIfEOF_);
+            payload_->setItem(i + j, var);
           } else if (item.rtype == rdb::FLOAT) {
-            auto var = readFromFstream<float>(myFile, loopToBeginningIfEOF_);
-            payload->setItem(i + j, var);
+            auto var = readFromFstream<float>(myFile_, loopToBeginningIfEOF_);
+            payload_->setItem(i + j, var);
           } else if (item.rtype == rdb::DOUBLE) {
-            auto var = readFromFstream<double>(myFile, loopToBeginningIfEOF_);
-            payload->setItem(i + j, var);
+            auto var = readFromFstream<double>(myFile_, loopToBeginningIfEOF_);
+            payload_->setItem(i + j, var);
           } else if (item.rtype == rdb::BYTE) {  // This is different!
-            auto var = readFromFstream<unsigned>(myFile, loopToBeginningIfEOF_);
-            payload->setItem(i + j, static_cast<uint8_t>(var));
+            auto var = readFromFstream<unsigned>(myFile_, loopToBeginningIfEOF_);
+            payload_->setItem(i + j, static_cast<uint8_t>(var));
           } else {
             SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(item.rtype));
             assert(false && "read - Unsupported type in text data source");
@@ -113,15 +111,15 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
     }
   }
 
-  std::memcpy(reinterpret_cast<char *>(ptrData), payload->get(), descriptor.getSizeInBytes());
+  std::memcpy(ptrData, payload_->span().data(), descriptor_.getSizeInBytes());
 
-  if (loopToBeginningIfEOF_) assert((myFile.rdstate() & std::ifstream::failbit) == 0);
+  if (loopToBeginningIfEOF_) assert((myFile_.rdstate() & std::ifstream::failbit) == 0);
 
-  readCount++;
+  readCount_++;
 
   return EXIT_SUCCESS;
 }
 
-size_t textSourceAccessorRO::count() { return readCount; }
+size_t textSourceAccessorRO::count() { return readCount_; }
 
 }  // namespace rdb

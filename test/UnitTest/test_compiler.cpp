@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "retractor/lib/QStruct.h"
 #include "retractor/lib/compiler.h"
+#include "retractor/lib/QStruct.h"
 
 // ctest -R '^ut-test_compiler' -V
 
@@ -39,17 +39,17 @@ bool check_compile_function() {
 // SELECT * STREAM test1 FROM core@(1,-10)
 // SELECT * STREAM test2 FROM core@(1,10)
 
-TEST(xparser, check_compile) { ASSERT_TRUE(check_compile_function()); }
+TEST(xparser, check_compile) { EXPECT_TRUE(check_compile_function()); }
 
 TEST(xparser, check_compile_result) {
-  ASSERT_TRUE(check_compile_function());
+  EXPECT_TRUE(check_compile_function());
 
   SPDLOG_INFO("coreInstance.size() {}", coreInstance.size());
 
   for (auto q : coreInstance) {
     SPDLOG_INFO("coreInstance[] {}, {}", q.id, q.filename);
     if (q.id == "test1") {
-      ASSERT_TRUE(q.isDeclaration() == false);
+      EXPECT_TRUE(q.isDeclaration() == false);
     }
   }
 }
@@ -57,9 +57,9 @@ TEST(xparser, check_compile_result) {
 TEST(xparser, check_parserRQLString) {
   auto [result, first_keyword, stream_name] =
       parserRQLString(coreInstance, "DECLARE a INTEGER, b BYTE STREAM core0, 1 FILE '/dev/urandom'");
-  ASSERT_TRUE(result == "OK");
-  ASSERT_TRUE(first_keyword == "DECLARE");
-  ASSERT_TRUE(stream_name == "core0");
+  EXPECT_TRUE(result == "OK");
+  EXPECT_TRUE(first_keyword == "DECLARE");
+  EXPECT_TRUE(stream_name == "core0");
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }

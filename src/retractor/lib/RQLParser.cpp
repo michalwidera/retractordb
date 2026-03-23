@@ -3,21 +3,19 @@
 
 // please note that the order of includes is important here
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
-#include <boost/cerrno.hpp>
-#include <boost/json.hpp>
-#include <boost/lexical_cast.hpp>
 #include <cstdlib>
-#include <filesystem>
 #include <iostream>
 #include <string>
+
+#include <boost/cerrno.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"
 #include ".antlr/RQLParser.h"
-#include "QStruct.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "constants.hpp"
+#include "QStruct.h"
 #include "rdb/convertTypes.h"
 
 using namespace antlrcpp;
@@ -117,7 +115,7 @@ class ParserListener : public RQLBaseListener {
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext *ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
   void exitExpString(RQLParser::ExpStringContext *ctx) { program.push_back(token(PUSH_VAL, rdb::descFldVT(ctx->getText()))); }
-//  void exitExpRational(RQLParser::ExpRationalContext *ctx) { program.push_back(token(PUSH_VAL, rationalResult)); }
+  //  void exitExpRational(RQLParser::ExpRationalContext *ctx) { program.push_back(token(PUSH_VAL, rationalResult)); }
 
   void exitSExpHash(RQLParser::SExpHashContext *ctx) { recpToken(STREAM_HASH); }
 

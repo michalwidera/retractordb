@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCFS_H_
-#define STORAGE_RDB_INCLUDE_FACCFS_H_
+#pragma once
 
 #include "fainterface.h"
 
@@ -13,12 +12,12 @@ namespace rdb {
  * Type: GENERIC
  */
 struct genericBinaryFileAccessor : public FileAccessorInterface {
-  std::string filename;
-  const std::size_t size;
+  std::string filename_;
+  const ssize_t recordSize_;
   int percounter_;
 
  public:
-  genericBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
+  genericBinaryFileAccessor(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
   ~genericBinaryFileAccessor() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
@@ -33,5 +32,3 @@ struct genericBinaryFileAccessor : public FileAccessorInterface {
 };
 
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCFS_H_

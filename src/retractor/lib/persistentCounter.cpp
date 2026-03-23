@@ -1,6 +1,5 @@
 #include "persistentCounter.h"
 
-#include <filesystem>
 #include <fstream>
 
 PersistentCounter::PersistentCounter(std::string initFilename)

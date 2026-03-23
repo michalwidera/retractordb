@@ -1,7 +1,5 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCPOSIX_H_
-#define STORAGE_RDB_INCLUDE_FACCPOSIX_H_
+#pragma once
 
-#include "descriptor.h"
 #include "fainterface.h"
 
 namespace rdb {
@@ -14,8 +12,8 @@ namespace rdb {
  * Type: DEFAULT
  */
 class posixBinaryFileAccessor : public FileAccessorInterface {
-  std::string filename;
-  const std::size_t size;
+  std::string filename_;
+  const ssize_t recordSize_;
   /**
    * @brief Posix File Descriptor
    */
@@ -23,7 +21,7 @@ class posixBinaryFileAccessor : public FileAccessorInterface {
   int percounter_;
 
  public:
-  posixBinaryFileAccessor(const std::string_view fileName, const size_t size, int percounter = -1);
+  posixBinaryFileAccessor(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
   ~posixBinaryFileAccessor() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
@@ -33,5 +31,3 @@ class posixBinaryFileAccessor : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCPOSIX_H_

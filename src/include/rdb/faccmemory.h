@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCMEMORY_H_
-#define STORAGE_RDB_INCLUDE_FACCMEMORY_H_
+#pragma once
 
 #include "fainterface.h"
 
@@ -10,16 +9,16 @@ namespace rdb {
  * Type: MEMORY
  */
 struct memoryFileAccessor : public FileAccessorInterface {
-  std::string filename;
-  const std::size_t size;
-  const int retention_size;   // Retention size for the records, if set to no_retention, no limit is applied
-  int removed_count = 0;      // Count of removed records, used for retention management
+  std::string filename_;
+  const ssize_t recordSize_;
+  const int retentionSize_;   // Retention size for the records, if set to no_retention, no limit is applied
+  int removed_count_ = 0;     // Count of removed records, used for retention management
   enum { no_retention = 0 };  // Default retention size if not specified
  public:
-  memoryFileAccessor(const std::string_view fileName, const size_t size, std::pair<std::string, size_t> retention_size)
-      : filename(std::string(fileName)),  //
-        size(size),                       //
-        retention_size(retention_size.second) {};
+  memoryFileAccessor(const std::string_view fileName, const ssize_t recordSize, std::pair<std::string, size_t> retentionSize)
+      : filename_(std::string(fileName)),  //
+        recordSize_(recordSize),           //
+        retentionSize_(retentionSize.second) {};
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
@@ -33,5 +32,3 @@ struct memoryFileAccessor : public FileAccessorInterface {
 };
 
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCMEMORY_H_

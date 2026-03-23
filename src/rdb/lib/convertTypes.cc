@@ -2,9 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <iostream>
 #include <istream>
-#include <optional>
 #include <stack>
 #include <string>
 #include <type_traits>

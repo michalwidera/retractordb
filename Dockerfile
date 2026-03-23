@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 
 LABEL com.retractordb.version="0.0.4"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-01-06"
+LABEL com.retractordb.release-date="2026-03-19"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
 # Update package list and install essential packages
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     # GCC toolchain and build essentials
     build-essential \
     gcc \
@@ -56,27 +56,27 @@ RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 # Set working directory
 WORKDIR /home/developer/workspace
 
-# Copy any local files if needed (uncomment and modify as needed)
-COPY DockerConan.txt /home/developer/workspace/
-
 # Change ownership of workspace to developer user
 RUN chown -R developer:developer /home/developer/workspace
 
 # Switch to non-root user
 USER developer
 
+# Copy any local files if needed (uncomment and modify as needed)
+COPY DockerConan.txt /home/developer/workspace/
+
 RUN python3 -m venv .venv \
-    && . .venv/bin/activate \ 
+    && . .venv/bin/activate \
     && pip install --upgrade pip \
-    && pip install cmakelang \
-    && pip install conan \
+    && pip install cmakelang conan \
     && conan profile detect \
     && sed -i -e "s/gnu17/gnu20/g" ~/.conan2/profiles/default \
     && echo '[conf]' >> ~/.conan2/profiles/default \
     && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default \
     && conan install DockerConan.txt -s build_type=Release --build missing \
     && conan install DockerConan.txt -s build_type=Debug --build missing \
-    && conan cache clean
+    && conan cache clean "*" \
+    && pip cache purge
 
 RUN echo "source .venv/bin/activate" >> ~/.bashrc
 # RUN echo "cat /etc/lsb-release" >> ~/.bashrc
@@ -101,5 +101,3 @@ CMD ["/bin/bash"]
 
 # clean up all dangling images
 # https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
-
-# Current compressed image size: 773.93MB

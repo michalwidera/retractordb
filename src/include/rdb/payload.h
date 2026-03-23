@@ -1,8 +1,8 @@
-#ifndef STORAGE_RDB_INCLUDE_PAYLOADACC_H_
-#define STORAGE_RDB_INCLUDE_PAYLOADACC_H_
+#pragma once
 
 #include <any>
 #include <memory>  // std::unique_ptr
+#include <span>
 
 #include "descriptor.h"
 
@@ -10,29 +10,24 @@ namespace rdb {
 /// @brief This class define accessing method to payload (memory area)
 /// This is accessor for payload memory area that supports applying descriptor type over memory area.
 class payload {
-  /// @brief Descriptor of managed payload area
-  Descriptor descriptor;
-
   /// @brief Payload memory area
-  std::unique_ptr<uint8_t[]> payloadData;
+  std::unique_ptr<uint8_t[]> payloadData_;
 
   /// @brief Type of dumped or read numeric formats
-  bool hexFormat = false;
+  bool hexFormat_ = false;
 
   template <typename T>
   void setItemBy(const int position, std::any value);
 
+  payload &operator=(const Descriptor &other);
+
  public:
-  /// @brief binary dump
-  bool specialDebug = false;
+  /// @brief Descriptor of managed payload area
+  Descriptor descriptor;
 
-  /// @brief Accessor to descriptor object
-  /// @return Descriptor
-  Descriptor getDescriptor() const;
-
-  /// @brief Accessor to pointer to payload
-  /// @return  T* pointer to payload
-  uint8_t *get() const;
+  /// @brief Span accessor to payload (modern, bounds-aware)
+  /// @return  std::span over the payload memory
+  std::span<uint8_t> span() const;
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
@@ -64,10 +59,7 @@ class payload {
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
 
-  payload &operator=(const Descriptor &other);
   payload &operator=(const payload &other);
   payload operator+(const payload &other);
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_PAYLOADACC_H_

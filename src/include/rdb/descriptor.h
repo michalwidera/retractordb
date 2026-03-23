@@ -1,11 +1,9 @@
-#ifndef STORAGE_RDB_INCLUDE_DESC_H_
-#define STORAGE_RDB_INCLUDE_DESC_H_
+#pragma once
 
+#include <algorithm>
 #include <initializer_list>
-#include <map>
 #include <optional>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "cmdID.hpp"
@@ -17,34 +15,32 @@ namespace rdb {
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
 enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
-
-bool getFlat();
-void setFlat(bool);
 //
 // Creates ability to create descriptions of binary frames using types and arrays
 //
 
 class Descriptor : public std::vector<rField> {
   std::vector<std::pair<int, int>> convMap_;
-  std::map<std::pair<int, int>, int> convReMap_;
   std::vector<int> offsetMap_;
   int clen_ = 0;
+  bool dirtyMap{true};
   void updateConvMaps();
 
+  static bool flatOutput_;
+
  public:
-  bool dirtyMap{true};
-  bool isEmpty() const;
-
+  static bool getFlat() { return flatOutput_; }
+  static void setFlat(bool val) { flatOutput_ = val; }
   Descriptor(std::initializer_list<rField> l);
-  Descriptor(const std::string &n, int l, int a, rdb::descFld t);
+  Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type);
 
-  Descriptor() = default;
-  Descriptor(const Descriptor &init);
+  Descriptor()                       = default;
+  Descriptor(const Descriptor &init) = default;
 
   void append(std::initializer_list<rField> l);
 
   Descriptor &operator+=(const Descriptor &rhs);
-  Descriptor &operator=(const Descriptor &rhs);
+  Descriptor &operator=(const Descriptor &rhs) = default;
   bool operator==(const Descriptor &rhs) const;
 
   Descriptor &createHash(const std::string &name, Descriptor lhs, Descriptor rhs);
@@ -52,12 +48,10 @@ class Descriptor : public std::vector<rField> {
 
   size_t getSizeInBytes() const;
   size_t position(const std::string_view name);
-  std::string fieldName(int fieldPosition);
   int len(const std::string_view name);
   constexpr int len(const rdb::rField &field) const;
   size_t offsetBegArr(const std::string_view name);
   int offset(int position);
-  int arraySize(const std::string_view name);
   std::string_view type(const std::string_view name);
   int sizeFlat();
   std::vector<rField> fieldsFlat();
@@ -68,33 +62,10 @@ class Descriptor : public std::vector<rField> {
   std::pair<rdb::descFld, int> getMaxType();
 
   std::optional<std::pair<int, int>> convert(int position);
-  std::optional<int> convert(std::pair<int, int> position);
 
-  bool hasField(const std::string_view name) {
-    for (const auto &f : *this) {
-      if (f.rname == name) return true;
-    }
-    return false;
+  bool hasField(const std::string_view name) const {
+    return std::any_of(begin(), end(), [name](const auto &f) { return f.rname == name; });
   }
-
-  template <typename T>
-  std::string toString(const std::string_view name, T *ptr) {
-    return std::string(reinterpret_cast<char *>(ptr + offsetBegArr(name)), len(name));
-  }
-
-  /**
-   * @brief Reads data from binary package via tuple-data from inner container
-   *
-   * @param T Type that data should be converted (returned)
-   * @param name name of given field
-   * @param ptr pointer to beginning of package
-   * @return auto Value from binary package that corresponds to field from
-   * container
-   */
-  template <typename T, typename K>
-  auto cast(const std::string_view name, K *ptr) {
-    return *(reinterpret_cast<T *>(ptr + offsetBegArr(name)));
-  };
 
   // Operators that enables read and write Descriptor to file/screen i Human
   // Readable Form.
@@ -108,5 +79,3 @@ Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
 std::ostream &flat(std::ostream &os);
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_DESC_H_

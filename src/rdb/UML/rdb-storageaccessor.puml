@@ -2,13 +2,13 @@
 
 /' To preview in VSCode: Alt-D '/
 
-title Storage Accessor - Activty Diagram
+title Storage Accessor - Activity Diagram
 
 start
 
 partition "construct" {
 :storageAccessor(descriptorname, storagename, storageParam, oneShot, onHold, percounter) ;
-note right: Crete storageAccessor class instance;
+note right: Create storageAccessor class instance;
 
 :assume descriptor filename
 as storagename.desc;
@@ -16,32 +16,32 @@ as storagename.desc;
 
 partition "attachDescriptor [descriptorParam]" {
 if (descriptor file exists?) then (yes)
-	partition "attach [descriptorParam]" {
-  :read descriptor file;
-  if (descriptor == descriptorParam) then (yes|[])
-    :set storage location
-    [ref];
-    note right: CurrDir if no ref;
-  else (no)
-    :<color:red>LOG: Descriptors not match.>
-    stop
-  endif
-  :<color blue>LOG: Descriptor from file used.>
+  partition "attach [descriptorParam]" {
+    :read descriptor file;
+    if (descriptor == descriptorParam) then (yes)
+      :set storage location
+      [ref];
+      note right: CurrDir if no ref;
+    else (no)
+      :<color:red>LOG: Descriptors not match.>
+      stop
+    endif
+    :<color blue>LOG: Descriptor from file used.>
   }
 else (no)
-	partition "create (descriptorParam)" {
-	  :create descriptor
-	  and descriptor file
-	  [ref];
-	  note right: CurrDir if no ref;
-	  :<color blue>LOG: Descriptor created.>
-	}
+  partition "create (descriptorParam)" {
+    :create descriptor
+    and descriptor file
+    [ref];
+    note right: CurrDir if no ref;
+    :<color blue>LOG: Descriptor created.>
+  }
 endif
 
 partition "attachStorage" {
   :<color:green>descriptor is ready;
 
-  note left: Storage location estabilished
+  note left: Storage location established
 
   :assume storage filename
   as storagename;
@@ -49,7 +49,7 @@ partition "attachStorage" {
   if (storage file exists?) then (yes)
     :attach storage;
     note left: compute storage size
-    :<color blue>LOG: record count {} on {}>
+    :<color blue>LOG: record count on storage>
   else (no)
     :create storage;
     :<color blue>LOG: Storage created.>

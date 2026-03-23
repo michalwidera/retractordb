@@ -3,17 +3,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
+#include <cassert>
+#include <cmath>
+#include <sstream>
+
 #include <boost/lexical_cast.hpp>
-#include <boost/program_options.hpp>
 #include <boost/rational.hpp>
 #include <boost/regex.hpp>
-#include <boost/system/error_code.hpp>
-#include <fstream>
-#include <iostream>
-
-#include "QStruct.h"
-#include "SOperations.hpp"
 
 using boost::lexical_cast;
 
@@ -374,7 +370,8 @@ std::string compiler::prepareFields() {
         }
         ++it;
       }
-      for (auto eraseIt : eraseList) q.lSchema.erase(eraseIt);
+      for (auto eraseIt : eraseList)
+        q.lSchema.erase(eraseIt);
     }
   }
   coreInstance.sort();
@@ -570,7 +567,8 @@ std::string compiler::convertRemotes() {
         offset += coreInstance[f.getStr_()].descriptorStorage().sizeFlat();
       }
       if (f.getCommandID() == STREAM_HASH) {
-        for (auto &i : offsetItem) i.second = 0;
+        for (auto &i : offsetItem)
+          i.second = 0;
       }
     }
     offsetMap[q.id] = offsetItem;

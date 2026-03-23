@@ -1,7 +1,5 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCBINDEV_H_
-#define STORAGE_RDB_INCLUDE_FACCBINDEV_H_
+#pragma once
 
-#include "descriptor.h"
 #include "fainterface.h"
 
 namespace rdb {
@@ -13,7 +11,7 @@ namespace rdb {
 
 class binaryDeviceAccessorRO : public FileAccessorInterface {
   std::string filename_;
-  const std::size_t recSize_;
+  const ssize_t recordSize_;
   /**
    * @brief Posix File Descriptor
    */
@@ -24,7 +22,7 @@ class binaryDeviceAccessorRO : public FileAccessorInterface {
   bool loopToBeginningIfEOF_ = true;
 
  public:
-  explicit binaryDeviceAccessorRO(const std::string_view fileName, const size_t recSize, bool loopToBeginningIfEOF);
+  explicit binaryDeviceAccessorRO(const std::string_view fileName, const ssize_t recordSize, bool loopToBeginningIfEOF);
   ~binaryDeviceAccessorRO() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
@@ -36,5 +34,3 @@ class binaryDeviceAccessorRO : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCBINDEV_H_

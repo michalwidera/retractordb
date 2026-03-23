@@ -1,14 +1,13 @@
 #pragma once
 
-#include <boost/program_options.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <map>
 #include <set>
 #include <string>
 
-#include "CRSMath.h"
-#include "QStruct.h"
+#include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 #include "compiler.h"
+#include "CRSMath.h"
 #include "lockManager.hpp"
 
 typedef boost::property_tree::ptree ptree;
@@ -25,7 +24,7 @@ struct executorsm {
   static void commandProcessorLoop();
   static ptree commandProcessor(ptree ptInval);
   static ptree collectStreamsParameters();
-  static ptree getAdHoc(std::string adHocQuery);
+  static ptree getAdHoc(const std::string &adHocQuery);
   static void boradcastOutOfBussiness();
 
   void boradcast(const std::set<std::string> &inSet);

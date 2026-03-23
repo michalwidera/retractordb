@@ -1,5 +1,7 @@
 core0.desc
 str1
 str1.desc
+str1.meta
 stradhoc
 stradhoc.desc
+stradhoc.meta

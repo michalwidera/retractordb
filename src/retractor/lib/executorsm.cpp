@@ -4,7 +4,13 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
-#include <boost/chrono.hpp>
+#include <atomic>
+#include <condition_variable>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <thread>
+
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -12,16 +18,8 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
-#include <boost/range/adaptors.hpp>
-#include <boost/range/algorithm.hpp>
 #include <boost/system/error_code.hpp>
-#include <filesystem>
-#include <iostream>
-#include <memory>
-#include <thread>
 
-#include "compiler.h"
-#include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "dataModel.h"
 #include "persistentCounter.h"
@@ -117,7 +115,7 @@ ptree executorsm::collectStreamsParameters() {
   return ptRetval;
 }
 
-ptree executorsm::getAdHoc(std::string adHocQuery) {
+ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   qTree coreCopy;
   ptree ptRetval;
   SPDLOG_INFO("got adhoc {} rcv.", adHocQuery);
@@ -509,7 +507,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
     {
       std::stringstream dummy;
-      for (const auto &p : inSet) dummy << p << " ";
+      for (const auto &p : inSet)
+        dummy << p << " ";
       SPDLOG_INFO("ZERO-step processed for streams: {}", dummy.str());
     }
     // End of ZERO-step
@@ -551,7 +550,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
       {
         std::stringstream dummy;
-        for (const auto &p : inSet) dummy << p << " ";
+        for (const auto &p : inSet)
+          dummy << p << " ";
         SPDLOG_INFO("NEXT-step processed for streams: {}", dummy.str());
       }
       // End of loop while( ! _kbhit(ignoreanykey) )

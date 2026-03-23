@@ -1,9 +1,10 @@
 #pragma once
 
-#include <boost/core/noncopyable.hpp>
-#include <boost/rational.hpp>
 #include <map>
 #include <set>
+
+#include <boost/core/noncopyable.hpp>
+#include <boost/rational.hpp>
 
 namespace CRationalStreamMath {
 

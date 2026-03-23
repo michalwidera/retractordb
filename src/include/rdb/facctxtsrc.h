@@ -1,5 +1,4 @@
-#ifndef STORAGE_RDB_INCLUDE_FACCTXTSRC_H_
-#define STORAGE_RDB_INCLUDE_FACCTXTSRC_H_
+#pragma once
 
 #include <fstream>
 
@@ -14,22 +13,22 @@ namespace rdb {
  * Type: TEXTSOURCE
  */
 class textSourceAccessorRO : public FileAccessorInterface {
-  std::string filename;
-  const std::size_t sizeRec;
+  std::string filename_;
+  const ssize_t recordSize_;
 
-  Descriptor descriptor;
+  Descriptor descriptor_;
 
-  std::unique_ptr<rdb::payload> payload;
+  std::unique_ptr<rdb::payload> payload_;
 
-  std::fstream myFile;
+  std::fstream myFile_;
 
-  size_t readCount = 0;
+  size_t readCount_ = 0;
 
   bool loopToBeginningIfEOF_ = true;
 
  public:
   textSourceAccessorRO(const std::string_view fileName,    //
-                       const size_t sizeRec,               //
+                       const ssize_t recordSize,              //
                        const rdb::Descriptor &descriptor,  //
                        bool loopToBeginningIfEOF);
 
@@ -44,5 +43,3 @@ class textSourceAccessorRO : public FileAccessorInterface {
   size_t count() override;
 };
 }  // namespace rdb
-
-#endif  // STORAGE_RDB_INCLUDE_FACCTXTSRC_H_
