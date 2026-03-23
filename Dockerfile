@@ -101,5 +101,3 @@ CMD ["/bin/bash"]
 
 # clean up all dangling images
 # https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
-
-# Current compressed image size: 773.93MB
