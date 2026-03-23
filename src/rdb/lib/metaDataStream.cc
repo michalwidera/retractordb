@@ -173,6 +173,13 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &
       metaFilePath_(metaFilePath) {
   createNullBitsetTemplate();
   loadIndex();
+
+  // Ensure the meta file exists on disk (even if empty) so that
+  // external tools / tests can detect its presence.  When the process
+  // is killed before the destructor runs, the file still exists.
+  if (!std::filesystem::exists(metaFilePath_)) {
+    std::ofstream touch(metaFilePath_, std::ios::binary);
+  }
 }
 
 metaDataStream::~metaDataStream() {
