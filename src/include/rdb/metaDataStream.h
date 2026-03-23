@@ -27,6 +27,7 @@ namespace rdb {
 /// - powinien dostarczyć informacji o rzeczywistym czasie rejestracji danych.
 /// - powinien być w stanie obsłużyć duże ilości danych.
 /// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
+/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekorda, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storageAccessor, zapewniając jednocześnie trwałość i integralność danych.
 /// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storageAccessor.
