@@ -205,7 +205,7 @@ RetractorDB uses a custom query language for declaring and processing time serie
 
 Declares a time series data source:
 
-```sql
+```
 DECLARE field_name type [, field_name type ...]
 STREAM stream_name, frequency
 FILE source_path
@@ -215,14 +215,14 @@ FILE source_path
 ```
 
 **Example** - Reading from /dev/random at 10 Hz:
-```sql
+```
 DECLARE random_value INTEGER
 STREAM random_stream, 0.1
 FILE '/dev/random'
 ```
 
 **Example** - Reading from text file:
-```sql
+```
 DECLARE sensor_data INTEGER
 STREAM sensor_input, 1
 FILE 'datafile.txt'
@@ -232,7 +232,7 @@ FILE 'datafile.txt'
 
 Creates continuous queries that transform and combine streams:
 
-```sql
+```
 SELECT column_expression [AS column_name], [column_expression [AS column_name] ...]
 STREAM output_stream_name
 FROM stream_junction_expression
@@ -242,14 +242,14 @@ FROM stream_junction_expression
 ```
 
 **Example** - Simple transformation:
-```sql
+```
 SELECT core0[0] + 1
 STREAM str1
 FROM core0
 ```
 
 **Example** - Combining streams:
-```sql
+```
 SELECT str2[0]/2+1, str2[1]
 STREAM str2
 FROM core1+core0
@@ -259,7 +259,7 @@ FROM core1+core0
 
 Defines conditional monitoring rules:
 
-```sql
+```
 RULE rule_name
 FROM stream_name
 IF logical_condition
@@ -268,7 +268,7 @@ THEN action
 ```
 
 **Example** - Trigger on threshold:
-```sql
+```
 RULE alarm_high
 FROM sensor_stream
 IF sensor_stream[0] > 11
@@ -303,7 +303,7 @@ seq 1 100 > data.txt
 ```
 
 2. **Create a query file** (`example.rql`):
-```sql
+```
 -- Declare input stream
 DECLARE value INTEGER
 STREAM input, 1
