@@ -163,9 +163,7 @@ std::pair<size_t, size_t> metaDataStream::locateRecord(size_t recordIndex) const
 // ── Construction / destruction ───────────────────────────────────────
 
 static int64_t nowEpochMs() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(
-             std::chrono::system_clock::now().time_since_epoch())
-      .count();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath)
@@ -182,9 +180,7 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &
   }
 }
 
-metaDataStream::~metaDataStream() {
-  saveIndex();
-}
+metaDataStream::~metaDataStream() { saveIndex(); }
 
 // ── Core update interface ────────────────────────────────────────────
 
@@ -242,8 +238,7 @@ void metaDataStream::onRecordModified(size_t recordIndex, std::vector<bool> &nul
   // Replace the segment
   if (segIdx < index_.size()) {
     index_.erase(index_.begin() + static_cast<std::ptrdiff_t>(segIdx));
-    index_.insert(index_.begin() + static_cast<std::ptrdiff_t>(segIdx),
-                  replacement.begin(), replacement.end());
+    index_.insert(index_.begin() + static_cast<std::ptrdiff_t>(segIdx), replacement.begin(), replacement.end());
   } else {
     // Modified segment was currentEntry_
     currentEntry_ = replacement.back();
@@ -256,7 +251,7 @@ void metaDataStream::onRecordModified(size_t recordIndex, std::vector<bool> &nul
 
 std::vector<bool> metaDataStream::getNullBitset(size_t recordIndex) const {
   auto [segIdx, offset] = locateRecord(recordIndex);
-  const auto &seg = (segIdx < index_.size()) ? index_[segIdx] : currentEntry_;
+  const auto &seg       = (segIdx < index_.size()) ? index_[segIdx] : currentEntry_;
   return seg.nullBitset;
 }
 
@@ -274,9 +269,7 @@ size_t metaDataStream::totalRecords() const {
   return total;
 }
 
-const std::vector<metaDataStream::IndexRecord> &metaDataStream::entries() const {
-  return index_;
-}
+const std::vector<metaDataStream::IndexRecord> &metaDataStream::entries() const { return index_; }
 
 // ── Transmission-gap interface ───────────────────────────────────────
 
@@ -311,14 +304,12 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
 
 int64_t metaDataStream::getRecordTimestamp(size_t recordIndex) const {
   auto [segIdx, offset] = locateRecord(recordIndex);
-  const auto &seg = (segIdx < index_.size()) ? index_[segIdx] : currentEntry_;
+  const auto &seg       = (segIdx < index_.size()) ? index_[segIdx] : currentEntry_;
   return seg.timestamp;
 }
 
 // ── Accessor ─────────────────────────────────────────────────────────
 
-const Descriptor &metaDataStream::descriptor() const {
-  return *descriptorRef_;
-}
+const Descriptor &metaDataStream::descriptor() const { return *descriptorRef_; }
 
 }  // namespace rdb

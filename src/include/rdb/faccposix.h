@@ -3,14 +3,17 @@
 #include "fainterface.h"
 
 namespace rdb {
-/**
- * @brief Object that implements storage interface via posix calls
- *
- * File Accessor as Posix Permanent - type.
- * This is underlying type that supports access to binary fields. Posix functions are
- *
- * Type: DEFAULT
- */
+
+/// @brief Definicja klasy implementującej dostęp do pliku binarnego
+///
+/// Obiekt posixBinaryFileAccessor metaDataStream powinien:
+/// - umożliwiać odczyt i zapis danych do pliku binarnego
+/// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
+/// - implementować interfejs FileAccessorInterface, aby umożliwić integrację z innymi komponentami systemu
+/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
+/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
+/// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
+
 class posixBinaryFileAccessor : public FileAccessorInterface {
   std::string filename_;
   const ssize_t recordSize_;

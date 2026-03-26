@@ -10,7 +10,7 @@
 namespace rdb {
 
 binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName,  //
-                                               const ssize_t recordSize,            //
+                                               const ssize_t recordSize,         //
                                                bool loopToBeginningIfEOF)        //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),

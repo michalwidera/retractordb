@@ -41,7 +41,7 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
   gap.timestamp   = 9999;
   gap.isGap       = true;
 
-  auto serialized = gap.serialize();
+  auto serialized   = gap.serialize();
   auto deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
   EXPECT_EQ(deserialized.isGap, true);
   EXPECT_EQ(deserialized.recordCount, 0u);
@@ -54,14 +54,14 @@ TEST_F(MetaTestFixture, test_append_and_query) {
 
   {
     rdb::metaDataStream meta(descriptor, metaFile);
-    std::vector<bool> allNull  = {true, true};
-    std::vector<bool> noNull   = {false, false};
-    std::vector<bool> mixed    = {true, false};
+    std::vector<bool> allNull = {true, true};
+    std::vector<bool> noNull  = {false, false};
+    std::vector<bool> mixed   = {true, false};
 
-    meta.onRecordAppended(allNull);   // rec 0
-    meta.onRecordAppended(allNull);   // rec 1
-    meta.onRecordAppended(noNull);    // rec 2
-    meta.onRecordAppended(mixed);     // rec 3
+    meta.onRecordAppended(allNull);  // rec 0
+    meta.onRecordAppended(allNull);  // rec 1
+    meta.onRecordAppended(noNull);   // rec 2
+    meta.onRecordAppended(mixed);    // rec 3
 
     EXPECT_EQ(meta.totalRecords(), 4u);
     EXPECT_EQ(meta.getNullBitset(0), allNull);
@@ -90,7 +90,8 @@ TEST_F(MetaTestFixture, test_modify_splits_rle) {
   std::vector<bool> noNull_ = {false};
 
   // Build a run of 5 identical records
-  for (int i = 0; i < 5; ++i) meta.onRecordAppended(null_);
+  for (int i = 0; i < 5; ++i)
+    meta.onRecordAppended(null_);
 
   // Modify the middle one
   meta.onRecordModified(2, noNull_);
@@ -110,10 +111,10 @@ TEST_F(MetaTestFixture, test_transmission_gap) {
   rdb::metaDataStream meta(descriptor, metaFile);
   std::vector<bool> pat = {false};
 
-  meta.onRecordAppended(pat);   // rec 0
-  meta.onRecordAppended(pat);   // rec 1
+  meta.onRecordAppended(pat);  // rec 0
+  meta.onRecordAppended(pat);  // rec 1
   meta.onTransmissionGap();
-  meta.onRecordAppended(pat);   // rec 2
+  meta.onRecordAppended(pat);  // rec 2
 
   EXPECT_EQ(meta.totalRecords(), 3u);
   EXPECT_FALSE(meta.isGapBefore(0));

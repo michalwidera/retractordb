@@ -133,7 +133,8 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
 
 std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view streamName, const std::string_view taskName) {
   std::string key = std::string(streamName) + std::string(taskName);
-  auto filename   = std::filesystem::path(storagePath) / std::filesystem::path(std::string(streamName) + "_" + std::string(taskName));
+  auto filename =
+      std::filesystem::path(storagePath) / std::filesystem::path(std::string(streamName) + "_" + std::string(taskName));
   if (retentionSize[key] == 0) {
     filename += "_dump.tmp";
   } else {

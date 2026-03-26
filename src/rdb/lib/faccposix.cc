@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <cstring>
 #include <filesystem>
 namespace rdb {
 
@@ -54,6 +55,7 @@ ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t posi
   if (position == std::numeric_limits<size_t>::max()) {
     auto result = ::lseek(fd, 0, SEEK_END);
     assert(result != -1);
+    if (result == -1) return errno;  // Error status
   } else {
     auto result = ::lseek(fd, position, SEEK_SET);
     assert(result != -1);
@@ -77,16 +79,29 @@ ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t posi
 ssize_t posixBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
-  if (fd < 0) return fd;  // <- Error status
+  if (fd < 0) return fd;
 
   ssize_t read_size = ::pread(fd, ptrData, recordSize_, static_cast<off_t>(position));
+  if (read_size != recordSize_) {
+    if (read_size < 0) {
+      if (errno == EINTR) return read(ptrData, position);  // Retry
+      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(errno));
+      return EXIT_FAILURE;
+    }
+    SPDLOG_WARN("::pread {} partial read: {} of {} bytes at pos {}", filename_, read_size, recordSize_, position);
+    return EXIT_FAILURE;
+  }
   return EXIT_SUCCESS;
 }
 
 size_t posixBinaryFileAccessor::count() {
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
-  return rc == 0 ? stat_buf.st_size / recordSize_ : -1;
+  if (rc != 0) {
+    SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
+    return -1;
+  }
+  return stat_buf.st_size / recordSize_;
 }
 
 }  // namespace rdb

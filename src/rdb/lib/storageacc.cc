@@ -13,8 +13,8 @@ namespace rdb {
 
 bool isOpen(const storageState val) { return (val == storageState::openAndCreate); };
 
-storageAccessor::storageAccessor(const std::string_view qryID,              //
-                                 const std::string_view fileName,           //
+storageAccessor::storageAccessor(const std::string_view qryID,         //
+                                 const std::string_view fileName,      //
                                  const std::string_view storageParam,  //
                                  bool oneShot,                         //
                                  bool isHold,                          //

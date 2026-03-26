@@ -28,7 +28,7 @@ class textSourceAccessorRO : public FileAccessorInterface {
 
  public:
   textSourceAccessorRO(const std::string_view fileName,    //
-                       const ssize_t recordSize,              //
+                       const ssize_t recordSize,           //
                        const rdb::Descriptor &descriptor,  //
                        bool loopToBeginningIfEOF);
 
