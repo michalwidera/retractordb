@@ -2,11 +2,13 @@
 
 #include "fainterface.h"
 
+#include <vector>
+
 namespace rdb {
 
 /// @brief Definicja klasy implementującej dostęp do pliku binarnego
 ///
-/// Obiekt posixBinaryFileAccessor metaDataStream powinien:
+/// Obiekt posixBinaryFileAccessor powinien:
 /// - umożliwiać odczyt i zapis danych do pliku binarnego
 /// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
 /// - implementować interfejs FileAccessorInterface, aby umożliwić integrację z innymi komponentami systemu

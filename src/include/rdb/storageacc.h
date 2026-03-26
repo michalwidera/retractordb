@@ -10,6 +10,7 @@
 #include "faccfs.h"
 #include "faccmemory.h"
 #include "faccposix.h"
+#include "faccposixshd.h"
 #include "facctxtsrc.h"
 #include "fagrp.h"
 #include "metaDataStream.h"
