@@ -6,21 +6,24 @@
 #include <string>
 
 namespace rdb {
-/// @brief This is interface for accessor interface.
+
+/// @brief To jest klasa abstrakcyjna, która definiuje interfejs do operacji na różnych typach magazynów danych (np. pliki, obiekty, blob) używanych jako storageAccessor w klasie storageAccessor.
 ///
-/// File Accessor Interface.
-/// This is used as pattern for: faccposix, facposixprm and faccfs types.
-/// All these types need to support this interface to be used as storage accessor in storageAccessor class.
-/// There is only 3 operations over file/object/blob aka storage
-/// append data at the end of storage
-/// Read data from the storage
-/// Update data in the middle of storage
-/// This three has been covered by following interface
-/// 1. read ::= read(data, position)
-/// 2. append :== write(data, position == max_possible_value )
-/// 3. update :== write(data, position)
-/// Note: position is in bytes and size of data is determined by descriptor of storageAccessor class and is not part of this
-/// interface.
+/// obiekt klasy dziedziczącej po klasie FileAccessorInterface powinien:
+/// - zapewniać jednolity interfejs do operacji na różnych typach magazynów danych (np. pliki, obiekty, blob) używanych jako storageAccessor w klasie storageAccessor.
+/// - umożliwiać odczyt danych z magazynu na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy pochodnej.
+/// - w przyadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji dane odczytywane są jedynie z pozycji 0.
+/// - umożliwiać dodawanie danych na końcu magazynu, traktując określoną wartość pozycji jako sygnał do operacji append.
+/// - zapewniać informacje o liczbie rekordów w magazynie, co jest istotne dla zarządzania danymi w storageAccessor.
+/// - w przypadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji, metoda count() może zwracać liczbę odczytów wykonanych na tym źródle danych.
+///
+/// Oto trzy podstawowe operacje, które powinny być obsługiwane przez implementację tego interfejsu:
+/// 1. read ::= read(data, pozycja) :== odczyt danych z magazynu na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy pochodnej.
+/// 2. append :== write(data, pozycja == maksymalna wartość size_t) :== dodawanie danych na końcu magazynu, traktując określoną wartość pozycji jako sygnał do operacji append.
+/// 3. update :== write(data, pozycja) :== aktualizacja danych w magazynie na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy pochodnej.
+///
+/// @note pozycja wyrażona jest w bajtach, a rozmiar danych jest określany przez descriptor klasy pochodnej i nie jest częścią tego interfejsu.
+
 struct FileAccessorInterface {
   /// @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
   /// @param ptrData pointer to data in memory where data will be fetched from storage
