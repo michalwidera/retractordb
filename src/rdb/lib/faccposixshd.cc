@@ -101,13 +101,20 @@ ssize_t posixBinaryFileWithShadowAccessor::write(const uint8_t *ptrData, const s
 
     ssize_t sizesh(recordSize_);
     const uint8_t *ptr = ptrData;
+    constexpr int maxRetries = 5;
+    int retries = 0;
     while (sizesh > 0) {
       ssize_t write_result = ::write(fd, ptr, sizesh);
       if (write_result < 0) {
-        if (errno == EINTR) continue;
+        if (errno == EINTR && ++retries <= maxRetries) continue;
+        if (errno == EINTR) {
+          SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
+          return errno;
+        }
         SPDLOG_ERROR("::write {} failed: {}", filename_, strerror(errno));
         return EXIT_FAILURE;
       }
+      retries = 0;
       ptr += write_result;
       sizesh -= write_result;
     }
@@ -129,13 +136,20 @@ ssize_t posixBinaryFileWithShadowAccessor::write(const uint8_t *ptrData, const s
   // Zapisz dane
   ssize_t sizesh(recordSize_);
   const uint8_t *ptr = ptrData;
+  constexpr int maxRetries = 5;
+  int retries = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd_shadow, ptr, sizesh);
     if (write_result < 0) {
-      if (errno == EINTR) continue;
+      if (errno == EINTR && ++retries <= maxRetries) continue;
+      if (errno == EINTR) {
+        SPDLOG_ERROR("::write shadow {} failed after {} EINTR retries", shadowName(), maxRetries);
+        return errno;
+      }
       SPDLOG_ERROR("::write shadow {} failed: {}", shadowName(), strerror(errno));
       return EXIT_FAILURE;
     }
+    retries = 0;
     ptr += write_result;
     sizesh -= write_result;
   }
@@ -151,17 +165,20 @@ ssize_t posixBinaryFileWithShadowAccessor::read(uint8_t *ptrData, const size_t p
   if (shadowFind(ptrData, position) == EXIT_SUCCESS) return EXIT_SUCCESS;
 
   // Fallback — odczyt z głównego pliku
-  ssize_t read_size = ::pread(fd, ptrData, recordSize_, static_cast<off_t>(position));
-  if (read_size != recordSize_) {
+  constexpr int maxRetries = 5;
+  for (int attempt = 0; attempt < maxRetries; ++attempt) {
+    ssize_t read_size = ::pread(fd, ptrData, recordSize_, static_cast<off_t>(position));
+    if (read_size == recordSize_) return EXIT_SUCCESS;
     if (read_size < 0) {
-      if (errno == EINTR) return read(ptrData, position);
+      if (errno == EINTR) continue;  // Retry
       SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(errno));
       return EXIT_FAILURE;
     }
     SPDLOG_WARN("::pread {} partial read: {} of {} bytes at pos {}", filename_, read_size, recordSize_, position);
     return EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
+  SPDLOG_ERROR("::pread {} failed after {} EINTR retries", filename_, maxRetries);
+  return EXIT_FAILURE;
 }
 
 size_t posixBinaryFileWithShadowAccessor::count() {

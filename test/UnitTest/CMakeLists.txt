@@ -28,6 +28,10 @@ foreach(item ${V_GLOB})
   set(SOURCES_${OUTPUT_FILE_NOEXT}_TEST ${item} launch/main.cpp)
   add_executable(${OUTPUT_FILE_NOEXT} ${SOURCES_${OUTPUT_FILE_NOEXT}_TEST})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
+  if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposixEintr")
+    target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE
+      -Wl,--wrap=pread -Wl,--wrap=write)
+  endif()
   add_test(
     NAME ut-${OUTPUT_FILE_NOEXT}
     WORKING_DIRECTORY
