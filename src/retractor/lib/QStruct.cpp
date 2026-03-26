@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cctype>
 #include <sstream>
@@ -71,11 +72,8 @@ void query::reset() {
 }
 
 bool isThere(const std::vector<query> &v, const std::string &query_name) {
-  for (const auto &q : v) {
-    if (q.id == "") continue;
-    if (q.id == query_name) return true;
-  }
-  return false;
+  return std::any_of(v.begin(), v.end(),
+                     [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
 }
 
 void qTree::dfs(const std::string &v) {
@@ -110,10 +108,7 @@ void qTree::topologicalSort() {
 }
 
 bool qTree::exists(const std::string &query_name) {
-  for (const auto &q : *this) {
-    if (q.id == query_name) return true;
-  }
-  return false;
+  return std::any_of(begin(), end(), [&query_name](const auto &q) { return q.id == query_name; });
 }
 
 boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }

@@ -222,7 +222,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       if (_kbhit(vm.count("needctrlc"))) break;
       if (timeLimitCntQry == 1) {
         if (vm.count("kill")) {
-          ptree pt = netClient("kill", "");
+          netClient("kill", "");
           SPDLOG_INFO("Time limit reached - exiting (kill on end).");
           done = true;
         }
@@ -248,13 +248,13 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
               std::cout << "plot";
 
               const auto schema = netClient("detail", input);
-              int i{0};
+              int colIdx{0};
               for (const auto &v : schema.get_child("db.field")) {
-                if (i != 0) std::cout << ",";
+                if (colIdx != 0) std::cout << ",";
                 auto columnName = v.second.get<std::string>("");
                 std::replace(columnName.begin(), columnName.end(), '_', '-');
-                std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors[i % colors.size()] << "'";
-                i++;
+                std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors[colIdx % colors.size()] << "'";
+                colIdx++;
               }
               std::cout << "\r\n";
 
