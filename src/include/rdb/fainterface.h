@@ -25,7 +25,7 @@ namespace rdb {
 /// Oto trzy podstawowe operacje, które powinny być obsługiwane przez implementację tego interfejsu:
 /// 1. read ::= read(data, pozycja) :== odczyt danych z magazynu na podstawie pozycji (w bajtach) i rozmiaru danych określonego
 /// przez descriptor klasy pochodnej.
-/// 2. append :== write(data, pozycja == maksymalna wartość size_t) :== dodawanie danych na końcu magazynu, traktując określoną
+/// 2. append :== write(data, maksymalna wartość size_t) :== dodawanie danych na końcu magazynu, traktując określoną
 /// wartość pozycji jako sygnał do operacji append.
 /// 3. update :== write(data, pozycja) :== aktualizacja danych w magazynie na podstawie pozycji (w bajtach) i rozmiaru danych
 /// określonego przez descriptor klasy pochodnej.
