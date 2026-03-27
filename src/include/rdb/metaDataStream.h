@@ -2,6 +2,7 @@
 
 #include "descriptor.h"
 
+#include <boost/rational.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -21,15 +22,13 @@ namespace rdb {
 /// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storageAccessor.
 /// - umożliwiać aktualizację informacji o nullach dla istniejących rekordów.
 /// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storageAccessor jest
-/// niedozwolone.
+/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
+/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storageAccessor jest niedozwolone.
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
 /// - zapewniać informacje o przerwach w transmisji danych.
-/// - powinien dostarczyć informacji o rzeczywistym czasie rejestracji danych.
 /// - powinien być w stanie obsłużyć duże ilości danych.
 /// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
-/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekorda,
-/// ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
+/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych
 /// napływających do storageAccessor, zapewniając jednocześnie trwałość i integralność danych.
@@ -49,7 +48,6 @@ class metaDataStream {
   struct IndexRecord {
     std::vector<bool> nullBitset;                                     ///< one bit per descriptor field (true = null)
     size_t recordCount{0};                                            ///< number of consecutive records with this pattern
-    int64_t timestamp{0};                                             ///< epoch time (ms) of the first record in this run
     bool isGap{false};                                                ///< true = this entry marks a transmission gap
     std::vector<std::byte> serialize() const;                         ///< serialize the entry to a vector of bytes
     static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
@@ -69,6 +67,8 @@ class metaDataStream {
   std::fstream indexFile_;                     ///< file stream for reading/writing the meta index
   std::vector<IndexRecord> index_;             ///< all committed RLE segments (in memory)
   std::shared_ptr<Descriptor> descriptorRef_;  ///< descriptor of the indexed data stream
+  boost::rational<int> rInterval_{1};          ///< stream sampling interval for time calculations
+  std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
 
  public:
   IndexRecord currentEntry_;  ///< accumulator for the current (not yet committed) RLE run
@@ -81,7 +81,8 @@ class metaDataStream {
   /// into the in-memory index (loadIndex).
   /// @param descriptor descriptor of the indexed data stream
   /// @param metaFilePath path of the file to save/load the meta index
-  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath);
+  /// @param rInterval sampling interval for time calculations (default: 1 second)
+  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath, boost::rational<int> rInterval = boost::rational<int>(1));
 
   /// @brief Destructor – flushes the current entry and saves the full
   ///        index to file.
@@ -138,11 +139,21 @@ class metaDataStream {
   /// @brief Check whether a gap marker exists right before @p recordIndex.
   bool isGapBefore(size_t recordIndex) const;
 
-  // ── Timestamp interface ────────────────────────────────────────────
+  // ── Time calculation interface ─────────────────────────────────────
 
-  /// @brief Return the registration timestamp (epoch ms) for the
-  ///        record at @p recordIndex.
-  int64_t getRecordTimestamp(size_t recordIndex) const;
+  /// @brief Calculate registration timestamp for a record based on its position.
+  /// Uses index creation time + (recordIndex * rInterval) formula.
+  /// @param recordIndex global position of the record in the stream
+  /// @return calculated timestamp for the record
+  std::chrono::system_clock::time_point calculateRecordTimestamp(size_t recordIndex) const;
+
+  /// @brief Get the creation time of the index.
+  /// @return timestamp when index was created
+  std::chrono::system_clock::time_point getCreationTime() const;
+
+  /// @brief Get the configured sampling interval.
+  /// @return rInterval value used for time calculations
+  boost::rational<int> getSamplingInterval() const;
 
   // ── Accessor ───────────────────────────────────────────────────────
 
