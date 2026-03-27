@@ -21,7 +21,7 @@
 #include "lib/lockManager.hpp"
 #include "lib/persistentCounter.h"
 #include "lib/presenter.h"
-#include "lib/QStruct.h"
+#include "lib/qTree.h"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;

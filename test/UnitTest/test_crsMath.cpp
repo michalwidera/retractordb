@@ -12,7 +12,7 @@
 #include "retractor/lib/compiler.h"
 #include "retractor/lib/CRSMath.h"
 #include "retractor/lib/dataModel.h"
-#include "retractor/lib/QStruct.h"  // coreInstance
+#include "retractor/lib/qTree.h"  // coreInstance
 
 // ctest -R '^ut-test_crsMath' -V
 

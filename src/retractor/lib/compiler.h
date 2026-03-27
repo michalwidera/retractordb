@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "QStruct.h"  // for query, token
+#include "qTree.h"   // for qTree, query, token
 
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};

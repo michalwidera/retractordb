@@ -1,6 +1,6 @@
 #pragma once
 
-#include "QStruct.h"  // token, std::list
+#include "token.h"  // token, std::list
 #include "rdb/payload.h"
 
 class expressionEvaluator {

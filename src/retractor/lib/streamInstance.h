@@ -4,7 +4,7 @@
 #include <string>
 
 #include "dumpManager.h"
-#include "QStruct.h"         // qTree
+#include "qTree.h"          // qTree
 #include "rdb/storageacc.h"  // rdb::storageAccessor (transitively includes descriptor.h, payload.h)
 
 struct streamInstance {
@@ -15,7 +15,7 @@ struct streamInstance {
   std::unique_ptr<rdb::payload> inputPayload;           // payload used for computation in select
                                                         // clause - created by from clause.
 
-  // This constructor will create data based on QStruct query
+  // This constructor will create data based on query
   explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
 
   rdb::payload constructAgsePayload(const int length,             //  _@(_,length)

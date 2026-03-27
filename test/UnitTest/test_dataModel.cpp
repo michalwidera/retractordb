@@ -14,7 +14,7 @@
 #include "rdb/payload.h"
 #include "rdb/storageacc.h"
 #include "retractor/lib/dataModel.h"
-#include "retractor/lib/QStruct.h"  // coreInstance
+#include "retractor/lib/qTree.h"  // coreInstance
 
 // ctest -R '^ut-test_dataModel' -V
 

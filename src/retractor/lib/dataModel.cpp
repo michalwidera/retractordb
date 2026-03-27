@@ -218,7 +218,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //
       assert(arg.size() == 2);
 
-      const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with QStruct.cpp
+      const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       assert(step > 0);
       const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();

@@ -4,7 +4,7 @@
 #include <memory>  // unique_ptr
 #include <vector>
 
-#include "streamInstance.h"  // streamInstance (transitively includes QStruct.h, rdb/payload.h)
+#include "streamInstance.h"  // streamInstance (transitively includes qTree.h, rdb/payload.h)
 class dataModel {
  private:
   qTree &coreInstance_;

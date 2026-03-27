@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "retractor/lib/compiler.h"
-#include "retractor/lib/QStruct.h"
+#include "retractor/lib/qTree.h"
 
 // ctest -R '^ut-test_compiler' -V
 
