@@ -103,7 +103,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz
+            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz lcov gcovr
             python3 -m venv .venv
             source .venv/bin/activate
             pip3 install --upgrade pip 
@@ -146,6 +146,27 @@ commands:
             source .venv/bin/activate
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> install
+  conan-build-covergage:
+    parameters:
+      build_conan_type: 
+        type: string
+        default: "conan-debug"
+      build_type: 
+        type: string
+        default: "Debug"
+      build_tool:
+        type: string
+        default: "make"
+    steps:
+      - run:
+          name: Conan build with coverage
+          command: |
+            cmake --preset <<parameters.build_conan_type>> -DENABLE_COVERAGE=ON
+            <<parameters.build_tool>> clean && <<parameters.build_tool>>
+            ctest
+            gcovr --root . --filter 'src/' --gcov-executable gcov-14 --exclude '.*\.antlr.*' build/<<parameters.build_type>> --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+      - store_artifacts:
+          path: coverage
   run-test:
     parameters:
       build_type:
@@ -215,6 +236,10 @@ jobs:
           build_param: --build missing
           build_tool: ninja
       - run-test:
+          build_tool: ninja
+      - conan-build-covergage:
+          build_conan_type: conan-debug
+          build_type: Debug
           build_tool: ninja
       - run-package:
           build_tool: ninja

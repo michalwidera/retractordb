@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 
 LABEL com.retractordb.version="0.0.4"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-03-19"
+LABEL com.retractordb.release-date="2026-03-27"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -42,6 +42,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     pkg-config \
     sudo \
     graphviz \
+    gcovr \
+    lcov \
     # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

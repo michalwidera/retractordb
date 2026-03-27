@@ -13,7 +13,20 @@ add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
 add_definitions(-DHAS_BOOST)
 
+option(ENABLE_COVERAGE "Enable code coverage" OFF)
+
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
+
+if(ENABLE_COVERAGE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+endif()
+
+# cmake --preset conan-debug -DENABLE_COVERAGE=ON
+# ninja clean && ninja
+# ctest
+# gcovr --root . --filter 'src/' --gcov-executable gcov-14 --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+
 find_package(Boost CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
