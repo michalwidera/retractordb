@@ -237,10 +237,6 @@ jobs:
           build_tool: ninja
       - run-test:
           build_tool: ninja
-      - conan-build-covergage:
-          build_conan_type: conan-debug
-          build_type: Debug
-          build_tool: ninja
       - run-package:
           build_tool: ninja
 
@@ -266,6 +262,10 @@ jobs:
           build_type: Debug
           build_tool: ninja
       - run-package:
+          build_type: Debug
+          build_tool: ninja
+      - conan-build-covergage:
+          build_conan_type: conan-debug
           build_type: Debug
           build_tool: ninja
 
