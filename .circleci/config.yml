@@ -268,7 +268,7 @@ jobs:
       - conan-build-covergage:
           build_conan_type: conan-debug
           build_type: Debug
-          build_tool: ninja
+          build_tool: make
 
   build-release:
     working_directory: ~/retractordb
