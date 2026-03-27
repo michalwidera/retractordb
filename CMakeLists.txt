@@ -23,8 +23,10 @@ if(ENABLE_COVERAGE)
 endif()
 
 # cmake --preset conan-debug -DENABLE_COVERAGE=ON
+# cd build/Debug
 # ninja clean && ninja
 # ctest
+# cd ../..
 # gcovr --root . --filter 'src/' --gcov-executable gcov-14 --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
 
 find_package(Boost CONFIG REQUIRED)

@@ -65,6 +65,15 @@ run_option() {
             echo "-- Last two lines of ~/.bashrc are:"
             tail -n 2 ~/.bashrc
             ;;
+        "coverage")
+            cd $build_folder
+            cmake --preset conan-debug -DENABLE_COVERAGE=ON
+            cd build/Debug
+            ninja clean && ninja
+            ctest
+            cd ../..
+            gcovr --root . --filter 'src/' --gcov-executable gcov-14 --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+            ;;
         "quit")
             echo "-- Current conan profile is:"
             cat ~/.conan2/profiles/default
@@ -80,6 +89,7 @@ run_option() {
             echo "  conan      - Detect conan profile and set C++23 standard"
             echo "  ninja      - Add Ninja generator to conan profile"
             echo "  bashrc     - Add retractordb/bin to PATH in ~/.bashrc"
+            echo "  coverage   - Build tests with code coverage enabled"
             echo "  help       - Show this help message"
             echo "  quit       - Show current conan profile and exit"
             echo ""
@@ -87,7 +97,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-           echo "Valid options: release debug conan ninja toolchain bashrc help quit"
+           echo "Valid options: release debug conan ninja toolchain bashrc coverage help quit"
            exit 1
            ;;
     esac
