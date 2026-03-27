@@ -146,28 +146,6 @@ commands:
             source .venv/bin/activate
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> install
-  conan-build-covergage:
-    parameters:
-      build_conan_type: 
-        type: string
-        default: "conan-debug"
-      build_type: 
-        type: string
-        default: "Debug"
-      build_tool:
-        type: string
-        default: "make"
-    steps:
-      - run:
-          name: Conan build with coverage
-          command: |
-            source .venv/bin/activate
-            cmake --preset <<parameters.build_conan_type>> -DENABLE_COVERAGE=ON
-            (cd build/<<parameters.build_type>> && <<parameters.build_tool>> clean && <<parameters.build_tool>>)
-            (cd build/<<parameters.build_type>>/test && ctest)
-            gcovr --root . --filter 'src/' --gcov-executable gcov-14 --exclude '.*\.antlr.*' build/<<parameters.build_type>> --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
-      - store_artifacts:
-          path: coverage
   run-test:
     parameters:
       build_type:
@@ -265,10 +243,6 @@ jobs:
       - run-package:
           build_type: Debug
           build_tool: ninja
-      - conan-build-covergage:
-          build_conan_type: conan-debug
-          build_type: Debug
-          build_tool: make
 
   build-release:
     working_directory: ~/retractordb
