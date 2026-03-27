@@ -22,24 +22,20 @@ esac
 
 echo "-- Note: Current folder is [ $foldername ] and will start build in [ $build_folder ]"
 
-PS3='-- Pick option, please enter your setup choice: '
-options=("release" "debug" "conan" "ninja" "toolchain" "bashrc" "quit")
-select opt in "${options[@]}"
-do
-    case $opt in
+run_option() {
+    local opt="$1"
+    case "$opt" in
         "release")
             sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Release --build missing
             conan build $build_folder -s build_type=Release --build missing
-            break
             ;;
         "debug")
             sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
             conan source $build_folder
             conan install $build_folder -s build_type=Debug --build missing
             conan build $build_folder -s build_type=Debug --build missing
-            break
             ;;
         "toolchain")
             sudo apt-get update
@@ -51,18 +47,15 @@ do
             pip3 install conan
             if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect ; fi
             conan profile show
-            break
             ;;
         "conan")
             conan profile detect -f
             sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
-            break
             ;;
         "ninja")
             echo '[conf]' >> ~/.conan2/profiles/default
             echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default
             cat ~/.conan2/profiles/default
-            break
             ;;
         "bashrc")
             cd $build_folder
@@ -71,14 +64,45 @@ do
             echo 'source ~/.venv/bin/activate' >> ~/.bashrc
             echo "-- Last two lines of ~/.bashrc are:"
             tail -n 2 ~/.bashrc
-            break
             ;;
         "quit")
             echo "-- Current conan profile is:"
             cat ~/.conan2/profiles/default
             echo "-- Ok, quit - no action."
-            break
             ;;
-        *) echo "invalid option $REPLY";;
+        "help"|"--help"|"-h")
+            echo "Usage: $0 [option ...]"
+            echo ""
+            echo "Options:"
+            echo "  release    - Build in Release mode (conan source, install, build)"
+            echo "  debug      - Build in Debug mode (conan source, install, build)"
+            echo "  toolchain  - Install build toolchain (gcc, cmake, ninja, conan, etc.)"
+            echo "  conan      - Detect conan profile and set C++23 standard"
+            echo "  ninja      - Add Ninja generator to conan profile"
+            echo "  bashrc     - Add retractordb/bin to PATH in ~/.bashrc"
+            echo "  help       - Show this help message"
+            echo "  quit       - Show current conan profile and exit"
+            echo ""
+            echo "Without arguments, runs in interactive mode."
+            echo "Multiple options can be passed: $0 conan ninja debug"
+            ;;
+        *) echo "invalid option: $opt"
+           echo "Valid options: release debug conan ninja toolchain bashrc help quit"
+           exit 1
+           ;;
     esac
-done
+}
+
+if [ $# -gt 0 ]; then
+    for arg in "$@"; do
+        run_option "$arg"
+    done
+else
+    PS3='-- Pick option, please enter your setup choice: '
+    options=("release" "debug" "conan" "ninja" "toolchain" "bashrc" "help" "quit")
+    select opt in "${options[@]}"
+    do
+        run_option "$opt"
+        break
+    done
+fi
