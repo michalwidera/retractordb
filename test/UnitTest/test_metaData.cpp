@@ -3,6 +3,8 @@
 #include "rdb/descriptor.h"
 #include "rdb/metaDataStream.h"
 
+#include <boost/rational.hpp>
+#include <chrono>
 #include <cstdio>
 
 // Helper: remove test file if it exists
@@ -23,14 +25,12 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
   rdb::metaDataStream::IndexRecord original;
   original.recordCount = 42;
   original.nullBitset  = {true, false, true, true, false};
-  original.timestamp   = 1234567890;
   original.isGap       = false;
 
   std::vector<std::byte> serialized             = original.serialize();
   rdb::metaDataStream::IndexRecord deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
   EXPECT_EQ(deserialized.recordCount, original.recordCount);
   EXPECT_EQ(deserialized.nullBitset, original.nullBitset);
-  EXPECT_EQ(deserialized.timestamp, original.timestamp);
   EXPECT_EQ(deserialized.isGap, original.isGap);
 }
 
@@ -38,14 +38,12 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
   rdb::metaDataStream::IndexRecord gap;
   gap.recordCount = 0;
   gap.nullBitset  = {false, false};
-  gap.timestamp   = 9999;
   gap.isGap       = true;
 
   auto serialized   = gap.serialize();
   auto deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
   EXPECT_EQ(deserialized.isGap, true);
   EXPECT_EQ(deserialized.recordCount, 0u);
-  EXPECT_EQ(deserialized.timestamp, 9999);
 }
 
 TEST_F(MetaTestFixture, test_append_and_query) {
@@ -126,10 +124,27 @@ TEST_F(MetaTestFixture, test_timestamps) {
   rdb::Descriptor descriptor;
   descriptor.append({{"t", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  auto before = std::chrono::system_clock::now();
+  rdb::metaDataStream meta(descriptor, metaFile, boost::rational<int>(1, 10));  // 0.1s interval
+  auto after = std::chrono::system_clock::now();
   std::vector<bool> pat = {false};
 
   meta.onRecordAppended(pat);
-  int64_t ts = meta.getRecordTimestamp(0);
-  EXPECT_GT(ts, 0);
+
+  // Creation time should be between before and after construction
+  auto creationTime = meta.getCreationTime();
+  EXPECT_GE(creationTime, before);
+  EXPECT_LE(creationTime, after);
+
+  // Sampling interval should be 1/10
+  EXPECT_EQ(meta.getSamplingInterval(), boost::rational<int>(1, 10));
+
+  // Record 0 timestamp == creation time
+  auto ts0 = meta.calculateRecordTimestamp(0);
+  EXPECT_EQ(ts0, creationTime);
+
+  // Record 10 timestamp == creation time + 1 second (10 * 0.1s)
+  auto ts10 = meta.calculateRecordTimestamp(10);
+  auto expected = creationTime + std::chrono::seconds(1);
+  EXPECT_EQ(ts10, expected);
 }

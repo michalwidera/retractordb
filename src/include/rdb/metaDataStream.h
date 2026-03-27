@@ -6,7 +6,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
 #include <memory>
 #include <span>
 #include <string>
@@ -29,6 +28,7 @@ namespace rdb {
 /// - powinien być w stanie obsłużyć duże ilości danych.
 /// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
 /// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
+/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu.
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych
 /// napływających do storageAccessor, zapewniając jednocześnie trwałość i integralność danych.
@@ -55,20 +55,25 @@ class metaDataStream {
 
  private:
   void createNullBitsetTemplate();
-  void loadIndex();          ///< deserialize all committed entries from file into index_
-  void saveIndex();          ///< serialize all entries (index_ + currentEntry_) to file
-  void flushCurrentEntry();  ///< commit currentEntry_ to index_ if recordCount > 0
+  void loadIndex();          ///< read header and restore currentEntry_ from file
+  void saveHeader();         ///< write file header (creation time, rInterval) without entries
+  void appendEntry(const IndexRecord &entry);  ///< append a single entry to end of file
+  void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
+  void flushCurrentEntry();  ///< commit currentEntry_ to file if recordCount > 0
+  std::vector<IndexRecord> readCommittedEntries() const;  ///< read all committed entries from file
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
-  /// @return pair(segment index in index_, offset within that segment)
+  /// @return pair(segment index in committed entries, offset within that segment)
+  ///         If segment index == committed entry count, the record is in currentEntry_.
   std::pair<size_t, size_t> locateRecord(size_t recordIndex) const;
 
+  size_t entrySize() const;  ///< byte size of one serialized IndexRecord
+
   std::string metaFilePath_{};                 ///< file path for saving/loading the meta index
-  std::fstream indexFile_;                     ///< file stream for reading/writing the meta index
-  std::vector<IndexRecord> index_;             ///< all committed RLE segments (in memory)
   std::shared_ptr<Descriptor> descriptorRef_;  ///< descriptor of the indexed data stream
   boost::rational<int> rInterval_{1};          ///< stream sampling interval for time calculations
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
+  size_t committedRecordCount_{0};             ///< cached total records in committed entries on disk
 
  public:
   IndexRecord currentEntry_;  ///< accumulator for the current (not yet committed) RLE run
@@ -125,8 +130,8 @@ class metaDataStream {
   ///        (sum of recordCount across all committed entries + currentEntry).
   size_t totalRecords() const;
 
-  /// @brief Read-only access to all committed RLE entries.
-  const std::vector<IndexRecord> &entries() const;
+  /// @brief Read-only access to all committed RLE entries (loaded from file).
+  std::vector<IndexRecord> entries() const;
 
   // ── Transmission-gap interface ─────────────────────────────────────
 
