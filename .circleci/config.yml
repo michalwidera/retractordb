@@ -167,7 +167,9 @@ commands:
           name: Regression & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>>/test && ctest -V
+            cd build/<<parameters.build_type>>/test && ctest -V --output-junit test_results.xml
+      - store_test_results:
+          path: build/<<parameters.build_type>>/test/Testing
   run-cppcheck:
     parameters:
       build_type:
