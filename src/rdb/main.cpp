@@ -27,13 +27,8 @@ using namespace boost;
 
 enum payloadStatusType { fetched, clean, stored, changed, error };
 
-void cleanup() {
-  spdlog::shutdown();  // flush logs on disk
-}
-
 int main(int argc, char *argv[]) {
   payloadStatusType payloadStatus{clean};
-  std::atexit(cleanup);
 
   std::string GREEN  = "\x1B[32m";
   std::string RED    = "\x1B[31m";
@@ -50,6 +45,7 @@ int main(int argc, char *argv[]) {
     std::cout << config_line << std::endl;
     std::cout << "Log: " << filelog << std::endl;
     std::cout << warranty << std::endl;
+    spdlog::shutdown();
     return system::errc::success;
   }
   std::unique_ptr<rdb::storageAccessor> dacc;
@@ -355,6 +351,7 @@ int main(int argc, char *argv[]) {
     }
     std::cout << ok;
   } while (true);
-  // use '$xxd datafile-11' to check
+  dacc.reset();
+  spdlog::shutdown();
   return 0;
 }
