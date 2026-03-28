@@ -38,7 +38,7 @@ class query {
   std::list<rule> lRules;
 
   rdb::retention_t retention            = rdb::retention_t{0, 0};  // Retention segments and capacity
-  std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFileAccessor::no_retention);
+  std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFile::no_retention);
 
   bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();

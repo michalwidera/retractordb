@@ -12,11 +12,11 @@ typedef unsigned char BYTE;
 // src/rdb/lib/faccmemory.cc
 
 // ============================================================
-// memoryFileAccessor tests
+// memoryFile tests
 // ============================================================
 
 // Verify write and sequential read of 4 records without retention limit
-TEST(MemoryAccessorTest, test_faccmemory_infinite) {
+TEST(MemoryTest, test_faccmemory_infinite) {
   struct {
     BYTE data;
   } record;
@@ -24,8 +24,8 @@ TEST(MemoryAccessorTest, test_faccmemory_infinite) {
   std::string filename = "test_file_memory";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   record.data = 1;
   GTEST_ASSERT_EQ(mfa->write(&record.data), EXIT_SUCCESS);
@@ -55,7 +55,7 @@ TEST(MemoryAccessorTest, test_faccmemory_infinite) {
 }
 
 // Verify retention evicts oldest records and reading evicted positions returns failure
-TEST(MemoryAccessorTest, test_faccmemory_retention) {
+TEST(MemoryTest, test_faccmemory_retention) {
   struct {
     BYTE data;
   } record;
@@ -64,7 +64,7 @@ TEST(MemoryAccessorTest, test_faccmemory_retention) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("MEMORY", 2);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   record.data = 1;
   GTEST_ASSERT_EQ(mfa->write(&record.data), EXIT_SUCCESS);
@@ -91,14 +91,14 @@ TEST(MemoryAccessorTest, test_faccmemory_retention) {
 }
 
 // Verify write and read of multi-byte records (4-byte integers) without retention
-TEST(MemoryAccessorTest, test_faccmemory_multibyte_record) {
+TEST(MemoryTest, test_faccmemory_multibyte_record) {
   int record;
 
   std::string filename = "test_file_memory_multi";
 
   auto recsize   = sizeof(int);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   record = 1000;
   GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
@@ -124,14 +124,14 @@ TEST(MemoryAccessorTest, test_faccmemory_multibyte_record) {
 }
 
 // Verify update-in-place overwrites existing record at given position
-TEST(MemoryAccessorTest, test_faccmemory_update_in_place) {
+TEST(MemoryTest, test_faccmemory_update_in_place) {
   BYTE record;
 
   std::string filename = "test_file_memory_update";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   record = 10;
   mfa->write(&record);
@@ -164,12 +164,12 @@ TEST(MemoryAccessorTest, test_faccmemory_update_in_place) {
 }
 
 // Verify name() returns the filename passed at construction
-TEST(MemoryAccessorTest, test_faccmemory_name) {
+TEST(MemoryTest, test_faccmemory_name) {
   std::string filename = "test_file_memory_name";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   EXPECT_EQ(mfa->name(), "test_file_memory_name");
 
@@ -177,12 +177,12 @@ TEST(MemoryAccessorTest, test_faccmemory_name) {
 }
 
 // Verify count is 0 for freshly created memory accessor
-TEST(MemoryAccessorTest, test_faccmemory_empty_count) {
+TEST(MemoryTest, test_faccmemory_empty_count) {
   std::string filename = "test_file_memory_empty";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   GTEST_ASSERT_EQ(mfa->count(), 0);
 
@@ -191,14 +191,14 @@ TEST(MemoryAccessorTest, test_faccmemory_empty_count) {
 
 // Verify retention boundary: eviction triggers when internal size exceeds retentionSize.
 // The check is `size > N` (checked before push), so first eviction happens on write N+2.
-TEST(MemoryAccessorTest, test_faccmemory_retention_boundary) {
+TEST(MemoryTest, test_faccmemory_retention_boundary) {
   BYTE record;
 
   std::string filename = "test_file_memory_boundary";
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("MEMORY", 3);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   // Write 4 records - no eviction (size checked before push: 0,1,2,3 are all <= 3)
   for (BYTE i = 1; i <= 4; i++) {
@@ -232,14 +232,14 @@ TEST(MemoryAccessorTest, test_faccmemory_retention_boundary) {
 }
 
 // Verify read beyond storage bounds returns EXIT_FAILURE
-TEST(MemoryAccessorTest, test_faccmemory_read_beyond_bounds) {
+TEST(MemoryTest, test_faccmemory_read_beyond_bounds) {
   BYTE record;
 
   std::string filename = "test_file_memory_bounds";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
 
   record = 10;
   mfa->write(&record);
@@ -264,16 +264,16 @@ TEST(MemoryAccessorTest, test_faccmemory_read_beyond_bounds) {
 }
 
 // Verify data persists in static storage across instances with the same filename
-TEST(MemoryAccessorTest, test_faccmemory_persistence_across_instances) {
+TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
   BYTE record;
 
   std::string filename = "test_file_memory_persist";
 
   auto recsize   = sizeof(BYTE);
-  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFileAccessor::no_retention);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
 
   {
-    auto mfa = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+    auto mfa = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
     record = 0x42;
     mfa->write(&record);
     record = 0x43;
@@ -282,7 +282,7 @@ TEST(MemoryAccessorTest, test_faccmemory_persistence_across_instances) {
   }  // mfa destroyed
 
   // New instance with same filename should see persisted data
-  auto mfa2 = std::make_unique<rdb::memoryFileAccessor>(filename, recsize, retention);
+  auto mfa2 = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
   GTEST_ASSERT_EQ(mfa2->count(), 2);
 
   GTEST_ASSERT_EQ(mfa2->read(&record, 0), EXIT_SUCCESS);

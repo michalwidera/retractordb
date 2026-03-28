@@ -14,7 +14,7 @@ namespace rdb {
 // https://en.cppreference.com/w/cpp/io/ios_base/openmode
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
-genericBinaryFileAccessor::genericBinaryFileAccessor(  //
+genericBinaryFile::genericBinaryFile(  //
     const std::string_view fileName,                   //
     const ssize_t recordSize,                          //
     int percounter)                                    //
@@ -22,7 +22,7 @@ genericBinaryFileAccessor::genericBinaryFileAccessor(  //
       recordSize_(recordSize),
       percounter_(percounter) {}
 
-genericBinaryFileAccessor::~genericBinaryFileAccessor() {
+genericBinaryFile::~genericBinaryFile() {
   if (percounter_ >= 0) {
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
@@ -30,9 +30,9 @@ genericBinaryFileAccessor::~genericBinaryFileAccessor() {
   }
 }
 
-auto genericBinaryFileAccessor::name() -> std::string & { return filename_; }
+auto genericBinaryFile::name() -> std::string & { return filename_; }
 
-ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
+ssize_t genericBinaryFile::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -63,7 +63,7 @@ ssize_t genericBinaryFileAccessor::write(const uint8_t *ptrData, const size_t po
   return EXIT_SUCCESS;
 }
 
-ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
+ssize_t genericBinaryFile::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -86,7 +86,7 @@ ssize_t genericBinaryFileAccessor::read(uint8_t *ptrData, const size_t position)
   return EXIT_SUCCESS;
 }
 
-size_t genericBinaryFileAccessor::count() {
+size_t genericBinaryFile::count() {
   std::ifstream in(filename_, std::ifstream::ate | std::ifstream::binary);
   return in.tellg() / recordSize_;
 }

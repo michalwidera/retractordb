@@ -8,17 +8,17 @@
 namespace rdb {
 
 /// @brief To jest klasa abstrakcyjna, która definiuje interfejs do operacji na różnych typach magazynów danych (np. pliki,
-/// obiekty, blob) używanych jako storageAccessor w klasie storageAccessor.
+/// obiekty, blob) używanych jako storage w klasie storage.
 ///
-/// obiekt klasy dziedziczącej po klasie FileAccessorInterface powinien:
+/// obiekt klasy dziedziczącej po klasie FileInterface powinien:
 /// - zapewniać jednolity interfejs do operacji na różnych typach magazynów danych (np. pliki, obiekty, blob) używanych jako
-/// storageAccessor w klasie storageAccessor.
+/// storage w klasie storage.
 /// - umożliwiać odczyt danych z magazynu na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy
 /// pochodnej.
 /// - w przyadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji dane
 /// odczytywane są jedynie z pozycji 0.
 /// - umożliwiać dodawanie danych na końcu magazynu, traktując określoną wartość pozycji jako sygnał do operacji append.
-/// - zapewniać informacje o liczbie rekordów w magazynie, co jest istotne dla zarządzania danymi w storageAccessor.
+/// - zapewniać informacje o liczbie rekordów w magazynie, co jest istotne dla zarządzania danymi w storage.
 /// - w przypadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji,
 /// metoda count() może zwracać liczbę odczytów wykonanych na tym źródle danych.
 ///
@@ -33,7 +33,7 @@ namespace rdb {
 /// @note pozycja wyrażona jest w bajtach, a rozmiar danych jest określany przez descriptor klasy pochodnej i nie jest częścią
 /// tego interfejsu.
 
-struct FileAccessorInterface {
+struct FileInterface {
   /// @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
   /// @param ptrData pointer to data in memory where data will be fetched from storage
   /// @param position position from the beginning of file [unit: Bytes]
@@ -53,6 +53,6 @@ struct FileAccessorInterface {
   /// @return number of records in storage
   virtual size_t count() = 0;
 
-  virtual ~FileAccessorInterface() = default;
+  virtual ~FileInterface() = default;
 };
 }  // namespace rdb

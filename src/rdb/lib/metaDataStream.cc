@@ -426,7 +426,7 @@ std::chrono::system_clock::time_point metaDataStream::getCreationTime() const { 
 
 boost::rational<int> metaDataStream::getSamplingInterval() const { return rInterval_; }
 
-// ── Accessor ─────────────────────────────────────────────────────────
+// ──  ─────────────────────────────────────────────────────────
 
 const Descriptor &metaDataStream::descriptor() const { return *descriptorRef_; }
 

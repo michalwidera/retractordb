@@ -16,7 +16,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 // fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
 
-groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
+groupFile::groupFile(const std::string_view fileName,  //
                                      const ssize_t recordSize,         //
                                      const retention_t &retention,     //
                                      int percounter)                   //
@@ -27,7 +27,7 @@ groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
   writeCount_      = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
   if (retention.noRetention()) {
-    vec_.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
   } else {
     auto min = std::numeric_limits<size_t>::max();
     auto max = std::numeric_limits<size_t>::min();
@@ -49,16 +49,16 @@ groupFileAccessor::groupFileAccessor(const std::string_view fileName,  //
     for (auto i = min; i <= max; ++i) {
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-      vec_.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recordSize_, percounter_));
+      vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
       SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount_ = vec_.back()->count();
     }
   }
 }
 
-groupFileAccessor::~groupFileAccessor() {}
+groupFile::~groupFile() {}
 
-auto groupFileAccessor::name() -> std::string & {
+auto groupFile::name() -> std::string & {
   if (retention_.noRetention()) {
     // pottenially consider change filename storage file here.
     return filename_;
@@ -66,7 +66,7 @@ auto groupFileAccessor::name() -> std::string & {
   return currentFilename_;
 }
 
-ssize_t groupFileAccessor::write(const uint8_t *ptrData, const size_t position) {
+ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
 
   if (position == std::numeric_limits<size_t>::max()) writeCount_++;
@@ -85,7 +85,7 @@ ssize_t groupFileAccessor::write(const uint8_t *ptrData, const size_t position) 
     writeCount_      = 0;
     currentSegment_  = 0;
     currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-    vec_.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
     removedSegments_ = 0;
     spdlog::info("Purged all segments, current segment is now 0.");
     assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
@@ -102,7 +102,7 @@ ssize_t groupFileAccessor::write(const uint8_t *ptrData, const size_t position) 
 
     spdlog::info("Rotating segments: currentSegment={}", currentSegment_);
 
-    vec_.push_back(std::make_unique<posixBinaryFileAccessor>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
 
     writeCount_ = 0;
 
@@ -131,7 +131,7 @@ ssize_t groupFileAccessor::write(const uint8_t *ptrData, const size_t position) 
   }
 }
 
-ssize_t groupFileAccessor::read(uint8_t *ptrData, const size_t position) {
+ssize_t groupFile::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   if (retention_.noRetention()) return vec_[0]->read(ptrData, position);
 
@@ -144,7 +144,7 @@ ssize_t groupFileAccessor::read(uint8_t *ptrData, const size_t position) {
   return vec_[segmentIndex - removedSegments_]->read(ptrData, positionInSegment);
 }
 
-size_t groupFileAccessor::count() {
+size_t groupFile::count() {
   size_t sumCount = 0;
   for (auto &v : vec_)
     sumCount += v->count();

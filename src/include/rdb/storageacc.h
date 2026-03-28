@@ -20,8 +20,8 @@ namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
 enum class sourceState { empty, flux, armed };
 
-class storageAccessor {
-  std::unique_ptr<FileAccessorInterface> accessor_;
+class storage {
+  std::unique_ptr<FileInterface> accessor_;
   std::unique_ptr<rdb::payload> storagePayload_;
   std::unique_ptr<rdb::payload> chamber_;
 
@@ -41,20 +41,20 @@ class storageAccessor {
   boost::circular_buffer<rdb::payload> circularBuffer_{0};
 
   void abortIfStorageNotPrepared();
-  void initializeAccessor();
+  void initialize();
 
   std::unique_ptr<rdb::metaDataStream> metaDataStream_;
 
  public:
-  storageAccessor() = delete;
-  explicit storageAccessor(const std::string_view qryID,         //
+  storage() = delete;
+  explicit storage(const std::string_view qryID,         //
                            const std::string_view fileName,      //
                            const std::string_view storageParam,  //
                            bool oneShot   = false,               //
                            bool isHold    = false,               //
                            int percounter = -1                   //
   );
-  virtual ~storageAccessor();
+  virtual ~storage();
 
   Descriptor descriptor;
 

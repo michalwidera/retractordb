@@ -8,14 +8,14 @@
 
 namespace rdb {
 
-class groupFileAccessor : public FileAccessorInterface {
+class groupFile : public FileInterface {
   std::string filename_;
   std::string currentFilename_;
   const ssize_t recordSize_;
 
   retention_t retention_{0, 0};
 
-  std::vector<std::unique_ptr<posixBinaryFileAccessor>> vec_;
+  std::vector<std::unique_ptr<posixBinaryFile>> vec_;
 
   size_t writeCount_     = 0;
   size_t currentSegment_ = 0;
@@ -25,8 +25,8 @@ class groupFileAccessor : public FileAccessorInterface {
   int percounter_;
 
  public:
-  groupFileAccessor(const std::string_view fileName, const ssize_t recordSize, const retention_t &retention, int percounter);
-  ~groupFileAccessor() override;
+  groupFile(const std::string_view fileName, const ssize_t recordSize, const retention_t &retention, int percounter);
+  ~groupFile() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

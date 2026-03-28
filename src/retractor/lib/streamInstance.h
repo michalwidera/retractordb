@@ -5,13 +5,13 @@
 
 #include "dumpManager.h"
 #include "qTree.h"          // qTree
-#include "rdb/storageacc.h"  // rdb::storageAccessor (transitively includes descriptor.h, payload.h)
+#include "rdb/storageacc.h"  // rdb::storage (transitively includes descriptor.h, payload.h)
 
 struct streamInstance {
   qTree &coreInstance;
   streamInstance() = delete;
 
-  std::unique_ptr<rdb::storageAccessor> outputPayload;  // here is payload that will be stored - select clause
+  std::unique_ptr<rdb::storage> outputPayload;  // here is payload that will be stored - select clause
   std::unique_ptr<rdb::payload> inputPayload;           // payload used for computation in select
                                                         // clause - created by from clause.
 

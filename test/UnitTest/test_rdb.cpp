@@ -19,21 +19,21 @@ extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_vie
 template <typename T, typename K>
 bool test_1() {
   const int noPerCounter = -1;
-  K binaryAccessor1("testfile-fstream", AREA_SIZE, noPerCounter);
+  K binary1("testfile-fstream", AREA_SIZE, noPerCounter);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
 
-    binaryAccessor1.write(xData);
+    binary1.write(xData);
 
     if (std::memcmp(xData, "test data", AREA_SIZE) != 0) return false;
 
     T yData[AREA_SIZE];
-    binaryAccessor1.read(yData, 0);
+    binary1.read(yData, 0);
 
     if (std::memcmp(yData, "test data", AREA_SIZE) != 0) return false;
   }
-  auto statusRemove1 = remove(binaryAccessor1.name().c_str());
+  auto statusRemove1 = remove(binary1.name().c_str());
   if (statusRemove1 != 0) return false;
 
   return true;
@@ -204,7 +204,7 @@ TEST(xrdb, test_storage) {
   // This assert will fail is structure is not packed.
   EXPECT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
-  rdb::storageAccessor dAcc2("datafile-fstream2", "datafile-fstream2", "");
+  rdb::storage dAcc2("datafile-fstream2", "datafile-fstream2", "");
 
   dAcc2.attachDescriptor(&dataDescriptor);
   dAcc2.setDisposable(true);
@@ -257,21 +257,21 @@ TEST(xrdb, test_descriptor_compare) {
   EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
-TEST(crdb, genericBinaryFileAccessor_byte) {
-  auto result1 = test_1<uint8_t, rdb::genericBinaryFileAccessor>();
+TEST(crdb, genericBinaryFile_byte) {
+  auto result1 = test_1<uint8_t, rdb::genericBinaryFile>();
   EXPECT_TRUE(result1);
-  auto result2 = test_2<uint8_t, rdb::genericBinaryFileAccessor>();
+  auto result2 = test_2<uint8_t, rdb::genericBinaryFile>();
   EXPECT_TRUE(result2);
-  auto result3 = test_3<uint8_t, rdb::genericBinaryFileAccessor>();
+  auto result3 = test_3<uint8_t, rdb::genericBinaryFile>();
   EXPECT_TRUE(result3);
 }
 
-TEST(crdb, posixBinaryFileAccessor_byte) {
-  auto result1 = test_1<uint8_t, rdb::posixBinaryFileAccessor>();
+TEST(crdb, posixBinaryFile_byte) {
+  auto result1 = test_1<uint8_t, rdb::posixBinaryFile>();
   EXPECT_TRUE(result1);
-  auto result2 = test_2<uint8_t, rdb::posixBinaryFileAccessor>();
+  auto result2 = test_2<uint8_t, rdb::posixBinaryFile>();
   EXPECT_TRUE(result2);
-  auto result3 = test_3<uint8_t, rdb::posixBinaryFileAccessor>();
+  auto result3 = test_3<uint8_t, rdb::posixBinaryFile>();
   EXPECT_TRUE(result3);
 }
 

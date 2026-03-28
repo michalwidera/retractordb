@@ -36,7 +36,7 @@ struct fileInfo {
 // --- Test fixture ---
 // Creates a clean sandbox directory before each test and removes it after
 
-class PosixFileAccessorTest : public ::testing::Test {
+class PosixFileTest : public ::testing::Test {
  protected:
   const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_faccposix";
   const std::string filename                = "test_file";
@@ -65,14 +65,14 @@ class PosixFileAccessorTest : public ::testing::Test {
 };
 
 // ============================================================
-// posixBinaryFileAccessor tests
+// posixBinaryFile tests
 // ============================================================
 
 // Verify basic write (append) and read of records
-TEST_F(PosixFileAccessorTest, test_faccposix_write_and_read) {
+TEST_F(PosixFileTest, test_faccposix_write_and_read) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(sandboxPath("posix_test"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_test"), recsize);
 
   record = 0xAA;
   GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
@@ -94,10 +94,10 @@ TEST_F(PosixFileAccessorTest, test_faccposix_write_and_read) {
 }
 
 // Verify read beyond EOF returns EXIT_FAILURE (partial read handling)
-TEST_F(PosixFileAccessorTest, test_faccposix_read_beyond_eof) {
+TEST_F(PosixFileTest, test_faccposix_read_beyond_eof) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(sandboxPath("posix_eof"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eof"), recsize);
 
   record = 0x11;
   GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
@@ -108,20 +108,20 @@ TEST_F(PosixFileAccessorTest, test_faccposix_read_beyond_eof) {
 }
 
 // Verify read from empty file returns EXIT_FAILURE
-TEST_F(PosixFileAccessorTest, test_faccposix_read_empty_file) {
+TEST_F(PosixFileTest, test_faccposix_read_empty_file) {
   BYTE record = 0xFF;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(sandboxPath("posix_empty"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_empty"), recsize);
 
   GTEST_ASSERT_EQ(pfa->count(), 0);
   GTEST_ASSERT_EQ(pfa->read(&record, 0), EXIT_FAILURE);
 }
 
 // Verify truncate (write nullptr at position 0) clears the file
-TEST_F(PosixFileAccessorTest, test_faccposix_truncate) {
+TEST_F(PosixFileTest, test_faccposix_truncate) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(sandboxPath("posix_trunc"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_trunc"), recsize);
 
   record = 0x01;
   pfa->write(&record);
@@ -138,10 +138,10 @@ TEST_F(PosixFileAccessorTest, test_faccposix_truncate) {
 }
 
 // Verify update-in-place overwrites record at given byte position
-TEST_F(PosixFileAccessorTest, test_faccposix_update_in_place) {
+TEST_F(PosixFileTest, test_faccposix_update_in_place) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(sandboxPath("posix_update"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_update"), recsize);
 
   record = 10;
   pfa->write(&record);
@@ -172,19 +172,19 @@ TEST_F(PosixFileAccessorTest, test_faccposix_update_in_place) {
 }
 
 // Verify name() returns the path passed at construction
-TEST_F(PosixFileAccessorTest, test_faccposix_name) {
+TEST_F(PosixFileTest, test_faccposix_name) {
   auto path = sandboxPath("posix_name");
-  auto pfa  = std::make_unique<rdb::posixBinaryFileAccessor>(path, recsize);
+  auto pfa  = std::make_unique<rdb::posixBinaryFile>(path, recsize);
 
   EXPECT_EQ(pfa->name(), path);
 }
 
 // Verify multi-byte record write and read
-TEST_F(PosixFileAccessorTest, test_faccposix_multibyte_record) {
+TEST_F(PosixFileTest, test_faccposix_multibyte_record) {
   int record;
   auto recsize_int = sizeof(int);
 
-  auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(sandboxPath("posix_multi"), recsize_int);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_multi"), recsize_int);
 
   record = 1000;
   GTEST_ASSERT_EQ(pfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
@@ -204,12 +204,12 @@ TEST_F(PosixFileAccessorTest, test_faccposix_multibyte_record) {
 }
 
 // Verify data persists on disk after destructor (durability via reopen)
-TEST_F(PosixFileAccessorTest, test_faccposix_persistence) {
+TEST_F(PosixFileTest, test_faccposix_persistence) {
   BYTE record;
   auto path = sandboxPath("posix_persist");
 
   {
-    auto pfa = std::make_unique<rdb::posixBinaryFileAccessor>(path, recsize);
+    auto pfa = std::make_unique<rdb::posixBinaryFile>(path, recsize);
     record   = 0x42;
     pfa->write(&record);
     record = 0x43;
@@ -217,7 +217,7 @@ TEST_F(PosixFileAccessorTest, test_faccposix_persistence) {
   }  // destructor closes file
 
   // Reopen and verify data persists
-  auto pfa2 = std::make_unique<rdb::posixBinaryFileAccessor>(path, recsize);
+  auto pfa2 = std::make_unique<rdb::posixBinaryFile>(path, recsize);
   GTEST_ASSERT_EQ(pfa2->count(), 2);
 
   GTEST_ASSERT_EQ(pfa2->read(&record, 0), EXIT_SUCCESS);

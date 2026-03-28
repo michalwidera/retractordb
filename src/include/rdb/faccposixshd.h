@@ -6,14 +6,14 @@ namespace rdb {
 
 /// @brief Definicja klasy implementującej dostęp do pliku binarnego
 ///
-/// Obiekt posixBinaryFileWithShadowAccessor powinien:
+/// Obiekt posixBinaryFileWithShadow powinien:
 /// - umożliwiać odczyt i zapis danych do pliku binarnego
 /// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
 /// - zapisywać zmiany uprzednio zarejestrowanych danych do pliku cienia (shadow file) zamiast aktualizacji głównego pliku, aby uniemożliwić fizyczną modyfikację uprzednio zarejestrowanych danych.
 /// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) dla operacji update, aby plik cienia był kompaktowy i znacznie mniejszy od głównego pliku danych.
 /// - udostępniać dane, jeśli istnieją z pliku cienia jako aktualny stan danych, umożliwiając odczyt i dalsze aktualizacje bez modyfikacji głównego pliku.
 /// - w przypadku wielokrotnych aktualizacji tej samej pozycji, zwracać dane z ostatniego zapisu (przeszukiwanie pliku cienia od końca).
-/// - implementować interfejs FileAccessorInterface, aby umożliwić integrację z innymi komponentami systemu
+/// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
 /// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
@@ -22,7 +22,7 @@ namespace rdb {
 /// - w operacji truncate (write z nullptr i position 0) czyścić zarówno główny plik jak i plik cienia.
 /// - zwracać liczbę rekordów wyłącznie na podstawie głównego pliku (count), niezależnie od zawartości pliku cienia.
 
-class posixBinaryFileWithShadowAccessor : public FileAccessorInterface {
+class posixBinaryFileWithShadow : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
   /**
@@ -41,8 +41,8 @@ class posixBinaryFileWithShadowAccessor : public FileAccessorInterface {
   ssize_t shadowFind(uint8_t *ptrData, size_t position);
 
  public:
-  posixBinaryFileWithShadowAccessor(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
-  ~posixBinaryFileWithShadowAccessor() override;
+  posixBinaryFileWithShadow(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
+  ~posixBinaryFileWithShadow() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;

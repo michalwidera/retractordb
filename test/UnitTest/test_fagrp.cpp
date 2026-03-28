@@ -36,7 +36,7 @@ struct fileInfo {
 // --- Test fixture ---
 // Creates a clean sandbox directory before each test and removes it after
 
-class GroupFileAccessorTest : public ::testing::Test {
+class GroupFileTest : public ::testing::Test {
  protected:
   const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_fagrp";
   const std::string filename                = "test_file";
@@ -74,15 +74,15 @@ class GroupFileAccessorTest : public ::testing::Test {
 };
 
 // ============================================================
-// groupFileAccessor tests
+// groupFile tests
 // ============================================================
 
 // Verify no-retention mode writes all records into a single file
-TEST_F(GroupFileAccessorTest, test_fagrp_no_retention) {
+TEST_F(GroupFileTest, test_fagrp_no_retention) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   record = 11;
   gfa->write(&record);
@@ -98,13 +98,13 @@ TEST_F(GroupFileAccessorTest, test_fagrp_no_retention) {
 }
 
 // Verify retention mode splits records across segment files with correct contents
-TEST_F(GroupFileAccessorTest, test_fagrp_segmented_write_and_read) {
+TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
   BYTE record;
 
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   // Write 6 records across 2 segments of capacity 3
   for (BYTE i = 1; i <= 6; i++) {
@@ -132,13 +132,13 @@ TEST_F(GroupFileAccessorTest, test_fagrp_segmented_write_and_read) {
 // Verify segment rotation evicts oldest segment when segment count exceeds limit.
 // Rotation triggers when writeCount_ > capacity. The record that triggers rotation
 // is written to the new segment (not the old one).
-TEST_F(GroupFileAccessorTest, test_fagrp_segment_rotation) {
+TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   BYTE record;
 
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 2;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   // Write 6 records with capacity=2:
   // segment_0: [1,2]   (rotation triggered by record 3, which goes to segment_1)
@@ -159,13 +159,13 @@ TEST_F(GroupFileAccessorTest, test_fagrp_segment_rotation) {
 }
 
 // Verify purge clears all segments and resets state
-TEST_F(GroupFileAccessorTest, test_fagrp_purge) {
+TEST_F(GroupFileTest, test_fagrp_purge) {
   BYTE record;
 
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   for (BYTE i = 1; i <= 6; i++) {
     record = i;
@@ -188,35 +188,35 @@ TEST_F(GroupFileAccessorTest, test_fagrp_purge) {
 }
 
 // Verify name() returns base filename in no-retention mode
-TEST_F(GroupFileAccessorTest, test_fagrp_name_no_retention) {
+TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   EXPECT_EQ(gfa->name(), "test_file");
 }
 
 // Verify name() returns segment filename in retention mode
-TEST_F(GroupFileAccessorTest, test_fagrp_name_retention) {
+TEST_F(GroupFileTest, test_fagrp_name_retention) {
   auto retention = rdb::retention_t{2, 3};
-  auto gfa       = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   EXPECT_EQ(gfa->name(), "test_file_segment_0");
 }
 
 // Verify count is 0 for freshly created group accessor
-TEST_F(GroupFileAccessorTest, test_fagrp_empty_count) {
+TEST_F(GroupFileTest, test_fagrp_empty_count) {
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   GTEST_ASSERT_EQ(gfa->count(), 0);
 }
 
 // Verify update-in-place within a segment overwrites the correct record
-TEST_F(GroupFileAccessorTest, test_fagrp_update_in_place) {
+TEST_F(GroupFileTest, test_fagrp_update_in_place) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   record = 10;
   gfa->write(&record);
@@ -248,13 +248,13 @@ TEST_F(GroupFileAccessorTest, test_fagrp_update_in_place) {
 
 // Verify count compensates for removed segments after rotation.
 // With capacity=2, rotation triggers at writeCount > 2, so each segment holds 3 records.
-TEST_F(GroupFileAccessorTest, test_fagrp_count_after_rotation) {
+TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   BYTE record;
 
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFileAccessor>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   // Write 8 records with capacity=3 (rotation at writeCount > 3):
   // segment_0: [1,2,3,4] (4 records)

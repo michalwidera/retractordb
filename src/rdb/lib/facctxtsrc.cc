@@ -29,7 +29,7 @@ K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
   return var;
 }
 
-textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    //
+textSourceRO::textSourceRO(const std::string_view fileName,    //
                                            const ssize_t recordSize,           //
                                            const rdb::Descriptor &descriptor,  //
                                            bool loopToBeginningIfEOF)
@@ -45,11 +45,11 @@ textSourceAccessorRO::textSourceAccessorRO(const std::string_view fileName,    /
   payload_ = std::make_unique<rdb::payload>(descriptor_);
 }
 
-textSourceAccessorRO::~textSourceAccessorRO() { myFile_.close(); }
+textSourceRO::~textSourceRO() { myFile_.close(); }
 
-auto textSourceAccessorRO::name() -> std::string & { return filename_; }
+auto textSourceRO::name() -> std::string & { return filename_; }
 
-ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
+ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
   assert(recordSize_ != 0);
 
@@ -120,6 +120,6 @@ ssize_t textSourceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-size_t textSourceAccessorRO::count() { return readCount_; }
+size_t textSourceRO::count() { return readCount_; }
 
 }  // namespace rdb

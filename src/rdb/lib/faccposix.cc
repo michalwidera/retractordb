@@ -10,7 +10,7 @@
 #include <filesystem>
 namespace rdb {
 
-posixBinaryFileAccessor::posixBinaryFileAccessor(const std::string_view fileName,  //
+posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
                                                  const ssize_t recordSize,         //
                                                  int percounter)                   //
     : filename_(std::string(fileName)),
@@ -24,7 +24,7 @@ posixBinaryFileAccessor::posixBinaryFileAccessor(const std::string_view fileName
   assert(fd >= 0);
 }
 
-posixBinaryFileAccessor::~posixBinaryFileAccessor() {
+posixBinaryFile::~posixBinaryFile() {
   ::close(fd);
   if (percounter_ >= 0) {
     SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
@@ -39,9 +39,9 @@ posixBinaryFileAccessor::~posixBinaryFileAccessor() {
   }
 }
 
-auto posixBinaryFileAccessor::name() -> std::string & { return filename_; }
+auto posixBinaryFile::name() -> std::string & { return filename_; }
 
-ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;  // Error status
@@ -82,7 +82,7 @@ ssize_t posixBinaryFileAccessor::write(const uint8_t *ptrData, const size_t posi
   return EXIT_SUCCESS;
 }
 
-ssize_t posixBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFile::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return fd;
@@ -103,7 +103,7 @@ ssize_t posixBinaryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   return EXIT_FAILURE;
 }
 
-size_t posixBinaryFileAccessor::count() {
+size_t posixBinaryFile::count() {
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
   if (rc != 0) {

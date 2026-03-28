@@ -9,7 +9,7 @@
 
 namespace rdb {
 
-binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName,  //
+binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
                                                const ssize_t recordSize,         //
                                                bool loopToBeginningIfEOF)        //
     : filename_(std::string(fileName)),
@@ -25,11 +25,11 @@ binaryDeviceAccessorRO::binaryDeviceAccessorRO(const std::string_view fileName, 
   // checking fd on read function.
 }
 
-binaryDeviceAccessorRO::~binaryDeviceAccessorRO() { ::close(fd_); }
+binaryDeviceRO::~binaryDeviceRO() { ::close(fd_); }
 
-auto binaryDeviceAccessorRO::name() -> std::string & { return filename_; }
+auto binaryDeviceRO::name() -> std::string & { return filename_; }
 
-ssize_t binaryDeviceAccessorRO::read(uint8_t *ptrData, const size_t position) {
+ssize_t binaryDeviceRO::read(uint8_t *ptrData, const size_t position) {
   if (fd_ < 0) return EXIT_FAILURE;
   if (recordSize_ == 0) return EXIT_FAILURE;  // No read on data source supported
 
@@ -56,6 +56,6 @@ ssize_t binaryDeviceAccessorRO::read(uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-size_t binaryDeviceAccessorRO::count() { return cnt_; }
+size_t binaryDeviceRO::count() { return cnt_; }
 
 }  // namespace rdb

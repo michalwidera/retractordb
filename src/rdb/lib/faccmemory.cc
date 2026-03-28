@@ -12,9 +12,9 @@ static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 
 namespace rdb {
 
-auto memoryFileAccessor::name() -> std::string & { return filename_; }
+auto memoryFile::name() -> std::string & { return filename_; }
 
-ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position) {
+ssize_t memoryFile::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   auto location = position / recordSize_;
   // If ptrData is null, clear the storage and reset removed_count
@@ -48,7 +48,7 @@ ssize_t memoryFileAccessor::write(const uint8_t *ptrData, const size_t position)
   return EXIT_SUCCESS;
 }
 
-ssize_t memoryFileAccessor::read(uint8_t *ptrData, const size_t position) {
+ssize_t memoryFile::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   auto location = position / recordSize_;
   if (location < removed_count_) {
@@ -70,6 +70,6 @@ ssize_t memoryFileAccessor::read(uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-size_t memoryFileAccessor::count() { return memoryStorage[filename_].size() + removed_count_; }
+size_t memoryFile::count() { return memoryStorage[filename_].size() + removed_count_; }
 
 }  // namespace rdb

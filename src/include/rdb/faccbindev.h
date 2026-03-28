@@ -9,7 +9,7 @@ namespace rdb {
  * Type: BINARY
  */
 
-class binaryDeviceAccessorRO : public FileAccessorInterface {
+class binaryDeviceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
   /**
@@ -22,8 +22,8 @@ class binaryDeviceAccessorRO : public FileAccessorInterface {
   bool loopToBeginningIfEOF_ = true;
 
  public:
-  explicit binaryDeviceAccessorRO(const std::string_view fileName, const ssize_t recordSize, bool loopToBeginningIfEOF);
-  ~binaryDeviceAccessorRO() override;
+  explicit binaryDeviceRO(const std::string_view fileName, const ssize_t recordSize, bool loopToBeginningIfEOF);
+  ~binaryDeviceRO() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {

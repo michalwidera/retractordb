@@ -12,7 +12,7 @@ namespace rdb {
  *
  * Type: TEXTSOURCE
  */
-class textSourceAccessorRO : public FileAccessorInterface {
+class textSourceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
 
@@ -27,12 +27,12 @@ class textSourceAccessorRO : public FileAccessorInterface {
   bool loopToBeginningIfEOF_ = true;
 
  public:
-  textSourceAccessorRO(const std::string_view fileName,    //
+  textSourceRO(const std::string_view fileName,    //
                        const ssize_t recordSize,           //
                        const rdb::Descriptor &descriptor,  //
                        bool loopToBeginningIfEOF);
 
-  ~textSourceAccessorRO() override;
+  ~textSourceRO() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {

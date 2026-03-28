@@ -12,12 +12,12 @@
 
 namespace rdb {
 
-std::string posixBinaryFileWithShadowAccessor::shadowName() const { return filename_ + ".shadow"; }
+std::string posixBinaryFileWithShadow::shadowName() const { return filename_ + ".shadow"; }
 
 /// @brief Wyszukuje rekord w pliku cienia na podstawie pozycji.
 /// Shadow file przechowuje pary (size_t position, uint8_t data[recordSize_]).
 /// Przeszukuje wpisy od końca — ostatni wpis z daną pozycją jest aktualny.
-ssize_t posixBinaryFileWithShadowAccessor::shadowFind(uint8_t *ptrData, size_t position) {
+ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position) {
   struct stat stat_buf;
   if (fstat(fd_shadow, &stat_buf) != 0) return EXIT_FAILURE;
 
@@ -40,7 +40,7 @@ ssize_t posixBinaryFileWithShadowAccessor::shadowFind(uint8_t *ptrData, size_t p
   return EXIT_FAILURE;
 }
 
-posixBinaryFileWithShadowAccessor::posixBinaryFileWithShadowAccessor(const std::string_view fileName,
+posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName,
                                                                      const ssize_t recordSize,
                                                                      int percounter)
     : filename_(std::string(fileName)),
@@ -61,7 +61,7 @@ posixBinaryFileWithShadowAccessor::posixBinaryFileWithShadowAccessor(const std::
   assert(fd_shadow >= 0);
 }
 
-posixBinaryFileWithShadowAccessor::~posixBinaryFileWithShadowAccessor() {
+posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
   ::close(fd_shadow);
   ::close(fd);
   if (percounter_ >= 0) {
@@ -77,9 +77,9 @@ posixBinaryFileWithShadowAccessor::~posixBinaryFileWithShadowAccessor() {
   }
 }
 
-auto posixBinaryFileWithShadowAccessor::name() -> std::string & { return filename_; }
+auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
-ssize_t posixBinaryFileWithShadowAccessor::write(const uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;
@@ -156,7 +156,7 @@ ssize_t posixBinaryFileWithShadowAccessor::write(const uint8_t *ptrData, const s
   return EXIT_SUCCESS;
 }
 
-ssize_t posixBinaryFileWithShadowAccessor::read(uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return fd;
@@ -181,7 +181,7 @@ ssize_t posixBinaryFileWithShadowAccessor::read(uint8_t *ptrData, const size_t p
   return EXIT_FAILURE;
 }
 
-size_t posixBinaryFileWithShadowAccessor::count() {
+size_t posixBinaryFileWithShadow::count() {
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
   if (rc != 0) {
@@ -191,7 +191,7 @@ size_t posixBinaryFileWithShadowAccessor::count() {
   return stat_buf.st_size / recordSize_;
 }
 
-ssize_t posixBinaryFileWithShadowAccessor::merge() {
+ssize_t posixBinaryFileWithShadow::merge() {
   struct stat shadow_stat;
   if (fstat(fd_shadow, &shadow_stat) != 0) {
     SPDLOG_ERROR("::fstat shadow {} failed: {}", shadowName(), strerror(errno));

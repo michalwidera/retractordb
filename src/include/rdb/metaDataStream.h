@@ -13,16 +13,16 @@
 
 namespace rdb {
 
-/// @brief Klasa opisująca strumień indeksujący dane napływające w klasie storageAccessor.
+/// @brief Klasa opisująca strumień indeksujący dane napływające w klasie storage.
 ///
 /// obiekt klasy metaDataStream powinien:
-/// - tworzyć dane wraz z napływem danych w storageAccessor.
+/// - tworzyć dane wraz z napływem danych w storage.
 /// - być odpowiedzialny za przechowanie informacji o tym, które pola w rekordach są nullami.
-/// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storageAccessor.
+/// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storage.
 /// - umożliwiać aktualizację informacji o nullach dla istniejących rekordów.
 /// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
 /// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storageAccessor jest niedozwolone.
+/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
 /// - zapewniać informacje o przerwach w transmisji danych.
 /// - powinien być w stanie obsłużyć duże ilości danych.
@@ -31,13 +31,13 @@ namespace rdb {
 /// - nie przechowywać znacznika czasu wewnątrz struktury indeksu.
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych
-/// napływających do storageAccessor, zapewniając jednocześnie trwałość i integralność danych.
+/// napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
 /// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w
-/// przetwarzaniu danych w storageAccessor.
+/// przetwarzaniu danych w storage.
 /// @note W przypadku dużych ilości danych, implementacja powinna uwzględniać mechanizmy buforowania i zarządzania pamięcią, aby
 /// zapewnić płynne działanie systemu.
 /// @note Klasa metaDataStream powinna być projektowana z myślą o łatwej integracji z innymi komponentami systemu, takimi jak
-/// storageAccessor, aby zapewnić spójność i efektywność całego systemu.
+/// storage, aby zapewnić spójność i efektywność całego systemu.
 /// @note W przypadku przerw w transmisji danych, klasa metaDataStream powinna być w stanie wykryć i odpowiednio zareagować na
 /// takie sytuacje, np. poprzez zapisywanie stanu indeksu przed przerwą i przywracanie go po wznowieniu transmisji.
 
@@ -160,7 +160,7 @@ class metaDataStream {
   /// @return rInterval value used for time calculations
   boost::rational<int> getSamplingInterval() const;
 
-  // ── Accessor ───────────────────────────────────────────────────────
+  // ──  ───────────────────────────────────────────────────────
 
   /// @brief Read-only access to the descriptor.
   const Descriptor &descriptor() const;
