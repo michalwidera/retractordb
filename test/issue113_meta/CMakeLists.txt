@@ -8,4 +8,6 @@ add_test(
   COMMAND
     bash -c "set -e ; \
   xtrdb < term.script > out.txt ;  \
+  cat out.txt: ; \
+  cat pattern.txt ; \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
