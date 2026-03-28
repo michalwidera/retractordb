@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>  // make_unique
 #include <string>
+#include <cstdlib>
 
 #include "config.h"
 #include "rdb/descriptor.h"
@@ -156,10 +157,10 @@ int main(int argc, char *argv[]) {
       std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
       std::cout << "size \t\t\t\t show database size in records\n";
       std::cout << "cap [value]\t\t\t set device stream backread capacity\n";
-      std::cout << "lock|flux \t\t\t (un)lock circular backread buffer\n";
       std::cout << "dump \t\t\t\t show payload memory\n";
       std::cout << "mono \t\t\t\t no color mode\n";
       std::cout << "echo \t\t\t\t print message on terminal\n";
+      std::cout << "system \t\t\t\t execute system command\n";
       std::cout << "help|h \t\t\t\t show this help\n";
 
       std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
@@ -207,6 +208,13 @@ int main(int argc, char *argv[]) {
       }
       payloadStatus = returnStatus ? fetched : error;
 
+    } else if (cmd == "system") {
+      std::string systemCommand;
+      std::getline(std::cin, systemCommand);
+      int returnCode = std::system(systemCommand.c_str());
+      if (returnCode != 0) {
+        std::cout << RED << "system command error: " << returnCode << "\n" << RESET;
+      }
     } else if (cmd == "set") {
       std::cin >> *(dacc->getPayload());
       payloadStatus = changed;
@@ -259,10 +267,6 @@ int main(int argc, char *argv[]) {
       int backCapacityValue;
       std::cin >> backCapacityValue;
       dacc->setCapacity(backCapacityValue);
-    } else if (cmd == "lock") {
-      std::cout << "deprecated\n" << std::endl;
-    } else if (cmd == "flux") {
-      dacc->bufferState = rdb::sourceState::flux;
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setDisposable(rox);
