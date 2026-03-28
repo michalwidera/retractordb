@@ -8,26 +8,26 @@ echo append values - no modified
 list 2
 system ls -p test_db*
 echo db
-system hexdump test_db
+system xxd test_db
 echo shadow
-system hexdump test_db.shadow
+system xxd test_db.shadow
 echo start update
 set a 10
 write 0
 echo a[0] -> 10
 system ls -p test_db*
 echo db
-system hexdump test_db
+system xxd test_db
 echo shadow
-system hexdump test_db.shadow
+system xxd test_db.shadow
 list 2
 set a 20
 write 1
 echo a[1] -> 20
 list 2
 echo db
-system hexdump test_db
+system xxd test_db
 echo shadow
-system hexdump test_db.shadow
+system xxd test_db.shadow
 dropfile { test_db test_db.shadow }
 quit
