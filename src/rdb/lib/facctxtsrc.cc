@@ -15,15 +15,14 @@ K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
     if (loopToBeginningIfEOF) {
       myFile.clear();
       myFile.seekg(0, std::ios::beg);
-      myFile >> var;
+      if (!(myFile >> var)) return K{0};
     }
   } else {
-    assert((myFile.rdstate() & std::ifstream::failbit) == 0);
     myFile >> var;
     if (myFile.eof() && loopToBeginningIfEOF) {
       myFile.clear();
       myFile.seekg(0, std::ios::beg);
-      myFile >> var;
+      if (!(myFile >> var)) return K{0};
     }
   }
   return var;
@@ -51,7 +50,12 @@ auto textSourceRO::name() -> std::string & { return filename_; }
 
 ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
   assert(position == 0);
+  if (position != 0) return EXIT_FAILURE;
+
   assert(recordSize_ != 0);
+  if (recordSize_ == 0) return EXIT_FAILURE;
+
+  if (!myFile_.is_open()) return EXIT_FAILURE;
 
   if (!loopToBeginningIfEOF_) {
     if (myFile_.eof()) {
@@ -60,12 +64,9 @@ ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
 
       return EXIT_SUCCESS;
     }
-
-    // all assertions releated to failbit are after read operations
-    // on the end of file should not block here
   }
 
-  assert((myFile_.rdstate() & std::ifstream::failbit) == 0);
+  if (myFile_.fail()) return EXIT_FAILURE;
 
   auto i = 0;
   for (auto item : descriptor_) {
@@ -74,13 +75,30 @@ ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
         std::string var;
         auto strLen = item.rlen * item.rarray;
         char c;
+        bool found = false;
         while (myFile_.get(c) && c != '"')
           ;
-        while (myFile_.get(c) && c != '"')
-          var += c;
+        if (myFile_.eof() && loopToBeginningIfEOF_) {
+          myFile_.clear();
+          myFile_.seekg(0, std::ios::beg);
+          while (myFile_.get(c) && c != '"')
+            ;
+        }
+        if (!myFile_.eof()) {
+          while (myFile_.get(c) && c != '"')
+            var += c;
+          found = true;
+        }
+        if (!found && loopToBeginningIfEOF_) {
+          myFile_.clear();
+          myFile_.seekg(0, std::ios::beg);
+          while (myFile_.get(c) && c != '"')
+            ;
+          while (myFile_.get(c) && c != '"')
+            var += c;
+        }
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
-        // SPDLOG_INFO("test nr:{} val:{}", i, var.c_str());
         payload_->setItem(i, var);
       } else
         for (auto j = 0; j < item.rarray; j++) {
@@ -112,8 +130,6 @@ ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
   }
 
   std::memcpy(ptrData, payload_->span().data(), descriptor_.getSizeInBytes());
-
-  if (loopToBeginningIfEOF_) assert((myFile_.rdstate() & std::ifstream::failbit) == 0);
 
   readCount_++;
 
