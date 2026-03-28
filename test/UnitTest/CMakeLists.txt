@@ -5,6 +5,7 @@ include_directories(AFTER ${CMAKE_SOURCE_DIR}/src/include
 
 file(
   GLOB V_GLOB
+  CONFIGURE_DEPENDS
   LIST_DIRECTORIES false
   "*.cpp")
 
@@ -28,6 +29,7 @@ foreach(item ${V_GLOB})
   set(SOURCES_${OUTPUT_FILE_NOEXT}_TEST ${item} launch/main.cpp)
   add_executable(${OUTPUT_FILE_NOEXT} ${SOURCES_${OUTPUT_FILE_NOEXT}_TEST})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
+  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT})
   if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposixEintr")
     target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE
       -Wl,--wrap=pread -Wl,--wrap=write)

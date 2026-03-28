@@ -1,9 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstring>
 #include <iostream>
-#include <locale>
 #include <string>
 
 #include "rdb/fainterface.h"
@@ -13,8 +11,6 @@
 // ctest -R '^ut-test_rdb' -V
 
 const uint AREA_SIZE = 10;
-
-extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 
 template <typename T, typename K>
 bool test_1() {
@@ -101,85 +97,6 @@ bool test_3() {
   return true;
 }
 
-bool test_descriptor() {
-  rdb::Descriptor data1{rdb::rField("Name3", 1, 10, rdb::STRING), rdb::rField("Name4", 10, 1, rdb::STRING)};
-
-  data1.append({rdb::rField("Name5z", 1, 10, rdb::STRING)});
-  data1.append({rdb::rField("Name6z", 1, 10, rdb::STRING)});
-
-  data1.push_back(rdb::rField("Name", 1, 10, rdb::STRING));
-  data1.push_back(rdb::rField("TLen", sizeof(uint), 1, rdb::UINT));
-
-  data1 += rdb::Descriptor("Name2", 1, 10, rdb::STRING);
-  data1 += rdb::Descriptor("Control", 1, 1, rdb::BYTE);
-  data1 += rdb::Descriptor("Len3", 4, 1, rdb::UINT);
-  {
-    std::stringstream coutstring;
-    coutstring << data1;
-    char test[] =
-        "{\tSTRING Name3[10]\n\tSTRING Name4[10]\n\tSTRING "
-        "Name5z[10]\n\tSTRING Name6z[10]\n\tSTRING Name[10]\n\tUINT "
-        "TLen\n\tSTRING Name2[10]\n\tBYTE Control\n\tUINT Len3\n}";
-    if (strcmp(coutstring.str().c_str(), test) != 0) return false;
-  }
-
-  rdb::Descriptor data2 = rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
-                          rdb::Descriptor("Len3", 4, 1, rdb::UINT) +     //
-                          rdb::Descriptor("Control", 1, 1, rdb::BYTE);
-  {
-    std::stringstream coutstring;
-    char test[] = "{\tSTRING Name[10]\n\tUINT Len3\n\tBYTE Control\n}";
-    coutstring << data2;
-    if (strcmp(coutstring.str().c_str(), test) != 0) return false;
-  }
-
-  if (data2.position("Control") != 2) return false;
-  if (data2.len("Control") != 1) return false;
-  if (strcmp(data2.type("Control").data(), "BYTE") != 0) return false;
-  if (data2.offsetBegArr("Control") != 14) return false;
-
-  return true;
-}
-
-bool test_descriptor_read() {
-  // start cin test
-  // https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
-  std::streambuf *orig = std::cin.rdbuf();
-  // Note: This mess is intended here in test
-
-  const char *test_string =
-      "{ STRING Name3[10]\nSTRING Name[10]\nUINT Len STRING Name2[10] BYTE "
-      "Control UINT Len3 }";
-
-  // Test goes here
-
-  rdb::Descriptor data3;
-
-  std::istringstream input(test_string);
-  std::cin.rdbuf(input.rdbuf());
-  std::cin >> data3;
-  // Revert to orginal cin
-  std::cin.rdbuf(orig);
-
-  {
-    std::stringstream coutstring;
-    const char *test =
-        "{\tSTRING Name3[10]\n\tSTRING Name[10]\n\tUINT Len\n\tSTRING "
-        "Name2[10]\n\tBYTE Control\n\tUINT Len3\n}";
-    coutstring << data3;
-
-    if (strcmp(coutstring.str().c_str(), test) != 0) return false;
-  }
-
-  // end cin test
-
-  return true;
-}
-
-TEST(xrdb, test_descriptor_read) { EXPECT_TRUE(test_descriptor_read()); }
-
-TEST(xrdb, test_descriptor) { EXPECT_TRUE(test_descriptor()); }
-
 TEST(xrdb, test_storage) {
   // This structure is tricky
   // If not aligned - size is 15
@@ -237,24 +154,6 @@ TEST(xrdb, test_storage) {
   EXPECT_EQ(std::any_cast<std::string>(pl->getItem(0)), "xxxx xxxx");
   EXPECT_EQ(std::any_cast<int>(pl->getItem(2)), 0x67);
   EXPECT_EQ(std::any_cast<uint8_t>(pl->getItem(1)), 0x33);
-}
-
-TEST(xrdb, test_descriptor_compare) {
-  rdb::Descriptor dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
-                                  rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
-                                  rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  rdb::Descriptor dataDescriptor2{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
-                                  rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
-                                  rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  rdb::Descriptor dataDescriptorDiff1{rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
-                                      rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
-                                      rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  rdb::Descriptor dataDescriptorDiff2{rdb::Descriptor("Name", 1, 11, rdb::STRING) +  //
-                                      rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
-                                      rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-  EXPECT_TRUE(dataDescriptor1 == dataDescriptor2);
-  EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
-  EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
 TEST(crdb, genericBinaryFile_byte) {
@@ -349,61 +248,3 @@ TEST(crdb, payload_add_operator) {
   EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
 }
 
-TEST(crdb, position_conversion_test1) {
-  auto desc1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
-             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
-             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-
-  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
-  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
-  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
-  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
-  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
-}
-
-TEST(crdb, position_conversion_test2) {
-  auto desc1{rdb::Descriptor("Name", 1, 1, rdb::BYTE) +     //
-             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
-             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
-
-  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
-  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
-  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
-  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
-  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
-}
-
-TEST(crdb, position_conversion_test3) {
-  auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) +    //
-             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
-             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER) +  //
-             rdb::Descriptor("Name", 1, 10, rdb::STRING)};
-
-  rdb::payload payload(desc1);
-
-  payload.setItem(0, 145);
-  payload.setItem(1, static_cast<uint8_t>(24));
-  payload.setItem(2, static_cast<uint8_t>(25));
-  payload.setItem(3, static_cast<uint8_t>(26));
-  payload.setItem(4, 2000);
-  payload.setItem(5, std::string("test"));
-
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0)) == 145);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1)) == 24);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
-  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
-  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
-
-  std::stringstream coutstring;
-  coutstring << rdb::flat << payload;
-  EXPECT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
-}
-
-TEST(crdb, descriptor_parser_test) {
-  rdb::Descriptor out;
-  EXPECT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
-  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
-  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
-  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
-}

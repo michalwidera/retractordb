@@ -1,0 +1,268 @@
+#include <gtest/gtest.h>
+
+#include <any>
+#include <cstring>
+#include <iostream>
+#include <sstream>
+#include <string>
+
+#include "rdb/descriptor.h"
+#include "rdb/payload.h"
+
+extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
+
+namespace {
+
+bool test_descriptor() {
+  rdb::Descriptor data1{rdb::rField("Name3", 1, 10, rdb::STRING), rdb::rField("Name4", 10, 1, rdb::STRING)};
+
+  data1.append({rdb::rField("Name5z", 1, 10, rdb::STRING)});
+  data1.append({rdb::rField("Name6z", 1, 10, rdb::STRING)});
+
+  data1.push_back(rdb::rField("Name", 1, 10, rdb::STRING));
+  data1.push_back(rdb::rField("TLen", sizeof(uint), 1, rdb::UINT));
+
+  data1 += rdb::Descriptor("Name2", 1, 10, rdb::STRING);
+  data1 += rdb::Descriptor("Control", 1, 1, rdb::BYTE);
+  data1 += rdb::Descriptor("Len3", 4, 1, rdb::UINT);
+  {
+    std::stringstream coutstring;
+    coutstring << data1;
+    char test[] =
+        "{\tSTRING Name3[10]\n\tSTRING Name4[10]\n\tSTRING "
+        "Name5z[10]\n\tSTRING Name6z[10]\n\tSTRING Name[10]\n\tUINT "
+        "TLen\n\tSTRING Name2[10]\n\tBYTE Control\n\tUINT Len3\n}";
+    if (strcmp(coutstring.str().c_str(), test) != 0) return false;
+  }
+
+  rdb::Descriptor data2 = rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+                          rdb::Descriptor("Len3", 4, 1, rdb::UINT) +     //
+                          rdb::Descriptor("Control", 1, 1, rdb::BYTE);
+  {
+    std::stringstream coutstring;
+    char test[] = "{\tSTRING Name[10]\n\tUINT Len3\n\tBYTE Control\n}";
+    coutstring << data2;
+    if (strcmp(coutstring.str().c_str(), test) != 0) return false;
+  }
+
+  if (data2.position("Control") != 2) return false;
+  if (data2.len("Control") != 1) return false;
+  if (strcmp(data2.type("Control").data(), "BYTE") != 0) return false;
+  if (data2.offsetBegArr("Control") != 14) return false;
+
+  return true;
+}
+
+bool test_descriptor_read() {
+  // start cin test
+  // https://stackoverflow.com/questions/14550187/how-to-put-data-in-cin-from-string
+  std::streambuf *orig = std::cin.rdbuf();
+
+  const char *test_string =
+      "{ STRING Name3[10]\nSTRING Name[10]\nUINT Len STRING Name2[10] BYTE "
+      "Control UINT Len3 }";
+
+  rdb::Descriptor data3;
+
+  std::istringstream input(test_string);
+  std::cin.rdbuf(input.rdbuf());
+  std::cin >> data3;
+  std::cin.rdbuf(orig);
+
+  {
+    std::stringstream coutstring;
+    const char *test =
+        "{\tSTRING Name3[10]\n\tSTRING Name[10]\n\tUINT Len\n\tSTRING "
+        "Name2[10]\n\tBYTE Control\n\tUINT Len3\n}";
+    coutstring << data3;
+
+    if (strcmp(coutstring.str().c_str(), test) != 0) return false;
+  }
+
+  return true;
+}
+
+}  // namespace
+
+TEST(descriptor, read_from_stream) { EXPECT_TRUE(test_descriptor_read()); }
+
+TEST(descriptor, print_and_basic_accessors) { EXPECT_TRUE(test_descriptor()); }
+
+TEST(descriptor, compare) {
+  rdb::Descriptor dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+                                  rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+                                  rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptor2{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+                                  rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+                                  rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptorDiff1{rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+                                      rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+                                      rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor dataDescriptorDiff2{rdb::Descriptor("Name", 1, 11, rdb::STRING) +  //
+                                      rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+                                      rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  EXPECT_TRUE(dataDescriptor1 == dataDescriptor2);
+  EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff1);
+  EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
+}
+
+TEST(descriptor, retention_and_policy_defaults) {
+  auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
+
+  auto retention = desc.retention();
+  EXPECT_TRUE(retention.noRetention());
+
+  auto policy = desc.policy();
+  EXPECT_TRUE(policy.first.empty());
+  EXPECT_EQ(policy.second, 0U);
+}
+
+TEST(descriptor, retention_and_policy_values) {
+  auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER) +    //
+              rdb::Descriptor("MEMORY", 0, 1, rdb::TYPE) +      //
+              rdb::Descriptor("retention-mem", 7, 1, rdb::RETMEMORY) +
+              rdb::Descriptor("retention", 5, 2, rdb::RETENTION);
+
+  auto retention = desc.retention();
+  EXPECT_EQ(retention.segments, 5U);
+  EXPECT_EQ(retention.capacity, 2U);
+
+  auto policy = desc.policy();
+  EXPECT_EQ(policy.first, "MEMORY");
+  EXPECT_EQ(policy.second, 7U);
+}
+
+TEST(descriptor, clean_ref_and_flat_fields) {
+  auto desc = rdb::Descriptor("src.bin", 0, 0, rdb::REF) +      //
+              rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
+              rdb::Descriptor("a", 1, 3, rdb::BYTE) +           //
+              rdb::Descriptor("s", 8, 99, rdb::STRING);
+
+  EXPECT_TRUE(desc.hasField("src.bin"));
+  EXPECT_EQ(desc.sizeFlat(), 3);
+
+  auto flatFields = desc.fieldsFlat();
+  EXPECT_EQ(flatFields.size(), 2U);
+  EXPECT_EQ(flatFields[0].rname, "a");
+  EXPECT_EQ(flatFields[1].rname, "s");
+
+  desc.cleanRef();
+  EXPECT_FALSE(desc.hasField("src.bin"));
+  EXPECT_FALSE(desc.hasField("TEXTSOURCE"));
+  EXPECT_TRUE(desc.hasField("a"));
+  EXPECT_TRUE(desc.hasField("s"));
+  EXPECT_EQ(desc.size(), 2U);
+}
+
+TEST(descriptor, create_hash_uses_max_len_and_type) {
+  auto lhs = rdb::Descriptor("src-left", 0, 0, rdb::REF) +   //
+             rdb::Descriptor("a", 1, 1, rdb::BYTE) +         //
+             rdb::Descriptor("b", 4, 1, rdb::UINT);
+  auto rhs = rdb::Descriptor("src-right", 0, 0, rdb::REF) +  //
+             rdb::Descriptor("a", 4, 1, rdb::INTEGER) +      //
+             rdb::Descriptor("b", 1, 1, rdb::BYTE);
+
+  rdb::Descriptor out;
+  out.createHash("h", lhs, rhs);
+
+  EXPECT_EQ(out.size(), 2U);
+  EXPECT_EQ(out[0].rname, "h_0");
+  EXPECT_EQ(out[0].rlen, 4);
+  EXPECT_EQ(out[0].rarray, 1);
+  EXPECT_EQ(out[0].rtype, rdb::INTEGER);
+
+  EXPECT_EQ(out[1].rname, "h_1");
+  EXPECT_EQ(out[1].rlen, 4);
+  EXPECT_EQ(out[1].rarray, 1);
+  EXPECT_EQ(out[1].rtype, rdb::UINT);
+}
+
+TEST(descriptor, flat_output_resets_after_stream) {
+  auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
+
+  std::stringstream flatOut;
+  flatOut << rdb::flat << desc;
+  EXPECT_EQ(flatOut.str(), "{ BYTE x }");
+  EXPECT_FALSE(rdb::Descriptor::getFlat());
+
+  std::stringstream multilineOut;
+  multilineOut << desc;
+  EXPECT_EQ(multilineOut.str(), "{\tBYTE x\n}");
+}
+
+TEST(descriptor, offset_and_convert_for_string_and_arrays) {
+  auto desc = rdb::Descriptor("a", 1, 2, rdb::BYTE) +     //
+              rdb::Descriptor("s", 5, 9, rdb::STRING) +   //
+              rdb::Descriptor("v", 4, 1, rdb::INTEGER);
+
+  EXPECT_EQ(desc.sizeFlat(), 4);
+
+  EXPECT_TRUE(desc.convert(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc.convert(1) == std::make_pair(0, 1));
+  EXPECT_TRUE(desc.convert(2) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc.convert(3) == std::make_pair(2, 0));
+
+  EXPECT_EQ(desc.offset(0), 0);
+  EXPECT_EQ(desc.offset(1), 1);
+  EXPECT_EQ(desc.offset(2), 2);
+  EXPECT_EQ(desc.offset(3), 47);
+}
+
+TEST(descriptor, position_conversion_case_1) {
+  auto desc1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+
+  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
+  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
+  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+}
+
+TEST(descriptor, position_conversion_case_2) {
+  auto desc1{rdb::Descriptor("Name", 1, 1, rdb::BYTE) +     //
+             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+
+  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
+  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
+  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+}
+
+TEST(descriptor, position_conversion_case_3_with_payload) {
+  auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) +    //
+             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER) +  //
+             rdb::Descriptor("Name", 1, 10, rdb::STRING)};
+
+  rdb::payload payload(desc1);
+
+  payload.setItem(0, 145);
+  payload.setItem(1, static_cast<uint8_t>(24));
+  payload.setItem(2, static_cast<uint8_t>(25));
+  payload.setItem(3, static_cast<uint8_t>(26));
+  payload.setItem(4, 2000);
+  payload.setItem(5, std::string("test"));
+
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0)) == 145);
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1)) == 24);
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
+  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
+  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
+
+  std::stringstream coutstring;
+  coutstring << rdb::flat << payload;
+  EXPECT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
+}
+
+TEST(descriptor, parser) {
+  rdb::Descriptor out;
+  EXPECT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
+  EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
+}
