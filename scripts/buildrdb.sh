@@ -109,7 +109,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "conan" "ninja" "toolchain" "bashrc" "help" "quit")
+    options=("release" "debug" "conan" "ninja" "toolchain" "bashrc" "help" "coverage" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"
