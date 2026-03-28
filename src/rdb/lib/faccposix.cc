@@ -11,8 +11,8 @@
 namespace rdb {
 
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
-                                                 const ssize_t recordSize,         //
-                                                 int percounter)                   //
+                                 const ssize_t recordSize,         //
+                                 int percounter)                   //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       percounter_(percounter) {
@@ -63,7 +63,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
   }
   ssize_t sizesh(recordSize_);
   constexpr int maxRetries = 5;
-  int retries = 0;
+  int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd, ptrData, sizesh);
     if (write_result < 0) {

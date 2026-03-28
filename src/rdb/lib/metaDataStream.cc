@@ -105,8 +105,8 @@ void metaDataStream::saveHeader() {
   if (!out.is_open()) return;
 
   int64_t creationTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(creationTime_.time_since_epoch()).count();
-  int32_t rNum = rInterval_.numerator();
-  int32_t rDen = rInterval_.denominator();
+  int32_t rNum           = rInterval_.numerator();
+  int32_t rDen           = rInterval_.denominator();
   out.write(reinterpret_cast<const char *>(&creationTimeNs), sizeof(creationTimeNs));
   out.write(reinterpret_cast<const char *>(&rNum), sizeof(rNum));
   out.write(reinterpret_cast<const char *>(&rDen), sizeof(rDen));
@@ -130,8 +130,8 @@ void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
   if (!out.is_open()) return;
 
   int64_t creationTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(creationTime_.time_since_epoch()).count();
-  int32_t rNum = rInterval_.numerator();
-  int32_t rDen = rInterval_.denominator();
+  int32_t rNum           = rInterval_.numerator();
+  int32_t rDen           = rInterval_.denominator();
   out.write(reinterpret_cast<const char *>(&creationTimeNs), sizeof(creationTimeNs));
   out.write(reinterpret_cast<const char *>(&rNum), sizeof(rNum));
   out.write(reinterpret_cast<const char *>(&rDen), sizeof(rDen));
@@ -218,7 +218,7 @@ void metaDataStream::loadIndex() {
 std::pair<size_t, size_t> metaDataStream::locateRecord(size_t recordIndex) const {
   // First check committed entries on disk
   if (recordIndex < committedRecordCount_) {
-    auto entries = readCommittedEntries();
+    auto entries      = readCommittedEntries();
     size_t cumulative = 0;
     for (size_t i = 0; i < entries.size(); ++i) {
       if (entries[i].isGap) continue;
@@ -254,9 +254,7 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &
   }
 }
 
-metaDataStream::~metaDataStream() {
-  flushCurrentEntry();
-}
+metaDataStream::~metaDataStream() { flushCurrentEntry(); }
 
 // ── Core update interface ────────────────────────────────────────────
 
@@ -348,8 +346,7 @@ void metaDataStream::onRecordModified(size_t recordIndex, std::vector<bool> &nul
   }
 
   allEntries.erase(allEntries.begin() + static_cast<std::ptrdiff_t>(segIdx));
-  allEntries.insert(allEntries.begin() + static_cast<std::ptrdiff_t>(segIdx),
-                    replacement.begin(), replacement.end());
+  allEntries.insert(allEntries.begin() + static_cast<std::ptrdiff_t>(segIdx), replacement.begin(), replacement.end());
 
   rewriteFile(allEntries);
 
@@ -377,9 +374,7 @@ bool metaDataStream::isFieldNull(size_t recordIndex, size_t fieldIndex) const {
   return bitset[fieldIndex];
 }
 
-size_t metaDataStream::totalRecords() const {
-  return committedRecordCount_ + currentEntry_.recordCount;
-}
+size_t metaDataStream::totalRecords() const { return committedRecordCount_ + currentEntry_.recordCount; }
 
 std::vector<metaDataStream::IndexRecord> metaDataStream::entries() const { return readCommittedEntries(); }
 
@@ -400,7 +395,7 @@ void metaDataStream::onTransmissionGap() {
 bool metaDataStream::isGapBefore(size_t recordIndex) const {
   if (recordIndex == 0) return false;
 
-  auto allEntries = readCommittedEntries();
+  auto allEntries   = readCommittedEntries();
   size_t cumulative = 0;
   for (size_t i = 0; i < allEntries.size(); ++i) {
     if (allEntries[i].isGap) {
@@ -416,8 +411,8 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
 
 std::chrono::system_clock::time_point metaDataStream::calculateRecordTimestamp(size_t recordIndex) const {
   // time = creationTime_ + recordIndex * rInterval_ (in seconds)
-  int64_t num = static_cast<int64_t>(recordIndex) * rInterval_.numerator();
-  int64_t den = rInterval_.denominator();
+  int64_t num   = static_cast<int64_t>(recordIndex) * rInterval_.numerator();
+  int64_t den   = rInterval_.denominator();
   auto offsetNs = std::chrono::nanoseconds(num * 1000000000LL / den);
   return creationTime_ + offsetNs;
 }

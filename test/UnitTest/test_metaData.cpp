@@ -126,7 +126,7 @@ TEST_F(MetaTestFixture, test_timestamps) {
 
   auto before = std::chrono::system_clock::now();
   rdb::metaDataStream meta(descriptor, metaFile, boost::rational<int>(1, 10));  // 0.1s interval
-  auto after = std::chrono::system_clock::now();
+  auto after            = std::chrono::system_clock::now();
   std::vector<bool> pat = {false};
 
   meta.onRecordAppended(pat);
@@ -144,7 +144,7 @@ TEST_F(MetaTestFixture, test_timestamps) {
   EXPECT_EQ(ts0, creationTime);
 
   // Record 10 timestamp == creation time + 1 second (10 * 0.1s)
-  auto ts10 = meta.calculateRecordTimestamp(10);
+  auto ts10     = meta.calculateRecordTimestamp(10);
   auto expected = creationTime + std::chrono::seconds(1);
   EXPECT_EQ(ts10, expected);
 }
@@ -159,10 +159,10 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   std::vector<bool> noNull_ = {false};
 
   // Append 3 null records, then switch pattern to force flush to disk
-  meta.onRecordAppended(null_);   // rec 0
-  meta.onRecordAppended(null_);   // rec 1
-  meta.onRecordAppended(null_);   // rec 2
-  meta.onRecordAppended(noNull_); // rec 3 — forces recs 0-2 to disk
+  meta.onRecordAppended(null_);    // rec 0
+  meta.onRecordAppended(null_);    // rec 1
+  meta.onRecordAppended(null_);    // rec 2
+  meta.onRecordAppended(noNull_);  // rec 3 — forces recs 0-2 to disk
 
   // recs 0-2 are now committed on disk, rec 3 is in currentEntry_
   EXPECT_EQ(meta.entries().size(), 1u);  // one committed segment {null_, 3}
@@ -172,7 +172,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
 
   EXPECT_EQ(meta.totalRecords(), 4u);
   EXPECT_EQ(meta.getNullBitset(0), null_);
-  EXPECT_EQ(meta.getNullBitset(1), noNull_);   // modified on disk
+  EXPECT_EQ(meta.getNullBitset(1), noNull_);  // modified on disk
   EXPECT_EQ(meta.getNullBitset(2), null_);
   EXPECT_EQ(meta.getNullBitset(3), noNull_);
 
@@ -190,17 +190,17 @@ TEST_F(MetaTestFixture, test_committed_on_disk_current_in_memory) {
   std::vector<bool> patB = {false};
 
   // Same pattern — stays only in currentEntry_, nothing on disk
-  meta.onRecordAppended(patA);  // rec 0
-  meta.onRecordAppended(patA);  // rec 1
+  meta.onRecordAppended(patA);                    // rec 0
+  meta.onRecordAppended(patA);                    // rec 1
   EXPECT_EQ(meta.entries().size(), 0u);           // nothing committed yet
   EXPECT_EQ(meta.currentEntry_.recordCount, 2u);  // buffered in memory
 
   // Different pattern — flushes patA to disk, patB becomes currentEntry_
-  meta.onRecordAppended(patB);  // rec 2
-  EXPECT_EQ(meta.entries().size(), 1u);            // patA committed to disk
+  meta.onRecordAppended(patB);           // rec 2
+  EXPECT_EQ(meta.entries().size(), 1u);  // patA committed to disk
   EXPECT_EQ(meta.entries()[0].recordCount, 2u);
   EXPECT_EQ(meta.entries()[0].nullBitset, patA);
-  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);   // patB in memory only
+  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);  // patB in memory only
   EXPECT_EQ(meta.currentEntry_.nullBitset, patB);
 }
 

@@ -17,9 +17,9 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 // fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
 
 groupFile::groupFile(const std::string_view fileName,  //
-                                     const ssize_t recordSize,         //
-                                     const retention_t &retention,     //
-                                     int percounter)                   //
+                     const ssize_t recordSize,         //
+                     const retention_t &retention,     //
+                     int percounter)                   //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       retention_(retention),

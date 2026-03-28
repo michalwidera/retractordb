@@ -14,11 +14,11 @@ namespace rdb {
 bool isOpen(const storageState val) { return (val == storageState::openAndCreate); };
 
 storage::storage(const std::string_view qryID,         //
-                                 const std::string_view fileName,      //
-                                 const std::string_view storageParam,  //
-                                 bool oneShot,                         //
-                                 bool isHold,                          //
-                                 int percounter)
+                 const std::string_view fileName,      //
+                 const std::string_view storageParam,  //
+                 bool oneShot,                         //
+                 bool isHold,                          //
+                 int percounter)
     : descriptorFile_(std::string(qryID) + ".desc"),
       storageFile_(fileName),
       percounter_(percounter),

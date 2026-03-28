@@ -2,8 +2,8 @@
 
 #include <list>
 
-#include "token.h"
 #include "rdb/descriptor.h"
+#include "token.h"
 
 struct field {
   std::list<token> lProgram;

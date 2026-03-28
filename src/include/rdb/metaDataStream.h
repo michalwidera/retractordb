@@ -21,13 +21,16 @@ namespace rdb {
 /// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storage.
 /// - umożliwiać aktualizację informacji o nullach dla istniejących rekordów.
 /// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
-/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
+/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero
+/// przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
+/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest
+/// niedozwolone.
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
 /// - zapewniać informacje o przerwach w transmisji danych.
 /// - powinien być w stanie obsłużyć duże ilości danych.
 /// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
-/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
+/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord,
+/// ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
 /// - nie przechowywać znacznika czasu wewnątrz struktury indeksu.
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych
@@ -55,12 +58,12 @@ class metaDataStream {
 
  private:
   void createNullBitsetTemplate();
-  void loadIndex();          ///< read header and restore currentEntry_ from file
-  void saveHeader();         ///< write file header (creation time, rInterval) without entries
-  void appendEntry(const IndexRecord &entry);  ///< append a single entry to end of file
+  void loadIndex();                                           ///< read header and restore currentEntry_ from file
+  void saveHeader();                                          ///< write file header (creation time, rInterval) without entries
+  void appendEntry(const IndexRecord &entry);                 ///< append a single entry to end of file
   void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
-  void flushCurrentEntry();  ///< commit currentEntry_ to file if recordCount > 0
-  std::vector<IndexRecord> readCommittedEntries() const;  ///< read all committed entries from file
+  void flushCurrentEntry();                                   ///< commit currentEntry_ to file if recordCount > 0
+  std::vector<IndexRecord> readCommittedEntries() const;      ///< read all committed entries from file
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
   /// @return pair(segment index in committed entries, offset within that segment)
@@ -69,11 +72,11 @@ class metaDataStream {
 
   size_t entrySize() const;  ///< byte size of one serialized IndexRecord
 
-  std::string metaFilePath_{};                 ///< file path for saving/loading the meta index
-  std::shared_ptr<Descriptor> descriptorRef_;  ///< descriptor of the indexed data stream
-  boost::rational<int> rInterval_{1};          ///< stream sampling interval for time calculations
+  std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
+  std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
+  boost::rational<int> rInterval_{1};                   ///< stream sampling interval for time calculations
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
-  size_t committedRecordCount_{0};             ///< cached total records in committed entries on disk
+  size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
 
  public:
   IndexRecord currentEntry_;  ///< accumulator for the current (not yet committed) RLE run
@@ -87,7 +90,8 @@ class metaDataStream {
   /// @param descriptor descriptor of the indexed data stream
   /// @param metaFilePath path of the file to save/load the meta index
   /// @param rInterval sampling interval for time calculations (default: 1 second)
-  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath, boost::rational<int> rInterval = boost::rational<int>(1));
+  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath,
+                          boost::rational<int> rInterval = boost::rational<int>(1));
 
   /// @brief Destructor – flushes the current entry and saves the full
   ///        index to file.

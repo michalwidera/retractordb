@@ -26,8 +26,7 @@ void query::reset() {
 }
 
 bool isThere(const std::vector<query> &v, const std::string &query_name) {
-  return std::any_of(v.begin(), v.end(),
-                     [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
+  return std::any_of(v.begin(), v.end(), [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
 }
 
 /** Construktor set */

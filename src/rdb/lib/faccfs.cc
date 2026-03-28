@@ -15,9 +15,9 @@ namespace rdb {
 // https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 genericBinaryFile::genericBinaryFile(  //
-    const std::string_view fileName,                   //
-    const ssize_t recordSize,                          //
-    int percounter)                                    //
+    const std::string_view fileName,   //
+    const ssize_t recordSize,          //
+    int percounter)                    //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       percounter_(percounter) {}

@@ -118,10 +118,9 @@ TEST(descriptor, retention_and_policy_defaults) {
 }
 
 TEST(descriptor, retention_and_policy_values) {
-  auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER) +    //
-              rdb::Descriptor("MEMORY", 0, 1, rdb::TYPE) +      //
-              rdb::Descriptor("retention-mem", 7, 1, rdb::RETMEMORY) +
-              rdb::Descriptor("retention", 5, 2, rdb::RETENTION);
+  auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER) +  //
+              rdb::Descriptor("MEMORY", 0, 1, rdb::TYPE) +    //
+              rdb::Descriptor("retention-mem", 7, 1, rdb::RETMEMORY) + rdb::Descriptor("retention", 5, 2, rdb::RETENTION);
 
   auto retention = desc.retention();
   EXPECT_EQ(retention.segments, 5U);
@@ -155,8 +154,8 @@ TEST(descriptor, clean_ref_and_flat_fields) {
 }
 
 TEST(descriptor, create_hash_uses_max_len_and_type) {
-  auto lhs = rdb::Descriptor("src-left", 0, 0, rdb::REF) +   //
-             rdb::Descriptor("a", 1, 1, rdb::BYTE) +         //
+  auto lhs = rdb::Descriptor("src-left", 0, 0, rdb::REF) +  //
+             rdb::Descriptor("a", 1, 1, rdb::BYTE) +        //
              rdb::Descriptor("b", 4, 1, rdb::UINT);
   auto rhs = rdb::Descriptor("src-right", 0, 0, rdb::REF) +  //
              rdb::Descriptor("a", 4, 1, rdb::INTEGER) +      //
@@ -191,8 +190,8 @@ TEST(descriptor, flat_output_resets_after_stream) {
 }
 
 TEST(descriptor, offset_and_convert_for_string_and_arrays) {
-  auto desc = rdb::Descriptor("a", 1, 2, rdb::BYTE) +     //
-              rdb::Descriptor("s", 5, 9, rdb::STRING) +   //
+  auto desc = rdb::Descriptor("a", 1, 2, rdb::BYTE) +    //
+              rdb::Descriptor("s", 5, 9, rdb::STRING) +  //
               rdb::Descriptor("v", 4, 1, rdb::INTEGER);
 
   EXPECT_EQ(desc.sizeFlat(), 4);

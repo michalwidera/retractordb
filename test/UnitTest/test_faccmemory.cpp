@@ -274,7 +274,7 @@ TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
 
   {
     auto mfa = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
-    record = 0x42;
+    record   = 0x42;
     mfa->write(&record);
     record = 0x43;
     mfa->write(&record);

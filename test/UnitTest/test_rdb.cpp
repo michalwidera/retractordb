@@ -247,4 +247,3 @@ TEST(crdb, payload_add_operator) {
   EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
   EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
 }
-

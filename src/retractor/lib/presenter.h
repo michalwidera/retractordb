@@ -2,7 +2,7 @@
 
 #include <boost/program_options.hpp>  // IWYU pragma: keep
 
-#include "qTree.h"   // for qTree, query, token
+#include "qTree.h"  // for qTree, query, token
 
 struct presenter {
   explicit presenter(qTree &coreInstance) : coreInstance(coreInstance) {};

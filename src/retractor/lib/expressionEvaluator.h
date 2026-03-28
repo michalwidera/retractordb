@@ -1,7 +1,7 @@
 #pragma once
 
-#include "token.h"  // token, std::list
 #include "rdb/payload.h"
+#include "token.h"  // token, std::list
 
 class expressionEvaluator {
  private:

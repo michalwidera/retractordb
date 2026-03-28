@@ -21,7 +21,7 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
   struct stat stat_buf;
   if (fstat(fd_shadow, &stat_buf) != 0) return EXIT_FAILURE;
 
-  const ssize_t entrySize = sizeof(size_t) + recordSize_;
+  const ssize_t entrySize  = sizeof(size_t) + recordSize_;
   const ssize_t numEntries = stat_buf.st_size / entrySize;
   if (numEntries == 0) return EXIT_FAILURE;
 
@@ -40,9 +40,7 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
   return EXIT_FAILURE;
 }
 
-posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName,
-                                                                     const ssize_t recordSize,
-                                                                     int percounter)
+posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName, const ssize_t recordSize, int percounter)
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       percounter_(percounter) {
@@ -100,9 +98,9 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const size_t po
     if (result == -1) return errno;
 
     ssize_t sizesh(recordSize_);
-    const uint8_t *ptr = ptrData;
+    const uint8_t *ptr       = ptrData;
     constexpr int maxRetries = 5;
-    int retries = 0;
+    int retries              = 0;
     while (sizesh > 0) {
       ssize_t write_result = ::write(fd, ptr, sizesh);
       if (write_result < 0) {
@@ -135,9 +133,9 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const size_t po
 
   // Zapisz dane
   ssize_t sizesh(recordSize_);
-  const uint8_t *ptr = ptrData;
+  const uint8_t *ptr       = ptrData;
   constexpr int maxRetries = 5;
-  int retries = 0;
+  int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd_shadow, ptr, sizesh);
     if (write_result < 0) {
@@ -198,7 +196,7 @@ ssize_t posixBinaryFileWithShadow::merge() {
     return EXIT_FAILURE;
   }
 
-  const ssize_t entrySize = sizeof(size_t) + recordSize_;
+  const ssize_t entrySize  = sizeof(size_t) + recordSize_;
   const ssize_t numEntries = shadow_stat.st_size / entrySize;
   if (numEntries == 0) return EXIT_SUCCESS;
 

@@ -238,7 +238,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_count_ignores_shadow) {
 // Verify reading from an empty file returns failure
 TEST_F(ShadowFileTest, test_faccposixshd_read_empty_file) {
   BYTE record = 0xFF;
-  auto path = sandboxPath("shd_empty");
+  auto path   = sandboxPath("shd_empty");
 
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
 
@@ -291,7 +291,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_shadow_entry_format) {
 // Verify multi-byte record shadow operations
 TEST_F(ShadowFileTest, test_faccposixshd_multibyte_record) {
   const size_t multiRecSize = 4;
-  auto path = sandboxPath("shd_multi_rec");
+  auto path                 = sandboxPath("shd_multi_rec");
 
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, multiRecSize);
 
@@ -330,7 +330,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_persistence) {
 
   {
     auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
-    record = 0x10;
+    record   = 0x10;
     shd->write(&record);
     record = 0x20;
     shd->write(&record);
@@ -419,7 +419,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_write_after_merge) {
 // Verify name() returns the correct filename
 TEST_F(ShadowFileTest, test_faccposixshd_name) {
   auto path = sandboxPath("shd_name");
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd  = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
 
   GTEST_ASSERT_EQ(shd->name(), path);
 }

@@ -10,8 +10,8 @@
 // --- fixArgcv tests ---
 
 TEST(FixArgcv, strips_trailing_cr_from_arguments) {
-  char arg0[] = "program\r";
-  char arg1[] = "hello\r";
+  char arg0[]  = "program\r";
+  char arg1[]  = "hello\r";
   char *argv[] = {arg0, arg1};
 
   fixArgcv(2, argv);
@@ -21,8 +21,8 @@ TEST(FixArgcv, strips_trailing_cr_from_arguments) {
 }
 
 TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
-  char arg0[] = "program";
-  char arg1[] = "--flag";
+  char arg0[]  = "program";
+  char arg1[]  = "--flag";
   char *argv[] = {arg0, arg1};
 
   fixArgcv(2, argv);
@@ -32,7 +32,7 @@ TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
 }
 
 TEST(FixArgcv, handles_empty_string_argument) {
-  char arg0[] = "";
+  char arg0[]  = "";
   char *argv[] = {arg0};
 
   fixArgcv(1, argv);
@@ -52,7 +52,7 @@ TEST(FixArgcv, handles_null_argv) {
 }
 
 TEST(FixArgcv, only_strips_last_character_if_cr) {
-  char arg0[] = "a\rb\r";
+  char arg0[]  = "a\rb\r";
   char *argv[] = {arg0};
 
   fixArgcv(1, argv);

@@ -48,11 +48,11 @@ class storage {
  public:
   storage() = delete;
   explicit storage(const std::string_view qryID,         //
-                           const std::string_view fileName,      //
-                           const std::string_view storageParam,  //
-                           bool oneShot   = false,               //
-                           bool isHold    = false,               //
-                           int percounter = -1                   //
+                   const std::string_view fileName,      //
+                   const std::string_view storageParam,  //
+                   bool oneShot   = false,               //
+                   bool isHold    = false,               //
+                   int percounter = -1                   //
   );
   virtual ~storage();
 

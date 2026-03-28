@@ -9,10 +9,10 @@
 #include <boost/rational.hpp>
 
 #include "field.h"
-#include "rule.h"
-#include "token.h"
 #include "rdb/descriptor.h"
 #include "rdb/faccmemory.h"
+#include "rule.h"
+#include "token.h"
 
 class qTree;
 

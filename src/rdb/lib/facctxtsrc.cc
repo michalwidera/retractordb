@@ -29,9 +29,9 @@ K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
 }
 
 textSourceRO::textSourceRO(const std::string_view fileName,    //
-                                           const ssize_t recordSize,           //
-                                           const rdb::Descriptor &descriptor,  //
-                                           bool loopToBeginningIfEOF)
+                           const ssize_t recordSize,           //
+                           const rdb::Descriptor &descriptor,  //
+                           bool loopToBeginningIfEOF)
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
       recordSize_(recordSize),
