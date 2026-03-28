@@ -34,6 +34,10 @@ foreach(item ${V_GLOB})
     target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE
       -Wl,--wrap=pread -Wl,--wrap=write)
   endif()
+  if(OUTPUT_FILE_NOEXT STREQUAL "test_uxSysTermTools")
+    target_sources(${OUTPUT_FILE_NOEXT} PRIVATE
+      ${CMAKE_SOURCE_DIR}/src/common/uxSysTermTools.cpp)
+  endif()
   add_test(
     NAME ut-${OUTPUT_FILE_NOEXT}
     WORKING_DIRECTORY
