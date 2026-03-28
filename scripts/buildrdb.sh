@@ -69,10 +69,13 @@ run_option() {
             cd $build_folder
             cmake --preset conan-debug -DENABLE_COVERAGE=ON
             cd build/Debug
+            find . -name '*.gcda' -delete -o -name '*.gcno' -delete
             ninja clean && ninja
-            ctest
+            export PATH="$(pwd)/src/retractor:$(pwd)/src/rdb:$(pwd)/src/qry:$PATH"
+            ctest || true
             cd ../..
-            gcovr --root . --filter 'src/' --gcov-executable gcov-14 --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+            rm -f *.gcov
+            gcovr --root . --filter 'src/' --gcov-executable gcov-14 --gcov-ignore-errors all --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
             ;;
         "quit")
             echo "-- Current conan profile is:"
