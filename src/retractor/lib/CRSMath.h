@@ -13,7 +13,7 @@ using namespace boost;
 using std::map;
 using std::set;
 
-/// @brief Klasa TimeLine wyznacza kolejne przedziały czasowe. 
+/// @brief Klasa TimeLine wyznacza kolejne przedziały czasowe.
 ///
 /// Obiekt klasy TimeLine powinien:
 /// - być inicjalizowany zbiorem czasów między kolejnymi zdarzeniami.

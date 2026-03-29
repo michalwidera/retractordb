@@ -18,8 +18,7 @@ namespace rdb {
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu.
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych.
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
-/// - po przeczytaniu ostatnichd danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do
-/// początku pliku i kontynuować odczyt danych od początku.
+/// - po przeczytaniu ostatnichd danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do początku pliku i kontynuować odczyt danych od początku.
 class textSourceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
