@@ -15,6 +15,9 @@ namespace rdb {
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
 /// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
+/// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
+/// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych
+/// między uruchomieniami programu
 
 class posixBinaryFile : public FileInterface {
   std::string filename_;

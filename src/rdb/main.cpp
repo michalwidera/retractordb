@@ -4,13 +4,13 @@
 #include <algorithm>
 #include <boost/system/error_code.hpp>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>  // make_unique
 #include <string>
-#include <cstdlib>
 
 #include "config.h"
 #include "rdb/descriptor.h"

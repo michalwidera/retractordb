@@ -16,16 +16,50 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       percounter_(percounter) {
+  assert(recordSize_ > 0);
+
+  std::error_code fs_ec;
+  const bool fileExisted = std::filesystem::exists(filename_, fs_ec);
+  if (fs_ec) {
+    SPDLOG_WARN("Failed to check if {} exists: {}", filename_, fs_ec.message());
+  }
+
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename_, fd);
   else
     SPDLOG_INFO("::open {} -> {}", filename_, fd);
   assert(fd >= 0);
+
+  if (fd >= 0 && fileExisted) {
+    const off_t fileSize = ::lseek(fd, 0, SEEK_END);
+    if (fileSize < 0) {
+      SPDLOG_ERROR("::lseek {} failed during state restore: {}", filename_, strerror(errno));
+    } else {
+      const off_t alignedSize = (fileSize / recordSize_) * recordSize_;
+      if (alignedSize != fileSize) {
+        SPDLOG_WARN("{} has {} trailing bytes; truncating to {} to restore consistent records", filename_,
+                    fileSize - alignedSize, alignedSize);
+        if (::ftruncate(fd, alignedSize) != 0) {
+          SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedSize, strerror(errno));
+        }
+      }
+      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedSize / recordSize_);
+    }
+  }
 }
 
 posixBinaryFile::~posixBinaryFile() {
-  ::close(fd);
+  if (fd >= 0) {
+    if (::fsync(fd) != 0) {
+      SPDLOG_ERROR("::fsync {} failed before close: {}", filename_, strerror(errno));
+    }
+    if (::close(fd) != 0) {
+      SPDLOG_ERROR("::close {} failed: {}", filename_, strerror(errno));
+    }
+    fd = -1;
+  }
+
   if (percounter_ >= 0) {
     SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);

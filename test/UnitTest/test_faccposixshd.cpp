@@ -461,3 +461,74 @@ TEST_F(ShadowFileTest, test_faccposixshd_merge_empty_shadow) {
   GTEST_ASSERT_EQ(shd->read(&record, 1), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0xBB);
 }
+
+// Verify reopen restores main file alignment to whole records
+TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_main_file) {
+  const size_t multiRecSize = 2;
+  auto path                 = sandboxPath("shd_restore_main_align");
+
+  {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(out.is_open());
+    const BYTE raw[] = {0x01, 0x02, 0x03, 0x04, 0xFF};  // 5 bytes: 2 full records + 1 trailing byte
+    out.write(reinterpret_cast<const char *>(raw), sizeof(raw));
+  }
+
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, multiRecSize);
+
+  // Constructor should truncate the trailing byte and restore consistent record state
+  GTEST_ASSERT_EQ(filesize(path), static_cast<std::ifstream::pos_type>(4));
+  GTEST_ASSERT_EQ(shd->count(), 2);
+
+  uint8_t rec[2] = {};
+  GTEST_ASSERT_EQ(shd->read(rec, 0), EXIT_SUCCESS);
+  EXPECT_EQ(rec[0], 0x01);
+  EXPECT_EQ(rec[1], 0x02);
+
+  GTEST_ASSERT_EQ(shd->read(rec, 2), EXIT_SUCCESS);
+  EXPECT_EQ(rec[0], 0x03);
+  EXPECT_EQ(rec[1], 0x04);
+
+  GTEST_ASSERT_NE(shd->read(rec, 4), EXIT_SUCCESS);
+}
+
+// Verify reopen restores shadow file alignment to whole (position, data) entries
+TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file) {
+  auto path = sandboxPath("shd_restore_shadow_align");
+
+  // Prepare main file with 2 records
+  {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(out.is_open());
+    const BYTE mainRaw[] = {0x10, 0x20};
+    out.write(reinterpret_cast<const char *>(mainRaw), sizeof(mainRaw));
+  }
+
+  // Prepare shadow file: one valid entry + one trailing garbage byte
+  {
+    std::ofstream out(path + ".shadow", std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(out.is_open());
+
+    const size_t position = 0;
+    const BYTE updated    = 0x99;
+    const BYTE garbage    = 0xAB;
+
+    out.write(reinterpret_cast<const char *>(&position), sizeof(position));
+    out.write(reinterpret_cast<const char *>(&updated), sizeof(updated));
+    out.write(reinterpret_cast<const char *>(&garbage), sizeof(garbage));
+  }
+
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+
+  const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);
+  GTEST_ASSERT_EQ(filesize(path + ".shadow"), expectedShadowSize);
+
+  BYTE record = 0;
+  // Updated value should still be available from the valid shadow entry
+  GTEST_ASSERT_EQ(shd->read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x99);
+
+  // Position without shadow update should still be read from main file
+  GTEST_ASSERT_EQ(shd->read(&record, 1), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x20);
+}

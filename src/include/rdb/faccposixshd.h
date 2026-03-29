@@ -27,6 +27,9 @@ namespace rdb {
 /// (truncate po merge).
 /// - w operacji truncate (write z nullptr i position 0) czyścić zarówno główny plik jak i plik cienia.
 /// - zwracać liczbę rekordów wyłącznie na podstawie głównego pliku (count), niezależnie od zawartości pliku cienia.
+/// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
+/// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych
+/// między uruchomieniami programu
 
 class posixBinaryFileWithShadow : public FileInterface {
   std::string filename_;
