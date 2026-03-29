@@ -133,8 +133,8 @@ TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
 }
 
 // Verify segment rotation evicts oldest segment when segment count exceeds limit.
-// Rotation triggers when writeCount_ > capacity. The record that triggers rotation
-// is written to the new segment (not the old one).
+// Rotation triggers when the current segment reaches capacity. The next record
+// is written to the new segment.
 TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   BYTE record;
 
@@ -144,9 +144,9 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
   // Write 6 records with capacity=2:
-  // segment_0: [1,2]   (rotation triggered by record 3, which goes to segment_1)
-  // segment_1: [3,4,5] (rotation triggered by record 6, which goes to segment_2; segment_0 evicted)
-  // segment_2: [6]
+  // segment_0: [1,2]
+  // segment_1: [3,4]
+  // segment_2: [5,6] and segment_0 is evicted (silos_count=2)
   for (BYTE i = 1; i <= 6; i++) {
     record = i;
     gfa->write(&record);
@@ -157,8 +157,8 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   // segment_0 should be evicted (vec_.size() exceeded silos_count)
   GTEST_ASSERT_EQ(mapOfFiles.count(sandboxPath("test_file_segment_0")), 0);
 
-  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({3, 4, 5}));
-  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({6}));
+  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({3, 4}));
+  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({5, 6}));
 }
 
 // Verify rotation removes shadow file for evicted segment as well.
@@ -276,7 +276,6 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
 }
 
 // Verify count compensates for removed segments after rotation.
-// With capacity=2, rotation triggers at writeCount > 2, so each segment holds 3 records.
 TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   BYTE record;
 
@@ -285,9 +284,10 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   auto retention              = rdb::retention_t{silos_count, silos_size};
   auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
 
-  // Write 8 records with capacity=3 (rotation at writeCount > 3):
-  // segment_0: [1,2,3,4] (4 records)
-  // segment_1: [5,6,7,8] (4 records) -> segment_0 evicted (silos_count=2)
+  // Write 8 records with capacity=3:
+  // segment_0: [1,2,3]
+  // segment_1: [4,5,6]
+  // segment_2: [7,8] and segment_0 evicted (silos_count=2)
   for (BYTE i = 1; i <= 8; i++) {
     record = i;
     gfa->write(&record);
@@ -295,6 +295,25 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
 
   // count() = remaining segment counts + removedSegments * capacity
   GTEST_ASSERT_EQ(gfa->count(), 8);
+}
+
+// Verify reads and updates into already removed global positions fail safely.
+TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
+  BYTE record;
+
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 2;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+
+  for (BYTE i = 1; i <= 6; i++) {
+    record = i;
+    gfa->write(&record);
+  }
+
+  record = 99;
+  GTEST_ASSERT_NE(gfa->read(&record, 0), 0);
+  GTEST_ASSERT_NE(gfa->write(&record, 0), 0);
 }
 
 // ============================================================
