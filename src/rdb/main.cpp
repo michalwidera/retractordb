@@ -109,9 +109,9 @@ int main(int argc, char *argv[]) {
       }
       auto oldPos = file.find(".old");
       if (oldPos != std::string::npos) {
-        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam);
+        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam, "DEFAULT");
       } else
-        dacc = std::make_unique<rdb::storage>(file, file, storageParam);
+        dacc = std::make_unique<rdb::storage>(file, file, storageParam, "DEFAULT");
       assert(dacc != nullptr);
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist

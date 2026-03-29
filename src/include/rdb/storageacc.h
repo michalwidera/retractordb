@@ -32,7 +32,7 @@ class storage {
   std::string descriptorFile_ = "";
   std::string storageFile_    = "";
   std::string metaIndexFile_  = "";  // file path for saving/loading the meta index
-  std::string storageType_    = "DEFAULT";
+  std::string storageType_    = "";
   int percounter_             = -1;
 
   void moveRef();
@@ -47,12 +47,13 @@ class storage {
 
  public:
   storage() = delete;
-  explicit storage(const std::string_view qryID,         //
-                   const std::string_view fileName,      //
-                   const std::string_view storageParam,  //
-                   bool oneShot   = false,               //
-                   bool isHold    = false,               //
-                   int percounter = -1                   //
+  explicit storage(const std::string_view qryID,                    //
+                   const std::string_view fileName,                 //
+                   const std::string_view storageParam,             //
+                   const std::string_view storageType = "DEFAULT",  //
+                   bool oneShot                       = false,      //
+                   bool isHold                        = false,      //
+                   int percounter                     = -1          //
   );
   virtual ~storage();
 

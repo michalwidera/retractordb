@@ -16,6 +16,7 @@ bool isOpen(const storageState val) { return (val == storageState::openAndCreate
 storage::storage(const std::string_view qryID,         //
                  const std::string_view fileName,      //
                  const std::string_view storageParam,  //
+                 const std::string_view storageType,   //
                  bool oneShot,                         //
                  bool isHold,                          //
                  int percounter)
@@ -23,7 +24,8 @@ storage::storage(const std::string_view qryID,         //
       storageFile_(fileName),
       percounter_(percounter),
       isOneShot_(oneShot),
-      isHold_(isHold) {
+      isHold_(isHold),
+      storageType_(storageType) {
   assert(!qryID.empty());
   assert(!fileName.empty());
 

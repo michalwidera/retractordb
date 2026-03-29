@@ -1,4 +1,4 @@
-out1(1/2)
+out1(1/2)	out1_file.dat
 	:- PUSH_STREAM(datasrc)
 	datasrc_0: INTEGER
 		PUSH_ID(out1[0])
