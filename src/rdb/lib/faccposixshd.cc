@@ -152,10 +152,8 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const size_t po
 
   if (ptrData == nullptr && position == 0) {
     // Truncate — czyści oba pliki
-    auto result = ::ftruncate(fd, 0);
-    assert(result != -1);
-    result = ::ftruncate(fd_shadow, 0);
-    assert(result != -1);
+    std::filesystem::remove(name());
+    std::filesystem::remove(name() + ".shadow");
     return EXIT_SUCCESS;
   }
 
@@ -248,11 +246,14 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, const size_t position)
 }
 
 size_t posixBinaryFileWithShadow::count() {
+  if (!std::filesystem::exists(filename_)) {
+    return 0;
+  }
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
   if (rc != 0) {
     SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
-    return -1;
+    return 0;
   }
   return stat_buf.st_size / recordSize_;
 }

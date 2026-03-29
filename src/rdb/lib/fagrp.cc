@@ -106,8 +106,7 @@ auto groupFile::name() -> std::string & {
 
 ssize_t groupFile::purge() {
   for (auto &v : vec_) {
-    std::filesystem::remove(v->name());
-    std::filesystem::remove(v->name() + ".shadow");
+    v->write(nullptr, 0);  // purge files using special write command - this deltes the files
   }
   vec_.clear();
 

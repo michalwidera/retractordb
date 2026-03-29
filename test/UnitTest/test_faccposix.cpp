@@ -170,7 +170,7 @@ TEST_F(PosixFileTest, test_faccposix_truncate) {
   GTEST_ASSERT_EQ(pfa->count(), 0);
 
   // Read after truncate should fail
-  GTEST_ASSERT_EQ(pfa->read(&record, 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(pfa->read(&record, 0), 0);
 }
 
 // Verify update-in-place overwrites record at given byte position

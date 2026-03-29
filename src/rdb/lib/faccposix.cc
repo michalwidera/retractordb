@@ -82,9 +82,9 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
 
   if (ptrData == nullptr && position == 0) {
     // nullptr, position 0,0 - truncate file.
-    auto result = ::ftruncate(fd, 0);
-    assert(result != -1);
-    return errno;
+    std::filesystem::remove(name());
+    
+    return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
     auto result = ::lseek(fd, 0, SEEK_END);
@@ -138,6 +138,9 @@ ssize_t posixBinaryFile::read(uint8_t *ptrData, const size_t position) {
 }
 
 size_t posixBinaryFile::count() {
+  if (!std::filesystem::exists(filename_)) {
+    return 0;
+  }
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
   if (rc != 0) {
