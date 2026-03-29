@@ -13,10 +13,15 @@ using namespace boost;
 using std::map;
 using std::set;
 
-/**
- * This class is designed to time management and scheduling task
- * Note: This is complicated
- */
+/// @brief Klasa TimeLine wyznacza kolejne przedziały czasowe. 
+///
+/// Obiekt klasy TimeLine powinien:
+/// - być inicjalizowany zbiorem czasów między kolejnymi zdarzeniami.
+/// - dostarczać funkcji zwracającej najbliższy kolejny termin w systemie odstępów czasów.
+/// - być zabezpieczony przed kopiowaniem.
+/// - być używany do zarządzania i synchronizacji zdarzeń w systemie.
+/// - dostarczać funkcji sprawdzającej, czy dany odstęp czasowy jest oczekiwany w bieżącym przedziale czasowym.
+
 class TimeLine : private boost::noncopyable {
   /** Set of _SORTED_ deltas */
   set<rational<int>> sr_;
@@ -35,7 +40,7 @@ class TimeLine : private boost::noncopyable {
    * Times that are multiplicity of other values are removed
    * Prepared list is then taken as argument by getNextTimeSlot function
    */
-  explicit TimeLine(set<rational<int>> const &inSet);
+  explicit TimeLine(set<boost::rational<int>> const &inSet);
   TimeLine() = delete;
 
   /** Function return true if given delta is in current time slot

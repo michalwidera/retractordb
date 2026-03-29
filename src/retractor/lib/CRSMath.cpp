@@ -34,6 +34,7 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) {
 }
 
 bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDelta) {
+  if (inDelta == boost::rational<int>(0)) return false;
   boost::rational<int> value = ctSlot_ / inDelta;
   return (value.denominator() == 1);
 }
