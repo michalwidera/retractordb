@@ -41,6 +41,8 @@ int main(int argc, char *argv[]) {
 
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
 
+  std::string storagePolicy = "DEFAULT";
+
   if (argc == 2 && strcmp(argv[1], "-h") == 0) {
     std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
     std::cout << config_line << std::endl;
@@ -101,6 +103,11 @@ int main(int argc, char *argv[]) {
       std::cin >> storageParam;
       continue;
     }
+    if (cmd == "policy") {
+      std::cin >> storagePolicy;
+      std::transform(storagePolicy.begin(), storagePolicy.end(), storagePolicy.begin(), ::toupper);
+      continue;
+    }
     if (cmd == "open") {
       std::cin >> file;
       if (file.find('{') != std::string::npos) {
@@ -109,9 +116,9 @@ int main(int argc, char *argv[]) {
       }
       auto oldPos = file.find(".old");
       if (oldPos != std::string::npos) {
-        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam, "DEFAULT");
+        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam, storagePolicy);
       } else
-        dacc = std::make_unique<rdb::storage>(file, file, storageParam, "DEFAULT");
+        dacc = std::make_unique<rdb::storage>(file, file, storageParam, storagePolicy);
       assert(dacc != nullptr);
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
