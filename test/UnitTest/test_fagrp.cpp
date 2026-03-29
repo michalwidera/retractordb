@@ -337,6 +337,47 @@ TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   GTEST_ASSERT_NE(gfa->write(&record, 0), 0);
 }
 
+// Verify object state is restored after restart and append continues from restored state.
+TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
+  BYTE record;
+
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 3;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+
+  {
+    auto gfa = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+    for (BYTE i = 1; i <= 5; i++) {
+      record = i;
+      GTEST_ASSERT_EQ(gfa->write(&record), 0);
+    }
+    GTEST_ASSERT_EQ(gfa->count(), 5);
+  }
+
+  {
+    auto gfa = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+    GTEST_ASSERT_EQ(gfa->count(), 5);
+
+    // Verify data persisted and is readable by global position after restart.
+    for (BYTE i = 0; i < 5; i++) {
+      GTEST_ASSERT_EQ(gfa->read(&record, i), 0);
+      GTEST_ASSERT_EQ(record, i + 1);
+    }
+
+    // Continue appending after restart and verify rotation is based on restored writeCount_.
+    record = 6;
+    GTEST_ASSERT_EQ(gfa->write(&record), 0);
+    record = 7;
+    GTEST_ASSERT_EQ(gfa->write(&record), 0);
+
+    auto mapOfFiles = collectFiles();
+    GTEST_ASSERT_EQ(mapOfFiles.count(sandboxPath("test_file_segment_0")), 0);
+    GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({4, 5, 6}));
+    GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({7}));
+    GTEST_ASSERT_EQ(gfa->count(), 7);
+  }
+}
+
 // ============================================================
 // retention_t tests
 // ============================================================

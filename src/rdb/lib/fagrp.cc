@@ -65,9 +65,26 @@ groupFile::groupFile(const std::string_view fileName,  //
     }
 
     std::sort(existingSegments.begin(), existingSegments.end());
+    existingSegments.erase(std::unique(existingSegments.begin(), existingSegments.end()), existingSegments.end());
 
-    removedSegments_ = existingSegments.front();
-    for (const auto i : existingSegments) {
+    // Restore only a contiguous suffix ending at the latest segment. This guarantees
+    // global-position mapping remains valid after restart even if older files are missing.
+    auto firstContiguousIdx = existingSegments.size() - 1;
+    while (firstContiguousIdx > 0) {
+      if (existingSegments[firstContiguousIdx - 1] + 1 != existingSegments[firstContiguousIdx]) {
+        break;
+      }
+      --firstContiguousIdx;
+    }
+
+    std::vector<size_t> restoredSegments(existingSegments.begin() + firstContiguousIdx, existingSegments.end());
+
+    if (retention_.segments != 0 && restoredSegments.size() > retention_.segments) {
+      restoredSegments.erase(restoredSegments.begin(), restoredSegments.begin() + (restoredSegments.size() - retention_.segments));
+    }
+
+    removedSegments_ = restoredSegments.front();
+    for (const auto i : restoredSegments) {
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
