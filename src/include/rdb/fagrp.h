@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "faccposix.h"
 #include "faccposixshd.h"
 #include "retention.h"
 
@@ -18,10 +19,12 @@
 /// - zapewniać, że operacje odczytu i zapisu są poprawnie kierowane do segmentów zgodnie z ustawieniami retencji.
 /// - zarządzać stanem segmentów i ich rotacją w sposób spójny z polityką retencji.
 /// - umożliwiać odczyt liczby zapisanych rekordów, uwzględniając usunięte segmenty.
-/// - umożliwiać zapis danych w trybie aktualizacji (update-in-place) w ramach segmentu, jeśli pozycja jest określona.  
+/// - umożliwiać zapis danych w trybie aktualizacji (update-in-place) w ramach segmentu, jeśli pozycja jest określona.
 /// - zapewniać, że nazwa zwracana przez name() jest zgodna z aktualnym segmentem, jeśli retencja jest włączona, lub podstawową nazwą pliku, jeśli retencja jest wyłączona.
 /// - w przypadku żądania zapisu danych z nullptr i position 0, usuwać wszystkie segmenty i ich pliki cienia, resetując stan grupy do początkowego.
 namespace rdb {
+
+template <typename T = posixBinaryFileWithShadow>
 class groupFile : public FileInterface {
   std::string filename_;
   std::string currentFilename_;
@@ -29,7 +32,7 @@ class groupFile : public FileInterface {
 
   retention_t retention_{0, 0};
 
-  std::vector<std::unique_ptr<posixBinaryFileWithShadow>> vec_;
+  std::vector<std::unique_ptr<T>> vec_;
 
   size_t writeCount_     = 0;
   size_t currentSegment_ = 0;
@@ -49,4 +52,7 @@ class groupFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
 };
+
+template class groupFile<posixBinaryFileWithShadow>;
+template class groupFile<posixBinaryFile>;
 }  // namespace rdb

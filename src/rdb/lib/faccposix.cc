@@ -83,7 +83,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
   if (ptrData == nullptr && position == 0) {
     // nullptr, position 0,0 - truncate file.
     std::filesystem::remove(name());
-    
+
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {

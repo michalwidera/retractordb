@@ -34,11 +34,11 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 }
 
 // fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
-
-groupFile::groupFile(const std::string_view fileName,  //
-                     const ssize_t recordSize,         //
-                     const retention_t &retention,     //
-                     int percounter)                   //
+template <typename T>
+groupFile<T>::groupFile(const std::string_view fileName,  //
+                        const ssize_t recordSize,         //
+                        const retention_t &retention,     //
+                        int percounter)                   //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       retention_(retention),
@@ -47,7 +47,7 @@ groupFile::groupFile(const std::string_view fileName,  //
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
 
   if (retention.noRetention()) {
-    vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
   } else {
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? 8 : retention_.segments);
@@ -80,23 +80,25 @@ groupFile::groupFile(const std::string_view fileName,  //
     std::vector<size_t> restoredSegments(existingSegments.begin() + firstContiguousIdx, existingSegments.end());
 
     if (retention_.segments != 0 && restoredSegments.size() > retention_.segments) {
-      restoredSegments.erase(restoredSegments.begin(), restoredSegments.begin() + (restoredSegments.size() - retention_.segments));
+      restoredSegments.erase(restoredSegments.begin(),
+                             restoredSegments.begin() + (restoredSegments.size() - retention_.segments));
     }
 
     removedSegments_ = restoredSegments.front();
     for (const auto i : restoredSegments) {
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-      vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
+      vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
       SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount_ = vec_.back()->count();
     }
   }
 }
+template <typename T>
+groupFile<T>::~groupFile() {}
 
-groupFile::~groupFile() {}
-
-auto groupFile::name() -> std::string & {
+template <typename T>
+auto groupFile<T>::name() -> std::string & {
   if (retention_.noRetention()) {
     // pottenially consider change filename storage file here.
     return filename_;
@@ -104,7 +106,8 @@ auto groupFile::name() -> std::string & {
   return currentFilename_;
 }
 
-ssize_t groupFile::purge() {
+template <typename T>
+ssize_t groupFile<T>::purge() {
   for (auto &v : vec_) {
     v->write(nullptr, 0);  // purge files using special write command - this deltes the files
   }
@@ -115,7 +118,7 @@ ssize_t groupFile::purge() {
   currentSegment_  = 0;
   removedSegments_ = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-  vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
+  vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
 
   spdlog::info("Purged all segments and reset group state.");
   assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
@@ -124,7 +127,8 @@ ssize_t groupFile::purge() {
   return EXIT_SUCCESS;
 }
 
-ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
+template <typename T>
+ssize_t groupFile<T>::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
 
   // Keep backward compatibility: special write request triggers full purge.
@@ -144,7 +148,7 @@ ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
 
       spdlog::info("Rotating segments: currentSegment={}", currentSegment_);
 
-      vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
+      vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
       writeCount_ = 0;
 
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
@@ -180,7 +184,8 @@ ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
   return vec_[localSegmentIndex]->write(ptrData, positionInSegment);
 }
 
-ssize_t groupFile::read(uint8_t *ptrData, const size_t position) {
+template <typename T>
+ssize_t groupFile<T>::read(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   if (retention_.noRetention()) return vec_[0]->read(ptrData, position);
 
@@ -201,7 +206,8 @@ ssize_t groupFile::read(uint8_t *ptrData, const size_t position) {
   return vec_[localSegmentIndex]->read(ptrData, positionInSegment);
 }
 
-size_t groupFile::count() {
+template <typename T>
+size_t groupFile<T>::count() {
   size_t sumCount = 0;
   for (auto &v : vec_)
     sumCount += v->count();

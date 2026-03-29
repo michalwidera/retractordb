@@ -85,7 +85,7 @@ TEST_F(GroupFileTest, test_fagrp_no_retention) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   record = 11;
   gfa->write(&record);
@@ -107,7 +107,7 @@ TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   // Write 6 records across 2 segments of capacity 3
   for (BYTE i = 1; i <= 6; i++) {
@@ -141,7 +141,7 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 2;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   // Write 6 records with capacity=2:
   // segment_0: [1,2]
@@ -168,7 +168,7 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation_removes_shadow) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 2;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   // Keep writing so segment_0 gets evicted when segment_2 is created.
   for (BYTE i = 1; i <= 2; i++) {
@@ -194,7 +194,7 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   for (BYTE i = 1; i <= 6; i++) {
     record = i;
@@ -221,7 +221,7 @@ TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   record = 11;
   gfa->write(&record);
@@ -240,7 +240,7 @@ TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
 // Verify name() returns base filename in no-retention mode
 TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   EXPECT_EQ(gfa->name(), "test_file");
 }
@@ -248,7 +248,7 @@ TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
 // Verify name() returns segment filename in retention mode
 TEST_F(GroupFileTest, test_fagrp_name_retention) {
   auto retention = rdb::retention_t{2, 3};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   EXPECT_EQ(gfa->name(), "test_file_segment_0");
 }
@@ -256,7 +256,7 @@ TEST_F(GroupFileTest, test_fagrp_name_retention) {
 // Verify count is 0 for freshly created group accessor
 TEST_F(GroupFileTest, test_fagrp_empty_count) {
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   GTEST_ASSERT_EQ(gfa->count(), 0);
 }
@@ -266,7 +266,7 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   record = 10;
   gfa->write(&record);
@@ -303,7 +303,7 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   // Write 8 records with capacity=3:
   // segment_0: [1,2,3]
@@ -325,7 +325,7 @@ TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 2;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   for (BYTE i = 1; i <= 6; i++) {
     record = i;
@@ -346,7 +346,7 @@ TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
   auto retention              = rdb::retention_t{silos_count, silos_size};
 
   {
-    auto gfa = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+    auto gfa = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
     for (BYTE i = 1; i <= 5; i++) {
       record = i;
       GTEST_ASSERT_EQ(gfa->write(&record), 0);
@@ -355,7 +355,7 @@ TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
   }
 
   {
-    auto gfa = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+    auto gfa = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
     GTEST_ASSERT_EQ(gfa->count(), 5);
 
     // Verify data persisted and is readable by global position after restart.
