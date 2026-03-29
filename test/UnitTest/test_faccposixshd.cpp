@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -15,6 +16,37 @@ typedef unsigned char BYTE;
 
 // Source under test:
 // src/rdb/lib/faccposixshd.cc
+
+// --- Linker-level interposition via --wrap ---
+// g_pread_eintr_count / g_write_eintr_count control how many
+// consecutive EINTR errors the wrapped syscall will produce
+// before delegating to the real implementation.
+
+static thread_local int g_pread_eintr_count = 0;
+static thread_local int g_write_eintr_count = 0;
+
+extern "C" {
+ssize_t __real_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t __real_write(int fd, const void *buf, size_t count);
+
+ssize_t __wrap_pread(int fd, void *buf, size_t count, off_t offset) {
+  if (g_pread_eintr_count > 0) {
+    --g_pread_eintr_count;
+    errno = EINTR;
+    return -1;
+  }
+  return __real_pread(fd, buf, count, offset);
+}
+
+ssize_t __wrap_write(int fd, const void *buf, size_t count) {
+  if (g_write_eintr_count > 0) {
+    --g_write_eintr_count;
+    errno = EINTR;
+    return -1;
+  }
+  return __real_write(fd, buf, count);
+}
+}
 
 // --- Helpers ---
 
@@ -38,6 +70,8 @@ class ShadowFileTest : public ::testing::Test {
   const size_t recsize                      = sizeof(BYTE);
 
   void SetUp() override {
+    g_pread_eintr_count = 0;
+    g_write_eintr_count = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -51,6 +85,8 @@ class ShadowFileTest : public ::testing::Test {
   }
 
   void TearDown() override {
+    g_pread_eintr_count = 0;
+    g_write_eintr_count = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -531,4 +567,79 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file
   // Position without shadow update should still be read from main file
   GTEST_ASSERT_EQ(shd->read(&record, 1), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x20);
+}
+
+// shadow read(): EINTR within retry limit on fallback pread
+TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_ok"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append to main
+
+  g_pread_eintr_count = 4;  // 4 failures, 5th succeeds
+  uint8_t result      = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xAA);
+}
+
+// shadow read(): EINTR exceeding retry limit on fallback pread
+TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_fail"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append to main
+
+  g_pread_eintr_count = 10;  // well above maxRetries
+  uint8_t result      = 0;
+  ASSERT_NE(pfa->read(&result, 0), EXIT_SUCCESS);
+}
+
+// shadow append write(): EINTR within retry limit
+TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_ok"), sizeof(uint8_t));
+
+  g_write_eintr_count = 5;  // retries 1..5, 6th succeeds
+  uint8_t data        = 0xBB;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append (position = max)
+
+  uint8_t result = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xBB);
+}
+
+// shadow append write(): EINTR exceeding retry limit
+TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_fail"), sizeof(uint8_t));
+
+  g_write_eintr_count = 10;
+  uint8_t data        = 0xCC;
+  ASSERT_NE(pfa->write(&data), EXIT_SUCCESS);  // append should fail
+}
+
+// shadow update write(): keeps behavior for update path in shadow file
+TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_ok"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  g_write_eintr_count = 0;
+  data                = 0xDD;
+  ASSERT_EQ(pfa->write(&data, 0), EXIT_SUCCESS);
+
+  uint8_t result = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xDD);
+}
+
+// shadow update write(): EINTR exceeding retry limit
+TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_fail"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  g_write_eintr_count = 10;
+  data                = 0xEE;
+  ASSERT_NE(pfa->write(&data, 0), EXIT_SUCCESS);
 }

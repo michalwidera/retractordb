@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -15,6 +16,37 @@ typedef unsigned char BYTE;
 
 // Source under test:
 // src/rdb/lib/faccposix.cc
+
+// --- Linker-level interposition via --wrap ---
+// g_pread_eintr_count / g_write_eintr_count control how many
+// consecutive EINTR errors the wrapped syscall will produce
+// before delegating to the real implementation.
+
+static thread_local int g_pread_eintr_count = 0;
+static thread_local int g_write_eintr_count = 0;
+
+extern "C" {
+ssize_t __real_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t __real_write(int fd, const void *buf, size_t count);
+
+ssize_t __wrap_pread(int fd, void *buf, size_t count, off_t offset) {
+  if (g_pread_eintr_count > 0) {
+    --g_pread_eintr_count;
+    errno = EINTR;
+    return -1;
+  }
+  return __real_pread(fd, buf, count, offset);
+}
+
+ssize_t __wrap_write(int fd, const void *buf, size_t count) {
+  if (g_write_eintr_count > 0) {
+    --g_write_eintr_count;
+    errno = EINTR;
+    return -1;
+  }
+  return __real_write(fd, buf, count);
+}
+}
 
 // --- Helpers ---
 
@@ -43,6 +75,8 @@ class PosixFileTest : public ::testing::Test {
   const size_t recsize                      = sizeof(BYTE);
 
   void SetUp() override {
+    g_pread_eintr_count = 0;
+    g_write_eintr_count = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -56,6 +90,8 @@ class PosixFileTest : public ::testing::Test {
   }
 
   void TearDown() override {
+    g_pread_eintr_count = 0;
+    g_write_eintr_count = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -225,4 +261,51 @@ TEST_F(PosixFileTest, test_faccposix_persistence) {
 
   GTEST_ASSERT_EQ(pfa2->read(&record, 1), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x43);
+}
+
+// read(): EINTR within retry limit (4 failures, 5th attempt succeeds)
+TEST_F(PosixFileTest, test_faccposix_read_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_r_ok"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  g_pread_eintr_count = 4;  // maxRetries is 5 -> 4 failures + 1 success
+  uint8_t result      = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xAA);
+}
+
+// read(): EINTR exceeding retry limit (all 5 attempts are EINTR)
+TEST_F(PosixFileTest, test_faccposix_read_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_r_fail"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  g_pread_eintr_count = 10;  // well above maxRetries
+  uint8_t result      = 0;
+  ASSERT_NE(pfa->read(&result, 0), EXIT_SUCCESS);
+}
+
+// write(): EINTR within retry limit (5 failures, 6th attempt succeeds)
+TEST_F(PosixFileTest, test_faccposix_write_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_w_ok"), sizeof(uint8_t));
+
+  g_write_eintr_count = 5;  // maxRetries is 5 -> retries 1..5 allowed, 6th succeeds
+  uint8_t data        = 0xBB;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  uint8_t result = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xBB);
+}
+
+// write(): EINTR exceeding retry limit (6+ failures -> gives up)
+TEST_F(PosixFileTest, test_faccposix_write_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_w_fail"), sizeof(uint8_t));
+
+  g_write_eintr_count = 10;  // well above maxRetries
+  uint8_t data        = 0xCC;
+  ASSERT_NE(pfa->write(&data), EXIT_SUCCESS);
 }
