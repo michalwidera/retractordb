@@ -204,7 +204,7 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-STRING_PROFILE:    '\'' ('MEMORY'|'memory'|'DEFAULT'|'default'|'DEFAULT_SHD'|'default_shd'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource') '\'';
+STRING_PROFILE:    '\'' ('MEMORY'|'memory'|'DEFAULT'|'default'|'SHADOW'|'shadow'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource') '\'';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
