@@ -25,6 +25,66 @@ extern dataModel *pProc;
 
 qTree coreInstance;
 
+namespace {
+
+TEST(TimeLineUnitTest, GeneratesNearestNextTermsForSimpleDeltas) {
+  set<boost::rational<int>> deltas = {
+      boost::rational<int>(1, 2),
+      boost::rational<int>(3, 4),
+  };
+
+  TimeLine tl(deltas);
+
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 2));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 4));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 1));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 2));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(2, 1));
+}
+
+TEST(TimeLineUnitTest, FiltersOutNaturalMultiplesFromInputSet) {
+  set<boost::rational<int>> deltas = {
+      boost::rational<int>(1, 1),
+      boost::rational<int>(4, 1),
+      boost::rational<int>(1, 2),
+      boost::rational<int>(3, 4),
+  };
+
+  TimeLine tl(deltas);
+
+  // Expected behavior from constructor comments: {1, 4, 1/2, 3/4} -> {1/2, 3/4}.
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 2));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 4));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 1));
+}
+
+TEST(TimeLineUnitTest, AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta) {
+  set<boost::rational<int>> deltas = {
+      boost::rational<int>(1, 2),
+      boost::rational<int>(3, 4),
+      boost::rational<int>(1, 1),
+  };
+
+  TimeLine tl(deltas);
+
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(0, 1)));
+
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 2));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(3, 4)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(0, 1)));
+
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 4));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(3, 4)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
+
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 1));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 2)));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
+}
+
 const int TEST_COUNT = 15;
 
 // std::unique_ptr<dataModel> dataArea;
@@ -41,7 +101,6 @@ struct crsMathTestInit {
 
 } crsMathTestInstance_;
 
-namespace {
 class crsMathTest : public ::testing::Test {
  protected:
   crsMathTest() {}
