@@ -77,8 +77,10 @@ ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
 
   // Purge operation
   if (ptrData == nullptr && position == 0) {
-    for (auto &v : vec_)
+    for (auto &v : vec_) {
       std::filesystem::remove(v->name());
+      std::filesystem::remove(v->name() + ".shadow");
+    }
     vec_.clear();
 
     // Reset state
@@ -110,6 +112,7 @@ ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
       auto segmentToRemove = vec_.front()->name();
       spdlog::info("Removing oldest segment: {}", segmentToRemove);
       std::filesystem::remove(segmentToRemove);
+      std::filesystem::remove(segmentToRemove + ".shadow");
       vec_.erase(vec_.begin());
       removedSegments_++;
       assert(vec_.size() > 0);

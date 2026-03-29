@@ -161,6 +161,32 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({6}));
 }
 
+// Verify rotation removes shadow file for evicted segment as well.
+TEST_F(GroupFileTest, test_fagrp_segment_rotation_removes_shadow) {
+  BYTE record;
+
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 2;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+
+  // Keep writing so segment_0 gets evicted when segment_2 is created.
+  for (BYTE i = 1; i <= 2; i++) {
+    record = i;
+    gfa->write(&record);
+  }
+
+  GTEST_ASSERT_TRUE(std::filesystem::exists(sandboxPath("test_file_segment_0.shadow")));
+
+  for (BYTE i = 3; i <= 6; i++) {
+    record = i;
+    gfa->write(&record);
+  }
+
+  GTEST_ASSERT_FALSE(std::filesystem::exists(sandboxPath("test_file_segment_0")));
+  GTEST_ASSERT_FALSE(std::filesystem::exists(sandboxPath("test_file_segment_0.shadow")));
+}
+
 // Verify purge clears all segments and resets state
 TEST_F(GroupFileTest, test_fagrp_purge) {
   BYTE record;
