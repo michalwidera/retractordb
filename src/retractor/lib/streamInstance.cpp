@@ -23,7 +23,8 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   if (pCounterPtr) percounter = pCounterPtr->getCount();
 
   inputPayload  = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
-  outputPayload = std::make_unique<rdb::storage>(qry.id, storageName, storagePathParam, qry.storage_policy, qry.isOneShot, qry.isHold, percounter);
+  outputPayload = std::make_unique<rdb::storage>(qry.id, storageName, storagePathParam, qry.storage_policy, qry.isOneShot,
+                                                 qry.isHold, percounter);
 
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
