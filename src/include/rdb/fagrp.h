@@ -44,6 +44,7 @@ class groupFile : public FileInterface {
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  ssize_t purge();
 
   auto name() -> std::string & override;
   size_t count() override;

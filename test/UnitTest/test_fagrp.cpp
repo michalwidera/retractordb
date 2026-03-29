@@ -203,8 +203,8 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
 
   GTEST_ASSERT_EQ(gfa->count(), 6);
 
-  // Purge all segments (write nullptr at position 0)
-  gfa->write(nullptr, 0);
+  // Purge all segments using explicit API
+  gfa->purge();
   GTEST_ASSERT_EQ(gfa->count(), 0);
 
   // Should be able to write new records after purge
@@ -214,6 +214,27 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
 
   gfa->read(&record, 0);
   GTEST_ASSERT_EQ(record, 42);
+}
+
+// Verify purge API works in no-retention mode as well.
+TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
+  BYTE record;
+
+  auto retention = rdb::retention_t{0, 0};
+  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+
+  record = 11;
+  gfa->write(&record);
+  record = 12;
+  gfa->write(&record);
+  GTEST_ASSERT_EQ(gfa->count(), 2);
+
+  gfa->purge();
+  GTEST_ASSERT_EQ(gfa->count(), 0);
+
+  auto mapOfFiles = collectFiles();
+  GTEST_ASSERT_EQ(mapOfFiles.size(), 1);
+  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file")].sizeFromSystem, 0);
 }
 
 // Verify name() returns base filename in no-retention mode

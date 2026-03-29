@@ -87,32 +87,38 @@ auto groupFile::name() -> std::string & {
   return currentFilename_;
 }
 
+ssize_t groupFile::purge() {
+  for (auto &v : vec_) {
+    std::filesystem::remove(v->name());
+    std::filesystem::remove(v->name() + ".shadow");
+  }
+  vec_.clear();
+
+  // Reset state
+  writeCount_      = 0;
+  currentSegment_  = 0;
+  removedSegments_ = 0;
+  currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
+  vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
+
+  spdlog::info("Purged all segments and reset group state.");
+  assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
+  assert(vec_[0]->count() == 0 && "After purge, the segment should be empty.");
+
+  return EXIT_SUCCESS;
+}
+
 ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
+
+  // Keep backward compatibility: special write request triggers full purge.
+  if (ptrData == nullptr && position == 0) {
+    return purge();
+  }
 
   if (retention_.noRetention()) return vec_[0]->write(ptrData, position);
 
   assert(retention_.capacity != 0);
-
-  // Purge operation
-  if (ptrData == nullptr && position == 0) {
-    for (auto &v : vec_) {
-      std::filesystem::remove(v->name());
-      std::filesystem::remove(v->name() + ".shadow");
-    }
-    vec_.clear();
-
-    // Reset state
-    writeCount_      = 0;
-    currentSegment_  = 0;
-    currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-    vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
-    removedSegments_ = 0;
-    spdlog::info("Purged all segments, current segment is now 0.");
-    assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
-    assert(vec_[0]->count() == 0 && "After purge, the segment should be empty.");
-    return 0;
-  }
 
   if (position == std::numeric_limits<size_t>::max()) {
     if (writeCount_ >= retention_.capacity) {
