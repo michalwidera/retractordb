@@ -27,7 +27,7 @@ groupFile::groupFile(const std::string_view fileName,  //
   writeCount_      = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
   if (retention.noRetention()) {
-    vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
   } else {
     auto min = std::numeric_limits<size_t>::max();
     auto max = std::numeric_limits<size_t>::min();
@@ -49,7 +49,7 @@ groupFile::groupFile(const std::string_view fileName,  //
     for (auto i = min; i <= max; ++i) {
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-      vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
+      vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
       SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount_ = vec_.back()->count();
     }
@@ -85,7 +85,7 @@ ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
     writeCount_      = 0;
     currentSegment_  = 0;
     currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-    vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
     removedSegments_ = 0;
     spdlog::info("Purged all segments, current segment is now 0.");
     assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
@@ -102,7 +102,7 @@ ssize_t groupFile::write(const uint8_t *ptrData, const size_t position) {
 
     spdlog::info("Rotating segments: currentSegment={}", currentSegment_);
 
-    vec_.push_back(std::make_unique<posixBinaryFile>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<posixBinaryFileWithShadow>(name(), recordSize_, percounter_));
 
     writeCount_ = 0;
 

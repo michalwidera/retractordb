@@ -65,6 +65,9 @@ class GroupFileTest : public ::testing::Test {
   std::map<std::string, fileInfo> collectFiles() {
     std::map<std::string, fileInfo> mapOfFiles;
     for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
+      if (entry.path().filename().string().ends_with(".shadow")) {
+        continue;
+      }
       mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
     }
     return mapOfFiles;

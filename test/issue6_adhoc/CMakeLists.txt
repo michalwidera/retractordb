@@ -9,5 +9,5 @@ add_test(
     bash -c "set -e ; \
   chmod +x ./xlaunch.sh ; \
   ./xlaunch.sh ; \
-  ls temp > out-ls.txt ; \
+  ls temp | grep --invert-match '\\.shadow$' > out-ls.txt ; \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-ls.txt out-ls.txt")

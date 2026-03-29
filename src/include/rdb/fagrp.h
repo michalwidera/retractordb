@@ -3,11 +3,10 @@
 #include <memory>
 #include <vector>
 
-#include "faccposix.h"
+#include "faccposixshd.h"
 #include "retention.h"
 
 namespace rdb {
-
 class groupFile : public FileInterface {
   std::string filename_;
   std::string currentFilename_;
@@ -15,7 +14,7 @@ class groupFile : public FileInterface {
 
   retention_t retention_{0, 0};
 
-  std::vector<std::unique_ptr<posixBinaryFile>> vec_;
+  std::vector<std::unique_ptr<posixBinaryFileWithShadow>> vec_;
 
   size_t writeCount_     = 0;
   size_t currentSegment_ = 0;
