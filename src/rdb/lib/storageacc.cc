@@ -149,7 +149,7 @@ void storage::attachStorage() {
     SPDLOG_INFO("Storage type from descriptor {}", storageType_);
   }
 
-  initialize();
+  initializeAccessor();
 
   if (isDeclared()) {
     SPDLOG_INFO("records declared source on {}", storageFile_);
@@ -176,7 +176,7 @@ storage::~storage() {
 
 bool storage::isDeclared() { return (storageType_ == "DEVICE") || (storageType_ == "TEXTSOURCE"); }
 
-void storage::initialize() {
+void storage::initializeAccessor() {
   assert(storageFile_ != "");
   assert(storageType_ != "");
   auto size = descriptor.getSizeInBytes();
@@ -214,7 +214,7 @@ void storage::reset() {
   if (resourceAlreadyExist)
     if (!isDeclared()) remove(storageFile_.c_str());
 
-  initialize();
+  initializeAccessor();
 
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;
@@ -253,8 +253,6 @@ void storage::releaseOnHold() {
 }
 
 size_t storage::getRecordsCount() { return recordsCount_; }
-
-std::string storage::getStorageName() { return storageFile_; }
 
 void storage::abortIfStorageNotPrepared() {
   if (descriptor.empty()) {

@@ -41,7 +41,7 @@ class storage {
   boost::circular_buffer<rdb::payload> circularBuffer_{0};
 
   void abortIfStorageNotPrepared();
-  void initialize();
+  void initializeAccessor();
 
   std::unique_ptr<rdb::metaDataStream> metaDataStream_;
 
@@ -76,8 +76,6 @@ class storage {
   void releaseOnHold();
   size_t getRecordsCount();
   bool descriptorFileExist();
-
-  std::string getStorageName();
 
   bool isDeclared();
 
