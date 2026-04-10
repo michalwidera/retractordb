@@ -2,7 +2,19 @@
 
 if [ -z "$1" ]
   then
-    echo "No argument supplied. Try query-lnx.rql"
+    echo "No argument supplied. Try query-lnx.rql str2 str3"
+    exit 1
+fi
+
+if [ -z "$2" ]
+  then
+    echo "No argument supplied. Try query-lnx.rql str2 str3"
+    exit 1
+fi
+
+if [ -z "$3" ]
+  then
+    echo "No argument supplied. Try query-lnx.rql str2 str3"
     exit 1
 fi
 
@@ -17,8 +29,8 @@ xretractor $1 -m 8000 &
 sleep 1
 
 xqry -d
-xqry -s str2 -m 3
-xqry -s str2 -m 3
+xqry -s $2 -m 3
+xqry -s $3 -m 3
 xqry -l
 xqry -k
 
