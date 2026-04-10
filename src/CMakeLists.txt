@@ -100,7 +100,7 @@ set(CSTYLE
     KeepEmptyLinesAtTheStartOfBlocks: false,
     MaxEmptyLinesToKeep: 1,
     NamespaceIndentation: None,
-    ReflowComments: true,
+    ReflowComments: false,
     SeparateDefinitionBlocks: Leave,
     SortIncludes: CaseInsensitive,
     SpaceAfterTemplateKeyword: true,

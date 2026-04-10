@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <boost/system/error_code.hpp>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -39,6 +40,8 @@ int main(int argc, char *argv[]) {
   std::string BLINK  = "\x1b[5m";
 
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
+
+  std::string storagePolicy = "DEFAULT";
 
   if (argc == 2 && strcmp(argv[1], "-h") == 0) {
     std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
@@ -100,6 +103,11 @@ int main(int argc, char *argv[]) {
       std::cin >> storageParam;
       continue;
     }
+    if (cmd == "policy") {
+      std::cin >> storagePolicy;
+      std::transform(storagePolicy.begin(), storagePolicy.end(), storagePolicy.begin(), ::toupper);
+      continue;
+    }
     if (cmd == "open") {
       std::cin >> file;
       if (file.find('{') != std::string::npos) {
@@ -108,9 +116,9 @@ int main(int argc, char *argv[]) {
       }
       auto oldPos = file.find(".old");
       if (oldPos != std::string::npos) {
-        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam);
+        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam, storagePolicy);
       } else
-        dacc = std::make_unique<rdb::storage>(file, file, storageParam);
+        dacc = std::make_unique<rdb::storage>(file, file, storageParam, storagePolicy);
       assert(dacc != nullptr);
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
@@ -135,32 +143,35 @@ int main(int argc, char *argv[]) {
       if (dacc->isDeclared()) dacc->setCapacity(1);
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
-      std::cout << "exit|quit|q \t\t\t exit\n";
-      std::cout << "quitdrop|qd \t\t\t exit & drop artifacts\n";
-      std::cout << "open file [schema] \t\t open or create database with schema\n";
-      std::cout << "\t\t\t\t example: .open test_db { INTEGER dane STRING name[3] }\n";
-      std::cout << "storage [path] \t\t\t set storage path for database\n";
-      std::cout << "dropfile \t\t\t remove file from disk\n";
-      std::cout << "desc|descc \t\t\t show schema\n";
-      std::cout << "read|rread [n] \t\t\t read record from database into payload\n";
-      std::cout << "write [n] \t\t\t from payload send record to database\n";
-      std::cout << "purge \t\t\t\t remove all records from database\n";
-      std::cout << "append \t\t\t\t append payload to database\n";
-      std::cout << "set [field][value] \t\t set payload field value\n";
-      std::cout << "setpos [position][number value]\t set payload field number value\n";
-      std::cout << "status \t\t\t\t show status of payload\n";
-      std::cout << "rox \t\t\t\t remove on exit flip\n";
-      std::cout << "print|printt \t\t\t show payload\n";
-      std::cout << "list|rlist [value] \t\t print value records\n";
-      std::cout << "input [[field][value]] \t\t fill payload\n";
-      std::cout << "hex|dec \t\t\t type of input/output of byte/number fields\n";
-      std::cout << "size \t\t\t\t show database size in records\n";
-      std::cout << "cap [value]\t\t\t set device stream backread capacity\n";
-      std::cout << "lock|flux \t\t\t (un)lock circular backread buffer\n";
-      std::cout << "dump \t\t\t\t show payload memory\n";
-      std::cout << "mono \t\t\t\t no color mode\n";
-      std::cout << "echo \t\t\t\t print message on terminal\n";
-      std::cout << "help|h \t\t\t\t show this help\n";
+      std::cout << "exit|quit|q                     exit\n";
+      std::cout << "quitdrop|qd                     exit & drop artifacts\n";
+      std::cout << "open file [schema]              open or create database with schema\n";
+      std::cout << "                                example: .open test_db { INTEGER dane STRING name[3] }\n";
+      std::cout << "storage [path]                  set storage path for database\n";
+      std::cout << "policy [name]                   set storage policy\n";
+      std::cout << "dropfile [file1] [file2] ... }  remove listed file(s), end with }\n";
+      std::cout << "desc|descc                      show schema\n";
+      std::cout << "read|rread [n]                  read record from database into payload\n";
+      std::cout << "write [n]                       from payload send record to database\n";
+      std::cout << "purge                           remove all records from database\n";
+      std::cout << "append                          append payload to database\n";
+      std::cout << "set [field][value]              set payload field value\n";
+      std::cout << "setpos [position][number value] set payload field number value\n";
+      std::cout << "getpos [position]               show payload field value\n";
+      std::cout << "status                          show current payload status\n";
+      std::cout << "rox                             remove on exit flip\n";
+      std::cout << "print|printt                    show payload\n";
+      std::cout << "list|rlist [count]              print first records\n";
+      std::cout << "input [[field][value]]          fill payload\n";
+      std::cout << "hex|dec                         type of input/output of byte/number fields\n";
+      std::cout << "size                            show database size in records\n";
+      std::cout << "cap [value]                     set device stream backread capacity\n";
+      std::cout << "dump                            show payload memory\n";
+      std::cout << "mono|noprompt                   no color mode / no prompt\n";
+      std::cout << "echo                            print message on terminal\n";
+      std::cout << "system                          execute system command\n";
+      std::cout << "#|rem [text]                    comment line\n";
+      std::cout << "help|h                          show this help\n";
 
       std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
       // std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
@@ -207,6 +218,13 @@ int main(int argc, char *argv[]) {
       }
       payloadStatus = returnStatus ? fetched : error;
 
+    } else if (cmd == "system") {
+      std::string systemCommand;
+      std::getline(std::cin, systemCommand);
+      int returnCode = std::system(systemCommand.c_str());
+      if (returnCode != 0) {
+        std::cout << RED << "system command error: " << returnCode << "\n" << RESET;
+      }
     } else if (cmd == "set") {
       std::cin >> *(dacc->getPayload());
       payloadStatus = changed;
@@ -259,10 +277,6 @@ int main(int argc, char *argv[]) {
       int backCapacityValue;
       std::cin >> backCapacityValue;
       dacc->setCapacity(backCapacityValue);
-    } else if (cmd == "lock") {
-      std::cout << "deprecated\n" << std::endl;
-    } else if (cmd == "flux") {
-      dacc->bufferState = rdb::sourceState::flux;
     } else if (cmd == "rox") {
       rox = !rox;
       dacc->setDisposable(rox);

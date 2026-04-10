@@ -65,6 +65,9 @@ class GroupFileTest : public ::testing::Test {
   std::map<std::string, fileInfo> collectFiles() {
     std::map<std::string, fileInfo> mapOfFiles;
     for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder)) {
+      if (entry.path().filename().string().ends_with(".shadow")) {
+        continue;
+      }
       mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
     }
     return mapOfFiles;
@@ -82,7 +85,7 @@ TEST_F(GroupFileTest, test_fagrp_no_retention) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   record = 11;
   gfa->write(&record);
@@ -104,7 +107,7 @@ TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   // Write 6 records across 2 segments of capacity 3
   for (BYTE i = 1; i <= 6; i++) {
@@ -130,20 +133,20 @@ TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
 }
 
 // Verify segment rotation evicts oldest segment when segment count exceeds limit.
-// Rotation triggers when writeCount_ > capacity. The record that triggers rotation
-// is written to the new segment (not the old one).
+// Rotation triggers when the current segment reaches capacity. The next record
+// is written to the new segment.
 TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   BYTE record;
 
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 2;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   // Write 6 records with capacity=2:
-  // segment_0: [1,2]   (rotation triggered by record 3, which goes to segment_1)
-  // segment_1: [3,4,5] (rotation triggered by record 6, which goes to segment_2; segment_0 evicted)
-  // segment_2: [6]
+  // segment_0: [1,2]
+  // segment_1: [3,4]
+  // segment_2: [5,6] and segment_0 is evicted (silos_count=2)
   for (BYTE i = 1; i <= 6; i++) {
     record = i;
     gfa->write(&record);
@@ -154,8 +157,34 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
   // segment_0 should be evicted (vec_.size() exceeded silos_count)
   GTEST_ASSERT_EQ(mapOfFiles.count(sandboxPath("test_file_segment_0")), 0);
 
-  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({3, 4, 5}));
-  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({6}));
+  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({3, 4}));
+  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({5, 6}));
+}
+
+// Verify rotation removes shadow file for evicted segment as well.
+TEST_F(GroupFileTest, test_fagrp_segment_rotation_removes_shadow) {
+  BYTE record;
+
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 2;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
+
+  // Keep writing so segment_0 gets evicted when segment_2 is created.
+  for (BYTE i = 1; i <= 2; i++) {
+    record = i;
+    gfa->write(&record);
+  }
+
+  GTEST_ASSERT_TRUE(std::filesystem::exists(sandboxPath("test_file_segment_0.shadow")));
+
+  for (BYTE i = 3; i <= 6; i++) {
+    record = i;
+    gfa->write(&record);
+  }
+
+  GTEST_ASSERT_FALSE(std::filesystem::exists(sandboxPath("test_file_segment_0")));
+  GTEST_ASSERT_FALSE(std::filesystem::exists(sandboxPath("test_file_segment_0.shadow")));
 }
 
 // Verify purge clears all segments and resets state
@@ -165,7 +194,7 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   for (BYTE i = 1; i <= 6; i++) {
     record = i;
@@ -174,8 +203,8 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
 
   GTEST_ASSERT_EQ(gfa->count(), 6);
 
-  // Purge all segments (write nullptr at position 0)
-  gfa->write(nullptr, 0);
+  // Purge all segments using explicit API
+  gfa->purge();
   GTEST_ASSERT_EQ(gfa->count(), 0);
 
   // Should be able to write new records after purge
@@ -187,10 +216,31 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
   GTEST_ASSERT_EQ(record, 42);
 }
 
+// Verify purge API works in no-retention mode as well.
+TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
+  BYTE record;
+
+  auto retention = rdb::retention_t{0, 0};
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
+
+  record = 11;
+  gfa->write(&record);
+  record = 12;
+  gfa->write(&record);
+  GTEST_ASSERT_EQ(gfa->count(), 2);
+
+  gfa->purge();
+  GTEST_ASSERT_EQ(gfa->count(), 0);
+
+  auto mapOfFiles = collectFiles();
+  GTEST_ASSERT_EQ(mapOfFiles.size(), 1);
+  GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file")].sizeFromSystem, 0);
+}
+
 // Verify name() returns base filename in no-retention mode
 TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   EXPECT_EQ(gfa->name(), "test_file");
 }
@@ -198,7 +248,7 @@ TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
 // Verify name() returns segment filename in retention mode
 TEST_F(GroupFileTest, test_fagrp_name_retention) {
   auto retention = rdb::retention_t{2, 3};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   EXPECT_EQ(gfa->name(), "test_file_segment_0");
 }
@@ -206,7 +256,7 @@ TEST_F(GroupFileTest, test_fagrp_name_retention) {
 // Verify count is 0 for freshly created group accessor
 TEST_F(GroupFileTest, test_fagrp_empty_count) {
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   GTEST_ASSERT_EQ(gfa->count(), 0);
 }
@@ -216,7 +266,7 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
-  auto gfa       = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
   record = 10;
   gfa->write(&record);
@@ -247,18 +297,18 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
 }
 
 // Verify count compensates for removed segments after rotation.
-// With capacity=2, rotation triggers at writeCount > 2, so each segment holds 3 records.
 TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   BYTE record;
 
   rdb::segments_t silos_count = 2;
   rdb::capacity_t silos_size  = 3;
   auto retention              = rdb::retention_t{silos_count, silos_size};
-  auto gfa                    = std::make_unique<rdb::groupFile>(filename, recsize, retention, -1);
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
 
-  // Write 8 records with capacity=3 (rotation at writeCount > 3):
-  // segment_0: [1,2,3,4] (4 records)
-  // segment_1: [5,6,7,8] (4 records) -> segment_0 evicted (silos_count=2)
+  // Write 8 records with capacity=3:
+  // segment_0: [1,2,3]
+  // segment_1: [4,5,6]
+  // segment_2: [7,8] and segment_0 evicted (silos_count=2)
   for (BYTE i = 1; i <= 8; i++) {
     record = i;
     gfa->write(&record);
@@ -266,6 +316,66 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
 
   // count() = remaining segment counts + removedSegments * capacity
   GTEST_ASSERT_EQ(gfa->count(), 8);
+}
+
+// Verify reads and updates into already removed global positions fail safely.
+TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
+  BYTE record;
+
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 2;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+  auto gfa                    = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
+
+  for (BYTE i = 1; i <= 6; i++) {
+    record = i;
+    gfa->write(&record);
+  }
+
+  record = 99;
+  GTEST_ASSERT_NE(gfa->read(&record, 0), 0);
+  GTEST_ASSERT_NE(gfa->write(&record, 0), 0);
+}
+
+// Verify object state is restored after restart and append continues from restored state.
+TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
+  BYTE record;
+
+  rdb::segments_t silos_count = 2;
+  rdb::capacity_t silos_size  = 3;
+  auto retention              = rdb::retention_t{silos_count, silos_size};
+
+  {
+    auto gfa = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
+    for (BYTE i = 1; i <= 5; i++) {
+      record = i;
+      GTEST_ASSERT_EQ(gfa->write(&record), 0);
+    }
+    GTEST_ASSERT_EQ(gfa->count(), 5);
+  }
+
+  {
+    auto gfa = std::make_unique<rdb::groupFile<>>(filename, recsize, retention, -1);
+    GTEST_ASSERT_EQ(gfa->count(), 5);
+
+    // Verify data persisted and is readable by global position after restart.
+    for (BYTE i = 0; i < 5; i++) {
+      GTEST_ASSERT_EQ(gfa->read(&record, i), 0);
+      GTEST_ASSERT_EQ(record, i + 1);
+    }
+
+    // Continue appending after restart and verify rotation is based on restored writeCount_.
+    record = 6;
+    GTEST_ASSERT_EQ(gfa->write(&record), 0);
+    record = 7;
+    GTEST_ASSERT_EQ(gfa->write(&record), 0);
+
+    auto mapOfFiles = collectFiles();
+    GTEST_ASSERT_EQ(mapOfFiles.count(sandboxPath("test_file_segment_0")), 0);
+    GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({4, 5, 6}));
+    GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({7}));
+    GTEST_ASSERT_EQ(gfa->count(), 7);
+  }
 }
 
 // ============================================================

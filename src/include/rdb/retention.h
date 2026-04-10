@@ -1,7 +1,7 @@
 #pragma once
 
-#include <utility>
-
+#include <cstddef>  // size_t
+#include <utility>  // std::pair
 namespace rdb {
 /**
  * @brief Object that implements storage interface for group files

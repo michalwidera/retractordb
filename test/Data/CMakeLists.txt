@@ -28,12 +28,12 @@ add_test(
 add_test(
   NAME ${TestID}-workflow
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND ./test-workflow.sh query-lnx.rql)
+  COMMAND ./test-workflow.sh query-lnx.rql str2 str3)
 
 add_test(
   NAME ${TestID}-all-operators
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND test-all-operators.sh query-all.rql)
+  COMMAND ./test-workflow.sh query-all.rql str2 str2)
 
 set_tests_properties(${TestID}-waterfall ${TestID}-workflow
                      ${TestID}-all-operators PROPERTIES RUN_SERIAL TRUE)

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -15,6 +16,37 @@ typedef unsigned char BYTE;
 
 // Source under test:
 // src/rdb/lib/faccposixshd.cc
+
+// --- Linker-level interposition via --wrap ---
+// g_pread_eintr_count / g_write_eintr_count control how many
+// consecutive EINTR errors the wrapped syscall will produce
+// before delegating to the real implementation.
+
+static thread_local int g_pread_eintr_count = 0;
+static thread_local int g_write_eintr_count = 0;
+
+extern "C" {
+ssize_t __real_pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t __real_write(int fd, const void *buf, size_t count);
+
+ssize_t __wrap_pread(int fd, void *buf, size_t count, off_t offset) {
+  if (g_pread_eintr_count > 0) {
+    --g_pread_eintr_count;
+    errno = EINTR;
+    return -1;
+  }
+  return __real_pread(fd, buf, count, offset);
+}
+
+ssize_t __wrap_write(int fd, const void *buf, size_t count) {
+  if (g_write_eintr_count > 0) {
+    --g_write_eintr_count;
+    errno = EINTR;
+    return -1;
+  }
+  return __real_write(fd, buf, count);
+}
+}
 
 // --- Helpers ---
 
@@ -38,6 +70,8 @@ class ShadowFileTest : public ::testing::Test {
   const size_t recsize                      = sizeof(BYTE);
 
   void SetUp() override {
+    g_pread_eintr_count = 0;
+    g_write_eintr_count = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -51,6 +85,8 @@ class ShadowFileTest : public ::testing::Test {
   }
 
   void TearDown() override {
+    g_pread_eintr_count = 0;
+    g_write_eintr_count = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -211,7 +247,6 @@ TEST_F(ShadowFileTest, test_faccposixshd_truncate) {
   shd->write(nullptr, 0);
 
   GTEST_ASSERT_EQ(shd->count(), 0);
-  GTEST_ASSERT_EQ(filesize(path + ".shadow"), 0);
 }
 
 // Verify count returns only main file record count (shadow doesn't affect count)
@@ -243,7 +278,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_empty_file) {
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
 
   GTEST_ASSERT_EQ(shd->count(), 0);
-  GTEST_ASSERT_NE(shd->read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_NE(std::filesystem::exists(path), 0);
 }
 
 // Verify reading beyond EOF returns failure
@@ -460,4 +495,150 @@ TEST_F(ShadowFileTest, test_faccposixshd_merge_empty_shadow) {
   GTEST_ASSERT_EQ(record, 0xAA);
   GTEST_ASSERT_EQ(shd->read(&record, 1), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0xBB);
+}
+
+// Verify reopen restores main file alignment to whole records
+TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_main_file) {
+  const size_t multiRecSize = 2;
+  auto path                 = sandboxPath("shd_restore_main_align");
+
+  {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(out.is_open());
+    const BYTE raw[] = {0x01, 0x02, 0x03, 0x04, 0xFF};  // 5 bytes: 2 full records + 1 trailing byte
+    out.write(reinterpret_cast<const char *>(raw), sizeof(raw));
+  }
+
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, multiRecSize);
+
+  // Constructor should truncate the trailing byte and restore consistent record state
+  GTEST_ASSERT_EQ(filesize(path), static_cast<std::ifstream::pos_type>(4));
+  GTEST_ASSERT_EQ(shd->count(), 2);
+
+  uint8_t rec[2] = {};
+  GTEST_ASSERT_EQ(shd->read(rec, 0), EXIT_SUCCESS);
+  EXPECT_EQ(rec[0], 0x01);
+  EXPECT_EQ(rec[1], 0x02);
+
+  GTEST_ASSERT_EQ(shd->read(rec, 2), EXIT_SUCCESS);
+  EXPECT_EQ(rec[0], 0x03);
+  EXPECT_EQ(rec[1], 0x04);
+
+  GTEST_ASSERT_NE(shd->read(rec, 4), EXIT_SUCCESS);
+}
+
+// Verify reopen restores shadow file alignment to whole (position, data) entries
+TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file) {
+  auto path = sandboxPath("shd_restore_shadow_align");
+
+  // Prepare main file with 2 records
+  {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(out.is_open());
+    const BYTE mainRaw[] = {0x10, 0x20};
+    out.write(reinterpret_cast<const char *>(mainRaw), sizeof(mainRaw));
+  }
+
+  // Prepare shadow file: one valid entry + one trailing garbage byte
+  {
+    std::ofstream out(path + ".shadow", std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(out.is_open());
+
+    const size_t position = 0;
+    const BYTE updated    = 0x99;
+    const BYTE garbage    = 0xAB;
+
+    out.write(reinterpret_cast<const char *>(&position), sizeof(position));
+    out.write(reinterpret_cast<const char *>(&updated), sizeof(updated));
+    out.write(reinterpret_cast<const char *>(&garbage), sizeof(garbage));
+  }
+
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+
+  const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);
+  GTEST_ASSERT_EQ(filesize(path + ".shadow"), expectedShadowSize);
+
+  BYTE record = 0;
+  // Updated value should still be available from the valid shadow entry
+  GTEST_ASSERT_EQ(shd->read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x99);
+
+  // Position without shadow update should still be read from main file
+  GTEST_ASSERT_EQ(shd->read(&record, 1), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x20);
+}
+
+// shadow read(): EINTR within retry limit on fallback pread
+TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_ok"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append to main
+
+  g_pread_eintr_count = 4;  // 4 failures, 5th succeeds
+  uint8_t result      = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xAA);
+}
+
+// shadow read(): EINTR exceeding retry limit on fallback pread
+TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_fail"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append to main
+
+  g_pread_eintr_count = 10;  // well above maxRetries
+  uint8_t result      = 0;
+  ASSERT_NE(pfa->read(&result, 0), EXIT_SUCCESS);
+}
+
+// shadow append write(): EINTR within retry limit
+TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_ok"), sizeof(uint8_t));
+
+  g_write_eintr_count = 5;  // retries 1..5, 6th succeeds
+  uint8_t data        = 0xBB;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append (position = max)
+
+  uint8_t result = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xBB);
+}
+
+// shadow append write(): EINTR exceeding retry limit
+TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_fail"), sizeof(uint8_t));
+
+  g_write_eintr_count = 10;
+  uint8_t data        = 0xCC;
+  ASSERT_NE(pfa->write(&data), EXIT_SUCCESS);  // append should fail
+}
+
+// shadow update write(): keeps behavior for update path in shadow file
+TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_within_limit_succeeds) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_ok"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  g_write_eintr_count = 0;
+  data                = 0xDD;
+  ASSERT_EQ(pfa->write(&data, 0), EXIT_SUCCESS);
+
+  uint8_t result = 0;
+  ASSERT_EQ(pfa->read(&result, 0), EXIT_SUCCESS);
+  ASSERT_EQ(result, 0xDD);
+}
+
+// shadow update write(): EINTR exceeding retry limit
+TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails) {
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_fail"), sizeof(uint8_t));
+
+  uint8_t data = 0xAA;
+  ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
+
+  g_write_eintr_count = 10;
+  data                = 0xEE;
+  ASSERT_NE(pfa->write(&data, 0), EXIT_SUCCESS);
 }

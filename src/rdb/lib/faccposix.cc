@@ -16,16 +16,50 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       percounter_(percounter) {
+  assert(recordSize_ > 0);
+
+  std::error_code fs_ec;
+  const bool fileExisted = std::filesystem::exists(filename_, fs_ec);
+  if (fs_ec) {
+    SPDLOG_WARN("Failed to check if {} exists: {}", filename_, fs_ec.message());
+  }
+
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename_, fd);
   else
     SPDLOG_INFO("::open {} -> {}", filename_, fd);
   assert(fd >= 0);
+
+  if (fd >= 0 && fileExisted) {
+    const off_t fileSize = ::lseek(fd, 0, SEEK_END);
+    if (fileSize < 0) {
+      SPDLOG_ERROR("::lseek {} failed during state restore: {}", filename_, strerror(errno));
+    } else {
+      const off_t alignedSize = (fileSize / recordSize_) * recordSize_;
+      if (alignedSize != fileSize) {
+        SPDLOG_WARN("{} has {} trailing bytes; truncating to {} to restore consistent records", filename_,
+                    fileSize - alignedSize, alignedSize);
+        if (::ftruncate(fd, alignedSize) != 0) {
+          SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedSize, strerror(errno));
+        }
+      }
+      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedSize / recordSize_);
+    }
+  }
 }
 
 posixBinaryFile::~posixBinaryFile() {
-  ::close(fd);
+  if (fd >= 0) {
+    if (::fsync(fd) != 0) {
+      SPDLOG_ERROR("::fsync {} failed before close: {}", filename_, strerror(errno));
+    }
+    if (::close(fd) != 0) {
+      SPDLOG_ERROR("::close {} failed: {}", filename_, strerror(errno));
+    }
+    fd = -1;
+  }
+
   if (percounter_ >= 0) {
     SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
@@ -48,9 +82,9 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
 
   if (ptrData == nullptr && position == 0) {
     // nullptr, position 0,0 - truncate file.
-    auto result = ::ftruncate(fd, 0);
-    assert(result != -1);
-    return errno;
+    std::filesystem::remove(name());
+
+    return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
     auto result = ::lseek(fd, 0, SEEK_END);
@@ -104,6 +138,9 @@ ssize_t posixBinaryFile::read(uint8_t *ptrData, const size_t position) {
 }
 
 size_t posixBinaryFile::count() {
+  if (!std::filesystem::exists(filename_)) {
+    return 0;
+  }
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
   if (rc != 0) {

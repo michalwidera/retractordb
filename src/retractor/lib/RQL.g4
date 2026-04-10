@@ -14,9 +14,10 @@ compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING
 select_statement    : SELECT select_list
                       STREAM stream_name=ID
                       FROM stream_expression
-                      (FILE name=STRING)?
+                      (FILE file_name=STRING)?
                       (retention_from)?
                       (VOLATILE)?
+                      (STORAGE type_name=TYPE_PROFILE)?
                     # Select
                     ;
 
@@ -204,7 +205,8 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-STRING_PROFILE:    '\'' ('MEMORY'|'memory'|'DEFAULT'|'default'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource') '\'';
+TYPE_PROFILE:       'MEMORY'|'memory'|'DEFAULT'|'default'|'SHADOW'|'shadow'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
+STRING_PROFILE:    '\'' TYPE_PROFILE '\'';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';

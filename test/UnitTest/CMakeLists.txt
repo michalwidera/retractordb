@@ -30,7 +30,8 @@ foreach(item ${V_GLOB})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   file(MAKE_DIRECTORY
        ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT})
-  if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposixEintr")
+  if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposix" OR OUTPUT_FILE_NOEXT STREQUAL
+                                                    "test_faccposixshd")
     target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=pread
                         -Wl,--wrap=write)
   endif()

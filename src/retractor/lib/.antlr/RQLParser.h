@@ -20,13 +20,13 @@ public:
     FILE = 32, STORAGE = 33, ROTATION = 34, SUBSTRAT = 35, RULE = 36, DISPOSABLE = 37, 
     ONESHOT = 38, HOLD = 39, VOLATILE = 40, ON = 41, WHEN = 42, DUMP = 43, 
     SYSTEM = 44, DO = 45, TO = 46, AND_C = 47, OR_C = 48, NOT_C = 49, MIN = 50, 
-    MAX = 51, AVG = 52, SUMC = 53, STRING_PROFILE = 54, ID = 55, STRING = 56, 
-    FLOAT = 57, DECIMAL = 58, REAL = 59, IS_EQ = 60, IS_NQ = 61, IS_GR = 62, 
-    IS_LS = 63, IS_GE = 64, IS_LE = 65, EXCLAMATION = 66, DOUBLE_BAR = 67, 
-    DOT = 68, UNDERLINE = 69, AT = 70, SHARP = 71, AND = 72, MOD = 73, DOLLAR = 74, 
-    COMMA = 75, SEMI = 76, COLON = 77, DOUBLE_COLON = 78, STAR = 79, DIVIDE = 80, 
-    PLUS = 81, MINUS = 82, BIT_NOT = 83, BIT_OR = 84, BIT_XOR = 85, SPACE = 86, 
-    COMMENT = 87, LINE_COMMENT1 = 88, LINE_COMMENT2 = 89
+    MAX = 51, AVG = 52, SUMC = 53, TYPE_PROFILE = 54, STRING_PROFILE = 55, 
+    ID = 56, STRING = 57, FLOAT = 58, DECIMAL = 59, REAL = 60, IS_EQ = 61, 
+    IS_NQ = 62, IS_GR = 63, IS_LS = 64, IS_GE = 65, IS_LE = 66, EXCLAMATION = 67, 
+    DOUBLE_BAR = 68, DOT = 69, UNDERLINE = 70, AT = 71, SHARP = 72, AND = 73, 
+    MOD = 74, DOLLAR = 75, COMMA = 76, SEMI = 77, COLON = 78, DOUBLE_COLON = 79, 
+    STAR = 80, DIVIDE = 81, PLUS = 82, MINUS = 83, BIT_NOT = 84, BIT_OR = 85, 
+    BIT_XOR = 86, SPACE = 87, COMMENT = 88, LINE_COMMENT1 = 89, LINE_COMMENT2 = 90
   };
 
   enum {
@@ -153,7 +153,8 @@ public:
     SelectContext(Select_statementContext *ctx);
 
     antlr4::Token *stream_name = nullptr;
-    antlr4::Token *name = nullptr;
+    antlr4::Token *file_name = nullptr;
+    antlr4::Token *type_name = nullptr;
     antlr4::tree::TerminalNode *SELECT();
     Select_listContext *select_list();
     antlr4::tree::TerminalNode *STREAM();
@@ -163,7 +164,9 @@ public:
     antlr4::tree::TerminalNode *FILE();
     Retention_fromContext *retention_from();
     antlr4::tree::TerminalNode *VOLATILE();
+    antlr4::tree::TerminalNode *STORAGE();
     antlr4::tree::TerminalNode *STRING();
+    antlr4::tree::TerminalNode *TYPE_PROFILE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

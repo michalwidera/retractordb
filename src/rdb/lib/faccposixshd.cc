@@ -44,6 +44,20 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       percounter_(percounter) {
+  assert(recordSize_ > 0);
+
+  std::error_code fs_ec;
+  const bool mainFileExisted = std::filesystem::exists(filename_, fs_ec);
+  if (fs_ec) {
+    SPDLOG_WARN("Failed to check if {} exists: {}", filename_, fs_ec.message());
+  }
+
+  fs_ec.clear();
+  const bool shadowFileExisted = std::filesystem::exists(shadowName(), fs_ec);
+  if (fs_ec) {
+    SPDLOG_WARN("Failed to check if {} exists: {}", shadowName(), fs_ec.message());
+  }
+
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename_, fd);
@@ -57,11 +71,65 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   else
     SPDLOG_INFO("::open shadow {} -> {}", shadowName(), fd_shadow);
   assert(fd_shadow >= 0);
+
+  if (fd >= 0 && mainFileExisted) {
+    const off_t mainSize = ::lseek(fd, 0, SEEK_END);
+    if (mainSize < 0) {
+      SPDLOG_ERROR("::lseek {} failed during state restore: {}", filename_, strerror(errno));
+    } else {
+      const off_t alignedMainSize = (mainSize / recordSize_) * recordSize_;
+      if (alignedMainSize != mainSize) {
+        SPDLOG_WARN("{} has {} trailing bytes; truncating to {} to restore consistent records", filename_,
+                    mainSize - alignedMainSize, alignedMainSize);
+        if (::ftruncate(fd, alignedMainSize) != 0) {
+          SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedMainSize, strerror(errno));
+        }
+      }
+      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedMainSize / recordSize_);
+    }
+  }
+
+  if (fd_shadow >= 0 && shadowFileExisted) {
+    const ssize_t entrySize = sizeof(size_t) + recordSize_;
+    const off_t shadowSize  = ::lseek(fd_shadow, 0, SEEK_END);
+    if (shadowSize < 0) {
+      SPDLOG_ERROR("::lseek shadow {} failed during state restore: {}", shadowName(), strerror(errno));
+    } else {
+      const off_t alignedShadowSize = (shadowSize / entrySize) * entrySize;
+      if (alignedShadowSize != shadowSize) {
+        SPDLOG_WARN("{} has {} trailing bytes; truncating to {} to restore consistent shadow entries", shadowName(),
+                    shadowSize - alignedShadowSize, alignedShadowSize);
+        if (::ftruncate(fd_shadow, alignedShadowSize) != 0) {
+          SPDLOG_ERROR("::ftruncate shadow {} to {} failed during state restore: {}", shadowName(), alignedShadowSize,
+                       strerror(errno));
+        }
+      }
+      SPDLOG_INFO("Restored {} with {} pending shadow entries", shadowName(), alignedShadowSize / entrySize);
+    }
+  }
 }
 
 posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
-  ::close(fd_shadow);
-  ::close(fd);
+  if (fd_shadow >= 0) {
+    if (::fsync(fd_shadow) != 0) {
+      SPDLOG_ERROR("::fsync shadow {} failed before close: {}", shadowName(), strerror(errno));
+    }
+    if (::close(fd_shadow) != 0) {
+      SPDLOG_ERROR("::close shadow {} failed: {}", shadowName(), strerror(errno));
+    }
+    fd_shadow = -1;
+  }
+
+  if (fd >= 0) {
+    if (::fsync(fd) != 0) {
+      SPDLOG_ERROR("::fsync {} failed before close: {}", filename_, strerror(errno));
+    }
+    if (::close(fd) != 0) {
+      SPDLOG_ERROR("::close {} failed: {}", filename_, strerror(errno));
+    }
+    fd = -1;
+  }
+
   if (percounter_ >= 0) {
     SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
@@ -84,10 +152,8 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const size_t po
 
   if (ptrData == nullptr && position == 0) {
     // Truncate — czyści oba pliki
-    auto result = ::ftruncate(fd, 0);
-    assert(result != -1);
-    result = ::ftruncate(fd_shadow, 0);
-    assert(result != -1);
+    std::filesystem::remove(name());
+    std::filesystem::remove(name() + ".shadow");
     return EXIT_SUCCESS;
   }
 
@@ -180,11 +246,14 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, const size_t position)
 }
 
 size_t posixBinaryFileWithShadow::count() {
+  if (!std::filesystem::exists(filename_)) {
+    return 0;
+  }
   struct stat stat_buf;
   int rc = stat(filename_.c_str(), &stat_buf);
   if (rc != 0) {
     SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
-    return -1;
+    return 0;
   }
   return stat_buf.st_size / recordSize_;
 }

@@ -53,6 +53,7 @@ endif()
 # message(STATUS "CMAKE_PREFIX_PATH: ${CMAKE_PREFIX_PATH}") message(STATUS
 # "antlr4Path: ${antlr4Path}") message(STATUS "javaPath: ${javaPath}")
 
+include(CTest)
 enable_testing()
 
 include_directories(

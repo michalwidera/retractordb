@@ -32,7 +32,7 @@ class storage {
   std::string descriptorFile_ = "";
   std::string storageFile_    = "";
   std::string metaIndexFile_  = "";  // file path for saving/loading the meta index
-  std::string storageType_    = "DEFAULT";
+  std::string storageType_    = "";
   int percounter_             = -1;
 
   void moveRef();
@@ -41,18 +41,19 @@ class storage {
   boost::circular_buffer<rdb::payload> circularBuffer_{0};
 
   void abortIfStorageNotPrepared();
-  void initialize();
+  void initializeAccessor();
 
   std::unique_ptr<rdb::metaDataStream> metaDataStream_;
 
  public:
   storage() = delete;
-  explicit storage(const std::string_view qryID,         //
-                   const std::string_view fileName,      //
-                   const std::string_view storageParam,  //
-                   bool oneShot   = false,               //
-                   bool isHold    = false,               //
-                   int percounter = -1                   //
+  explicit storage(const std::string_view qryID,                    //
+                   const std::string_view fileName,                 //
+                   const std::string_view storageParam,             //
+                   const std::string_view storageType = "DEFAULT",  //
+                   bool oneShot                       = false,      //
+                   bool isHold                        = false,      //
+                   int percounter                     = -1          //
   );
   virtual ~storage();
 
@@ -75,8 +76,6 @@ class storage {
   void releaseOnHold();
   size_t getRecordsCount();
   bool descriptorFileExist();
-
-  std::string getStorageName();
 
   bool isDeclared();
 

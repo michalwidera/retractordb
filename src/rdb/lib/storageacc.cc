@@ -16,6 +16,7 @@ bool isOpen(const storageState val) { return (val == storageState::openAndCreate
 storage::storage(const std::string_view qryID,         //
                  const std::string_view fileName,      //
                  const std::string_view storageParam,  //
+                 const std::string_view storageType,   //
                  bool oneShot,                         //
                  bool isHold,                          //
                  int percounter)
@@ -23,7 +24,8 @@ storage::storage(const std::string_view qryID,         //
       storageFile_(fileName),
       percounter_(percounter),
       isOneShot_(oneShot),
-      isHold_(isHold) {
+      isHold_(isHold),
+      storageType_(storageType) {
   assert(!qryID.empty());
   assert(!fileName.empty());
 
@@ -147,7 +149,7 @@ void storage::attachStorage() {
     SPDLOG_INFO("Storage type from descriptor {}", storageType_);
   }
 
-  initialize();
+  initializeAccessor();
 
   if (isDeclared()) {
     SPDLOG_INFO("records declared source on {}", storageFile_);
@@ -174,13 +176,16 @@ storage::~storage() {
 
 bool storage::isDeclared() { return (storageType_ == "DEVICE") || (storageType_ == "TEXTSOURCE"); }
 
-void storage::initialize() {
+void storage::initializeAccessor() {
   assert(storageFile_ != "");
   assert(storageType_ != "");
   auto size = descriptor.getSizeInBytes();
 
   if (storageType_ == "DEFAULT") {
-    accessor_ = std::make_unique<rdb::groupFile>(storageFile_, size, descriptor.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, size, descriptor.retention(), percounter_);
+  } else if (storageType_ == "SHADOW") {
+    accessor_ =
+        std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, size, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
     accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, size, descriptor.policy());
   } else if (storageType_ == "POSIX") {
@@ -209,7 +214,7 @@ void storage::reset() {
   if (resourceAlreadyExist)
     if (!isDeclared()) remove(storageFile_.c_str());
 
-  initialize();
+  initializeAccessor();
 
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;
@@ -248,8 +253,6 @@ void storage::releaseOnHold() {
 }
 
 size_t storage::getRecordsCount() { return recordsCount_; }
-
-std::string storage::getStorageName() { return storageFile_; }
 
 void storage::abortIfStorageNotPrepared() {
   if (descriptor.empty()) {

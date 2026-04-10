@@ -12,8 +12,7 @@ namespace rdb {
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
-/// - umożliwiać kontrolę ilości przechowywanych danych za pomocą mechanizmu retencji, który usuwa najstarsze dane po
-/// przekroczeniu określonego limitu
+/// - umożliwiać kontrolę ilości przechowywanych danych za pomocą mechanizmu retencji, który usuwa najstarsze dane po przekroczeniu określonego limitu
 
 struct memoryFile : public FileInterface {
   std::string filename_;
