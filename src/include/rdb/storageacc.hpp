@@ -104,10 +104,6 @@ class storage {
   /// @return true if a gap marker exists immediately before this record
   bool hasGapBefore(size_t recordIndex) const;
 
-  /// @brief Get all transmission gaps recorded in the stream.
-  /// @return vector of TransmissionGap structures with their positions and timestamps
-  std::vector<rdb::metaDataStream::TransmissionGap> getTransmissionGaps() const;
-
   /// @brief Check if the meta index is empty (no records tracked).
   /// @return true if neither storage nor meta index contain any records
   bool isMetaIndexEmpty() const;

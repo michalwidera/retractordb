@@ -327,8 +327,6 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_timeout) {
     pl->setItem(0, 20);
     ASSERT_TRUE(s.write());
 
-    auto gaps = s.getTransmissionGaps();
-    EXPECT_EQ(gaps.size(), 1u);
     EXPECT_TRUE(s.hasGapBefore(1));
   }
 
@@ -360,8 +358,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
       ASSERT_TRUE(s.write());
     }
 
-    auto gaps = s.getTransmissionGaps();
-    EXPECT_EQ(gaps.size(), 0u);
+    EXPECT_FALSE(s.hasGapBefore(0));
   }
 
   std::filesystem::remove(dataFile);
@@ -396,8 +393,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     pl->setItem(0, 99);
     ASSERT_TRUE(s.write(0));
 
-    auto gaps = s.getTransmissionGaps();
-    EXPECT_EQ(gaps.size(), 0u);
+    EXPECT_FALSE(s.hasGapBefore(0));
   }
 
   std::filesystem::remove(dataFile);

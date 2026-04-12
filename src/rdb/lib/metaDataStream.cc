@@ -509,23 +509,4 @@ void metaDataStream::purge(size_t upToRecordIndex) {
                totalRecords());
 }
 
-std::vector<metaDataStream::TransmissionGap> metaDataStream::getTransmissionGaps() const {
-  std::vector<TransmissionGap> gaps;
-  auto allEntries = readCommittedEntries();
-
-  size_t cumulative = 0;
-  for (const auto &entry : allEntries) {
-    if (entry.recordCount == 0) {
-      TransmissionGap gap;
-      gap.recordIndex = cumulative;
-      gap.timestamp = calculateRecordTimestamp(cumulative);
-      gaps.push_back(gap);
-    } else {
-      cumulative += entry.recordCount;
-    }
-  }
-
-  return gaps;
-}
-
 }  // namespace rdb

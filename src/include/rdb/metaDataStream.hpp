@@ -24,18 +24,19 @@ namespace rdb {
 /// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
 /// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone. (wyjątek stanowi czyszczenie - tzw. purge).
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
-/// - zapewniać informacje o przerwach w transmisji danych.
-/// - powinien być w stanie obsłużyć duże ilości danych.
-/// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
+/// - zapewniać informacje o przerwach w transmisji danych poprzez wpisy IndexRecord z recordCount == 0, persystowane na dysku wewnątrz pliku indeksu.
+/// - powinien być w stanie obsłużyć duże ilości danych, w tym wiele przerw w transmisji.
+/// - zapewnić serializacji i deseralizacji danych przy uruchomieniu i zamknięciu systemu.
 /// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
-/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu.
+/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu; czas przerwy wyliczany jest względem czasu bazowego z nagłówka i skonfigurowanego interwału próbkowania.
 /// - zapis pierwszego rekordu do pliku indeksu nie jest wymagany natychmiast; wymagane jest utworzenie i synchronizacja indeksu przy zamknięciu systemu, a jeśli plik .meta pozostaje po zamknięciu i zarejestrowano dane (nawet bez null), liczba rekordów w indeksie powinna być niezerowa.
+/// - udostępniać wszystkie wpisy indeksu (dane oraz markery przerw) przez metodę entries(); klienci samodzielnie filtrują przerwy po warunku recordCount == 0.
 ///
+/// @note Format binarny wpisu IndexRecord: [recordCount : size_t][bitsetSize : size_t][bitset bytes]; recordCount == 0 oznacza marker przerwy.
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
 /// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storage.
 /// @note W przypadku dużych ilości danych, implementacja powinna uwzględniać mechanizmy buforowania i zarządzania pamięcią, aby zapewnić płynne działanie systemu.
 /// @note Klasa metaDataStream powinna być projektowana z myślą o łatwej integracji z innymi komponentami systemu, takimi jak storage, aby zapewnić spójność i efektywność całego systemu.
-/// @note W przypadku przerw w transmisji danych, klasa metaDataStream powinna być w stanie wykryć i odpowiednio zareagować na takie sytuacje, np. poprzez zapisywanie stanu indeksu przed przerwą i przywracanie go po wznowieniu transmisji.
 
 class metaDataStream {
  public:
@@ -45,15 +46,9 @@ class metaDataStream {
   ///        of consecutive records sharing that pattern.
   struct IndexRecord {
     std::vector<bool> nullBitset;                                     ///< one bit per descriptor field (true = null)
-    size_t recordCount{0};                                            ///< consecutive records with this pattern; 0 = transmission gap marker
+    size_t recordCount{0};                                            ///< number of consecutive records with this pattern; 0 = transmission gap
     std::vector<std::byte> serialize() const;                         ///< serialize the entry to a vector of bytes
     static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
-  };
-
-  /// @brief Represents a transmission gap in the data stream.
-  struct TransmissionGap {
-    size_t recordIndex{0};                           ///< global position where the gap starts
-    std::chrono::system_clock::time_point timestamp; ///< calculated timestamp of the gap
   };
 
   // ── Construction / destruction ──────────────────────────────────────
@@ -134,11 +129,6 @@ class metaDataStream {
   /// @return true if a gap marker is positioned immediately before this record
   /// @note For recordIndex == 0, returns false (no gap before first record)
   bool isGapBefore(size_t recordIndex) const;
-
-  /// @brief Retrieve all transmission gaps recorded in the index.
-  /// @return vector of TransmissionGap structures with their positions and timestamps
-  /// @note Gaps are represented as markers between records; gaps themselves don't have indices
-  std::vector<TransmissionGap> getTransmissionGaps() const;
 
   // ── Time / configuration interface ────────────────────────────────
 

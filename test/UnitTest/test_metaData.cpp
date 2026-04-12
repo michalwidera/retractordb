@@ -138,13 +138,19 @@ TEST_F(MetaTestFixture, test_timestamps) {
   // Verify timestamp calculation through public gap API.
   // Gap inserted after one record should be at record index 1.
   meta.onTransmissionGap();
-  auto gaps = meta.getTransmissionGaps();
-  ASSERT_EQ(gaps.size(), 1u);
-  EXPECT_EQ(gaps[0].recordIndex, 1u);
+  size_t gapCount = 0, gapPos = 0, cumulative = 0;
+  for (const auto &e : meta.entries()) {
+    if (e.recordCount == 0) { gapPos = cumulative; ++gapCount; }
+    else cumulative += e.recordCount;
+  }
+  ASSERT_EQ(gapCount, 1u);
+  EXPECT_EQ(gapPos, 1u);
 
   // recordIndex=1 with 0.1s interval => creation + 100ms
+  auto iv       = meta.getSamplingInterval();
+  auto gapTs    = creationTime + std::chrono::nanoseconds(static_cast<int64_t>(gapPos) * iv.numerator() * 1000000000LL / iv.denominator());
   auto expected = creationTime + std::chrono::milliseconds(100);
-  EXPECT_EQ(gaps[0].timestamp, expected);
+  EXPECT_EQ(gapTs, expected);
 }
 
 // R4: Modify a record already committed to disk (rewriteFile path)
@@ -511,8 +517,11 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   EXPECT_FALSE(meta.isGapBefore(3));
   EXPECT_TRUE(meta.isGapBefore(4));   // gap before recovery
 
-  auto gaps = meta.getTransmissionGaps();
-  EXPECT_EQ(gaps.size(), 2u);
+  {
+    auto allEntries = meta.entries();
+    size_t gapCnt = std::count_if(allEntries.begin(), allEntries.end(), [](const auto &e) { return e.recordCount == 0; });
+    EXPECT_EQ(gapCnt, 2u);
+  }
 
   // Modify records in error state
   meta.onRecordModified(2, normal);
@@ -538,23 +547,27 @@ TEST_F(MetaTestFixture, integration_reset_after_complex_operations) {
     meta.onRecordAppended(pat);
 
   EXPECT_EQ(meta.totalRecords(), 100u);
-  auto gaps1 = meta.getTransmissionGaps();
-  EXPECT_EQ(gaps1.size(), 1u);
+  {
+    auto e1 = meta.entries();
+    EXPECT_EQ(std::count_if(e1.begin(), e1.end(), [](const auto &e) { return e.recordCount == 0; }), 1u);
+  }
 
   // Reset and verify
   meta.reset();
 
   EXPECT_TRUE(meta.isEmpty());
   EXPECT_EQ(meta.totalRecords(), 0u);
-  auto gaps2 = meta.getTransmissionGaps();
-  EXPECT_EQ(gaps2.size(), 0u);
+  {
+    auto e2 = meta.entries();
+    EXPECT_EQ(std::count_if(e2.begin(), e2.end(), [](const auto &e) { return e.recordCount == 0; }), 0u);
+  }
 
   // Should be reusable after reset
   meta.onRecordAppended(pat);
   EXPECT_EQ(meta.totalRecords(), 1u);
 }
 
-// ── Tests for new functionality: isEmpty, reset, purge, getTransmissionGaps ───
+// ── Tests for new functionality: isEmpty, reset, purge, gap queries via entries() ───
 
 TEST_F(MetaTestFixture, test_isEmpty_initial_state) {
   rdb::Descriptor descriptor;
@@ -705,15 +718,24 @@ TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
   meta.onTransmissionGap();     // gap before record 4
   meta.onRecordAppended(pat);  // rec 4
 
-  auto gaps = meta.getTransmissionGaps();
-  EXPECT_EQ(gaps.size(), 2u);
-  EXPECT_EQ(gaps[0].recordIndex, 2u);
-  EXPECT_EQ(gaps[1].recordIndex, 4u);
+  std::vector<size_t> gapPositions;
+  size_t cum = 0;
+  for (const auto &e : meta.entries()) {
+    if (e.recordCount == 0) gapPositions.push_back(cum);
+    else cum += e.recordCount;
+  }
+  EXPECT_EQ(gapPositions.size(), 2u);
+  EXPECT_EQ(gapPositions[0], 2u);
+  EXPECT_EQ(gapPositions[1], 4u);
 
   // Verify timestamps are calculated correctly
   auto creationTime = meta.getCreationTime();
-  EXPECT_EQ(gaps[0].timestamp, creationTime + std::chrono::seconds(2));
-  EXPECT_EQ(gaps[1].timestamp, creationTime + std::chrono::seconds(4));
+  auto iv = meta.getSamplingInterval();
+  auto calcTs = [&](size_t pos) {
+    return creationTime + std::chrono::nanoseconds(static_cast<int64_t>(pos) * iv.numerator() * 1000000000LL / iv.denominator());
+  };
+  EXPECT_EQ(calcTs(gapPositions[0]), creationTime + std::chrono::seconds(2));
+  EXPECT_EQ(calcTs(gapPositions[1]), creationTime + std::chrono::seconds(4));
 }
 
 TEST_F(MetaTestFixture, test_transmission_gaps_empty) {
@@ -726,8 +748,10 @@ TEST_F(MetaTestFixture, test_transmission_gaps_empty) {
   meta.onRecordAppended(pat);
   meta.onRecordAppended(pat);
 
-  auto gaps = meta.getTransmissionGaps();
-  EXPECT_EQ(gaps.size(), 0u);
+  {
+    auto e = meta.entries();
+    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.recordCount == 0; }), 0u);
+  }
 }
 
 TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
@@ -743,14 +767,16 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
     meta.onRecordAppended(pat);
     meta.onTransmissionGap();
 
-    auto gaps = meta.getTransmissionGaps();
-    EXPECT_EQ(gaps.size(), 2u);
+    {
+      auto e = meta.entries();
+      EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.recordCount == 0; }), 2u);
+    }
   }
 
   // Reload and verify gaps are persisted
   {
     rdb::metaDataStream meta(descriptor, metaFile);
-    auto gaps = meta.getTransmissionGaps();
-    EXPECT_EQ(gaps.size(), 2u);
+    auto e = meta.entries();
+    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.recordCount == 0; }), 2u);
   }
 }

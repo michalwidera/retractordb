@@ -323,14 +323,6 @@ bool storage::hasGapBefore(size_t recordIndex) const {
   return metaDataStream_->isGapBefore(recordIndex);
 }
 
-std::vector<rdb::metaDataStream::TransmissionGap> storage::getTransmissionGaps() const {
-  if (!metaDataStream_) {
-    return std::vector<rdb::metaDataStream::TransmissionGap>();
-  }
-
-  return metaDataStream_->getTransmissionGaps();
-}
-
 bool storage::isMetaIndexEmpty() const {
   if (!metaDataStream_) {
     return recordsCount_ == 0;
