@@ -44,7 +44,7 @@ bool test_descriptor() {
   }
 
   if (data2.position("Control") != 2) return false;
-  if (data2.len("Control") != 1) return false;
+  if (data2.fieldSize("Control") != 1) return false;
   if (strcmp(data2.type("Control").data(), "BYTE") != 0) return false;
   if (data2.offsetBegArr("Control") != 14) return false;
 
@@ -263,7 +263,7 @@ TEST(descriptor, assign_operator) {
   rdb::Descriptor data2;
   data2 = data1;
   EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
-  EXPECT_TRUE(data2.len("Control") == data1.len("Control"));
+  EXPECT_TRUE(data2.fieldSize("Control") == data1.fieldSize("Control"));
   EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }
 
@@ -273,6 +273,6 @@ TEST(descriptor, copy_constructor) {
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2{data1};
   EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
-  EXPECT_TRUE(data2.len("Control") == data1.len("Control"));
+  EXPECT_TRUE(data2.fieldSize("Control") == data1.fieldSize("Control"));
   EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
 }

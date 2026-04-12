@@ -327,7 +327,7 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
     std::string record;
     // std::getline(is >> std::ws, record);
     is >> record;
-    auto fieldLen  = desc.len(fieldName);
+    auto fieldLen  = desc.fieldSize(fieldName);
     auto fieldSpan = rhs.span().subspan(desc.offsetBegArr(fieldName), fieldLen);
     std::fill(fieldSpan.begin(), fieldSpan.end(), 0);
     std::copy_n(record.c_str(), std::min((size_t)fieldLen, record.size()), fieldSpan.begin());
@@ -381,8 +381,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << ":";
     auto offset_ = desc.offsetBegArr(r.rname);
     if (r.rtype == STRING) {
-      auto fieldSpan = rhs.span().subspan(offset_, desc.len(r.rname));
-      auto len       = desc.len(r.rname);
+      auto fieldSpan = rhs.span().subspan(offset_, desc.fieldSize(r.rname));
+      auto len       = desc.fieldSize(r.rname);
       for (auto i = 0; i < len; i++)
         if (fieldSpan[i] == 0) {
           len = i;

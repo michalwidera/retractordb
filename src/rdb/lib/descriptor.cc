@@ -48,7 +48,7 @@ void Descriptor::updateConvMaps() {
     for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
       convMap_.push_back(std::make_pair(static_cast<int>(fieldIndex), arrayIndex));
       offsetMap_.push_back(offset);
-      offset += (field.rtype == rdb::STRING) ? len(field) : field.rlen;
+      offset += (field.rtype == rdb::STRING) ? fieldSize(field) : field.rlen;
       ++clen_;
     }
   }
@@ -123,7 +123,7 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
       return lhsIt == end() && rhsIt == rhs.end();
     }
 
-    if (len(*lhsIt) < len(*rhsIt) || lhsIt->rtype < rhsIt->rtype) return false;
+    if (fieldSize(*lhsIt) < fieldSize(*rhsIt) || lhsIt->rtype < rhsIt->rtype) return false;
 
     ++lhsIt;
     ++rhsIt;
@@ -159,7 +159,7 @@ void Descriptor::composeHashDescriptorFrom(const std::string &name, Descriptor l
   dirtyMap = true;
 }
 
-constexpr int Descriptor::len(const rdb::rField &field) const {
+constexpr int Descriptor::fieldSize(const rdb::rField &field) const {
   if (isConfigurationField(field.rtype)) return 0;
   return field.rlen * field.rarray;
 }
@@ -167,7 +167,7 @@ constexpr int Descriptor::len(const rdb::rField &field) const {
 size_t Descriptor::getSizeInBytes() const {
   auto size{0};
   for (auto const i : *this)
-    size += len(i);
+    size += fieldSize(i);
   return size;
 }
 
@@ -214,13 +214,13 @@ size_t Descriptor::position(const std::string_view name) {
   return 0;  // ProForma Error
 }
 
-int Descriptor::len(const std::string_view name) { return len((*this)[position(name)]); }
+int Descriptor::fieldSize(const std::string_view name) { return fieldSize((*this)[position(name)]); }
 
 size_t Descriptor::offsetBegArr(const std::string_view name) {
   auto offset{0};
   for (auto const field : *this) {
     if (name == field.rname) return offset;
-    offset += len(field);
+    offset += fieldSize(field);
   }
   assert(false && "field not found with that name");
   return 0;  // ProForma Error
@@ -244,7 +244,7 @@ std::pair<rdb::descFld, int> Descriptor::getMaxType() {
     if (isConfigurationField(field.rtype)) continue;
     if (retVal <= field.rtype) {
       retVal = field.rtype;
-      if (size < len(field)) size = len(field);
+      if (size < fieldSize(field)) size = fieldSize(field);
     }
   }
   return std::make_pair(retVal, size);

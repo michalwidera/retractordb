@@ -111,12 +111,12 @@ class Descriptor : public std::vector<rField> {
   /// @brief Get total byte length of a field selected by name
   /// @param name field name
   /// @return field size in bytes including array expansion
-  int len(const std::string_view name);
+  int fieldSize(const std::string_view name);
 
   /// @brief Get total byte length of a field
   /// @param field field definition
   /// @return field size in bytes including array expansion
-  constexpr int len(const rdb::rField &field) const;
+  constexpr int fieldSize(const rdb::rField &field) const;
 
   /// @brief Compute byte offset of the beginning of named field
   /// @param name field name
