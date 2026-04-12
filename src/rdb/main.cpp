@@ -8,6 +8,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>  // make_unique
 #include <string>
@@ -172,6 +173,7 @@ int main(int argc, char *argv[]) {
       std::cout << "cap [value]                     set device stream backread capacity\n";
       std::cout << "dump                            show payload memory\n";
       std::cout << "meta                            show meta index (null patterns) for open db\n";
+      std::cout << "metaraw                         show internal meta file structure\n";
       std::cout << "echo                            print message on terminal\n";
       std::cout << "system                          execute system command\n";
       std::cout << "#|rem [text]                    comment line\n";
@@ -414,6 +416,66 @@ int main(int argc, char *argv[]) {
         std::cout << "] runs:" << cur.recordCount << "\n" << RESET;
       }
       std::cout << BLUE << committed.size() + (cur.recordCount > 0 ? 1 : 0) << " segment(s)\n" << RESET;
+      continue;
+    } else if (cmd == "metaraw") {
+      const std::string metaFilePath =
+          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() +
+          ".meta";
+      if (!std::filesystem::exists(metaFilePath)) {
+        std::cout << RED << "meta file not found: " << metaFilePath << "\n" << RESET;
+        continue;
+      }
+
+      constexpr size_t headerSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
+      const size_t bitsetBytes    = (dacc->descriptor.size() + 7) / 8;
+      const size_t entrySize      = sizeof(size_t) + sizeof(uint8_t) + sizeof(size_t) + bitsetBytes;
+
+      std::ifstream in(metaFilePath, std::ios::binary);
+      if (!in.is_open()) {
+        std::cout << RED << "cannot open meta file: " << metaFilePath << "\n" << RESET;
+        continue;
+      }
+
+      int64_t creationTimeNs = 0;
+      int32_t rNum = 0, rDen = 1;
+      in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
+      in.read(reinterpret_cast<char *>(&rNum), sizeof(rNum));
+      in.read(reinterpret_cast<char *>(&rDen), sizeof(rDen));
+
+      std::cout << BLUE << "meta raw: " << metaFilePath << "\n" << RESET;
+      std::cout << "header size: " << headerSize << "\n";
+      std::cout << "entry size: " << entrySize << "\n";
+      std::cout << "sampling interval: " << rNum << "/" << rDen << "\n";
+
+      size_t entryIdx = 0;
+      while (true) {
+        std::vector<std::byte> raw(entrySize);
+        in.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(entrySize));
+        const auto bytesRead = in.gcount();
+        if (bytesRead == 0) break;
+        if (static_cast<size_t>(bytesRead) != entrySize) {
+          std::cout << RED << "truncated entry at index: " << entryIdx << "\n" << RESET;
+          break;
+        }
+
+        auto rec = rdb::metaDataStream::IndexRecord::deserialize(std::span<const std::byte>(raw));
+        std::cout << "entry[" << entryIdx << "] ";
+        std::cout << "count:" << rec.recordCount << " ";
+        std::cout << "flags:" << (rec.isGap ? 1 : 0) << " ";
+        std::cout << "bitsetSize:" << rec.nullBitset.size() << " ";
+        std::cout << "bitsetHex:";
+        for (size_t bi = 0; bi < bitsetBytes; ++bi) {
+          uint8_t byteVal = 0;
+          for (size_t bit = 0; bit < 8; ++bit) {
+            const size_t fieldIdx = bi * 8 + bit;
+            if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1u << bit);
+          }
+          std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byteVal) << std::dec;
+        }
+        std::cout << "\n";
+        ++entryIdx;
+      }
+      std::cout << "entries: " << entryIdx << "\n";
       continue;
     } else {
       std::cout << RED << "?\n" << RESET;
