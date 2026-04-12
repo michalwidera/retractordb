@@ -72,6 +72,24 @@ TEST(payload, nullopt_writes_string_fallback_to_memory) {
   EXPECT_FALSE(payload.getItem(0).has_value());
 }
 
+TEST(payload, null_type_round_trips_as_monostate) {
+  auto desc = rdb::Descriptor("nothing", 0, 1, rdb::NULLTYPE);
+  rdb::payload payload(desc);
+
+  auto value = payload.getItem(0);
+  ASSERT_TRUE(value.has_value());
+  EXPECT_EQ(value->type(), typeid(std::monostate));
+
+  payload.setItem(0, std::any(std::monostate{}));
+  auto rewritten = payload.getItem(0);
+  ASSERT_TRUE(rewritten.has_value());
+  EXPECT_EQ(rewritten->type(), typeid(std::monostate));
+
+  std::stringstream out;
+  out << rdb::flat << payload;
+  EXPECT_EQ(out.str(), "{ nothing:null }");
+}
+
 TEST(payload, add_preserves_null_flags) {
   auto leftDesc  = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
   auto rightDesc = rdb::Descriptor("b", 4, 1, rdb::INTEGER);

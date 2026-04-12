@@ -158,6 +158,28 @@ TEST_F(TextSourceROTest, test_read_byte) {
   GTEST_ASSERT_EQ(buffer[0], 255);
 }
 
+// Verify NULL token maps to null/fallback for scalar numeric fields
+TEST_F(TextSourceROTest, test_read_integer_null_token) {
+  auto filename = createTestFile("test_int_null.txt", "NULL\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  int value = -1;
+  std::memcpy(&value, buffer.get(), sizeof(int));
+  GTEST_ASSERT_EQ(value, 0);
+
+  auto nulls = src->lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_TRUE(nulls[0]);
+}
+
 // ============================================================
 // textSourceRO - string reading tests
 // ============================================================
@@ -196,6 +218,22 @@ TEST_F(TextSourceROTest, test_read_string_padded) {
   EXPECT_EQ(buffer[1], 'i');
 }
 
+// Verify NULL token clears string field bytes in text input
+TEST_F(TextSourceROTest, test_read_string_null_token) {
+  auto filename = createTestFile("test_str_null.txt", "NULL\n");
+
+  rdb::Descriptor desc{{"s", 5, 1, rdb::STRING}};
+  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  for (int i = 0; i < desc.getSizeInBytes(); ++i) EXPECT_EQ(buffer[i], 0);
+}
+
 // ============================================================
 // textSourceRO - multi-field descriptor tests
 // ============================================================
@@ -220,6 +258,25 @@ TEST_F(TextSourceROTest, test_read_multi_field) {
   float floatVal;
   std::memcpy(&floatVal, buffer.get() + sizeof(int), sizeof(float));
   EXPECT_NEAR(floatVal, 2.5f, 0.001f);
+}
+
+// Verify null bitset exported by source for mixed token record
+TEST_F(TextSourceROTest, test_last_null_bitset_for_mixed_record) {
+  auto filename = createTestFile("test_mixed_nulls.txt", "NULL 5\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER},
+                       {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  auto nulls = src->lastNullBitset();
+  ASSERT_EQ(nulls.size(), 2U);
+  EXPECT_TRUE(nulls[0]);
+  EXPECT_FALSE(nulls[1]);
 }
 
 // ============================================================
@@ -297,6 +354,11 @@ TEST_F(TextSourceROTest, test_no_loop_eof_zeros) {
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
   std::memcpy(&value, buffer.get(), sizeof(int));
   GTEST_ASSERT_EQ(value, 0);
+
+  // and expose null metadata for this fallback row
+  auto nulls = src->lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_TRUE(nulls[0]);
 }
 
 // ============================================================

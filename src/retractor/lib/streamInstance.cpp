@@ -367,6 +367,12 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
     expressionEvaluator expression;
     rdb::descFldVT retVal = expression.eval(program.lProgram, inputPayload.get());
 
+    if (std::holds_alternative<std::monostate>(retVal)) {
+      outputPayload->getPayload()->setItem(i, std::nullopt);
+      i++;
+      continue;
+    }
+
     std::any result = std::visit([](auto &&arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
 
     assert(result.has_value());
@@ -386,6 +392,7 @@ bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
   std::visit(Overload{
+                 [&retVal](std::monostate) { retVal = false; },                                    //
                  [&retVal](uint8_t a) { retVal = (a != 0); },                                   //
                  [&retVal](int a) { retVal = (a != 0); },                                       //
                  [&retVal](unsigned a) { retVal = (a != 0); },                                  //

@@ -20,7 +20,9 @@ boost::rational<int> token::getRI() {
 }
 
 std::string token::getStr_() {
-  if (getVT().index() == rdb::STRING)
+  if (getVT().index() == rdb::NULLTYPE)
+    return "null";
+  else if (getVT().index() == rdb::STRING)
     return std::get<std::string>(getVT());
   else if (getVT().index() == rdb::FLOAT)
     return std::to_string(std::get<float>(getVT()));
@@ -54,6 +56,8 @@ token::token(command_id id, rdb::descFldVT value)
 
 std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
   switch (rhs.index()) {
+    case rdb::NULLTYPE:
+      return os << "null";
     case rdb::STRING:
       return os << std::get<std::string>(rhs);
     case rdb::FLOAT:

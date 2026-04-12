@@ -4,6 +4,7 @@
 #include <memory>  // std::unique_ptr
 #include <optional>
 #include <span>
+#include <vector>
 
 #include "descriptor.h"
 
@@ -68,6 +69,12 @@ class payload {
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
+
+  /// @brief Expose null metadata for external persistence (metaDataStream)
+  const std::vector<bool> &getNullBitset() const;
+
+  /// @brief Restore null metadata read from metaDataStream/text source
+  void setNullBitset(const std::vector<bool> &nullBitset);
 
   friend std::istream &operator>>(std::istream &is, const payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);

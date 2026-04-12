@@ -1,0 +1,6 @@
+noprompt
+open test_db
+rread 0
+getpos 0
+getpos 1
+quit

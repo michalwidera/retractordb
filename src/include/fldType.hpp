@@ -20,7 +20,8 @@ typedef std::variant<uint8_t,                      // BYTE
                      double,                       // DOUBLE
                      std::pair<int, int>,          // INTPAIR
                      std::pair<std::string, int>,  // IDXPAIR
-                     std::string>                  // STRING
+                     std::string,                  // STRING
+                     std::monostate>               // NULL
     descFldVT;
 
 enum descFld {
@@ -33,13 +34,16 @@ enum descFld {
   INTPAIR,    //
   IDXPAIR,    //
   STRING,     //
+  NULLTYPE,   // NULL value type
   TYPE,       //
   REF,        //
   RETENTION,  //
   RETMEMORY   // Retention memory
 };
 
-constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view { return magic_enum::enum_name(index); }
+constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view {
+  return index == NULLTYPE ? std::string_view("NULL") : magic_enum::enum_name(index);
+}
 
 struct rField {
   std::string rname;

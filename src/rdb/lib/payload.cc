@@ -115,6 +115,13 @@ void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arr
 
 void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 
+const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
+
+void payload::setNullBitset(const std::vector<bool> &nullBitset) {
+  assert(nullBitset.size() == descriptor.size());
+  nullBitset_ = nullBitset;
+}
+
 std::span<uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
@@ -172,6 +179,8 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
 
   try {
     switch (requestedType) {
+      case rdb::NULLTYPE:
+        break;
       case rdb::STRING:
         writeStringField();
         break;
@@ -264,6 +273,8 @@ std::optional<std::any> payload::getItem(const int positionFlat) {
   };
 
   switch (requestedType) {
+    case rdb::NULLTYPE:
+      return std::any(std::monostate{});
     case rdb::STRING:
       return readStringField();
     case rdb::BYTE:
@@ -302,6 +313,11 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   else
     is >> std::dec;
   Descriptor desc(rhs.descriptor);
+
+  if (desc.type(fieldName) == "NULL") {
+    const_cast<payload &>(rhs).setItem(static_cast<int>(desc.position(fieldName)), std::any(std::monostate{}));
+    return is;
+  }
 
   if (desc.type(fieldName) == "STRING") {
     std::string record;
@@ -360,7 +376,9 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << r.rname;
     os << ":";
     auto offset_ = desc.offsetBegArr(r.rname);
-    if (r.rtype == STRING) {
+    if (r.rtype == rdb::NULLTYPE) {
+      os << "null";
+    } else if (r.rtype == STRING) {
       auto fieldSpan = rhs.span().subspan(offset_, desc.fieldSize(r.rname));
       auto len       = desc.fieldSize(r.rname);
       for (auto i = 0; i < len; i++)

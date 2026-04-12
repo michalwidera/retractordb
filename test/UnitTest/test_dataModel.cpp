@@ -195,6 +195,7 @@ auto print(const std::vector<rdb::descFldVT> &row) {
     std::stringstream coutstring;
 
     std::visit(Overload{                                                                                                    //
+                        [&coutstring](std::monostate) { coutstring << "null"; },                                            //
                         [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
                         [&coutstring](int a) { coutstring << a; },                                                          //
                         [&coutstring](unsigned a) { coutstring << a; },                                                     //

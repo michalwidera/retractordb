@@ -15,9 +15,14 @@ namespace rdb {
 
 bool Descriptor::flatOutput_ = false;
 
-constexpr auto GetFieldType(const std::string_view name) { return magic_enum::enum_cast<rdb::descFld>(name); }
+constexpr auto GetFieldType(const std::string_view name) {
+  if (name == "NULL") return std::optional<rdb::descFld>(rdb::NULLTYPE);
+  return magic_enum::enum_cast<rdb::descFld>(name);
+}
 
-constexpr auto GetFieldType(const rdb::descFld index) { return magic_enum::enum_name(index); }
+constexpr auto GetFieldType(const rdb::descFld index) {
+  return index == rdb::NULLTYPE ? std::string_view("NULL") : magic_enum::enum_name(index);
+}
 
 constexpr auto isConfigurationField(const rdb::descFld index) {
   return index == rdb::TYPE ||       //
@@ -161,6 +166,7 @@ void Descriptor::composeHashDescriptorFrom(const std::string &name, Descriptor l
 
 constexpr int Descriptor::fieldSize(const rdb::rField &field) const {
   if (isConfigurationField(field.rtype)) return 0;
+  if (field.rtype == rdb::NULLTYPE) return 0;
   return field.rlen * field.rarray;
 }
 

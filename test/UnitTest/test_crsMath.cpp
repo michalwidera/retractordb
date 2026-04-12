@@ -213,6 +213,7 @@ std::string print(std::string query_name, dataModel &proc) {
   auto cnt = proc.getPayload(query_name)->descriptor.flatElementCount();
   for (auto value : proc.getRow(query_name, 0)) {
     std::visit(Overload{                                                                                                    //
+                        [&coutstring](std::monostate) { coutstring << "null"; },                                            //
                         [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
                         [&coutstring](int a) { coutstring << a; },                                                          //
                         [&coutstring](unsigned a) { coutstring << a; },                                                     //

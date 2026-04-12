@@ -48,5 +48,7 @@ class textSourceRO : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+
+  const std::vector<bool> &lastNullBitset() const;
 };
 }  // namespace rdb

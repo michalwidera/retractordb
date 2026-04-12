@@ -263,6 +263,9 @@ int main(int argc, char *argv[]) {
         continue;
       }
       std::any value = valueOpt.value();
+      if (value.type() == typeid(std::monostate)) {
+        std::cout << "null" << std::endl;
+      }
       if (value.type() == typeid(std::string)) {
         std::cout << std::any_cast<std::string>(value) << std::endl;
       }

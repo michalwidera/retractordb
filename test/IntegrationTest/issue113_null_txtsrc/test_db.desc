@@ -1,0 +1,5 @@
+{	INTEGER a
+	INTEGER b
+	REF "data.txt"
+	TYPE TEXTSOURCE
+}

@@ -304,9 +304,16 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     assert(result == 0);
+    if (metaDataStream_) {
+      if (recordIndexFromFront < metaDataStream_->totalRecords())
+        storagePayload_->setNullBitset(metaDataStream_->getNullBitset(recordIndexFromFront));
+      else
+        storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
+    }
     SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront, recordsCount_);
   } else {
     std::memset(destination, 0, size);
+    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
     SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
                 recordsCount_);
   }
@@ -352,7 +359,20 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     //
     auto result = accessor_->read(chamber_->span().data(), 0);
     SPDLOG_INFO("Physical read from source {} into chamber_ result={}", accessor_->name(), result);
-    assert(result == EXIT_SUCCESS && "read failure from data source");
+
+    if (auto *textSource = dynamic_cast<rdb::textSourceRO *>(accessor_.get())) {
+      chamber_->setNullBitset(textSource->lastNullBitset());
+    } else if (result == EXIT_SUCCESS) {
+      chamber_->setNullBitset(std::vector<bool>(descriptor.size(), false));
+    } else {
+      chamber_->setNullBitset(std::vector<bool>(descriptor.size(), true));
+      std::fill(chamber_->span().begin(), chamber_->span().end(), 0);
+    }
+
+    if (result != EXIT_SUCCESS) {
+      SPDLOG_WARN("Read failure from declared source {}. Returning null row.", accessor_->name());
+    }
+
     bufferState              = sourceState::armed;
     *(storagePayload_.get()) = *chamber_;
     return true;
@@ -395,8 +415,7 @@ void storage::setCapacity(const int capacity) {
 }
 
 bool storage::write(const size_t recordIndex) {
-  std::vector<bool> nullInfo;  // TODO: pass real null bitset
-  nullInfo.resize(descriptor.size(), false);
+  auto nullInfo = storagePayload_->getNullBitset();
 
   abortIfStorageNotPrepared();
 
@@ -411,7 +430,7 @@ bool storage::write(const size_t recordIndex) {
     assert(result == 0);
     if (result == 0) recordsCount_++;
 
-    if (metaDataStream_) metaDataStream_->onRecordAppended(nullInfo);  // TODO: pass real null bitset
+    if (metaDataStream_) metaDataStream_->onRecordAppended(nullInfo);
 
   } else {
     SPDLOG_INFO("write {}", recordIndex);
@@ -422,7 +441,7 @@ bool storage::write(const size_t recordIndex) {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * size);
     assert(result == 0);
 
-    if (metaDataStream_) metaDataStream_->onRecordModified(recordIndex, nullInfo);  // TODO: pass real null bitset
+    if (metaDataStream_) metaDataStream_->onRecordModified(recordIndex, nullInfo);
 
     assert(recordsCount_ == accessor_->count());
   }

@@ -17,6 +17,7 @@ void visit_descFld(const K &inVar, K &retVal) {
 
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
+                   [&retVal](std::monostate) { retVal = T{}; },                                      //
                    [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                                 //
                    [&retVal](int a) { retVal = static_cast<T>(a); },                                     //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                //
@@ -35,7 +36,9 @@ void visit_descFld(const K &inVar, K &retVal) {
                },
                inVar);
   } else {
-    if (inVar.type() == typeid(uint8_t)) {
+    if (inVar.type() == typeid(std::monostate)) {
+      retVal = T{};
+    } else if (inVar.type() == typeid(uint8_t)) {
       retVal = static_cast<T>(std::any_cast<uint8_t>(inVar));
     } else if (inVar.type() == typeid(int)) {
       retVal = static_cast<T>(std::any_cast<int>(inVar));
@@ -79,7 +82,28 @@ std::istream &expect(std::istream &in) {
 // https://stackoverflow.com/questions/52088928/trying-to-return-the-value-from-stdvariant-using-stdvisit-and-a-lambda-expre
 template <typename T>
 T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
-  T retVal;
+  T retVal{};
+
+  if (reqType == rdb::NULLTYPE) {
+    if constexpr (std::is_same_v<T, rdb::descFldVT>) {
+      return std::monostate{};
+    } else if constexpr (std::is_same_v<T, std::any>) {
+      return std::any(std::monostate{});
+    } else {
+      return T{};
+    }
+  }
+
+  if constexpr (std::is_same_v<T, rdb::descFldVT>) {
+    if (std::holds_alternative<std::monostate>(inVar)) return nullFallbackValue(reqType);
+  } else if constexpr (std::is_same_v<T, std::any>) {
+    if (inVar.type() == typeid(std::monostate)) {
+      T fallback;
+      std::visit([&fallback](const auto &v) { fallback = std::any(v); }, nullFallbackValue(reqType));
+      return fallback;
+    }
+  }
+
   switch (reqType) {
     case rdb::BYTE:
       visit_descFld<uint8_t>(inVar, retVal);
@@ -96,6 +120,8 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
     case rdb::FLOAT:
       visit_descFld<float>(inVar, retVal);
       break;
+    case rdb::NULLTYPE:
+      break;
     case rdb::IDXPAIR:
       SPDLOG_ERROR("TODO - IDXPAIR->T");
       assert(false);
@@ -105,6 +131,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
         std::visit(
             Overload{                                                                                                 //
+               [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },                                    //
                      [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
                      [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
                      [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
@@ -158,6 +185,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       // Requested type is RATIONAL
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
         std::visit(Overload{                                                                                //
+                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },            //
                             [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
                             [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
                             [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
@@ -212,6 +240,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
         std::visit(
             Overload{                                                                                                          //
+               [&retVal](std::monostate) { retVal = std::string(""); },                                                 //
                      [&retVal](uint8_t a) { retVal = std::to_string(a); },                                                     //
                      [&retVal](int a) { retVal = std::to_string(a); },                                                         //
                      [&retVal](unsigned a) { retVal = std::to_string(a); },                                                    //
@@ -312,6 +341,8 @@ rdb::descFldVT nullFallbackValue(rdb::descFld type) {
       return std::make_pair(std::string(""), 0);
     case rdb::STRING:
       return std::string("");
+    case rdb::NULLTYPE:
+      return std::monostate{};
     default:
       return uint8_t(0);
   }
@@ -319,8 +350,9 @@ rdb::descFldVT nullFallbackValue(rdb::descFld type) {
 
 // based: https://stackoverflow.com/questions/61182946/convert-stdany-to-stdvariant
 rdb::descFldVT any_to_variant_cast(std::any a) {
-  if (!a.has_value()) throw std::bad_any_cast();
+  if (!a.has_value()) return std::monostate{};
   cast<rdb::descFldVT> castRI;
+  if (a.type() == typeid(std::monostate)) return std::monostate{};
   if (a.type() == typeid(std::string)) return castRI(std::any_cast<std::string>(a), rdb::STRING);
   if (a.type() == typeid(int)) return castRI(std::any_cast<int>(a), rdb::INTEGER);
   if (a.type() == typeid(uint8_t)) return castRI(std::any_cast<uint8_t>(a), rdb::BYTE);
@@ -329,7 +361,7 @@ rdb::descFldVT any_to_variant_cast(std::any a) {
   if (a.type() == typeid(float)) return castRI(std::any_cast<float>(a), rdb::FLOAT);
   if (a.type() == typeid(boost::rational<int>)) return castRI(std::any_cast<boost::rational<int>>(a), rdb::RATIONAL);
   throw std::bad_any_cast();
-  return rdb::descFldVT(0);  // Proforma
+  return std::monostate{};  // Proforma
 }
 
 template struct cast<rdb::descFldVT>;

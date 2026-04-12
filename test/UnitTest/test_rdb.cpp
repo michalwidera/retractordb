@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <filesystem>
 #include <string>
 
 #include "rdb/fainterface.h"
@@ -172,4 +173,62 @@ TEST(crdb, posixBinaryFile_byte) {
   EXPECT_TRUE(result2);
   auto result3 = test_3<uint8_t, rdb::posixBinaryFile>();
   EXPECT_TRUE(result3);
+}
+
+TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
+  const std::string streamName = "ut-null-meta-stream";
+  const std::string dataFile   = "ut-null-meta-stream.bin";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+    s.setDisposable(true);
+
+    auto *pl = s.getPayload();
+
+    pl->setItem(0, std::nullopt);
+    ASSERT_TRUE(s.write());
+
+    pl->setItem(0, 77);
+    ASSERT_TRUE(s.write());
+
+    ASSERT_TRUE(s.read(0));
+    EXPECT_FALSE(pl->getItem(0).has_value());
+
+    ASSERT_TRUE(s.read(1));
+    ASSERT_TRUE(pl->getItem(0).has_value());
+    EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 77);
+  }
+
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_updates_null_flags_on_record_modify) {
+  const std::string streamName = "ut-null-meta-modify";
+  const std::string dataFile   = "ut-null-meta-modify.bin";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+    s.setDisposable(true);
+
+    auto *pl = s.getPayload();
+
+    pl->setItem(0, 123);
+    ASSERT_TRUE(s.write());
+
+    pl->setItem(0, std::nullopt);
+    ASSERT_TRUE(s.write(0));
+
+    ASSERT_TRUE(s.read(0));
+    EXPECT_FALSE(pl->getItem(0).has_value());
+  }
+
+  std::filesystem::remove(metaFile);
 }
