@@ -383,7 +383,7 @@ int main(int argc, char *argv[]) {
       }
       rdb::metaDataStream metaView(dacc->descriptor, metaFilePath);
       auto committed       = metaView.entries();
-      const auto &cur      = metaView.currentEntry_;
+      const auto &cur      = metaView.pendingEntry();
       const size_t nFields = dacc->descriptor.size();
 
       std::cout << BLUE << "meta: " << metaFilePath << "\n";

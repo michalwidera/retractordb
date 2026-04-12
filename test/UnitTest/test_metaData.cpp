@@ -66,8 +66,8 @@ TEST_F(MetaTestFixture, test_append_and_query) {
     EXPECT_EQ(meta.getNullBitset(1), allNull);
     EXPECT_EQ(meta.getNullBitset(2), noNull);
     EXPECT_EQ(meta.getNullBitset(3), mixed);
-    EXPECT_TRUE(meta.isFieldNull(0, 0));
-    EXPECT_FALSE(meta.isFieldNull(2, 0));
+    EXPECT_TRUE(meta.getNullBitset(0)[0]);
+    EXPECT_FALSE(meta.getNullBitset(2)[0]);
   }
 
   // Verify persistence: reload from file
@@ -139,14 +139,16 @@ TEST_F(MetaTestFixture, test_timestamps) {
   // Sampling interval should be 1/10
   EXPECT_EQ(meta.getSamplingInterval(), boost::rational<int>(1, 10));
 
-  // Record 0 timestamp == creation time
-  auto ts0 = meta.calculateRecordTimestamp(0);
-  EXPECT_EQ(ts0, creationTime);
+  // Verify timestamp calculation through public gap API.
+  // Gap inserted after one record should be at record index 1.
+  meta.onTransmissionGap();
+  auto gaps = meta.getTransmissionGaps();
+  ASSERT_EQ(gaps.size(), 1u);
+  EXPECT_EQ(gaps[0].recordIndex, 1u);
 
-  // Record 10 timestamp == creation time + 1 second (10 * 0.1s)
-  auto ts10     = meta.calculateRecordTimestamp(10);
-  auto expected = creationTime + std::chrono::seconds(1);
-  EXPECT_EQ(ts10, expected);
+  // recordIndex=1 with 0.1s interval => creation + 100ms
+  auto expected = creationTime + std::chrono::milliseconds(100);
+  EXPECT_EQ(gaps[0].timestamp, expected);
 }
 
 // R4: Modify a record already committed to disk (rewriteFile path)
@@ -193,15 +195,15 @@ TEST_F(MetaTestFixture, test_committed_on_disk_current_in_memory) {
   meta.onRecordAppended(patA);                    // rec 0
   meta.onRecordAppended(patA);                    // rec 1
   EXPECT_EQ(meta.entries().size(), 0u);           // nothing committed yet
-  EXPECT_EQ(meta.currentEntry_.recordCount, 2u);  // buffered in memory
+  EXPECT_EQ(meta.pendingEntry().recordCount, 2u);  // buffered in memory
 
   // Different pattern — flushes patA to disk, patB becomes currentEntry_
   meta.onRecordAppended(patB);           // rec 2
   EXPECT_EQ(meta.entries().size(), 1u);  // patA committed to disk
   EXPECT_EQ(meta.entries()[0].recordCount, 2u);
   EXPECT_EQ(meta.entries()[0].nullBitset, patA);
-  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);  // patB in memory only
-  EXPECT_EQ(meta.currentEntry_.nullBitset, patB);
+  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);  // patB in memory only
+  EXPECT_EQ(meta.pendingEntry().nullBitset, patB);
 }
 
 // R10: Handle large amounts of data
@@ -251,7 +253,7 @@ TEST_F(MetaTestFixture, test_rle_compression_structure) {
 
   // All 1000 should be in a single currentEntry_ (no committed entries)
   EXPECT_EQ(meta.entries().size(), 0u);
-  EXPECT_EQ(meta.currentEntry_.recordCount, 1000u);
+  EXPECT_EQ(meta.pendingEntry().recordCount, 1000u);
   EXPECT_EQ(meta.totalRecords(), 1000u);
 
   // Force commit by switching pattern
@@ -263,8 +265,8 @@ TEST_F(MetaTestFixture, test_rle_compression_structure) {
   EXPECT_EQ(committed.size(), 1u);
   EXPECT_EQ(committed[0].recordCount, 1000u);
   EXPECT_EQ(committed[0].nullBitset, pat);
-  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);
-  EXPECT_EQ(meta.currentEntry_.nullBitset, pat2);
+  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);
+  EXPECT_EQ(meta.pendingEntry().nullBitset, pat2);
 }
 
 // ── Integration tests: null data arrival → IndexRecord aggregation ───
@@ -284,10 +286,10 @@ TEST_F(MetaTestFixture, integration_all_null_stream_aggregated_into_single_index
   // All 10 records share the same pattern — must stay in one in-memory entry
   EXPECT_EQ(meta.totalRecords(), 10u);
   EXPECT_EQ(meta.entries().size(), 0u);           // nothing committed to disk yet
-  EXPECT_EQ(meta.currentEntry_.recordCount, 10u); // single RLE run
-  EXPECT_EQ(meta.currentEntry_.nullBitset, allNull);
-  EXPECT_TRUE(meta.currentEntry_.nullBitset[0]);
-  EXPECT_TRUE(meta.currentEntry_.nullBitset[1]);
+  EXPECT_EQ(meta.pendingEntry().recordCount, 10u); // single RLE run
+  EXPECT_EQ(meta.pendingEntry().nullBitset, allNull);
+  EXPECT_TRUE(meta.pendingEntry().nullBitset[0]);
+  EXPECT_TRUE(meta.pendingEntry().nullBitset[1]);
 }
 
 // When the null pattern changes after all-null records, the all-null
@@ -312,8 +314,8 @@ TEST_F(MetaTestFixture, integration_all_null_run_committed_when_pattern_changes)
   EXPECT_FALSE(committed[0].isGap);
 
   // Current in-memory entry holds the mixed record
-  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);
-  EXPECT_EQ(meta.currentEntry_.nullBitset, mixed);
+  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);
+  EXPECT_EQ(meta.pendingEntry().nullBitset, mixed);
 }
 
 // A realistic data sequence: all-null, mixed-null, no-null records
@@ -350,8 +352,8 @@ TEST_F(MetaTestFixture, integration_realistic_sequence_produces_correct_index_re
   EXPECT_EQ(committed[1].nullBitset, mixed);
   EXPECT_EQ(committed[1].recordCount, 3u);
 
-  EXPECT_EQ(meta.currentEntry_.nullBitset, noNull);
-  EXPECT_EQ(meta.currentEntry_.recordCount, 4u);
+  EXPECT_EQ(meta.pendingEntry().nullBitset, noNull);
+  EXPECT_EQ(meta.pendingEntry().recordCount, 4u);
 
   // Null-bitset queries must be consistent with the RLE structure
   EXPECT_EQ(meta.getNullBitset(0), allNull);
@@ -391,7 +393,7 @@ TEST_F(MetaTestFixture, integration_persistence_restores_aggregated_index_record
     // Total must account for all 7 records across the segments
     size_t total = 0;
     for (const auto &e : committed) total += e.recordCount;
-    total += meta.currentEntry_.recordCount;
+    total += meta.pendingEntry().recordCount;
     EXPECT_EQ(total, 7u);
 
     EXPECT_EQ(meta.getNullBitset(0), allNull);
@@ -415,9 +417,9 @@ TEST_F(MetaTestFixture, integration_is_field_null_inside_aggregated_rle_entry) {
 
   // All 8 records share the same pattern in one RLE accumulator
   for (int i = 0; i < 8; ++i) {
-    EXPECT_FALSE(meta.isFieldNull(i, 0)) << "rec " << i << " field 0";
-    EXPECT_TRUE(meta.isFieldNull(i, 1))  << "rec " << i << " field 1";
-    EXPECT_FALSE(meta.isFieldNull(i, 2)) << "rec " << i << " field 2";
+    EXPECT_FALSE(meta.getNullBitset(i)[0]) << "rec " << i << " field 0";
+    EXPECT_TRUE(meta.getNullBitset(i)[1])  << "rec " << i << " field 1";
+    EXPECT_FALSE(meta.getNullBitset(i)[2]) << "rec " << i << " field 2";
   }
 }
 
@@ -444,20 +446,20 @@ TEST_F(MetaTestFixture, integration_metadata_with_payload_nulls) {
   EXPECT_EQ(meta.totalRecords(), 5u);
 
   // Verify each record's null pattern
-  EXPECT_TRUE(meta.isFieldNull(0, 0));   // rec 0, val1
-  EXPECT_FALSE(meta.isFieldNull(0, 1));  // rec 0, val2
+  EXPECT_TRUE(meta.getNullBitset(0)[0]);   // rec 0, val1
+  EXPECT_FALSE(meta.getNullBitset(0)[1]);  // rec 0, val2
 
-  EXPECT_TRUE(meta.isFieldNull(1, 0));   // rec 1, val1
-  EXPECT_FALSE(meta.isFieldNull(1, 1));  // rec 1, val2
+  EXPECT_TRUE(meta.getNullBitset(1)[0]);   // rec 1, val1
+  EXPECT_FALSE(meta.getNullBitset(1)[1]);  // rec 1, val2
 
-  EXPECT_FALSE(meta.isFieldNull(2, 0));  // rec 2, val1
-  EXPECT_TRUE(meta.isFieldNull(2, 1));   // rec 2, val2
+  EXPECT_FALSE(meta.getNullBitset(2)[0]);  // rec 2, val1
+  EXPECT_TRUE(meta.getNullBitset(2)[1]);   // rec 2, val2
 
-  EXPECT_FALSE(meta.isFieldNull(3, 0));  // rec 3, val1
-  EXPECT_FALSE(meta.isFieldNull(3, 1));  // rec 3, val2
+  EXPECT_FALSE(meta.getNullBitset(3)[0]);  // rec 3, val1
+  EXPECT_FALSE(meta.getNullBitset(3)[1]);  // rec 3, val2
 
-  EXPECT_FALSE(meta.isFieldNull(4, 0));  // rec 4, val1
-  EXPECT_FALSE(meta.isFieldNull(4, 1));  // rec 4, val2
+  EXPECT_FALSE(meta.getNullBitset(4)[0]);  // rec 4, val1
+  EXPECT_FALSE(meta.getNullBitset(4)[1]);  // rec 4, val2
 }
 
 TEST_F(MetaTestFixture, integration_storage_operations_with_meta) {
@@ -479,7 +481,7 @@ TEST_F(MetaTestFixture, integration_storage_operations_with_meta) {
 
   EXPECT_EQ(meta.totalRecords(), 5u);
   EXPECT_EQ(meta.entries().size(), 1u);      // patA committed to disk
-  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);  // patB in memory
+  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);  // patB in memory
 
   // Test modify on committed entry
   meta.onRecordModified(0, patB);
@@ -600,7 +602,7 @@ TEST_F(MetaTestFixture, test_reset_clears_all_data) {
 
     EXPECT_EQ(meta.totalRecords(), 0u);
     EXPECT_TRUE(meta.isEmpty());
-    EXPECT_EQ(meta.currentEntry_.recordCount, 0u);
+    EXPECT_EQ(meta.pendingEntry().recordCount, 0u);
   }
 
   // Verify file is empty after reload

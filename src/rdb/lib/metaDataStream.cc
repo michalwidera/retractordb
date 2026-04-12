@@ -2,13 +2,11 @@
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
-#include <numeric>
 #include <stdexcept>
 
 namespace rdb {
@@ -259,7 +257,7 @@ metaDataStream::~metaDataStream() { flushCurrentEntry(); }
 
 // ── Core update interface ────────────────────────────────────────────
 
-void metaDataStream::onRecordAppended(std::vector<bool> &nullBitsetParam) {
+void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) {
   if (currentEntry_.recordCount > 0 && currentEntry_.nullBitset == nullBitsetParam) {
     currentEntry_.recordCount++;
   } else {
@@ -270,7 +268,7 @@ void metaDataStream::onRecordAppended(std::vector<bool> &nullBitsetParam) {
   }
 }
 
-void metaDataStream::onRecordModified(size_t recordIndex, std::vector<bool> &nullBitsetParam) {
+void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
   auto [segIdx, offset] = locateRecord(recordIndex);
 
   const bool inCurrentEntry = (segIdx == std::numeric_limits<size_t>::max());
@@ -378,6 +376,8 @@ bool metaDataStream::isFieldNull(size_t recordIndex, size_t fieldIndex) const {
 size_t metaDataStream::totalRecords() const { return committedRecordCount_ + currentEntry_.recordCount; }
 
 std::vector<metaDataStream::IndexRecord> metaDataStream::entries() const { return readCommittedEntries(); }
+
+const metaDataStream::IndexRecord &metaDataStream::pendingEntry() const { return currentEntry_; }
 
 // ── Transmission-gap interface ───────────────────────────────────────
 
