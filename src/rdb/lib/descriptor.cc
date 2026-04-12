@@ -39,62 +39,29 @@ void Descriptor::updateConvMaps() {
   offsetMap_.clear();
 
   clen_ = 0;
-  for (auto it : *this)
-    clen_ += (it.rtype == rdb::STRING) ? 1 : it.rarray;
-
-  std::vector<rField>::iterator it = this->begin();
-  int fieldCounter{0};
-  int backCounterArray{0};
-  int counterArray{(*it).rarray};
   int offset{0};
-  int clen_alignment{0};
-  for (int i = 0; i < clen_; ++i) {
-    if (isConfigurationField((*it).rtype)) {
-      ++it;
-      ++clen_alignment;
-      continue;
-    }
+  for (size_t fieldIndex = 0; fieldIndex < size(); ++fieldIndex) {
+    const auto &field = (*this)[fieldIndex];
+    if (isConfigurationField(field.rtype)) continue;
 
-    if ((*it).rtype == rdb::STRING) {
-      counterArray     = 1;
-      backCounterArray = 0;
-    }
-
-    if (counterArray > 0) {
-      convMap_.push_back(std::make_pair(fieldCounter, backCounterArray));
+    const int flatCount = (field.rtype == rdb::STRING) ? 1 : field.rarray;
+    for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
+      convMap_.push_back(std::make_pair(static_cast<int>(fieldIndex), arrayIndex));
       offsetMap_.push_back(offset);
-      if ((*it).rtype == rdb::STRING)
-        offset += len(*it);
-      else
-        offset += (*it).rlen;
-    }
-
-    --counterArray;
-    ++backCounterArray;
-
-    if (counterArray == 0) {
-      ++it;
-      if (it == this->end()) break;
-      backCounterArray = 0;
-      ++fieldCounter;
-      counterArray = (*it).rarray;
+      offset += (field.rtype == rdb::STRING) ? len(field) : field.rlen;
+      ++clen_;
     }
   }
-  clen_ -= clen_alignment;
   dirtyMap = false;
 }
 
 std::optional<std::pair<int, int>> Descriptor::convert(int position) {
   updateConvMaps();
-  if (position < clen_) {
-    return convMap_[position];
-  } else {
-    assert(false);
-    return {};
-  }
+  if (position < 0 || position >= clen_) return {};
+  return convMap_[position];
 }
 
-int Descriptor::sizeFlat() {
+int Descriptor::flatElementCount() {
   updateConvMaps();
   return clen_;
 };
@@ -139,24 +106,31 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto refCountRhs  = std::count_if(rhs.begin(), rhs.end(),                                          //
-                                    [](const rField &i) { return isConfigurationField(i.rtype); });  //
-  auto refCountThis = std::count_if(begin(), end(),                                                  //
-                                    [](const rField &i) { return isConfigurationField(i.rtype); });  //
-  auto i{0};
-  for (const rField &f : *this) {
-    if (isConfigurationField(f.rtype) || isConfigurationField(rhs[i].rtype)) {
-      ++i;
-      continue;
-    }
-    if (len(f) < len(rhs[i]) || f.rtype < rhs[i].rtype) return false;
+  auto lhsIt = begin();
+  auto rhsIt = rhs.begin();
 
-    ++i;
+  auto skipConfigurationFields = [](auto &it, const auto &container) {
+    while (it != container.end() && isConfigurationField(it->rtype)) {
+      ++it;
+    }
+  };
+
+  while (true) {
+    skipConfigurationFields(lhsIt, *this);
+    skipConfigurationFields(rhsIt, rhs);
+
+    if (lhsIt == end() || rhsIt == rhs.end()) {
+      return lhsIt == end() && rhsIt == rhs.end();
+    }
+
+    if (len(*lhsIt) < len(*rhsIt) || lhsIt->rtype < rhsIt->rtype) return false;
+
+    ++lhsIt;
+    ++rhsIt;
   }
-  return this->size() - refCountThis == rhs.size() - refCountRhs;
 }
 
-Descriptor &Descriptor::cleanRef() {
+void Descriptor::removeConfigurationFields() {
   Descriptor rhs(*this);
   clear();
   std::copy_if(rhs.begin(), rhs.end(),     //
@@ -166,12 +140,11 @@ Descriptor &Descriptor::cleanRef() {
                });
 
   dirtyMap = true;
-  return *this;
 }
 
-Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Descriptor rhs) {
-  lhs.cleanRef();
-  rhs.cleanRef();
+void Descriptor::composeHashDescriptorFrom(const std::string &name, Descriptor lhs, Descriptor rhs) {
+  lhs.removeConfigurationFields();
+  rhs.removeConfigurationFields();
   assert(lhs.size() == rhs.size());
 
   clear();
@@ -184,7 +157,6 @@ Descriptor &Descriptor::createHash(const std::string &name, Descriptor lhs, Desc
   }
 
   dirtyMap = true;
-  return *this;
 }
 
 constexpr int Descriptor::len(const rdb::rField &field) const {
@@ -256,6 +228,8 @@ size_t Descriptor::offsetBegArr(const std::string_view name) {
 
 int Descriptor::offset(const int position) {
   updateConvMaps();
+  assert(position >= 0 && position < clen_ && "flat position out of range");
+  if (position < 0 || position >= clen_) return 0;
   return offsetMap_[position];
 }
 

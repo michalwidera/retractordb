@@ -480,8 +480,13 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
       case PUSH_ID: {
         assert(payload != nullptr);
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
-        const auto anyValue   = payload->getItem(instancePosition.second);
-        rdb::descFldVT val    = any_to_variant_cast(anyValue);
+        auto anyValueOpt      = payload->getItem(instancePosition.second);
+        if (!anyValueOpt.has_value()) {
+          auto descPosition = payload->descriptor.convert(instancePosition.second).value().first;
+          rStack.push(nullFallbackValue(payload->descriptor[descPosition].rtype));
+          break;
+        }
+        rdb::descFldVT val = any_to_variant_cast(anyValueOpt.value());
         rStack.push(val);
       } break;
       case PUSH_IDX:
@@ -499,9 +504,14 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         const std::string sOffset1(what[2]);
         const int offset1(atoi(sOffset1.c_str()));
 
-        const auto anyValue = payload->getItem(offset1);
+        auto anyValueOpt = payload->getItem(offset1);
+        if (!anyValueOpt.has_value()) {
+          auto descPosition = payload->descriptor.convert(offset1).value().first;
+          rStack.push(nullFallbackValue(payload->descriptor[descPosition].rtype));
+          break;
+        }
 
-        rdb::descFldVT val = any_to_variant_cast(anyValue);
+        rdb::descFldVT val = any_to_variant_cast(anyValueOpt.value());
         rStack.push(val);
       } break;
       default:

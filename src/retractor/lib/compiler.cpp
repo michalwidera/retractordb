@@ -242,8 +242,8 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
-    if (coreInstance.getQuery(sName1).descriptorStorage().sizeFlat() !=
-        coreInstance.getQuery(sName2).descriptorStorage().sizeFlat())
+    if (coreInstance.getQuery(sName1).descriptorStorage().flatElementCount() !=
+        coreInstance.getQuery(sName2).descriptorStorage().flatElementCount())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
     lRetVal = coreInstance.getQuery(sName1).lSchema;
   } else if (cmd == STREAM_DEHASH_DIV)
@@ -389,7 +389,7 @@ std::string compiler::replicateIDX() {
       if (usedSchemaX.size() != 0) {
         int minSizeFlat{std::numeric_limits<int>::max()};
         for (auto schema : usedSchemaX) {
-          auto size = coreInstance.getQuery(schema).descriptorStorage().sizeFlat();
+          auto size = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
           if (size < minSizeFlat) minSizeFlat = size;
         }
 
@@ -564,7 +564,7 @@ std::string compiler::convertRemotes() {
     for (auto &f : q.lProgram) {            // for each token in stream program
       if (f.getCommandID() == PUSH_STREAM) {
         offsetItem[f.getStr_()] = offset;
-        offset += coreInstance[f.getStr_()].descriptorStorage().sizeFlat();
+        offset += coreInstance[f.getStr_()].descriptorStorage().flatElementCount();
       }
       if (f.getCommandID() == STREAM_HASH) {
         for (auto &i : offsetItem)
@@ -597,8 +597,8 @@ std::string compiler::applyConstraints() {
     auto i{0};
     switch (cmd.getCommandID()) {
       case STREAM_HASH: {
-        if (coreInstance.getQuery(arg1).descriptorStorage().sizeFlat() !=
-            coreInstance.getQuery(arg2).descriptorStorage().sizeFlat()) {
+        if (coreInstance.getQuery(arg1).descriptorStorage().flatElementCount() !=
+            coreInstance.getQuery(arg2).descriptorStorage().flatElementCount()) {
           SPDLOG_ERROR("Hash operations need to work on two schemas with the same size. q.id={}", q.id);
           return std::string("HASH operation constraint failed on " + q.id);
         }
@@ -652,7 +652,7 @@ std::map<std::string, int> compiler::countBuffersCapacity() {
         auto [step, length] = get<std::pair<int, int>>(cmd.getVT());
         assert(step > 0);
         length                    = abs(length);
-        const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().sizeFlat();
+        const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().flatElementCount();
         const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 2;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);

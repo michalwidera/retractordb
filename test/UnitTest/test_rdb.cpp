@@ -136,7 +136,7 @@ TEST(xrdb, test_storage) {
   {
     int tlenViaOffset;
     std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.offsetBegArr("TLen"), sizeof(int));
-    EXPECT_EQ(std::any_cast<int>(pl->getItem(2)), tlenViaOffset);
+    EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), tlenViaOffset);
   }
 
   dAcc2.write();
@@ -151,9 +151,9 @@ TEST(xrdb, test_storage) {
 
   dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
 
-  EXPECT_EQ(std::any_cast<std::string>(pl->getItem(0)), "xxxx xxxx");
-  EXPECT_EQ(std::any_cast<int>(pl->getItem(2)), 0x67);
-  EXPECT_EQ(std::any_cast<uint8_t>(pl->getItem(1)), 0x33);
+  EXPECT_EQ(std::any_cast<std::string>(pl->getItem(0).value()), "xxxx xxxx");
+  EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), 0x67);
+  EXPECT_EQ(std::any_cast<uint8_t>(pl->getItem(1).value()), 0x33);
 }
 
 TEST(crdb, genericBinaryFile_byte) {
@@ -220,10 +220,10 @@ TEST(crdb, payload_add_operator) {
   data1Payload.setItem(2, 2000);
   data1Payload.setItem(3, 3333);
 
-  std::any Name_    = data1Payload.getItem(0);
-  std::any Control_ = data1Payload.getItem(1);
-  std::any ll_      = data1Payload.getItem(2);
-  std::any TLen_    = data1Payload.getItem(3);
+  std::any Name_    = data1Payload.getItem(0).value();
+  std::any Control_ = data1Payload.getItem(1).value();
+  std::any ll_      = data1Payload.getItem(2).value();
+  std::any TLen_    = data1Payload.getItem(3).value();
 
   dataPayload var;
 
@@ -235,15 +235,15 @@ TEST(crdb, payload_add_operator) {
   rdb::payload data2Payload(data2);
   data2Payload.setItem(0, 4004);
 
-  EXPECT_TRUE(std::any_cast<int>(data1Payload.getItem(2)) == 2000);
+  EXPECT_TRUE(std::any_cast<int>(data1Payload.getItem(2).value()) == 2000);
 
   rdb::payload data3Payload;
 
   data3Payload = data1Payload + data2Payload;
 
-  EXPECT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0)) == "test");
-  EXPECT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1)) == 24);
-  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(2)) == 2000);
-  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(3)) == 3333);
-  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4)) == 4004);
+  EXPECT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0).value()) == "test");
+  EXPECT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1).value()) == 24);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(2).value()) == 2000);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(3).value()) == 3333);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4).value()) == 4004);
 }

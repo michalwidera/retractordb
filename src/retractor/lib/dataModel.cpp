@@ -272,7 +272,13 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   }
   auto i{0};
   for (auto f : payload->descriptor.fieldsFlat()) {
-    retVal.push_back(any_to_variant_cast(payload->getItem(i++)));
+    auto valueOpt = payload->getItem(i++);
+    if (valueOpt.has_value()) {
+      retVal.push_back(any_to_variant_cast(valueOpt.value()));
+      continue;
+    }
+
+    retVal.push_back(nullFallbackValue(f.rtype));
   }
   return retVal;
 }

@@ -51,11 +51,13 @@ set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp
                      launch/main.cpp)
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 target_link_libraries(test_xqry PRIVATE ${LIBRARY_TEST_SET})
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)
 add_test(
   NAME ut-xqry
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
   COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)
 add_test(
   NAME ut-dataModel-compile
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel

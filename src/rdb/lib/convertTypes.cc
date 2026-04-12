@@ -292,6 +292,31 @@ boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6
   return err1 > err2 ? result2 : result1;
 }
 
+rdb::descFldVT nullFallbackValue(rdb::descFld type) {
+  switch (type) {
+    case rdb::BYTE:
+      return uint8_t(0);
+    case rdb::INTEGER:
+      return int(0);
+    case rdb::UINT:
+      return unsigned(0);
+    case rdb::RATIONAL:
+      return boost::rational<int>(0, 1);
+    case rdb::FLOAT:
+      return float(0);
+    case rdb::DOUBLE:
+      return double(0);
+    case rdb::INTPAIR:
+      return std::make_pair(0, 0);
+    case rdb::IDXPAIR:
+      return std::make_pair(std::string(""), 0);
+    case rdb::STRING:
+      return std::string("");
+    default:
+      return uint8_t(0);
+  }
+}
+
 // based: https://stackoverflow.com/questions/61182946/convert-stdany-to-stdvariant
 rdb::descFldVT any_to_variant_cast(std::any a) {
   if (!a.has_value()) throw std::bad_any_cast();

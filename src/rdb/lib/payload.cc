@@ -24,14 +24,17 @@ payload::payload(const Descriptor &descriptor)
       hexFormat_(false) {
   payloadData_ = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
   std::fill(span().begin(), span().end(), 0);
+
+  nullBitset.resize(descriptor.size(), false);
 }
 
 // copy constructor
 
 payload::payload(const payload &other) {
-  payloadData_ = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
   descriptor   = other.descriptor;
+  payloadData_ = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
   std::copy(other.span().begin(), other.span().end(), span().begin());
+  nullBitset = other.nullBitset;
 }
 
 // Copy & assignment operator
@@ -41,6 +44,7 @@ payload &payload::operator=(const payload &other) {
 
   *this = other.descriptor;  // call operator=(const Descriptor
   std::copy(other.span().begin(), other.span().end(), span().begin());
+  nullBitset = other.nullBitset;
   return *this;
 }
 
@@ -55,6 +59,8 @@ payload &payload::operator=(const Descriptor &other) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
     descriptor   = other;
     payloadData_ = std::make_unique<uint8_t[]>(other.getSizeInBytes());
+    std::fill(span().begin(), span().end(), 0);
+    nullBitset.assign(descriptor.size(), false);
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
@@ -70,7 +76,7 @@ payload &payload::operator=(const Descriptor &other) {
 payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
   descSum += other.descriptor;                    // ! moving this into constructor fails
-  descSum.cleanRef();                             //
+  descSum.removeConfigurationFields();                             //
   payload result(descSum);                        //
   SPDLOG_INFO("operator+ {} {} {}",               //
               descriptor.getSizeInBytes(),        //
@@ -78,6 +84,21 @@ payload payload::operator+(const payload &other) {
               result.descriptor.getSizeInBytes());
   std::copy(span().begin(), span().end(), result.span().begin());
   std::copy(other.span().begin(), other.span().end(), result.span().subspan(descriptor.getSizeInBytes()).begin());
+
+  result.nullBitset.clear();
+  result.nullBitset.reserve(result.descriptor.size());
+
+  auto appendDataFieldNullFlags = [&result](const payload &src) {
+    for (size_t i = 0; i < src.descriptor.size(); ++i) {
+      auto type = src.descriptor[i].rtype;
+      if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
+      result.nullBitset.push_back(i < src.nullBitset.size() ? src.nullBitset[i] : false);
+    }
+  };
+
+  appendDataFieldNullFlags(*this);
+  appendDataFieldNullFlags(other);
+
   return result;
 }
 
@@ -97,26 +118,46 @@ void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 std::span<uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
-void payload::setItemBy(const int positionFlat, std::any value) {
-  T data          = std::any_cast<T>(value);
+void payload::setItemBy(const int positionFlat, std::optional<std::any> value) {
+  T data          = std::any_cast<T>(value.value());
   auto position   = descriptor.convert(positionFlat).value().first;
   auto offsetFlat = descriptor.offset(positionFlat);
   auto dest       = span().subspan(offsetFlat, descriptor[position].rlen);
   std::memcpy(dest.data(), &data, descriptor[position].rlen);
 }
 
-void payload::setItem(const int positionFlat, std::any valueParam) {
-  if (positionFlat > descriptor.sizeFlat() - 1) {
-    SPDLOG_ERROR("Write out of descriptor - req:{} available len: {}", positionFlat, descriptor.sizeFlat());
+void payload::setItem(const int positionFlat, std::optional<std::any> valueParam) {
+  if (positionFlat < 0 || positionFlat > descriptor.flatElementCount() - 1) {
+    SPDLOG_ERROR("Write out of descriptor - req:{} available len: {}", positionFlat, descriptor.flatElementCount());
     assert(false && "setItem - Write out of descriptor");
     abort();
   }
 
-  auto position      = descriptor.convert(positionFlat).value().first;
+  auto positionOpt = descriptor.convert(positionFlat);
+  if (!positionOpt.has_value()) {
+    SPDLOG_ERROR("Write conversion failed for flat position {}", positionFlat);
+    assert(false && "setItem - Flat conversion failed");
+    abort();
+  }
+
+  auto position = positionOpt->first;
+  if (position < 0 || position >= static_cast<int>(descriptor.size())) {
+    SPDLOG_ERROR("Write converted index out of descriptor bounds: {}", position);
+    assert(false && "setItem - Converted index out of range");
+    abort();
+  }
+
   auto requestedType = descriptor[position].rtype;
 
+  if (!valueParam.has_value()) {
+    nullBitset[position] = true;
+    return;
+  }
+
+  nullBitset[position] = false;
+
   cast<std::any> castAny;
-  std::any value = castAny(valueParam, requestedType);
+  std::any value = castAny(valueParam.value(), requestedType);
 
   try {
     switch (requestedType) {
@@ -178,9 +219,9 @@ T getVal(std::span<uint8_t> s, int offset) {
   return val;
 }
 
-std::any payload::getItem(const int positionFlat) {
-  if (positionFlat > descriptor.sizeFlat() - 1) {
-    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, descriptor.sizeFlat());
+std::optional<std::any> payload::getItem(const int positionFlat) {
+  if (positionFlat < 0 || positionFlat > descriptor.flatElementCount() - 1) {
+    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, descriptor.flatElementCount());
     std::stringstream message;
     message << boost::stacktrace::stacktrace();
     SPDLOG_ERROR("Stack: {}", message.str());
@@ -189,13 +230,21 @@ std::any payload::getItem(const int positionFlat) {
     abort();
   }
 
-  auto position = descriptor.convert(positionFlat).value().first;
-
-  if (position > descriptor.sizeFlat() - 1) {
-    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", position, descriptor.sizeFlat());
-    assert(false && "getItem - Read out of descriptor");
+  auto positionOpt = descriptor.convert(positionFlat);
+  if (!positionOpt.has_value()) {
+    SPDLOG_ERROR("Read conversion failed for flat position {}", positionFlat);
+    assert(false && "getItem - Flat conversion failed");
     abort();
   }
+
+  auto position = positionOpt->first;
+  if (position < 0 || position >= static_cast<int>(descriptor.size())) {
+    SPDLOG_ERROR("Read converted index out of descriptor bounds: {}", position);
+    assert(false && "getItem - Converted index out of range");
+    abort();
+  }
+
+  if (nullBitset[position]) return std::nullopt;
 
   // The aim of this procedure is : get raw data from descriptor and return as std::any
 
@@ -242,24 +291,24 @@ std::any payload::getItem(const int positionFlat) {
     }
     case rdb::REF: {
       SPDLOG_ERROR("REF not supported.");
-      return 0xdead;
+      return std::nullopt;
     }
     case rdb::TYPE: {
       SPDLOG_ERROR("TYPE not supported.");
-      return 0xdead;
+      return std::nullopt;
     }
     case rdb::RETENTION: {
       SPDLOG_ERROR("RETENTION not supported.");
-      return 0xdead;
+      return std::nullopt;
     }
     case rdb::RETMEMORY: {
       SPDLOG_ERROR("RETENTION MEMORY not supported.");
-      return 0xdead;
+      return std::nullopt;
     }
   };
   SPDLOG_ERROR("Type not supported. {}", int(descriptor[position].rtype));
   assert(false && "type not supported on getter.");
-  return 0xdead;
+  return std::nullopt;
 }
 
 // Friend operators
@@ -323,7 +372,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         (r.rtype == rdb::REF) ||        //
         (r.rtype == rdb::RETENTION) ||  //
         (r.rtype == rdb::RETMEMORY))    // skip these types
-      break;
+      continue;
     if (!Descriptor::getFlat())
       os << "\t";
     else

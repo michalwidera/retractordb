@@ -68,7 +68,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   auto lengthAbs = abs(length);
 
   auto recordsCountSrc   = source->getRecordsCount();
-  auto descriptorSrcSize = source->descriptor.sizeFlat();
+  auto descriptorSrcSize = source->descriptor.flatElementCount();
   auto [maxType, maxLen] = source->descriptor.getMaxType();
   for (auto i = 0; i < lengthAbs; ++i) {
     rdb::rField x(instance + "_" + std::to_string(i),  //
@@ -108,8 +108,11 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
     auto locSrc = fp.rem;
     if (locSrc >= 0) {
-      std::any value = source->getPayload()->getItem(locSrc);
-      result->setItem(flip ? lengthAbs - i - 1 : i, value);
+      auto valueOpt = source->getPayload()->getItem(locSrc);
+      if (valueOpt.has_value())
+        result->setItem(flip ? lengthAbs - i - 1 : i, valueOpt.value());
+      else
+        result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
     } else
       result->setItem(flip ? lengthAbs - i - 1 : i, -1);
   }
@@ -246,13 +249,18 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   assert(valueRet.has_value());
 
   auto item{0};
+  auto validItemCount{0};
   for (auto const it : outputPayload->descriptor) {
     if (it.rtype == rdb::REF) continue;
     if (it.rtype == rdb::TYPE) continue;
     if (it.rtype == rdb::RETENTION) continue;
     if (it.rtype == rdb::RETMEMORY) continue;
 
-    std::any value = castAny(outputPayload->getPayload()->getItem(item++), maxType_);
+    auto valueOpt = outputPayload->getPayload()->getItem(item++);
+    if (!valueOpt.has_value()) continue;
+    validItemCount++;
+
+    std::any value = castAny(valueOpt.value(), maxType_);
     switch (maxType_) {
       case rdb::BYTE:
       case rdb::INTEGER:
@@ -274,8 +282,14 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
     }
   }
 
+  if (validItemCount == 0) {
+    auto postion{0};
+    localPayload->setItem(postion, std::nullopt);
+    return *(localPayload.get());
+  }
+
   if (cmd == STREAM_AVG) {
-    std::any value = castAny((uint8_t)(outputPayload->getPayload()->descriptor.size()), maxType_);
+    std::any value = castAny(static_cast<uint8_t>(validItemCount), maxType_);
     switch (maxType_) {
       case rdb::BYTE:
       case rdb::INTEGER:

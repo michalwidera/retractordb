@@ -145,8 +145,8 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       retVal += rdb::Descriptor(id + "_0", maxLen, 1, maxType);
     } break;
     case STREAM_HASH: {
-      retVal.createHash(id, coreInstance.getQuery(arg1).descriptorStorage(), coreInstance.getQuery(arg2).descriptorStorage());
-      retVal.cleanRef();
+      retVal.composeHashDescriptorFrom(id, coreInstance.getQuery(arg1).descriptorStorage(), coreInstance.getQuery(arg2).descriptorStorage());
+      retVal.removeConfigurationFields();
     } break;
     case STREAM_DEHASH_DIV:
     case STREAM_DEHASH_MOD:

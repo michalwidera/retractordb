@@ -1,13 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <any>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
 
 #include "rdb/descriptor.h"
-#include "rdb/payload.h"
 
 extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 
@@ -106,6 +104,17 @@ TEST(descriptor, compare) {
   EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
+TEST(descriptor, compare_ignores_configuration_fields_without_out_of_bounds_access) {
+  auto withConfig = rdb::Descriptor("source.dat", 0, 0, rdb::REF) +  //
+                    rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
+                    rdb::Descriptor("value", 4, 1, rdb::INTEGER);
+  auto plain = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
+  auto different = rdb::Descriptor("value", 8, 1, rdb::DOUBLE);
+
+  EXPECT_TRUE(withConfig == plain);
+  EXPECT_FALSE(withConfig == different);
+}
+
 TEST(descriptor, retention_and_policy_defaults) {
   auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
 
@@ -138,14 +147,14 @@ TEST(descriptor, clean_ref_and_flat_fields) {
               rdb::Descriptor("s", 8, 99, rdb::STRING);
 
   EXPECT_TRUE(desc.hasField("src.bin"));
-  EXPECT_EQ(desc.sizeFlat(), 3);
+  EXPECT_EQ(desc.flatElementCount(), 4);
 
   auto flatFields = desc.fieldsFlat();
   EXPECT_EQ(flatFields.size(), 2U);
   EXPECT_EQ(flatFields[0].rname, "a");
   EXPECT_EQ(flatFields[1].rname, "s");
 
-  desc.cleanRef();
+  desc.removeConfigurationFields();
   EXPECT_FALSE(desc.hasField("src.bin"));
   EXPECT_FALSE(desc.hasField("TEXTSOURCE"));
   EXPECT_TRUE(desc.hasField("a"));
@@ -162,7 +171,7 @@ TEST(descriptor, create_hash_uses_max_len_and_type) {
              rdb::Descriptor("b", 1, 1, rdb::BYTE);
 
   rdb::Descriptor out;
-  out.createHash("h", lhs, rhs);
+  out.composeHashDescriptorFrom("h", lhs, rhs);
 
   EXPECT_EQ(out.size(), 2U);
   EXPECT_EQ(out[0].rname, "h_0");
@@ -194,7 +203,7 @@ TEST(descriptor, offset_and_convert_for_string_and_arrays) {
               rdb::Descriptor("s", 5, 9, rdb::STRING) +  //
               rdb::Descriptor("v", 4, 1, rdb::INTEGER);
 
-  EXPECT_EQ(desc.sizeFlat(), 4);
+  EXPECT_EQ(desc.flatElementCount(), 4);
 
   EXPECT_TRUE(desc.convert(0) == std::make_pair(0, 0));
   EXPECT_TRUE(desc.convert(1) == std::make_pair(0, 1));
@@ -205,6 +214,14 @@ TEST(descriptor, offset_and_convert_for_string_and_arrays) {
   EXPECT_EQ(desc.offset(1), 1);
   EXPECT_EQ(desc.offset(2), 2);
   EXPECT_EQ(desc.offset(3), 47);
+}
+
+TEST(descriptor, empty_descriptor_has_empty_flat_mapping) {
+  rdb::Descriptor empty;
+
+  EXPECT_EQ(empty.flatElementCount(), 0);
+  EXPECT_TRUE(empty.fieldsFlat().empty());
+  EXPECT_FALSE(empty.convert(0).has_value());
 }
 
 TEST(descriptor, position_conversion_case_1) {
@@ -229,33 +246,6 @@ TEST(descriptor, position_conversion_case_2) {
   EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
   EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
   EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
-}
-
-TEST(descriptor, position_conversion_case_3_with_payload) {
-  auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) +    //
-             rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
-             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER) +  //
-             rdb::Descriptor("Name", 1, 10, rdb::STRING)};
-
-  rdb::payload payload(desc1);
-
-  payload.setItem(0, 145);
-  payload.setItem(1, static_cast<uint8_t>(24));
-  payload.setItem(2, static_cast<uint8_t>(25));
-  payload.setItem(3, static_cast<uint8_t>(26));
-  payload.setItem(4, 2000);
-  payload.setItem(5, std::string("test"));
-
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0)) == 145);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1)) == 24);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2)) == 25);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3)) == 26);
-  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4)) == 2000);
-  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5)).c_str() == std::string("test"));
-
-  std::stringstream coutstring;
-  coutstring << rdb::flat << payload;
-  EXPECT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
 }
 
 TEST(descriptor, parser) {

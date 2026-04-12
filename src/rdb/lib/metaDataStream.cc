@@ -77,8 +77,7 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 // ── Private helpers ──────────────────────────────────────────────────
 
 void metaDataStream::createNullBitsetTemplate() {
-  currentEntry_.nullBitset.resize(descriptorRef_->size());
-  std::fill(currentEntry_.nullBitset.begin(), currentEntry_.nullBitset.end(), false);
+  currentEntry_.nullBitset.resize(descriptorRef_->size(), false);
   currentEntry_.recordCount = 0;
   currentEntry_.isGap       = false;
 }
