@@ -33,7 +33,7 @@ class payload {
 
   payload &operator=(const Descriptor &other);
 
-  std::vector<bool> nullBitset;  // true if field at position i is null, false otherwise
+  std::vector<bool> nullBitset_;  // true if field at position i is null, false otherwise
  public:
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;

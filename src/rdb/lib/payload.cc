@@ -25,7 +25,7 @@ payload::payload(const Descriptor &descriptor)
   payloadData_ = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
   std::fill(span().begin(), span().end(), 0);
 
-  nullBitset.resize(descriptor.size(), false);
+  nullBitset_.resize(descriptor.size(), false);
 }
 
 // copy constructor
@@ -34,7 +34,7 @@ payload::payload(const payload &other) {
   descriptor   = other.descriptor;
   payloadData_ = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
   std::copy(other.span().begin(), other.span().end(), span().begin());
-  nullBitset = other.nullBitset;
+  nullBitset_ = other.nullBitset_;
 }
 
 // Copy & assignment operator
@@ -44,7 +44,7 @@ payload &payload::operator=(const payload &other) {
 
   *this = other.descriptor;  // call operator=(const Descriptor
   std::copy(other.span().begin(), other.span().end(), span().begin());
-  nullBitset = other.nullBitset;
+  nullBitset_ = other.nullBitset_;
   return *this;
 }
 
@@ -60,7 +60,7 @@ payload &payload::operator=(const Descriptor &other) {
     descriptor   = other;
     payloadData_ = std::make_unique<uint8_t[]>(other.getSizeInBytes());
     std::fill(span().begin(), span().end(), 0);
-    nullBitset.assign(descriptor.size(), false);
+    nullBitset_.assign(descriptor.size(), false);
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
@@ -85,14 +85,14 @@ payload payload::operator+(const payload &other) {
   std::copy(span().begin(), span().end(), result.span().begin());
   std::copy(other.span().begin(), other.span().end(), result.span().subspan(descriptor.getSizeInBytes()).begin());
 
-  result.nullBitset.clear();
-  result.nullBitset.reserve(result.descriptor.size());
+  result.nullBitset_.clear();
+  result.nullBitset_.reserve(result.descriptor.size());
 
   auto appendDataFieldNullFlags = [&result](const payload &src) {
     for (size_t i = 0; i < src.descriptor.size(); ++i) {
       auto type = src.descriptor[i].rtype;
       if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
-      result.nullBitset.push_back(i < src.nullBitset.size() ? src.nullBitset[i] : false);
+      result.nullBitset_.push_back(i < src.nullBitset_.size() ? src.nullBitset_[i] : false);
     }
   };
 
@@ -150,11 +150,11 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
   auto requestedType = descriptor[position].rtype;
 
   if (!valueParam.has_value()) {
-    nullBitset[position] = true;
+    nullBitset_[position] = true;
     return;
   }
 
-  nullBitset[position] = false;
+  nullBitset_[position] = false;
 
   cast<std::any> castAny;
   std::any value = castAny(valueParam.value(), requestedType);
@@ -244,7 +244,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) {
     abort();
   }
 
-  if (nullBitset[position]) return std::nullopt;
+  if (nullBitset_[position]) return std::nullopt;
 
   // The aim of this procedure is : get raw data from descriptor and return as std::any
 
