@@ -255,3 +255,24 @@ TEST(descriptor, parser) {
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
 }
+
+TEST(descriptor, assign_operator) {
+  auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+             rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor data2;
+  data2 = data1;
+  EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
+  EXPECT_TRUE(data2.len("Control") == data1.len("Control"));
+  EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
+}
+
+TEST(descriptor, copy_constructor) {
+  auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+             rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+  rdb::Descriptor data2{data1};
+  EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
+  EXPECT_TRUE(data2.len("Control") == data1.len("Control"));
+  EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
+}

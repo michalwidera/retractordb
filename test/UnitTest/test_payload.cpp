@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <any>
+#include <cstring>
 #include <sstream>
 #include <string>
 
@@ -61,4 +62,57 @@ TEST(payload, add_preserves_null_flags) {
   EXPECT_FALSE(merged.getItem(0).has_value());
   ASSERT_TRUE(merged.getItem(1).has_value());
   EXPECT_EQ(std::any_cast<int>(merged.getItem(1).value()), 777);
+}
+
+TEST(payload, add_operator) {
+  auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
+             rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
+             rdb::Descriptor("ll", 4, 1, rdb::INTEGER) +    //
+             rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
+
+  union dataPayload {
+    uint8_t ptr[19];
+    struct __attribute__((packed)) {
+      char Name[10];    // 10
+      uint8_t Control;  // 1
+      int ll;           // 4
+      int TLen;         // 4
+    };
+  };
+
+  auto data2{rdb::Descriptor("TLen2", 4, 1, rdb::INTEGER)};
+
+  rdb::payload data1Payload(data1);
+
+  data1Payload.setItem(0, std::string("test"));
+  data1Payload.setItem(1, static_cast<uint8_t>(24));
+  data1Payload.setItem(2, 2000);
+  data1Payload.setItem(3, 3333);
+
+  std::any Name_    = data1Payload.getItem(0).value();
+  std::any Control_ = data1Payload.getItem(1).value();
+  std::any ll_      = data1Payload.getItem(2).value();
+  std::any TLen_    = data1Payload.getItem(3).value();
+
+  dataPayload var;
+
+  std::memcpy(&var, data1Payload.span().data(), 19);
+
+  EXPECT_TRUE(var.ll == std::any_cast<int>(ll_));
+  EXPECT_TRUE(var.TLen == std::any_cast<int>(TLen_));
+
+  rdb::payload data2Payload(data2);
+  data2Payload.setItem(0, 4004);
+
+  EXPECT_TRUE(std::any_cast<int>(data1Payload.getItem(2).value()) == 2000);
+
+  rdb::payload data3Payload;
+
+  data3Payload = data1Payload + data2Payload;
+
+  EXPECT_TRUE(std::any_cast<std::string>(data3Payload.getItem(0).value()) == "test");
+  EXPECT_TRUE(std::any_cast<uint8_t>(data3Payload.getItem(1).value()) == 24);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(2).value()) == 2000);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(3).value()) == 3333);
+  EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4).value()) == 4004);
 }
