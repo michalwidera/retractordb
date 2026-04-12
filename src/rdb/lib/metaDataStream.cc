@@ -13,8 +13,7 @@ namespace rdb {
 
 // ── IndexRecord serialization ────────────────────────────────────────
 // Format (all fields little-endian, native size_t):
-//   [recordCount : size_t]
-//   [flags       : uint8_t]   // bit 0 = isGap
+//   [recordCount : size_t]    // 0 = transmission gap marker
 //   [bitsetSize  : size_t]
 //   [bitset bytes: ceil(bitsetSize/8)]
 
@@ -22,16 +21,12 @@ std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   const size_t bitsetSize = nullBitset.size();
   const size_t byteCount  = (bitsetSize + 7) / 8;
 
-  const size_t totalSize = sizeof(size_t) + sizeof(uint8_t) + sizeof(size_t) + byteCount;
+  const size_t totalSize = sizeof(size_t) + sizeof(size_t) + byteCount;
   std::vector<std::byte> buf(totalSize, std::byte{0});
   std::byte *ptr = buf.data();
 
   std::memcpy(ptr, &recordCount, sizeof(recordCount));
   ptr += sizeof(recordCount);
-
-  uint8_t flags = isGap ? 1u : 0u;
-  std::memcpy(ptr, &flags, sizeof(flags));
-  ptr += sizeof(flags);
 
   std::memcpy(ptr, &bitsetSize, sizeof(bitsetSize));
   ptr += sizeof(bitsetSize);
@@ -56,10 +51,6 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 
   read(rec.recordCount);
 
-  uint8_t flags = 0;
-  read(flags);
-  rec.isGap = (flags & 1u) != 0;
-
   size_t bitsetSize = 0;
   read(bitsetSize);
 
@@ -79,12 +70,11 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 void metaDataStream::createNullBitsetTemplate() {
   currentEntry_.nullBitset.resize(descriptorRef_->size(), false);
   currentEntry_.recordCount = 0;
-  currentEntry_.isGap       = false;
 }
 
 size_t metaDataStream::entrySize() const {
   const size_t bitsetBytes = (descriptorRef_->size() + 7) / 8;
-  return sizeof(size_t) + sizeof(uint8_t) + sizeof(size_t) + bitsetBytes;
+  return sizeof(size_t) + sizeof(size_t) + bitsetBytes;
 }
 
 static constexpr size_t kHeaderSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
@@ -199,7 +189,7 @@ void metaDataStream::loadIndex() {
   auto allEntries = readCommittedEntries();
 
   // Restore currentEntry_ from the last non-gap entry for RLE continuation
-  if (!allEntries.empty() && !allEntries.back().isGap) {
+  if (!allEntries.empty() && allEntries.back().recordCount != 0) {
     currentEntry_ = allEntries.back();
     allEntries.pop_back();
 
@@ -220,7 +210,7 @@ std::pair<size_t, size_t> metaDataStream::locateRecord(size_t recordIndex) const
     auto entries      = readCommittedEntries();
     size_t cumulative = 0;
     for (size_t i = 0; i < entries.size(); ++i) {
-      if (entries[i].isGap) continue;
+      if (entries[i].recordCount == 0) continue;
       if (recordIndex < cumulative + entries[i].recordCount) {
         return {i, recordIndex - cumulative};
       }
@@ -264,7 +254,6 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
     flushCurrentEntry();  // appends old currentEntry_ to file
     currentEntry_.nullBitset  = nullBitsetParam;
     currentEntry_.recordCount = 1;
-    currentEntry_.isGap       = false;
   }
 }
 
@@ -387,7 +376,6 @@ void metaDataStream::onTransmissionGap() {
   IndexRecord gapMarker;
   gapMarker.nullBitset.resize(descriptorRef_->size(), false);
   gapMarker.recordCount = 0;
-  gapMarker.isGap       = true;
   appendEntry(gapMarker);
 
   createNullBitsetTemplate();
@@ -399,7 +387,7 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
   auto allEntries   = readCommittedEntries();
   size_t cumulative = 0;
   for (size_t i = 0; i < allEntries.size(); ++i) {
-    if (allEntries[i].isGap) {
+    if (allEntries[i].recordCount == 0) {
       if (cumulative == recordIndex) return true;
       continue;
     }
@@ -432,7 +420,6 @@ void metaDataStream::reset() {
   // Clear all data and reset to initial state
   currentEntry_.recordCount = 0;
   currentEntry_.nullBitset.assign(descriptorRef_->size(), false);
-  currentEntry_.isGap = false;
 
   committedRecordCount_ = 0;
 
@@ -457,7 +444,6 @@ void metaDataStream::purge(size_t upToRecordIndex) {
   IndexRecord savedCurrent = currentEntry_;
   currentEntry_.recordCount = 0;
   currentEntry_.nullBitset.assign(descriptorRef_->size(), false);
-  currentEntry_.isGap = false;
   committedRecordCount_ = 0;
 
   // Process all entries and remove records
@@ -465,7 +451,7 @@ void metaDataStream::purge(size_t upToRecordIndex) {
   size_t cumulative = 0;
 
   for (auto &entry : allEntries) {
-    if (entry.isGap) {
+    if (entry.recordCount == 0) {
       // Skip gap if it's within the purged range
       if (cumulative <= upToRecordIndex) {
         continue;
@@ -487,7 +473,6 @@ void metaDataStream::purge(size_t upToRecordIndex) {
       IndexRecord kept;
       kept.nullBitset = entry.nullBitset;
       kept.recordCount = toKeep;
-      kept.isGap = false;
       newEntries.push_back(kept);
       cumulative += entry.recordCount;
     } else {
@@ -506,7 +491,6 @@ void metaDataStream::purge(size_t upToRecordIndex) {
     size_t toKeep = cumulative + savedCurrent.recordCount - recordsToRemove;
     currentEntry_.nullBitset = savedCurrent.nullBitset;
     currentEntry_.recordCount = toKeep;
-    currentEntry_.isGap = false;
   } else {
     // Current entry is entirely kept
     currentEntry_ = savedCurrent;
@@ -531,7 +515,7 @@ std::vector<metaDataStream::TransmissionGap> metaDataStream::getTransmissionGaps
 
   size_t cumulative = 0;
   for (const auto &entry : allEntries) {
-    if (entry.isGap) {
+    if (entry.recordCount == 0) {
       TransmissionGap gap;
       gap.recordIndex = cumulative;
       gap.timestamp = calculateRecordTimestamp(cumulative);

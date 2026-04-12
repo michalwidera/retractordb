@@ -25,24 +25,20 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
   rdb::metaDataStream::IndexRecord original;
   original.recordCount = 42;
   original.nullBitset  = {true, false, true, true, false};
-  original.isGap       = false;
 
   std::vector<std::byte> serialized             = original.serialize();
   rdb::metaDataStream::IndexRecord deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
   EXPECT_EQ(deserialized.recordCount, original.recordCount);
   EXPECT_EQ(deserialized.nullBitset, original.nullBitset);
-  EXPECT_EQ(deserialized.isGap, original.isGap);
 }
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
   rdb::metaDataStream::IndexRecord gap;
   gap.recordCount = 0;
   gap.nullBitset  = {false, false};
-  gap.isGap       = true;
 
   auto serialized   = gap.serialize();
   auto deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
-  EXPECT_EQ(deserialized.isGap, true);
   EXPECT_EQ(deserialized.recordCount, 0u);
 }
 
@@ -311,7 +307,6 @@ TEST_F(MetaTestFixture, integration_all_null_run_committed_when_pattern_changes)
   ASSERT_EQ(committed.size(), 1u);
   EXPECT_EQ(committed[0].recordCount, 3u);
   EXPECT_EQ(committed[0].nullBitset, allNull);
-  EXPECT_FALSE(committed[0].isGap);
 
   // Current in-memory entry holds the mixed record
   EXPECT_EQ(meta.pendingEntry().recordCount, 1u);

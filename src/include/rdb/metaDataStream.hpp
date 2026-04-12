@@ -45,8 +45,7 @@ class metaDataStream {
   ///        of consecutive records sharing that pattern.
   struct IndexRecord {
     std::vector<bool> nullBitset;                                     ///< one bit per descriptor field (true = null)
-    size_t recordCount{0};                                            ///< number of consecutive records with this pattern
-    bool isGap{false};                                                ///< true = this entry marks a transmission gap
+    size_t recordCount{0};                                            ///< consecutive records with this pattern; 0 = transmission gap marker
     std::vector<std::byte> serialize() const;                         ///< serialize the entry to a vector of bytes
     static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
   };
