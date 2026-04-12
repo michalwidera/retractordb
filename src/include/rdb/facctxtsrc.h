@@ -8,7 +8,7 @@
 
 namespace rdb {
 
-/// @brief Definicja klasy implementującej dostęp do pliku binarnego
+/// @brief Definicja klasy implementującej dostęp do pliku tekstowego
 ///
 /// Obiekt textSourceRO powinien:
 /// - umożliwiać odczyt danych z pliku tekstowego.
@@ -19,6 +19,9 @@ namespace rdb {
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych.
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
 /// - po przeczytaniu ostatnichd danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do początku pliku i kontynuować odczyt danych od początku.
+/// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, powinien zwrócić dane z ustawionymi wartościami null i zerami, a następnie zakończyć odczyt danych.
+/// - w przypadku pojawienia się wartości null w danych, powinien odpowiednio ustawić metadane null dla tych wartości, aby umożliwić ich prawidłową obsługę przez inne komponenty systemu.
+/// - w przypadku błędu odczytu danych z pliku, powinien odpowiednio ustawić metadane null dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
 class textSourceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;

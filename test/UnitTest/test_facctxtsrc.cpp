@@ -180,6 +180,29 @@ TEST_F(TextSourceROTest, test_read_integer_null_token) {
   EXPECT_TRUE(nulls[0]);
 }
 
+// Verify failed file open is handled by read() as an all-null zero row
+TEST_F(TextSourceROTest, test_read_missing_file_returns_null_row) {
+  const std::string filename = "does_not_exist.txt";
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_FAILURE);
+
+  int value = -1;
+  std::memcpy(&value, buffer.get(), sizeof(int));
+  EXPECT_EQ(value, 0);
+
+  auto nulls = src->lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_TRUE(nulls[0]);
+  EXPECT_EQ(src->count(), 1u);
+}
+
 // ============================================================
 // textSourceRO - string reading tests
 // ============================================================

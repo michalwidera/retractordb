@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "rdb/descriptor.h"
 #include "rdb/faccbindev.h"
 
 namespace {
@@ -34,11 +35,16 @@ class BinaryDeviceROTest : public ::testing::Test {
 
 }  // namespace
 
+static rdb::Descriptor fixedIntDescriptor() {
+  return rdb::Descriptor{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+}
+
 TEST_F(BinaryDeviceROTest, read_exact_record_and_count) {
   auto path = sandboxPath("device.bin");
   writeBinaryFile(path, {0x11, 0x22, 0x33, 0x44});
 
-  rdb::binaryDeviceRO dev(path, 4, true);
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, 4, desc, true);
   uint8_t out[4] = {0, 0, 0, 0};
 
   EXPECT_EQ(dev.read(out, 0), EXIT_SUCCESS);
@@ -47,13 +53,18 @@ TEST_F(BinaryDeviceROTest, read_exact_record_and_count) {
   EXPECT_EQ(out[2], 0x33);
   EXPECT_EQ(out[3], 0x44);
   EXPECT_EQ(dev.count(), 1U);
+
+  auto nulls = dev.lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_FALSE(nulls[0]);
 }
 
 TEST_F(BinaryDeviceROTest, count_starts_at_zero_before_any_read) {
   auto path = sandboxPath("position.bin");
   writeBinaryFile(path, {0xAA, 0xBB, 0xCC, 0xDD});
 
-  rdb::binaryDeviceRO dev(path, 4, true);
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, 4, desc, true);
   EXPECT_EQ(dev.count(), 0U);
 
   uint8_t out[4] = {0, 0, 0, 0};
@@ -65,7 +76,8 @@ TEST_F(BinaryDeviceROTest, read_loops_to_beginning_on_eof_when_enabled) {
   auto path = sandboxPath("loop.bin");
   writeBinaryFile(path, {0x01, 0x02, 0x03, 0x04});
 
-  rdb::binaryDeviceRO dev(path, 4, true);
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, 4, desc, true);
   uint8_t out[4] = {0, 0, 0, 0};
 
   EXPECT_EQ(dev.read(out, 0), EXIT_SUCCESS);
@@ -81,7 +93,8 @@ TEST_F(BinaryDeviceROTest, read_zero_fills_on_eof_when_loop_disabled) {
   auto path = sandboxPath("noloop.bin");
   writeBinaryFile(path, {0x10, 0x20, 0x30, 0x40});
 
-  rdb::binaryDeviceRO dev(path, 4, false);
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, 4, desc, false);
   uint8_t out[4] = {0, 0, 0, 0};
 
   EXPECT_EQ(dev.read(out, 0), EXIT_SUCCESS);
@@ -96,24 +109,55 @@ TEST_F(BinaryDeviceROTest, read_zero_fills_on_eof_when_loop_disabled) {
   EXPECT_EQ(out[2], 0x00);
   EXPECT_EQ(out[3], 0x00);
   EXPECT_EQ(dev.count(), 2U);
+
+  auto nulls = dev.lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_TRUE(nulls[0]);
 }
 
 TEST_F(BinaryDeviceROTest, read_fails_on_empty_file_when_loop_enabled) {
   auto path = sandboxPath("empty.bin");
   writeBinaryFile(path, {});
 
-  rdb::binaryDeviceRO dev(path, 4, true);
-  uint8_t out[4] = {0, 0, 0, 0};
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, 4, desc, true);
+  uint8_t out[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
   EXPECT_EQ(dev.read(out, 0), EXIT_FAILURE);
-  EXPECT_EQ(dev.count(), 0U);
+  EXPECT_EQ(out[0], 0x00);
+  EXPECT_EQ(out[1], 0x00);
+  EXPECT_EQ(out[2], 0x00);
+  EXPECT_EQ(out[3], 0x00);
+  EXPECT_EQ(dev.count(), 1U);
+
+  auto nulls = dev.lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_TRUE(nulls[0]);
+}
+
+TEST_F(BinaryDeviceROTest, read_fails_on_missing_file_with_null_metadata) {
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(sandboxPath("missing.bin"), 4, desc, true);
+  uint8_t out[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+
+  EXPECT_EQ(dev.read(out, 0), EXIT_FAILURE);
+  EXPECT_EQ(out[0], 0x00);
+  EXPECT_EQ(out[1], 0x00);
+  EXPECT_EQ(out[2], 0x00);
+  EXPECT_EQ(out[3], 0x00);
+  EXPECT_EQ(dev.count(), 1U);
+
+  auto nulls = dev.lastNullBitset();
+  ASSERT_EQ(nulls.size(), 1U);
+  EXPECT_TRUE(nulls[0]);
 }
 
 TEST_F(BinaryDeviceROTest, name_and_write_contract) {
   auto path = sandboxPath("name.bin");
   writeBinaryFile(path, {0xAA, 0xBB, 0xCC, 0xDD});
 
-  rdb::binaryDeviceRO dev(path, 4, true);
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, 4, desc, true);
   uint8_t out[4] = {0x10, 0x20, 0x30, 0x40};
 
   EXPECT_EQ(dev.name(), path);

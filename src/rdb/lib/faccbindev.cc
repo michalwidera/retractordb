@@ -6,56 +6,67 @@
 #include <unistd.h>  // ::read, ::open ...
 
 #include <cassert>
+#include <cstring>
 
 namespace rdb {
 
 binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
                                const ssize_t recordSize,         //
+                               const rdb::Descriptor &descriptor,
                                bool loopToBeginningIfEOF)        //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
-      loopToBeginningIfEOF_(loopToBeginningIfEOF) {
+      descriptor_(descriptor),
+      loopToBeginningIfEOF_(loopToBeginningIfEOF),
+      lastNullBitset_(descriptor.size(), false) {
   fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC, 0644);
-  // TODO: there is a need of support failure here
-  // sometimes /dev/random is not available
-  // of other file are not available
-  // only debug show someting wrong.
-  assert(fd_ >= 0);
-  assert(recordSize_ != 0);
-  // checking fd on read function.
+  if (fd_ < 0) {
+    SPDLOG_WARN("Unable to open binary device source: {}", filename_);
+  }
 }
 
-binaryDeviceRO::~binaryDeviceRO() { ::close(fd_); }
+binaryDeviceRO::~binaryDeviceRO() {
+  if (fd_ >= 0) ::close(fd_);
+}
 
 auto binaryDeviceRO::name() -> std::string & { return filename_; }
 
 ssize_t binaryDeviceRO::read(uint8_t *ptrData, const size_t position) {
-  if (fd_ < 0) return EXIT_FAILURE;
-  if (recordSize_ == 0) return EXIT_FAILURE;  // No read on data source supported
+  auto markAllNullAndZero = [&](ssize_t status) {
+    lastNullBitset_.assign(descriptor_.size(), true);
+    if (ptrData != nullptr) {
+      std::memset(ptrData, 0, recordSize_);
+    }
+    cnt_++;
+    return status;
+  };
+
+  if (fd_ < 0) return markAllNullAndZero(EXIT_FAILURE);
+  if (recordSize_ == 0) return markAllNullAndZero(EXIT_FAILURE);
 
   assert(recordSize_ != 0);
   assert(position == 0);
   if (position != 0) {
-    return EXIT_FAILURE;
+    return markAllNullAndZero(EXIT_FAILURE);
   }
-  assert(fd_ >= 0);
-  if (fd_ < 0) {
-    return fd_;  // <- Error status
-  }
+
   auto read_size = ::read(fd_, ptrData, recordSize_);  // /dev/random no seek supported
   if (read_size != recordSize_) {                      // dev/random has no seek - but binary files should loop?
     if (loopToBeginningIfEOF_) {
       ::lseek(fd_, 0, SEEK_SET);
       auto read_size_sh = ::read(fd_, ptrData, recordSize_);
-      if (read_size_sh != recordSize_) return EXIT_FAILURE;
+      if (read_size_sh != recordSize_) return markAllNullAndZero(EXIT_FAILURE);
     } else {
-      std::memset(ptrData, 0, recordSize_);  // zero the rest of data
+      return markAllNullAndZero(EXIT_SUCCESS);
     }
   }
+  lastNullBitset_.assign(descriptor_.size(), false);
   cnt_++;
   return EXIT_SUCCESS;
 }
 
 size_t binaryDeviceRO::count() { return cnt_; }
+
+const std::vector<bool> &binaryDeviceRO::lastNullBitset() const { return lastNullBitset_; }
 
 }  // namespace rdb

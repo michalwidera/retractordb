@@ -59,7 +59,10 @@ textSourceRO::textSourceRO(const std::string_view fileName,    //
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
   myFile_.rdbuf()->pubsetbuf(nullptr, 0);
   myFile_.open(filename_, std::ios::in);
-  assert((myFile_.rdstate() & std::ifstream::failbit) == 0);
+  if ((myFile_.rdstate() & std::ifstream::failbit) != 0) {
+    SPDLOG_WARN("Unable to open text source file: {}", filename_);
+    myFile_.clear();
+  }
 
   payload_ = std::make_unique<rdb::payload>(descriptor_);
 }

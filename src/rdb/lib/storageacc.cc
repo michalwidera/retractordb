@@ -195,7 +195,7 @@ void storage::initializeAccessor() {
   } else if (storageType_ == "GENERIC") {
     accessor_ = std::make_unique<rdb::genericBinaryFile>(storageFile_, size, percounter_);
   } else if (storageType_ == "DEVICE") {
-    accessor_ = std::make_unique<rdb::binaryDeviceRO>(storageFile_, size, !isOneShot_);
+    accessor_ = std::make_unique<rdb::binaryDeviceRO>(storageFile_, size, descriptor, !isOneShot_);
   } else if (storageType_ == "TEXTSOURCE") {
     accessor_ = std::make_unique<rdb::textSourceRO>(storageFile_, size, descriptor, !isOneShot_);
   } else {
@@ -362,6 +362,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
 
     if (auto *textSource = dynamic_cast<rdb::textSourceRO *>(accessor_.get())) {
       chamber_->setNullBitset(textSource->lastNullBitset());
+    } else if (auto *binarySource = dynamic_cast<rdb::binaryDeviceRO *>(accessor_.get())) {
+      chamber_->setNullBitset(binarySource->lastNullBitset());
     } else if (result == EXIT_SUCCESS) {
       chamber_->setNullBitset(std::vector<bool>(descriptor.size(), false));
     } else {
