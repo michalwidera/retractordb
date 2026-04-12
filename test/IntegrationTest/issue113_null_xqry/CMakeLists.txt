@@ -7,6 +7,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
+    mkdir -p temp ; \
     xretractor query.rql -k -x & \
     while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     xqry -s str_null -k -m 3 > out.txt ; \

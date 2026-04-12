@@ -3,6 +3,7 @@
 { a:2 }
 test_db
 test_db.desc
+test_db.meta
 test_db.shadow
  db
 00000000: 0100 0000 0200 0000                      ........
@@ -11,6 +12,7 @@ test_db.shadow
  a[0] -> 10
 test_db
 test_db.desc
+test_db.meta
 test_db.shadow
  db
 00000000: 0100 0000 0200 0000                      ........

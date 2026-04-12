@@ -16,6 +16,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/faccposix.hpp"
+#include "rdb/metaDataStream.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storageacc.hpp"
 #include "uxSysTermTools.hpp"
@@ -170,6 +171,7 @@ int main(int argc, char *argv[]) {
       std::cout << "size                            show database size in records\n";
       std::cout << "cap [value]                     set device stream backread capacity\n";
       std::cout << "dump                            show payload memory\n";
+      std::cout << "meta                            show meta index (null patterns) for open db\n";
       std::cout << "echo                            print message on terminal\n";
       std::cout << "system                          execute system command\n";
       std::cout << "#|rem [text]                    comment line\n";
@@ -369,6 +371,50 @@ int main(int argc, char *argv[]) {
         std::cout << " ";
       }
       std::cout << "\n";
+    } else if (cmd == "meta") {
+      const std::string metaFilePath =
+          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() +
+          ".meta";
+      if (!std::filesystem::exists(metaFilePath)) {
+        std::cout << RED << "meta file not found: " << metaFilePath << "\n" << RESET;
+        continue;
+      }
+      rdb::metaDataStream metaView(dacc->descriptor, metaFilePath);
+      auto committed       = metaView.entries();
+      const auto &cur      = metaView.currentEntry_;
+      const size_t nFields = dacc->descriptor.size();
+
+      std::cout << BLUE << "meta: " << metaFilePath << "\n";
+      std::cout << "interval: " << metaView.getSamplingInterval() << "  ";
+      std::cout << "total records: " << metaView.totalRecords() << "\n" << RESET;
+
+      size_t segIdx = 0;
+      for (const auto &entry : committed) {
+        std::cout << YELLOW << "[" << segIdx++ << "] ";
+        if (entry.isGap) {
+          std::cout << "gap\n";
+        } else {
+          std::cout << "[";
+          for (size_t fi = 0; fi < nFields; ++fi) {
+            if (fi > 0) std::cout << " ";
+            std::cout << dacc->descriptor[fi].rname << ":";
+            std::cout << (fi < entry.nullBitset.size() && entry.nullBitset[fi] ? "null" : "ok");
+          }
+          std::cout << "] runs:" << entry.recordCount << "\n";
+        }
+        std::cout << RESET;
+      }
+      if (cur.recordCount > 0) {
+        std::cout << YELLOW << "[cur] [";
+        for (size_t fi = 0; fi < nFields; ++fi) {
+          if (fi > 0) std::cout << " ";
+          std::cout << dacc->descriptor[fi].rname << ":";
+          std::cout << (fi < cur.nullBitset.size() && cur.nullBitset[fi] ? "null" : "ok");
+        }
+        std::cout << "] runs:" << cur.recordCount << "\n" << RESET;
+      }
+      std::cout << BLUE << committed.size() + (cur.recordCount > 0 ? 1 : 0) << " segment(s)\n" << RESET;
+      continue;
     } else {
       std::cout << RED << "?\n" << RESET;
       continue;

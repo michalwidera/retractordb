@@ -33,8 +33,11 @@ storage::storage(const std::string_view qryID,         //
     SPDLOG_INFO("Stream file '{}' created in HOLD state", storageFile_);
   }
 
+  metaIndexFile_ = storageFile_ + ".meta";
+
   if (storageParam.empty()) {
     SPDLOG_INFO("That's OK. Storage path is empty - no change of storageFile");
+    SPDLOG_INFO("Meta index path {}", metaIndexFile_);
     return;  // no change
   }
 
@@ -49,7 +52,7 @@ storage::storage(const std::string_view qryID,         //
 
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
   storageFile_    = std::filesystem::path(storageParam) / std::filesystem::path(storageFile_);
-  metaIndexFile_  = std::filesystem::path(storageFile_ + ".meta");
+  metaIndexFile_  = storageFile_ + ".meta";
 
   SPDLOG_INFO("Meta index path {}", metaIndexFile_);
   SPDLOG_INFO("Storage path changed to {}", storageFile_);
@@ -123,7 +126,9 @@ void storage::moveRef() {
   // Descriptor changes storageFile location
   if (it != descriptor.end()) {
     storageFile_ = (*it).rname;
+    metaIndexFile_ = storageFile_ + ".meta";
     SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile_);
+    SPDLOG_INFO("Meta index path changed to {}", metaIndexFile_);
   }
 
   // if storage object was created with default storage as ""

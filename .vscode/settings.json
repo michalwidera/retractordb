@@ -1,0 +1,6 @@
+{
+  "cmake.useCMakePresets": "always",
+  "cmake.configurePreset": "conan-debug",
+  "cmake.buildPreset": "conan-debug",
+  "cmake.testPreset": "conan-debug"
+}

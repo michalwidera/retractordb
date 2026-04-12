@@ -14,8 +14,8 @@
 
 int _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return 0;
-  struct termios oldt;
-  struct termios newt;
+  struct termios oldt = {};
+  struct termios newt = {};
   int ch;
   int oldf;
   tcgetattr(STDIN_FILENO, &oldt);

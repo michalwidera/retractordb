@@ -1,0 +1,8 @@
+{
+   <tcsetattr_kbhit_padding_bytes>
+   Memcheck:Param
+   ioctl(TCSET*)
+   obj:*/libc.so*
+   fun:_kbhit*
+}
+

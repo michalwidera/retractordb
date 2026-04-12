@@ -1,0 +1,7 @@
+dropfile test_db test_db.desc test_db.meta }
+open test_db { INTEGER a }
+set a 1
+append
+set a 2
+append
+quit
