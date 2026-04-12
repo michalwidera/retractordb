@@ -5,7 +5,7 @@
 #include ".antlr/DESCBaseListener.h"
 #include ".antlr/DESCLexer.h"
 #include "antlr4-runtime/antlr4-runtime.h"
-#include "rdb/descriptor.h"
+#include "rdb/descriptor.hpp"
 
 using namespace antlrcpp;
 using namespace antlr4;

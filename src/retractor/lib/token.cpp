@@ -1,11 +1,11 @@
-#include "token.h"
+#include "token.hpp"
 
 #include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <type_traits>
 
-#include "rdb/convertTypes.h"
+#include "rdb/convertTypes.hpp"
 
 static_assert(std::is_copy_constructible_v<rdb::descFldVT> == true);
 

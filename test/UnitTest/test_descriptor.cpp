@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-#include "rdb/descriptor.h"
+#include "rdb/descriptor.hpp"
 
 extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
 

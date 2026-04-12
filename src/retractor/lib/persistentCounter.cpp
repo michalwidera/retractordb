@@ -1,4 +1,4 @@
-#include "persistentCounter.h"
+#include "persistentCounter.hpp"
 
 #include <fstream>
 

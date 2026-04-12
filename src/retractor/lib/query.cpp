@@ -1,6 +1,6 @@
-#include "query.h"
+#include "query.hpp"
 
-#include "qTree.h"
+#include "qTree.hpp"
 
 #include <spdlog/spdlog.h>
 

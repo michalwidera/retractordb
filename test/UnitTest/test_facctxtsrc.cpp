@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "rdb/facctxtsrc.h"
+#include "rdb/facctxtsrc.hpp"
 
 // ctest -R '^ut-test_facctxtsrc' -V
 

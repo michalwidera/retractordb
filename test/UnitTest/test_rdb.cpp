@@ -5,9 +5,9 @@
 #include <iostream>
 #include <string>
 
-#include "rdb/fainterface.h"
-#include "rdb/payload.h"
-#include "rdb/storageacc.h"
+#include "rdb/fainterface.hpp"
+#include "rdb/payload.hpp"
+#include "rdb/storageacc.hpp"
 
 // ctest -R '^ut-test_rdb' -V
 

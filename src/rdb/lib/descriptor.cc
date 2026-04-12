@@ -1,4 +1,4 @@
-#include "rdb/descriptor.h"
+#include "rdb/descriptor.hpp"
 
 #include <spdlog/spdlog.h>
 

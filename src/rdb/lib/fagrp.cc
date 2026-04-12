@@ -1,4 +1,4 @@
-#include "rdb/fagrp.h"
+#include "rdb/fagrp.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -33,7 +33,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
   return in.tellg();
 }
 
-// fagrp.h -> typedef std::pair<segments_t, capacity_t> retention_t;
+// fagrp.hpp -> typedef std::pair<segments_t, capacity_t> retention_t;
 template <typename T>
 groupFile<T>::groupFile(const std::string_view fileName,  //
                         const ssize_t recordSize,         //

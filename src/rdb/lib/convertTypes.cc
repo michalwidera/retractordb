@@ -1,4 +1,4 @@
-#include "rdb/convertTypes.h"
+#include "rdb/convertTypes.hpp"
 
 #include <spdlog/spdlog.h>
 

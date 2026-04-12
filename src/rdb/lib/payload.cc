@@ -1,4 +1,4 @@
-#include "rdb/payload.h"
+#include "rdb/payload.hpp"
 
 #define BOOST_STACKTRACE_USE_BACKTRACE
 
@@ -13,7 +13,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "rdb/convertTypes.h"
+#include "rdb/convertTypes.hpp"
 
 namespace rdb {
 

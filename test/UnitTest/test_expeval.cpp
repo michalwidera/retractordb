@@ -4,8 +4,8 @@
 
 #include <stdexcept>
 
-#include "rdb/payload.h"
-#include "retractor/lib/expressionEvaluator.h"
+#include "rdb/payload.hpp"
+#include "retractor/lib/expressionEvaluator.hpp"
 
 // ctest -R '^ut-expeval' -V
 

@@ -3,9 +3,9 @@
 #include <memory>
 #include <vector>
 
-#include "faccposix.h"
-#include "faccposixshd.h"
-#include "retention.h"
+#include "faccposix.hpp"
+#include "faccposixshd.hpp"
+#include "retention.hpp"
 
 /// @brief klasa groupFile tworzy pliki z retencją
 ///

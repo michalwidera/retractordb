@@ -1,17 +1,21 @@
 #pragma once
 
-#include <fstream>
+#include <vector>
 
-#include "descriptor.h"
-#include "fainterface.h"
-#include "payload.h"
+#include "descriptor.hpp"
+#include "fainterface.hpp"
 
 namespace rdb {
+/**
+ * @brief Object that implements READ ONLY data source interface via posix calls
+ *
+ * Type: BINARY
+ */
 
-/// @brief Definicja klasy implementującej dostęp do pliku tekstowego
+/// @brief Definicja klasy implementującej dostęp do pliku binarnego
 ///
-/// Obiekt textSourceRO powinien:
-/// - umożliwiać odczyt danych z pliku tekstowego.
+/// Obiekt binaryDeviceRO powinien:
+/// - umożliwiać odczyt danych z pliku binarnego.
 /// - interpretować dane zgodnie z dostarczonym opisem (Descriptor), umożliwiając odczyt danych o różnych typach i strukturach.
 /// - uniemożliwiać zapis danych do pliku, zapewniając, że obiekt jest tylko do odczytu.
 /// - obsługiwać sytuację, gdy osiągnięty zostanie koniec pliku (EOF), z opcją pętli do początku pliku, jeśli jest włączona.
@@ -22,32 +26,30 @@ namespace rdb {
 /// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, powinien zwrócić dane z ustawionymi wartościami null i zerami, a następnie zakończyć odczyt danych.
 /// - w przypadku pojawienia się wartości null w danych, powinien odpowiednio ustawić metadane null dla tych wartości, aby umożliwić ich prawidłową obsługę przez inne komponenty systemu.
 /// - w przypadku błędu odczytu danych z pliku, powinien odpowiednio ustawić metadane null dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
-class textSourceRO : public FileInterface {
+
+class binaryDeviceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
-
   Descriptor descriptor_;
+  /**
+   * @brief Posix File Descriptor
+   */
+  int fd_;
 
-  std::unique_ptr<rdb::payload> payload_;
-
-  std::fstream myFile_;
-
-  size_t readCount_ = 0;
+  size_t cnt_ = 0;
 
   bool loopToBeginningIfEOF_ = true;
+  std::vector<bool> lastNullBitset_;
 
  public:
-  textSourceRO(const std::string_view fileName,    //
-               const ssize_t recordSize,           //
-               const rdb::Descriptor &descriptor,  //
-               bool loopToBeginningIfEOF);
-
-  ~textSourceRO() override;
+  explicit binaryDeviceRO(const std::string_view fileName, const ssize_t recordSize, const rdb::Descriptor &descriptor,
+                          bool loopToBeginningIfEOF);
+  ~binaryDeviceRO() override;
 
   ssize_t read(uint8_t *ptrData, const size_t position) override;
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {
     return EXIT_FAILURE;
-  }
+  };
 
   auto name() -> std::string & override;
   size_t count() override;

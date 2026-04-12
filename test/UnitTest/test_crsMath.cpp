@@ -6,13 +6,13 @@
 #include <variant>
 
 #include "config.h"
-#include "rdb/fainterface.h"
-#include "rdb/payload.h"
-#include "rdb/storageacc.h"
-#include "retractor/lib/compiler.h"
-#include "retractor/lib/CRSMath.h"
-#include "retractor/lib/dataModel.h"
-#include "retractor/lib/qTree.h"  // coreInstance
+#include "rdb/fainterface.hpp"
+#include "rdb/payload.hpp"
+#include "rdb/storageacc.hpp"
+#include "retractor/lib/compiler.hpp"
+#include "retractor/lib/CRSMath.hpp"
+#include "retractor/lib/dataModel.hpp"
+#include "retractor/lib/qTree.hpp"  // coreInstance
 
 // ctest -R '^ut-test_crsMath' -V
 

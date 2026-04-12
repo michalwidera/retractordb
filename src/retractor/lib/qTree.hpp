@@ -8,7 +8,7 @@
 
 #include <boost/rational.hpp>
 
-#include "query.h"
+#include "query.hpp"
 
 class qTree : public std::vector<query> {
   /* Topological sort vars */

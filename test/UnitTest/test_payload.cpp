@@ -5,8 +5,8 @@
 #include <sstream>
 #include <string>
 
-#include "rdb/descriptor.h"
-#include "rdb/payload.h"
+#include "rdb/descriptor.hpp"
+#include "rdb/payload.hpp"
 
 TEST(payload, position_conversion_case_3_with_payload) {
   auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) +    //

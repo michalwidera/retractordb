@@ -1,4 +1,4 @@
-#include "presenter.h"
+#include "presenter.hpp"
 
 #include <iostream>  // for operator<<
 
@@ -6,7 +6,7 @@
 #include <boost/regex.hpp>         // IWYU pragma: keep
 #include <boost/system/error_code.hpp>
 
-#include "CRSMath.h"
+#include "CRSMath.hpp"
 
 // https://ref.pencilcode.net/turtle/colors.html
 

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "rdb/descriptor.h"
-#include "rdb/metaDataStream.h"
+#include "rdb/descriptor.hpp"
+#include "rdb/metaDataStream.hpp"
 
 #include <boost/rational.hpp>
 #include <chrono>

@@ -1,4 +1,4 @@
-#include "dumpManager.h"
+#include "dumpManager.hpp"
 
 #include <fcntl.h>
 #include <spdlog/spdlog.h>
@@ -9,7 +9,7 @@
 #include <cstdlib>  // std::abs
 #include <filesystem>
 
-#include "dataModel.h"
+#include "dataModel.hpp"
 
 extern dataModel *pProc;
 

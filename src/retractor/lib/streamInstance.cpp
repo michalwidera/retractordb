@@ -1,4 +1,4 @@
-#include "streamInstance.h"
+#include "streamInstance.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -6,9 +6,9 @@
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
 
-#include "expressionEvaluator.h"
-#include "persistentCounter.h"
-#include "rdb/convertTypes.h"
+#include "expressionEvaluator.hpp"
+#include "persistentCounter.hpp"
+#include "rdb/convertTypes.hpp"
 
 extern std::unique_ptr<PersistentCounter> pCounterPtr;
 

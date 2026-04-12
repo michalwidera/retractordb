@@ -1,6 +1,6 @@
 #pragma once
 
-#include "descriptor.h"
+#include "descriptor.hpp"
 
 #include <boost/rational.hpp>
 #include <chrono>

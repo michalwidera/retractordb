@@ -5,16 +5,16 @@
 
 #include <boost/circular_buffer.hpp>
 
-#include "descriptor.h"
-#include "faccbindev.h"
-#include "faccfs.h"
-#include "faccmemory.h"
-#include "faccposix.h"
-#include "faccposixshd.h"
-#include "facctxtsrc.h"
-#include "fagrp.h"
-#include "metaDataStream.h"
-#include "payload.h"
+#include "descriptor.hpp"
+#include "faccbindev.hpp"
+#include "faccfs.hpp"
+#include "faccmemory.hpp"
+#include "faccposix.hpp"
+#include "faccposixshd.hpp"
+#include "facctxtsrc.hpp"
+#include "fagrp.hpp"
+#include "metaDataStream.hpp"
+#include "payload.hpp"
 
 namespace rdb {
 enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };

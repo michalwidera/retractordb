@@ -3,9 +3,9 @@
 #include <memory>  // unique_ptr
 #include <string>
 
-#include "dumpManager.h"
-#include "qTree.h"           // qTree
-#include "rdb/storageacc.h"  // rdb::storage (transitively includes descriptor.h, payload.h)
+#include "dumpManager.hpp"
+#include "qTree.hpp"           // qTree
+#include "rdb/storageacc.hpp"  // rdb::storage (transitively includes descriptor.hpp, payload.hpp)
 
 struct streamInstance {
   qTree &coreInstance;

@@ -4,7 +4,7 @@
 #include <string>
 #include <utility>
 
-#include "token.h"
+#include "token.hpp"
 
 struct rule {
   std::string name;

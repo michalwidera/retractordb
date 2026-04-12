@@ -8,11 +8,11 @@
 
 #include <boost/rational.hpp>
 
-#include "field.h"
-#include "rdb/descriptor.h"
-#include "rdb/faccmemory.h"
-#include "rule.h"
-#include "token.h"
+#include "field.hpp"
+#include "rdb/descriptor.hpp"
+#include "rdb/faccmemory.hpp"
+#include "rule.hpp"
+#include "token.hpp"
 
 class qTree;
 

@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "retractor/lib/compiler.h"
-#include "retractor/lib/qTree.h"
+#include "retractor/lib/compiler.hpp"
+#include "retractor/lib/qTree.hpp"
 
 // ctest -R '^ut-test_compiler' -V
 

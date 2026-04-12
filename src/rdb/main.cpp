@@ -13,11 +13,11 @@
 #include <string>
 
 #include "config.h"
-#include "rdb/descriptor.h"
-#include "rdb/faccfs.h"
-#include "rdb/faccposix.h"
-#include "rdb/payload.h"
-#include "rdb/storageacc.h"
+#include "rdb/descriptor.hpp"
+#include "rdb/faccfs.hpp"
+#include "rdb/faccposix.hpp"
+#include "rdb/payload.hpp"
+#include "rdb/storageacc.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;

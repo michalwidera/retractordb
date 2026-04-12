@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "rdb/faccposix.h"
+#include "rdb/faccposix.hpp"
 
 typedef unsigned char BYTE;
 

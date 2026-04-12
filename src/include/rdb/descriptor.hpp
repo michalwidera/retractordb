@@ -8,7 +8,7 @@
 
 #include "cmdID.hpp"
 #include "fldType.hpp"
-#include "retention.h"
+#include "retention.hpp"
 namespace rdb {
 
 // https://developers.google.com/protocol-buffers/docs/overview#scalar

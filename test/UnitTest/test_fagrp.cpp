@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "rdb/fagrp.h"
+#include "rdb/fagrp.hpp"
 
 typedef unsigned char BYTE;
 

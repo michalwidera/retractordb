@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "rdb/descriptor.h"
-#include "rdb/faccbindev.h"
+#include "rdb/descriptor.hpp"
+#include "rdb/faccbindev.hpp"
 
 namespace {
 

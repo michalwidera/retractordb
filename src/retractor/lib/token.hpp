@@ -6,7 +6,7 @@
 
 #include <boost/rational.hpp>
 
-#include "rdb/descriptor.h"
+#include "rdb/descriptor.hpp"
 
 class token {
   command_id command_;

@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-#include "descriptor.h"
+#include "descriptor.hpp"
 
 /// @brief Definicja klasy zarządzającej obszarem pamęci, który jest interpretowany zgodnie z opisem w Descriptorze.
 ///

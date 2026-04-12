@@ -1,4 +1,4 @@
-#include "rdb/faccfs.h"
+#include "rdb/faccfs.hpp"
 
 #include <cassert>
 #include <filesystem>

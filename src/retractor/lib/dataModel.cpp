@@ -1,4 +1,4 @@
-#include "dataModel.h"
+#include "dataModel.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -10,7 +10,7 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include "rdb/convertTypes.h"
+#include "rdb/convertTypes.hpp"
 #include "SOperations.hpp"
 
 // ctest -R '^ut-dataModel' -V

@@ -9,7 +9,7 @@
 
 #include <boost/circular_buffer.hpp>
 
-#include "rdb/payload.h"
+#include "rdb/payload.hpp"
 
 struct dumpTask {
   // from rule definition

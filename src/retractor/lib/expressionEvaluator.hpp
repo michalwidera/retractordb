@@ -1,8 +1,8 @@
 #pragma once
 
 #include "fldType.hpp"
-#include "rdb/payload.h"
-#include "token.h"  // token, std::list
+#include "rdb/payload.hpp"
+#include "token.hpp"  // token, std::list
 
 /// @brief Klasa opisująca proces wyznaczania wartości wyrażenia.
 ///

@@ -1,4 +1,4 @@
-#include "executorsm.h"
+#include "executorsm.hpp"
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
@@ -21,8 +21,8 @@
 #include <boost/system/error_code.hpp>
 
 #include "constants.hpp"
-#include "dataModel.h"
-#include "persistentCounter.h"
+#include "dataModel.hpp"
+#include "persistentCounter.hpp"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"

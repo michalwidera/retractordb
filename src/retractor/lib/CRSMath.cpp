@@ -1,4 +1,4 @@
-#include "CRSMath.h"
+#include "CRSMath.hpp"
 
 #include <cassert>  // for assert
 

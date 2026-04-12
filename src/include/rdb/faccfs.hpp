@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fainterface.h"
+#include "fainterface.hpp"
 
 namespace rdb {
 /**

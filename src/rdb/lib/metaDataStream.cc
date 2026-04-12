@@ -1,4 +1,4 @@
-#include "rdb/metaDataStream.h"
+#include "rdb/metaDataStream.hpp"
 
 #include <algorithm>
 #include <cassert>
