@@ -239,6 +239,7 @@ int main(int argc, char *argv[]) {
       if (coreInstance[stream_id].isCompilerDirective()) continue;
       dropArtifactFile(std::filesystem::path(storage_location) / stream_id);
       dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".desc"));
+      dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".meta"));
     }
 
     SPDLOG_INFO("Cleanup completed.");

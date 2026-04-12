@@ -175,7 +175,8 @@ storage::~storage() {
   if (isDisposable_) {
     if (storageFile_ != "") auto statusRemove1 = remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
-    SPDLOG_INFO("Disposable - drop storage, drop descriptor");
+    if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) remove(metaIndexFile_.c_str());
+    SPDLOG_INFO("Disposable - drop storage, drop descriptor, drop meta");
   }
 }
 
