@@ -148,16 +148,16 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
   }
 
   auto requestedType = descriptor[position].rtype;
-
+  std::any value;
   if (!valueParam.has_value()) {
     nullBitset_[position] = true;
-    return;
+    auto fallbackValue = nullFallbackValue(requestedType);
+    std::visit([&value](const auto &v) { value = std::any(v); }, fallbackValue);
+  } else {
+    nullBitset_[position] = false;
+    cast<std::any> castAny;
+    value = castAny(valueParam.value(), requestedType);
   }
-
-  nullBitset_[position] = false;
-
-  cast<std::any> castAny;
-  std::any value = castAny(valueParam.value(), requestedType);
 
   try {
     switch (requestedType) {
@@ -168,6 +168,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
         auto destOffset = descriptor.offset(positionFlat);
         auto dest       = span().subspan(destOffset, len);
         assert(position + len <= descriptor.getSizeInBytes());
+        std::fill(dest.begin(), dest.end(), 0);
         std::copy_n(data.c_str(), lenr, dest.begin());
         if (lenr != len) dest[lenr] = '\0';
       } break;

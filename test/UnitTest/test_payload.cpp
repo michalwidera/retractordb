@@ -47,6 +47,31 @@ TEST(payload, null_can_be_cleared_by_writing_value) {
   EXPECT_EQ(std::any_cast<int>(payload.getItem(0).value()), 123);
 }
 
+TEST(payload, nullopt_writes_integer_fallback_to_memory) {
+  auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
+  rdb::payload payload(desc);
+
+  payload.setItem(0, 123456);
+  payload.setItem(0, std::nullopt);
+
+  int raw = -1;
+  std::memcpy(&raw, payload.span().data(), sizeof(int));
+  EXPECT_EQ(raw, 0);
+  EXPECT_FALSE(payload.getItem(0).has_value());
+}
+
+TEST(payload, nullopt_writes_string_fallback_to_memory) {
+  auto desc = rdb::Descriptor("name", 1, 6, rdb::STRING);
+  rdb::payload payload(desc);
+
+  payload.setItem(0, std::string("abcde"));
+  payload.setItem(0, std::nullopt);
+
+  auto bytes = payload.span().subspan(0, 6);
+  EXPECT_TRUE(std::all_of(bytes.begin(), bytes.end(), [](uint8_t b) { return b == 0; }));
+  EXPECT_FALSE(payload.getItem(0).has_value());
+}
+
 TEST(payload, add_preserves_null_flags) {
   auto leftDesc  = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
   auto rightDesc = rdb::Descriptor("b", 4, 1, rdb::INTEGER);
