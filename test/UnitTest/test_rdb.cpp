@@ -173,4 +173,3 @@ TEST(crdb, posixBinaryFile_byte) {
   auto result3 = test_3<uint8_t, rdb::posixBinaryFile>();
   EXPECT_TRUE(result3);
 }
-

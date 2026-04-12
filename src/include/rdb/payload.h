@@ -2,8 +2,8 @@
 
 #include <any>
 #include <memory>  // std::unique_ptr
-#include <span>
 #include <optional>
+#include <span>
 
 #include "descriptor.h"
 
@@ -33,7 +33,7 @@ class payload {
 
   payload &operator=(const Descriptor &other);
 
-  std::vector<bool> nullBitset;
+  std::vector<bool> nullBitset;  // true if field at position i is null, false otherwise
  public:
   /// @brief Descriptor of managed payload area
   Descriptor descriptor;

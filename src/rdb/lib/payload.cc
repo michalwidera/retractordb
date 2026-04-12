@@ -76,7 +76,7 @@ payload &payload::operator=(const Descriptor &other) {
 payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
   descSum += other.descriptor;                    // ! moving this into constructor fails
-  descSum.removeConfigurationFields();                             //
+  descSum.removeConfigurationFields();            //
   payload result(descSum);                        //
   SPDLOG_INFO("operator+ {} {} {}",               //
               descriptor.getSizeInBytes(),        //

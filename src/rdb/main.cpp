@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
       int position;
       std::cin >> position;
       auto fieldName = dacc->descriptor[position].rname;
-      auto valueOpt = dacc->getPayload()->getItem(position);
+      auto valueOpt  = dacc->getPayload()->getItem(position);
       if (!valueOpt.has_value()) {
         std::cout << fieldName << ": null" << std::endl;
         continue;

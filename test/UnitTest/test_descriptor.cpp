@@ -105,10 +105,10 @@ TEST(descriptor, compare) {
 }
 
 TEST(descriptor, compare_ignores_configuration_fields_without_out_of_bounds_access) {
-  auto withConfig = rdb::Descriptor("source.dat", 0, 0, rdb::REF) +  //
+  auto withConfig = rdb::Descriptor("source.dat", 0, 0, rdb::REF) +   //
                     rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
                     rdb::Descriptor("value", 4, 1, rdb::INTEGER);
-  auto plain = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
+  auto plain     = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
   auto different = rdb::Descriptor("value", 8, 1, rdb::DOUBLE);
 
   EXPECT_TRUE(withConfig == plain);

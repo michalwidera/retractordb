@@ -65,7 +65,7 @@ class Descriptor : public std::vector<rField> {
   Descriptor(const std::string &name, int length, int arrayCount, rdb::descFld type);
 
   /// @brief Default constructor
-  Descriptor()                       = default;
+  Descriptor() = default;
 
   /// @brief Copy constructor
   /// @param init descriptor used as source
