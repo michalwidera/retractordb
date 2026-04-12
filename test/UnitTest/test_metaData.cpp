@@ -120,22 +120,14 @@ TEST_F(MetaTestFixture, test_timestamps) {
   rdb::Descriptor descriptor;
   descriptor.append({{"t", 4, 0, rdb::INTEGER}});
 
-  auto before = std::chrono::system_clock::now();
   rdb::metaDataStream meta(descriptor, metaFile, boost::rational<int>(1, 10));  // 0.1s interval
-  auto after            = std::chrono::system_clock::now();
   std::vector<bool> pat = {false};
 
   meta.onRecordAppended(pat);
 
-  // Creation time should be between before and after construction
-  auto creationTime = meta.getCreationTime();
-  EXPECT_GE(creationTime, before);
-  EXPECT_LE(creationTime, after);
-
   // Sampling interval should be 1/10
   EXPECT_EQ(meta.getSamplingInterval(), boost::rational<int>(1, 10));
 
-  // Verify timestamp calculation through public gap API.
   // Gap inserted after one record should be at record index 1.
   meta.onTransmissionGap();
   size_t gapCount = 0, gapPos = 0, cumulative = 0;
@@ -145,12 +137,6 @@ TEST_F(MetaTestFixture, test_timestamps) {
   }
   ASSERT_EQ(gapCount, 1u);
   EXPECT_EQ(gapPos, 1u);
-
-  // recordIndex=1 with 0.1s interval => creation + 100ms
-  auto iv       = meta.getSamplingInterval();
-  auto gapTs    = creationTime + std::chrono::nanoseconds(static_cast<int64_t>(gapPos) * iv.numerator() * 1000000000LL / iv.denominator());
-  auto expected = creationTime + std::chrono::milliseconds(100);
-  EXPECT_EQ(gapTs, expected);
 }
 
 // R4: Modify a record already committed to disk (rewriteFile path)
@@ -626,12 +612,7 @@ TEST_F(MetaTestFixture, test_reset_preserves_metadata) {
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
   auto rInterval = boost::rational<int>(1, 2);
-  auto before    = std::chrono::system_clock::now();
-
   rdb::metaDataStream meta(descriptor, metaFile, rInterval);
-
-  auto creationTime = meta.getCreationTime();
-  EXPECT_GE(creationTime, before);
 
   std::vector<bool> pat = {true};
   meta.onRecordAppended(pat);
@@ -639,68 +620,9 @@ TEST_F(MetaTestFixture, test_reset_preserves_metadata) {
   // Reset
   meta.reset();
 
-  // Creation time and sampling interval should be preserved
-  EXPECT_EQ(meta.getCreationTime(), creationTime);
+  // Sampling interval should be preserved
   EXPECT_EQ(meta.getSamplingInterval(), rInterval);
   EXPECT_EQ(meta.totalRecords(), 0u);
-}
-
-TEST_F(MetaTestFixture, test_purge_removes_records) {
-  rdb::Descriptor descriptor;
-  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
-
-  rdb::metaDataStream meta(descriptor, metaFile);
-  std::vector<bool> null_   = {true};
-  std::vector<bool> noNull_ = {false};
-
-  // Build index: 5 null records, then 5 non-null records
-  for (int i = 0; i < 5; ++i)
-    meta.onRecordAppended(null_);
-  for (int i = 0; i < 5; ++i)
-    meta.onRecordAppended(noNull_);
-
-  EXPECT_EQ(meta.totalRecords(), 10u);
-
-  // Purge records 0-4 (inclusive)
-  meta.purge(4);
-
-  EXPECT_EQ(meta.totalRecords(), 5u);
-  // After purge, remaining records are what were originally records 5-9
-  EXPECT_EQ(meta.getNullBitset(0), noNull_);
-  EXPECT_EQ(meta.getNullBitset(4), noNull_);
-}
-
-TEST_F(MetaTestFixture, test_purge_all) {
-  rdb::Descriptor descriptor;
-  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
-
-  rdb::metaDataStream meta(descriptor, metaFile);
-  std::vector<bool> pat = {true};
-
-  for (int i = 0; i < 10; ++i)
-    meta.onRecordAppended(pat);
-
-  EXPECT_EQ(meta.totalRecords(), 10u);
-
-  // Purge all records
-  meta.purge(9);
-
-  EXPECT_EQ(meta.totalRecords(), 0u);
-  EXPECT_TRUE(meta.isEmpty());
-}
-
-TEST_F(MetaTestFixture, test_purge_out_of_range) {
-  rdb::Descriptor descriptor;
-  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
-
-  rdb::metaDataStream meta(descriptor, metaFile);
-  std::vector<bool> pat = {true};
-
-  for (int i = 0; i < 5; ++i)
-    meta.onRecordAppended(pat);
-
-  // Try to purge beyond the total record count
-  EXPECT_THROW(meta.purge(10), std::out_of_range);
 }
 
 TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
@@ -727,15 +649,6 @@ TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
   EXPECT_EQ(gapPositions.size(), 2u);
   EXPECT_EQ(gapPositions[0], 2u);
   EXPECT_EQ(gapPositions[1], 4u);
-
-  // Verify timestamps are calculated correctly
-  auto creationTime = meta.getCreationTime();
-  auto iv = meta.getSamplingInterval();
-  auto calcTs = [&](size_t pos) {
-    return creationTime + std::chrono::nanoseconds(static_cast<int64_t>(pos) * iv.numerator() * 1000000000LL / iv.denominator());
-  };
-  EXPECT_EQ(calcTs(gapPositions[0]), creationTime + std::chrono::seconds(2));
-  EXPECT_EQ(calcTs(gapPositions[1]), creationTime + std::chrono::seconds(4));
 }
 
 TEST_F(MetaTestFixture, test_transmission_gaps_empty) {

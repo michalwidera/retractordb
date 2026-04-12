@@ -356,12 +356,6 @@ std::vector<bool> metaDataStream::getNullBitset(size_t recordIndex) const {
   return entries[segIdx].nullBitset;
 }
 
-bool metaDataStream::isFieldNull(size_t recordIndex, size_t fieldIndex) const {
-  auto bitset = getNullBitset(recordIndex);
-  if (fieldIndex >= bitset.size()) throw std::out_of_range("fieldIndex out of range");
-  return bitset[fieldIndex];
-}
-
 size_t metaDataStream::totalRecords() const { return committedRecordCount_ + currentEntry_.recordCount; }
 
 std::vector<metaDataStream::IndexRecord> metaDataStream::entries() const { return readCommittedEntries(); }
@@ -396,23 +390,9 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
   return false;
 }
 
-// ── Time calculation interface ───────────────────────────────────────
-
-std::chrono::system_clock::time_point metaDataStream::calculateRecordTimestamp(size_t recordIndex) const {
-  // time = creationTime_ + recordIndex * rInterval_ (in seconds)
-  int64_t num   = static_cast<int64_t>(recordIndex) * rInterval_.numerator();
-  int64_t den   = rInterval_.denominator();
-  auto offsetNs = std::chrono::nanoseconds(num * 1000000000LL / den);
-  return creationTime_ + offsetNs;
-}
-
-std::chrono::system_clock::time_point metaDataStream::getCreationTime() const { return creationTime_; }
+// ── Time / configuration interface ─────────────────────────────────
 
 boost::rational<int> metaDataStream::getSamplingInterval() const { return rInterval_; }
-
-// ──  ─────────────────────────────────────────────────────────
-
-const Descriptor &metaDataStream::descriptor() const { return *descriptorRef_; }
 
 bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
 
@@ -427,86 +407,6 @@ void metaDataStream::reset() {
   rewriteFile(std::vector<IndexRecord>());
 
   SPDLOG_DEBUG("metaDataStream reset - all entries cleared");
-}
-
-void metaDataStream::purge(size_t upToRecordIndex) {
-  if (upToRecordIndex >= totalRecords()) {
-    throw std::out_of_range("purge: upToRecordIndex >= totalRecords");
-  }
-
-  // Calculate how many records are being removed
-  size_t recordsToRemove = upToRecordIndex + 1;
-
-  // Read all committed entries
-  auto allEntries = readCommittedEntries();
-
-  // Separate currentEntry_ as it's not on disk yet
-  IndexRecord savedCurrent = currentEntry_;
-  currentEntry_.recordCount = 0;
-  currentEntry_.nullBitset.assign(descriptorRef_->size(), false);
-  committedRecordCount_ = 0;
-
-  // Process all entries and remove records
-  std::vector<IndexRecord> newEntries;
-  size_t cumulative = 0;
-
-  for (auto &entry : allEntries) {
-    if (entry.recordCount == 0) {
-      // Skip gap if it's within the purged range
-      if (cumulative <= upToRecordIndex) {
-        continue;
-      }
-      newEntries.push_back(entry);
-      continue;
-    }
-
-    // Handle non-gap entries
-    if (cumulative + entry.recordCount <= recordsToRemove) {
-      // Entire entry falls within purge range
-      cumulative += entry.recordCount;
-      continue;
-    }
-
-    if (cumulative <= upToRecordIndex) {
-      // Entry is partially purged
-      size_t toKeep = cumulative + entry.recordCount - recordsToRemove;
-      IndexRecord kept;
-      kept.nullBitset = entry.nullBitset;
-      kept.recordCount = toKeep;
-      newEntries.push_back(kept);
-      cumulative += entry.recordCount;
-    } else {
-      // Entry is entirely kept
-      newEntries.push_back(entry);
-      cumulative += entry.recordCount;
-    }
-  }
-
-  // Handle currentEntry_
-  if (cumulative <= upToRecordIndex) {
-    // Current entry is entirely within purge range
-    currentEntry_.recordCount = 0;
-  } else if (cumulative > recordsToRemove) {
-    // Current entry is partially kept
-    size_t toKeep = cumulative + savedCurrent.recordCount - recordsToRemove;
-    currentEntry_.nullBitset = savedCurrent.nullBitset;
-    currentEntry_.recordCount = toKeep;
-  } else {
-    // Current entry is entirely kept
-    currentEntry_ = savedCurrent;
-  }
-
-  // Recompute committedRecordCount_
-  committedRecordCount_ = 0;
-  for (const auto &rec : newEntries) {
-    committedRecordCount_ += rec.recordCount;
-  }
-
-  // Rewrite file with updated entries
-  rewriteFile(newEntries);
-
-  SPDLOG_DEBUG("metaDataStream purged records 0..{}, saved {} records", upToRecordIndex,
-               totalRecords());
 }
 
 }  // namespace rdb

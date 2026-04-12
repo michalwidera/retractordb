@@ -22,7 +22,7 @@ namespace rdb {
 /// - umożliwiać aktualizację informacji o nullach dla istniejących rekordów.
 /// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
 /// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone. (wyjątek stanowi czyszczenie - tzw. purge).
+/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
 /// - zapewniać informacje o przerwach w transmisji danych poprzez wpisy IndexRecord z recordCount == 0, persystowane na dysku wewnątrz pliku indeksu.
 /// - powinien być w stanie obsłużyć duże ilości danych, w tym wiele przerw w transmisji.
@@ -85,16 +85,6 @@ class metaDataStream {
   /// @param nullBitset bit pattern indicating which fields are null
   void onRecordAppended(const std::vector<bool> &nullBitset);
 
-  /// @brief Purge (remove) all records up to and including @p upToRecordIndex.
-  ///
-  /// This is the only operation that removes records from the meta index.
-  /// Records are removed in the context of storage purge operations.
-  /// The meta index is rewritten to remove the purged entries.
-  /// @param upToRecordIndex global position of the last record to remove (inclusive)
-  /// @throws std::out_of_range if upToRecordIndex >= totalRecords()
-  /// @note This operation rebuilds the file, renumbering all remaining record indices.
-  void purge(size_t upToRecordIndex);
-
   // ── Query interface ────────────────────────────────────────────────
 
   /// @brief Retrieve the null bit-set for the record at @p recordIndex.
@@ -132,10 +122,6 @@ class metaDataStream {
 
   // ── Time / configuration interface ────────────────────────────────
 
-  /// @brief Get the creation time of the index.
-  /// @return timestamp when index was created
-  std::chrono::system_clock::time_point getCreationTime() const;
-
   /// @brief Get the configured sampling interval.
   /// @return rInterval value used for time calculations
   boost::rational<int> getSamplingInterval() const;
@@ -151,7 +137,6 @@ class metaDataStream {
   /// Removes all committed entries and resets the pending entry.
   /// Does not modify the creation time or sampling interval.
   /// The meta file is rewritten with only the header.
-  /// @note This is different from purge() which maintains relative indices.
   void reset();
 
  private:
@@ -168,9 +153,6 @@ class metaDataStream {
   ///         If segment index == committed entry count, the record is in currentEntry_.
   std::pair<size_t, size_t> locateRecord(size_t recordIndex) const;
 
-  std::chrono::system_clock::time_point calculateRecordTimestamp(size_t recordIndex) const;
-  bool isFieldNull(size_t recordIndex, size_t fieldIndex) const;
-  const Descriptor &descriptor() const;
   size_t entrySize() const;  ///< byte size of one serialized IndexRecord
 
   std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
