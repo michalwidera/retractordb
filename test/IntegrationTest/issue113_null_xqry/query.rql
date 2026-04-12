@@ -1,0 +1,7 @@
+# make install && ctest -R issue113_null_xqry -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER STREAM core0, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT core0[0], core0[1] STREAM str_null FROM core0

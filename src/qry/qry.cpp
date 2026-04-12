@@ -48,6 +48,27 @@ static std::atomic<bool> done{false};
 
 std::vector<std::string> colors = {"red", "blue", "green", "orange", "purple", "brown", "pink", "yellow", "cyan", "magenta"};
 
+namespace {
+
+bool isNullAt(const std::string &nullmap, int index) {
+  return index >= 0 && index < static_cast<int>(nullmap.size()) && nullmap[index] == '1';
+}
+
+bool isAllNull(const std::string &nullmap, int count) {
+  if (count <= 0) return false;
+  for (int i = 0; i < count; i++) {
+    if (!isNullAt(nullmap, i)) return false;
+  }
+  return true;
+}
+
+std::string displayedValue(const ptree &row, int index, const std::string &nullmap, formatMode mode) {
+  if (!isNullAt(nullmap, index)) return row.get(std::to_string(index), "");
+  return mode == formatMode::GNUPLOT ? "NaN" : "null";
+}
+
+}  // namespace
+
 void qry::producer() {
   try {
     const int messageSize = 1024;
@@ -230,6 +251,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
       while (spsc_queue.pop(e_value)) {
         const std::string streamN = e_value.get("stream", "");
+        const std::string nullmap = e_value.get("nullmap", "");
         if (streamN == constants::Reserved_id_oob) {
           done = true;
           break;
@@ -238,9 +260,11 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
           if (w == streamN) {
             if (outputFormatMode == formatMode::RAW) {
               const int count = std::stoi(e_value.get("count", ""));
-              for (int i = 0; i < count; i++)
-                printf("%s ", e_value.get(std::to_string(i), "").c_str());
-              printf("\r\n");
+              if (!vm.count("null") || !isAllNull(nullmap, count)) {
+                for (int i = 0; i < count; i++)
+                  printf("%s ", displayedValue(e_value, i, nullmap, outputFormatMode).c_str());
+                printf("\r\n");
+              }
             } else if (outputFormatMode == formatMode::GNUPLOT) {
               const int count = std::stoi(e_value.get("count", ""));
               if (output_lines.size() < count) output_lines.resize(count);
@@ -259,7 +283,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
               std::cout << "\r\n";
 
               for (int i = 0; i < count; i++) {
-                output_lines[i].push_front(e_value.get(std::to_string(i), ""));
+                output_lines[i].push_front(displayedValue(e_value, i, nullmap, outputFormatMode));
                 if (output_lines[i].size() > std::get<0>(gnuplotDim)) output_lines[i].pop_back();
               }
 
@@ -273,6 +297,10 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
               int i{0};
               const auto schema = netClient("detail", input);
               for (const auto &v : schema.get_child("db.field")) {
+                if (isNullAt(nullmap, i)) {
+                  ++i;
+                  continue;
+                }
                 printf("%s.%s %s %llu\n", input.c_str(), v.second.get<std::string>("").c_str(),
                        e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
               }
@@ -280,17 +308,25 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
               // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
               using namespace std::chrono;
               int i{0};
-              printf("%s ", input.c_str());
               bool firstValNoComma(true);
+              std::stringstream line;
+              line << input << " ";
               const auto schema = netClient("detail", input);
               for (const auto &v : schema.get_child("db.field")) {
+                if (isNullAt(nullmap, i)) {
+                  ++i;
+                  continue;
+                }
                 if (firstValNoComma)
                   firstValNoComma = false;
                 else
-                  printf(",");
-                printf("%s=%s", v.second.get<std::string>("").c_str(), e_value.get(std::to_string(i++), "").c_str());
+                  line << ",";
+                line << v.second.get<std::string>("") << "=" << e_value.get(std::to_string(i++), "");
               }
-              printf(" %ld\n", duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count());
+              if (!firstValNoComma) {
+                line << " " << duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+                printf("%s\n", line.str().c_str());
+              }
             }
             // This part is time limited (-m) resposbile
             if (timeLimitCntQry > 1) --timeLimitCntQry;

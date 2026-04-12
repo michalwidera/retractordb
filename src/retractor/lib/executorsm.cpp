@@ -23,6 +23,7 @@
 #include "constants.hpp"
 #include "dataModel.hpp"
 #include "persistentCounter.hpp"
+#include "rdb/convertTypes.hpp"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -359,17 +360,29 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
   assert(coreInstancePtr != nullptr);
+  auto payload = pProc->getPayload(query_name, 0);
+  assert(payload != nullptr);
+
   ptree pt;
   pt.put("stream", query_name);
-  pt.put("count", boost::lexical_cast<std::string>(coreInstancePtr->getQuery(query_name).lSchema.size()));
+  const auto fields = payload->descriptor.fieldsFlat();
+  pt.put("count", boost::lexical_cast<std::string>(fields.size()));
+
+  std::string nullmap;
+  nullmap.reserve(fields.size());
+
   int i = 0;
-  for (auto value : pProc->getRow(query_name, 0)) {
+  for (const auto &field : fields) {
     //
     // There is part of communication format - here data are formatted for
     // transmission via internal queue.
     //
     // std::stringstream retVal;
     // retVal << boost::rational_cast<double>(value); - now it's more complicated due types.
+
+    auto valueOpt = payload->getItem(i);
+    auto value    = valueOpt.has_value() ? any_to_variant_cast(valueOpt.value()) : nullFallbackValue(field.rtype);
+    nullmap.push_back(valueOpt.has_value() ? '0' : '1');
 
     std::stringstream coutstring;
 
@@ -388,6 +401,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 
     pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
   }
+  pt.put("nullmap", nullmap);
   std::stringstream strstream;
   write_info(strstream, pt);
   return strstream.str();
