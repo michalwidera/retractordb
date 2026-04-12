@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
     } else if (cmd == "help" || cmd == "h") {
       std::cout << GREEN;
       std::cout << "exit|quit|q                     exit\n";
-      std::cout << "quitdrop|qd                     exit & drop artifacts\n";
+      std::cout << "quitdrop|qd                     exit & drop artifacts (data, .desc, .meta)\n";
       std::cout << "open file [schema]              open or create database with schema\n";
       std::cout << "                                example: .open test_db { INTEGER dane STRING name[3] }\n";
       std::cout << "storage [path]                  set storage path for database\n";
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
       std::cout << "setpos [position][number value] set payload field number value\n";
       std::cout << "getpos [position]               show payload field value\n";
       std::cout << "status                          show current payload status\n";
-      std::cout << "rox                             remove on exit flip\n";
+      std::cout << "rox                             remove on exit flip (data, .desc, .meta)\n";
       std::cout << "print|printt                    show payload\n";
       std::cout << "list|rlist [count]              print first records\n";
       std::cout << "input [[field][value]]          fill payload\n";

@@ -1,5 +1,7 @@
 #include "rdb/metaDataStream.hpp"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -423,5 +425,123 @@ boost::rational<int> metaDataStream::getSamplingInterval() const { return rInter
 // ──  ─────────────────────────────────────────────────────────
 
 const Descriptor &metaDataStream::descriptor() const { return *descriptorRef_; }
+
+bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
+
+void metaDataStream::reset() {
+  // Clear all data and reset to initial state
+  currentEntry_.recordCount = 0;
+  currentEntry_.nullBitset.assign(descriptorRef_->size(), false);
+  currentEntry_.isGap = false;
+
+  committedRecordCount_ = 0;
+
+  // Rewrite file with only the header
+  rewriteFile(std::vector<IndexRecord>());
+
+  SPDLOG_DEBUG("metaDataStream reset - all entries cleared");
+}
+
+void metaDataStream::purge(size_t upToRecordIndex) {
+  if (upToRecordIndex >= totalRecords()) {
+    throw std::out_of_range("purge: upToRecordIndex >= totalRecords");
+  }
+
+  // Calculate how many records are being removed
+  size_t recordsToRemove = upToRecordIndex + 1;
+
+  // Read all committed entries
+  auto allEntries = readCommittedEntries();
+
+  // Separate currentEntry_ as it's not on disk yet
+  IndexRecord savedCurrent = currentEntry_;
+  currentEntry_.recordCount = 0;
+  currentEntry_.nullBitset.assign(descriptorRef_->size(), false);
+  currentEntry_.isGap = false;
+  committedRecordCount_ = 0;
+
+  // Process all entries and remove records
+  std::vector<IndexRecord> newEntries;
+  size_t cumulative = 0;
+
+  for (auto &entry : allEntries) {
+    if (entry.isGap) {
+      // Skip gap if it's within the purged range
+      if (cumulative <= upToRecordIndex) {
+        continue;
+      }
+      newEntries.push_back(entry);
+      continue;
+    }
+
+    // Handle non-gap entries
+    if (cumulative + entry.recordCount <= recordsToRemove) {
+      // Entire entry falls within purge range
+      cumulative += entry.recordCount;
+      continue;
+    }
+
+    if (cumulative <= upToRecordIndex) {
+      // Entry is partially purged
+      size_t toKeep = cumulative + entry.recordCount - recordsToRemove;
+      IndexRecord kept;
+      kept.nullBitset = entry.nullBitset;
+      kept.recordCount = toKeep;
+      kept.isGap = false;
+      newEntries.push_back(kept);
+      cumulative += entry.recordCount;
+    } else {
+      // Entry is entirely kept
+      newEntries.push_back(entry);
+      cumulative += entry.recordCount;
+    }
+  }
+
+  // Handle currentEntry_
+  if (cumulative <= upToRecordIndex) {
+    // Current entry is entirely within purge range
+    currentEntry_.recordCount = 0;
+  } else if (cumulative > recordsToRemove) {
+    // Current entry is partially kept
+    size_t toKeep = cumulative + savedCurrent.recordCount - recordsToRemove;
+    currentEntry_.nullBitset = savedCurrent.nullBitset;
+    currentEntry_.recordCount = toKeep;
+    currentEntry_.isGap = false;
+  } else {
+    // Current entry is entirely kept
+    currentEntry_ = savedCurrent;
+  }
+
+  // Recompute committedRecordCount_
+  committedRecordCount_ = 0;
+  for (const auto &rec : newEntries) {
+    committedRecordCount_ += rec.recordCount;
+  }
+
+  // Rewrite file with updated entries
+  rewriteFile(newEntries);
+
+  SPDLOG_DEBUG("metaDataStream purged records 0..{}, saved {} records", upToRecordIndex,
+               totalRecords());
+}
+
+std::vector<metaDataStream::TransmissionGap> metaDataStream::getTransmissionGaps() const {
+  std::vector<TransmissionGap> gaps;
+  auto allEntries = readCommittedEntries();
+
+  size_t cumulative = 0;
+  for (const auto &entry : allEntries) {
+    if (entry.isGap) {
+      TransmissionGap gap;
+      gap.recordIndex = cumulative;
+      gap.timestamp = calculateRecordTimestamp(cumulative);
+      gaps.push_back(gap);
+    } else {
+      cumulative += entry.recordCount;
+    }
+  }
+
+  return gaps;
+}
 
 }  // namespace rdb

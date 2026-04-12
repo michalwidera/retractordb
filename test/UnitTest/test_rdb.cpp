@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
@@ -230,5 +232,206 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
     EXPECT_FALSE(pl->getItem(0).has_value());
   }
 
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_purge_resets_metadata_stream_state) {
+  const std::string streamName = "ut-purge-meta-reset";
+  const std::string dataFile   = "ut-purge-meta-reset.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+
+    auto *pl = s.getPayload();
+
+    pl->setItem(0, std::nullopt);
+    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.getRecordsCount(), 1u);
+
+    s.purge();
+    ASSERT_EQ(s.getRecordsCount(), 0u);
+
+    pl->setItem(0, 1234);
+    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.getRecordsCount(), 1u);
+
+    ASSERT_TRUE(s.read(0));
+    ASSERT_TRUE(pl->getItem(0).has_value());
+    EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 1234);
+  }
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_first_write_persists_first_meta_record) {
+  const std::string streamName = "ut-meta-first-record";
+  const std::string dataFile   = "ut-meta-first-record.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+
+    auto *pl = s.getPayload();
+    pl->setItem(0, std::nullopt);
+    ASSERT_TRUE(s.write());
+    // Meta index is flushed to disk at destructor (lazy-write per spec):
+    // "zapis pierwszego rekordu do pliku indeksu nie jest wymagany natychmiast"
+  }
+
+  // After storage is closed, meta file must contain at least one RLE entry
+  ASSERT_TRUE(std::filesystem::exists(metaFile));
+  constexpr uintmax_t headerSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
+  EXPECT_GT(std::filesystem::file_size(metaFile), headerSize);
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_auto_gap_detection_marks_gap_after_timeout) {
+  const std::string streamName = "ut-auto-gap";
+  const std::string dataFile   = "ut-auto-gap.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+
+    // rInterval=1/100 (10ms), gapMultiplier=2 → threshold = 20ms
+    s.setSamplingInterval(boost::rational<int>(1, 100), 2);
+
+    auto *pl = s.getPayload();
+
+    // First write — no gap (nothing to compare against)
+    pl->setItem(0, 10);
+    ASSERT_TRUE(s.write());
+
+    // Wait longer than threshold (20ms)
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // Second write — should trigger auto-gap
+    pl->setItem(0, 20);
+    ASSERT_TRUE(s.write());
+
+    auto gaps = s.getTransmissionGaps();
+    EXPECT_EQ(gaps.size(), 1u);
+    EXPECT_TRUE(s.hasGapBefore(1));
+  }
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
+  const std::string streamName = "ut-auto-gap-fast";
+  const std::string dataFile   = "ut-auto-gap-fast.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+
+    // rInterval=1 (1 second), gapMultiplier=3 → threshold = 3000ms
+    // All writes happen within milliseconds so no gap should be detected
+    s.setSamplingInterval(boost::rational<int>(1), 3);
+
+    auto *pl = s.getPayload();
+
+    for (int i = 0; i < 5; ++i) {
+      pl->setItem(0, i);
+      ASSERT_TRUE(s.write());
+    }
+
+    auto gaps = s.getTransmissionGaps();
+    EXPECT_EQ(gaps.size(), 0u);
+  }
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
+  const std::string streamName = "ut-auto-gap-modify";
+  const std::string dataFile   = "ut-auto-gap-modify.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+
+    // rInterval=1/100 (10ms), gapMultiplier=2 → threshold = 20ms
+    s.setSamplingInterval(boost::rational<int>(1, 100), 2);
+
+    auto *pl = s.getPayload();
+
+    pl->setItem(0, 10);
+    ASSERT_TRUE(s.write());
+
+    // Wait longer than threshold
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // Modify existing record — auto-gap should NOT be triggered for modifications
+    pl->setItem(0, 99);
+    ASSERT_TRUE(s.write(0));
+
+    auto gaps = s.getTransmissionGaps();
+    EXPECT_EQ(gaps.size(), 0u);
+  }
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+}
+
+TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
+  const std::string streamName = "ut-interval-prop";
+  const std::string dataFile   = "ut-interval-prop.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+
+    s.setSamplingInterval(boost::rational<int>(1, 10));
+
+    auto *pl = s.getPayload();
+
+    // Write 3 records and verify meta tracks them
+    for (int i = 0; i < 3; ++i) {
+      pl->setItem(0, i * 10);
+      ASSERT_TRUE(s.write());
+    }
+
+    EXPECT_FALSE(s.isMetaIndexEmpty());
+    EXPECT_EQ(s.getRecordsCount(), 3u);
+  }
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
   std::filesystem::remove(metaFile);
 }

@@ -420,3 +420,340 @@ TEST_F(MetaTestFixture, integration_is_field_null_inside_aggregated_rle_entry) {
     EXPECT_FALSE(meta.isFieldNull(i, 2)) << "rec " << i << " field 2";
   }
 }
+
+// ── Integration tests: metaDataStream with payload nullBitset ────────
+
+TEST_F(MetaTestFixture, integration_metadata_with_payload_nulls) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"val1", 4, 0, rdb::INTEGER}, {"val2", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+
+  // Simulate payload null handling
+  std::vector<bool> fieldNullsA = {true, false};   // val1 is null
+  std::vector<bool> fieldNullsB = {false, true};   // val2 is null
+  std::vector<bool> fieldNullsC = {false, false};  // no nulls
+
+  // Record stream with different null patterns
+  meta.onRecordAppended(fieldNullsA);
+  meta.onRecordAppended(fieldNullsA);
+  meta.onRecordAppended(fieldNullsB);
+  meta.onRecordAppended(fieldNullsC);
+  meta.onRecordAppended(fieldNullsC);
+
+  EXPECT_EQ(meta.totalRecords(), 5u);
+
+  // Verify each record's null pattern
+  EXPECT_TRUE(meta.isFieldNull(0, 0));   // rec 0, val1
+  EXPECT_FALSE(meta.isFieldNull(0, 1));  // rec 0, val2
+
+  EXPECT_TRUE(meta.isFieldNull(1, 0));   // rec 1, val1
+  EXPECT_FALSE(meta.isFieldNull(1, 1));  // rec 1, val2
+
+  EXPECT_FALSE(meta.isFieldNull(2, 0));  // rec 2, val1
+  EXPECT_TRUE(meta.isFieldNull(2, 1));   // rec 2, val2
+
+  EXPECT_FALSE(meta.isFieldNull(3, 0));  // rec 3, val1
+  EXPECT_FALSE(meta.isFieldNull(3, 1));  // rec 3, val2
+
+  EXPECT_FALSE(meta.isFieldNull(4, 0));  // rec 4, val1
+  EXPECT_FALSE(meta.isFieldNull(4, 1));  // rec 4, val2
+}
+
+TEST_F(MetaTestFixture, integration_storage_operations_with_meta) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"id", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+
+  // Simulate storage operations - test with records committed to disk
+  std::vector<bool> patA = {false};
+  std::vector<bool> patB = {true};
+
+  // Write pattern A (forced to disk), then pattern B (stays in memory)
+  meta.onRecordAppended(patA);  // rec 0
+  meta.onRecordAppended(patA);  // rec 1
+  meta.onRecordAppended(patA);  // rec 2
+  meta.onRecordAppended(patA);  // rec 3
+  meta.onRecordAppended(patB);  // rec 4 - forces patA to disk
+
+  EXPECT_EQ(meta.totalRecords(), 5u);
+  EXPECT_EQ(meta.entries().size(), 1u);      // patA committed to disk
+  EXPECT_EQ(meta.currentEntry_.recordCount, 1u);  // patB in memory
+
+  // Test modify on committed entry
+  meta.onRecordModified(0, patB);
+  EXPECT_EQ(meta.getNullBitset(0), patB);
+  EXPECT_EQ(meta.getNullBitset(4), patB);
+}
+
+TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> normal = {false};
+  std::vector<bool> error  = {true};
+
+  // Build sequence: normal data -> gap -> recovery -> gap -> normal data
+  meta.onRecordAppended(normal);  // rec 0
+  meta.onRecordAppended(normal);  // rec 1
+  meta.onTransmissionGap();        // gap before rec 2
+  meta.onRecordAppended(error);   // rec 2 - error state
+  meta.onRecordAppended(error);   // rec 3 - error state
+  meta.onTransmissionGap();        // gap before rec 4
+  meta.onRecordAppended(normal);  // rec 4 - recovered
+  meta.onRecordAppended(normal);  // rec 5 - recovered
+
+  EXPECT_EQ(meta.totalRecords(), 6u);
+
+  // Check gap positions
+  EXPECT_FALSE(meta.isGapBefore(0));
+  EXPECT_FALSE(meta.isGapBefore(1));
+  EXPECT_TRUE(meta.isGapBefore(2));   // gap before error sequence
+  EXPECT_FALSE(meta.isGapBefore(3));
+  EXPECT_TRUE(meta.isGapBefore(4));   // gap before recovery
+
+  auto gaps = meta.getTransmissionGaps();
+  EXPECT_EQ(gaps.size(), 2u);
+
+  // Modify records in error state
+  meta.onRecordModified(2, normal);
+  meta.onRecordModified(3, normal);
+
+  // Verify modification
+  EXPECT_EQ(meta.getNullBitset(2), normal);
+  EXPECT_EQ(meta.getNullBitset(3), normal);
+}
+
+TEST_F(MetaTestFixture, integration_reset_after_complex_operations) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"data", 8, 0, rdb::DOUBLE}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> pat = {false};
+
+  // Build complex index
+  for (int i = 0; i < 50; ++i)
+    meta.onRecordAppended(pat);
+  meta.onTransmissionGap();
+  for (int i = 0; i < 50; ++i)
+    meta.onRecordAppended(pat);
+
+  EXPECT_EQ(meta.totalRecords(), 100u);
+  auto gaps1 = meta.getTransmissionGaps();
+  EXPECT_EQ(gaps1.size(), 1u);
+
+  // Reset and verify
+  meta.reset();
+
+  EXPECT_TRUE(meta.isEmpty());
+  EXPECT_EQ(meta.totalRecords(), 0u);
+  auto gaps2 = meta.getTransmissionGaps();
+  EXPECT_EQ(gaps2.size(), 0u);
+
+  // Should be reusable after reset
+  meta.onRecordAppended(pat);
+  EXPECT_EQ(meta.totalRecords(), 1u);
+}
+
+// ── Tests for new functionality: isEmpty, reset, purge, getTransmissionGaps ───
+
+TEST_F(MetaTestFixture, test_isEmpty_initial_state) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  EXPECT_TRUE(meta.isEmpty());
+  EXPECT_EQ(meta.totalRecords(), 0u);
+}
+
+TEST_F(MetaTestFixture, test_isEmpty_after_append) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> pat = {true};
+
+  meta.onRecordAppended(pat);
+  EXPECT_FALSE(meta.isEmpty());
+  EXPECT_EQ(meta.totalRecords(), 1u);
+}
+
+TEST_F(MetaTestFixture, test_reset_clears_all_data) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  {
+    rdb::metaDataStream meta(descriptor, metaFile);
+    std::vector<bool> pat = {true};
+
+    // Add 10 records
+    for (int i = 0; i < 10; ++i)
+      meta.onRecordAppended(pat);
+
+    EXPECT_EQ(meta.totalRecords(), 10u);
+    EXPECT_FALSE(meta.isEmpty());
+
+    // Reset
+    meta.reset();
+
+    EXPECT_EQ(meta.totalRecords(), 0u);
+    EXPECT_TRUE(meta.isEmpty());
+    EXPECT_EQ(meta.currentEntry_.recordCount, 0u);
+  }
+
+  // Verify file is empty after reload
+  {
+    rdb::metaDataStream meta(descriptor, metaFile);
+    EXPECT_TRUE(meta.isEmpty());
+    EXPECT_EQ(meta.totalRecords(), 0u);
+  }
+}
+
+TEST_F(MetaTestFixture, test_reset_preserves_metadata) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  auto rInterval = boost::rational<int>(1, 2);
+  auto before    = std::chrono::system_clock::now();
+
+  rdb::metaDataStream meta(descriptor, metaFile, rInterval);
+
+  auto creationTime = meta.getCreationTime();
+  EXPECT_GE(creationTime, before);
+
+  std::vector<bool> pat = {true};
+  meta.onRecordAppended(pat);
+
+  // Reset
+  meta.reset();
+
+  // Creation time and sampling interval should be preserved
+  EXPECT_EQ(meta.getCreationTime(), creationTime);
+  EXPECT_EQ(meta.getSamplingInterval(), rInterval);
+  EXPECT_EQ(meta.totalRecords(), 0u);
+}
+
+TEST_F(MetaTestFixture, test_purge_removes_records) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> null_   = {true};
+  std::vector<bool> noNull_ = {false};
+
+  // Build index: 5 null records, then 5 non-null records
+  for (int i = 0; i < 5; ++i)
+    meta.onRecordAppended(null_);
+  for (int i = 0; i < 5; ++i)
+    meta.onRecordAppended(noNull_);
+
+  EXPECT_EQ(meta.totalRecords(), 10u);
+
+  // Purge records 0-4 (inclusive)
+  meta.purge(4);
+
+  EXPECT_EQ(meta.totalRecords(), 5u);
+  // After purge, remaining records are what were originally records 5-9
+  EXPECT_EQ(meta.getNullBitset(0), noNull_);
+  EXPECT_EQ(meta.getNullBitset(4), noNull_);
+}
+
+TEST_F(MetaTestFixture, test_purge_all) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> pat = {true};
+
+  for (int i = 0; i < 10; ++i)
+    meta.onRecordAppended(pat);
+
+  EXPECT_EQ(meta.totalRecords(), 10u);
+
+  // Purge all records
+  meta.purge(9);
+
+  EXPECT_EQ(meta.totalRecords(), 0u);
+  EXPECT_TRUE(meta.isEmpty());
+}
+
+TEST_F(MetaTestFixture, test_purge_out_of_range) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> pat = {true};
+
+  for (int i = 0; i < 5; ++i)
+    meta.onRecordAppended(pat);
+
+  // Try to purge beyond the total record count
+  EXPECT_THROW(meta.purge(10), std::out_of_range);
+}
+
+TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"v", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> pat = {false};
+
+  meta.onRecordAppended(pat);  // rec 0
+  meta.onRecordAppended(pat);  // rec 1
+  meta.onTransmissionGap();     // gap before record 2
+  meta.onRecordAppended(pat);  // rec 2
+  meta.onRecordAppended(pat);  // rec 3
+  meta.onTransmissionGap();     // gap before record 4
+  meta.onRecordAppended(pat);  // rec 4
+
+  auto gaps = meta.getTransmissionGaps();
+  EXPECT_EQ(gaps.size(), 2u);
+  EXPECT_EQ(gaps[0].recordIndex, 2u);
+  EXPECT_EQ(gaps[1].recordIndex, 4u);
+
+  // Verify timestamps are calculated correctly
+  auto creationTime = meta.getCreationTime();
+  EXPECT_EQ(gaps[0].timestamp, creationTime + std::chrono::seconds(2));
+  EXPECT_EQ(gaps[1].timestamp, creationTime + std::chrono::seconds(4));
+}
+
+TEST_F(MetaTestFixture, test_transmission_gaps_empty) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"v", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> pat = {false};
+
+  meta.onRecordAppended(pat);
+  meta.onRecordAppended(pat);
+
+  auto gaps = meta.getTransmissionGaps();
+  EXPECT_EQ(gaps.size(), 0u);
+}
+
+TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"v", 4, 0, rdb::INTEGER}});
+
+  {
+    rdb::metaDataStream meta(descriptor, metaFile);
+    std::vector<bool> pat = {false};
+
+    meta.onRecordAppended(pat);
+    meta.onTransmissionGap();
+    meta.onRecordAppended(pat);
+    meta.onTransmissionGap();
+
+    auto gaps = meta.getTransmissionGaps();
+    EXPECT_EQ(gaps.size(), 2u);
+  }
+
+  // Reload and verify gaps are persisted
+  {
+    rdb::metaDataStream meta(descriptor, metaFile);
+    auto gaps = meta.getTransmissionGaps();
+    EXPECT_EQ(gaps.size(), 2u);
+  }
+}

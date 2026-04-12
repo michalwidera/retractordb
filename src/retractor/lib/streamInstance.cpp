@@ -29,6 +29,10 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
 
+  if (qry.rInterval > 0) {
+    outputPayload->setSamplingInterval(qry.rInterval);
+  }
+
   auto requestedCapacity = coreInstance.maxCapacity[qry.id];
   outputPayload->setCapacity(requestedCapacity);
 

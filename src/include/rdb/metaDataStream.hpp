@@ -22,13 +22,14 @@ namespace rdb {
 /// - umożliwiać aktualizację informacji o nullach dla istniejących rekordów.
 /// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
 /// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
+/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone. (wyjątek stanowi czyszczenie - tzw. purge).
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
 /// - zapewniać informacje o przerwach w transmisji danych.
 /// - powinien być w stanie obsłużyć duże ilości danych.
 /// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
 /// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
 /// - nie przechowywać znacznika czasu wewnątrz struktury indeksu.
+/// - zapis pierwszego rekordu do pliku indeksu nie jest wymagany natychmiast; wymagane jest utworzenie i synchronizacja indeksu przy zamknięciu systemu, a jeśli plik .meta pozostaje po zamknięciu i zarejestrowano dane (nawet bez null), liczba rekordów w indeksie powinna być niezerowa.
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
 /// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storage.
@@ -46,6 +47,12 @@ class metaDataStream {
     bool isGap{false};                                                ///< true = this entry marks a transmission gap
     std::vector<std::byte> serialize() const;                         ///< serialize the entry to a vector of bytes
     static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
+  };
+
+  /// @brief Represents a transmission gap in the data stream.
+  struct TransmissionGap {
+    size_t recordIndex{0};  ///< global position where the gap starts
+    std::chrono::system_clock::time_point timestamp;  ///< calculated timestamp of the gap
   };
 
  private:
@@ -98,6 +105,7 @@ class metaDataStream {
   /// containing the record is split accordingly.
   /// @param recordIndex  position of the modified record in the stream
   /// @param nullBitset   new null bit-set pattern of the modified record
+  /// @throws std::out_of_range if recordIndex >= totalRecords()
   void onRecordModified(size_t recordIndex, std::vector<bool> &nullBitset);
 
   /// @brief Notify the meta index that a record has been appended.
@@ -107,6 +115,16 @@ class metaDataStream {
   /// is committed and a new entry is started with count = 1.
   /// @param nullBitset bit pattern indicating which fields are null
   void onRecordAppended(std::vector<bool> &nullBitset);
+
+  /// @brief Purge (remove) all records up to and including @p upToRecordIndex.
+  ///
+  /// This is the only operation that removes records from the meta index.
+  /// Records are removed in the context of storage purge operations.
+  /// The meta index is rewritten to remove the purged entries.
+  /// @param upToRecordIndex global position of the last record to remove (inclusive)
+  /// @throws std::out_of_range if upToRecordIndex >= totalRecords()
+  /// @note This operation rebuilds the file, renumbering all remaining record indices.
+  void purge(size_t upToRecordIndex);
 
   // ── Query interface ────────────────────────────────────────────────
 
@@ -120,6 +138,7 @@ class metaDataStream {
   /// @param recordIndex global position of the record
   /// @param fieldIndex  position of the field in the descriptor
   /// @return true if the field is null
+  /// @throws std::out_of_range if recordIndex >= totalRecords() or fieldIndex >= descriptor().fieldCount()
   bool isFieldNull(size_t recordIndex, size_t fieldIndex) const;
 
   /// @brief Total number of records tracked by the meta index
@@ -135,10 +154,20 @@ class metaDataStream {
   ///
   /// Commits the current entry and inserts a zero-length gap marker
   /// so that downstream consumers can detect a discontinuity.
+  /// The gap entry itself does not consume a record index; it serves as
+  /// a marker between records.
   void onTransmissionGap();
 
   /// @brief Check whether a gap marker exists right before @p recordIndex.
+  /// @param recordIndex global position of the record to check
+  /// @return true if a gap marker is positioned immediately before this record
+  /// @note For recordIndex == 0, returns false (no gap before first record)
   bool isGapBefore(size_t recordIndex) const;
+
+  /// @brief Retrieve all transmission gaps recorded in the index.
+  /// @return vector of TransmissionGap structures with their positions and timestamps
+  /// @note Gaps are represented as markers between records; gaps themselves don't have indices
+  std::vector<TransmissionGap> getTransmissionGaps() const;
 
   // ── Time calculation interface ─────────────────────────────────────
 
@@ -160,6 +189,18 @@ class metaDataStream {
 
   /// @brief Read-only access to the descriptor.
   const Descriptor &descriptor() const;
+
+  /// @brief Check whether the index is empty (no records registered).
+  /// @return true if totalRecords() == 0
+  bool isEmpty() const;
+
+  /// @brief Clear all index data and reset to initial state.
+  ///
+  /// Removes all committed entries and resets the current entry.
+  /// Does not modify the creation time or sampling interval.
+  /// The meta file is rewritten with only the header.
+  /// @note This is different from purge() which maintains relative indices.
+  void reset();
 };  // class metaDataStream
 
 }  // namespace rdb

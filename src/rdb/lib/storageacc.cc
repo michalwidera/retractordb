@@ -167,8 +167,8 @@ void storage::attachStorage() {
 
   dataFileStatus = storageState::openAndCreate;
 
-  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
-  SPDLOG_INFO("metaIndex file {}", metaIndexFile_);
+  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
+  SPDLOG_INFO("metaIndex file {} rInterval {}/{}", metaIndexFile_, rInterval_.numerator(), rInterval_.denominator());
 }
 
 storage::~storage() {
@@ -225,9 +225,14 @@ void storage::reset() {
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;
 
+  // Reset meta index if it exists
+  if (metaDataStream_) {
+    metaDataStream_->reset();
+  }
+
   assert(recordsCount_ == accessor_->count());
 
-  SPDLOG_INFO("reset - drop & recreate storage.");
+  SPDLOG_INFO("reset - drop & recreate storage and meta index.");
 }
 
 void storage::cleanPayload(uint8_t *destination) {
@@ -285,7 +290,54 @@ void storage::fire() {
   circularBuffer_.push_front(*storagePayload_.get());  // only one place when buffer is feed.
 }
 
-void storage::purge() { accessor_->write(nullptr, 0); }
+void storage::purge() {
+  abortIfStorageNotPrepared();
+
+  accessor_->write(nullptr, 0);
+  recordsCount_ = 0;
+
+  // Reset meta index if it exists
+  if (metaDataStream_) {
+    metaDataStream_->reset();
+    SPDLOG_INFO("metaDataStream reset during purge");
+  }
+
+  SPDLOG_INFO("purge - storage and meta index cleared");
+}
+
+void storage::markTransmissionGap() {
+  if (!metaDataStream_) {
+    SPDLOG_WARN("markTransmissionGap called but metaDataStream is not initialized");
+    return;
+  }
+
+  metaDataStream_->onTransmissionGap();
+  SPDLOG_INFO("Transmission gap marked at record position {}", recordsCount_);
+}
+
+bool storage::hasGapBefore(size_t recordIndex) const {
+  if (!metaDataStream_) {
+    return false;
+  }
+
+  return metaDataStream_->isGapBefore(recordIndex);
+}
+
+std::vector<rdb::metaDataStream::TransmissionGap> storage::getTransmissionGaps() const {
+  if (!metaDataStream_) {
+    return std::vector<rdb::metaDataStream::TransmissionGap>();
+  }
+
+  return metaDataStream_->getTransmissionGaps();
+}
+
+bool storage::isMetaIndexEmpty() const {
+  if (!metaDataStream_) {
+    return recordsCount_ == 0;
+  }
+
+  return metaDataStream_->isEmpty();
+}
 
 bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   assert(!isDeclared());
@@ -427,6 +479,11 @@ bool storage::write(const size_t recordIndex) {
 
   abortIfStorageNotPrepared();
 
+  // Auto-detect transmission gap before appending
+  if (recordIndex >= recordsCount_) {
+    checkAndMarkAutoGap();
+  }
+
   assert(recordsCount_ == accessor_->count());
 
   auto size   = descriptor.getSizeInBytes();
@@ -455,5 +512,38 @@ bool storage::write(const size_t recordIndex) {
   }
   return result == 0;
 };
+
+void storage::setSamplingInterval(boost::rational<int> rInterval, int gapMultiplier) {
+  rInterval_      = rInterval;
+  gapMultiplier_  = gapMultiplier;
+
+  // If metaDataStream already exists, recreate it with the new interval
+  if (metaDataStream_) {
+    metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
+  }
+
+  SPDLOG_INFO("setSamplingInterval rInterval={}/{} gapMultiplier={}", rInterval_.numerator(), rInterval_.denominator(),
+              gapMultiplier_);
+}
+
+void storage::checkAndMarkAutoGap() {
+  if (!metaDataStream_ || rInterval_ <= 0) return;
+
+  auto now = std::chrono::steady_clock::now();
+
+  if (lastWriteTimeInitialized_) {
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastWriteTime_).count();
+    auto thresholdMs =
+        static_cast<long long>(boost::rational_cast<double>(rInterval_) * 1000.0 * gapMultiplier_);
+
+    if (thresholdMs > 0 && elapsedMs > thresholdMs) {
+      markTransmissionGap();
+      SPDLOG_INFO("Auto gap detected: {}ms elapsed, threshold {}ms", elapsedMs, thresholdMs);
+    }
+  }
+
+  lastWriteTime_            = now;
+  lastWriteTimeInitialized_ = true;
+}
 
 }  // namespace rdb
