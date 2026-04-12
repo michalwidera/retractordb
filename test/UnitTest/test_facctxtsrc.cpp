@@ -254,7 +254,8 @@ TEST_F(TextSourceROTest, test_read_string_null_token) {
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
 
-  for (int i = 0; i < desc.getSizeInBytes(); ++i) EXPECT_EQ(buffer[i], 0);
+  for (int i = 0; i < desc.getSizeInBytes(); ++i)
+    EXPECT_EQ(buffer[i], 0);
 }
 
 // ============================================================

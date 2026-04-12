@@ -17,7 +17,7 @@ void visit_descFld(const K &inVar, K &retVal) {
 
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
-                   [&retVal](std::monostate) { retVal = T{}; },                                      //
+                   [&retVal](std::monostate) { retVal = T{}; },                                          //
                    [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                                 //
                    [&retVal](int a) { retVal = static_cast<T>(a); },                                     //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                //
@@ -131,7 +131,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
         std::visit(
             Overload{                                                                                                 //
-               [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },                                    //
+                     [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },                                    //
                      [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
                      [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
                      [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
@@ -185,7 +185,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       // Requested type is RATIONAL
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
         std::visit(Overload{                                                                                //
-                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },            //
+                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },             //
                             [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
                             [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
                             [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
@@ -240,7 +240,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
         std::visit(
             Overload{                                                                                                          //
-               [&retVal](std::monostate) { retVal = std::string(""); },                                                 //
+                     [&retVal](std::monostate) { retVal = std::string(""); },                                                  //
                      [&retVal](uint8_t a) { retVal = std::to_string(a); },                                                     //
                      [&retVal](int a) { retVal = std::to_string(a); },                                                         //
                      [&retVal](unsigned a) { retVal = std::to_string(a); },                                                    //

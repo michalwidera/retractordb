@@ -27,36 +27,32 @@ bool isNullValue(const rdb::descFldVT &value) { return std::holds_alternative<st
 
 std::optional<bool> toLogicValue(const rdb::descFldVT &value) {
   return std::visit(
-      Overload{
-          [](std::monostate) -> std::optional<bool> { return std::nullopt; },
-          [](uint8_t a) -> std::optional<bool> { return a != 0; },
-          [](int a) -> std::optional<bool> { return a != 0; },
-          [](unsigned a) -> std::optional<bool> { return a != 0; },
-          [](double a) -> std::optional<bool> { return a != 0.0; },
-          [](float a) -> std::optional<bool> { return a != 0.0f; },
-          [](boost::rational<int> a) -> std::optional<bool> { return a != boost::rational<int>(0); },
-          [](auto) -> std::optional<bool> {
-            assert(false && "Unsupported type for logic evaluation");
-            return false;
-          }},
+      Overload{[](std::monostate) -> std::optional<bool> { return std::nullopt; },
+               [](uint8_t a) -> std::optional<bool> { return a != 0; }, [](int a) -> std::optional<bool> { return a != 0; },
+               [](unsigned a) -> std::optional<bool> { return a != 0; },
+               [](double a) -> std::optional<bool> { return a != 0.0; },
+               [](float a) -> std::optional<bool> { return a != 0.0f; },
+               [](boost::rational<int> a) -> std::optional<bool> { return a != boost::rational<int>(0); },
+               [](auto) -> std::optional<bool> {
+                 assert(false && "Unsupported type for logic evaluation");
+                 return false;
+               }},
       value);
 }
 
 rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef) {
-  return std::visit(
-      Overload{
-          [value](uint8_t) -> rdb::descFldVT { return static_cast<uint8_t>(value ? 1 : 0); },
-          [value](int) -> rdb::descFldVT { return value ? 1 : 0; },
-          [value](unsigned) -> rdb::descFldVT { return value ? 1U : 0U; },
-          [value](double) -> rdb::descFldVT { return value ? 1.0 : 0.0; },
-          [value](float) -> rdb::descFldVT { return value ? 1.0f : 0.0f; },
-          [value](boost::rational<int>) -> rdb::descFldVT { return boost::rational<int>(value ? 1 : 0); },
-          [](std::monostate) -> rdb::descFldVT { return std::monostate{}; },
-          [](auto) -> rdb::descFldVT {
-            assert(false && "Unsupported type for logic result conversion");
-            return std::monostate{};
-          }},
-      typeRef);
+  return std::visit(Overload{[value](uint8_t) -> rdb::descFldVT { return static_cast<uint8_t>(value ? 1 : 0); },
+                             [value](int) -> rdb::descFldVT { return value ? 1 : 0; },
+                             [value](unsigned) -> rdb::descFldVT { return value ? 1U : 0U; },
+                             [value](double) -> rdb::descFldVT { return value ? 1.0 : 0.0; },
+                             [value](float) -> rdb::descFldVT { return value ? 1.0f : 0.0f; },
+                             [value](boost::rational<int>) -> rdb::descFldVT { return boost::rational<int>(value ? 1 : 0); },
+                             [](std::monostate) -> rdb::descFldVT { return std::monostate{}; },
+                             [](auto) -> rdb::descFldVT {
+                               assert(false && "Unsupported type for logic result conversion");
+                               return std::monostate{};
+                             }},
+                    typeRef);
 }
 
 const rdb::descFldVT &logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT &b) {
@@ -85,7 +81,7 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },       //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                            //
                  [&retVal](int a, int b) { retVal = a + b; },                                    //
                  [&retVal](unsigned a, unsigned b) { retVal = a + b; },                          //
@@ -115,7 +111,7 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },       //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                    //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                                         //
                  [&retVal](int a, int b) { retVal = a - b; },                                                 //
                  [&retVal](unsigned a, unsigned b) { retVal = a - b; },                                       //
@@ -145,7 +141,7 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                   //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                                        //
                  [&retVal](int a, int b) { retVal = a * b; },                                                //
                  [&retVal](unsigned a, unsigned b) { retVal = a * b; },                                      //
@@ -172,17 +168,12 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
-  const bool divisorIsZero = std::visit(
-      Overload{
-          [](uint8_t v) { return v == 0; },
-          [](int v) { return v == 0; },
-          [](unsigned v) { return v == 0U; },
-          [](double v) { return v == 0.0; },
-          [](float v) { return v == 0.0f; },
-          [](boost::rational<int> v) { return v == boost::rational<int>(0); },
-          [](std::monostate) { return false; },
-          [](auto) { return false; }},
-      b);
+  const bool divisorIsZero =
+      std::visit(Overload{[](uint8_t v) { return v == 0; }, [](int v) { return v == 0; }, [](unsigned v) { return v == 0U; },
+                          [](double v) { return v == 0.0; }, [](float v) { return v == 0.0f; },
+                          [](boost::rational<int> v) { return v == boost::rational<int>(0); },
+                          [](std::monostate) { return false; }, [](auto) { return false; }},
+                 b);
 
   if (divisorIsZero) {
     throw std::domain_error("Division by zero in expressionEvaluator");
@@ -191,7 +182,7 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                                       //
                  [&retVal](int a, int b) { retVal = a / b; },                                               //
                  [&retVal](unsigned a, unsigned b) { retVal = a / b; },                                     //
@@ -221,7 +212,7 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = (a == b) ? uint8_t(1) : uint8_t(0); },          //
                  [&retVal](int a, int b) { retVal = (a == b) ? int(1) : int(0); },                          //
                  [&retVal](unsigned a, unsigned b) { retVal = (a == b) ? unsigned(1) : unsigned(0); },      //
@@ -249,7 +240,7 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = (a != b) ? uint8_t(1) : uint8_t(0); },          //
                  [&retVal](int a, int b) { retVal = (a != b) ? int(1) : int(0); },                          //
                  [&retVal](unsigned a, unsigned b) { retVal = (a != b) ? unsigned(1) : unsigned(0); },      //
@@ -277,7 +268,7 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                 //
                  [&retVal](uint8_t a, uint8_t b) { retVal = (a < b) ? uint8_t(1) : uint8_t(0); },          //
                  [&retVal](int a, int b) { retVal = (a < b) ? int(1) : int(0); },                          //
                  [&retVal](unsigned a, unsigned b) { retVal = (a < b) ? unsigned(1) : unsigned(0); },      //
@@ -305,7 +296,7 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                 //
                  [&retVal](uint8_t a, uint8_t b) { retVal = (a > b) ? uint8_t(1) : uint8_t(0); },          //
                  [&retVal](int a, int b) { retVal = (a > b) ? int(1) : int(0); },                          //
                  [&retVal](unsigned a, unsigned b) { retVal = (a > b) ? unsigned(1) : unsigned(0); },      //
@@ -333,7 +324,7 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = (a >= b) ? uint8_t(1) : uint8_t(0); },          //
                  [&retVal](int a, int b) { retVal = (a >= b) ? int(1) : int(0); },                          //
                  [&retVal](unsigned a, unsigned b) { retVal = (a >= b) ? unsigned(1) : unsigned(0); },      //
@@ -361,7 +352,7 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   assert(typeid(a) == typeid(b));
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },      //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = (a <= b) ? uint8_t(1) : uint8_t(0); },          //
                  [&retVal](int a, int b) { retVal = (a <= b) ? int(1) : int(0); },                          //
                  [&retVal](unsigned a, unsigned b) { retVal = (a <= b) ? unsigned(1) : unsigned(0); },      //
@@ -415,7 +406,7 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar) {
   if (isNullValue(inVar)) return std::monostate{};
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = std::monostate{}; },                                   //
+                 [&retVal](std::monostate) { retVal = std::monostate{}; },                                         //
                  [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                                      // xor ?
                  [&retVal](int a) { retVal = -a; },                                                                //
                  [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                                    // xor ?

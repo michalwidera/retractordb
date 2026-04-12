@@ -61,17 +61,23 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)
 add_test(
   NAME ut-dataModel-compile
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
-  COMMAND sh -c "set -e ; \
+  COMMAND
+    sh -c
+    "set -e ; \
     ${CMAKE_BINARY_DIR}/src/retractor/xretractor ut_example_schema.rql -c > out_compile.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt")
 
 add_test(
   NAME ut-dataModel-compare
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
-  COMMAND bash -c "set -e ; ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
+  COMMAND
+    bash -c
+    "set -e ; ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(ut-dataModel-compare PROPERTIES DEPENDS "ut-dataModel-compile;ut-test_dataModel")
+set_tests_properties(
+  ut-dataModel-compare PROPERTIES DEPENDS
+                                  "ut-dataModel-compile;ut-test_dataModel")
 
 set_tests_properties(
   ut-test_rdb ut-xqry ut-test_dataModel ut-dataModel-compile

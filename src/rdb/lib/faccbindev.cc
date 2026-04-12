@@ -13,7 +13,7 @@ namespace rdb {
 binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
                                const ssize_t recordSize,         //
                                const rdb::Descriptor &descriptor,
-                               bool loopToBeginningIfEOF)        //
+                               bool loopToBeginningIfEOF)  //
     : filename_(std::string(fileName)),
       recordSize_(recordSize),
       descriptor_(descriptor),

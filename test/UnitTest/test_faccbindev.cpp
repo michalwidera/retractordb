@@ -35,9 +35,7 @@ class BinaryDeviceROTest : public ::testing::Test {
 
 }  // namespace
 
-static rdb::Descriptor fixedIntDescriptor() {
-  return rdb::Descriptor{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-}
+static rdb::Descriptor fixedIntDescriptor() { return rdb::Descriptor{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}}; }
 
 TEST_F(BinaryDeviceROTest, read_exact_record_and_count) {
   auto path = sandboxPath("device.bin");

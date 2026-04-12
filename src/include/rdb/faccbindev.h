@@ -42,9 +42,7 @@ class binaryDeviceRO : public FileInterface {
   std::vector<bool> lastNullBitset_;
 
  public:
-  explicit binaryDeviceRO(const std::string_view fileName,
-                          const ssize_t recordSize,
-                          const rdb::Descriptor &descriptor,
+  explicit binaryDeviceRO(const std::string_view fileName, const ssize_t recordSize, const rdb::Descriptor &descriptor,
                           bool loopToBeginningIfEOF);
   ~binaryDeviceRO() override;
 

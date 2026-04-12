@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
-#include <iostream>
 #include <filesystem>
+#include <iostream>
 #include <string>
 
 #include "rdb/fainterface.h"

@@ -15,12 +15,14 @@ add_custom_target(
 add_custom_target(
   simple-max
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
+  WORKING_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
   simple-timeshift
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1 query-51.rql
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift)
+  WORKING_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift)
 
 add_custom_target(
   dsp
@@ -42,7 +44,8 @@ add_custom_target(
   simple-max-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
+  WORKING_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
   dsp-view

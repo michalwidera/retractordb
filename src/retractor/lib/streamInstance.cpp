@@ -392,7 +392,7 @@ bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = false; },                                    //
+                 [&retVal](std::monostate) { retVal = false; },                                 //
                  [&retVal](uint8_t a) { retVal = (a != 0); },                                   //
                  [&retVal](int a) { retVal = (a != 0); },                                       //
                  [&retVal](unsigned a) { retVal = (a != 0); },                                  //
