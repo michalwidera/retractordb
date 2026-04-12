@@ -1,4 +1,4 @@
-.{ dane:1 }
+{ dane:1 }
 { dane:2 }
 { dane:3 }
 { dane:4 }

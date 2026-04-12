@@ -8,7 +8,7 @@ add_test(
   xretractor -c query-consitency.rql > out_compile.txt ; \
   xretractor query-consitency.rql -m 5 -v > verbose.txt ; \
   while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-  xtrdb < term.script > out_xtrdb.txt ; \
+  ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out_xtrdb.txt ; \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_compile.txt out_compile.txt ; \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_xtrdb.txt out_xtrdb.txt"
 )

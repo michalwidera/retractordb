@@ -1,4 +1,4 @@
-. SELECT * STREAM signalText0 FROM core1@(1,4)
+ SELECT * STREAM signalText0 FROM core1@(1,4)
  This looks OK
 14 Record(s)
 16 Byte(s) per record.

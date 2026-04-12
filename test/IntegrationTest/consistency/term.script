@@ -2,7 +2,6 @@
 # 
 # Purpose of this test is to check consistency of stored data streams
 # and cleanup of run artifacts
-noprompt
 echo str1 - stream dump
 open str1
 descc

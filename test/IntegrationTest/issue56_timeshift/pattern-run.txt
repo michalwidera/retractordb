@@ -1,4 +1,4 @@
-.9 Record(s)
+9 Record(s)
 12 Byte(s) per record.
 {	INTEGER str1_0
 	INTEGER str1_1

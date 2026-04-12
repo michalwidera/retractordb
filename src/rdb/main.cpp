@@ -43,20 +43,38 @@ int main(int argc, char *argv[]) {
 
   std::string storagePolicy = "DEFAULT";
 
-  if (argc == 2 && strcmp(argv[1], "-h") == 0) {
-    std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
-    std::cout << config_line << std::endl;
-    std::cout << "Log: " << filelog << std::endl;
-    std::cout << warranty << std::endl;
-    spdlog::shutdown();
-    return system::errc::success;
+  bool cliNoPrompt = false;
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "-h") == 0) {
+      std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
+      std::cout << config_line << std::endl;
+      std::cout << "Log: " << filelog << std::endl;
+      std::cout << warranty << std::endl;
+      spdlog::shutdown();
+      return system::errc::success;
+    }
+    if (strcmp(argv[i], "noprompt") == 0) {
+      cliNoPrompt = true;
+    }
   }
+
+  if (cliNoPrompt) {
+    std::string empty = "";
+    GREEN             = empty;
+    RED               = empty;
+    ORANGE            = empty;
+    BLUE              = empty;
+    YELLOW            = empty;
+    RESET             = empty;
+    BLINK             = empty;
+  }
+
   std::unique_ptr<rdb::storage> dacc;
   std::string file;
   std::string storageParam = "";  // storage path parameter
   bool rox                 = true;
-  std::string prompt       = ".";
-  std::string ok           = "ok\n";
+  std::string prompt       = cliNoPrompt ? "" : ".";
+  std::string ok           = cliNoPrompt ? "" : "ok\n";
   std::string cmd;
   std::string wasteComment;
   do {
@@ -73,21 +91,6 @@ int main(int argc, char *argv[]) {
       // btw - I'm either surprised by two kinds of comments ...
       std::getline(std::cin, wasteComment);
       if (cmd == "rem") std::cout << ok;
-      continue;
-    }
-    if (cmd == "mono" || cmd == "noprompt") {
-      if (cmd == "noprompt") {
-        prompt = "";
-        ok     = "";
-      }
-      GREEN  = "";
-      RED    = "";
-      ORANGE = "";
-      BLUE   = "";
-      YELLOW = "";
-      RESET  = "";
-      BLINK  = "";
-      std::cout << ok;
       continue;
     }
     if (cmd == "quitdrop" || cmd == "qd") {
@@ -167,7 +170,6 @@ int main(int argc, char *argv[]) {
       std::cout << "size                            show database size in records\n";
       std::cout << "cap [value]                     set device stream backread capacity\n";
       std::cout << "dump                            show payload memory\n";
-      std::cout << "mono|noprompt                   no color mode / no prompt\n";
       std::cout << "echo                            print message on terminal\n";
       std::cout << "system                          execute system command\n";
       std::cout << "#|rem [text]                    comment line\n";

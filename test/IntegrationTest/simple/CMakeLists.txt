@@ -30,5 +30,5 @@ add_test(
   COMMAND
     bash -c "set -e ; \
   xretractor query.rql -m 10 ; \
-  xtrdb < term.script > out.txt ;  \
+  ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ;  \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out.txt")

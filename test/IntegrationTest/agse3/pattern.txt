@@ -1,4 +1,4 @@
-. serial4
+ serial4
 14 Record(s)
 8 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 }

@@ -1,4 +1,4 @@
-. append values - no modified
+ append values - no modified
 { a:1 }
 { a:2 }
 test_db

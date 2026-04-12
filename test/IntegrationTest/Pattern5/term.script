@@ -1,4 +1,3 @@
-noprompt
 dropfile { test2 test2.desc }
 open test2 { STRING name[5] INTEGER data[3] BYTE bt[3] BYTE Control FLOAT m1 INTEGER m2 }
 size

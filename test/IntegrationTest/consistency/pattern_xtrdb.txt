@@ -1,4 +1,4 @@
-. str1 - stream dump
+ str1 - stream dump
 { INTEGER str1_0 }
 4 Record(s)
 4 Byte(s) per record.

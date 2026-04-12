@@ -1,4 +1,3 @@
-noprompt
 echo SELECT * STREAM signalText0 FROM core1@(1,4)
 echo This looks OK
 open signalText0

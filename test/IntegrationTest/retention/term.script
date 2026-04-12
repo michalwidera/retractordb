@@ -1,4 +1,3 @@
-noprompt
 open test_file { BYTE dane RETENTION 3 2 }
 purge
 set dane 1

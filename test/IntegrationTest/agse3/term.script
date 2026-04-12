@@ -1,4 +1,3 @@
-noprompt
 
 echo serial4
 open serial4

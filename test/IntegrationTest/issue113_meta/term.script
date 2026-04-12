@@ -1,4 +1,3 @@
-noprompt
 open test_db
 set a 1
 append

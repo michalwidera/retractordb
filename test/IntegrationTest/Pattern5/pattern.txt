@@ -1,4 +1,4 @@
-.0 Record(s)
+0 Record(s)
 29 Byte(s) per record.
 { name:test1 data:1 2 3 bt:1 2 3 Control:2 m1:1.23 m2:234 }
 { name:test1 data:1 2 3 bt:1 2 3 Control:2 m1:1.23 m2:234 }
