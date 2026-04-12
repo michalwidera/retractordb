@@ -217,8 +217,9 @@ T getVal(std::span<uint8_t> s, int offset) {
 }
 
 std::optional<std::any> payload::getItem(const int positionFlat) {
-  if (positionFlat < 0 || positionFlat > descriptor.flatElementCount() - 1) {
-    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, descriptor.flatElementCount());
+  const auto flatCount = descriptor.flatElementCount();
+  if (positionFlat < 0 || positionFlat > flatCount - 1) {
+    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, flatCount);
     std::stringstream message;
     message << boost::stacktrace::stacktrace();
     SPDLOG_ERROR("Stack: {}", message.str());
@@ -243,67 +244,49 @@ std::optional<std::any> payload::getItem(const int positionFlat) {
 
   if (nullBitset_[position]) return std::nullopt;
 
-  // The aim of this procedure is : get raw data from descriptor and return as std::any
+  const auto requestedType = descriptor[position].rtype;
+  const auto offsetFlat    = descriptor.offset(positionFlat);
+  auto memory              = span();
 
-  switch (descriptor[position].rtype) {
-    case rdb::STRING: {
-      auto len       = descriptor[position].rlen * descriptor[position].rarray;
-      auto fieldSpan = span().subspan(descriptor.offset(positionFlat), len);
+  auto readStringField = [&]() -> std::string {
+    auto len       = descriptor[position].rlen * descriptor[position].rarray;
+    auto fieldSpan = memory.subspan(offsetFlat, len);
+    auto descLen   = descriptor.getSizeInBytes();
+    assert(offsetFlat + len <= descLen);
 
-      auto descLen  = descriptor.getSizeInBytes();
-      auto startPos = descriptor.offset(positionFlat);
-      assert(startPos + len <= descLen);
-      for (auto i = 0; i < len; i++)
-        if (fieldSpan[i] == 0) {
-          len = i;
-          break;
-        }
-      std::string s(fieldSpan.begin(), fieldSpan.begin() + len);
-
-      return s;
+    for (auto i = 0; i < len; i++) {
+      if (fieldSpan[i] == 0) {
+        len = i;
+        break;
+      }
     }
-    case rdb::BYTE: {
-      uint8_t data = getVal<uint8_t>(span(), descriptor.offset(positionFlat));
-      return data;
-    }
-    case rdb::INTEGER: {
-      int data = getVal<int>(span(), descriptor.offset(positionFlat));
-      return data;
-    }
-    case rdb::UINT: {
-      uint data = getVal<uint>(span(), descriptor.offset(positionFlat));
-      return data;
-    }
-    case rdb::DOUBLE: {
-      double data = getVal<double>(span(), descriptor.offset(positionFlat));
-      return data;
-    }
-    case rdb::FLOAT: {
-      float data = getVal<float>(span(), descriptor.offset(positionFlat));
-      return data;
-    }
-    case rdb::RATIONAL: {
-      boost::rational<int> data = getVal<boost::rational<int>>(span(), descriptor.offset(positionFlat));
-      return data;
-    }
-    case rdb::REF: {
-      SPDLOG_ERROR("REF not supported.");
-      return std::nullopt;
-    }
-    case rdb::TYPE: {
-      SPDLOG_ERROR("TYPE not supported.");
-      return std::nullopt;
-    }
-    case rdb::RETENTION: {
-      SPDLOG_ERROR("RETENTION not supported.");
-      return std::nullopt;
-    }
-    case rdb::RETMEMORY: {
-      SPDLOG_ERROR("RETENTION MEMORY not supported.");
-      return std::nullopt;
-    }
+    return std::string(fieldSpan.begin(), fieldSpan.begin() + len);
   };
-  SPDLOG_ERROR("Type not supported. {}", int(descriptor[position].rtype));
+
+  switch (requestedType) {
+    case rdb::STRING:
+      return readStringField();
+    case rdb::BYTE:
+      return getVal<uint8_t>(memory, offsetFlat);
+    case rdb::INTEGER:
+      return getVal<int>(memory, offsetFlat);
+    case rdb::UINT:
+      return getVal<uint>(memory, offsetFlat);
+    case rdb::DOUBLE:
+      return getVal<double>(memory, offsetFlat);
+    case rdb::FLOAT:
+      return getVal<float>(memory, offsetFlat);
+    case rdb::RATIONAL:
+      return getVal<boost::rational<int>>(memory, offsetFlat);
+    case rdb::REF:
+    case rdb::TYPE:
+    case rdb::RETENTION:
+    case rdb::RETMEMORY:
+      SPDLOG_ERROR("Configuration field type not supported in getItem: {}", static_cast<int>(requestedType));
+      return std::nullopt;
+  }
+
+  SPDLOG_ERROR("Type not supported. {}", int(requestedType));
   assert(false && "type not supported on getter.");
   return std::nullopt;
 }
