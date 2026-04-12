@@ -151,7 +151,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
   std::any value;
   if (!valueParam.has_value()) {
     nullBitset_[position] = true;
-    auto fallbackValue = nullFallbackValue(requestedType);
+    auto fallbackValue    = nullFallbackValue(requestedType);
     std::visit([&value](const auto &v) { value = std::any(v); }, fallbackValue);
   } else {
     nullBitset_[position] = false;
@@ -159,19 +159,22 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     value = castAny(valueParam.value(), requestedType);
   }
 
+  auto writeStringField = [&]() {
+    const auto len = descriptor[position].rlen * descriptor[position].rarray;
+    std::string data(std::any_cast<std::string>(value));
+    auto lenr       = std::min(len, static_cast<int>(data.length()));
+    auto destOffset = descriptor.offset(positionFlat);
+    auto dest       = span().subspan(destOffset, len);
+    assert(position + len <= descriptor.getSizeInBytes());
+    std::fill(dest.begin(), dest.end(), 0);
+    std::copy_n(data.c_str(), lenr, dest.begin());
+  };
+
   try {
     switch (requestedType) {
-      case rdb::STRING: {
-        const auto len = descriptor[position].rlen * descriptor[position].rarray;
-        std::string data(std::any_cast<std::string>(value));
-        auto lenr       = std::min(len, static_cast<int>(data.length()));
-        auto destOffset = descriptor.offset(positionFlat);
-        auto dest       = span().subspan(destOffset, len);
-        assert(position + len <= descriptor.getSizeInBytes());
-        std::fill(dest.begin(), dest.end(), 0);
-        std::copy_n(data.c_str(), lenr, dest.begin());
-        if (lenr != len) dest[lenr] = '\0';
-      } break;
+      case rdb::STRING:
+        writeStringField();
+        break;
       case rdb::BYTE:
         setItemBy<uint8_t>(positionFlat, value);
         break;
@@ -190,23 +193,16 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
       case rdb::RATIONAL:
         setItemBy<boost::rational<int>>(positionFlat, value);
         break;
-      case rdb::REF: {
-        SPDLOG_INFO("Skip REF");
-      } break;
-      case rdb::TYPE: {
-        SPDLOG_INFO("Skip TYPE");
-      } break;
-      case rdb::RETENTION: {
-        SPDLOG_INFO("Skip RETENTION");
-      } break;
-      case rdb::RETMEMORY: {
-        SPDLOG_INFO("Skip RETMEMORY");
-      } break;
-      default: {
+      case rdb::REF:
+      case rdb::TYPE:
+      case rdb::RETENTION:
+      case rdb::RETMEMORY:
+        SPDLOG_INFO("Skip configuration field type: {}", static_cast<int>(requestedType));
+        break;
+      default:
         SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
         assert(false && "setItem - Type not supported.");
         abort();
-      }
     }
   } catch (const std::bad_any_cast &e) {
     SPDLOG_ERROR("Error on payload::setItem");
