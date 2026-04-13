@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
         ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
         ("tlimitqry,m", po::value<int>(&timeLimit)->default_value(0), "limit of elements, 0 - no limit")  //
-        ("null,n", "if null row appear - skip it in output")                                                                                 //
+        ("null,n", "if null row appear - skip it in output")                                              //
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //
         ("dir,d", "list of queries")                                                                      //

@@ -375,8 +375,7 @@ int main(int argc, char *argv[]) {
       std::cout << "\n";
     } else if (cmd == "meta") {
       const std::string metaFilePath =
-          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() +
-          ".meta";
+          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() + ".meta";
       if (!std::filesystem::exists(metaFilePath)) {
         std::cout << RED << "meta file not found: " << metaFilePath << "\n" << RESET;
         continue;
@@ -419,8 +418,7 @@ int main(int argc, char *argv[]) {
       continue;
     } else if (cmd == "metaraw") {
       const std::string metaFilePath =
-          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() +
-          ".meta";
+          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() + ".meta";
       if (!std::filesystem::exists(metaFilePath)) {
         std::cout << RED << "meta file not found: " << metaFilePath << "\n" << RESET;
         continue;

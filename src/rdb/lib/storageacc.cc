@@ -123,7 +123,7 @@ void storage::moveRef() {
 
   // Descriptor changes storageFile location
   if (it != descriptor.end()) {
-    storageFile_ = (*it).rname;
+    storageFile_   = (*it).rname;
     metaIndexFile_ = storageFile_ + ".meta";
     SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile_);
     SPDLOG_INFO("Meta index path changed to {}", metaIndexFile_);
@@ -502,8 +502,8 @@ bool storage::write(const size_t recordIndex) {
 };
 
 void storage::setSamplingInterval(boost::rational<int> rInterval, int gapMultiplier) {
-  rInterval_      = rInterval;
-  gapMultiplier_  = gapMultiplier;
+  rInterval_     = rInterval;
+  gapMultiplier_ = gapMultiplier;
 
   // If metaDataStream already exists, recreate it with the new interval
   if (metaDataStream_) {
@@ -520,9 +520,8 @@ void storage::checkAndMarkAutoGap() {
   auto now = std::chrono::steady_clock::now();
 
   if (lastWriteTimeInitialized_) {
-    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastWriteTime_).count();
-    auto thresholdMs =
-        static_cast<long long>(boost::rational_cast<double>(rInterval_) * 1000.0 * gapMultiplier_);
+    auto elapsedMs   = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastWriteTime_).count();
+    auto thresholdMs = static_cast<long long>(boost::rational_cast<double>(rInterval_) * 1000.0 * gapMultiplier_);
 
     if (thresholdMs > 0 && elapsedMs > thresholdMs) {
       markTransmissionGap();

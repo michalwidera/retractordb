@@ -3,8 +3,11 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
 # Step 1: run xretractor to produce str_null stream + meta index
+
 # Step 2: open str_null in xtrdb and invoke "meta", capture output
+
 # Step 3: verify key properties of the meta output
+
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

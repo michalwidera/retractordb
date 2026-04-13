@@ -50,10 +50,10 @@ class storage {
   std::string storageType_    = "";
   int percounter_             = -1;
 
-  boost::rational<int> rInterval_{1};                          ///< sampling interval for time calculations
-  int gapMultiplier_{3};                                       ///< gap threshold = gapMultiplier_ × rInterval_ without data
-  std::chrono::steady_clock::time_point lastWriteTime_{};      ///< timestamp of last write()
-  bool lastWriteTimeInitialized_{false};                       ///< true after first write
+  boost::rational<int> rInterval_{1};                      ///< sampling interval for time calculations
+  int gapMultiplier_{3};                                   ///< gap threshold = gapMultiplier_ × rInterval_ without data
+  std::chrono::steady_clock::time_point lastWriteTime_{};  ///< timestamp of last write()
+  bool lastWriteTimeInitialized_{false};                   ///< true after first write
 
   void checkAndMarkAutoGap();  ///< auto-detect gap based on elapsed time since last write
   void moveRef();
@@ -80,7 +80,7 @@ class storage {
 
   Descriptor descriptor;
 
-  sourceState bufferState     = sourceState::empty;  // ? test lock
+  sourceState bufferState{sourceState::empty};  // ? test lock
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 

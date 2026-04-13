@@ -132,8 +132,11 @@ TEST_F(MetaTestFixture, test_timestamps) {
   meta.onTransmissionGap();
   size_t gapCount = 0, gapPos = 0, cumulative = 0;
   for (const auto &e : meta.entries()) {
-    if (e.recordCount == 0) { gapPos = cumulative; ++gapCount; }
-    else cumulative += e.recordCount;
+    if (e.recordCount == 0) {
+      gapPos = cumulative;
+      ++gapCount;
+    } else
+      cumulative += e.recordCount;
   }
   ASSERT_EQ(gapCount, 1u);
   EXPECT_EQ(gapPos, 1u);
@@ -180,9 +183,9 @@ TEST_F(MetaTestFixture, test_committed_on_disk_current_in_memory) {
   std::vector<bool> patB = {false};
 
   // Same pattern — stays only in currentEntry_, nothing on disk
-  meta.onRecordAppended(patA);                    // rec 0
-  meta.onRecordAppended(patA);                    // rec 1
-  EXPECT_EQ(meta.entries().size(), 0u);           // nothing committed yet
+  meta.onRecordAppended(patA);                     // rec 0
+  meta.onRecordAppended(patA);                     // rec 1
+  EXPECT_EQ(meta.entries().size(), 0u);            // nothing committed yet
   EXPECT_EQ(meta.pendingEntry().recordCount, 2u);  // buffered in memory
 
   // Different pattern — flushes patA to disk, patB becomes currentEntry_
@@ -273,8 +276,8 @@ TEST_F(MetaTestFixture, integration_all_null_stream_aggregated_into_single_index
 
   // All 10 records share the same pattern — must stay in one in-memory entry
   EXPECT_EQ(meta.totalRecords(), 10u);
-  EXPECT_EQ(meta.entries().size(), 0u);           // nothing committed to disk yet
-  EXPECT_EQ(meta.pendingEntry().recordCount, 10u); // single RLE run
+  EXPECT_EQ(meta.entries().size(), 0u);             // nothing committed to disk yet
+  EXPECT_EQ(meta.pendingEntry().recordCount, 10u);  // single RLE run
   EXPECT_EQ(meta.pendingEntry().nullBitset, allNull);
   EXPECT_TRUE(meta.pendingEntry().nullBitset[0]);
   EXPECT_TRUE(meta.pendingEntry().nullBitset[1]);
@@ -312,9 +315,9 @@ TEST_F(MetaTestFixture, integration_realistic_sequence_produces_correct_index_re
   descriptor.append({{"x", 4, 0, rdb::INTEGER}, {"y", 4, 0, rdb::INTEGER}});
 
   rdb::metaDataStream meta(descriptor, metaFile);
-  std::vector<bool> allNull = {true, true};   // e.g. "NULL NULL" rows
-  std::vector<bool> mixed   = {true, false};  // e.g. "10 NULL" rows
-  std::vector<bool> noNull  = {false, false}; // e.g. "20 30" rows
+  std::vector<bool> allNull = {true, true};    // e.g. "NULL NULL" rows
+  std::vector<bool> mixed   = {true, false};   // e.g. "10 NULL" rows
+  std::vector<bool> noNull  = {false, false};  // e.g. "20 30" rows
 
   // Simulate a stream: 2× all-null, 3× mixed, 4× no-null
   meta.onRecordAppended(allNull);  // rec 0
@@ -363,7 +366,8 @@ TEST_F(MetaTestFixture, integration_persistence_restores_aggregated_index_record
 
   {
     rdb::metaDataStream meta(descriptor, metaFile);
-    for (int i = 0; i < 5; ++i) meta.onRecordAppended(allNull);
+    for (int i = 0; i < 5; ++i)
+      meta.onRecordAppended(allNull);
     meta.onRecordAppended(mixed);
     meta.onRecordAppended(noNull);
     // destructor flushes currentEntry_ to disk
@@ -379,7 +383,8 @@ TEST_F(MetaTestFixture, integration_persistence_restores_aggregated_index_record
     // restored as the in-memory accumulator with count=0 or the last segment)
     // Total must account for all 7 records across the segments
     size_t total = 0;
-    for (const auto &e : committed) total += e.recordCount;
+    for (const auto &e : committed)
+      total += e.recordCount;
     total += meta.pendingEntry().recordCount;
     EXPECT_EQ(total, 7u);
 
@@ -397,7 +402,7 @@ TEST_F(MetaTestFixture, integration_is_field_null_inside_aggregated_rle_entry) {
   descriptor.append({{"c1", 4, 0, rdb::INTEGER}, {"c2", 4, 0, rdb::INTEGER}, {"c3", 4, 0, rdb::INTEGER}});
 
   rdb::metaDataStream meta(descriptor, metaFile);
-  std::vector<bool> pat = {false, true, false}; // only field 1 is null
+  std::vector<bool> pat = {false, true, false};  // only field 1 is null
 
   for (int i = 0; i < 8; ++i)
     meta.onRecordAppended(pat);
@@ -405,7 +410,7 @@ TEST_F(MetaTestFixture, integration_is_field_null_inside_aggregated_rle_entry) {
   // All 8 records share the same pattern in one RLE accumulator
   for (int i = 0; i < 8; ++i) {
     EXPECT_FALSE(meta.getNullBitset(i)[0]) << "rec " << i << " field 0";
-    EXPECT_TRUE(meta.getNullBitset(i)[1])  << "rec " << i << " field 1";
+    EXPECT_TRUE(meta.getNullBitset(i)[1]) << "rec " << i << " field 1";
     EXPECT_FALSE(meta.getNullBitset(i)[2]) << "rec " << i << " field 2";
   }
 }
@@ -467,7 +472,7 @@ TEST_F(MetaTestFixture, integration_storage_operations_with_meta) {
   meta.onRecordAppended(patB);  // rec 4 - forces patA to disk
 
   EXPECT_EQ(meta.totalRecords(), 5u);
-  EXPECT_EQ(meta.entries().size(), 1u);      // patA committed to disk
+  EXPECT_EQ(meta.entries().size(), 1u);            // patA committed to disk
   EXPECT_EQ(meta.pendingEntry().recordCount, 1u);  // patB in memory
 
   // Test modify on committed entry
@@ -487,10 +492,10 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   // Build sequence: normal data -> gap -> recovery -> gap -> normal data
   meta.onRecordAppended(normal);  // rec 0
   meta.onRecordAppended(normal);  // rec 1
-  meta.onTransmissionGap();        // gap before rec 2
+  meta.onTransmissionGap();       // gap before rec 2
   meta.onRecordAppended(error);   // rec 2 - error state
   meta.onRecordAppended(error);   // rec 3 - error state
-  meta.onTransmissionGap();        // gap before rec 4
+  meta.onTransmissionGap();       // gap before rec 4
   meta.onRecordAppended(normal);  // rec 4 - recovered
   meta.onRecordAppended(normal);  // rec 5 - recovered
 
@@ -499,13 +504,13 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   // Check gap positions
   EXPECT_FALSE(meta.isGapBefore(0));
   EXPECT_FALSE(meta.isGapBefore(1));
-  EXPECT_TRUE(meta.isGapBefore(2));   // gap before error sequence
+  EXPECT_TRUE(meta.isGapBefore(2));  // gap before error sequence
   EXPECT_FALSE(meta.isGapBefore(3));
-  EXPECT_TRUE(meta.isGapBefore(4));   // gap before recovery
+  EXPECT_TRUE(meta.isGapBefore(4));  // gap before recovery
 
   {
     auto allEntries = meta.entries();
-    size_t gapCnt = std::count_if(allEntries.begin(), allEntries.end(), [](const auto &e) { return e.recordCount == 0; });
+    size_t gapCnt   = std::count_if(allEntries.begin(), allEntries.end(), [](const auto &e) { return e.recordCount == 0; });
     EXPECT_EQ(gapCnt, 2u);
   }
 
@@ -634,17 +639,19 @@ TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
 
   meta.onRecordAppended(pat);  // rec 0
   meta.onRecordAppended(pat);  // rec 1
-  meta.onTransmissionGap();     // gap before record 2
+  meta.onTransmissionGap();    // gap before record 2
   meta.onRecordAppended(pat);  // rec 2
   meta.onRecordAppended(pat);  // rec 3
-  meta.onTransmissionGap();     // gap before record 4
+  meta.onTransmissionGap();    // gap before record 4
   meta.onRecordAppended(pat);  // rec 4
 
   std::vector<size_t> gapPositions;
   size_t cum = 0;
   for (const auto &e : meta.entries()) {
-    if (e.recordCount == 0) gapPositions.push_back(cum);
-    else cum += e.recordCount;
+    if (e.recordCount == 0)
+      gapPositions.push_back(cum);
+    else
+      cum += e.recordCount;
   }
   EXPECT_EQ(gapPositions.size(), 2u);
   EXPECT_EQ(gapPositions[0], 2u);

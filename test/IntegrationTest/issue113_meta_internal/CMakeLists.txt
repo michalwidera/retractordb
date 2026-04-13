@@ -6,7 +6,8 @@ add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
-    bash -c "set -e ; \
+    bash -c
+    "set -e ; \
     mkdir -p temp ; \
     rm -f temp/str_null temp/str_null.* temp/core0 temp/core0.* ; \
     for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 1; done ; \
@@ -24,5 +25,4 @@ add_test(
     grep -Fq 'entry[0] count:1 gap:0 bitsetSize:2 bitsetHex:03' out.txt ; \
     grep -Fq 'entry[1] count:2 gap:0 bitsetSize:2 bitsetHex:02' out.txt ; \
     grep -Fq 'entry[2] count:1 gap:0 bitsetSize:2 bitsetHex:00' out.txt ; \
-    grep -Fq 'entries: 3' out.txt"
-)
+    grep -Fq 'entries: 3' out.txt")
