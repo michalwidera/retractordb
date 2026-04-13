@@ -5,7 +5,7 @@
 
 #include "dumpManager.h"
 #include "qTree.h"           // qTree
-#include "rdb/storageacc.h"  // rdb::storage (transitively includes descriptor.h, payload.h)
+#include "rdb/storage.h"  // rdb::storage (transitively includes descriptor.h, payload.h)
 
 struct streamInstance {
   qTree &coreInstance;

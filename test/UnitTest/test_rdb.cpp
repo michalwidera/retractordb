@@ -6,7 +6,7 @@
 
 #include "rdb/fainterface.h"
 #include "rdb/payload.h"
-#include "rdb/storageacc.h"
+#include "rdb/storage.h"
 
 // ctest -R '^ut-test_rdb' -V
 

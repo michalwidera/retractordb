@@ -17,8 +17,25 @@
 #include "payload.h"
 
 namespace rdb {
-enum class storageState { noDescriptor, attachedDescriptor, openAndCreate };
+enum class storageState { noDescriptor, openAndCreate };
 enum class sourceState { empty, flux, armed };
+
+/// @brief Definicja klasy implmentującej zarządzenie danymi zapisywanymi w bazie danych.
+///
+/// Obiekt storage powinien:
+/// - być tworzony na podstawie identyfikatora zapytania (qryID) i nazwy pliku (fileName).
+/// - umożliwiać dołączenie obiektu descriptor, który definiuje strukturę danych zarządzanych przez storage.
+/// - umożliwiać odczyt i zapis danych do/z pliku, zgodnie z opisem w descriptorze.
+/// - zarządzać stanem pliku danych (otwarty, zamknięty, itp.) i stanem bufora (pusty, wypełniony, itp.).
+/// - umożliwiać ustawienie pojemności bufora, jeśli jest to wymagane.
+/// - umożliwiać oznaczenie storage jako jednorazowego (one-shot) lub wielokrotnego użytku.
+/// - umożliwiać oznaczenie storage jako "hold", co oznacza, że nie będzie przetwarzał danych, dopóki nie pojawi się pierwsze zapytanie.
+/// - umożliwiać zwolnienie storage z "hold" i rozpoczęcie przetwarzania danych.
+/// - umożliwiać sprawdzenie, czy plik descriptor istnieje.
+/// - umożliwiać czyszczenie danych w payload.
+/// - umożliwiać resetowanie stanu storage (np. dla celów testowych).
+/// - umożliwiać usunięcie storage i descriptor, jeśli storage jest oznaczony jako jednorazowy (disposable).
+/// - łączyć zdefiniowany sposób dostępu do pliku (np. przez FileInterface) z zarządzaniem danymi w pamięci (np. przez payload).
 
 class storage {
   std::unique_ptr<FileInterface> accessor_;

@@ -7,8 +7,17 @@
 #include "descriptor.h"
 
 namespace rdb {
-/// @brief This class define accessing method to payload (memory area)
-/// This is accessor for payload memory area that supports applying descriptor type over memory area.
+/// @brief Definicja klasy implementującej dostęp do binarnego obrazu danych transportowanych w systemie.
+///
+/// Obiekt payload powinien:
+/// - być tworzony na podstawie obiektu descriptor, który definiuje strukturę danych w payload.
+/// - udostępniać metodę span() zwracającą std::span<uint8_t> do obszaru pamięci, który jest zarządzany przez payload.
+/// - przechowywać dane w formacie binarnym, zgodnie z opisem w descriptorze.
+/// - udostępniać metodę setItem(int position, std::any value) do ustawiania wartości w obszarze pamięci zgodnie z pozycją i typem określonymi w descriptor.
+/// - udostępniać metodę getItem(int position) do pobierania wartości z obszaru pamięci zgodnie z pozycją i typem określonymi w descriptor.
+/// - obsługiwać formatowanie danych w formacie szesnastkowym (hex).
+/// - być kopiowalny i przypisywalny.
+/// - być strumieniowalny do std::ostream i std::istream.
 class payload {
   /// @brief Payload memory area
   std::unique_ptr<uint8_t[]> payloadData_;

@@ -17,7 +17,7 @@
 #include "rdb/faccfs.h"
 #include "rdb/faccposix.h"
 #include "rdb/payload.h"
-#include "rdb/storageacc.h"
+#include "rdb/storage.h"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;

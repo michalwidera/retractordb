@@ -12,7 +12,7 @@
 #include "config.h"
 #include "rdb/fainterface.h"
 #include "rdb/payload.h"
-#include "rdb/storageacc.h"
+#include "rdb/storage.h"
 #include "retractor/lib/dataModel.h"
 #include "retractor/lib/qTree.h"  // coreInstance
 

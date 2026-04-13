@@ -16,22 +16,23 @@ namespace rdb {
 /// @brief Klasa opisująca strumień indeksujący dane napływające w klasie storage.
 ///
 /// obiekt klasy metaDataStream powinien:
-/// - tworzyć dane wraz z napływem danych w storage.
-/// - być odpowiedzialny za przechowanie informacji o tym, które pola w rekordach są nullami.
+/// - tworzyć dane w pliku indeksu wraz z napływem danych w storage.
+/// - przechowywać informacje o tym, które pola w rekordach pliku indeksowanego są nullami.
 /// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storage.
-/// - umożliwiać aktualizację informacji o nullach dla istniejących rekordów.
+/// - umożliwiać aktualizację informacji o wartościach null dla istniejących rekordów.
 /// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
-/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
+/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu obiektu lub systemu.
+/// - umożliwiać jedynie dodawnie i modyfikowanie wartości w pliku indeksu, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
 /// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
-/// - zapewniać informacje o przerwach w transmisji danych.
+/// - zapewniać informacje o przerwach w transmisji danych poprzez zanotowanie rekordu oznaczającego przerwę.
 /// - powinien być w stanie obsłużyć duże ilości danych.
-/// - zapewnić serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
+/// - zapewnić procedury serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
 /// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
-/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu.
+/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu dla każdego rekordu.
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
 /// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storage.
+/// @note Interfejs i implementacja klasy powinna być minimalna i skupiona na funkcjonalności.
 /// @note W przypadku dużych ilości danych, implementacja powinna uwzględniać mechanizmy buforowania i zarządzania pamięcią, aby zapewnić płynne działanie systemu.
 /// @note Klasa metaDataStream powinna być projektowana z myślą o łatwej integracji z innymi komponentami systemu, takimi jak storage, aby zapewnić spójność i efektywność całego systemu.
 /// @note W przypadku przerw w transmisji danych, klasa metaDataStream powinna być w stanie wykryć i odpowiednio zareagować na takie sytuacje, np. poprzez zapisywanie stanu indeksu przed przerwą i przywracanie go po wznowieniu transmisji.
