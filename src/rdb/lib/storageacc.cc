@@ -11,8 +11,6 @@
 
 namespace rdb {
 
-bool isOpen(const storageState val) { return (val == storageState::openAndCreate); };
-
 storage::storage(const std::string_view qryID,         //
                  const std::string_view fileName,      //
                  const std::string_view storageParam,  //
@@ -165,8 +163,6 @@ void storage::attachStorage() {
   recordsCount_ = accessor_->count();
   SPDLOG_INFO("record count {} on {}", recordsCount_, storageFile_);
 
-  dataFileStatus = storageState::openAndCreate;
-
   metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
   SPDLOG_INFO("metaIndex file {} rInterval {}/{}", metaIndexFile_, rInterval_.numerator(), rInterval_.denominator());
 }
@@ -271,7 +267,7 @@ void storage::abortIfStorageNotPrepared() {
     assert(false && "Empty descriptor");
     abort();
   }
-  if (!isOpen(dataFileStatus)) {
+  if (!accessor_) {
     SPDLOG_ERROR("data file is not opened");
     assert(false && "data file didn't opened");
     abort();

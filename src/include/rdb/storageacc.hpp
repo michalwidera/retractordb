@@ -19,7 +19,6 @@
 #include "payload.hpp"
 
 namespace rdb {
-enum class storageState { noDescriptor, openAndCreate };
 enum class sourceState { empty, flux, armed };
 
 /// @brief Klasa nadzorująca zapis danych na dysku.
@@ -81,7 +80,6 @@ class storage {
 
   Descriptor descriptor;
 
-  storageState dataFileStatus = storageState::noDescriptor;
   sourceState bufferState     = sourceState::empty;  // ? test lock
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
