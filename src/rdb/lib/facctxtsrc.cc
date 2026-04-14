@@ -10,26 +10,6 @@
 
 namespace rdb {
 
-template <typename K>
-K readFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
-  K var{0};
-  if (myFile.eof()) {
-    if (loopToBeginningIfEOF) {
-      myFile.clear();
-      myFile.seekg(0, std::ios::beg);
-      if (!(myFile >> var)) return K{0};
-    }
-  } else {
-    myFile >> var;
-    if (myFile.eof() && loopToBeginningIfEOF) {
-      myFile.clear();
-      myFile.seekg(0, std::ios::beg);
-      if (!(myFile >> var)) return K{0};
-    }
-  }
-  return var;
-}
-
 std::optional<std::string> readTokenFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
   std::string token;
 
@@ -47,6 +27,37 @@ std::optional<std::string> readTokenFromFstream(std::fstream &myFile, bool loopT
 }
 
 bool isNullToken(const std::string &token) { return token == "NULL" || token == "Null" || token == "null"; }
+
+template <typename T>
+T parseAs(const std::string &token) {
+  T var{0};
+  std::istringstream(token) >> var;
+  return var;
+}
+
+void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype, const std::string &token) {
+  switch (rtype) {
+    case rdb::INTEGER:
+      payload.setItem(index, parseAs<int>(token));
+      break;
+    case rdb::UINT:
+      payload.setItem(index, parseAs<unsigned>(token));
+      break;
+    case rdb::FLOAT:
+      payload.setItem(index, parseAs<float>(token));
+      break;
+    case rdb::DOUBLE:
+      payload.setItem(index, parseAs<double>(token));
+      break;
+    case rdb::BYTE:
+      payload.setItem(index, static_cast<uint8_t>(parseAs<unsigned>(token)));
+      break;
+    default:
+      SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(rtype));
+      assert(false && "read - Unsupported type in text data source");
+      abort();
+  }
+}
 
 textSourceRO::textSourceRO(const std::string_view fileName,    //
                            const ssize_t recordSize,           //
@@ -152,45 +163,16 @@ ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
         var.erase(remove(var.begin(), var.end(), '"'), var.end());
         var.resize(strLen);
         payload_->setItem(i, var);
-      } else
+      } else {
         for (auto j = 0; j < item.rarray; j++) {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
-          if (!token.has_value()) {
+          if (!token.has_value() || isNullToken(*token)) {
             payload_->setItem(i + j, std::nullopt);
             continue;
           }
-          if (isNullToken(*token)) {
-            payload_->setItem(i + j, std::nullopt);
-            continue;
-          }
-
-          std::istringstream tokenStream(*token);
-          if (item.rtype == rdb::INTEGER) {
-            int var{0};
-            tokenStream >> var;
-            payload_->setItem(i + j, var);
-          } else if (item.rtype == rdb::UINT) {
-            unsigned var{0};
-            tokenStream >> var;
-            payload_->setItem(i + j, var);
-          } else if (item.rtype == rdb::FLOAT) {
-            float var{0};
-            tokenStream >> var;
-            payload_->setItem(i + j, var);
-          } else if (item.rtype == rdb::DOUBLE) {
-            double var{0};
-            tokenStream >> var;
-            payload_->setItem(i + j, var);
-          } else if (item.rtype == rdb::BYTE) {  // This is different!
-            unsigned var{0};
-            tokenStream >> var;
-            payload_->setItem(i + j, static_cast<uint8_t>(var));
-          } else {
-            SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(item.rtype));
-            assert(false && "read - Unsupported type in text data source");
-            abort();
-          }
+          parseAndSetNumericItem(*payload_, i + j, item.rtype, *token);
         }
+      }
 
       // rdb::RATIONAL - deprecate ?
       i++;
