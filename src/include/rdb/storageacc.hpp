@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <memory>  // std::unique_ptr
 #include <string>
 
@@ -61,12 +60,11 @@ class storage {
   boost::rational<int> rInterval_{1};                      ///< sampling interval for time calculations
   int nullFillCount_{2};                                   ///< number of nullfill records written before a gap is marked (R17)
   int gapDetectionThreshold_{3};                             ///< number of missed intervals that trigger a gap marker
-  std::chrono::steady_clock::time_point lastWriteTime_{};  ///< timestamp of last write()
-  bool lastWriteTimeInitialized_{false};                   ///< true after first write
-  bool samplingIntervalConfigured_{false};                 ///< true only when setSamplingInterval() was explicitly called
+  size_t consecutiveNullCount_{0};     ///< consecutive all-null records received from source
+  size_t activeGapDuration_{0};        ///< accumulated gap duration not yet flushed to meta index
+  bool gapDetectionConfigured_{false}; ///< true only when configureGapDetection() was explicitly called
 
-  void checkAndMarkAutoGap();             ///< auto-detect gap based on elapsed time since last write
-  void fillMissedIntervals(size_t count);  ///< insert null/fallback records for missed intervals
+  void flushPendingGap();  ///< flush accumulated gap duration to meta index
   void moveRef();
   void attachStorage();
 
@@ -139,7 +137,7 @@ class storage {
   /// @param rInterval             sampling interval (e.g. 1/10 = 100ms)
   /// @param nullFillCount         number of nullfill records to write before marking a gap (default: 2)
   /// @param gapDetectionThreshold number of missed intervals that trigger gap detection (default: 3)
-  void setSamplingInterval(boost::rational<int> rInterval, int nullFillCount = 2, int gapDetectionThreshold = 3);
+  void configureGapDetection(boost::rational<int> rInterval, int nullFillCount = 2, int gapDetectionThreshold = 3);
 
   // technical function - for unit tests
   void reset();

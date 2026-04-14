@@ -168,6 +168,7 @@ void storage::attachStorage() {
 }
 
 storage::~storage() {
+  flushPendingGap();
   if (isDisposable_) {
     if (storageFile_ != "") auto statusRemove1 = remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
@@ -208,6 +209,8 @@ void storage::initializeAccessor() {
 }
 
 void storage::reset() {
+  consecutiveNullCount_ = 0;
+  activeGapDuration_    = 0;
   assert(storageFile_ != "");
 
   if (!accessor_) return;  // no accessor initialized - no need to reset.
@@ -288,6 +291,9 @@ void storage::fire() {
 
 void storage::purge() {
   abortIfStorageNotPrepared();
+
+  consecutiveNullCount_ = 0;
+  activeGapDuration_    = 0;
 
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;
@@ -467,9 +473,21 @@ bool storage::write(const size_t recordIndex) {
 
   abortIfStorageNotPrepared();
 
-  // Auto-detect transmission gap before appending
-  if (recordIndex >= recordsCount_) {
-    checkAndMarkAutoGap();
+  if (recordIndex >= recordsCount_ && gapDetectionConfigured_ && metaDataStream_) {
+    const bool isAllNull = !nullInfo.empty() &&
+                           std::all_of(nullInfo.begin(), nullInfo.end(), [](bool b) { return b; });
+    if (isAllNull) {
+      consecutiveNullCount_++;
+      if (consecutiveNullCount_ > static_cast<size_t>(nullFillCount_)) {
+        activeGapDuration_++;
+        SPDLOG_INFO("Gap phase: skipping write, activeGapDuration={}", activeGapDuration_);
+        return true;
+      }
+      SPDLOG_INFO("Nullfill phase: null record {}/{}", consecutiveNullCount_, nullFillCount_);
+    } else {
+      flushPendingGap();
+      consecutiveNullCount_ = 0;
+    }
   }
 
   assert(recordsCount_ == accessor_->count());
@@ -501,72 +519,26 @@ bool storage::write(const size_t recordIndex) {
   return result == 0;
 };
 
-void storage::setSamplingInterval(boost::rational<int> rInterval, int nullFillCount, int gapDetectionThreshold) {
+void storage::configureGapDetection(boost::rational<int> rInterval, int nullFillCount, int gapDetectionThreshold) {
   rInterval_                    = rInterval;
   nullFillCount_                = nullFillCount;
   gapDetectionThreshold_        = gapDetectionThreshold;
-  samplingIntervalConfigured_   = true;
+  gapDetectionConfigured_   = true;
 
   // If metaDataStream already exists, recreate it with the new interval
   if (metaDataStream_) {
     metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
   }
 
-  SPDLOG_INFO("setSamplingInterval rInterval={}/{} nullFillCount={} gapDetectionThreshold={}", rInterval_.numerator(),
+  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={} gapDetectionThreshold={}", rInterval_.numerator(),
               rInterval_.denominator(), nullFillCount_, gapDetectionThreshold_);
 }
 
-void storage::checkAndMarkAutoGap() {
-  if (!metaDataStream_ || !samplingIntervalConfigured_) return;
-
-  auto now = std::chrono::steady_clock::now();
-
-  if (lastWriteTimeInitialized_) {
-    auto elapsedMs  = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastWriteTime_).count();
-    auto intervalMs = static_cast<long long>(boost::rational_cast<double>(rInterval_) * 1000.0);
-
-    if (intervalMs > 0) {
-      auto missedIntervals = static_cast<size_t>(elapsedMs / intervalMs);
-
-      if (missedIntervals >= 1 && missedIntervals < static_cast<size_t>(gapDetectionThreshold_)) {
-        // Phase 1 (nullfill): write exactly nullFillCount_ null/fallback records before the current write
-        fillMissedIntervals(static_cast<size_t>(nullFillCount_));
-        SPDLOG_INFO("Filled {} nullfill records ({}ms elapsed, {} missed intervals)", nullFillCount_, elapsedMs,
-                    missedIntervals);
-      } else if (missedIntervals >= static_cast<size_t>(gapDetectionThreshold_)) {
-        // Phase 2: mark transmission gap with duration
-        markTransmissionGap(missedIntervals);
-        SPDLOG_INFO("Auto gap detected: {} missed intervals ({}ms elapsed, threshold: {})", missedIntervals, elapsedMs,
-                    gapDetectionThreshold_);
-      }
-    }
-  }
-
-  lastWriteTime_            = now;
-  lastWriteTimeInitialized_ = true;
-}
-
-void storage::fillMissedIntervals(size_t count) {
-  if (count == 0 || !accessor_ || !storagePayload_) return;
-
-  // Save current payload
-  auto savedPayload = *storagePayload_;
-
-  // Fill with zeros (fallback) and all-null bitset
-  cleanPayload();
-  std::vector<bool> allNull(descriptor.size(), true);
-
-  for (size_t i = 0; i < count; ++i) {
-    auto result = accessor_->write(storagePayload_->span().data());
-    assert(result == 0);
-    if (result == 0) recordsCount_++;
-    if (metaDataStream_) metaDataStream_->onRecordAppended(allNull);
-  }
-
-  SPDLOG_INFO("Inserted {} fallback null records", count);
-
-  // Restore original payload
-  *storagePayload_ = savedPayload;
+void storage::flushPendingGap() {
+  if (activeGapDuration_ == 0 || !metaDataStream_) return;
+  markTransmissionGap(activeGapDuration_);
+  SPDLOG_INFO("Flushed pending gap: duration={}", activeGapDuration_);
+  activeGapDuration_ = 0;
 }
 
 }  // namespace rdb

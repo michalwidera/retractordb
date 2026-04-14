@@ -30,7 +30,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   outputPayload->attachDescriptor(&desc);
 
   if (qry.rInterval > 0 && qry.isDeclaration()) {
-    outputPayload->setSamplingInterval(qry.rInterval);
+    outputPayload->configureGapDetection(qry.rInterval);
   }
 
   auto requestedCapacity = coreInstance.maxCapacity[qry.id];
