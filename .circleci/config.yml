@@ -1,6 +1,7 @@
 version: 2.1
 
 # https://circleci.com/developer/machine/image/ubuntu-2204#image-tags
+# oauth cycle
 
 workflows:
   commit:
