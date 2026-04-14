@@ -60,12 +60,11 @@ void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
 }
 
 textSourceRO::textSourceRO(const std::string_view fileName,    //
-                           const ssize_t recordSize,           //
                            const rdb::Descriptor &descriptor,  //
                            bool loopToBeginningIfEOF)
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
-      recordSize_(recordSize),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       readCount_(0),
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
   myFile_.rdbuf()->pubsetbuf(nullptr, 0);

@@ -47,9 +47,8 @@ TEST_F(TextSourceROTest, test_read_single_integer) {
   auto filename = createTestFile("test_int.txt", "42\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -64,9 +63,8 @@ TEST_F(TextSourceROTest, test_read_multiple_integers) {
   auto filename = createTestFile("test_multi_int.txt", "10\n20\n30\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   int value;
@@ -93,9 +91,8 @@ TEST_F(TextSourceROTest, test_read_float) {
   auto filename = createTestFile("test_float.txt", "3.14\n");
 
   rdb::Descriptor desc{{"x", static_cast<int>(sizeof(float)), 1, rdb::FLOAT}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -110,9 +107,8 @@ TEST_F(TextSourceROTest, test_read_double) {
   auto filename = createTestFile("test_double.txt", "2.718281828\n");
 
   rdb::Descriptor desc{{"x", static_cast<int>(sizeof(double)), 1, rdb::DOUBLE}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -131,9 +127,8 @@ TEST_F(TextSourceROTest, test_read_uint) {
   auto filename = createTestFile("test_uint.txt", "100\n");
 
   rdb::Descriptor desc{{"u", static_cast<int>(sizeof(unsigned)), 1, rdb::UINT}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -148,9 +143,8 @@ TEST_F(TextSourceROTest, test_read_byte) {
   auto filename = createTestFile("test_byte.txt", "255\n");
 
   rdb::Descriptor desc{{"b", 1, 1, rdb::BYTE}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -163,9 +157,8 @@ TEST_F(TextSourceROTest, test_read_integer_null_token) {
   auto filename = createTestFile("test_int_null.txt", "NULL\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
@@ -185,9 +178,8 @@ TEST_F(TextSourceROTest, test_read_missing_file_returns_null_row) {
   const std::string filename = "does_not_exist.txt";
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
@@ -212,9 +204,8 @@ TEST_F(TextSourceROTest, test_read_string) {
   auto filename = createTestFile("test_str.txt", "\"hello\"\n");
 
   rdb::Descriptor desc{{"s", 5, 1, rdb::STRING}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -228,9 +219,8 @@ TEST_F(TextSourceROTest, test_read_string_padded) {
   auto filename = createTestFile("test_str_pad.txt", "\"hi\"\n");
 
   rdb::Descriptor desc{{"s", 5, 1, rdb::STRING}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
@@ -246,9 +236,8 @@ TEST_F(TextSourceROTest, test_read_string_null_token) {
   auto filename = createTestFile("test_str_null.txt", "NULL\n");
 
   rdb::Descriptor desc{{"s", 5, 1, rdb::STRING}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
@@ -268,9 +257,8 @@ TEST_F(TextSourceROTest, test_read_multi_field) {
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER},
                        {"b", static_cast<int>(sizeof(float)), 1, rdb::FLOAT}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -290,9 +278,8 @@ TEST_F(TextSourceROTest, test_last_null_bitset_for_mixed_record) {
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER},
                        {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -312,9 +299,8 @@ TEST_F(TextSourceROTest, test_read_integer_array) {
   auto filename = createTestFile("test_arr.txt", "1 2 3\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 3, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
@@ -335,9 +321,8 @@ TEST_F(TextSourceROTest, test_loop_to_beginning) {
   auto filename = createTestFile("test_loop.txt", "100\n200\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, true);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, true);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   int value;
@@ -362,9 +347,8 @@ TEST_F(TextSourceROTest, test_no_loop_eof_zeros) {
   auto filename = createTestFile("test_noloop.txt", "42\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   int value;
@@ -394,9 +378,8 @@ TEST_F(TextSourceROTest, test_count_increments) {
   auto filename = createTestFile("test_count.txt", "1\n2\n3\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   GTEST_ASSERT_EQ(src->count(), 0u);
 
@@ -420,9 +403,8 @@ TEST_F(TextSourceROTest, test_name) {
   auto filename = createTestFile("test_name.txt", "1\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   EXPECT_EQ(src->name(), "test_name.txt");
 }
@@ -436,9 +418,8 @@ TEST_F(TextSourceROTest, test_write_returns_failure) {
   auto filename = createTestFile("test_ro.txt", "1\n");
 
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   uint8_t data[] = {0};
   GTEST_ASSERT_EQ(src->write(data, 0), EXIT_FAILURE);
@@ -454,9 +435,8 @@ TEST_F(TextSourceROTest, test_read_string_loop) {
   auto filename = createTestFile("test_str_loop.txt", "\"abc\"\n");
 
   rdb::Descriptor desc{{"s", 3, 1, rdb::STRING}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, true);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, true);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
 
@@ -476,9 +456,8 @@ TEST_F(TextSourceROTest, test_read_string_no_loop_eof_zero_padded) {
   auto filename = createTestFile("test_str_noloop_eof.txt", "\"abc\"\n");
 
   rdb::Descriptor desc{{"s", 3, 1, rdb::STRING}};
-  auto recsize = static_cast<ssize_t>(desc.getSizeInBytes());
 
-  auto src = std::make_unique<rdb::textSourceRO>(filename, recsize, desc, false);
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
 

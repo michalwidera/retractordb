@@ -16,16 +16,15 @@ namespace rdb {
 ///
 /// Obiekt binaryDeviceRO powinien:
 /// - umożliwiać odczyt danych z pliku binarnego.
-/// - interpretować dane zgodnie z dostarczonym opisem (Descriptor), umożliwiając odczyt danych o różnych typach i strukturach.
+/// - wyznaczać długość paczki danych zgodnie z dostarczonym opisem (Descriptor).
 /// - uniemożliwiać zapis danych do pliku, zapewniając, że obiekt jest tylko do odczytu.
-/// - obsługiwać sytuację, gdy osiągnięty zostanie koniec pliku (EOF), z opcją pętli do początku pliku, jeśli jest włączona.
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu.
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych.
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
-/// - po przeczytaniu ostatnichd danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do początku pliku i kontynuować odczyt danych od początku.
-/// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, powinien zwrócić dane z ustawionymi wartościami null i zerami, a następnie zakończyć odczyt danych.
-/// - w przypadku pojawienia się wartości null w danych, powinien odpowiednio ustawić metadane null dla tych wartości, aby umożliwić ich prawidłową obsługę przez inne komponenty systemu.
-/// - w przypadku błędu odczytu danych z pliku, powinien odpowiednio ustawić metadane null dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
+/// - po przeczytaniu ostatnich danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do początku pliku i kontynuować odczyt danych od początku.
+/// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, powinien zwrócić dane z ustawionymi wartościami null i zerami a dane odczytywane powinny zawierać wartości null lub failover.
+/// - nie interpretować poszczególnych pól danych i próbować ustawić poszczególne wartości null dla pól, które nie zostały poprawnie odczytane, ale zamiast tego powinien ustawić wektor null wartości dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
+/// - w przypadku błędu odczytu danych z pliku, powinien odpowiednio ustawić wektor null wartości dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
 
 class binaryDeviceRO : public FileInterface {
   std::string filename_;
@@ -42,7 +41,8 @@ class binaryDeviceRO : public FileInterface {
   std::vector<bool> lastNullBitset_;
 
  public:
-  explicit binaryDeviceRO(const std::string_view fileName, const ssize_t recordSize, const rdb::Descriptor &descriptor,
+  explicit binaryDeviceRO(const std::string_view fileName,    //
+                          const rdb::Descriptor &descriptor,  //
                           bool loopToBeginningIfEOF);
   ~binaryDeviceRO() override;
 

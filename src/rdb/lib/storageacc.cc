@@ -198,9 +198,9 @@ void storage::initializeAccessor() {
   } else if (storageType_ == "GENERIC") {
     accessor_ = std::make_unique<rdb::genericBinaryFile>(storageFile_, size, percounter_);
   } else if (storageType_ == "DEVICE") {
-    accessor_ = std::make_unique<rdb::binaryDeviceRO>(storageFile_, size, descriptor, !isOneShot_);
+    accessor_ = std::make_unique<rdb::binaryDeviceRO>(storageFile_, descriptor, !isOneShot_);
   } else if (storageType_ == "TEXTSOURCE") {
-    accessor_ = std::make_unique<rdb::textSourceRO>(storageFile_, size, descriptor, !isOneShot_);
+    accessor_ = std::make_unique<rdb::textSourceRO>(storageFile_, descriptor, !isOneShot_);
   } else {
     SPDLOG_INFO("Unsupported storage type {}", storageType_);
     assert(false && "Unsupported storage type");
@@ -474,8 +474,7 @@ bool storage::write(const size_t recordIndex) {
   abortIfStorageNotPrepared();
 
   if (recordIndex >= recordsCount_ && gapDetectionConfigured_ && metaDataStream_) {
-    const bool isAllNull = !nullInfo.empty() &&
-                           std::all_of(nullInfo.begin(), nullInfo.end(), [](bool b) { return b; });
+    const bool isAllNull = !nullInfo.empty() && std::all_of(nullInfo.begin(), nullInfo.end(), [](bool b) { return b; });
     if (isAllNull) {
       consecutiveNullCount_++;
       if (consecutiveNullCount_ > static_cast<size_t>(nullFillCount_)) {
@@ -520,10 +519,10 @@ bool storage::write(const size_t recordIndex) {
 };
 
 void storage::configureGapDetection(boost::rational<int> rInterval, int nullFillCount, int gapDetectionThreshold) {
-  rInterval_                    = rInterval;
-  nullFillCount_                = nullFillCount;
-  gapDetectionThreshold_        = gapDetectionThreshold;
-  gapDetectionConfigured_   = true;
+  rInterval_              = rInterval;
+  nullFillCount_          = nullFillCount;
+  gapDetectionThreshold_  = gapDetectionThreshold;
+  gapDetectionConfigured_ = true;
 
   // If metaDataStream already exists, recreate it with the new interval
   if (metaDataStream_) {

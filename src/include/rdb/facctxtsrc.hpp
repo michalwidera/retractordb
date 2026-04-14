@@ -38,7 +38,6 @@ class textSourceRO : public FileInterface {
 
  public:
   textSourceRO(const std::string_view fileName,    //
-               const ssize_t recordSize,           //
                const rdb::Descriptor &descriptor,  //
                bool loopToBeginningIfEOF);
 

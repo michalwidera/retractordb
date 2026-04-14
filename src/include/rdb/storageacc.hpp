@@ -33,7 +33,7 @@ enum class sourceState { empty, flux, armed };
 /// - zarządzać plikiem indeksu metaDataStream, który przechowuje informacje o nullach dla każdego rekordu, zapewniając trwałość tych informacji i umożliwiając ich odczyt po ponownym uruchomieniu programu.
 /// - zapewniać że każda dana zapisana do storage jest odpowiednio zarejestrowana w metaDataStream, aby utrzymać spójność między danymi a ich indeksami.
 /// - rozpoznać przerwę (gap) po zarejestrowaniu niezerowej ilości odczytów null ze źródła i zapisaniu danych failover do storage i nullfill do indeksu ze źródła.
-/// - zapisać wstępny brak danych (nullfill) w indeksie oraz failover w storage po otrzymaniu wstępnych danych null ze źródła. 
+/// - zapisać wstępny brak danych (nullfill) w indeksie oraz failover w storage po otrzymaniu wstępnych danych null ze źródła.
 /// - zapisać informacje o przerwach w transmisji danych (gaps) w metaDataStream, aby umożliwić późniejsze wykrycie i obsługę takich sytuacji.
 /// - przechowywać przerwy w transmisji danych (gaps) wyrażone w ilości interwałów próbkowania.
 /// - zapewniać mechanizmy do wykrywania i obsługi przerw w transmisji danych (gaps) jak i fallback (nullfill)
@@ -57,12 +57,12 @@ class storage {
   std::string storageType_    = "";
   int percounter_             = -1;
 
-  boost::rational<int> rInterval_{1};                      ///< sampling interval for time calculations
-  int nullFillCount_{2};                                   ///< number of nullfill records written before a gap is marked (R17)
-  int gapDetectionThreshold_{3};                             ///< number of missed intervals that trigger a gap marker
-  size_t consecutiveNullCount_{0};     ///< consecutive all-null records received from source
-  size_t activeGapDuration_{0};        ///< accumulated gap duration not yet flushed to meta index
-  bool gapDetectionConfigured_{false}; ///< true only when configureGapDetection() was explicitly called
+  boost::rational<int> rInterval_{1};   ///< sampling interval for time calculations
+  int nullFillCount_{2};                ///< number of nullfill records written before a gap is marked (R17)
+  int gapDetectionThreshold_{3};        ///< number of missed intervals that trigger a gap marker
+  size_t consecutiveNullCount_{0};      ///< consecutive all-null records received from source
+  size_t activeGapDuration_{0};         ///< accumulated gap duration not yet flushed to meta index
+  bool gapDetectionConfigured_{false};  ///< true only when configureGapDetection() was explicitly called
 
   void flushPendingGap();  ///< flush accumulated gap duration to meta index
   void moveRef();
