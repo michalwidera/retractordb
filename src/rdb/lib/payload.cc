@@ -363,7 +363,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   os << "{";
 
   Descriptor desc(rhs.descriptor);
-  for (auto const &r : rhs.descriptor) {
+  for (size_t idx = 0; idx < rhs.descriptor.size(); ++idx) {
+    const auto &r = rhs.descriptor[idx];
     if ((r.rtype == rdb::TYPE) ||       //
         (r.rtype == rdb::REF) ||        //
         (r.rtype == rdb::RETENTION) ||  //
@@ -376,7 +377,9 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << r.rname;
     os << ":";
     auto offset_ = desc.offsetBegArr(r.rname);
-    if (r.rtype == rdb::NULLTYPE) {
+    if (idx < rhs.nullBitset_.size() && rhs.nullBitset_[idx]) {
+      os << "null";
+    } else if (r.rtype == rdb::NULLTYPE) {
       os << "null";
     } else if (r.rtype == STRING) {
       auto fieldSpan = rhs.span().subspan(offset_, desc.fieldSize(r.rname));

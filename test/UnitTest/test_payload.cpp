@@ -159,3 +159,78 @@ TEST(payload, add_operator) {
   EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(3).value()) == 3333);
   EXPECT_TRUE(std::any_cast<int>(data3Payload.getItem(4).value()) == 4004);
 }
+
+TEST(payload, operator_ostream_emits_null_for_null_field) {
+  auto desc = rdb::Descriptor("x", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+
+  p.setItem(0, std::nullopt);
+
+  std::stringstream out;
+  out << rdb::flat << p;
+  EXPECT_EQ(out.str(), "{ x:null }");
+}
+
+TEST(payload, operator_ostream_mixed_null_and_value) {
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) +  //
+              rdb::Descriptor("b", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+
+  p.setItem(0, std::nullopt);
+  p.setItem(1, 42);
+
+  std::stringstream out;
+  out << rdb::flat << p;
+  EXPECT_EQ(out.str(), "{ a:null b:42 }");
+}
+
+TEST(payload, get_and_set_null_bitset_round_trips) {
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) +  //
+              rdb::Descriptor("b", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+
+  p.setItem(0, 10);
+  p.setItem(1, 20);
+
+  const std::vector<bool> nulls = {true, false};
+  p.setNullBitset(nulls);
+
+  EXPECT_EQ(p.getNullBitset(), nulls);
+  EXPECT_FALSE(p.getItem(0).has_value());
+  ASSERT_TRUE(p.getItem(1).has_value());
+  EXPECT_EQ(std::any_cast<int>(p.getItem(1).value()), 20);
+}
+
+TEST(payload, copy_constructor_preserves_null_bitset) {
+  auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
+  rdb::payload original(desc);
+  original.setItem(0, std::nullopt);
+
+  rdb::payload copy(original);
+
+  EXPECT_FALSE(copy.getItem(0).has_value());
+  EXPECT_EQ(copy.getNullBitset(), original.getNullBitset());
+}
+
+TEST(payload, copy_assignment_preserves_null_bitset) {
+  auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
+  rdb::payload original(desc);
+  original.setItem(0, std::nullopt);
+
+  rdb::payload assigned;
+  assigned = original;
+
+  EXPECT_FALSE(assigned.getItem(0).has_value());
+  EXPECT_EQ(assigned.getNullBitset(), original.getNullBitset());
+}
+
+TEST(payload, operator_ostream_null_string_field) {
+  auto desc = rdb::Descriptor("name", 1, 8, rdb::STRING);
+  rdb::payload p(desc);
+
+  p.setItem(0, std::nullopt);
+
+  std::stringstream out;
+  out << rdb::flat << p;
+  EXPECT_EQ(out.str(), "{ name:null }");
+}

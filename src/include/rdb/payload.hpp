@@ -16,9 +16,10 @@
 /// - obsługiwać różne typy danych, takie jak liczby całkowite, zmiennoprzecinkowe, łańcuchy znaków itp., zgodnie z opisem w Descriptorze.
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
 /// - obsługiwać formatowanie danych w formacie szesnastkowym (hex) dla typów numerycznych.
-/// - udostępniać metody do ustawiania i pobierania wartości w obszarze pamięci, które są zgodne z opisem w Descriptorze.
-/// - dostarczać metody do kopiowania danych między obiektami payload.
-/// - uwzględniać obsługę wartości null dla pól, które mogą być przechowywać wartości null.
+/// - dostarczać metody do kopiowania danych między obiektami payload (konstruktor kopiujący, operator=, operator+).
+/// - uwzględniać obsługę wartości null dla pól — getItem() zwraca std::nullopt, operator<< wypisuje "null".
+/// - obsługiwać serializację i deserializację przez operator<< i operator>>.
+
 namespace rdb {
 /// @brief This class define accessing method to payload (memory area)
 /// This is accessor for payload memory area that supports applying descriptor type over memory area.
