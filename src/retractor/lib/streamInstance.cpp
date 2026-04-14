@@ -118,7 +118,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
       else
         result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
     } else
-      result->setItem(flip ? lengthAbs - i - 1 : i, -1);
+      result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
   }
 
   // 3. Cleanup source after processing

@@ -122,7 +122,7 @@ TEST_F(xschema, check_construct_payload) {
     coutstring2 << rdb::flat << *(payload.get());
     std::cerr << rdb::flat << *(payload.get()) << std::endl;
 
-    EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:-1 str1_2:-1 str1_3:-1 }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:null str1_2:null str1_3:null }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
@@ -148,7 +148,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
     coutstring2 << rdb::flat << *(payload.get());
     std::cout << rdb::flat << *(payload.get()) << std::endl;
 
-    EXPECT_TRUE(coutstring2.str() == "{ str1_0:-1 str1_1:-1 str1_2:-1 str1_3:11 }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:null str1_1:null str1_2:null str1_3:11 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }

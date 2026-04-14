@@ -22,7 +22,7 @@
 14 Record(s)
 8 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 }
-{ core_0:10 core_1:-1 }
+{ core_0:10 core_1:null }
 { core_0:11 core_1:10 }
 { core_0:12 core_1:11 }
 { core_0:13 core_1:12 }
@@ -32,7 +32,7 @@
 7 Record(s)
 12 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 INTEGER core_2 }
-{ core_0:11 core_1:10 core_2:-1 }
+{ core_0:11 core_1:10 core_2:null }
 { core_0:13 core_1:12 core_2:11 }
 { core_0:15 core_1:14 core_2:13 }
 { core_0:17 core_1:16 core_2:15 }
@@ -42,7 +42,7 @@
 7 Record(s)
 16 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 INTEGER core_2 INTEGER core_3 }
-{ core_0:11 core_1:10 core_2:-1 core_3:-1 }
+{ core_0:11 core_1:10 core_2:null core_3:null }
 { core_0:13 core_1:12 core_2:11 core_3:10 }
 { core_0:15 core_1:14 core_2:13 core_3:12 }
 { core_0:17 core_1:16 core_2:15 core_3:14 }
