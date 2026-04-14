@@ -341,6 +341,47 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
   std::filesystem::remove(metaFile);
 }
 
+TEST(xrdb, storage_gap_flushed_on_destructor) {
+  const std::string streamName = "ut-auto-gap-dtor";
+  const std::string dataFile   = "ut-auto-gap-dtor.bin";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+    s.configureGapDetection(boost::rational<int>(1, 100), 1, 2);
+
+    auto *pl = s.getPayload();
+    const std::vector<bool> allNull(desc.size(), true);
+
+    // Nullfill phase: 1 all-null record written to storage as record 0
+    pl->setNullBitset(allNull);
+    ASSERT_TRUE(s.write());
+
+    // Gap phase: 1 more all-null record NOT written (activeGapDuration_ = 1)
+    ASSERT_TRUE(s.write());
+
+    // Destructor fires here — flushPendingGap() must persist the gap to meta file
+  }
+
+  // Reopen and verify gap was saved
+  {
+    rdb::storage s2(streamName, dataFile, ".");
+    s2.attachDescriptor(&desc);
+
+    // Record 0 was written; gap marker should be before record 1 (which doesn't exist yet,
+    // but isGapBefore is based on meta entries, not record count)
+    EXPECT_TRUE(s2.hasGapBefore(1));
+  }
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+}
+
 TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
   const std::string streamName = "ut-auto-gap-fast";
   const std::string dataFile   = "ut-auto-gap-fast.bin";
