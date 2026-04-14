@@ -34,12 +34,15 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
   rdb::metaDataStream::IndexRecord gap;
-  gap.recordCount = 0;
-  gap.nullBitset  = {false, false};
+  gap.isGap       = true;
+  gap.recordCount = 5;
+  gap.nullBitset  = {true, true};
 
   auto serialized   = gap.serialize();
   auto deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
-  EXPECT_EQ(deserialized.recordCount, 0u);
+  EXPECT_TRUE(deserialized.isGap);
+  EXPECT_EQ(deserialized.recordCount, 5u);
+  EXPECT_EQ(deserialized.nullBitset, gap.nullBitset);
 }
 
 TEST_F(MetaTestFixture, test_append_and_query) {
@@ -132,7 +135,7 @@ TEST_F(MetaTestFixture, test_timestamps) {
   meta.onTransmissionGap();
   size_t gapCount = 0, gapPos = 0, cumulative = 0;
   for (const auto &e : meta.entries()) {
-    if (e.recordCount == 0) {
+    if (e.isGap) {
       gapPos = cumulative;
       ++gapCount;
     } else
@@ -510,7 +513,7 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
 
   {
     auto allEntries = meta.entries();
-    size_t gapCnt   = std::count_if(allEntries.begin(), allEntries.end(), [](const auto &e) { return e.recordCount == 0; });
+    size_t gapCnt   = std::count_if(allEntries.begin(), allEntries.end(), [](const auto &e) { return e.isGap; });
     EXPECT_EQ(gapCnt, 2u);
   }
 
@@ -540,7 +543,7 @@ TEST_F(MetaTestFixture, integration_reset_after_complex_operations) {
   EXPECT_EQ(meta.totalRecords(), 100u);
   {
     auto e1 = meta.entries();
-    EXPECT_EQ(std::count_if(e1.begin(), e1.end(), [](const auto &e) { return e.recordCount == 0; }), 1u);
+    EXPECT_EQ(std::count_if(e1.begin(), e1.end(), [](const auto &e) { return e.isGap; }), 1u);
   }
 
   // Reset and verify
@@ -550,7 +553,7 @@ TEST_F(MetaTestFixture, integration_reset_after_complex_operations) {
   EXPECT_EQ(meta.totalRecords(), 0u);
   {
     auto e2 = meta.entries();
-    EXPECT_EQ(std::count_if(e2.begin(), e2.end(), [](const auto &e) { return e.recordCount == 0; }), 0u);
+    EXPECT_EQ(std::count_if(e2.begin(), e2.end(), [](const auto &e) { return e.isGap; }), 0u);
   }
 
   // Should be reusable after reset
@@ -648,7 +651,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
   std::vector<size_t> gapPositions;
   size_t cum = 0;
   for (const auto &e : meta.entries()) {
-    if (e.recordCount == 0)
+    if (e.isGap)
       gapPositions.push_back(cum);
     else
       cum += e.recordCount;
@@ -670,7 +673,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_empty) {
 
   {
     auto e = meta.entries();
-    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.recordCount == 0; }), 0u);
+    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 0u);
   }
 }
 
@@ -689,7 +692,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
 
     {
       auto e = meta.entries();
-      EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.recordCount == 0; }), 2u);
+      EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
     }
   }
 
@@ -697,6 +700,6 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
   {
     rdb::metaDataStream meta(descriptor, metaFile);
     auto e = meta.entries();
-    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.recordCount == 0; }), 2u);
+    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
   }
 }

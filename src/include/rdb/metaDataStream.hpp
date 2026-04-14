@@ -29,6 +29,7 @@ namespace rdb {
 /// - zapewnić procedury serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
 /// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
 /// - nie przechowywać znacznika czasu wewnątrz struktury indeksu dla każdego rekordu.
+/// - zapewniać definicję przerwy w transmisji danych (gap) jako wpis w indeksie z licznikiem równym czasie trwania przerwy (w jednostkach rInterval) i wzorem nulli ustawionym na wszystkie pola jako null.
 ///
 /// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
 /// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storage.
@@ -45,7 +46,8 @@ class metaDataStream {
   ///        of consecutive records sharing that pattern.
   struct IndexRecord {
     std::vector<bool> nullBitset;              ///< one bit per descriptor field (true = null)
-    size_t recordCount{0};                     ///< number of consecutive records with this pattern; 0 = transmission gap
+    size_t recordCount{0};                     ///< number of consecutive records with this pattern
+    bool isGap{false};                         ///< true if this entry represents a transmission gap
     std::vector<std::byte> serialize() const;  ///< serialize the entry to a vector of bytes
     static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
   };
@@ -107,11 +109,13 @@ class metaDataStream {
 
   /// @brief Mark a transmission gap at the current position.
   ///
-  /// Commits the pending entry and inserts a zero-length gap marker
+  /// Commits the pending entry and inserts a gap marker with all-null
+  /// bitset and recordCount equal to the gap duration (in rInterval units)
   /// so that downstream consumers can detect a discontinuity.
   /// The gap entry itself does not consume a record index; it serves as
   /// a marker between records.
-  void onTransmissionGap();
+  /// @param gapDuration number of missed sampling intervals (default: 1)
+  void onTransmissionGap(size_t gapDuration = 1);
 
   /// @brief Check whether a gap marker exists right before @p recordIndex.
   /// @param recordIndex global position of the record to check

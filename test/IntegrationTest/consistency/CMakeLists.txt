@@ -5,6 +5,7 @@ add_test(
   COMMAND
     sh -c
     "set -e ; \
+  rm -f *.meta ; \
   xretractor -c query-consitency.rql > out_compile.txt ; \
   xretractor query-consitency.rql -m 5 -v > verbose.txt ; \
   while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \

@@ -301,14 +301,14 @@ void storage::purge() {
   SPDLOG_INFO("purge - storage and meta index cleared");
 }
 
-void storage::markTransmissionGap() {
+void storage::markTransmissionGap(size_t gapDuration) {
   if (!metaDataStream_) {
     SPDLOG_WARN("markTransmissionGap called but metaDataStream is not initialized");
     return;
   }
 
-  metaDataStream_->onTransmissionGap();
-  SPDLOG_INFO("Transmission gap marked at record position {}", recordsCount_);
+  metaDataStream_->onTransmissionGap(gapDuration);
+  SPDLOG_INFO("Transmission gap (duration={}) marked at record position {}", gapDuration, recordsCount_);
 }
 
 bool storage::hasGapBefore(size_t recordIndex) const {
@@ -501,36 +501,72 @@ bool storage::write(const size_t recordIndex) {
   return result == 0;
 };
 
-void storage::setSamplingInterval(boost::rational<int> rInterval, int gapMultiplier) {
-  rInterval_     = rInterval;
-  gapMultiplier_ = gapMultiplier;
+void storage::setSamplingInterval(boost::rational<int> rInterval, int nullFillCount, int gapDetectionThreshold) {
+  rInterval_                    = rInterval;
+  nullFillCount_                = nullFillCount;
+  gapDetectionThreshold_        = gapDetectionThreshold;
+  samplingIntervalConfigured_   = true;
 
   // If metaDataStream already exists, recreate it with the new interval
   if (metaDataStream_) {
     metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
   }
 
-  SPDLOG_INFO("setSamplingInterval rInterval={}/{} gapMultiplier={}", rInterval_.numerator(), rInterval_.denominator(),
-              gapMultiplier_);
+  SPDLOG_INFO("setSamplingInterval rInterval={}/{} nullFillCount={} gapDetectionThreshold={}", rInterval_.numerator(),
+              rInterval_.denominator(), nullFillCount_, gapDetectionThreshold_);
 }
 
 void storage::checkAndMarkAutoGap() {
-  if (!metaDataStream_ || rInterval_ <= 0) return;
+  if (!metaDataStream_ || !samplingIntervalConfigured_) return;
 
   auto now = std::chrono::steady_clock::now();
 
   if (lastWriteTimeInitialized_) {
-    auto elapsedMs   = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastWriteTime_).count();
-    auto thresholdMs = static_cast<long long>(boost::rational_cast<double>(rInterval_) * 1000.0 * gapMultiplier_);
+    auto elapsedMs  = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastWriteTime_).count();
+    auto intervalMs = static_cast<long long>(boost::rational_cast<double>(rInterval_) * 1000.0);
 
-    if (thresholdMs > 0 && elapsedMs > thresholdMs) {
-      markTransmissionGap();
-      SPDLOG_INFO("Auto gap detected: {}ms elapsed, threshold {}ms", elapsedMs, thresholdMs);
+    if (intervalMs > 0) {
+      auto missedIntervals = static_cast<size_t>(elapsedMs / intervalMs);
+
+      if (missedIntervals >= 1 && missedIntervals < static_cast<size_t>(gapDetectionThreshold_)) {
+        // Phase 1 (nullfill): write exactly nullFillCount_ null/fallback records before the current write
+        fillMissedIntervals(static_cast<size_t>(nullFillCount_));
+        SPDLOG_INFO("Filled {} nullfill records ({}ms elapsed, {} missed intervals)", nullFillCount_, elapsedMs,
+                    missedIntervals);
+      } else if (missedIntervals >= static_cast<size_t>(gapDetectionThreshold_)) {
+        // Phase 2: mark transmission gap with duration
+        markTransmissionGap(missedIntervals);
+        SPDLOG_INFO("Auto gap detected: {} missed intervals ({}ms elapsed, threshold: {})", missedIntervals, elapsedMs,
+                    gapDetectionThreshold_);
+      }
     }
   }
 
   lastWriteTime_            = now;
   lastWriteTimeInitialized_ = true;
+}
+
+void storage::fillMissedIntervals(size_t count) {
+  if (count == 0 || !accessor_ || !storagePayload_) return;
+
+  // Save current payload
+  auto savedPayload = *storagePayload_;
+
+  // Fill with zeros (fallback) and all-null bitset
+  cleanPayload();
+  std::vector<bool> allNull(descriptor.size(), true);
+
+  for (size_t i = 0; i < count; ++i) {
+    auto result = accessor_->write(storagePayload_->span().data());
+    assert(result == 0);
+    if (result == 0) recordsCount_++;
+    if (metaDataStream_) metaDataStream_->onRecordAppended(allNull);
+  }
+
+  SPDLOG_INFO("Inserted {} fallback null records", count);
+
+  // Restore original payload
+  *storagePayload_ = savedPayload;
 }
 
 }  // namespace rdb

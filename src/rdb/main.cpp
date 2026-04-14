@@ -392,8 +392,8 @@ int main(int argc, char *argv[]) {
       size_t segIdx = 0;
       for (const auto &entry : committed) {
         std::cout << YELLOW << "[" << segIdx++ << "] ";
-        if (entry.recordCount == 0) {
-          std::cout << "gap\n";
+        if (entry.isGap) {
+          std::cout << "gap (duration:" << entry.recordCount << ")\n";
         } else {
           std::cout << "[";
           for (size_t fi = 0; fi < nFields; ++fi) {
@@ -426,7 +426,7 @@ int main(int argc, char *argv[]) {
 
       constexpr size_t headerSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
       const size_t bitsetBytes    = (dacc->descriptor.size() + 7) / 8;
-      const size_t entrySize      = sizeof(size_t) + sizeof(size_t) + bitsetBytes;
+      const size_t entrySize      = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
 
       std::ifstream in(metaFilePath, std::ios::binary);
       if (!in.is_open()) {
@@ -459,7 +459,7 @@ int main(int argc, char *argv[]) {
         auto rec = rdb::metaDataStream::IndexRecord::deserialize(std::span<const std::byte>(raw));
         std::cout << "entry[" << entryIdx << "] ";
         std::cout << "count:" << rec.recordCount << " ";
-        std::cout << "gap:" << (rec.recordCount == 0 ? 1 : 0) << " ";
+        std::cout << "gap:" << (rec.isGap ? 1 : 0) << " ";
         std::cout << "bitsetSize:" << rec.nullBitset.size() << " ";
         std::cout << "bitsetHex:";
         for (size_t bi = 0; bi < bitsetBytes; ++bi) {

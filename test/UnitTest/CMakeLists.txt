@@ -40,11 +40,21 @@ foreach(item ${V_GLOB})
                    PRIVATE ${CMAKE_SOURCE_DIR}/src/common/uxSysTermTools.cpp)
   endif()
   add_test(
+    NAME ut-${OUTPUT_FILE_NOEXT}-setup
+    WORKING_DIRECTORY
+      ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
+    COMMAND bash -c "rm -f *.meta *.desc")
+  set_tests_properties(ut-${OUTPUT_FILE_NOEXT}-setup PROPERTIES
+    FIXTURES_SETUP ut-${OUTPUT_FILE_NOEXT}-fixture)
+
+  add_test(
     NAME ut-${OUTPUT_FILE_NOEXT}
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND valgrind --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
+  set_tests_properties(ut-${OUTPUT_FILE_NOEXT} PROPERTIES
+    FIXTURES_REQUIRED ut-${OUTPUT_FILE_NOEXT}-fixture)
 endforeach()
 
 set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp

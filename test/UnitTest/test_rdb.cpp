@@ -311,8 +311,8 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_timeout) {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
 
-    // rInterval=1/100 (10ms), gapMultiplier=2 → threshold = 20ms
-    s.setSamplingInterval(boost::rational<int>(1, 100), 2);
+    // rInterval=1/100 (10ms), nullFillCount=2, gapDetectionThreshold=2 → threshold = 20ms
+    s.setSamplingInterval(boost::rational<int>(1, 100), 2, 2);
 
     auto *pl = s.getPayload();
 
@@ -347,9 +347,9 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
 
-    // rInterval=1 (1 second), gapMultiplier=3 → threshold = 3000ms
+    // rInterval=1 (1 second), nullFillCount=2, gapDetectionThreshold=3 → threshold = 3000ms
     // All writes happen within milliseconds so no gap should be detected
-    s.setSamplingInterval(boost::rational<int>(1), 3);
+    s.setSamplingInterval(boost::rational<int>(1), 2, 3);
 
     auto *pl = s.getPayload();
 
@@ -378,8 +378,8 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
 
-    // rInterval=1/100 (10ms), gapMultiplier=2 → threshold = 20ms
-    s.setSamplingInterval(boost::rational<int>(1, 100), 2);
+    // rInterval=1/100 (10ms), nullFillCount=2, gapDetectionThreshold=2 → threshold = 20ms
+    s.setSamplingInterval(boost::rational<int>(1, 100), 2, 2);
 
     auto *pl = s.getPayload();
 

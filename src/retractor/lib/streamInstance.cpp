@@ -29,7 +29,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
 
-  if (qry.rInterval > 0) {
+  if (qry.rInterval > 0 && qry.isDeclaration()) {
     outputPayload->setSamplingInterval(qry.rInterval);
   }
 
