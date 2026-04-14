@@ -28,14 +28,18 @@ bool isNullValue(const rdb::descFldVT &value) { return std::holds_alternative<st
 std::optional<bool> toLogicValue(const rdb::descFldVT &value) {
   return std::visit(
       Overload{[](std::monostate) -> std::optional<bool> { return std::nullopt; },
-               [](uint8_t a) -> std::optional<bool> { return a != 0; }, [](int a) -> std::optional<bool> { return a != 0; },
+               [](uint8_t a) -> std::optional<bool> { return a != 0; },
+               [](int a) -> std::optional<bool> { return a != 0; },
                [](unsigned a) -> std::optional<bool> { return a != 0; },
                [](double a) -> std::optional<bool> { return a != 0.0; },
                [](float a) -> std::optional<bool> { return a != 0.0f; },
                [](boost::rational<int> a) -> std::optional<bool> { return a != boost::rational<int>(0); },
-               [](auto) -> std::optional<bool> {
-                 assert(false && "Unsupported type for logic evaluation");
-                 return false;
+               [](const std::string &a) -> std::optional<bool> { return !a.empty(); },
+               [](std::pair<int, int>) -> std::optional<bool> {
+                 throw std::runtime_error("toLogicValue: INTPAIR type not supported in logical context");
+               },
+               [](std::pair<std::string, int>) -> std::optional<bool> {
+                 throw std::runtime_error("toLogicValue: IDXPAIR type not supported in logical context");
                }},
       value);
 }
@@ -48,10 +52,14 @@ rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef) {
                              [value](float) -> rdb::descFldVT { return value ? 1.0f : 0.0f; },
                              [value](boost::rational<int>) -> rdb::descFldVT { return boost::rational<int>(value ? 1 : 0); },
                              [](std::monostate) -> rdb::descFldVT { return std::monostate{}; },
-                             [](auto) -> rdb::descFldVT {
-                               assert(false && "Unsupported type for logic result conversion");
-                               return std::monostate{};
+                             [value](const std::string &) -> rdb::descFldVT { return value ? std::string("1") : std::string("0"); },
+                             [](std::pair<int, int>) -> rdb::descFldVT {
+                               throw std::runtime_error("logicResultAsType: INTPAIR type not supported");
+                             },
+                             [](std::pair<std::string, int>) -> rdb::descFldVT {
+                               throw std::runtime_error("logicResultAsType: IDXPAIR type not supported");
                              }},
+
                     typeRef);
 }
 
@@ -115,7 +123,7 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                                         //
                  [&retVal](int a, int b) { retVal = a - b; },                                                 //
                  [&retVal](unsigned a, unsigned b) { retVal = a - b; },                                       //
-                 [&retVal](const std::string &a, const std::string &b) { /* define string-minus-string */ },  //
+                 [](const std::string &, const std::string &) { throw std::runtime_error("Operator '-' not defined for string operands"); },  //
                  [&retVal](double a, double b) { retVal = a - b; },                                           //
                  [&retVal](float a, float b) { retVal = a - b; },                                             //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a - b; },               //
@@ -145,7 +153,7 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                                        //
                  [&retVal](int a, int b) { retVal = a * b; },                                                //
                  [&retVal](unsigned a, unsigned b) { retVal = a * b; },                                      //
-                 [&retVal](const std::string &a, const std::string &b) { /* define string-mult-string */ },  //
+                 [](const std::string &, const std::string &) { throw std::runtime_error("Operator '*' not defined for string operands"); },  //
                  [&retVal](double a, double b) { retVal = a * b; },                                          //
                  [&retVal](float a, float b) { retVal = a * b; },                                            //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a * b; },              //
@@ -186,7 +194,7 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                                       //
                  [&retVal](int a, int b) { retVal = a / b; },                                               //
                  [&retVal](unsigned a, unsigned b) { retVal = a / b; },                                     //
-                 [&retVal](const std::string &a, const std::string &b) { /* define string-div-string */ },  //
+                 [](const std::string &, const std::string &) { throw std::runtime_error("Operator '/' not defined for string operands"); },  //
                  [&retVal](double a, double b) { retVal = a / b; },                                         //
                  [&retVal](float a, float b) { retVal = a / b; },                                           //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a / b; },             //
@@ -222,9 +230,9 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a == b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                            //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
-                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_eq: INTPAIR not supported"); },                  //
+                 [](std::pair<std::string, int>, std::pair<std::string, int>) { throw std::runtime_error("is_eq: IDXPAIR not supported"); },  //
+                 [](auto, auto) { throw std::runtime_error("is_eq: unsupported operand types"); }                                            //
              },
              a, b);
 
@@ -249,10 +257,10 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
                  [&retVal](float a, float b) { retVal = (a != b) ? float(1) : float(0); },                  //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a != b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                            //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
-                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+                 },                                                                                                               //
+                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_neq: INTPAIR not supported"); },                  //
+                 [](std::pair<std::string, int>, std::pair<std::string, int>) { throw std::runtime_error("is_neq: IDXPAIR not supported"); },  //
+                 [](auto, auto) { throw std::runtime_error("is_neq: unsupported operand types"); }                                            //
              },
              a, b);
 
@@ -277,10 +285,10 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a < b) ? float(1) : float(0); },                  //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a < b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                            //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
-                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+                 },                                                                                                              //
+                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_lt: INTPAIR not supported"); },                  //
+                 [](std::pair<std::string, int>, std::pair<std::string, int>) { throw std::runtime_error("is_lt: IDXPAIR not supported"); },  //
+                 [](auto, auto) { throw std::runtime_error("is_lt: unsupported operand types"); }                                            //
              },
              a, b);
 
@@ -306,9 +314,9 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a > b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                            //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
-                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_gt: INTPAIR not supported"); },                  //
+                 [](std::pair<std::string, int>, std::pair<std::string, int>) { throw std::runtime_error("is_gt: IDXPAIR not supported"); },  //
+                 [](auto, auto) { throw std::runtime_error("is_gt: unsupported operand types"); }                                            //
              },
              a, b);
 
@@ -316,34 +324,6 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 }
 
 rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
-  rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
-  auto [a, b] = normalize(aParam, bParam);
-
-  assert(typeid(a) == typeid(b));
-
-  std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a >= b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a >= b) ? int(1) : int(0); },                          //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a >= b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a >= b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a >= b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a >= b) ? float(1) : float(0); },                  //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
-                   retVal = (a >= b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                            //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
-                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
-             },
-             a, b);
-
-  return retVal;
-}
-
-rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
@@ -361,10 +341,38 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a <= b) ? float(1) : float(0); },                  //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a <= b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                            //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) { assert(false && "no support."); },                  //
-                 [&retVal](std::pair<std::string, int> a, std::pair<std::string, int> b) { assert(false && "no support."); },  //
-                 [&retVal](auto a, auto b) { assert(false && "no support."); }                                                 //
+                 },                                                                                                              //
+                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_le: INTPAIR not supported"); },                  //
+                 [](std::pair<std::string, int>, std::pair<std::string, int>) { throw std::runtime_error("is_le: IDXPAIR not supported"); },  //
+                 [](auto, auto) { throw std::runtime_error("is_le: unsupported operand types"); }                                            //
+             },
+             a, b);
+
+  return retVal;
+}
+
+rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  rdb::descFldVT retVal{0};
+  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
+
+  auto [a, b] = normalize(aParam, bParam);
+
+  assert(typeid(a) == typeid(b));
+
+  std::visit(Overload{
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a >= b) ? uint8_t(1) : uint8_t(0); },          //
+                 [&retVal](int a, int b) { retVal = (a >= b) ? int(1) : int(0); },                          //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a >= b) ? unsigned(1) : unsigned(0); },      //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a >= b) ? "1" : "0"; },  //
+                 [&retVal](double a, double b) { retVal = (a >= b) ? double(1) : double(0); },              //
+                 [&retVal](float a, float b) { retVal = (a >= b) ? float(1) : float(0); },                  //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) {
+                   retVal = (a >= b) ? boost::rational<int>(1) : boost::rational<int>(0);
+                 },                                                                                                              //
+                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_ge: INTPAIR not supported"); },                  //
+                 [](std::pair<std::string, int>, std::pair<std::string, int>) { throw std::runtime_error("is_ge: IDXPAIR not supported"); },  //
+                 [](auto, auto) { throw std::runtime_error("is_ge: unsupported operand types"); }                                            //
              },
              a, b);
 
@@ -410,12 +418,12 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar) {
                  [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                                      // xor ?
                  [&retVal](int a) { retVal = -a; },                                                                //
                  [&retVal](unsigned a) { retVal = static_cast<unsigned>(~a); },                                    // xor ?
-                 [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<int>(-a); },                    //
+                 [&retVal](boost::rational<int> a) { retVal = -a; },                                              //
                  [&retVal](float a) { retVal = -a; },                                                              //
                  [&retVal](double a) { retVal = -a; },                                                             //
                  [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },               //
                  [&retVal](std::pair<std::string, int> a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
-                 [&retVal](const std::string &a) { assert(false && "no support."); }                               //
+                 [](const std::string &) { throw std::runtime_error("Operator 'negate' not defined for string operands"); }  //
              },
              inVar);
 
@@ -435,12 +443,8 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, std::function<double(double)> fnNa
     rdb::descFldVT floValue{fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)))};
     return castFldVT(floValue, (rdb::descFld)backResultType);
   } else {
-    // There is no definition of floor( std::string ) or sqrt( vector ) ?
-    // throw error ?
-    assert(false);
+    throw std::runtime_error("callFun: unsupported type - math functions require numeric operand");
   }
-
-  return inVar;
 }
 
 rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload *payload) {
@@ -549,7 +553,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
           throw std::runtime_error(std::string("Unsupported function call: ") + tkStr);
         break;
       case PUSH_ID: {
-        assert(payload != nullptr);
+        if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
         auto anyValueOpt      = payload->getItem(instancePosition.second);
         if (!anyValueOpt.has_value()) {
@@ -561,15 +565,14 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");
-        assert(false && "::eval - PUSH_IDX should be translated to other PUSH_");
-        abort();
+        throw std::runtime_error("PUSH_IDX should be translated to other PUSH_ before eval");
         break;
       case PUSH_ID2: {
-        assert(payload != nullptr);
+        if (payload == nullptr) throw std::runtime_error("PUSH_ID2: payload is null");
         std::regex r("(\\w*)\\[(\\d*)\\]");
         std::smatch what;
         std::regex_search(tkStr, what, r);  // something[1]
-        assert(what.size() == 3);
+        if (what.size() != 3) throw std::runtime_error("PUSH_ID2: malformed identifier '" + tkStr + "', expected format: name[index]");
         // const std::string schema(what[1]);
         const std::string sOffset1(what[2]);
         const int offset1(atoi(sOffset1.c_str()));

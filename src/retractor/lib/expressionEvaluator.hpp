@@ -18,7 +18,8 @@
 /// - być projektowany z myślą o łatwej integracji z innymi komponentami systemu, takimi jak streamInstance, aby umożliwić efektywne wyznaczanie wartości wyrażeń w różnych kontekstach, takich jak warunki reguł, obliczenia pól wyjściowych itp.
 ///
 /// @note Każde wyrażenie składa się z operatorów i operandów, reprezentowanych jako tokeny. Wykorzystuje stos do przechowywania pośrednich wyników obliczeń. Obsługuje operatory arytmetyczne, logiczne i porównania, a także negację. Umożliwia normalizację typów operandów przed wykonaniem operacji, zapewniając zgodność typów. Może być rozszerzona o dodatkowe operatory i funkcje w przyszłości.
-/// @note W wyrażeniach mogą się pojawić wartości null, które powinny być obsługiwane zgodnie z zasadami logiki trójwartościowej (true, false, null). Na przykład, porównanie wartości null z inną wartością powinno zwracać null, a operacje logiczne z udziałem null powinny być obsługiwane odpowiednio (np. true AND null = null, false OR null = null, cokolwiek operacja null = null itp.).
+/// @note W wyrażeniach mogą się pojawić wartości null, które powinny być obsługiwane zgodnie z zasadami logiki trójwartościowej (3VL). Porównanie wartości null z inną wartością zwraca null. Operacje logiczne z udziałem null są obsługiwane zgodnie z SQL 3VL: true OR null = true, false AND null = false, w pozostałych przypadkach wynik jest null (np. true AND null = null, false OR null = null).
+/// @note Logika trójwartościowa (3VL) w SQL obsługuje wartość NULL jako trzeci stan – „nieznany” (unknown), obok prawdy (TRUE) i fałszu (FALSE). Występuje, gdy brakuje danych, a porównania z NULL (np. x = NULL) dają wynik nieznany, a nie fałsz.
 class expressionEvaluator {
  private:
   /* data */
