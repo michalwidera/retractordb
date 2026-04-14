@@ -155,7 +155,8 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const size_t position) {
         auto segmentToRemove = vec_.front()->name();
         spdlog::info("Removing oldest segment: {}", segmentToRemove);
         std::filesystem::remove(segmentToRemove);
-        std::filesystem::remove(segmentToRemove + ".shadow");
+        if (std::filesystem::exists(segmentToRemove + ".shadow"))
+          std::filesystem::remove(segmentToRemove + ".shadow");
         vec_.erase(vec_.begin());
         removedSegments_++;
         assert(vec_.size() > 0);

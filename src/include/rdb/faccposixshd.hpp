@@ -24,6 +24,11 @@ namespace rdb {
 /// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
 /// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych między uruchomieniami programu
 
+// TODO: Wymaganie 12 mówi o "usuwaniu pliku cienia" po merge, jednak implementacja merge()
+//       wywołuje ::ftruncate(fd_shadow, 0), co zeruje plik, ale nie usuwa go z systemu plików.
+//       Należy ujednolicić: albo zmienić wymaganie na "zerowanie pliku cienia" (truncate do 0),
+//       albo zastąpić ftruncate wywołaniem ::unlink() + ::close() + ponownym ::open() z O_CREAT|O_TRUNC.
+
 class posixBinaryFileWithShadow : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;

@@ -21,7 +21,9 @@
 /// - umożliwiać odczyt liczby zapisanych rekordów, uwzględniając usunięte segmenty.
 /// - umożliwiać zapis danych w trybie aktualizacji (update-in-place) w ramach segmentu, jeśli pozycja jest określona.
 /// - zapewniać, że nazwa zwracana przez name() jest zgodna z aktualnym segmentem, jeśli retencja jest włączona, lub podstawową nazwą pliku, jeśli retencja jest wyłączona.
-/// - w przypadku żądania zapisu danych z nullptr i position 0, usuwać wszystkie segmenty i ich pliki cienia, resetując stan grupy do początkowego.
+/// - w przypadku zapisu danych z nullptr i pozycją 0, usuwać wszystkie segmenty i ich pliki cienia (jeśli istnieją), resetując stan obiektu do stanu początkowego.
+/// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów w bieżącym katalogu: odnajdywać spójny, ciągły przyrostek sekwencji segmentów kończący się na segmencie o najwyższym indeksie, ograniczać liczbę odtworzonych segmentów do retention_.segments (jeśli ustawione), oraz rekonstruować wartość removedSegments_ na podstawie indeksu pierwszego odtworzonego segmentu.
+
 namespace rdb {
 
 template <typename T = posixBinaryFileWithShadow>
