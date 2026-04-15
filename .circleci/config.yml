@@ -40,7 +40,7 @@ workflows:
     triggers:
       - schedule:
           # 0 19 * * 1
-          # At 19:00 on Monday..
+          # At 19:00 on Monday.
           cron: "0 19 * * 1"
           filters:
             branches:
@@ -69,13 +69,14 @@ executors:
 
   ubuntu-docker:
     docker:
-      - image: cimg/base:2025.09
+      # Use 'current' to always receive the latest security patches.
+      - image: cimg/base:current
     resource_class: large
 
   ubuntu-machine:
     machine:
       image: ubuntu-2404:2025.09.1
-    resource_class: large 
+    resource_class: large
 
   ubuntu-machine-arm:
     machine:
@@ -83,6 +84,62 @@ executors:
     resource_class: arm.large
 
 commands:
+  # ------------------------------------------------------------------
+  # Cache helpers
+  # ------------------------------------------------------------------
+  restore-conan-cache:
+    parameters:
+      cache_key:
+        type: string
+        default: "conan-v1-{{ arch }}-{{ checksum \"conanfile.py\" }}"
+    steps:
+      - restore_cache:
+          keys:
+            - << parameters.cache_key >>
+            - conan-v1-{{ arch }}-
+
+  save-conan-cache:
+    parameters:
+      cache_key:
+        type: string
+        default: "conan-v1-{{ arch }}-{{ checksum \"conanfile.py\" }}"
+    steps:
+      - save_cache:
+          key: << parameters.cache_key >>
+          paths:
+            - ~/.conan2/p
+
+  restore-apt-cache:
+    steps:
+      - restore_cache:
+          keys:
+            - apt-v1-{{ arch }}-{{ .Branch }}
+            - apt-v1-{{ arch }}-
+
+  save-apt-cache:
+    steps:
+      - save_cache:
+          key: apt-v1-{{ arch }}-{{ .Branch }}
+          paths:
+            - /var/cache/apt/archives
+
+  restore-venv-cache:
+    steps:
+      - restore_cache:
+          keys:
+            - venv-conan-v1-{{ arch }}-{{ checksum \"conanfile.py\" }}
+            - venv-conan-v1-{{ arch }}-
+
+  save-venv-cache:
+    steps:
+      - save_cache:
+          key: venv-conan-v1-{{ arch }}-{{ checksum \"conanfile.py\" }}
+          paths:
+            - .venv
+
+  # ------------------------------------------------------------------
+  # Build commands
+  # ------------------------------------------------------------------
   prep-env:
     parameters:
       gcc_version:
@@ -98,21 +155,40 @@ commands:
         type: string
         default: "make"
     steps:
+      - restore-apt-cache
       - run:
-          name: Install toolchain - conan 2.0
+          name: Install system toolchain
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz lcov gcovr xxd
-            python3 -m venv .venv
+            sudo apt-get -y install \
+              << parameters.gcc_version >> \
+              cmake \
+              << parameters.build_package >> \
+              build-essential \
+              python3 python3-pip python3-venv \
+              valgrind cppcheck mold graphviz lcov gcovr xxd
+      - save-apt-cache
+      - restore-venv-cache
+      - run:
+          name: Create Python venv and install Conan
+          command: |
+            if [ ! -d .venv ]; then
+              python3 -m venv .venv
+            fi
             source .venv/bin/activate
-            pip3 install --upgrade pip 
-            pip3 install conan
-            if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect && echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default && echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default ; fi
+            pip install --quiet conan
+            if [ ! -f ~/.conan2/profiles/default ]; then
+              conan profile detect
+              echo '<< parameters.conan_profile1 >>' >> ~/.conan2/profiles/default
+              echo '<< parameters.conan_profile2 >>' >> ~/.conan2/profiles/default
+            fi
             conan profile show
+      - save-venv-cache
+
   conan-install:
     parameters:
-      build_type: 
+      build_type:
         type: string
         default: "Release"
       build_param:
@@ -122,15 +198,17 @@ commands:
         type: string
         default: "make"
     steps:
+      - restore-conan-cache
       - run:
           name: Conan install
           command: |
             source .venv/bin/activate
-            conan source .
-            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
+            conan install . -s build_type=<< parameters.build_type >> << parameters.build_param >>
+      - save-conan-cache
+
   conan-build:
     parameters:
-      build_type: 
+      build_type:
         type: string
         default: "Release"
       build_param:
@@ -141,11 +219,12 @@ commands:
         default: "make"
     steps:
       - run:
-          name: Conan build; <<parameters.build_tool>> install
+          name: "Conan build (<< parameters.build_tool >>)"
           command: |
             source .venv/bin/activate
-            conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> install
+            conan build . -s build_type=<< parameters.build_type >> << parameters.build_param >>
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> install
+
   run-test:
     parameters:
       build_type:
@@ -159,7 +238,7 @@ commands:
           name: Smoke test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> showelf
             xretractor -h
             xqry -h
             xtrdb -h
@@ -167,9 +246,10 @@ commands:
           name: Regression & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>>/test && ctest -V --output-junit test_results.xml
+            cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
       - store_test_results:
-          path: build/<<parameters.build_type>>/test
+          path: build/<< parameters.build_type >>/test
+
   run-cppcheck:
     parameters:
       build_type:
@@ -182,7 +262,8 @@ commands:
       - run:
           name: Static analysis
           command: |
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> cppcheck
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> cppcheck
+
   run-package:
     parameters:
       build_type:
@@ -195,7 +276,7 @@ commands:
       - run:
           name: Package
           command: |
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> packages
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> packages
 
 jobs:
   build-release-ninja-mydocker:
@@ -250,10 +331,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - prep-env:
-          build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+      - prep-env
       - conan-install:
           build_param: --build missing
       - conan-build:
@@ -267,10 +345,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - prep-env:
-          build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+      - prep-env
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -280,8 +355,7 @@ jobs:
       - run-test:
           build_type: Debug
       - run-package:
-          build_type: Debug 
-          
+          build_type: Debug
 
   build-debug-ninja:
     working_directory: ~/retractordb
@@ -321,21 +395,18 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - prep-env:
-          build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+      - prep-env
       - conan-install:
-          build_type: <<parameters.build_type>>
+          build_type: << parameters.build_type >>
           build_param: --build missing
       - conan-build:
-          build_type: <<parameters.build_type>>
+          build_type: << parameters.build_type >>
           build_param: --build missing
       - run:
           name: Smoke test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> showelf
             xretractor -h
             xqry -h
             xtrdb -h
@@ -343,4 +414,6 @@ jobs:
           name: Regression & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>>/test && ctest -V
+            cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
+      - store_test_results:
+          path: build/<< parameters.build_type >>/test
