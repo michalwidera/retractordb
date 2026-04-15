@@ -8,9 +8,19 @@
 #include <string>
 #include <vector>
 
+#include "rdb/descriptor.hpp"
 #include "rdb/faccposixshd.hpp"
 
 typedef unsigned char BYTE;
+
+// Helper: create a single-field Descriptor of given byte size
+static rdb::Descriptor makeDesc(size_t size) {
+  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
+}
+
+static rdb::Descriptor makeDescInt(size_t size) {
+  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::INTEGER);
+}
 
 // ctest -R '^ut-test_faccposixshd' -V
 
@@ -68,6 +78,7 @@ class ShadowFileTest : public ::testing::Test {
   const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_faccposixshd";
   const std::string filename                = "test_file";
   const size_t recsize                      = sizeof(BYTE);
+  const rdb::Descriptor desc                = makeDesc(sizeof(BYTE));
 
   void SetUp() override {
     g_pread_eintr_count = 0;
@@ -104,7 +115,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_append_to_main) {
   BYTE record;
   auto path = sandboxPath("shd_main");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 0xAA;
   GTEST_ASSERT_EQ(shd->write(&record), EXIT_SUCCESS);
@@ -128,7 +139,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_to_shadow) {
   BYTE record;
   auto path = sandboxPath("shd_update");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   // Append 3 records
   record = 10;
@@ -166,7 +177,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_multiple_updates_same_pos) {
   BYTE record;
   auto path = sandboxPath("shd_multi");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 10;
   shd->write(&record);
@@ -195,7 +206,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_merge) {
   BYTE record;
   auto path = sandboxPath("shd_merge");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 10;
   shd->write(&record);
@@ -236,7 +247,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_truncate) {
   BYTE record;
   auto path = sandboxPath("shd_trunc");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 10;
   shd->write(&record);
@@ -254,7 +265,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_count_ignores_shadow) {
   BYTE record;
   auto path = sandboxPath("shd_count");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 1;
   shd->write(&record);
@@ -275,7 +286,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_empty_file) {
   BYTE record = 0xFF;
   auto path   = sandboxPath("shd_empty");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   GTEST_ASSERT_EQ(shd->count(), 0);
   GTEST_ASSERT_NE(std::filesystem::exists(path), 0);
@@ -286,7 +297,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_beyond_eof) {
   BYTE record;
   auto path = sandboxPath("shd_beyond");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 0xAA;
   shd->write(&record);
@@ -300,7 +311,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_shadow_entry_format) {
   BYTE record;
   auto path = sandboxPath("shd_fmt");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 0x10;
   shd->write(&record);
@@ -328,7 +339,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_multibyte_record) {
   const size_t multiRecSize = 4;
   auto path                 = sandboxPath("shd_multi_rec");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, multiRecSize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, makeDescInt(multiRecSize));
 
   uint8_t rec1[4] = {0x01, 0x02, 0x03, 0x04};
   uint8_t rec2[4] = {0x0A, 0x0B, 0x0C, 0x0D};
@@ -364,7 +375,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_persistence) {
   auto path = sandboxPath("shd_persist");
 
   {
-    auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+    auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
     record   = 0x10;
     shd->write(&record);
     record = 0x20;
@@ -375,7 +386,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_persistence) {
   }  // close files
 
   // Reopen and verify shadow state persists
-  auto shd2 = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd2 = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   GTEST_ASSERT_EQ(shd2->read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x99);  // from shadow
@@ -389,7 +400,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_merge_multiple_updates_same_pos) {
   BYTE record;
   auto path = sandboxPath("shd_merge_multi");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 0xAA;
   shd->write(&record);
@@ -421,7 +432,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_write_after_merge) {
   BYTE record;
   auto path = sandboxPath("shd_postmerge");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 0x10;
   shd->write(&record);
@@ -454,7 +465,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_write_after_merge) {
 // Verify name() returns the correct filename
 TEST_F(ShadowFileTest, test_faccposixshd_name) {
   auto path = sandboxPath("shd_name");
-  auto shd  = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd  = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   GTEST_ASSERT_EQ(shd->name(), path);
 }
@@ -464,7 +475,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_shadow_not_created_on_append_only) {
   BYTE record;
   auto path = sandboxPath("shd_appendonly");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   for (BYTE i = 0; i < 10; ++i) {
     record = i;
@@ -480,7 +491,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_merge_empty_shadow) {
   BYTE record;
   auto path = sandboxPath("shd_merge_empty");
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   record = 0xAA;
   shd->write(&record);
@@ -509,7 +520,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_main_file) 
     out.write(reinterpret_cast<const char *>(raw), sizeof(raw));
   }
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, multiRecSize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, makeDescInt(multiRecSize));
 
   // Constructor should truncate the trailing byte and restore consistent record state
   GTEST_ASSERT_EQ(filesize(path), static_cast<std::ifstream::pos_type>(4));
@@ -553,7 +564,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file
     out.write(reinterpret_cast<const char *>(&garbage), sizeof(garbage));
   }
 
-  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, recsize);
+  auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
   const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);
   GTEST_ASSERT_EQ(filesize(path + ".shadow"), expectedShadowSize);
@@ -570,7 +581,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file
 
 // shadow read(): EINTR within retry limit on fallback pread
 TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_within_limit_succeeds) {
-  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_ok"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_ok"), makeDesc(sizeof(uint8_t)));
 
   uint8_t data = 0xAA;
   ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append to main
@@ -583,7 +594,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_within_limit_succeeds) {
 
 // shadow read(): EINTR exceeding retry limit on fallback pread
 TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_exceeds_limit_fails) {
-  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_fail"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_r_fail"), makeDesc(sizeof(uint8_t)));
 
   uint8_t data = 0xAA;
   ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);  // append to main
@@ -595,7 +606,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_eintr_exceeds_limit_fails) {
 
 // shadow append write(): EINTR within retry limit
 TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_within_limit_succeeds) {
-  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_ok"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_ok"), makeDesc(sizeof(uint8_t)));
 
   g_write_eintr_count = 5;  // retries 1..5, 6th succeeds
   uint8_t data        = 0xBB;
@@ -608,7 +619,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_within_limit_succeed
 
 // shadow append write(): EINTR exceeding retry limit
 TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_exceeds_limit_fails) {
-  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_fail"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_aw_fail"), makeDesc(sizeof(uint8_t)));
 
   g_write_eintr_count = 10;
   uint8_t data        = 0xCC;
@@ -617,7 +628,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_append_write_eintr_exceeds_limit_fails)
 
 // shadow update write(): keeps behavior for update path in shadow file
 TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_within_limit_succeeds) {
-  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_ok"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_ok"), makeDesc(sizeof(uint8_t)));
 
   uint8_t data = 0xAA;
   ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
@@ -633,7 +644,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_within_limit_succeed
 
 // shadow update write(): EINTR exceeding retry limit
 TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails) {
-  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_fail"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFileWithShadow>(sandboxPath("shd_eintr_uw_fail"), makeDesc(sizeof(uint8_t)));
 
   uint8_t data = 0xAA;
   ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);

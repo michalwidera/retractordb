@@ -81,13 +81,14 @@ textSourceRO::~textSourceRO() { myFile_.close(); }
 
 auto textSourceRO::name() -> std::string & { return filename_; }
 
-ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
+ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   auto markAllNullAndZero = [&](ssize_t status) {
     payload_->setNullBitset(std::vector<bool>(descriptor_.size(), true));
     std::fill(payload_->span().begin(), payload_->span().end(), 0);
     if (ptrData != nullptr) {
       std::memcpy(ptrData, payload_->span().data(), descriptor_.getSizeInBytes());
     }
+    nullBitset = payload_->getNullBitset();
     readCount_++;
     return status;
   };
@@ -180,6 +181,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position) {
 
   std::memcpy(ptrData, payload_->span().data(), descriptor_.getSizeInBytes());
 
+  nullBitset = payload_->getNullBitset();
   readCount_++;
 
   return EXIT_SUCCESS;

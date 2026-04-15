@@ -1,6 +1,9 @@
 #pragma once
 
+#include "descriptor.hpp"
 #include "fainterface.hpp"
+
+#include <memory>
 
 namespace rdb {
 
@@ -13,6 +16,9 @@ namespace rdb {
 /// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) dla operacji update, aby plik cienia był kompaktowy i znacznie mniejszy od głównego pliku danych.
 /// - udostępniać dane, jeśli istnieją z pliku cienia jako aktualny stan danych, umożliwiając odczyt i dalsze aktualizacje bez modyfikacji głównego pliku.
 /// - w przypadku wielokrotnych aktualizacji tej samej pozycji, zwracać dane z ostatniego zapisu (przeszukiwanie pliku cienia od końca).
+/// - implementować null-aware interfejs FileInterface: podstawowe metody wirtualne to `write(data, nullBitset, position)` i `read(data, nullBitset, position)`
+/// - przekazywać wektor null bitset do/z warstwy wywołującej; śledzenie wartości null jest zarządzane przez `storage::metaDataStream_`, a nie przez ten obiekt
+/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
@@ -48,11 +54,13 @@ class posixBinaryFileWithShadow : public FileInterface {
   ssize_t shadowFind(uint8_t *ptrData, size_t position);
 
  public:
-  posixBinaryFileWithShadow(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
+  posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~posixBinaryFileWithShadow() override;
 
-  ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  using FileInterface::write;
+  using FileInterface::read;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
 
   auto name() -> std::string & override;
   size_t count() override;

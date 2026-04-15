@@ -18,15 +18,22 @@ if [ -z "$3" ]
     exit 1
 fi
 
-pkill xretractor
+pkill xretractor 2>/dev/null
+sleep 1
 rm -f core*
 rm -f str*
 
 if ! xretractor $1 -c ; then exit 1 ; fi
 
-xretractor $1 -m 8000 &
+xretractor $1 -m 100 -k &
+XRETRACTOR_PID=$!
 
 sleep 1
+
+if ! kill -0 $XRETRACTOR_PID 2>/dev/null; then
+  echo "xretractor failed to start"
+  exit 1
+fi
 
 xqry -d
 xqry -s $2 -m 3
@@ -34,7 +41,6 @@ xqry -s $3 -m 3
 xqry -l
 xqry -k
 
-pkill xretractor ; true
-# Ensure that the script exits cleanly even if pkill fails
-# This is useful in CI environments where pkill might not find the process
-# and return a non-zero exit code.
+kill $XRETRACTOR_PID 2>/dev/null
+wait $XRETRACTOR_PID 2>/dev/null
+pkill xretractor 2>/dev/null; true

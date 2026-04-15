@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 
+#include "rdb/descriptor.hpp"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storageacc.hpp"
@@ -15,10 +16,15 @@
 
 const uint AREA_SIZE = 10;
 
+// Helper: build a single-field Descriptor matching AREA_SIZE bytes
+static rdb::Descriptor makeDesc(size_t size) {
+  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
+}
+
 template <typename T, typename K>
 bool test_1() {
   const int noPerCounter = -1;
-  K binary1("testfile-fstream", AREA_SIZE, noPerCounter);
+  K binary1("testfile-fstream", makeDesc(AREA_SIZE), noPerCounter);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
@@ -41,7 +47,7 @@ bool test_1() {
 template <typename T, typename K>
 bool test_2() {
   const int noPerCounter = -1;
-  K dataStore("testfile-fstream", AREA_SIZE, noPerCounter);
+  K dataStore("testfile-fstream", makeDesc(AREA_SIZE), noPerCounter);
   {
     T xData[AREA_SIZE];
     std::memcpy(xData, "test data", AREA_SIZE);
@@ -65,7 +71,7 @@ bool test_2() {
 template <typename T, typename K>
 bool test_3() {
   const int noPerCounter = -1;
-  K dataStore("testfile-fstream", AREA_SIZE, noPerCounter);
+  K dataStore("testfile-fstream", makeDesc(AREA_SIZE), noPerCounter);
   {
     T xData[AREA_SIZE];
 
@@ -243,6 +249,12 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
 
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
+  // Clean up any stale files from a previous failed run
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
+  std::filesystem::remove(metaFile);
+  std::filesystem::remove("./" + dataFile + ".shadow");
+
   {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
@@ -268,6 +280,7 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
   std::filesystem::remove(dataFile);
   std::filesystem::remove(descFile);
   std::filesystem::remove(metaFile);
+  std::filesystem::remove("./" + dataFile + ".shadow");
 }
 
 TEST(xrdb, storage_first_write_persists_first_meta_record) {

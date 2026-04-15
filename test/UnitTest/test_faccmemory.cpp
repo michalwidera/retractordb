@@ -2,7 +2,10 @@
 
 #include <string>
 
+#include "rdb/descriptor.hpp"
 #include "rdb/faccmemory.hpp"
+
+static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", size, 1, rdb::BYTE); }
 
 typedef unsigned char BYTE;
 
@@ -25,7 +28,7 @@ TEST(MemoryTest, test_faccmemory_infinite) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   record.data = 1;
   GTEST_ASSERT_EQ(mfa->write(&record.data), EXIT_SUCCESS);
@@ -64,7 +67,7 @@ TEST(MemoryTest, test_faccmemory_retention) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("MEMORY", 2);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   record.data = 1;
   GTEST_ASSERT_EQ(mfa->write(&record.data), EXIT_SUCCESS);
@@ -98,7 +101,7 @@ TEST(MemoryTest, test_faccmemory_multibyte_record) {
 
   auto recsize   = sizeof(int);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   record = 1000;
   GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
@@ -131,7 +134,7 @@ TEST(MemoryTest, test_faccmemory_update_in_place) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   record = 10;
   mfa->write(&record);
@@ -169,7 +172,7 @@ TEST(MemoryTest, test_faccmemory_name) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   EXPECT_EQ(mfa->name(), "test_file_memory_name");
 
@@ -182,7 +185,7 @@ TEST(MemoryTest, test_faccmemory_empty_count) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   GTEST_ASSERT_EQ(mfa->count(), 0);
 
@@ -198,7 +201,7 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("MEMORY", 3);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   // Write 4 records - no eviction (size checked before push: 0,1,2,3 are all <= 3)
   for (BYTE i = 1; i <= 4; i++) {
@@ -239,7 +242,7 @@ TEST(MemoryTest, test_faccmemory_read_beyond_bounds) {
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-  auto mfa       = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
   record = 10;
   mfa->write(&record);
@@ -273,7 +276,7 @@ TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
 
   {
-    auto mfa = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+    auto mfa = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
     record   = 0x42;
     mfa->write(&record);
     record = 0x43;
@@ -282,7 +285,7 @@ TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
   }  // mfa destroyed
 
   // New instance with same filename should see persisted data
-  auto mfa2 = std::make_unique<rdb::memoryFile>(filename, recsize, retention);
+  auto mfa2 = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
   GTEST_ASSERT_EQ(mfa2->count(), 2);
 
   GTEST_ASSERT_EQ(mfa2->read(&record, 0), EXIT_SUCCESS);

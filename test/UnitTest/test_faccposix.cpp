@@ -8,9 +8,15 @@
 #include <string>
 #include <vector>
 
+#include "rdb/descriptor.hpp"
 #include "rdb/faccposix.hpp"
 
 typedef unsigned char BYTE;
+
+// Helper: create a single-field Descriptor of given byte size (BYTE type)
+static rdb::Descriptor makeDesc(size_t size) {
+  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
+}
 
 // ctest -R '^ut-test_faccposix' -V
 
@@ -73,6 +79,7 @@ class PosixFileTest : public ::testing::Test {
   const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_faccposix";
   const std::string filename                = "test_file";
   const size_t recsize                      = sizeof(BYTE);
+  const rdb::Descriptor desc                = makeDesc(sizeof(BYTE));
 
   void SetUp() override {
     g_pread_eintr_count = 0;
@@ -108,7 +115,7 @@ class PosixFileTest : public ::testing::Test {
 TEST_F(PosixFileTest, test_faccposix_write_and_read) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_test"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_test"), desc);
 
   record = 0xAA;
   GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
@@ -133,7 +140,7 @@ TEST_F(PosixFileTest, test_faccposix_write_and_read) {
 TEST_F(PosixFileTest, test_faccposix_read_beyond_eof) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eof"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eof"), desc);
 
   record = 0x11;
   GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
@@ -147,7 +154,7 @@ TEST_F(PosixFileTest, test_faccposix_read_beyond_eof) {
 TEST_F(PosixFileTest, test_faccposix_read_empty_file) {
   BYTE record = 0xFF;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_empty"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_empty"), desc);
 
   GTEST_ASSERT_EQ(pfa->count(), 0);
   GTEST_ASSERT_EQ(pfa->read(&record, 0), EXIT_FAILURE);
@@ -157,7 +164,7 @@ TEST_F(PosixFileTest, test_faccposix_read_empty_file) {
 TEST_F(PosixFileTest, test_faccposix_truncate) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_trunc"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_trunc"), desc);
 
   record = 0x01;
   pfa->write(&record);
@@ -177,7 +184,7 @@ TEST_F(PosixFileTest, test_faccposix_truncate) {
 TEST_F(PosixFileTest, test_faccposix_update_in_place) {
   BYTE record;
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_update"), recsize);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_update"), desc);
 
   record = 10;
   pfa->write(&record);
@@ -210,7 +217,7 @@ TEST_F(PosixFileTest, test_faccposix_update_in_place) {
 // Verify name() returns the path passed at construction
 TEST_F(PosixFileTest, test_faccposix_name) {
   auto path = sandboxPath("posix_name");
-  auto pfa  = std::make_unique<rdb::posixBinaryFile>(path, recsize);
+  auto pfa  = std::make_unique<rdb::posixBinaryFile>(path, desc);
 
   EXPECT_EQ(pfa->name(), path);
 }
@@ -220,7 +227,7 @@ TEST_F(PosixFileTest, test_faccposix_multibyte_record) {
   int record;
   auto recsize_int = sizeof(int);
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_multi"), recsize_int);
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_multi"), rdb::Descriptor("f", static_cast<int>(recsize_int), 1, rdb::INTEGER));
 
   record = 1000;
   GTEST_ASSERT_EQ(pfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
@@ -245,7 +252,7 @@ TEST_F(PosixFileTest, test_faccposix_persistence) {
   auto path = sandboxPath("posix_persist");
 
   {
-    auto pfa = std::make_unique<rdb::posixBinaryFile>(path, recsize);
+    auto pfa = std::make_unique<rdb::posixBinaryFile>(path, desc);
     record   = 0x42;
     pfa->write(&record);
     record = 0x43;
@@ -253,7 +260,7 @@ TEST_F(PosixFileTest, test_faccposix_persistence) {
   }  // destructor closes file
 
   // Reopen and verify data persists
-  auto pfa2 = std::make_unique<rdb::posixBinaryFile>(path, recsize);
+  auto pfa2 = std::make_unique<rdb::posixBinaryFile>(path, desc);
   GTEST_ASSERT_EQ(pfa2->count(), 2);
 
   GTEST_ASSERT_EQ(pfa2->read(&record, 0), EXIT_SUCCESS);
@@ -265,7 +272,7 @@ TEST_F(PosixFileTest, test_faccposix_persistence) {
 
 // read(): EINTR within retry limit (4 failures, 5th attempt succeeds)
 TEST_F(PosixFileTest, test_faccposix_read_eintr_within_limit_succeeds) {
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_r_ok"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_r_ok"), makeDesc(sizeof(uint8_t)));
 
   uint8_t data = 0xAA;
   ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
@@ -278,7 +285,7 @@ TEST_F(PosixFileTest, test_faccposix_read_eintr_within_limit_succeeds) {
 
 // read(): EINTR exceeding retry limit (all 5 attempts are EINTR)
 TEST_F(PosixFileTest, test_faccposix_read_eintr_exceeds_limit_fails) {
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_r_fail"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_r_fail"), makeDesc(sizeof(uint8_t)));
 
   uint8_t data = 0xAA;
   ASSERT_EQ(pfa->write(&data), EXIT_SUCCESS);
@@ -290,7 +297,7 @@ TEST_F(PosixFileTest, test_faccposix_read_eintr_exceeds_limit_fails) {
 
 // write(): EINTR within retry limit (5 failures, 6th attempt succeeds)
 TEST_F(PosixFileTest, test_faccposix_write_eintr_within_limit_succeeds) {
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_w_ok"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_w_ok"), makeDesc(sizeof(uint8_t)));
 
   g_write_eintr_count = 5;  // maxRetries is 5 -> retries 1..5 allowed, 6th succeeds
   uint8_t data        = 0xBB;
@@ -303,7 +310,7 @@ TEST_F(PosixFileTest, test_faccposix_write_eintr_within_limit_succeeds) {
 
 // write(): EINTR exceeding retry limit (6+ failures -> gives up)
 TEST_F(PosixFileTest, test_faccposix_write_eintr_exceeds_limit_fails) {
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_w_fail"), sizeof(uint8_t));
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_eintr_w_fail"), makeDesc(sizeof(uint8_t)));
 
   g_write_eintr_count = 10;  // well above maxRetries
   uint8_t data        = 0xCC;

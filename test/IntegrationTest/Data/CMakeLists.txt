@@ -36,4 +36,5 @@ add_test(
   COMMAND ./test-workflow.sh query-all.rql str2 str2)
 
 set_tests_properties(${TestID}-waterfall ${TestID}-workflow
-                     ${TestID}-all-operators PROPERTIES RUN_SERIAL TRUE)
+                     ${TestID}-all-operators PROPERTIES RUN_SERIAL TRUE
+                     TIMEOUT 30)

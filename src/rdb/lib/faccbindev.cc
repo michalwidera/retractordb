@@ -30,12 +30,13 @@ binaryDeviceRO::~binaryDeviceRO() {
 
 auto binaryDeviceRO::name() -> std::string & { return filename_; }
 
-ssize_t binaryDeviceRO::read(uint8_t *ptrData, const size_t position) {
+ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   auto markAllNullAndZero = [&](ssize_t status) {
     lastNullBitset_.assign(descriptor_.size(), true);
     if (ptrData != nullptr) {
       std::memset(ptrData, 0, recordSize_);
     }
+    nullBitset = lastNullBitset_;
     cnt_++;
     return status;
   };
@@ -60,6 +61,7 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, const size_t position) {
     }
   }
   lastNullBitset_.assign(descriptor_.size(), false);
+  nullBitset = lastNullBitset_;
   cnt_++;
   return EXIT_SUCCESS;
 }

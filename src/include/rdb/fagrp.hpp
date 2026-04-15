@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "descriptor.hpp"
 #include "faccposix.hpp"
 #include "faccposixshd.hpp"
 #include "retention.hpp"
@@ -15,6 +16,9 @@
 /// - usuwać najstarszy segment (i jego plik cienia) po przekroczeniu liczby segmentów.
 /// - obsługiwać odczyt i zapis danych z/do odpowiednich segmentów na podstawie pozycji.
 /// - umożliwiać tryb bez retencji, gdzie wszystkie dane są zapisywane do pojedynczego pliku.
+/// - implementować null-aware interfejs FileInterface: `write(data, nullBitset, position)` i `read(data, nullBitset, position)` są podstawowymi metodami wirtualnymi.
+/// - propagować wektor null bitset do/z segmentu T poprzez polimorficzne wywołanie wirtualne `static_cast<FileInterface*>(segment)->read/write(data, nullBitset, position)`.
+/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
 /// - dostarczać usługi zgodne z interfejsem FileInterface.
 /// - zapewniać, że operacje odczytu i zapisu są poprawnie kierowane do segmentów zgodnie z ustawieniami retencji.
 /// - zarządzać stanem segmentów i ich rotacją w sposób spójny z polityką retencji.
@@ -30,6 +34,7 @@ template <typename T = posixBinaryFileWithShadow>
 class groupFile : public FileInterface {
   std::string filename_;
   std::string currentFilename_;
+  Descriptor descriptor_;
   const ssize_t recordSize_;
 
   retention_t retention_{0, 0};
@@ -44,11 +49,13 @@ class groupFile : public FileInterface {
   int percounter_;
 
  public:
-  groupFile(const std::string_view fileName, const ssize_t recordSize, const retention_t &retention, int percounter);
+  groupFile(const std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter);
   ~groupFile() override;
 
-  ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  using FileInterface::write;
+  using FileInterface::read;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
   ssize_t purge();
 
   auto name() -> std::string & override;
