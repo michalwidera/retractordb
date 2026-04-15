@@ -9,12 +9,13 @@
 #include <vector>
 
 static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
+static std::map<std::string, std::vector<std::vector<bool>>> memoryNullStorage;
 
 namespace rdb {
 
 auto memoryFile::name() -> std::string & { return filename_; }
 
-ssize_t memoryFile::write(const uint8_t *ptrData, const size_t position) {
+ssize_t memoryFile::writeRaw(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   auto location = position / recordSize_;
   // If ptrData is null, clear the storage and reset removed_count
@@ -48,7 +49,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-ssize_t memoryFile::read(uint8_t *ptrData, const size_t position) {
+ssize_t memoryFile::readRaw(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   auto location = position / recordSize_;
   if (location < removed_count_) {
@@ -71,5 +72,34 @@ ssize_t memoryFile::read(uint8_t *ptrData, const size_t position) {
 }
 
 size_t memoryFile::count() { return memoryStorage[filename_].size() + removed_count_; }
+
+ssize_t memoryFile::write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) {
+  ssize_t result = writeRaw(ptrData, position);
+  if (result == EXIT_SUCCESS && ptrData != nullptr) {
+    if (position == std::numeric_limits<size_t>::max()) {
+      memoryNullStorage[filename_].push_back(nullBitset);
+    } else {
+      const size_t location         = position / recordSize_;
+      const size_t adjustedLocation = location - removed_count_;
+      if (adjustedLocation < memoryNullStorage[filename_].size()) {
+        memoryNullStorage[filename_][adjustedLocation] = nullBitset;
+      }
+    }
+  }
+  return result;
+}
+
+ssize_t memoryFile::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
+  ssize_t result            = readRaw(ptrData, position);
+  const size_t location     = position / recordSize_;
+  const size_t adjustedLoc  = location - removed_count_;
+  auto &nullVec             = memoryNullStorage[filename_];
+  if (result == EXIT_SUCCESS && adjustedLoc < nullVec.size()) {
+    nullBitset = nullVec[adjustedLoc];
+  } else {
+    nullBitset.clear();
+  }
+  return result;
+}
 
 }  // namespace rdb

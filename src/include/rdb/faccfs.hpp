@@ -1,6 +1,9 @@
 #pragma once
 
+#include "descriptor.hpp"
 #include "fainterface.hpp"
+
+#include <memory>
 
 namespace rdb {
 /**
@@ -17,14 +20,20 @@ struct genericBinaryFile : public FileInterface {
   int percounter_;
 
  public:
-  genericBinaryFile(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
+  genericBinaryFile(const std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~genericBinaryFile() override;
 
-  ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  using FileInterface::write;
+  using FileInterface::read;
+  ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) override;
+  ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) override;
 
   auto name() -> std::string & override;
   size_t count() override;
+
+ private:
+  ssize_t readRaw(uint8_t *ptrData, const size_t position);
+  ssize_t writeRaw(const uint8_t *ptrData, const size_t position);
 
   genericBinaryFile()                                           = delete;
   genericBinaryFile(const genericBinaryFile &)                  = delete;

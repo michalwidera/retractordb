@@ -43,8 +43,10 @@ class textSourceRO : public FileInterface {
 
   ~textSourceRO() override;
 
-  ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override {
+  using FileInterface::write;
+  using FileInterface::read;
+  ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) override;
+  ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) override {
     return EXIT_FAILURE;
   }
 

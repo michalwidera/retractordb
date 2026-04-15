@@ -1,6 +1,9 @@
 #pragma once
 
+#include "descriptor.hpp"
 #include "fainterface.hpp"
+
+#include <memory>
 
 namespace rdb {
 
@@ -48,16 +51,22 @@ class posixBinaryFileWithShadow : public FileInterface {
   ssize_t shadowFind(uint8_t *ptrData, size_t position);
 
  public:
-  posixBinaryFileWithShadow(const std::string_view fileName, const ssize_t recordSize, int percounter = -1);
+  posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~posixBinaryFileWithShadow() override;
 
-  ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  using FileInterface::write;
+  using FileInterface::read;
+  ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) override;
+  ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) override;
 
   auto name() -> std::string & override;
   size_t count() override;
 
   /// @brief Scala plik cienia z głównym plikiem i usuwa plik cienia
   ssize_t merge();
+
+ private:
+  ssize_t readRaw(uint8_t *ptrData, const size_t position);
+  ssize_t writeRaw(const uint8_t *ptrData, const size_t position);
 };
 }  // namespace rdb

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <memory>
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -16,10 +17,10 @@ namespace rdb {
 
 genericBinaryFile::genericBinaryFile(  //
     const std::string_view fileName,   //
-    const ssize_t recordSize,          //
+    const Descriptor &descriptor,      //
     int percounter)                    //
     : filename_(std::string(fileName)),
-      recordSize_(recordSize),
+      recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {}
 
 genericBinaryFile::~genericBinaryFile() {
@@ -32,7 +33,7 @@ genericBinaryFile::~genericBinaryFile() {
 
 auto genericBinaryFile::name() -> std::string & { return filename_; }
 
-ssize_t genericBinaryFile::write(const uint8_t *ptrData, const size_t position) {
+ssize_t genericBinaryFile::writeRaw(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -63,7 +64,7 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const size_t position) 
   return EXIT_SUCCESS;
 }
 
-ssize_t genericBinaryFile::read(uint8_t *ptrData, const size_t position) {
+ssize_t genericBinaryFile::readRaw(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
@@ -89,6 +90,15 @@ ssize_t genericBinaryFile::read(uint8_t *ptrData, const size_t position) {
 size_t genericBinaryFile::count() {
   std::ifstream in(filename_, std::ifstream::ate | std::ifstream::binary);
   return in.tellg() / recordSize_;
+}
+
+ssize_t genericBinaryFile::write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) {
+  return writeRaw(ptrData, position);
+}
+
+ssize_t genericBinaryFile::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
+  nullBitset.clear();
+  return readRaw(ptrData, position);
 }
 
 }  // namespace rdb

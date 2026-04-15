@@ -36,18 +36,19 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 // fagrp.hpp -> typedef std::pair<segments_t, capacity_t> retention_t;
 template <typename T>
 groupFile<T>::groupFile(const std::string_view fileName,  //
-                        const ssize_t recordSize,         //
+                        const Descriptor &descriptor,     //
                         const retention_t &retention,     //
                         int percounter)                   //
     : filename_(std::string(fileName)),
-      recordSize_(recordSize),
+      descriptor_(descriptor),
+      recordSize_(descriptor.getSizeInBytes()),
       retention_(retention),
       percounter_(percounter) {
   writeCount_      = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
 
   if (retention.noRetention()) {
-    vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
+    vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
   } else {
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? 8 : retention_.segments);
@@ -88,7 +89,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
     for (const auto i : restoredSegments) {
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-      vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
+      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
       SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount_ = vec_.back()->count();
     }
@@ -118,7 +119,7 @@ ssize_t groupFile<T>::purge() {
   currentSegment_  = 0;
   removedSegments_ = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-  vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
+  vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
 
   spdlog::info("Purged all segments and reset group state.");
   assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
@@ -128,7 +129,7 @@ ssize_t groupFile<T>::purge() {
 }
 
 template <typename T>
-ssize_t groupFile<T>::write(const uint8_t *ptrData, const size_t position) {
+ssize_t groupFile<T>::writeRaw(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
 
   // Keep backward compatibility: special write request triggers full purge.
@@ -148,7 +149,7 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const size_t position) {
 
       spdlog::info("Rotating segments: currentSegment={}", currentSegment_);
 
-      vec_.push_back(std::make_unique<T>(name(), recordSize_, percounter_));
+      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
       writeCount_ = 0;
 
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
@@ -185,7 +186,7 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const size_t position) {
 }
 
 template <typename T>
-ssize_t groupFile<T>::read(uint8_t *ptrData, const size_t position) {
+ssize_t groupFile<T>::readRaw(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   if (retention_.noRetention()) return vec_[0]->read(ptrData, position);
 
@@ -204,6 +205,72 @@ ssize_t groupFile<T>::read(uint8_t *ptrData, const size_t position) {
   }
 
   return vec_[localSegmentIndex]->read(ptrData, positionInSegment);
+}
+
+template <typename T>
+ssize_t groupFile<T>::write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) {
+  assert(recordSize_ != 0);
+
+  if (ptrData == nullptr && position == 0) {
+    return purge();
+  }
+
+  if (retention_.noRetention()) return static_cast<FileInterface *>(vec_[0].get())->write(ptrData, position, nullBitset);
+
+  assert(retention_.capacity != 0);
+
+  if (position == std::numeric_limits<size_t>::max()) {
+    if (writeCount_ >= retention_.capacity) {
+      currentSegment_++;
+      currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
+      spdlog::info("Rotating segments: currentSegment={}", currentSegment_);
+      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      writeCount_ = 0;
+      if (retention_.segments != 0 && vec_.size() > retention_.segments) {
+        auto segmentToRemove = vec_.front()->name();
+        spdlog::info("Removing oldest segment: {}", segmentToRemove);
+        std::filesystem::remove(segmentToRemove);
+        if (std::filesystem::exists(segmentToRemove + ".shadow")) std::filesystem::remove(segmentToRemove + ".shadow");
+        vec_.erase(vec_.begin());
+        removedSegments_++;
+        assert(vec_.size() > 0);
+      }
+    }
+    const auto rc =
+        static_cast<FileInterface *>(vec_[currentSegment_ - removedSegments_].get())->write(ptrData, position, nullBitset);
+    if (rc == EXIT_SUCCESS) {
+      writeCount_++;
+    }
+    return rc;
+  }
+
+  auto segmentIndex      = position / retention_.capacity;
+  auto positionInSegment = position % retention_.capacity;
+
+  if (segmentIndex < removedSegments_) return EXIT_FAILURE;
+
+  const auto localSegmentIndex = segmentIndex - removedSegments_;
+  if (localSegmentIndex >= vec_.size()) return EXIT_FAILURE;
+
+  return static_cast<FileInterface *>(vec_[localSegmentIndex].get())->write(ptrData, positionInSegment, nullBitset);
+}
+
+template <typename T>
+ssize_t groupFile<T>::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
+  assert(recordSize_ != 0);
+  if (retention_.noRetention()) return static_cast<FileInterface *>(vec_[0].get())->read(ptrData, position, nullBitset);
+
+  assert(retention_.capacity != 0);
+
+  auto segmentIndex      = position / retention_.capacity;
+  auto positionInSegment = position % retention_.capacity;
+
+  if (segmentIndex < removedSegments_) return EXIT_FAILURE;
+
+  const auto localSegmentIndex = segmentIndex - removedSegments_;
+  if (localSegmentIndex >= vec_.size()) return EXIT_FAILURE;
+
+  return static_cast<FileInterface *>(vec_[localSegmentIndex].get())->read(ptrData, positionInSegment, nullBitset);
 }
 
 template <typename T>

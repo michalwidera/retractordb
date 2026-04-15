@@ -4,6 +4,7 @@
 #include <cstdint>      // uint8_t
 #include <limits>       // numeric_limits
 #include <string>
+#include <vector>
 
 namespace rdb {
 
@@ -25,17 +26,37 @@ namespace rdb {
 /// @note pozycja wyrażona jest w bajtach, a rozmiar danych jest określany przez descriptor klasy pochodnej i nie jest częścią tego interfejsu.
 
 struct FileInterface {
-  /// @brief Reads from storage amount of bytes into memory pointed by ptrData from position in storage
-  /// @param ptrData pointer to data in memory where data will be fetched from storage
-  /// @param position position from the beginning of file [unit: Bytes]
+  /// @brief Null-aware write: stores data and associated null bitset in the storage.
+  /// @param ptrData    pointer to data bytes; nullptr with position=0 triggers purge
+  /// @param position   byte position (std::numeric_limits<size_t>::max() = append)
+  /// @param nullBitset one bool per descriptor field, true = null
   /// @return status of operation - 0/EXIT_SUCCESS success
-  virtual ssize_t read(uint8_t *ptrData, const size_t position) = 0;
+  virtual ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) = 0;
 
-  /// @brief Updates or appends data in the storage
-  /// @param ptrData pointer to table of bytes in memory that will be updated in storage
-  /// @param position position from the beginning of file [unit: Bytes]. If max possible value - works as append.
+  /// @brief Null-aware read: retrieves data and fills nullBitset for the record.
+  /// @param ptrData    pointer to destination buffer
+  /// @param position   byte position
+  /// @param nullBitset output: one bool per descriptor field, true = null
   /// @return status of operation - 0/EXIT_SUCCESS success
-  virtual ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) = 0;
+  virtual ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) = 0;
+
+  /// @brief Convenience wrapper: Updates or appends data without null tracking.
+  /// @param ptrData  pointer to data bytes; nullptr with position=0 triggers purge
+  /// @param position byte position (max = append)
+  /// @return status of operation - 0/EXIT_SUCCESS success
+  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) {
+    std::vector<bool> ignored;
+    return write(ptrData, position, ignored);
+  }
+
+  /// @brief Convenience wrapper: Reads data without null tracking.
+  /// @param ptrData  pointer to destination buffer
+  /// @param position byte position
+  /// @return status of operation - 0/EXIT_SUCCESS success
+  ssize_t read(uint8_t *ptrData, const size_t position) {
+    std::vector<bool> ignored;
+    return read(ptrData, position, ignored);
+  }
 
   // following: https://stackoverflow.com/questions/51615363/how-to-write-c-getters-and-setters
   virtual auto name() -> std::string & = 0;

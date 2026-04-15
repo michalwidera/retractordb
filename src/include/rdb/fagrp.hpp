@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "descriptor.hpp"
 #include "faccposix.hpp"
 #include "faccposixshd.hpp"
 #include "retention.hpp"
@@ -30,6 +31,7 @@ template <typename T = posixBinaryFileWithShadow>
 class groupFile : public FileInterface {
   std::string filename_;
   std::string currentFilename_;
+  Descriptor descriptor_;
   const ssize_t recordSize_;
 
   retention_t retention_{0, 0};
@@ -44,15 +46,21 @@ class groupFile : public FileInterface {
   int percounter_;
 
  public:
-  groupFile(const std::string_view fileName, const ssize_t recordSize, const retention_t &retention, int percounter);
+  groupFile(const std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter);
   ~groupFile() override;
 
-  ssize_t read(uint8_t *ptrData, const size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) override;
+  using FileInterface::write;
+  using FileInterface::read;
+  ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) override;
+  ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) override;
   ssize_t purge();
 
   auto name() -> std::string & override;
   size_t count() override;
+
+ private:
+  ssize_t readRaw(uint8_t *ptrData, const size_t position);
+  ssize_t writeRaw(const uint8_t *ptrData, const size_t position);
 };
 
 template class groupFile<posixBinaryFileWithShadow>;

@@ -11,10 +11,10 @@
 namespace rdb {
 
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
-                                 const ssize_t recordSize,         //
+                                 const Descriptor &descriptor,     //
                                  int percounter)                   //
     : filename_(std::string(fileName)),
-      recordSize_(recordSize),
+      recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
   assert(recordSize_ > 0);
 
@@ -75,7 +75,7 @@ posixBinaryFile::~posixBinaryFile() {
 
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
-ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFile::writeRaw(const uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;  // Error status
@@ -116,7 +116,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position) {
   return EXIT_SUCCESS;
 }
 
-ssize_t posixBinaryFile::read(uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFile::readRaw(uint8_t *ptrData, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return fd;
@@ -148,6 +148,15 @@ size_t posixBinaryFile::count() {
     return -1;
   }
   return stat_buf.st_size / recordSize_;
+}
+
+ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) {
+  return writeRaw(ptrData, position);
+}
+
+ssize_t posixBinaryFile::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
+  nullBitset.clear();
+  return readRaw(ptrData, position);
 }
 
 }  // namespace rdb

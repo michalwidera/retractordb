@@ -182,21 +182,20 @@ bool storage::isDeclared() { return (storageType_ == "DEVICE") || (storageType_ 
 void storage::initializeAccessor() {
   assert(storageFile_ != "");
   assert(storageType_ != "");
-  auto size = descriptor.getSizeInBytes();
 
   if (storageType_ == "DEFAULT") {
-    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, size, descriptor.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, descriptor, descriptor.retention(), percounter_);
   } else if (storageType_ == "DIRECT") {
     accessor_ =
-        std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, size, descriptor.retention(), percounter_);
+        std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, descriptor, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
-    accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, size, descriptor.policy());
+    accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, descriptor, descriptor.policy());
   } else if (storageType_ == "POSIX") {
-    accessor_ = std::make_unique<rdb::posixBinaryFile>(storageFile_, size, percounter_);
+    accessor_ = std::make_unique<rdb::posixBinaryFile>(storageFile_, descriptor, percounter_);
   } else if (storageType_ == "POSIXSHD") {
-    accessor_ = std::make_unique<rdb::posixBinaryFileWithShadow>(storageFile_, size, percounter_);
+    accessor_ = std::make_unique<rdb::posixBinaryFileWithShadow>(storageFile_, descriptor, percounter_);
   } else if (storageType_ == "GENERIC") {
-    accessor_ = std::make_unique<rdb::genericBinaryFile>(storageFile_, size, percounter_);
+    accessor_ = std::make_unique<rdb::genericBinaryFile>(storageFile_, descriptor, percounter_);
   } else if (storageType_ == "DEVICE") {
     accessor_ = std::make_unique<rdb::binaryDeviceRO>(storageFile_, descriptor, !isOneShot_);
   } else if (storageType_ == "TEXTSOURCE") {
