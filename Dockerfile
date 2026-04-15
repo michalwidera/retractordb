@@ -3,7 +3,7 @@ FROM debian:trixie-slim
 
 LABEL com.retractordb.version="0.0.4"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-03-27"
+LABEL com.retractordb.release-date="2026-04-15"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -14,6 +14,7 @@ ENV TZ=UTC
 # Update package list and install essential packages
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     # GCC toolchain and build essentials
+    openssh-client \
     build-essential \
     gcc \
     g++ \

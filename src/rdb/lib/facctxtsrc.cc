@@ -81,7 +81,7 @@ textSourceRO::~textSourceRO() { myFile_.close(); }
 
 auto textSourceRO::name() -> std::string & { return filename_; }
 
-ssize_t textSourceRO::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
+ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   auto markAllNullAndZero = [&](ssize_t status) {
     payload_->setNullBitset(std::vector<bool>(descriptor_.size(), true));
     std::fill(payload_->span().begin(), payload_->span().end(), 0);

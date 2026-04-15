@@ -16,6 +16,9 @@
 /// - usuwać najstarszy segment (i jego plik cienia) po przekroczeniu liczby segmentów.
 /// - obsługiwać odczyt i zapis danych z/do odpowiednich segmentów na podstawie pozycji.
 /// - umożliwiać tryb bez retencji, gdzie wszystkie dane są zapisywane do pojedynczego pliku.
+/// - implementować null-aware interfejs FileInterface: `write(data, nullBitset, position)` i `read(data, nullBitset, position)` są podstawowymi metodami wirtualnymi.
+/// - propagować wektor null bitset do/z segmentu T poprzez polimorficzne wywołanie wirtualne `static_cast<FileInterface*>(segment)->read/write(data, nullBitset, position)`.
+/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
 /// - dostarczać usługi zgodne z interfejsem FileInterface.
 /// - zapewniać, że operacje odczytu i zapisu są poprawnie kierowane do segmentów zgodnie z ustawieniami retencji.
 /// - zarządzać stanem segmentów i ich rotacją w sposób spójny z polityką retencji.
@@ -51,16 +54,12 @@ class groupFile : public FileInterface {
 
   using FileInterface::write;
   using FileInterface::read;
-  ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) override;
-  ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) override;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
   ssize_t purge();
 
   auto name() -> std::string & override;
   size_t count() override;
-
- private:
-  ssize_t readRaw(uint8_t *ptrData, const size_t position);
-  ssize_t writeRaw(const uint8_t *ptrData, const size_t position);
 };
 
 template class groupFile<posixBinaryFileWithShadow>;

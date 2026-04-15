@@ -75,7 +75,20 @@ posixBinaryFile::~posixBinaryFile() {
 
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
-ssize_t posixBinaryFile::writeRaw(const uint8_t *ptrData, const size_t position) {
+size_t posixBinaryFile::count() {
+  if (!std::filesystem::exists(filename_)) {
+    return 0;
+  }
+  struct stat stat_buf;
+  int rc = stat(filename_.c_str(), &stat_buf);
+  if (rc != 0) {
+    SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
+    return -1;
+  }
+  return stat_buf.st_size / recordSize_;
+}
+
+ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;  // Error status
@@ -83,7 +96,6 @@ ssize_t posixBinaryFile::writeRaw(const uint8_t *ptrData, const size_t position)
   if (ptrData == nullptr && position == 0) {
     // nullptr, position 0,0 - truncate file.
     std::filesystem::remove(name());
-
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
@@ -116,7 +128,8 @@ ssize_t posixBinaryFile::writeRaw(const uint8_t *ptrData, const size_t position)
   return EXIT_SUCCESS;
 }
 
-ssize_t posixBinaryFile::readRaw(uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
+  nullBitset.clear();
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return fd;
@@ -135,28 +148,6 @@ ssize_t posixBinaryFile::readRaw(uint8_t *ptrData, const size_t position) {
   }
   SPDLOG_ERROR("::pread {} failed after {} EINTR retries", filename_, maxRetries);
   return EXIT_FAILURE;
-}
-
-size_t posixBinaryFile::count() {
-  if (!std::filesystem::exists(filename_)) {
-    return 0;
-  }
-  struct stat stat_buf;
-  int rc = stat(filename_.c_str(), &stat_buf);
-  if (rc != 0) {
-    SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
-    return -1;
-  }
-  return stat_buf.st_size / recordSize_;
-}
-
-ssize_t posixBinaryFile::write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) {
-  return writeRaw(ptrData, position);
-}
-
-ssize_t posixBinaryFile::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
-  nullBitset.clear();
-  return readRaw(ptrData, position);
 }
 
 }  // namespace rdb

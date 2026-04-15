@@ -19,26 +19,27 @@ namespace rdb {
 /// - dostarczający informacje o liczbie rekordów w magazynie, co jest istotne dla zarządzania danymi w storage.
 /// - w przypadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji, metoda count() może zwracać liczbę odczytów wykonanych na tym źródle danych.
 ///
-/// Oto trzy podstawowe operacje, które powinny być obsługiwane przez implementację tego interfejsu:/// 1. read ::= read(data, pozycja) :== odczyt danych z magazynu na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy pochodnej.
-/// 2. append :== write(data, maksymalna wartość size_t) :== dodawanie danych na końcu magazynu, traktując określoną wartość pozycji jako sygnał do operacji append.
-/// 3. update :== write(data, pozycja) :== aktualizacja danych w magazynie na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy pochodnej.
+/// Podstawowe operacje obsługiwane przez implementację tego interfejsu (podstawowy kontrakt polimorficzny wymaga nullBitset):
+/// 1. read   ::= read(data, nullBitset, pozycja) :== odczyt danych z magazynu na podstawie pozycji (w bajtach); wypełnia nullBitset informacją o wartościach null dla każdego pola.
+/// 2. append :== write(data, nullBitset, max_size_t) :== dodawanie danych na końcu magazynu z przekazaniem wektora wartości null.
+/// 3. update :== write(data, nullBitset, pozycja) :== aktualizacja danych w magazynie na podstawie pozycji z przekazaniem wektora wartości null.
 ///
 /// @note pozycja wyrażona jest w bajtach, a rozmiar danych jest określany przez descriptor klasy pochodnej i nie jest częścią tego interfejsu.
 
 struct FileInterface {
   /// @brief Null-aware write: stores data and associated null bitset in the storage.
   /// @param ptrData    pointer to data bytes; nullptr with position=0 triggers purge
-  /// @param position   byte position (std::numeric_limits<size_t>::max() = append)
   /// @param nullBitset one bool per descriptor field, true = null
+  /// @param position   byte position (std::numeric_limits<size_t>::max() = append)
   /// @return status of operation - 0/EXIT_SUCCESS success
-  virtual ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) = 0;
+  virtual ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) = 0;
 
   /// @brief Null-aware read: retrieves data and fills nullBitset for the record.
   /// @param ptrData    pointer to destination buffer
-  /// @param position   byte position
   /// @param nullBitset output: one bool per descriptor field, true = null
+  /// @param position   byte position
   /// @return status of operation - 0/EXIT_SUCCESS success
-  virtual ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) = 0;
+  virtual ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) = 0;
 
   /// @brief Convenience wrapper: Updates or appends data without null tracking.
   /// @param ptrData  pointer to data bytes; nullptr with position=0 triggers purge
@@ -46,7 +47,7 @@ struct FileInterface {
   /// @return status of operation - 0/EXIT_SUCCESS success
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) {
     std::vector<bool> ignored;
-    return write(ptrData, position, ignored);
+    return write(ptrData, ignored, position);
   }
 
   /// @brief Convenience wrapper: Reads data without null tracking.
@@ -55,7 +56,7 @@ struct FileInterface {
   /// @return status of operation - 0/EXIT_SUCCESS success
   ssize_t read(uint8_t *ptrData, const size_t position) {
     std::vector<bool> ignored;
-    return read(ptrData, position, ignored);
+    return read(ptrData, ignored, position);
   }
 
   // following: https://stackoverflow.com/questions/51615363/how-to-write-c-getters-and-setters

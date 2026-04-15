@@ -13,6 +13,8 @@ namespace rdb {
 /// Obiekt posixBinaryFile powinien:
 /// - umożliwiać odczyt i zapis danych do pliku binarnego
 /// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
+/// - implementować null-aware interfejs FileInterface: podstawowe metody wirtualne to `write(data, nullBitset, position)` i `read(data, nullBitset, position)`
+/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
@@ -35,14 +37,10 @@ class posixBinaryFile : public FileInterface {
 
   using FileInterface::write;
   using FileInterface::read;
-  ssize_t write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) override;
-  ssize_t read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) override;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
 
   auto name() -> std::string & override;
   size_t count() override;
-
- private:
-  ssize_t readRaw(uint8_t *ptrData, const size_t position);
-  ssize_t writeRaw(const uint8_t *ptrData, const size_t position);
 };
 }  // namespace rdb

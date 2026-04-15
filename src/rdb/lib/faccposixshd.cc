@@ -145,7 +145,7 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
 
 auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
-ssize_t posixBinaryFileWithShadow::writeRaw(const uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;
@@ -220,7 +220,8 @@ ssize_t posixBinaryFileWithShadow::writeRaw(const uint8_t *ptrData, const size_t
   return EXIT_SUCCESS;
 }
 
-ssize_t posixBinaryFileWithShadow::readRaw(uint8_t *ptrData, const size_t position) {
+ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
+  nullBitset.clear();
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return fd;
@@ -295,15 +296,6 @@ ssize_t posixBinaryFileWithShadow::merge() {
   }
   SPDLOG_INFO("Merged {} shadow entries into {}", numEntries, filename_);
   return EXIT_SUCCESS;
-}
-
-ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const size_t position, const std::vector<bool> &nullBitset) {
-  return writeRaw(ptrData, position);
-}
-
-ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, const size_t position, std::vector<bool> &nullBitset) {
-  nullBitset.clear();
-  return readRaw(ptrData, position);
 }
 
 }  // namespace rdb
