@@ -13,14 +13,14 @@ namespace rdb {
 /// Obiekt posixBinaryFile powinien:
 /// - umożliwiać odczyt i zapis danych do pliku binarnego
 /// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
-/// - implementować null-aware interfejs FileInterface: podstawowe metody wirtualne to `write(data, nullBitset, position)` i `read(data, nullBitset, position)`
-/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
+/// - klasa nie zapewnia obsługi wartości null.
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
 /// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
 /// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
 /// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych między uruchomieniami programu
+/// - jeśli parametr percounter jest nieujemny, przed zakończeniem życia obiektu plik powinien zostać przemianowany do postaci `<nazwa>.old<percounter>`, realizując mechanizm rotacji plików
 
 class posixBinaryFile : public FileInterface {
   std::string filename_;
