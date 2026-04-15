@@ -185,10 +185,10 @@ void storage::initializeAccessor() {
   auto size = descriptor.getSizeInBytes();
 
   if (storageType_ == "DEFAULT") {
-    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, size, descriptor.retention(), percounter_);
-  } else if (storageType_ == "SHADOW") {
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, size, descriptor.retention(), percounter_);
+  } else if (storageType_ == "DIRECT") {
     accessor_ =
-        std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, size, descriptor.retention(), percounter_);
+        std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, size, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
     accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, size, descriptor.policy());
   } else if (storageType_ == "POSIX") {

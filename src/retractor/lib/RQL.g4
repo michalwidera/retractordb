@@ -205,7 +205,7 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-TYPE_PROFILE:       'MEMORY'|'memory'|'DEFAULT'|'default'|'SHADOW'|'shadow'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
+TYPE_PROFILE:       'MEMORY'|'memory'|'DEFAULT'|'default'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
 STRING_PROFILE:    '\'' TYPE_PROFILE '\'';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;

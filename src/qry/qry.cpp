@@ -238,6 +238,8 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
   }
 
   std::vector<std::deque<std::string>> output_lines;
+  constexpr int serverTimeoutMs = 10000;  // 10 seconds without data = server dead
+  int noDataCounter = 0;
   try {
     while (!done) {
       if (_kbhit(vm.count("needctrlc"))) break;
@@ -330,9 +332,15 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
             }
             // This part is time limited (-m) resposbile
             if (timeLimitCntQry > 1) --timeLimitCntQry;
+            noDataCounter = 0;  // reset timeout on data received
           }
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      if (++noDataCounter > serverTimeoutMs) {
+        SPDLOG_WARN("No data received for {} ms, assuming server is dead.", serverTimeoutMs);
+        done = true;
+        break;
+      }
     }
     while (spsc_queue.pop(e_value) && !done)
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
