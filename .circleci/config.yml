@@ -11,6 +11,7 @@ workflows:
               only:
                 - master
                 - /issue_.*/
+                - /[0-9]+-.*/
 
   nightly-full:
     triggers:
