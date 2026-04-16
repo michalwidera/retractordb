@@ -207,7 +207,7 @@ void storage::initializeAccessor() {
   }
 }
 
-void storage::reset() {
+void storage::resetForUnitTest() {
   consecutiveNullCount_ = 0;
   activeGapDuration_    = 0;
   assert(storageFile_ != "");

@@ -220,7 +220,7 @@ TEST_F(xschema, getRow_1) {
   21 32
   22 33
   */
-  dataArea->qSet["core0"]->outputPayload->reset();
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 
   std::set<std::string> rowSet = {"core0"};
   dataArea->processZeroStep();
@@ -234,6 +234,6 @@ TEST_F(xschema, getRow_1) {
   EXPECT_TRUE("{ 20 31 }" == res1);
   EXPECT_TRUE("{ 21 32 }" == res2);
 
-  dataArea->qSet["core0"]->outputPayload->reset();
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 }
 }  // namespace

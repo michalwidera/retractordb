@@ -133,6 +133,6 @@ class storage {
   void configureGapDetection(boost::rational<int> rInterval, int nullFillCount = 2);
 
   // technical function - for unit tests
-  void reset();
+  void resetForUnitTest();
 };
 }  // namespace rdb
