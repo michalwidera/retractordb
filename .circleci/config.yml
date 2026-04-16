@@ -70,13 +70,14 @@ executors:
 
   ubuntu-docker:
     docker:
-      - image: cimg/base:2025.09
+      # Use 'current' to always receive the latest security patches.
+      - image: cimg/base:current
     resource_class: large
 
   ubuntu-machine:
     machine:
       image: ubuntu-2404:2025.09.1
-    resource_class: large 
+    resource_class: large
 
   ubuntu-machine-arm:
     machine:
@@ -128,7 +129,7 @@ commands:
           command: |
             source .venv/bin/activate
             conan source .
-            conan install . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
+            conan install . -s build_type=<< parameters.build_type >> << parameters.build_param >>
   conan-build:
     parameters:
       build_type: 
@@ -142,7 +143,7 @@ commands:
         default: "make"
     steps:
       - run:
-          name: Conan build; <<parameters.build_tool>> install
+          name: "Conan build (<< parameters.build_tool >>)"
           command: |
             source .venv/bin/activate
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
@@ -160,7 +161,7 @@ commands:
           name: Smoke test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> showelf
             xretractor -h
             xqry -h
             xtrdb -h
@@ -168,9 +169,9 @@ commands:
           name: Regression & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>>/test && ctest -V --output-junit test_results.xml
+            cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
       - store_test_results:
-          path: build/<<parameters.build_type>>/test
+          path: build/<< parameters.build_type >>/test
   run-cppcheck:
     parameters:
       build_type:
@@ -183,7 +184,7 @@ commands:
       - run:
           name: Static analysis
           command: |
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> cppcheck
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> cppcheck
   run-package:
     parameters:
       build_type:
@@ -327,16 +328,16 @@ jobs:
           conan_profile1: ""
           conan_profile2: ""
       - conan-install:
-          build_type: <<parameters.build_type>>
+          build_type: << parameters.build_type >>
           build_param: --build missing
       - conan-build:
-          build_type: <<parameters.build_type>>
+          build_type: << parameters.build_type >>
           build_param: --build missing
       - run:
           name: Smoke test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>> && <<parameters.build_tool>> showelf
+            cd build/<< parameters.build_type >> && << parameters.build_tool >> showelf
             xretractor -h
             xqry -h
             xtrdb -h
@@ -344,4 +345,6 @@ jobs:
           name: Regression & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<<parameters.build_type>>/test && ctest -V
+            cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
+      - store_test_results:
+          path: build/<< parameters.build_type >>/test
