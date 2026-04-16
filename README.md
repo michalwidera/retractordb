@@ -1,7 +1,7 @@
 # RetractorDB
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master)
+[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master)
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
