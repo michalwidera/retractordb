@@ -239,7 +239,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
 
   std::vector<std::deque<std::string>> output_lines;
   constexpr int serverTimeoutMs = 10000;  // 10 seconds without data = server dead
-  int noDataCounter = 0;
+  int noDataCounter             = 0;
   try {
     while (!done) {
       if (_kbhit(vm.count("needctrlc"))) break;

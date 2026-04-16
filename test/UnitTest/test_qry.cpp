@@ -155,9 +155,7 @@ class qry_fake_hello_empty : public qry {
   boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
 };
 
-boost::property_tree::ptree qry_fake_hello_empty::netClient(const std::string &, const std::string &) {
-  return {};
-}
+boost::property_tree::ptree qry_fake_hello_empty::netClient(const std::string &, const std::string &) { return {}; }
 
 // Verify hello() returns protocol_error when server responds with an empty payload
 TEST(xqry, test_hello_empty_response) {

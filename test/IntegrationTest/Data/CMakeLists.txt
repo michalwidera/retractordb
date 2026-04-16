@@ -35,6 +35,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND ./test-workflow.sh query-all.rql str2 str2)
 
-set_tests_properties(${TestID}-waterfall ${TestID}-workflow
-                     ${TestID}-all-operators PROPERTIES RUN_SERIAL TRUE
-                     TIMEOUT 30)
+set_tests_properties(
+  ${TestID}-waterfall ${TestID}-workflow ${TestID}-all-operators
+  PROPERTIES RUN_SERIAL TRUE TIMEOUT 30)

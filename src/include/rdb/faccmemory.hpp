@@ -30,12 +30,12 @@ struct memoryFile : public FileInterface {
   enum { no_retention = 0 };    // Default retention size if not specified
  public:
   memoryFile(const std::string_view fileName, const Descriptor &descriptor, std::pair<std::string, size_t> retentionSize)
-      : filename_(std::string(fileName)),  //
-        recordSize_(descriptor.getSizeInBytes()),           //
+      : filename_(std::string(fileName)),          //
+        recordSize_(descriptor.getSizeInBytes()),  //
         retentionSize_(retentionSize.second) {};
 
-  using FileInterface::write;
   using FileInterface::read;
+  using FileInterface::write;
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
 

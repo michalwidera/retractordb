@@ -40,7 +40,8 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
   return EXIT_FAILURE;
 }
 
-posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor, int percounter)
+posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor,
+                                                     int percounter)
     : filename_(std::string(fileName)),
       recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
@@ -145,7 +146,8 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
 
 auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
-ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
+ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/,
+                                         const size_t position) {
   assert(recordSize_ != 0);
   assert(fd >= 0);
   if (fd < 0) return errno;

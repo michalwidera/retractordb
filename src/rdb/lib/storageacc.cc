@@ -184,10 +184,10 @@ void storage::initializeAccessor() {
   assert(storageType_ != "");
 
   if (storageType_ == "DEFAULT") {
-    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, descriptor, descriptor.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, descriptor, descriptor.retention(),
+                                                                            percounter_);
   } else if (storageType_ == "DIRECT") {
-    accessor_ =
-        std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, descriptor, descriptor.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, descriptor, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
     accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, descriptor, descriptor.policy());
   } else if (storageType_ == "POSIX") {
@@ -527,8 +527,8 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
     metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
   }
 
-  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(),
-              rInterval_.denominator(), nullFillCount_);
+  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(), rInterval_.denominator(),
+              nullFillCount_);
 }
 
 void storage::flushPendingGap() {

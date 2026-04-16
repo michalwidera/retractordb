@@ -17,9 +17,7 @@
 const uint AREA_SIZE = 10;
 
 // Helper: build a single-field Descriptor matching AREA_SIZE bytes
-static rdb::Descriptor makeDesc(size_t size) {
-  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
-}
+static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
 
 template <typename T, typename K>
 bool test_1() {
