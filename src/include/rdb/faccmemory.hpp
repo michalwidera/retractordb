@@ -7,17 +7,20 @@
 
 namespace rdb {
 
-/// @brief Definicja klasy implementującej dostęp danych przechowywanych w pamięci
+/// @brief Implementacja magazynu rekordów przechowywanych wyłącznie w pamięci procesu.
 ///
 /// Obiekt memoryFile powinien:
-/// - umożliwiać odczyt i zapis danych w pamięci
-/// - zapewniać trwałość danych w pamięci podczas działania programu
-/// - zapewnić obsługę wartości null w poleceniach odczytu i zapisu danych.
-/// - śledzić wartości null dla każdego rekordu poprzez globalną strukturę indeksowaną nazwą strumienia, współdzieloną między instancjami o tej samej nazwie.
-/// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
-/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
-/// - umożliwiać kontrolę ilości przechowywanych danych za pomocą mechanizmu retencji, który usuwa najstarsze dane po przekroczeniu określonego limitu
+/// - implementować interfejs FileInterface dla danych przechowywanych w pamięci,
+/// - umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
+/// - przechowywać dane rekordów w globalnej strukturze indeksowanej nazwą strumienia, współdzielonej między instancjami o tej samej nazwie,
+/// - przechowywać nullBitset dla rekordów w osobnej globalnej strukturze współdzielonej między instancjami o tej samej nazwie,
+/// - obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
+/// - traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
+/// - zwracać przez count() logiczną liczbę rekordów, z uwzględnieniem rekordów usuniętych wcześniej z powodu retencji,
+/// - opcjonalnie ograniczać liczbę przechowywanych rekordów przy dopisywaniu za pomocą prostego mechanizmu retencji usuwającego najstarsze dane.
+///
+/// @note Trwałość danych dotyczy wyłącznie czasu życia procesu; klasa nie zapisuje stanu na dysk.
+/// @note Stan rekordów i nullBitset jest współdzielony globalnie po nazwie strumienia, natomiast licznik usuniętych rekordów jest utrzymywany w instancji.
 
 struct memoryFile : public FileInterface {
   std::string filename_;

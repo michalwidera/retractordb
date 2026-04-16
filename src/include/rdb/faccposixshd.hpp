@@ -7,26 +7,23 @@
 
 namespace rdb {
 
-/// @brief Definicja klasy implementującej dostęp do pliku binarnego
+/// @brief Implementacja binarnego magazynu POSIX z dodatkowym plikiem cienia dla operacji update.
 ///
 /// Obiekt posixBinaryFileWithShadow powinien:
-/// - umożliwiać odczyt i zapis danych do pliku binarnego
-/// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
-/// - zapisywać zmiany uprzednio zarejestrowanych danych do pliku cienia (shadow file) zamiast aktualizacji głównego pliku, aby uniemożliwić fizyczną modyfikację uprzednio zarejestrowanych danych.
-/// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) dla operacji update, aby plik cienia był kompaktowy i znacznie mniejszy od głównego pliku danych.
-/// - udostępniać dane, jeśli istnieją z pliku cienia jako aktualny stan danych, umożliwiając odczyt i dalsze aktualizacje bez modyfikacji głównego pliku.
-/// - w przypadku wielokrotnych aktualizacji tej samej pozycji, zwracać dane z ostatniego zapisu (przeszukiwanie pliku cienia od końca).
-/// - klasa nie zapewnia obsługi wartości null; parametr nullBitset jest ignorowany przy zapisie i czyszczony przy odczycie, a śledzenie wartości null jest zarządzane przez `storage::metaDataStream_`
-/// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
-/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
-/// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
-/// - zapewnić mechanizm integracji pliku cienia z głównym plikiem (merge), umożliwiając scalanie zmian z pliku cienia do głównego pliku na żądanie.
-/// - zapewnić mechanizm zarządzania plikiem cienia, umożliwiając zerowanie (truncate do 0) pliku cienia po scaleniu zmian z głównym plikiem.
-/// - w operacji truncate (write z nullptr i position 0) czyścić zarówno główny plik jak i plik cienia.
-/// - zwracać liczbę rekordów wyłącznie na podstawie głównego pliku (count), niezależnie od zawartości pliku cienia.
-/// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
-/// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych między uruchomieniami programu
+/// - realizować append do głównego pliku danych oraz update do osobnego pliku cienia,
+/// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) opisujące zmiany istniejących rekordów,
+/// - podczas odczytu zwracać najnowszą wartość rekordu, preferując dane z pliku cienia przed danymi z pliku głównego,
+/// - przy wielokrotnych aktualizacjach tej samej pozycji traktować ostatni wpis w pliku cienia jako obowiązujący stan rekordu,
+/// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; obsługa wartości null jest realizowana poza tą klasą,
+/// - implementować interfejs FileInterface,
+/// - udostępniać operację merge(), która scala zmiany z pliku cienia do pliku głównego i zeruje plik cienia,
+/// - w operacji purge wywołanej przez write(nullptr, ..., 0) usuwać zarówno plik główny, jak i plik cienia,
+/// - zwracać przez count() liczbę rekordów wynikającą wyłącznie z rozmiaru pliku głównego,
+/// - przy tworzeniu obiektu odtwarzać stan z istniejącego pliku głównego i istniejącego pliku cienia, przycinając niepełne końcówki wpisów,
+/// - zwalniać deskryptory plików przy niszczeniu obiektu i podejmować próbę utrwalenia zapisanych danych przez fsync.
+///
+/// @note Klasa nie utrzymuje osobnego indeksu zmian; wyszukiwanie aktualizacji w pliku cienia odbywa się przez przeszukiwanie wpisów od końca.
+/// @note Zwykłe operacje update nie modyfikują głównego pliku danych; fizyczne scalenie zmian następuje dopiero po wywołaniu merge().
 
 class posixBinaryFileWithShadow : public FileInterface {
   std::string filename_;

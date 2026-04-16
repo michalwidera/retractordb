@@ -19,17 +19,21 @@ enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 // Creates ability to create descriptions of binary frames using types and arrays
 //
 
-/// @brief Definicja klasy implementującej strukturę opisu danych
+/// @brief Klasa opisująca układ pól rekordu oraz metadane konfiguracyjne związane z magazynem danych.
 ///
 /// Obiekt Descriptor powinien:
-/// - zapisywać i odczytywać pliki z opisem struktury danych
-/// - umożliwiać definiowanie różnych typów danych, takich jak liczby całkowite, zmiennoprzecinkowe, łańcuchy znaków itp.
-/// - umożliwiać definiowanie tablic o różnych rozmiarach i typach danych
-/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
-/// - udostępniać informacje o strukturze danych, takie jak nazwy pól, typy danych, rozmiary itp.
-/// - udostępniać informacje o fizycznej reprezentacji danych, takie jak rozmiar w bajtach, offsety itp.
-/// - dostarczać metod dodawnia i porównywania opisów danych
+/// - przechowywać definicje pól rekordu w postaci listy opisowej (rField),
+/// - umożliwiać definiowanie pól o różnych typach, długościach i krotnościach tablicowych,
+/// - udostępniać informacje o logicznej i fizycznej strukturze danych, takie jak nazwy pól, typy, rozmiary i offsety,
+/// - wyznaczać rozmiar binarnej reprezentacji rekordu z pominięciem pól konfiguracyjnych,
+/// - udostępniać odwzorowanie między pozycją w spłaszczonym widoku pól a indeksem pola oraz offsetem w rekordzie,
+/// - umożliwiać dodawanie i łączenie opisów pól,
+/// - umożliwiać odczyt i zapis tekstowej reprezentacji deskryptora przez operatory strumieniowe,
+/// - udostępniać metadane konfiguracyjne zapisane w polach specjalnych, takie jak REF, TYPE, RETENTION i RETMEMORY,
+/// - umożliwiać porównanie kompatybilności dwóch deskryptorów w zakresie pól danych przez operator==.
+///
+/// @note Descriptor dziedziczy po std::vector<rField>, więc zachowuje się jak kontener pól z dodatkowymi metodami pomocniczymi.
+/// @note Operator== nie oznacza ścisłej równości wszystkich właściwości deskryptora; sprawdza zgodność pól danych z pominięciem pól konfiguracyjnych.
 
 class Descriptor : public std::vector<rField> {
   std::vector<std::pair<int, int>> convMap_;

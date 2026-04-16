@@ -20,27 +20,23 @@
 namespace rdb {
 enum class sourceState { empty, flux, armed };
 
-/// @brief Klasa nadzorująca zapis danych na dysku.
+/// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
-/// obiekt klasy storage powinien:
-/// - zarządzać zapisem danych na dysku, zapewniając trwałość i integralność danych.
-/// - umożliwiać odczyt danych z dysku, zapewniając szybki dostęp do zapisanych danych.
-/// - obsługiwać różne formaty danych, zgodnie z opisem w Descriptorze.
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
-/// - obsługiwać różne strategie przechowywania danych, takie jak przechowywanie w pamięci lub na dysku w zależności od potrzeb i konfiguracji.
-/// - zapewniać mechanizmy buforowania danych, aby zoptymalizować operacje zapisu i odczytu, zwłaszcza w przypadku dużych ilości danych.
-/// - umożliwiać konfigurację parametrów przechowywania danych, takich jak rozmiar bufora, częstotliwość zapisu itp., aby dostosować działanie do różnych scenariuszy użytkowania.
-/// - zarządzać plikiem indeksu metaDataStream, który przechowuje informacje o nullach dla każdego rekordu, zapewniając trwałość tych informacji i umożliwiając ich odczyt po ponownym uruchomieniu programu.
-/// - zapewniać że każda dana zapisana do storage jest odpowiednio zarejestrowana w metaDataStream, aby utrzymać spójność między danymi a ich indeksami.
-/// - rozpoznać przerwę (gap) po zarejestrowaniu niezerowej ilości odczytów null ze źródła i zapisaniu danych failover do storage i nullfill do indeksu ze źródła.
-/// - zapisać wstępny brak danych (nullfill) w indeksie oraz failover w storage po otrzymaniu wstępnych danych null ze źródła.
-/// - zapisać informacje o przerwach w transmisji danych (gaps) w metaDataStream, aby umożliwić późniejsze wykrycie i obsługę takich sytuacji.
-/// - przechowywać przerwy w transmisji danych (gaps) wyrażone w ilości interwałów próbkowania.
-/// - zapewniać mechanizmy do wykrywania i obsługi przerw w transmisji danych (gaps) jak i fallback (nullfill)
-/// - umożliwiać odtworzenie zachodzącego procesu rejestracji danych i ich braku w oparciu o plik storage oraz plik indeksu.
-/// - dane wypełnione jako nullfill zawierające fallback w rejestrowanym źródłem nie są oznaczone jako gap.
-/// - informacja o przerwie w danych gap zawsze jest poprzedzona przez fazę nullfill.
-/// - umożliwiać konfigurację ile danych powinno być wypełnione jako nullfill przed oznaczeniem braku danych jako gap.
+/// Obiekt klasy storage powinien:
+/// - utrzymywać Descriptor oraz powiązane obiekty payload używane do odczytu, zapisu i buforowania danych,
+/// - tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
+/// - zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych,
+/// - udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
+/// - dla magazynów zapisywalnych utrzymywać spójność między zapisanymi rekordami a metadanymi null przechowywanymi w metaDataStream,
+/// - dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii w circularBuffer_,
+/// - wspierać czyszczenie magazynu i odpowiadającego mu indeksu metadanych przez purge() lub reset(),
+/// - opcjonalnie wykrywać przerwy w transmisji danych na podstawie kolejnych rekordów oznaczonych jako all-null,
+/// - przed oznaczeniem gap zapisywać początkowe rekordy null jako nullfill, a dopiero dalsze braki danych agregować do znacznika gap w metaDataStream,
+/// - przechowywać długość gap jako liczbę interwałów próbkowania i udostępniać informację, czy gap występuje przed danym rekordem,
+/// - umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap.
+///
+/// @note Klasa sama nie implementuje fizycznego formatu magazynu; deleguje operacje I/O do accessor_.
+/// @note Semantyka nullfill i gap dotyczy tylko ścieżki zapisu z włączonym mechanizmem gap detection oraz obecnym metaDataStream.
 
 class storage {
   std::unique_ptr<FileInterface> accessor_;

@@ -8,23 +8,23 @@
 #include "faccposixshd.hpp"
 #include "retention.hpp"
 
-/// @brief klasa groupFile tworzy pliki z retencją
+/// @brief Klasa groupFile udostępnia magazyn rekordów podzielony na segmenty zgodnie z polityką retencji.
 ///
-/// obiekty klasy groupFile powinny:
-/// - tworzyć segmenty plików o określonej pojemności (retention_.capacity).
-/// - przechowywać określoną liczbę segmentów (retention_.segments).
-/// - usuwać najstarszy segment (i jego plik cienia) po przekroczeniu liczby segmentów.
-/// - obsługiwać odczyt i zapis danych z/do odpowiednich segmentów na podstawie pozycji.
-/// - umożliwiać tryb bez retencji, gdzie wszystkie dane są zapisywane do pojedynczego pliku.
-/// - nie zarządzać wartościami null wewnętrznie; propagować parametr nullBitset do/z segmentu T poprzez wywołania wirtualne funkcji read i write.
-/// - dostarczać usługi zgodne z interfejsem FileInterface.
-/// - zapewniać, że operacje odczytu i zapisu są poprawnie kierowane do segmentów zgodnie z ustawieniami retencji.
-/// - zarządzać stanem segmentów i ich rotacją w sposób spójny z polityką retencji.
-/// - umożliwiać odczyt liczby zapisanych rekordów, uwzględniając usunięte segmenty.
-/// - umożliwiać zapis danych w trybie aktualizacji (update-in-place) w ramach segmentu, jeśli pozycja jest określona.
-/// - zapewniać, że nazwa zwracana przez name() jest zgodna z aktualnym segmentem, jeśli retencja jest włączona, lub podstawową nazwą pliku, jeśli retencja jest wyłączona.
-/// - w przypadku zapisu danych z nullptr i pozycją 0 (purge), usuwać wszystkie segmenty i ich pliki cienia (jeśli istnieją), resetować stan obiektu do stanu początkowego i tworzyć nowy pusty segment, zapewniając gotowość do dalszego zapisu.
-/// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów w bieżącym katalogu: odnajdywać spójny, ciągły przyrostek sekwencji segmentów kończący się na segmencie o najwyższym indeksie, ograniczać liczbę odtworzonych segmentów do retention_.segments (jeśli ustawione), oraz rekonstruować wartość removedSegments_ na podstawie indeksu pierwszego odtworzonego segmentu.
+/// Obiekt klasy groupFile powinien:
+/// - tworzyć i utrzymywać segmenty o pojemności określonej przez retention_.capacity,
+/// - ograniczać liczbę utrzymywanych segmentów do retention_.segments i usuwać najstarszy segment po przekroczeniu limitu,
+/// - umożliwiać tryb bez retencji, w którym wszystkie rekordy są przechowywane w pojedynczym pliku,
+/// - realizować operacje read i write zgodnie z interfejsem FileInterface, kierując je do właściwego segmentu,
+/// - traktować parametr position jako logiczną pozycję rekordu w groupFile; pozycja jest mapowana na segment i offset w segmencie,
+/// - propagować parametr nullBitset do segmentu T bez własnego przechowywania informacji o wartościach null,
+/// - obsługiwać dopisywanie rekordów oraz aktualizację istniejącego rekordu w odpowiednim segmencie,
+/// - zwracać przez count() logiczną liczbę rekordów uwzględniającą także rekordy znajdujące się wcześniej w usuniętych segmentach,
+/// - zwracać przez name() nazwę bieżącego segmentu, gdy retencja jest aktywna, albo nazwę bazową pliku w trybie bez retencji,
+/// - obsługiwać purge wywołane przez write(nullptr, ..., 0), resetując stan obiektu i odtwarzając pusty segment gotowy do dalszego zapisu,
+/// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając spójny końcowy fragment sekwencji i rekonstruując removedSegments_.
+///
+/// @note Klasa zarządza segmentacją i retencją, ale nie interpretuje zawartości rekordów ani semantyki null.
+/// @note Pozycje wskazujące rekordy należące do już usuniętych segmentów są traktowane jako niedostępne do odczytu i aktualizacji.
 
 namespace rdb {
 

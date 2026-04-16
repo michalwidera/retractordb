@@ -8,17 +8,18 @@
 
 #include "descriptor.hpp"
 
-/// @brief Definicja klasy zarządzającej obszarem pamęci, który jest interpretowany zgodnie z opisem w Descriptorze.
+/// @brief Definicja klasy zarządzającej obszarem pamięci interpretowanym zgodnie z opisem w Descriptor.
 ///
 /// Obiekt klasy payload powinien:
-/// - zarządzać obszarem pamięci, który jest interpretowany zgodnie z opisem w Descriptorze.
-/// - umożliwiać ustawianie i pobieranie wartości w obszarze pamięci zgodnie z opisem w Descriptorze.
-/// - obsługiwać różne typy danych, takie jak liczby całkowite, zmiennoprzecinkowe, łańcuchy znaków itp., zgodnie z opisem w Descriptorze.
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
-/// - obsługiwać formatowanie danych w formacie szesnastkowym (hex) dla typów numerycznych.
-/// - dostarczać metody do kopiowania danych między obiektami payload (konstruktor kopiujący, operator=, operator+).
-/// - uwzględniać obsługę wartości null dla pól — getItem() zwraca std::nullopt, operator<< wypisuje "null".
-/// - obsługiwać serializację i deserializację przez operator<< i operator>>.
+/// - zarządzać binarnym obszarem pamięci odpowiadającym układowi pól opisanemu przez Descriptor,
+/// - umożliwiać ustawianie i pobieranie wartości pól na podstawie pozycji w spłaszczonym widoku Descriptor,
+/// - obsługiwać typy danych wspierane przez Descriptor i implementację payload, w szczególności typy liczbowe, napisy i wartości null,
+/// - zarządzać własną pamięcią w sposób bezpieczny i bez wycieków,
+/// - udostępniać tekstową reprezentację danych przez operator<< oraz wczytywanie wartości przez operator>>,
+/// - umożliwiać formatowanie tekstowej reprezentacji wartości numerycznych w trybie dziesiętnym lub szesnastkowym,
+/// - wspierać kopiowanie stanu obiektu przez konstruktor kopiujący i operator=,
+/// - wspierać łączenie danych dwóch obiektów payload przez operator+,
+/// - uwzględniać obsługę wartości null na poziomie pola; getItem() zwraca std::nullopt, a operator<< wypisuje "null".
 
 namespace rdb {
 /// @brief This class define accessing method to payload (memory area)

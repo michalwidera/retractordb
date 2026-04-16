@@ -8,22 +8,22 @@
 
 namespace rdb {
 
-/// @brief Definicja klasy implementującej dostęp do pliku tekstowego
+/// @brief Implementacja tekstowego źródła danych działającego wyłącznie w trybie odczytu sekwencyjnego.
 ///
 /// Obiekt textSourceRO powinien:
-/// - umożliwiać odczyt danych z pliku tekstowego.
-/// - interpretować dane zgodnie z dostarczonym opisem (Descriptor), umożliwiając odczyt danych o różnych typach i strukturach.
-/// - uniemożliwiać zapis danych do pliku, zapewniając, że obiekt jest tylko do odczytu; metoda `write(data, position, nullBitset)` zawsze zwraca `EXIT_FAILURE`.
-/// - zapewnić obsługę wartości null w poleceniach odczytu danych.
-/// - w przypadku poprawnie sparsowanego pola ustawiać odpowiedni bit null na `false`; w przypadku braku wartości lub błędu parsowania — na `true`.
-/// - obsługiwać sytuację, gdy osiągnięty zostanie koniec pliku (EOF), z opcją pętli do początku pliku, jeśli jest włączona.
-/// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu.
-/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych.
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
-/// - po przeczytaniu ostatnich danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do początku pliku i kontynuować odczyt danych od początku.
-/// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, każde kolejne wywołanie read() zwraca dane wypełnione zerami z wektorem null ustawionym na same wartości `true`.
-/// - obsługiwać jedynie sekwencyjny odczyt danych, gdzie jedyna dopuszczalna pozycja odczytu to 0; wartość różna od 0 jest traktowana jako błąd i skutkuje zwróceniem danych null.
-/// - w przypadku błędu odczytu danych z pliku, powinien odpowiednio ustawić metadane null dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
+/// - odczytywać kolejne rekordy z pliku tekstowego i interpretować je zgodnie z dostarczonym Descriptor,
+/// - wspierać pola liczbowe, tekstowe oraz pola NULL zgodnie z zakresem obsługiwanym przez implementację,
+/// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca EXIT_FAILURE,
+/// - obsługiwać informację o wartościach null przez nullBitset powiązany z wewnętrznym obiektem payload,
+/// - traktować brak tokenu lub token `null`/`NULL`/`Null` jako wartość null dla odpowiedniego pola,
+/// - działać sekwencyjnie; jedyną poprawną pozycją odczytu jest 0, a inna pozycja skutkuje zwróceniem danych wyzerowanych i nullBitset ustawionego na same wartości true,
+/// - po osiągnięciu końca pliku wracać do początku, jeśli włączono loopToBeginningIfEOF,
+/// - po osiągnięciu końca pliku przy wyłączonym loopToBeginningIfEOF zwracać kolejne rekordy jako wyzerowane dane z nullBitset ustawionym na same wartości true,
+/// - w przypadku błędu otwarcia pliku lub błędu odczytu zwracać dane wyzerowane z nullBitset ustawionym na same wartości true,
+/// - zliczać wykonane odczyty i zwracać ich liczbę przez count().
+///
+/// @note Klasa nie obsługuje zapisu i nie zapewnia losowego dostępu do rekordów tekstowych.
+/// @note Interpretacja błędnych tokenów numerycznych zależy od bieżącej implementacji parsera i nie stanowi pełnej walidacji wejścia.
 class textSourceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;

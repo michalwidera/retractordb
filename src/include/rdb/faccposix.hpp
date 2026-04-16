@@ -8,19 +8,20 @@
 
 namespace rdb {
 
-/// @brief Definicja klasy implementującej dostęp do pliku binarnego
+/// @brief Implementacja binarnego magazynu rekordów opartego na deskryptorze pliku POSIX.
 ///
 /// Obiekt posixBinaryFile powinien:
-/// - umożliwiać odczyt i zapis danych do pliku binarnego
-/// - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
-/// - klasa nie zapewnia obsługi wartości null.
-/// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
-/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
-/// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
-/// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
-/// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych między uruchomieniami programu
-/// - jeśli parametr percounter jest nieujemny, przed zakończeniem życia obiektu plik powinien zostać przemianowany do postaci `<nazwa>.old<percounter>`, realizując mechanizm rotacji plików
+/// - implementować interfejs FileInterface dla binarnego pliku rekordowego,
+/// - umożliwiać dopisywanie rekordów oraz zapis i odczyt rekordu od wskazanej pozycji w pliku,
+/// - traktować Descriptor jako źródło rozmiaru pojedynczego rekordu,
+/// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; klasa nie przechowuje metadanych null,
+/// - zwracać przez count() liczbę rekordów wynikającą z rozmiaru pliku danych,
+/// - obsługiwać purge przez write(nullptr, ..., 0), usuwając plik danych,
+/// - przy tworzeniu obiektu odtwarzać spójny stan istniejącego pliku przez przycięcie niepełnego końca do wielokrotności rozmiaru rekordu,
+/// - przy niszczeniu obiektu zamykać deskryptor pliku i podejmować próbę utrwalenia danych przez fsync,
+/// - jeśli parametr percounter jest nieujemny, próbować po zamknięciu przemianować plik do postaci `<nazwa>.old<percounter>`.
+///
+/// @note Klasa nie zapewnia dodatkowej warstwy trwałości ani wersjonowania poza bezpośrednim zapisem do jednego pliku binarnego.
 
 class posixBinaryFile : public FileInterface {
   std::string filename_;

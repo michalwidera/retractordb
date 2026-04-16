@@ -13,30 +13,22 @@
 
 namespace rdb {
 
-/// @brief Klasa opisująca strumień indeksujący dane napływające w klasie storage.
+/// @brief Klasa utrzymująca trwały indeks informacji o wartościach null dla rekordów przechowywanych w storage.
 ///
-/// obiekt klasy metaDataStream powinien:
-/// - tworzyć dane w pliku indeksu wraz z napływem danych w storage.
-/// - przechowywać informacje o tym, które pola w rekordach pliku indeksowanego są nullami.
-/// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storage.
-/// - umożliwiać aktualizację informacji o wartościach null dla istniejących rekordów.
-/// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
-/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu obiektu lub systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości w pliku indeksu, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
-/// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
-/// - zapewniać informacje o przerwach w transmisji danych poprzez zanotowanie rekordu oznaczającego przerwę.
-/// - powinien być w stanie obsłużyć duże ilości danych.
-/// - zapewnić procedury serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
-/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
-/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu dla każdego rekordu.
-/// - zapewniać definicję przerwy w transmisji danych (gap) jako wpis w indeksie z licznikiem równym czasie trwania przerwy (w jednostkach rInterval) i wzorem nulli ustawionym na wszystkie pola jako null.
+/// Obiekt klasy metaDataStream powinien:
+/// - przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
+/// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
+/// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
+/// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
+/// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu,
+/// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie,
+/// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
+/// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu i interwał próbkowania są zapisywane w nagłówku pliku,
+/// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 ///
-/// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
-/// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storage.
-/// @note Interfejs i implementacja klasy powinna być minimalna i skupiona na funkcjonalności.
-/// @note W przypadku dużych ilości danych, implementacja powinna uwzględniać mechanizmy buforowania i zarządzania pamięcią, aby zapewnić płynne działanie systemu.
-/// @note Klasa metaDataStream powinna być projektowana z myślą o łatwej integracji z innymi komponentami systemu, takimi jak storage, aby zapewnić spójność i efektywność całego systemu.
-/// @note W przypadku przerw w transmisji danych, klasa metaDataStream powinna być w stanie wykryć i odpowiednio zareagować na takie sytuacje, np. poprzez zapisywanie stanu indeksu przed przerwą i przywracanie go po wznowieniu transmisji.
+/// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
+/// @note Wpisy gap są markerami przerw między rekordami i nie zwiększają numeracji logicznych rekordów zwracanej przez totalRecords().
+/// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
 
 class metaDataStream {
  public:

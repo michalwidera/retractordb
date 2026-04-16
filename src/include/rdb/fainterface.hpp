@@ -8,23 +8,23 @@
 
 namespace rdb {
 
-/// @brief To jest klasa abstrakcyjna, która definiuje interfejs do operacji na różnych typach magazynów danych (np. pliki,
-/// obiekty, blob) używanych jako storage w klasie storage.
+/// @brief Abstrakcyjny interfejs operacji wejścia/wyjścia dla magazynów używanych przez storage.
 ///
-/// obiekt klasy dziedziczącej po klasie FileInterface powinien zapewniać interfejs:
-/// - jednolity, do operacji na różnych typach magazynów danych (np. pliki, obiekty, blob) używanych jako storage w klasie storage.
-/// - umożliwiający odczyt danych z magazynu na podstawie pozycji (w bajtach) i rozmiaru danych określonego przez descriptor klasy pochodnej.
-/// - który, w przypadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji dane odczytywane są jedynie z pozycji 0.
-/// - umożliwiający dodawanie danych na końcu magazynu, traktując określoną wartość pozycji jako sygnał do operacji append.
-/// - dostarczający informacje o liczbie rekordów w magazynie, co jest istotne dla zarządzania danymi w storage.
-/// - w przypadku źródła danych sekwencyjnych (np. sterowników urządzeń), które nie obsługują odczytu z określonej pozycji, metoda count() może zwracać liczbę odczytów wykonanych na tym źródle danych.
+/// Klasa dziedzicząca po FileInterface powinna:
+/// - udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
+/// - obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
+/// - przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
+/// - umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
+/// - interpretować pozostałe wartości position zgodnie z kontraktem danej implementacji; dla większości magazynów losowego dostępu oznacza to pozycję w bajtach,
+/// - móc ograniczać dopuszczalne wartości position w przypadku źródeł sekwencyjnych, które nie wspierają losowego dostępu,
+/// - zwracać przez count() liczbę rekordów lub inną implementacyjnie zdefiniowaną miarę postępu zgodną z semantyką danej klasy pochodnej.
 ///
-/// Podstawowe operacje obsługiwane przez implementację tego interfejsu (podstawowy kontrakt polimorficzny wymaga nullBitset):
-/// 1. read   ::= read(data, nullBitset, pozycja) :== odczyt danych z magazynu na podstawie pozycji (w bajtach); wypełnia nullBitset informacją o wartościach null dla każdego pola.
-/// 2. append :== write(data, nullBitset, max_size_t) :== dodawanie danych na końcu magazynu z przekazaniem wektora wartości null.
-/// 3. update :== write(data, nullBitset, pozycja) :== aktualizacja danych w magazynie na podstawie pozycji z przekazaniem wektora wartości null.
+/// Podstawowe operacje objęte kontraktem polimorficznym:
+/// 1. `read(data, nullBitset, position)` odczytuje rekord z magazynu i wypełnia `nullBitset`, jeśli implementacja wspiera metadane null.
+/// 2. `write(data, nullBitset, std::numeric_limits<size_t>::max())` dopisuje rekord na końcu magazynu.
+/// 3. `write(data, nullBitset, position)` zapisuje rekord pod wskazaną pozycją zgodnie z semantyką implementacji.
 ///
-/// @note pozycja wyrażona jest w bajtach, a rozmiar danych jest określany przez descriptor klasy pochodnej i nie jest częścią tego interfejsu.
+/// @note FileInterface nie narzuca sposobu przechowywania rekordu ani obowiązkowej obsługi nullBitset; definiuje jedynie wspólną postać wywołań.
 
 struct FileInterface {
   /// @brief Null-aware write: stores data and associated null bitset in the storage.
