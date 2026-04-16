@@ -1,0 +1,7 @@
+# make install && ctest -R issue121_null_propagation -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT src[0], src[1] STREAM dst FROM src

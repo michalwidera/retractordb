@@ -16,16 +16,14 @@
 /// - usuwać najstarszy segment (i jego plik cienia) po przekroczeniu liczby segmentów.
 /// - obsługiwać odczyt i zapis danych z/do odpowiednich segmentów na podstawie pozycji.
 /// - umożliwiać tryb bez retencji, gdzie wszystkie dane są zapisywane do pojedynczego pliku.
-/// - implementować null-aware interfejs FileInterface: `write(data, nullBitset, position)` i `read(data, nullBitset, position)` są podstawowymi metodami wirtualnymi.
-/// - propagować wektor null bitset do/z segmentu T poprzez polimorficzne wywołanie wirtualne `static_cast<FileInterface*>(segment)->read/write(data, nullBitset, position)`.
-/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
+/// - nie zarządzać wartościami null wewnętrznie; propagować parametr nullBitset do/z segmentu T poprzez wywołania wirtualne funkcji read i write.
 /// - dostarczać usługi zgodne z interfejsem FileInterface.
 /// - zapewniać, że operacje odczytu i zapisu są poprawnie kierowane do segmentów zgodnie z ustawieniami retencji.
 /// - zarządzać stanem segmentów i ich rotacją w sposób spójny z polityką retencji.
 /// - umożliwiać odczyt liczby zapisanych rekordów, uwzględniając usunięte segmenty.
 /// - umożliwiać zapis danych w trybie aktualizacji (update-in-place) w ramach segmentu, jeśli pozycja jest określona.
 /// - zapewniać, że nazwa zwracana przez name() jest zgodna z aktualnym segmentem, jeśli retencja jest włączona, lub podstawową nazwą pliku, jeśli retencja jest wyłączona.
-/// - w przypadku zapisu danych z nullptr i pozycją 0, usuwać wszystkie segmenty i ich pliki cienia (jeśli istnieją), resetując stan obiektu do stanu początkowego.
+/// - w przypadku zapisu danych z nullptr i pozycją 0 (purge), usuwać wszystkie segmenty i ich pliki cienia (jeśli istnieją), resetować stan obiektu do stanu początkowego i tworzyć nowy pusty segment, zapewniając gotowość do dalszego zapisu.
 /// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów w bieżącym katalogu: odnajdywać spójny, ciągły przyrostek sekwencji segmentów kończący się na segmencie o najwyższym indeksie, ograniczać liczbę odtworzonych segmentów do retention_.segments (jeśli ustawione), oraz rekonstruować wartość removedSegments_ na podstawie indeksu pierwszego odtworzonego segmentu.
 
 namespace rdb {

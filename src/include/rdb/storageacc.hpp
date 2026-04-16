@@ -39,7 +39,7 @@ enum class sourceState { empty, flux, armed };
 /// - zapewniać mechanizmy do wykrywania i obsługi przerw w transmisji danych (gaps) jak i fallback (nullfill)
 /// - umożliwiać odtworzenie zachodzącego procesu rejestracji danych i ich braku w oparciu o plik storage oraz plik indeksu.
 /// - dane wypełnione jako nullfill zawierające fallback w rejestrowanym źródłem nie są oznaczone jako gap.
-/// - informacja o przewie w danych gap zawsze jest poprzedzona przez fazę nullfill.
+/// - informacja o przerwie w danych gap zawsze jest poprzedzona przez fazę nullfill.
 /// - umożliwiać konfigurację ile danych powinno być wypełnione jako nullfill przed oznaczeniem braku danych jako gap.
 
 class storage {
@@ -59,7 +59,6 @@ class storage {
 
   boost::rational<int> rInterval_{1};   ///< sampling interval for time calculations
   int nullFillCount_{2};                ///< number of nullfill records written before a gap is marked (R17)
-  int gapDetectionThreshold_{3};        ///< number of missed intervals that trigger a gap marker
   size_t consecutiveNullCount_{0};      ///< consecutive all-null records received from source
   size_t activeGapDuration_{0};         ///< accumulated gap duration not yet flushed to meta index
   bool gapDetectionConfigured_{false};  ///< true only when configureGapDetection() was explicitly called
@@ -127,17 +126,15 @@ class storage {
   void setCapacity(const int capacity);
   void cleanPayload(uint8_t *destination = nullptr);
 
-  /// @brief Configure sampling interval, nullfill length and gap detection threshold.
+  /// @brief Configure sampling interval and nullfill length for gap detection.
   ///
-  /// When set, write() will automatically detect transmission gaps by comparing
-  /// elapsed time since the last write against gapDetectionThreshold × rInterval.
-  /// Before a gap marker is registered, nullFillCount null/fallback records are
-  /// written to storage and the meta index, satisfying R17.
-  /// The rInterval is also forwarded to metaDataStream for timestamp calculations.
-  /// @param rInterval             sampling interval (e.g. 1/10 = 100ms)
-  /// @param nullFillCount         number of nullfill records to write before marking a gap (default: 2)
-  /// @param gapDetectionThreshold number of missed intervals that trigger gap detection (default: 3)
-  void configureGapDetection(boost::rational<int> rInterval, int nullFillCount = 2, int gapDetectionThreshold = 3);
+  /// When set, write() will automatically detect transmission gaps based on
+  /// consecutive all-null records from the source. Before a gap marker is registered,
+  /// nullFillCount null/fallback records are written to storage and the meta index,
+  /// satisfying R17. The rInterval is forwarded to metaDataStream for timestamp calculations.
+  /// @param rInterval     sampling interval (e.g. 1/10 = 100ms)
+  /// @param nullFillCount number of nullfill records to write before marking a gap (default: 2)
+  void configureGapDetection(boost::rational<int> rInterval, int nullFillCount = 2);
 
   // technical function - for unit tests
   void reset();

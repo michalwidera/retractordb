@@ -16,24 +16,17 @@ namespace rdb {
 /// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) dla operacji update, aby plik cienia był kompaktowy i znacznie mniejszy od głównego pliku danych.
 /// - udostępniać dane, jeśli istnieją z pliku cienia jako aktualny stan danych, umożliwiając odczyt i dalsze aktualizacje bez modyfikacji głównego pliku.
 /// - w przypadku wielokrotnych aktualizacji tej samej pozycji, zwracać dane z ostatniego zapisu (przeszukiwanie pliku cienia od końca).
-/// - implementować null-aware interfejs FileInterface: podstawowe metody wirtualne to `write(data, nullBitset, position)` i `read(data, nullBitset, position)`
-/// - przekazywać wektor null bitset do/z warstwy wywołującej; śledzenie wartości null jest zarządzane przez `storage::metaDataStream_`, a nie przez ten obiekt
-/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
+/// - klasa nie zapewnia obsługi wartości null; parametr nullBitset jest ignorowany przy zapisie i czyszczony przy odczycie, a śledzenie wartości null jest zarządzane przez `storage::metaDataStream_`
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci
 /// - być w stanie obsłużyć duże ilości danych, zapewniając płynne działanie systemu
 /// - zapewnić mechanizm integracji pliku cienia z głównym plikiem (merge), umożliwiając scalanie zmian z pliku cienia do głównego pliku na żądanie.
-/// - zapewnić mechanizm zarządzania plikiem cienia, umożliwiając usuwanie pliku cienia po scaleniu zmian z głównym plikiem (truncate po merge).
+/// - zapewnić mechanizm zarządzania plikiem cienia, umożliwiając zerowanie (truncate do 0) pliku cienia po scaleniu zmian z głównym plikiem.
 /// - w operacji truncate (write z nullptr i position 0) czyścić zarówno główny plik jak i plik cienia.
 /// - zwracać liczbę rekordów wyłącznie na podstawie głównego pliku (count), niezależnie od zawartości pliku cienia.
 /// - przed zakończeniem życia obiektu, dane powinny być bezpiecznie zapisane w pliku, a zasoby systemowe powinny być zwolnione
 /// - po ponownym utworzeniu obiektu, powinien odtworzyć stan z pliku, jeśli plik już istnieje, aby zapewnić ciągłość danych między uruchomieniami programu
-
-// TODO: Wymaganie 12 mówi o "usuwaniu pliku cienia" po merge, jednak implementacja merge()
-//       wywołuje ::ftruncate(fd_shadow, 0), co zeruje plik, ale nie usuwa go z systemu plików.
-//       Należy ujednolicić: albo zmienić wymaganie na "zerowanie pliku cienia" (truncate do 0),
-//       albo zastąpić ftruncate wywołaniem ::unlink() + ::close() + ponownym ::open() z O_CREAT|O_TRUNC.
 
 class posixBinaryFileWithShadow : public FileInterface {
   std::string filename_;

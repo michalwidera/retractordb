@@ -326,7 +326,7 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
 
     // nullFillCount=2: first 2 consecutive all-null appends go to storage (nullfill phase)
     // gap phase starts when consecutiveNullCount_ > nullFillCount_
-    s.configureGapDetection(boost::rational<int>(1, 100), 2, 2);
+    s.configureGapDetection(boost::rational<int>(1, 100), 2);
 
     auto *pl = s.getPayload();
     const std::vector<bool> allNull(desc.size(), true);
@@ -365,7 +365,7 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
   {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
-    s.configureGapDetection(boost::rational<int>(1, 100), 1, 2);
+    s.configureGapDetection(boost::rational<int>(1, 100), 1);
 
     auto *pl = s.getPayload();
     const std::vector<bool> allNull(desc.size(), true);
@@ -407,9 +407,9 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
 
-    // rInterval=1 (1 second), nullFillCount=2, gapDetectionThreshold=3 → threshold = 3000ms
+    // rInterval=1 (1 second), nullFillCount=2
     // All writes happen within milliseconds so no gap should be detected
-    s.configureGapDetection(boost::rational<int>(1), 2, 3);
+    s.configureGapDetection(boost::rational<int>(1), 2);
 
     auto *pl = s.getPayload();
 
@@ -438,8 +438,8 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     rdb::storage s(streamName, dataFile, ".");
     s.attachDescriptor(&desc);
 
-    // rInterval=1/100 (10ms), nullFillCount=2, gapDetectionThreshold=2 → threshold = 20ms
-    s.configureGapDetection(boost::rational<int>(1, 100), 2, 2);
+    // rInterval=1/100 (10ms), nullFillCount=2
+    s.configureGapDetection(boost::rational<int>(1, 100), 2);
 
     auto *pl = s.getPayload();
 

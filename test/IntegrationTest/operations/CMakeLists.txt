@@ -9,7 +9,7 @@ add_test(
     rm -f *.meta *.desc str1 str2 str3 core0 core1 ; \
     xretractor query.rql -k -x & \
     while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-    xqry -s str3 -k -m 10 > out.txt; \
+    xqry -s str3 -k -m 9 > out.txt; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     cat out.txt ; \
     ${CMAKE_COMMAND} -E compare_files --ignore-eol out-pattern.txt out.txt")

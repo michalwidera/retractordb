@@ -12,9 +12,8 @@ namespace rdb {
 /// Obiekt memoryFile powinien:
 /// - umożliwiać odczyt i zapis danych w pamięci
 /// - zapewniać trwałość danych w pamięci podczas działania programu
-/// - implementować null-aware interfejs FileInterface: podstawowe metody wirtualne to `write(data, nullBitset, position)` i `read(data, nullBitset, position)`
-/// - śledzić wartości null dla każdego rekordu poprzez statyczną mapę `memoryNullStorage` (zdefiniowaną w pliku implementacyjnym), indeksowaną nazwą pliku i pozycją rekordu
-/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
+/// - zapewnić obsługę wartości null w poleceniach odczytu i zapisu danych.
+/// - śledzić wartości null dla każdego rekordu poprzez globalną strukturę indeksowaną nazwą strumienia, współdzieloną między instancjami o tej samej nazwie.
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci

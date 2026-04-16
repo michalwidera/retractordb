@@ -18,16 +18,15 @@ namespace rdb {
 /// - umożliwiać odczyt danych z pliku binarnego.
 /// - wyznaczać długość paczki danych zgodnie z dostarczonym opisem (Descriptor).
 /// - uniemożliwiać zapis danych do pliku, zapewniając, że obiekt jest tylko do odczytu; metoda `write(data, position, nullBitset)` zawsze zwraca `EXIT_FAILURE`.
-/// - implementować null-aware interfejs FileInterface: `read(data, position, nullBitset)` wypełnia `nullBitset` wartością `lastNullBitset_` odczytaną przy ostatnim odczycie z urządzenia.
-/// - w przypadku poprawnego odczytu ustawiać wektor null na same wartości `false`; w przypadku błędu lub EOF (jeśli loopToBeginningIfEOF wyłączone) ustawiać wektor null na same wartości `true`.
-/// - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
+/// - zapewnić obsługę wartości null w poleceniach odczytu danych.
+/// - poprawny odczyt ustawia wektor null na same wartości `false`
+/// - w przypadku błędu, braku odczytu lub rozpoznania końca pliku/EOF (jeśli loopToBeginningIfEOF wyłączone) ustawiać wektor null na same wartości `true`.
+/// - obsługiwać jedynie sekwencyjny odczyt danych, gdzie jedyna dopuszczalna pozycja odczytu to 0 a dane są odczytywane w kolejności występowania w pliku.
 /// - implementować interfejs FileInterface, aby umożliwić integrację z innymi komponentami systemu.
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych.
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
 /// - po przeczytaniu ostatnich danych, jeśli opcja loopToBeginningIfEOF jest włączona, powinien automatycznie wrócić do początku pliku i kontynuować odczyt danych od początku.
-/// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, powinien zwrócić dane z ustawionymi wartościami null i zerami a dane odczytywane powinny zawierać wartości null lub failover.
-/// - w przypadku błędu odczytu danych z pliku, powinien odpowiednio ustawić wektor null wartości dla wszystkich pól, aby wskazać, że dane są nieprawidłowe lub niedostępne.
-
+/// - w przypadku osiągnięcia końca pliku, jeśli opcja loopToBeginningIfEOF jest wyłączona, powinien zwrócić wartości oznaczone jako null a dane wypełnione zerami lub innym formatem failover
 class binaryDeviceRO : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;

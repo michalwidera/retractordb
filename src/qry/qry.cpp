@@ -203,7 +203,7 @@ bool qry::adhoc(const std::string &sAdhoc) {
 
 bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
                  std::tuple<int, int, int> gnuplotDim) {
-  timeLimitCntQry = iTimeLimit;  // set value from Launcher.
+  timeLimitCntQry = (iTimeLimit > 0) ? iTimeLimit + 1 : iTimeLimit;  // +1: sentinel 1 means "stop now", 0 means "no limit"
   ptree pt        = netClient("get", "");
 
   const auto stream = pt.get_child("db.stream");

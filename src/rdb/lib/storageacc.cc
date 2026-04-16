@@ -517,10 +517,9 @@ bool storage::write(const size_t recordIndex) {
   return result == 0;
 };
 
-void storage::configureGapDetection(boost::rational<int> rInterval, int nullFillCount, int gapDetectionThreshold) {
+void storage::configureGapDetection(boost::rational<int> rInterval, int nullFillCount) {
   rInterval_              = rInterval;
   nullFillCount_          = nullFillCount;
-  gapDetectionThreshold_  = gapDetectionThreshold;
   gapDetectionConfigured_ = true;
 
   // If metaDataStream already exists, recreate it with the new interval
@@ -528,8 +527,8 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
     metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
   }
 
-  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={} gapDetectionThreshold={}", rInterval_.numerator(),
-              rInterval_.denominator(), nullFillCount_, gapDetectionThreshold_);
+  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(),
+              rInterval_.denominator(), nullFillCount_);
 }
 
 void storage::flushPendingGap() {

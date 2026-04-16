@@ -66,6 +66,38 @@ run_option() {
             tail -n 2 ~/.bashrc
             ;;
         "coverage")
+            gcc_ver=$(gcc -dumpversion | cut -d. -f1)
+            gcov_exec="gcov-${gcc_ver}"
+            echo "-- GCC $gcc_ver detected, checking coverage tools..."
+
+            # gcov — wymagany w wersji zgodnej z GCC
+            if command -v "$gcov_exec" &>/dev/null; then
+                gcov_ver=$("$gcov_exec" --version | head -1 | grep -oP '\d+' | head -1)
+                if [[ "$gcov_ver" != "$gcc_ver" ]]; then
+                    echo "-- gcov version mismatch ($gcov_exec reports $gcov_ver, need $gcc_ver), installing $gcov_exec..."
+                    sudo apt-get install -y gcc-${gcc_ver} || { echo "Error: Failed to install $gcov_exec"; exit 1; }
+                fi
+            else
+                echo "-- $gcov_exec not found, installing $gcov_exec..."
+                sudo apt-get install -y gcc-${gcc_ver} || { echo "Error: Failed to install $gcov_exec"; exit 1; }
+            fi
+
+            # weryfikacja po instalacji
+            if ! command -v "$gcov_exec" &>/dev/null; then
+                echo "Error: $gcov_exec still not available after install attempt"; exit 1
+            fi
+            gcov_ver=$("$gcov_exec" --version | head -1 | grep -oP '\d+' | head -1)
+            if [[ "$gcov_ver" != "$gcc_ver" ]]; then
+                echo "Error: gcov version still mismatched ($gcov_ver != $gcc_ver) after reinstall"; exit 1
+            fi
+            echo "-- OK: $gcov_exec version $gcov_ver matches GCC $gcc_ver"
+
+            # gcovr — narzędzie raportujące
+            if ! command -v gcovr &>/dev/null; then
+                echo "-- gcovr not found, installing..."
+                pip3 install gcovr || { echo "Error: Failed to install gcovr"; exit 1; }
+            fi
+
             cd $build_folder
             cmake --preset conan-debug -DENABLE_COVERAGE=ON
             cd build/Debug
@@ -75,7 +107,8 @@ run_option() {
             ctest || true
             cd ../..
             rm -f *.gcov
-            gcovr --root . --filter 'src/' --gcov-executable gcov-14 --gcov-ignore-errors all --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+            mkdir -p coverage
+            gcovr --root . --filter 'src/' --gcov-executable "$gcov_exec" --gcov-ignore-errors all --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
             ;;
         "quit")
             echo "-- Current conan profile is:"
