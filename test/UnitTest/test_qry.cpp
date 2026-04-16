@@ -150,6 +150,21 @@ TEST(xqry, test_hello_failure) {
   EXPECT_TRUE(obj_fail.hello() == boost::system::errc::protocol_error);
 }
 
+class qry_fake_hello_empty : public qry {
+ public:
+  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+};
+
+boost::property_tree::ptree qry_fake_hello_empty::netClient(const std::string &, const std::string &) {
+  return {};
+}
+
+// Verify hello() returns protocol_error when server responds with an empty payload
+TEST(xqry, test_hello_empty_response) {
+  qry_fake_hello_empty obj_empty;
+  EXPECT_TRUE(obj_empty.hello() == boost::system::errc::protocol_error);
+}
+
 // Verify dirYaml() produces correct YAML with apiVersion header, stream list,
 // and all stream properties (name, delta, size, count, location)
 TEST(xqry, test_dirYaml) {
@@ -163,6 +178,20 @@ TEST(xqry, test_dirYaml) {
   EXPECT_TRUE(result.find("size: 123") != std::string::npos);
   EXPECT_TRUE(result.find("count: 345") != std::string::npos);
   EXPECT_TRUE(result.find("location: /dev/location") != std::string::npos);
+}
+
+// Verify dirYaml() exact output for a deterministic single-stream response
+TEST(xqry, test_dirYaml_exact_output) {
+  qry_fake_detail obj_detail;
+  EXPECT_EQ(obj_detail.dirYaml(),
+            "---\n"
+            "apiVersion: xqry/v1\n"
+            "streams:\n"
+            "  - name: core0\n"
+            "    delta: 1\n"
+            "    size: 123\n"
+            "    count: 345\n"
+            "    location: /dev/location\n");
 }
 
 // Multi-stream fake - returns two streams (core0, core1) with different deltas and sizes.
@@ -214,6 +243,14 @@ TEST(xqry, test_dir_multi_stream) {
   EXPECT_TRUE(result.find("400") != std::string::npos);
 }
 
+// Verify dir() keeps column widths aligned across multi-stream output
+TEST(xqry, test_dir_multi_stream_exact_output) {
+  qry_fake_multi obj_multi;
+  EXPECT_EQ(obj_multi.dir(),
+            "|core0|  1|100|200|/dev/loc0|300|\n"
+            "|core1|0.5|400|500|/dev/loc1|600|\n");
+}
+
 // Verify dirYaml() lists both streams with correct names and deltas
 TEST(xqry, test_dirYaml_multi_stream) {
   qry_fake_multi obj_multi;
@@ -240,6 +277,23 @@ TEST(xqry, test_detailShow_multi_stream_core1) {
 
   EXPECT_TRUE(result.find("name: core1") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 0.5") != std::string::npos);
+}
+
+// Verify detailShow() exact YAML for deterministic single-stream metadata
+TEST(xqry, test_detailShow_exact_output) {
+  qry_fake_detail obj_detail;
+  EXPECT_EQ(obj_detail.detailShow("core0"),
+            "---\n"
+            "apiVersion: xqry/v1\n"
+            "stream:\n"
+            "  name: core0\n"
+            "  delta: 1\n"
+            "query: SELECT * STREAM core0 FROM source\n"
+            "fields:\n"
+            "  core0.rname1:\n"
+            "    type: INTEGER\n"
+            "  core0.rname2:\n"
+            "    type: FLOAT\n");
 }
 
 // Fake with size="-1" and empty location - tests edge-case omission logic in dirYaml()
