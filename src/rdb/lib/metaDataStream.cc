@@ -145,19 +145,18 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
   const auto fileSize = in.tellg();
   if (fileSize <= 0 || static_cast<size_t>(fileSize) <= kHeaderSize) return result;
 
+  const size_t eSize       = entrySize();
   const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
-  if (payloadSize % entrySize() != 0) {
-    SPDLOG_DEBUG("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, entrySize());
+  if (payloadSize % eSize != 0) {
+    SPDLOG_DEBUG("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, eSize);
   }
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
 
-  const auto remainingSize = static_cast<size_t>(fileSize) - kHeaderSize;
-  std::vector<std::byte> fileData(remainingSize);
-  in.read(reinterpret_cast<char *>(fileData.data()), static_cast<std::streamsize>(remainingSize));
+  std::vector<std::byte> fileData(payloadSize);
+  in.read(reinterpret_cast<char *>(fileData.data()), static_cast<std::streamsize>(payloadSize));
 
   std::span<const std::byte> remaining(fileData);
-  const size_t eSize = entrySize();
 
   while (remaining.size() >= eSize) {
     auto rec = IndexRecord::deserialize(remaining.subspan(0, eSize));
@@ -372,8 +371,6 @@ void metaDataStream::onTransmissionGap(size_t gapDuration) {
   gapMarker.recordCount = gapDuration;
   gapMarker.isGap       = true;
   appendEntry(gapMarker);
-
-  createNullBitsetTemplate();
 }
 
 bool metaDataStream::isGapBefore(size_t recordIndex) const {
@@ -395,9 +392,7 @@ bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
 
 void metaDataStream::reset() {
   // Clear all data and reset to initial state
-  currentEntry_.recordCount = 0;
-  currentEntry_.nullBitset.assign(descriptorRef_->size(), false);
-
+  createNullBitsetTemplate();
   committedRecordCount_ = 0;
 
   // Rewrite file with only the header

@@ -23,7 +23,7 @@ namespace rdb {
 /// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie,
 /// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
 /// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
-/// - interwał próbkowania pobierany jest z klasy strorage i służy do obliczania długości przerw w transmisji w jednostkach próbkowania,
+/// - interwał próbkowania pobierany jest z klasy storage i służy do obliczania długości przerw w transmisji w jednostkach próbkowania,
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 ///
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
