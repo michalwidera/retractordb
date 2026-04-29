@@ -110,6 +110,13 @@ run_option() {
             mkdir -p coverage
             gcovr --root . --filter 'src/' --gcov-executable "$gcov_exec" --gcov-ignore-errors all --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
             ;;
+        "vimsyntax")
+            vim_dir="${HOME}/.vim"
+            mkdir -p "$vim_dir/syntax" "$vim_dir/ftdetect"
+            cp "$build_folder/scripts/.vim/syntax/rql.vim"   "$vim_dir/syntax/"
+            cp "$build_folder/scripts/.vim/ftdetect/rql.vim" "$vim_dir/ftdetect/"
+            echo "-- RetractorQL vim syntax installed to $vim_dir"
+            ;;
         "batsyntax")
             BAT=$(command -v batcat 2>/dev/null || command -v bat 2>/dev/null || true)
             if [ -z "$BAT" ]; then
@@ -139,6 +146,7 @@ run_option() {
             echo "  ninja      - Add Ninja generator to conan profile"
             echo "  bashrc     - Add retractordb/bin to PATH in ~/.bashrc"
             echo "  coverage   - Build tests with code coverage enabled"
+            echo "  vimsyntax  - Install RetractorQL syntax highlighting for vim"
             echo "  batsyntax  - Install RetractorQL syntax highlighting for bat/batcat"
             echo "  help       - Show this help message"
             echo "  quit       - Show current conan profile and exit"
@@ -147,7 +155,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-           echo "Valid options: release debug conan ninja toolchain bashrc coverage batsyntax help quit"
+           echo "Valid options: release debug conan ninja toolchain bashrc coverage vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -159,7 +167,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "conan" "ninja" "toolchain" "bashrc" "coverage" "batsyntax" "help" "quit")
+    options=("release" "debug" "conan" "ninja" "toolchain" "bashrc" "coverage" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"

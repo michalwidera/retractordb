@@ -6,32 +6,66 @@ if exists("b:current_syntax")
   finish
 endif
 
-" basic
-syn keyword rqlKey DECLARE FILE SELECT STREAM FROM STORAGE RULE VOLATILE ON WHEN DO DUMP SYSTEM
+" RQL statement keywords (SELECT, DECLARE, RULE, etc.)
+syn keyword rqlKey          SELECT select STREAM stream FROM from DECLARE declare
+syn keyword rqlKey          FILE file VOLATILE volatile RULE rule ON on
+syn keyword rqlKey          WHEN when DO do DUMP dump TO to SYSTEM system
+syn keyword rqlKey          DISPOSABLE disposable ONESHOT oneshot HOLD hold
+syn keyword rqlKey          RETENTION retention
 
-" comment
-syn match  rqlComment       "^#.*$"
+" Compiler option directives
+syn keyword rqlDirective    STORAGE storage ROTATION rotation SUBSTRAT substrat
 
-" Strings
-syn region rqlString        start=+"+  skip=+\\\\\|\\"+  end=+"+
-syn region rqlString        start=+'+  skip=+\\\\\|\\'+  end=+'+
-syn region rqlString        start=+`+  skip=+\\\\\|\\`+  end=+`+
+" Logical operators
+syn keyword rqlLogic        AND and OR or NOT not
 
-" Numbers
-syn match rqlNumber         "\<[0-9]*\>"
-syn match rqlNumber         "\<[0-9]*\.[0-9]*\>"
-syn match rqlNumber         "\<[0-9][0-9]*e[+-]\=[0-9]*\>"
-syn match rqlNumber         "\<[0-9]*\.[0-9]*e[+-]\=[0-9]*\>"
-syn match rqlNumber         "\<[0-9]*\/[0-9]*\>"
-syn match rqlNumber         "\<0x[abcdef0-9]*\>"
+" Storage profile values (TYPE_PROFILE)
+syn keyword rqlProfile      MEMORY memory DEFAULT default DIRECT direct
+syn keyword rqlProfile      POSIX posix POSIXSHD posixshd GENERIC generic
+syn keyword rqlProfile      DEVICE device TEXTSOURCE textsource
 
-" Types
-syn keyword rqlType         BYTE Byte CHAR Char UINT Unsigned FLOAT Float INTEGER Integer STRING String
+" Comments: '# ' (space required), // and /* */
+syn match  rqlComment       "# .*$"
+syn match  rqlComment       "//.*$"
+syn region rqlComment       start="/\*" end="\*/" contains=rqlComment
 
-hi def link rqlNumber       Number
-hi def link rqlString       String
+" Strings: single-quoted only ('' is escaped quote inside string)
+syn region rqlString        start=+'+  end=+'+  contains=rqlStringEscape
+syn match  rqlStringEscape  "''"  contained
+
+" Numbers: integer, float, fraction (rational)
+syn match rqlNumber         "\<[0-9]\+\>"
+syn match rqlNumber         "\<[0-9]\+\.[0-9]\+\>"
+syn match rqlNumber         "\<[0-9]\+[eE][+-]\=[0-9]\+\>"
+syn match rqlNumber         "\<[0-9]\+\.[0-9]\+[eE][+-]\=[0-9]\+\>"
+syn match rqlNumber         "\<[0-9]\+\/[0-9]\+\>"
+
+" Data types (RQL.g4 + DESC.g4)
+syn keyword rqlType         BYTE Byte CHAR Char UINT Uint STRING String
+syn keyword rqlType         FLOAT Float INTEGER Integer DOUBLE Double RATIONAL
+
+" DESC meta-commands
+syn keyword rqlDesc         REF TYPE RETMEMORY INTPAIR IDXPAIR
+
+" Aggregate functions
+syn keyword rqlAggregate    MIN min MAX max AVG avg SUMC sumc
+
+" Built-in functions
+syn keyword rqlFunction     Sqrt Ceil Abs Floor Sign Chr Length
+syn keyword rqlFunction     ToNumber ToTimeStamp FloatCast IntCast
+syn keyword rqlFunction     Count Crc Sum IsZero IsNonZero
+
 hi def link rqlKey          Keyword
+hi def link rqlDirective    PreProc
+hi def link rqlLogic        Operator
+hi def link rqlProfile      Constant
 hi def link rqlComment      Comment
+hi def link rqlString       String
+hi def link rqlStringEscape SpecialChar
+hi def link rqlNumber       Number
 hi def link rqlType         Type
+hi def link rqlDesc         Special
+hi def link rqlAggregate    Function
+hi def link rqlFunction     Function
 
 let b:current_syntax = "rql"
