@@ -386,7 +386,7 @@ int main(int argc, char *argv[]) {
       const size_t nFields = dacc->descriptor.size();
 
       std::cout << BLUE << "meta: " << metaFilePath << "\n";
-      std::cout << "interval: " << metaView.getSamplingInterval() << "  ";
+      std::cout << "interval: " << dacc->getSamplingInterval() << "  ";
       std::cout << "total records: " << metaView.totalRecords() << "\n" << RESET;
 
       size_t segIdx = 0;
@@ -424,7 +424,7 @@ int main(int argc, char *argv[]) {
         continue;
       }
 
-      constexpr size_t headerSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
+      constexpr size_t headerSize = sizeof(int64_t);
       const size_t bitsetBytes    = (dacc->descriptor.size() + 7) / 8;
       const size_t entrySize      = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
 
@@ -434,16 +434,25 @@ int main(int argc, char *argv[]) {
         continue;
       }
 
+      in.seekg(0, std::ios::end);
+      const auto fileSize = in.tellg();
+      in.seekg(0, std::ios::beg);
+
+      size_t effectiveHeaderSize = headerSize;
+      if (fileSize >= 0) {
+        const auto fs = static_cast<size_t>(fileSize);
+        if (!(fs >= headerSize && (fs - headerSize) % entrySize == 0)) {
+          std::cout << YELLOW << "warning: unexpected meta payload alignment\n" << RESET;
+        }
+      }
+
       int64_t creationTimeNs = 0;
-      int32_t rNum = 0, rDen = 1;
       in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
-      in.read(reinterpret_cast<char *>(&rNum), sizeof(rNum));
-      in.read(reinterpret_cast<char *>(&rDen), sizeof(rDen));
 
       std::cout << BLUE << "meta raw: " << metaFilePath << "\n" << RESET;
-      std::cout << "header size: " << headerSize << "\n";
+      std::cout << "header size: " << effectiveHeaderSize << "\n";
       std::cout << "entry size: " << entrySize << "\n";
-      std::cout << "sampling interval: " << rNum << "/" << rDen << "\n";
+      std::cout << "sampling interval: " << dacc->getSamplingInterval() << "\n";
 
       size_t entryIdx = 0;
       while (true) {

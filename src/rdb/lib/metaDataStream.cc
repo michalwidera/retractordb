@@ -85,7 +85,7 @@ size_t metaDataStream::entrySize() const {
   return sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
 }
 
-static constexpr size_t kHeaderSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
+static constexpr size_t kHeaderSize = sizeof(int64_t);
 
 void metaDataStream::flushCurrentEntry() {
   if (currentEntry_.recordCount > 0) {
@@ -102,11 +102,7 @@ void metaDataStream::saveHeader() {
   if (!out.is_open()) return;
 
   int64_t creationTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(creationTime_.time_since_epoch()).count();
-  int32_t rNum           = rInterval_.numerator();
-  int32_t rDen           = rInterval_.denominator();
   out.write(reinterpret_cast<const char *>(&creationTimeNs), sizeof(creationTimeNs));
-  out.write(reinterpret_cast<const char *>(&rNum), sizeof(rNum));
-  out.write(reinterpret_cast<const char *>(&rDen), sizeof(rDen));
 }
 
 void metaDataStream::appendEntry(const IndexRecord &entry) {
@@ -127,11 +123,7 @@ void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
   if (!out.is_open()) return;
 
   int64_t creationTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(creationTime_.time_since_epoch()).count();
-  int32_t rNum           = rInterval_.numerator();
-  int32_t rDen           = rInterval_.denominator();
   out.write(reinterpret_cast<const char *>(&creationTimeNs), sizeof(creationTimeNs));
-  out.write(reinterpret_cast<const char *>(&rNum), sizeof(rNum));
-  out.write(reinterpret_cast<const char *>(&rDen), sizeof(rDen));
 
   for (const auto &rec : entries) {
     auto buf = rec.serialize();
@@ -151,7 +143,12 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
 
   in.seekg(0, std::ios::end);
   const auto fileSize = in.tellg();
-  if (static_cast<size_t>(fileSize) <= kHeaderSize) return result;
+  if (fileSize <= 0 || static_cast<size_t>(fileSize) <= kHeaderSize) return result;
+
+  const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
+  if (payloadSize % entrySize() != 0) {
+    SPDLOG_DEBUG("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, entrySize());
+  }
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
 
@@ -183,13 +180,9 @@ void metaDataStream::loadIndex() {
   if (static_cast<size_t>(fileSize) < kHeaderSize) return;
 
   int64_t creationTimeNs = 0;
-  int32_t rNum = 0, rDen = 1;
   in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
-  in.read(reinterpret_cast<char *>(&rNum), sizeof(rNum));
-  in.read(reinterpret_cast<char *>(&rDen), sizeof(rDen));
 
   creationTime_ = std::chrono::system_clock::time_point(std::chrono::nanoseconds(creationTimeNs));
-  if (rDen != 0) rInterval_ = boost::rational<int>(rNum, rDen);
 
   in.close();
 
@@ -236,13 +229,12 @@ std::pair<size_t, size_t> metaDataStream::locateRecord(size_t recordIndex) const
 
 // ── Construction / destruction ───────────────────────────────────────
 
-metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath, boost::rational<int> rInterval)
+metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath)
     : descriptorRef_(std::make_shared<Descriptor>(descriptor)),
       metaFilePath_(metaFilePath),
-      rInterval_(rInterval),
       creationTime_(std::chrono::system_clock::now()) {
   createNullBitsetTemplate();
-  loadIndex();  // may overwrite creationTime_ & rInterval_ from file header
+  loadIndex();  // may overwrite creationTime_ from file header
 
   // Persist header even when there are no entries yet,
   // so that the file exists on disk for external tools / crash recovery.
@@ -398,10 +390,6 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
   }
   return false;
 }
-
-// ── Time / configuration interface ─────────────────────────────────
-
-boost::rational<int> metaDataStream::getSamplingInterval() const { return rInterval_; }
 
 bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
 

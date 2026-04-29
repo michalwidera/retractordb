@@ -3,7 +3,6 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/metaDataStream.hpp"
 
-#include <boost/rational.hpp>
 #include <chrono>
 #include <cstdio>
 
@@ -119,17 +118,14 @@ TEST_F(MetaTestFixture, test_transmission_gap) {
   EXPECT_TRUE(meta.isGapBefore(2));
 }
 
-TEST_F(MetaTestFixture, test_timestamps) {
+TEST_F(MetaTestFixture, test_transmission_gap_positioning) {
   rdb::Descriptor descriptor;
   descriptor.append({{"t", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile, boost::rational<int>(1, 10));  // 0.1s interval
+  rdb::metaDataStream meta(descriptor, metaFile);
   std::vector<bool> pat = {false};
 
   meta.onRecordAppended(pat);
-
-  // Sampling interval should be 1/10
-  EXPECT_EQ(meta.getSamplingInterval(), boost::rational<int>(1, 10));
 
   // Gap inserted after one record should be at record index 1.
   meta.onTransmissionGap();
@@ -619,8 +615,7 @@ TEST_F(MetaTestFixture, test_reset_preserves_metadata) {
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
-  auto rInterval = boost::rational<int>(1, 2);
-  rdb::metaDataStream meta(descriptor, metaFile, rInterval);
+  rdb::metaDataStream meta(descriptor, metaFile);
 
   std::vector<bool> pat = {true};
   meta.onRecordAppended(pat);
@@ -628,8 +623,7 @@ TEST_F(MetaTestFixture, test_reset_preserves_metadata) {
   // Reset
   meta.reset();
 
-  // Sampling interval should be preserved
-  EXPECT_EQ(meta.getSamplingInterval(), rInterval);
+  // Reset preserves metadata stream usability
   EXPECT_EQ(meta.totalRecords(), 0u);
 }
 

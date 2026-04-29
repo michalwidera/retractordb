@@ -302,7 +302,7 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
 
   // After storage is closed, meta file must contain at least one RLE entry
   ASSERT_TRUE(std::filesystem::exists(metaFile));
-  constexpr uintmax_t headerSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
+  constexpr uintmax_t headerSize = sizeof(int64_t);
   EXPECT_GT(std::filesystem::file_size(metaFile), headerSize);
 
   std::filesystem::remove(dataFile);

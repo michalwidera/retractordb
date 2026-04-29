@@ -2,7 +2,6 @@
 
 #include "descriptor.hpp"
 
-#include <boost/rational.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -23,7 +22,8 @@ namespace rdb {
 /// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu,
 /// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie,
 /// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
-/// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu i interwał próbkowania są zapisywane w nagłówku pliku,
+/// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
+/// - interwał próbkowania pobierany jest z klasy strorage i służy do obliczania długości przerw w transmisji w jednostkach próbkowania,
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 ///
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
@@ -52,9 +52,7 @@ class metaDataStream {
   /// into the in-memory index (loadIndex).
   /// @param descriptor  descriptor of the indexed data stream
   /// @param metaFilePath path of the file to save/load the meta index
-  /// @param rInterval   sampling interval for time calculations (default: 1 second)
-  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath,
-                          boost::rational<int> rInterval = boost::rational<int>(1));
+  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath);
 
   /// @brief Destructor – flushes the pending entry to file.
   ~metaDataStream();
@@ -115,12 +113,6 @@ class metaDataStream {
   /// @note For recordIndex == 0, returns false (no gap before first record)
   bool isGapBefore(size_t recordIndex) const;
 
-  // ── Time / configuration interface ────────────────────────────────
-
-  /// @brief Get the configured sampling interval.
-  /// @return rInterval value used for time calculations
-  boost::rational<int> getSamplingInterval() const;
-
   // ── Lifecycle interface ────────────────────────────────────────────
 
   /// @brief Check whether the index is empty (no records registered).
@@ -130,14 +122,14 @@ class metaDataStream {
   /// @brief Clear all index data and reset to initial state.
   ///
   /// Removes all committed entries and resets the pending entry.
-  /// Does not modify the creation time or sampling interval.
+  /// Does not modify the creation time.
   /// The meta file is rewritten with only the header.
   void reset();
 
  private:
   void createNullBitsetTemplate();
   void loadIndex();                                           ///< read header and restore currentEntry_ from file
-  void saveHeader();                                          ///< write file header (creation time, rInterval) without entries
+  void saveHeader();                                          ///< write file header (creation time) without entries
   void appendEntry(const IndexRecord &entry);                 ///< append a single entry to end of file
   void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
   void flushCurrentEntry();                                   ///< commit currentEntry_ to file if recordCount > 0
@@ -152,7 +144,6 @@ class metaDataStream {
 
   std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
-  boost::rational<int> rInterval_{1};                   ///< stream sampling interval for time calculations
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
   size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
   IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run

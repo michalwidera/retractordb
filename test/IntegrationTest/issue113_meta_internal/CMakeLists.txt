@@ -19,7 +19,7 @@ add_test(
     for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 1; done ; \
     [ ! -f /tmp/xretractor_service.lock ] ; \
     ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
-    grep -Fq 'header size: 16' out.txt ; \
+    grep -Fq 'header size: 8' out.txt ; \
     grep -Fq 'entry size: 18' out.txt ; \
     grep -Fq 'sampling interval: 1/1' out.txt ; \
     grep -Fq 'entry[0] count:1 gap:0 bitsetSize:2 bitsetHex:03' out.txt ; \

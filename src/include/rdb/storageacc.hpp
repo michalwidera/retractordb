@@ -127,10 +127,13 @@ class storage {
   /// When set, write() will automatically detect transmission gaps based on
   /// consecutive all-null records from the source. Before a gap marker is registered,
   /// nullFillCount null/fallback records are written to storage and the meta index,
-  /// satisfying R17. The rInterval is forwarded to metaDataStream for timestamp calculations.
+  /// satisfying R17.
   /// @param rInterval     sampling interval (e.g. 1/10 = 100ms)
   /// @param nullFillCount number of nullfill records to write before marking a gap (default: 2)
   void configureGapDetection(boost::rational<int> rInterval, int nullFillCount = 2);
+
+  /// @brief Return the current sampling interval configured in storage.
+  boost::rational<int> getSamplingInterval() const;
 
   // technical function - for unit tests
   void resetForUnitTest();

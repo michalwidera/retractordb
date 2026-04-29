@@ -163,7 +163,7 @@ void storage::attachStorage() {
   recordsCount_ = accessor_->count();
   SPDLOG_INFO("record count {} on {}", recordsCount_, storageFile_);
 
-  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
+  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
   SPDLOG_INFO("metaIndex file {} rInterval {}/{}", metaIndexFile_, rInterval_.numerator(), rInterval_.denominator());
 }
 
@@ -522,14 +522,16 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
   nullFillCount_          = nullFillCount;
   gapDetectionConfigured_ = true;
 
-  // If metaDataStream already exists, recreate it with the new interval
+  // If metaDataStream already exists, recreate it with current storage settings.
   if (metaDataStream_) {
-    metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
+    metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
   }
 
   SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(), rInterval_.denominator(),
               nullFillCount_);
 }
+
+boost::rational<int> storage::getSamplingInterval() const { return rInterval_; }
 
 void storage::flushPendingGap() {
   if (activeGapDuration_ == 0 || !metaDataStream_) return;
