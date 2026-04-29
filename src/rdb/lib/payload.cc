@@ -33,7 +33,7 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
     abort();
   }
 
-  auto positionOpt = descriptor.convert(positionFlat);
+  auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
   if (!positionOpt.has_value()) {
     SPDLOG_ERROR("{} conversion failed for flat position {}", context, positionFlat);
     assert(false && "payload flat conversion failed");
@@ -102,7 +102,7 @@ void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldNa
   T data;
   is >> data;
   Descriptor desc(rhs.descriptor);
-  auto dest = rhs.span().subspan(desc.offsetBegArr(fieldName) + arrayOffset, sizeof(T));
+  auto dest = rhs.span().subspan(desc.fieldByteOffset(fieldName) + arrayOffset, sizeof(T));
   std::memcpy(dest.data(), &data, sizeof(T));
 }
 
@@ -212,7 +212,7 @@ template <typename T>
 void payload::setItemBy(const int positionFlat, std::optional<std::any> value) {
   T data          = std::any_cast<T>(value.value());
   auto position   = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
-  auto offsetFlat = descriptor.offset(positionFlat);
+  auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);
   auto dest       = span().subspan(offsetFlat, descriptor[position].rlen);
   std::memcpy(dest.data(), &data, descriptor[position].rlen);
 }
@@ -236,7 +236,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     const auto len = descriptor[position].rlen * descriptor[position].rarray;
     std::string data(std::any_cast<std::string>(value));
     auto lenr       = std::min(len, static_cast<int>(data.length()));
-    auto destOffset = descriptor.offset(positionFlat);
+    auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
     assert(destOffset + len <= descriptor.getSizeInBytes());
     std::fill(dest.begin(), dest.end(), 0);
@@ -298,7 +298,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
   if (nullBitset_[position]) return std::nullopt;
 
   const auto requestedType = descriptorCopy[position].rtype;
-  const auto offsetFlat    = descriptorCopy.offset(positionFlat);
+  const auto offsetFlat    = descriptorCopy.byteOffsetAtFlatIndex(positionFlat);
   auto memory              = span();
 
   auto readStringField = [&]() -> std::string {
@@ -362,47 +362,47 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
     return is;
   }
 
-  const auto fieldIndex = desc.position(fieldName);
+  const auto fieldIndex = desc.fieldIndex(fieldName);
 
-  if (desc.type(fieldName) == "NULL") {
+  if (desc.fieldTypeName(fieldName) == "NULL") {
     rhs.setItem(static_cast<int>(fieldIndex), std::any(std::monostate{}));
     return is;
   }
 
-  if (desc.type(fieldName) == "STRING") {
+  if (desc.fieldTypeName(fieldName) == "STRING") {
     std::string record;
     is >> record;
     auto fieldLen  = desc.fieldSize(fieldName);
-    auto fieldSpan = rhs.span().subspan(desc.offsetBegArr(fieldName), fieldLen);
+    auto fieldSpan = rhs.span().subspan(desc.fieldByteOffset(fieldName), fieldLen);
     std::fill(fieldSpan.begin(), fieldSpan.end(), 0);
     std::copy_n(record.c_str(), std::min((size_t)fieldLen, record.size()), fieldSpan.begin());
     rhs.nullBitset_[fieldIndex] = false;
   } else
-    for (auto i = 0; i < desc[desc.position(fieldName)].rarray; i++) {
-      if (desc.type(fieldName) == "BYTE") {
+    for (auto i = 0; i < desc[desc.fieldIndex(fieldName)].rarray; i++) {
+      if (desc.fieldTypeName(fieldName) == "BYTE") {
         int data;
         is >> data;
         uint8_t data8 = static_cast<uint8_t>(data);
-        auto dest     = rhs.span().subspan(desc.offsetBegArr(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
+        auto dest     = rhs.span().subspan(desc.fieldByteOffset(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
         std::memcpy(dest.data(), &data8, sizeof(uint8_t));
         rhs.nullBitset_[fieldIndex] = false;
-      } else if (desc.type(fieldName) == "UINT")
+      } else if (desc.fieldTypeName(fieldName) == "UINT")
         copyToMemory<uint>(is, rhs, fieldName, i * sizeof(unsigned)), rhs.nullBitset_[fieldIndex] = false;
-      else if (desc.type(fieldName) == "INTEGER")
+      else if (desc.fieldTypeName(fieldName) == "INTEGER")
         copyToMemory<int>(is, rhs, fieldName, i * sizeof(int)), rhs.nullBitset_[fieldIndex] = false;
-      else if (desc.type(fieldName) == "FLOAT")
+      else if (desc.fieldTypeName(fieldName) == "FLOAT")
         copyToMemory<float>(is, rhs, fieldName, i * sizeof(float)), rhs.nullBitset_[fieldIndex] = false;
-      else if (desc.type(fieldName) == "DOUBLE")
+      else if (desc.fieldTypeName(fieldName) == "DOUBLE")
         copyToMemory<double>(is, rhs, fieldName, i * sizeof(double)), rhs.nullBitset_[fieldIndex] = false;
-      else if (desc.type(fieldName) == "RATIONAL")
+      else if (desc.fieldTypeName(fieldName) == "RATIONAL")
         copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)), rhs.nullBitset_[fieldIndex] = false;
-      else if (desc.type(fieldName) == "REF")
+      else if (desc.fieldTypeName(fieldName) == "REF")
         SPDLOG_ERROR("REF store not supported by this operator.");
-      else if (desc.type(fieldName) == "TYPE")
+      else if (desc.fieldTypeName(fieldName) == "TYPE")
         SPDLOG_ERROR("TYPE store not supported by this operator.");
-      else if (desc.type(fieldName) == "RETENTION")
+      else if (desc.fieldTypeName(fieldName) == "RETENTION")
         SPDLOG_ERROR("RETENTION store not supported by this operator.");
-      else if (desc.type(fieldName) == "RETMEMORY")
+      else if (desc.fieldTypeName(fieldName) == "RETMEMORY")
         SPDLOG_ERROR("RETMEMORY store not supported by this operator.");
       else
         SPDLOG_ERROR("field {} not found", fieldName);
@@ -426,7 +426,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         (r.rtype == rdb::RETENTION) ||  //
         (r.rtype == rdb::RETMEMORY))    // skip these types
       continue;
-    if (!Descriptor::getFlat())
+    if (!Descriptor::isSingleLineOutput())
       os << "\t";
     else
       os << " ";
@@ -449,16 +449,16 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
       flatIndex += flatCountForField;
     }
-    if (!Descriptor::getFlat()) os << std::endl;
+    if (!Descriptor::isSingleLineOutput()) os << std::endl;
   }
   if (rhs.descriptor.empty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  if (Descriptor::getFlat()) os << " ";
+  if (Descriptor::isSingleLineOutput()) os << " ";
   os << "}";
-  if (!Descriptor::getFlat()) os << std::endl;
-  Descriptor::setFlat(false);
+  if (!Descriptor::isSingleLineOutput()) os << std::endl;
+  Descriptor::setSingleLineOutput(false);
   return os;
 }
 

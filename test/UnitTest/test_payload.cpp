@@ -36,7 +36,7 @@ TEST(payload, position_conversion_case_3_with_payload) {
   EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()).c_str() == std::string("test"));
 
   std::stringstream coutstring;
-  coutstring << rdb::flat << payload;
+  coutstring << rdb::singleLineFormat << payload;
   EXPECT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
 }
 
@@ -91,7 +91,7 @@ TEST(payload, null_type_round_trips_as_monostate) {
   EXPECT_EQ(rewritten->type(), typeid(std::monostate));
 
   std::stringstream out;
-  out << rdb::flat << payload;
+  out << rdb::singleLineFormat << payload;
   EXPECT_EQ(out.str(), "{ nothing:null }");
 }
 
@@ -172,7 +172,7 @@ TEST(payload, operator_ostream_emits_null_for_null_field) {
   p.setItem(0, std::nullopt);
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ x:null }");
 }
 
@@ -185,7 +185,7 @@ TEST(payload, operator_ostream_mixed_null_and_value) {
   p.setItem(1, 42);
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ a:null b:42 }");
 }
 
@@ -236,7 +236,7 @@ TEST(payload, operator_ostream_null_string_field) {
   p.setItem(0, std::nullopt);
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ name:null }");
 }
 
@@ -284,6 +284,6 @@ TEST(payload, stream_operators_support_rational_fields) {
   EXPECT_EQ(std::any_cast<boost::rational<int>>(p.getItem(0).value()), boost::rational<int>(3, 4));
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ ratio:3/4 }");
 }

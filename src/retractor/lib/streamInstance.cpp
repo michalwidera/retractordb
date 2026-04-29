@@ -73,7 +73,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
   auto recordsCountSrc   = source->getRecordsCount();
   auto descriptorSrcSize = source->descriptor.flatElementCount();
-  auto [maxType, maxLen] = source->descriptor.getMaxType();
+  auto [maxType, maxLen] = source->descriptor.widestFieldType();
   for (auto i = 0; i < lengthAbs; ++i) {
     rdb::rField x(instance + "_" + std::to_string(i),  //
                   maxLen,                              //
@@ -163,7 +163,7 @@ rdb::payload streamInstance::constructAggregate(command_id cmd, const std::strin
   // First construct descriptor
   outputPayload->revRead(0);
 
-  auto [maxType_, maxLen] = outputPayload->descriptor.getMaxType();
+  auto [maxType_, maxLen] = outputPayload->descriptor.widestFieldType();
   auto const maxType      = maxType_;
   rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
   rdb::Descriptor descriptor{x};

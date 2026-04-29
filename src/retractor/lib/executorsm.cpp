@@ -367,7 +367,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 
   ptree pt;
   pt.put("stream", query_name);
-  const auto fields = payload->descriptor.fieldsFlat();
+  const auto fields = payload->descriptor.dataFields();
   pt.put("count", boost::lexical_cast<std::string>(fields.size()));
 
   std::string nullmap;

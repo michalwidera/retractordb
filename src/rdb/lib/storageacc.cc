@@ -189,7 +189,7 @@ void storage::initializeAccessor() {
   } else if (storageType_ == "DIRECT") {
     accessor_ = std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, descriptor, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
-    accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, descriptor, descriptor.policy());
+    accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, descriptor, descriptor.storagePolicy());
   } else if (storageType_ == "POSIX") {
     accessor_ = std::make_unique<rdb::posixBinaryFile>(storageFile_, descriptor, percounter_);
   } else if (storageType_ == "POSIXSHD") {

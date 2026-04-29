@@ -117,10 +117,10 @@ TEST_F(xschema, check_construct_payload) {
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 2));
     std::stringstream coutstring1;
-    coutstring1 << rdb::flat << payload.get()->descriptor;
+    coutstring1 << rdb::singleLineFormat << payload.get()->descriptor;
     std::stringstream coutstring2;
-    coutstring2 << rdb::flat << *(payload.get());
-    std::cerr << rdb::flat << *(payload.get()) << std::endl;
+    coutstring2 << rdb::singleLineFormat << *(payload.get());
+    std::cerr << rdb::singleLineFormat << *(payload.get()) << std::endl;
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:null str1_2:null str1_3:null }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -142,11 +142,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 2));
     std::stringstream coutstring1;
-    coutstring1 << rdb::flat << payload.get()->descriptor;
+    coutstring1 << rdb::singleLineFormat << payload.get()->descriptor;
 
     std::stringstream coutstring2;
-    coutstring2 << rdb::flat << *(payload.get());
-    std::cout << rdb::flat << *(payload.get()) << std::endl;
+    coutstring2 << rdb::singleLineFormat << *(payload.get());
+    std::cout << rdb::singleLineFormat << *(payload.get()) << std::endl;
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:null str1_1:null str1_2:null str1_3:11 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -177,11 +177,11 @@ TEST_F(xschema, check_sum) {
     auto payload = *(dataStr1.outputPayload->getPayload()) + *(dataStr2.outputPayload->getPayload());
 
     std::stringstream coutstring1;
-    coutstring1 << rdb::flat << payload.descriptor;
+    coutstring1 << rdb::singleLineFormat << payload.descriptor;
     std::cout << coutstring1.str() << std::endl;
 
     std::stringstream coutstring2;
-    coutstring2 << rdb::flat << payload;
+    coutstring2 << rdb::singleLineFormat << payload;
     std::cout << "!" << coutstring2.str() << std::endl;
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:16 str2_0:333 }");

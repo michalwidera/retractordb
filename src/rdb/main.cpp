@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
       std::cout << YELLOW << dacc->descriptor << RESET << std::endl;
       continue;
     } else if (cmd == "descc") {
-      std::cout << YELLOW << rdb::flat << dacc->descriptor << RESET << std::endl;
+      std::cout << YELLOW << rdb::singleLineFormat << dacc->descriptor << RESET << std::endl;
       continue;
     } else if (cmd == "read" || cmd == "rread") {
       int record;
@@ -239,19 +239,19 @@ int main(int argc, char *argv[]) {
       int position{0};
       std::cin >> position;
       auto fieldName = dacc->descriptor[position].rname;
-      if (dacc->descriptor.type(fieldName) == "INTEGER") {
+      if (dacc->descriptor.fieldTypeName(fieldName) == "INTEGER") {
         int value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->descriptor.type(fieldName) == "DOUBLE") {
+      } else if (dacc->descriptor.fieldTypeName(fieldName) == "DOUBLE") {
         double value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->descriptor.type(fieldName) == "BYTE") {
+      } else if (dacc->descriptor.fieldTypeName(fieldName) == "BYTE") {
         uint8_t value{0};
         std::cin >> value;
         dacc->getPayload()->setItem(position, value);
-      } else if (dacc->descriptor.type(fieldName) == "STRING") {
+      } else if (dacc->descriptor.fieldTypeName(fieldName) == "STRING") {
         std::string record{""};
         std::cin >> record;
         dacc->getPayload()->setItem(position, record);
@@ -298,7 +298,7 @@ int main(int argc, char *argv[]) {
       std::cout << ORANGE << *(dacc->getPayload()) << RESET;
       continue;
     } else if (cmd == "printt") {
-      std::cout << ORANGE << rdb::flat << *(dacc->getPayload()) << RESET << std::endl;
+      std::cout << ORANGE << rdb::singleLineFormat << *(dacc->getPayload()) << RESET << std::endl;
       continue;
     } else if (cmd == "list" || cmd == "rlist") {
       int record{0};
@@ -315,7 +315,7 @@ int main(int argc, char *argv[]) {
           std::cout << RED << "fetch error\n" << RESET;
           continue;
         }
-        std::cout << ORANGE << rdb::flat << *(dacc->getPayload()) << RESET << std::endl;
+        std::cout << ORANGE << rdb::singleLineFormat << *(dacc->getPayload()) << RESET << std::endl;
       }
       continue;
     } else if (cmd == "input") {

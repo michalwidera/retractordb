@@ -290,7 +290,7 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
     auto [step, windowSize] = std::get<std::pair<int, int>>(cmd_token.getVT());
-    auto [maxType, maxLen]  = coreInstance[sName1].descriptorStorage().getMaxType();
+    auto [maxType, maxLen]  = coreInstance[sName1].descriptorStorage().widestFieldType();
     std::list<field> schema;
     for (int i = 0; i < abs(windowSize); i++) {
       field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), maxLen, 1, maxType),

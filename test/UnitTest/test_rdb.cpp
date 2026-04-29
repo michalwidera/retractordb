@@ -139,10 +139,10 @@ TEST(xrdb, test_storage) {
   pl->setItem(1, static_cast<uint8_t>(0x22));
   pl->setItem(2, 0x66);
 
-  // Verify offsetBegArr("TLen") points to the correct location in raw memory
+  // Verify fieldByteOffset("TLen") points to the correct location in raw memory
   {
     int tlenViaOffset;
-    std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.offsetBegArr("TLen"), sizeof(int));
+    std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.fieldByteOffset("TLen"), sizeof(int));
     EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), tlenViaOffset);
   }
 
