@@ -19,6 +19,7 @@ namespace rdb {
 /// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
 /// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
 /// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
+/// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić szybkie aktualizacje bez konieczności odczytu całego indeksu z pliku,
 /// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu,
 /// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie,
 /// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
