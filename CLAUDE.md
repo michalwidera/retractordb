@@ -4,27 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build System
 
-RetractorDB uses **Conan 2** for dependency management and **CMake** (Make or Ninja) for building.
+RetractorDB uses **Conan 2** for dependency management and **CMake + Ninja** for building (Ninja preferred; Make also supported).
 
 ### Initial setup (first time)
+
+The helper script `scripts/buildrdb.sh` automates the full setup. Run it from the repo root, `scripts/`, or `build/Debug/` — it detects the current directory automatically. Options can be chained:
+
 ```bash
-conan profile detect
-conan install . -s build_type=Debug --build missing
-conan build . -s build_type=Debug --build missing
+scripts/buildrdb.sh toolchain   # install apt packages + Python venv + Conan
+scripts/buildrdb.sh conan       # detect Conan profile, set C++23
+scripts/buildrdb.sh ninja       # add Ninja generator to Conan profile
+scripts/buildrdb.sh bashrc      # add retractordb/bin to PATH in ~/.bashrc
+scripts/buildrdb.sh debug       # conan install + build (Debug)
+scripts/buildrdb.sh release     # conan install + build (Release)
+scripts/buildrdb.sh coverage    # build with coverage + run gcovr report
 ```
+
+Multiple options in one call: `scripts/buildrdb.sh conan ninja debug`
+
+Without arguments the script runs in interactive mode.
 
 ### Incremental builds (from `build/Debug`)
 ```bash
-make          # or: ninja
-make install  # installs to ~/.local/bin
+ninja          # build
+ninja install  # installs to ~/.local/bin
 ```
 
 ### Common targets (from `build/Debug`)
 ```bash
-make test          # run all tests (unit + integration, via valgrind)
-make cformat       # format all C++/CMake source files
-make descgrammar   # regenerate ANTLR4 descriptor grammar from DESC.g4
-make rqlgrammar    # regenerate ANTLR4 query grammar from RQL.g4
+ninja test          # run all tests (unit + integration, via valgrind)
+ninja cformat       # format all C++/CMake source files
+ninja descgrammar   # regenerate ANTLR4 descriptor grammar from DESC.g4
+ninja rqlgrammar    # regenerate ANTLR4 query grammar from RQL.g4
 ```
 
 ### Running a single test
@@ -36,15 +47,13 @@ ctest -R ut-test_payload -V       # verbose output
 
 Unit tests run through valgrind (leak checking enabled). Integration tests compare output against patterns in `test/IntegrationTest/*/Pattern*/`.
 
-### Coverage (from repo root)
+### Coverage
+
 ```bash
-cmake --preset conan-debug -DENABLE_COVERAGE=ON
-cd build/Debug && ninja clean && ninja ctest
-cd ../..
-gcovr --root . --filter 'src/' --gcov-executable gcov-14 \
-      --exclude '.*\.antlr.*' build/Debug \
-      --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+scripts/buildrdb.sh coverage
 ```
+
+The script auto-detects the GCC version, installs `gcovr` if missing, rebuilds with `-DENABLE_COVERAGE=ON`, runs `ctest`, and writes the report to `coverage/coverage.html`.
 
 ## Architecture
 
@@ -80,7 +89,7 @@ Three cooperating executables, each with a corresponding source directory under 
 
 - `src/rdb/lib/DESC.g4` — ANTLR4 grammar for `.desc` descriptor files.
 - `src/retractor/lib/RQL.g4` — ANTLR4 grammar for the RetractorQL query language.
-- Generated code lives in `.antlr/` subdirectories — do not edit by hand; regenerate with `make descgrammar` / `make rqlgrammar`.
+- Generated code lives in `.antlr/` subdirectories — do not edit by hand; regenerate with `ninja descgrammar` / `ninja rqlgrammar`.
 
 ### Tests layout
 
@@ -102,7 +111,7 @@ CI runs on CircleCI for branches matching `master` or `issue_*`.
 ## Code Style
 
 - **Standard**: C++23
-- **Formatter**: clang-format (Google style, 129-column limit, 2-space indent). Run `make cformat` before committing.
+- **Formatter**: clang-format (Google style, 129-column limit, 2-space indent). Run `ninja cformat` before committing.
 - **Linker**: `mold` (set in CMakeLists via `-fuse-ld=mold`)
 - **Dependencies**: Boost, spdlog (header-only), fmt (header-only), ANTLR4 runtime, GTest, magic_enum — all managed by Conan.
 - Comments in source are frequently in Polish; this is intentional.
