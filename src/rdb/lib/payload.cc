@@ -17,6 +17,97 @@
 
 namespace rdb {
 
+namespace {
+
+int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, const char *context) {
+  const auto flatCount = descriptor.flatElementCount();
+  if (positionFlat < 0 || positionFlat > flatCount - 1) {
+    SPDLOG_ERROR("{} out of descriptor req:{} available len: {}", context, positionFlat, flatCount);
+    if (std::string_view(context) == "Read") {
+      std::stringstream message;
+      message << boost::stacktrace::stacktrace();
+      SPDLOG_ERROR("Stack: {}", message.str());
+      std::cerr << message.str() << std::endl;
+    }
+    assert(false && "payload flat position out of range");
+    abort();
+  }
+
+  auto positionOpt = descriptor.convert(positionFlat);
+  if (!positionOpt.has_value()) {
+    SPDLOG_ERROR("{} conversion failed for flat position {}", context, positionFlat);
+    assert(false && "payload flat conversion failed");
+    abort();
+  }
+
+  const auto position = positionOpt->first;
+  if (position < 0 || position >= static_cast<int>(descriptor.size())) {
+    SPDLOG_ERROR("{} converted index out of descriptor bounds: {}", context, position);
+    assert(false && "payload converted index out of range");
+    abort();
+  }
+
+  return position;
+}
+
+void writeValue(std::ostream &os, const std::any &value, const descFld type, const bool hexFormat) {
+  switch (type) {
+    case rdb::NULLTYPE:
+      os << "null";
+      break;
+    case rdb::STRING:
+      os << std::any_cast<std::string>(value);
+      break;
+    case rdb::BYTE: {
+      if (hexFormat) {
+        os << std::setfill('0') << std::setw(2);
+      }
+      os << static_cast<int>(std::any_cast<uint8_t>(value));
+      break;
+    }
+    case rdb::INTEGER: {
+      if (hexFormat) {
+        os << std::setfill('0') << std::setw(8);
+      }
+      os << std::any_cast<int>(value);
+      break;
+    }
+    case rdb::UINT: {
+      if (hexFormat) {
+        os << std::setfill('0') << std::setw(8);
+      }
+      os << std::any_cast<unsigned>(value);
+      break;
+    }
+    case rdb::FLOAT:
+      os << std::any_cast<float>(value);
+      break;
+    case rdb::DOUBLE:
+      os << std::any_cast<double>(value);
+      break;
+    case rdb::RATIONAL:
+      os << std::any_cast<boost::rational<int>>(value);
+      break;
+    case rdb::REF:
+    case rdb::TYPE:
+    case rdb::RETENTION:
+    case rdb::RETMEMORY:
+      assert(false && "Configuration fields should not be formatted");
+      break;
+  }
+}
+
+template <typename T>
+void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldName, const int arrayOffset) {
+  T data;
+  is >> data;
+  Descriptor desc(rhs.descriptor);
+  auto dest = rhs.span().subspan(desc.offsetBegArr(fieldName) + arrayOffset, sizeof(T));
+  std::memcpy(dest.data(), &data, sizeof(T));
+}
+
+}  // namespace
+
 // default constructor
 
 payload::payload(const Descriptor &descriptor)
@@ -104,15 +195,6 @@ payload payload::operator+(const payload &other) {
 
 // Member Functions
 
-template <typename T, typename K>
-void copyToMemory(std::istream &is, const K &rhs, const char *fieldName, int arroffset) {
-  T data;
-  is >> data;
-  Descriptor desc(rhs.descriptor);
-  auto dest = rhs.span().subspan(desc.offsetBegArr(fieldName) + arroffset, sizeof(T));
-  std::memcpy(dest.data(), &data, sizeof(T));
-}
-
 void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 
 const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
@@ -122,37 +204,21 @@ void payload::setNullBitset(const std::vector<bool> &nullBitset) {
   nullBitset_ = nullBitset;
 }
 
-std::span<uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
+std::span<uint8_t> payload::span() { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
+
+std::span<const uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
 void payload::setItemBy(const int positionFlat, std::optional<std::any> value) {
   T data          = std::any_cast<T>(value.value());
-  auto position   = descriptor.convert(positionFlat).value().first;
+  auto position   = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
   auto offsetFlat = descriptor.offset(positionFlat);
   auto dest       = span().subspan(offsetFlat, descriptor[position].rlen);
   std::memcpy(dest.data(), &data, descriptor[position].rlen);
 }
 
 void payload::setItem(const int positionFlat, std::optional<std::any> valueParam) {
-  if (positionFlat < 0 || positionFlat > descriptor.flatElementCount() - 1) {
-    SPDLOG_ERROR("Write out of descriptor - req:{} available len: {}", positionFlat, descriptor.flatElementCount());
-    assert(false && "setItem - Write out of descriptor");
-    abort();
-  }
-
-  auto positionOpt = descriptor.convert(positionFlat);
-  if (!positionOpt.has_value()) {
-    SPDLOG_ERROR("Write conversion failed for flat position {}", positionFlat);
-    assert(false && "setItem - Flat conversion failed");
-    abort();
-  }
-
-  auto position = positionOpt->first;
-  if (position < 0 || position >= static_cast<int>(descriptor.size())) {
-    SPDLOG_ERROR("Write converted index out of descriptor bounds: {}", position);
-    assert(false && "setItem - Converted index out of range");
-    abort();
-  }
+  auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
 
   auto requestedType = descriptor[position].rtype;
   std::any value;
@@ -172,7 +238,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     auto lenr       = std::min(len, static_cast<int>(data.length()));
     auto destOffset = descriptor.offset(positionFlat);
     auto dest       = span().subspan(destOffset, len);
-    assert(position + len <= descriptor.getSizeInBytes());
+    assert(destOffset + len <= descriptor.getSizeInBytes());
     std::fill(dest.begin(), dest.end(), 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
   };
@@ -213,54 +279,32 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
         assert(false && "setItem - Type not supported.");
         abort();
     }
-  } catch (const std::bad_any_cast &e) {
+  } catch (const std::bad_any_cast &) {
     SPDLOG_ERROR("Error on payload::setItem");
   }
 }
 
 template <typename T>
-T getVal(std::span<uint8_t> s, int offset) {
+T getVal(std::span<const uint8_t> s, int offset) {
   T val;
   std::memcpy(&val, s.subspan(offset, sizeof(T)).data(), sizeof(T));
   return val;
 }
 
-std::optional<std::any> payload::getItem(const int positionFlat) {
-  const auto flatCount = descriptor.flatElementCount();
-  if (positionFlat < 0 || positionFlat > flatCount - 1) {
-    SPDLOG_ERROR("Read out of descriptor req:{} available len: {}", positionFlat, flatCount);
-    std::stringstream message;
-    message << boost::stacktrace::stacktrace();
-    SPDLOG_ERROR("Stack: {}", message.str());
-    std::cerr << message.str() << std::endl;
-    assert(false && "getItem - Read out of descriptor");
-    abort();
-  }
-
-  auto positionOpt = descriptor.convert(positionFlat);
-  if (!positionOpt.has_value()) {
-    SPDLOG_ERROR("Read conversion failed for flat position {}", positionFlat);
-    assert(false && "getItem - Flat conversion failed");
-    abort();
-  }
-
-  auto position = positionOpt->first;
-  if (position < 0 || position >= static_cast<int>(descriptor.size())) {
-    SPDLOG_ERROR("Read converted index out of descriptor bounds: {}", position);
-    assert(false && "getItem - Converted index out of range");
-    abort();
-  }
+std::optional<std::any> payload::getItem(const int positionFlat) const {
+  Descriptor descriptorCopy(descriptor);
+  auto position = resolveFieldIndexOrAbort(descriptorCopy, positionFlat, "Read");
 
   if (nullBitset_[position]) return std::nullopt;
 
-  const auto requestedType = descriptor[position].rtype;
-  const auto offsetFlat    = descriptor.offset(positionFlat);
+  const auto requestedType = descriptorCopy[position].rtype;
+  const auto offsetFlat    = descriptorCopy.offset(positionFlat);
   auto memory              = span();
 
   auto readStringField = [&]() -> std::string {
-    auto len       = descriptor[position].rlen * descriptor[position].rarray;
+    auto len       = descriptorCopy[position].rlen * descriptorCopy[position].rarray;
     auto fieldSpan = memory.subspan(offsetFlat, len);
-    auto descLen   = descriptor.getSizeInBytes();
+    auto descLen   = descriptorCopy.getSizeInBytes();
     assert(offsetFlat + len <= descLen);
 
     for (auto i = 0; i < len; i++) {
@@ -304,7 +348,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) {
 
 // Friend operators
 
-std::istream &operator>>(std::istream &is, const payload &rhs) {
+std::istream &operator>>(std::istream &is, payload &rhs) {
   std::string fieldName;
   is >> fieldName;
   if (is.eof()) return is;
@@ -313,20 +357,26 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
   else
     is >> std::dec;
   Descriptor desc(rhs.descriptor);
+  if (!desc.hasField(fieldName)) {
+    SPDLOG_ERROR("field {} not found", fieldName);
+    return is;
+  }
+
+  const auto fieldIndex = desc.position(fieldName);
 
   if (desc.type(fieldName) == "NULL") {
-    const_cast<payload &>(rhs).setItem(static_cast<int>(desc.position(fieldName)), std::any(std::monostate{}));
+    rhs.setItem(static_cast<int>(fieldIndex), std::any(std::monostate{}));
     return is;
   }
 
   if (desc.type(fieldName) == "STRING") {
     std::string record;
-    // std::getline(is >> std::ws, record);
     is >> record;
     auto fieldLen  = desc.fieldSize(fieldName);
     auto fieldSpan = rhs.span().subspan(desc.offsetBegArr(fieldName), fieldLen);
     std::fill(fieldSpan.begin(), fieldSpan.end(), 0);
     std::copy_n(record.c_str(), std::min((size_t)fieldLen, record.size()), fieldSpan.begin());
+    rhs.nullBitset_[fieldIndex] = false;
   } else
     for (auto i = 0; i < desc[desc.position(fieldName)].rarray; i++) {
       if (desc.type(fieldName) == "BYTE") {
@@ -335,20 +385,25 @@ std::istream &operator>>(std::istream &is, const payload &rhs) {
         uint8_t data8 = static_cast<uint8_t>(data);
         auto dest     = rhs.span().subspan(desc.offsetBegArr(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
         std::memcpy(dest.data(), &data8, sizeof(uint8_t));
+        rhs.nullBitset_[fieldIndex] = false;
       } else if (desc.type(fieldName) == "UINT")
-        copyToMemory<uint, payload>(is, rhs, fieldName.c_str(), i * sizeof(unsigned));
+        copyToMemory<uint>(is, rhs, fieldName, i * sizeof(unsigned)), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.type(fieldName) == "INTEGER")
-        copyToMemory<int, payload>(is, rhs, fieldName.c_str(), i * sizeof(int));
+        copyToMemory<int>(is, rhs, fieldName, i * sizeof(int)), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.type(fieldName) == "FLOAT")
-        copyToMemory<float, payload>(is, rhs, fieldName.c_str(), i * sizeof(float));
+        copyToMemory<float>(is, rhs, fieldName, i * sizeof(float)), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.type(fieldName) == "DOUBLE")
-        copyToMemory<double, payload>(is, rhs, fieldName.c_str(), i * sizeof(double));
+        copyToMemory<double>(is, rhs, fieldName, i * sizeof(double)), rhs.nullBitset_[fieldIndex] = false;
+      else if (desc.type(fieldName) == "RATIONAL")
+        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.type(fieldName) == "REF")
         SPDLOG_ERROR("REF store not supported by this operator.");
       else if (desc.type(fieldName) == "TYPE")
         SPDLOG_ERROR("TYPE store not supported by this operator.");
       else if (desc.type(fieldName) == "RETENTION")
         SPDLOG_ERROR("RETENTION store not supported by this operator.");
+      else if (desc.type(fieldName) == "RETMEMORY")
+        SPDLOG_ERROR("RETMEMORY store not supported by this operator.");
       else
         SPDLOG_ERROR("field {} not found", fieldName);
     }
@@ -363,6 +418,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   os << "{";
 
   Descriptor desc(rhs.descriptor);
+  int flatIndex = 0;
   for (size_t idx = 0; idx < rhs.descriptor.size(); ++idx) {
     const auto &r = rhs.descriptor[idx];
     if ((r.rtype == rdb::TYPE) ||       //
@@ -376,69 +432,23 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << " ";
     os << r.rname;
     os << ":";
-    auto offset_ = desc.offsetBegArr(r.rname);
-    if (idx < rhs.nullBitset_.size() && rhs.nullBitset_[idx]) {
+    const int flatCountForField = (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) ? 1 : r.rarray;
+    const auto firstValue       = rhs.getItem(flatIndex);
+    if (!firstValue.has_value()) {
       os << "null";
-    } else if (r.rtype == rdb::NULLTYPE) {
-      os << "null";
-    } else if (r.rtype == STRING) {
-      auto fieldSpan = rhs.span().subspan(offset_, desc.fieldSize(r.rname));
-      auto len       = desc.fieldSize(r.rname);
-      for (auto i = 0; i < len; i++)
-        if (fieldSpan[i] == 0) {
-          len = i;
-          break;
-        }
-
-      os << std::string(fieldSpan.begin(), fieldSpan.begin() + len);
-    } else
-      for (auto i = 0; i < r.rarray; i++) {
-        if (r.rtype == rdb::BYTE) {
-          uint8_t data{0};
-          auto src = rhs.span().subspan(offset_ + i * sizeof(uint8_t), sizeof(uint8_t));
-          std::memcpy(&data, src.data(), sizeof(uint8_t));
-          if (rhs.hexFormat_) {
-            os << std::setfill('0');
-            os << std::setw(2);
-          }
-          os << (int)data;
-        } else if (r.rtype == rdb::INTEGER) {
-          int data{0};
-          auto src = rhs.span().subspan(offset_ + i * sizeof(int), sizeof(int));
-          std::memcpy(&data, src.data(), sizeof(int));
-          if (rhs.hexFormat_) {
-            os << std::setfill('0');
-            os << std::setw(8);
-          }
-          os << data;
-        } else if (r.rtype == rdb::UINT) {
-          unsigned int data{0};
-          auto src = rhs.span().subspan(offset_ + i * sizeof(unsigned), sizeof(unsigned int));
-          std::memcpy(&data, src.data(), sizeof(unsigned int));
-          if (rhs.hexFormat_) {
-            os << std::setfill('0');
-            os << std::setw(8);
-          }
-          os << data;
-        } else if (r.rtype == rdb::FLOAT) {
-          float data{0};
-          auto src = rhs.span().subspan(offset_ + i * sizeof(float), sizeof(float));
-          std::memcpy(&data, src.data(), sizeof(float));
-          os << data;
-        } else if (r.rtype == rdb::DOUBLE) {
-          double data{0};
-          auto src = rhs.span().subspan(offset_ + i * sizeof(double), sizeof(double));
-          std::memcpy(&data, src.data(), sizeof(double));
-          os << data;
-        } else if (r.rtype == rdb::RETENTION) {
-          ;
-        } else if (r.rtype == rdb::RETMEMORY) {
-          ;
-        } else
-          assert(false && "Unrecognized type");
-
-        if (i < r.rarray - 1) os << " ";
+      flatIndex += flatCountForField;
+    } else if (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) {
+      writeValue(os, firstValue.value(), r.rtype, rhs.hexFormat_);
+      ++flatIndex;
+    } else {
+      for (int i = 0; i < flatCountForField; ++i) {
+        const auto value = rhs.getItem(flatIndex + i);
+        assert(value.has_value() && "Non-null array field should yield a value for each flat element");
+        writeValue(os, value.value(), r.rtype, rhs.hexFormat_);
+        if (i < flatCountForField - 1) os << " ";
       }
+      flatIndex += flatCountForField;
+    }
     if (!Descriptor::getFlat()) os << std::endl;
   }
   if (rhs.descriptor.empty()) {

@@ -43,7 +43,8 @@ class payload {
 
   /// @brief Span accessor to payload (modern, bounds-aware)
   /// @return  std::span over the payload memory
-  std::span<uint8_t> span() const;
+  std::span<uint8_t> span();
+  std::span<const uint8_t> span() const;
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
@@ -66,7 +67,7 @@ class payload {
   /// @param position position according to descriptor
   /// @return address of beginning memory that contains data described by
   /// descriptor
-  std::optional<std::any> getItem(const int position);
+  std::optional<std::any> getItem(const int position) const;
 
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
@@ -78,7 +79,7 @@ class payload {
   /// @brief Restore null metadata read from metaDataStream/text source
   void setNullBitset(const std::vector<bool> &nullBitset);
 
-  friend std::istream &operator>>(std::istream &is, const payload &rhs);
+  friend std::istream &operator>>(std::istream &is, payload &rhs);
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
 
   payload &operator=(const payload &other);
