@@ -25,7 +25,7 @@ boost::regex xprFieldId3("(\\w*)");                          // field_of_corn
 using namespace localContext;
 
 /** This procedure computes time delays (delta) for generated streams */
-std::string compiler::intervalCounter() {
+std::string compiler::resolveStreamIntervals() {
   while (true) {
     bool bOnceAgain(false);
     coreInstance.sort();
@@ -161,7 +161,7 @@ std::string compiler::intervalCounter() {
   return std::string("OK");
 }
 
-std::string compiler::generateStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
+std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
   if (sName2 == "")
     return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
   else
@@ -171,7 +171,7 @@ std::string compiler::generateStreamName(const std::string &sName1, const std::s
 /* Goal of this procedure is to provide stream to canonical form
 TODO: Stream_MAX,MIN,AVG...
 */
-std::string compiler::simplifyLProgram() {
+std::string compiler::extractIntermediateStreams() {
   coreInstance.sort();
 
   auto substratType_C = std::string("DEFAULT");
@@ -222,7 +222,7 @@ std::string compiler::simplifyLProgram() {
           lTempProgram.push_back(token(PUSH_TSCAN));
           newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
           newQuery.policy = std::make_pair(substratType_C, 1);
-          newQuery.id     = generateStreamName(arg1, arg2, cmd);
+          newQuery.id     = composeStreamName(arg1, arg2, cmd);
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           it = coreInstance.begin();
@@ -237,7 +237,7 @@ std::string compiler::simplifyLProgram() {
 }
 
 // Goal of this procedure is to unroll schema based of given command
-std::list<field> compiler::combine(const std::string &sName1, const std::string &sName2, token &cmd_token) {
+std::list<field> compiler::buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token) {
   std::list<field> lRetVal;
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
@@ -332,7 +332,7 @@ std::list<field> compiler::combine(const std::string &sName1, const std::string 
 // unfortunately algorithm if broken - because does not search backward but next
 // by next and some * can be process which have arguments appear as two asterisk
 // In such case unroll does not appear and algorithm gets shitin-shitout
-std::string compiler::prepareFields() {
+std::string compiler::expandSchemaWildcards() {
   int fieldCountSh = 0;
   coreInstance.topologicalSort();
   for (auto &q : coreInstance) {
@@ -364,7 +364,7 @@ std::string compiler::prepareFields() {
           }
           if (q.lProgram.size() == 3 || q.lProgram.size() == 2) {
             auto [sName1, sName2, cmd]{GetArgs(q.lProgram)};
-            q.lSchema = combine(sName1, sName2, cmd);
+            q.lSchema = buildOutputSchema(sName1, sName2, cmd);
             break;
           }
         }
@@ -379,7 +379,7 @@ std::string compiler::prepareFields() {
 }
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
-std::string compiler::replicateIDX() {
+std::string compiler::expandIndexWildcards() {
   for (auto &q : coreInstance) {             // for each query
     for (auto &f : q.lSchema) {              // for each field in query
       std::vector<std::string> usedSchemaX;  //
@@ -421,7 +421,7 @@ std::string compiler::replicateIDX() {
   return std::string("OK");
 }
 
-void compiler::ftokenfix(std::list<token> &lProgram, query &q) {
+void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
   for (auto &t : lProgram) {  // for each token in query field
     const command_id cmd(t.getCommandID());
     const std::string text(t.getStr_());
@@ -538,14 +538,14 @@ Command method of presentation aims simple data processing
 Aim of this procedure is change all of push_idXXX to push_id
 note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction */
-std::string compiler::convertReferences() {
+std::string compiler::resolveFieldReferences() {
   for (auto &q : coreInstance) {  // for each query
     assert(!q.isReductionRequired());
     for (auto &f : q.lSchema) {  // for each field in query
-      ftokenfix(f.lProgram, q);  // for each token in query field
+      resolveTokenReferences(f.lProgram, q);  // for each token in query field
     }  // end for each field in query
     for (auto &r : q.lRules) {    // for each rule in query
-      ftokenfix(r.condition, q);  // for each token in rule
+      resolveTokenReferences(r.condition, q);  // for each token in rule
     }  // end for each rule in query
   }
   return std::string("OK");
@@ -553,7 +553,7 @@ std::string compiler::convertReferences() {
 
 /* This function will convert fields list where stream a from b#c
 clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
-std::string compiler::convertRemotes() {
+std::string compiler::localizeFieldOffsets() {
   std::map<std::string, std::map<std::string, int>> offsetMap;
 
   // This loop fill&create OffsetMap structure.
@@ -589,7 +589,7 @@ std::string compiler::convertRemotes() {
   return std::string("OK");
 }
 
-std::string compiler::applyConstraints() {
+std::string compiler::validateConstraints() {
   for (auto &q : coreInstance) {       // for each query
     if (q.isDeclaration()) continue;   // do not check declaration in constraints.
     assert(!q.isReductionRequired());  // process data only with two or less arguments
@@ -610,7 +610,7 @@ std::string compiler::applyConstraints() {
   return std::string("OK");
 }
 
-std::string compiler::fillSubstractsMemSize(const std::map<std::string, int> &capMap) {
+std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> &capMap) {
   for (const auto &q : capMap) {                             // for each query
     if (coreInstance[q.first].policy.second == 0) continue;  // do not check declaration in constraints.
     assert(!coreInstance[q.first].isReductionRequired());    // process data only with two or less arguments
@@ -619,7 +619,7 @@ std::string compiler::fillSubstractsMemSize(const std::map<std::string, int> &ca
   return std::string("OK");
 }
 
-std::map<std::string, int> compiler::countBuffersCapacity() {
+std::map<std::string, int> compiler::computeRequiredCapacities() {
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
   for (auto &q : coreInstance) {       // for each declaration
@@ -677,42 +677,42 @@ std::map<std::string, int> compiler::countBuffersCapacity() {
   return capMap;
 }
 
-std::string compiler::run() {
+std::string compiler::compile() {
   std::string result;
 
-  result = simplifyLProgram();
+  result = extractIntermediateStreams();
   if (result != "OK") return result;
 
-  result = prepareFields();
+  result = expandSchemaWildcards();
   if (result != "OK") return result;
 
-  result = intervalCounter();
+  result = resolveStreamIntervals();
   if (result != "OK") return result;
 
-  result = convertReferences();
+  result = resolveFieldReferences();
   if (result != "OK") return result;
 
-  result = replicateIDX();
+  result = expandIndexWildcards();
   if (result != "OK") return result;
 
-  result = convertRemotes();
+  result = localizeFieldOffsets();
   if (result != "OK") return result;
 
-  coreInstance.maxCapacity = countBuffersCapacity();
+  coreInstance.maxCapacity = computeRequiredCapacities();
 
-  result = applyConstraints();
+  result = validateConstraints();
   if (result != "OK") return result;
 
-  result = fillSubstractsMemSize(coreInstance.maxCapacity);
+  result = applyCapacitiesToStreams(coreInstance.maxCapacity);
   if (result != "OK") return result;
 
   return std::string("OK");
 }
 
-std::vector<std::string> compiler::mergeCore(qTree &coreInstanceSrc) {
+std::vector<std::string> compiler::importFrom(qTree &source) {
   std::vector<std::string> retVal;
-  SPDLOG_INFO("Merging core instances - current size: {}, new size: {}", coreInstance.size(), coreInstanceSrc.size());
-  for (auto &q : coreInstanceSrc) {
+  SPDLOG_INFO("Merging core instances - current size: {}, new size: {}", coreInstance.size(), source.size());
+  for (auto &q : source) {
     if (q.isCompilerDirective()) continue;
     if (coreInstance.exists(q.id)) continue;
     SPDLOG_INFO("Merging query id: {}", q.id);

@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 
     std::string response;
 
-    response = cm.run();
+    response = cm.compile();
 
     if (response != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //

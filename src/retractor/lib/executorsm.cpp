@@ -156,7 +156,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   }
 
   compiler localCompiler(coreInstanceCopy);
-  auto response = localCompiler.run();
+  auto response = localCompiler.compile();
 
   if (response != "OK") {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
@@ -172,8 +172,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // These brackets are important - we need to lock coreInstancePtr as less as possible
   {
     std::lock_guard<std::mutex> scoped_lock(core_mutex);
-    mergedIds          = cmPtr->mergeCore(coreInstanceCopy);
-    compileChainResult = cmPtr->run();
+    mergedIds          = cmPtr->importFrom(coreInstanceCopy);
+    compileChainResult = cmPtr->compile();
   }
 
   if (compileChainResult != "OK") {
