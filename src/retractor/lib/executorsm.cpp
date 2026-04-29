@@ -537,7 +537,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 #ifdef __linux__
     struct timespec loop_anchor{};
     clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
-    const bool rt_mode = vm.count("rt") > 0;
+    const bool rt_mode = vm.count("realtime") > 0;
     if (rt_mode) {
       if (rtCheckAndPrint()) rtActivate();
     }

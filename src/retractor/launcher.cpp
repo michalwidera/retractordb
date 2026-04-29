@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
-          ("rt", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")  //
+          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")  //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
           ;
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << "Log: " << tempLocation << std::endl;
-      if (vm.count("rt")) rtCheckAndPrint();
+      if (vm.count("realtime")) rtCheckAndPrint();
       std::cout << warranty << std::endl;
       return system::errc::success;
     }
