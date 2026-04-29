@@ -11,6 +11,8 @@
 #include <mutex>
 #include <thread>
 
+#include "executor_rt.hpp"
+
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -531,6 +533,16 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     // Loop of data processing
     bool ignoreanykey = vm.count("noanykey") > 0;
     boost::rational<int> prev_interval(0);
+
+#ifdef __linux__
+    struct timespec loop_anchor{};
+    clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
+    const bool rt_mode = vm.count("rt") > 0;
+    if (rt_mode) {
+      if (rtCheckAndPrint()) rtActivate();
+    }
+#endif
+
     while (!_kbhit(ignoreanykey) && iTimeLimitCnt != executorsm::stop_now) {
       if (iTimeLimitCnt != executorsm::inifitie_loop) {
         if (iTimeLimitCnt != executorsm::stop_now)
@@ -557,7 +569,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       //
       // Waiting given miliseconds time that is computed
       //
-      std::this_thread::sleep_for(std::chrono::milliseconds(period));
+#ifdef __linux__
+      if (rt_mode)
+        rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
+      else
+#endif
+        std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
       inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
       proc.processRows(inSet);
