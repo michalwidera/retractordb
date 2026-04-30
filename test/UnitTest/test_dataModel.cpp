@@ -236,4 +236,44 @@ TEST_F(xschema, getRow_1) {
 
   dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 }
+TEST_F(xschema, constructAggregate_max) {
+  streamInstance data{coreInstance, coreInstance["str1"]};
+  data.outputPayload->setDisposable(false);
+  // str1 last record: {15, 16} → MAX = 16
+  auto result = data.constructAggregate(STREAM_MAX, "str1");
+  std::stringstream ss;
+  ss << rdb::singleLineFormat << result;
+  EXPECT_EQ(ss.str(), "{ str1:16 }");
+}
+
+TEST_F(xschema, constructAggregate_min) {
+  streamInstance data{coreInstance, coreInstance["str1"]};
+  data.outputPayload->setDisposable(false);
+  // str1 last record: {15, 16} → MIN = 15
+  auto result = data.constructAggregate(STREAM_MIN, "str1");
+  std::stringstream ss;
+  ss << rdb::singleLineFormat << result;
+  EXPECT_EQ(ss.str(), "{ str1:15 }");
+}
+
+TEST_F(xschema, constructAggregate_sum) {
+  streamInstance data{coreInstance, coreInstance["str1"]};
+  data.outputPayload->setDisposable(false);
+  // str1 last record: {15, 16} → SUM = 31
+  auto result = data.constructAggregate(STREAM_SUM, "str1");
+  std::stringstream ss;
+  ss << rdb::singleLineFormat << result;
+  EXPECT_EQ(ss.str(), "{ str1:31 }");
+}
+
+TEST_F(xschema, constructAggregate_avg) {
+  streamInstance data{coreInstance, coreInstance["str1"]};
+  data.outputPayload->setDisposable(false);
+  // str1 last record: {15, 16} → AVG = 31/2 = 15 (obcięcie do int)
+  auto result = data.constructAggregate(STREAM_AVG, "str1");
+  std::stringstream ss;
+  ss << rdb::singleLineFormat << result;
+  EXPECT_EQ(ss.str(), "{ str1:15 }");
+}
+
 }  // namespace
