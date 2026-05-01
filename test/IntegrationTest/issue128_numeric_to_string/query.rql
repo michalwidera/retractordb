@@ -4,4 +4,4 @@ STORAGE 'temp'
 
 DECLARE a INTEGER, b FLOAT STREAM src, 1/8 FILE 'data.txt' ONESHOT
 
-SELECT to_string(src[0]), to_string(src[1]) STREAM dst FROM src
+SELECT to_string(src[0])+'_test', to_string(src[1]) STREAM dst FROM src

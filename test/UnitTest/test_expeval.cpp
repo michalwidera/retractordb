@@ -77,7 +77,7 @@ TEST(xExpressionEval, add_string_int) {
 
   EXPECT_TRUE(result.index() == rdb::STRING);
 
-  EXPECT_TRUE(std::get<std::string>(result) == "data11");
+  EXPECT_TRUE(std::get<std::string>(result) == "1data1");
 }
 
 TEST(xExpressionEval, add_rational_int) {
@@ -105,7 +105,7 @@ TEST(xExpressionEval, add_rational_string) {
 
   EXPECT_TRUE(result.index() == rdb::STRING);
 
-  EXPECT_TRUE(std::get<std::string>(result) == "1/2test");
+  EXPECT_TRUE(std::get<std::string>(result) == "test1/2");
 }
 
 TEST(xExpressionEval, sub_int_int) {
@@ -1297,7 +1297,7 @@ TEST(xExpressionEval, add_string_float_converts_via_to_string) {
   rdb::descFldVT result = test.eval(program);  // "unit" + std::to_string(1.0f)
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "unit" + std::to_string(1.0f));
+  EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0f) + "unit");
 }
 
 TEST(xExpressionEval, add_string_double_converts_via_to_string) {
@@ -1310,7 +1310,7 @@ TEST(xExpressionEval, add_string_double_converts_via_to_string) {
   rdb::descFldVT result = test.eval(program);  // "val" + std::to_string(2.0)
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "val" + std::to_string(2.0));
+  EXPECT_EQ(std::get<std::string>(result), std::to_string(2.0) + "val");
 }
 
 // --- to_integer ---

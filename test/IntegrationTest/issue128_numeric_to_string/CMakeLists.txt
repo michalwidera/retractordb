@@ -15,9 +15,9 @@ add_test(
     while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     xqry -s dst -k -m 3 > out.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-    grep -F '42' out.txt ; \
+    grep -F '42_test' out.txt ; \
     grep -F '3.140000' out.txt ; \
-    grep -F '100' out.txt ; \
+    grep -F '100_test' out.txt ; \
     grep -F -- '-1.500000' out.txt ; \
-    grep -F '7' out.txt ; \
+    grep -F '7_test' out.txt ; \
     grep -F '0.000000' out.txt")

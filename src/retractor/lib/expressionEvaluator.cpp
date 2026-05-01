@@ -506,7 +506,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
         rStack.push(tk.getVT());
         break;
       case ADD:
-        rStack.push(a + b);
+        rStack.push(b + a);
         break;
       case SUBTRACT:
         rStack.push(b - a);
