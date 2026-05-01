@@ -17,9 +17,7 @@
 const uint AREA_SIZE = 10;
 
 // Helper: build a single-field Descriptor matching AREA_SIZE bytes
-static rdb::Descriptor makeDesc(size_t size) {
-  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
-}
+static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
 
 template <typename T, typename K>
 bool test_1() {
@@ -141,10 +139,10 @@ TEST(xrdb, test_storage) {
   pl->setItem(1, static_cast<uint8_t>(0x22));
   pl->setItem(2, 0x66);
 
-  // Verify offsetBegArr("TLen") points to the correct location in raw memory
+  // Verify fieldByteOffset("TLen") points to the correct location in raw memory
   {
     int tlenViaOffset;
-    std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.offsetBegArr("TLen"), sizeof(int));
+    std::memcpy(&tlenViaOffset, pl->span().data() + dAcc2.descriptor.fieldByteOffset("TLen"), sizeof(int));
     EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), tlenViaOffset);
   }
 
@@ -304,7 +302,7 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
 
   // After storage is closed, meta file must contain at least one RLE entry
   ASSERT_TRUE(std::filesystem::exists(metaFile));
-  constexpr uintmax_t headerSize = sizeof(int64_t) + sizeof(int32_t) + sizeof(int32_t);
+  constexpr uintmax_t headerSize = sizeof(int64_t);
   EXPECT_GT(std::filesystem::file_size(metaFile), headerSize);
 
   std::filesystem::remove(dataFile);

@@ -2,7 +2,6 @@
 
 #include "descriptor.hpp"
 
-#include <boost/rational.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -13,30 +12,24 @@
 
 namespace rdb {
 
-/// @brief Klasa opisująca strumień indeksujący dane napływające w klasie storage.
+/// @brief Klasa utrzymująca trwały indeks informacji o wartościach null dla rekordów przechowywanych w storage.
 ///
-/// obiekt klasy metaDataStream powinien:
-/// - tworzyć dane w pliku indeksu wraz z napływem danych w storage.
-/// - przechowywać informacje o tym, które pola w rekordach pliku indeksowanego są nullami.
-/// - udostępniać informację o wartościach nulli dla każdego zarejestrowanego rekordu w storage.
-/// - umożliwiać aktualizację informacji o wartościach null dla istniejących rekordów.
-/// - na bieżąco zapisywać dane do pliku, aby indeks był trwały i mógł być odczytany po ponownym uruchomieniu programu.
-/// - przechowywać wszystkie dane w pliku oprócz ostatniego wpisu, który jest buforowany w pamięci i zapisywany do pliku dopiero przy pojawieniu się nowego wzoru nulli lub przy zamknięciu obiektu lub systemu.
-/// - umożliwiać jedynie dodawnie i modyfikowanie wartości w pliku indeksu, ale nie usuwanie, ponieważ usuwanie rekordów w storage jest niedozwolone.
-/// - być odpowiedzialny za zarządzanie pamięcią, aby uniknąć wycieków pamięci i zapewnić efektywne wykorzystanie zasobów.
-/// - zapewniać informacje o przerwach w transmisji danych poprzez zanotowanie rekordu oznaczającego przerwę.
-/// - powinien być w stanie obsłużyć duże ilości danych.
-/// - zapewnić procedury serializacji i deseralizacji danych przy urchomieniu i zamknięciu systemu.
-/// - nie zapisywać natychmiast danych na dysku w przypadku pojawienia się danych o tym samym wzorze nulli co poprzedni rekord, ale powinien zliczać takie rekordy i zapisywać je jako jeden wpis z licznikiem (RLE).
-/// - nie przechowywać znacznika czasu wewnątrz struktury indeksu dla każdego rekordu.
-/// - zapewniać definicję przerwy w transmisji danych (gap) jako wpis w indeksie z licznikiem równym czasie trwania przerwy (w jednostkach rInterval) i wzorem nulli ustawionym na wszystkie pola jako null.
+/// Obiekt klasy metaDataStream powinien:
+/// - przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
+/// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
+/// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
+/// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
+/// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić szybkie aktualizacje bez konieczności odczytu całego indeksu z pliku,
+/// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu,
+/// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie,
+/// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
+/// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
+/// - interwał próbkowania pobierany jest z klasy storage i służy do obliczania długości przerw w transmisji w jednostkach próbkowania,
+/// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 ///
-/// @note Klasa metaDataStream jest kluczowym elementem systemu, który umożliwia efektywne zarządzanie i indeksowanie danych napływających do storage, zapewniając jednocześnie trwałość i integralność danych.
-/// @note Implementacja tej klasy powinna być zoptymalizowana pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu danych w storage.
-/// @note Interfejs i implementacja klasy powinna być minimalna i skupiona na funkcjonalności.
-/// @note W przypadku dużych ilości danych, implementacja powinna uwzględniać mechanizmy buforowania i zarządzania pamięcią, aby zapewnić płynne działanie systemu.
-/// @note Klasa metaDataStream powinna być projektowana z myślą o łatwej integracji z innymi komponentami systemu, takimi jak storage, aby zapewnić spójność i efektywność całego systemu.
-/// @note W przypadku przerw w transmisji danych, klasa metaDataStream powinna być w stanie wykryć i odpowiednio zareagować na takie sytuacje, np. poprzez zapisywanie stanu indeksu przed przerwą i przywracanie go po wznowieniu transmisji.
+/// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
+/// @note Wpisy gap są markerami przerw między rekordami i nie zwiększają numeracji logicznych rekordów zwracanej przez totalRecords().
+/// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
 
 class metaDataStream {
  public:
@@ -60,9 +53,7 @@ class metaDataStream {
   /// into the in-memory index (loadIndex).
   /// @param descriptor  descriptor of the indexed data stream
   /// @param metaFilePath path of the file to save/load the meta index
-  /// @param rInterval   sampling interval for time calculations (default: 1 second)
-  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath,
-                          boost::rational<int> rInterval = boost::rational<int>(1));
+  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath);
 
   /// @brief Destructor – flushes the pending entry to file.
   ~metaDataStream();
@@ -123,12 +114,6 @@ class metaDataStream {
   /// @note For recordIndex == 0, returns false (no gap before first record)
   bool isGapBefore(size_t recordIndex) const;
 
-  // ── Time / configuration interface ────────────────────────────────
-
-  /// @brief Get the configured sampling interval.
-  /// @return rInterval value used for time calculations
-  boost::rational<int> getSamplingInterval() const;
-
   // ── Lifecycle interface ────────────────────────────────────────────
 
   /// @brief Check whether the index is empty (no records registered).
@@ -138,14 +123,14 @@ class metaDataStream {
   /// @brief Clear all index data and reset to initial state.
   ///
   /// Removes all committed entries and resets the pending entry.
-  /// Does not modify the creation time or sampling interval.
+  /// Does not modify the creation time.
   /// The meta file is rewritten with only the header.
   void reset();
 
  private:
   void createNullBitsetTemplate();
   void loadIndex();                                           ///< read header and restore currentEntry_ from file
-  void saveHeader();                                          ///< write file header (creation time, rInterval) without entries
+  void saveHeader();                                          ///< write file header (creation time) without entries
   void appendEntry(const IndexRecord &entry);                 ///< append a single entry to end of file
   void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
   void flushCurrentEntry();                                   ///< commit currentEntry_ to file if recordCount > 0
@@ -160,7 +145,6 @@ class metaDataStream {
 
   std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
-  boost::rational<int> rInterval_{1};                   ///< stream sampling interval for time calculations
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
   size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
   IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run

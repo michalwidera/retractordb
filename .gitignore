@@ -43,3 +43,4 @@ graph_info.json
 docs/
 bin/*
 .venv/
+.codex

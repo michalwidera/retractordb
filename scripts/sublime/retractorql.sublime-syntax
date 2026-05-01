@@ -3,11 +3,13 @@
 # http://www.sublimetext.com/docs/3/syntax.html
 
 # https://github.com/sharkdp/bat#adding-new-syntaxes--language-definitions
-# mkdir -p "$(batcat --config-dir)/syntaxes"
-# cd "$(batcat --config-dir)/syntaxes"
-# cp thisfilefolder/retractorql.sublime-syntax .
-# batcat cache --build
-# batcat cache --clear
+# Install via buildrdb.sh:
+#   scripts/buildrdb.sh batsyntax
+# Or manually (bat/batcat depending on distro):
+#   BAT=$(command -v batcat || command -v bat)
+#   mkdir -p "$("$BAT" --config-dir)/syntaxes"
+#   cp scripts/sublime/retractorql.sublime-syntax "$("$BAT" --config-dir)/syntaxes/"
+#   "$BAT" cache --build
 
 name: RetractorQL
 file_extensions:
@@ -17,38 +19,66 @@ scope: source.rql
 
 contexts:
   main:
-    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|STORAGE|storage|FILE|file|VOLATILE|volatile|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|SYSTEM|system)\b
+    # RQL statement keywords
+    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|FILE|file|VOLATILE|volatile|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|TO|to|SYSTEM|system|DISPOSABLE|disposable|ONESHOT|oneshot|HOLD|hold|RETENTION|retention)\b
       scope: keyword.control.rql
+    # Compiler option directives
+    - match: \b(STORAGE|storage|ROTATION|rotation|SUBSTRAT|substrat)\b
+      scope: keyword.other.directive.rql
+    # Logical operators
+    - match: \b(AND|and|OR|or|NOT|not)\b
+      scope: keyword.operator.logical.rql
+    # Storage profile values (TYPE_PROFILE)
+    - match: \b(MEMORY|memory|DEFAULT|default|DIRECT|direct|POSIX|posix|POSIXSHD|posixshd|GENERIC|generic|DEVICE|device|TEXTSOURCE|textsource)\b
+      scope: support.constant.rql
     - match: "'"
       push: string
-    - match: '"'
-      push: string
     - include: comments
+    - include: numbers
     - include: types
+    - include: aggregators
     - include: functions
-    - include: desc
+    - include: desc_keywords
 
   string:
     - meta_scope: string.quoted.single.rql
-    - match: \\.
+    - match: "''"
       scope: constant.character.escape.rql
     - match: "'"
       pop: true
-    - match: '"'
-      pop: true
 
   comments:
-    - match: ^#.*
-      scope: comment.line.rql
+    - match: '# .*'
+      scope: comment.line.hash.rql
+    - match: //.*
+      scope: comment.line.double-slash.rql
+    - match: /\*
+      push: block_comment
+
+  block_comment:
+    - meta_scope: comment.block.rql
+    - match: \*/
+      pop: true
+
+  numbers:
+    - match: \b[0-9]+\.[0-9]+\b
+      scope: constant.numeric.float.rql
+    - match: \b[0-9]+\b
+      scope: constant.numeric.integer.rql
 
   types:
-    - match: \b(INTEGER|Integer|BYTE|Byte|CHAR|Char|UINT|Uint|STRING|String|FLOAT|Float|DOUBLE|Double|DISPOSABLE|disposable|RETENTION|retention|SUBSTRAT|substrat|ONESHOT|oneshot|HOLD|hold|STORAGE|storage|OR|or|AND|and)\b
+    - match: \b(INTEGER|Integer|BYTE|Byte|CHAR|Char|UINT|Uint|STRING|String|FLOAT|Float|DOUBLE|Double|RATIONAL)\b
       scope: storage.type.rql
-  
-  desc:
-    - match: \b(REF|TYPE|RETENTION|RETMEMORY)\b
+
+  desc_keywords:
+    # DESC.g4 meta-commands
+    - match: \b(REF|TYPE|RETMEMORY|INTPAIR|IDXPAIR)\b
       scope: constant.other.rql
 
+  aggregators:
+    - match: \b(MIN|min|MAX|max|AVG|avg|SUMC|sumc)\b
+      scope: support.function.aggregate.rql
+
   functions:
-    - match: \b(MIN|min|MAX|max|AVG|avg|SUMC|sumc|Sqrt|Ceil|Abs|Floor|Sign|Chr|Length|ToNumber|ToTimeStamp|FloatCast|IntCast|Count|Crt|IsZero|IsNonZero|Sum)\b
-      scope: constant.language.rql
+    - match: \b(Sqrt|Ceil|Abs|Floor|Sign|Chr|Length|ToNumber|ToTimeStamp|FloatCast|IntCast|Count|Crc|Sum|IsZero|IsNonZero)\b
+      scope: support.function.rql

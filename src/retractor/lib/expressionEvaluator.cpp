@@ -454,6 +454,8 @@ rdb::descFldVT logic_not(const rdb::descFldVT &inVar) {
   return logicResultAsType(!(*value), inVar);
 }
 
+rdb::descFldVT isnull(const rdb::descFldVT &inVar) { return isNullValue(inVar) ? 1 : 0; }
+
 rdb::descFldVT callFun(rdb::descFldVT &inVar, std::function<double(double)> fnName) {
   if (isNullValue(inVar)) return std::monostate{};
   auto backResultType = inVar.index();
@@ -567,6 +569,8 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
           rStack.push(callFun(b, log2));
         else if (tkStr == "trunc")
           rStack.push(callFun(b, trunc));
+        else if (tkStr == "isnull")
+          rStack.push(isnull(b));
         else
           throw std::runtime_error(std::string("Unsupported function call: ") + tkStr);
         break;

@@ -13,9 +13,7 @@
 
 typedef unsigned char BYTE;
 
-static rdb::Descriptor makeDesc(size_t size) {
-  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
-}
+static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
 
 // --- Test fixture ---
 
@@ -254,7 +252,7 @@ TEST_F(FaccfsTest, read_clears_null_bitset) {
 
   // Pre-fill nullBitset with values
   std::vector<bool> readNulls = {true, true, true};
-  uint8_t rData[10] = {};
+  uint8_t rData[10]           = {};
   ASSERT_EQ(gf.read(rData, readNulls, 0), EXIT_SUCCESS);
 
   // genericBinaryFile clears nullBitset on read (no null tracking)
@@ -326,7 +324,7 @@ TEST_F(FaccfsTest, single_byte_record_size) {
 
 TEST_F(FaccfsTest, large_record_size) {
   const size_t LARGE = 4096;
-  auto desc = makeDesc(LARGE);
+  auto desc          = makeDesc(LARGE);
   rdb::genericBinaryFile gf(sandboxPath("large_record"), desc);
 
   std::vector<uint8_t> wData(LARGE, 0);

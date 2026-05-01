@@ -22,6 +22,7 @@
 #include "lib/persistentCounter.hpp"
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
+#include "lib/executor_rt.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -117,6 +118,7 @@ int main(int argc, char *argv[]) {
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
+          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")  //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
           ;
@@ -144,6 +146,7 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << "Log: " << tempLocation << std::endl;
+      if (vm.count("realtime")) rtCheckAndPrint();
       std::cout << warranty << std::endl;
       return system::errc::success;
     }
@@ -188,7 +191,7 @@ int main(int argc, char *argv[]) {
 
     std::string response;
 
-    response = cm.run();
+    response = cm.compile();
 
     if (response != "OK") {
       std::cerr << "Input file:" << sInputFile << std::endl  //

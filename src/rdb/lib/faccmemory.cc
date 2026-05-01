@@ -45,7 +45,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
       return EXIT_FAILURE;  // Return an error code if position is out of bounds
     }
     assert(location >= removed_count_ && "write failed: Position out of bounds in memory storage");
-    const size_t adjustedLocation = location - removed_count_;
+    const size_t adjustedLocation              = location - removed_count_;
     memoryStorage[filename_][adjustedLocation] = std::move(vec);
     if (adjustedLocation < memoryNullStorage[filename_].size()) {
       memoryNullStorage[filename_][adjustedLocation] = nullBitset;

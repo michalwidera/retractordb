@@ -163,7 +163,7 @@ void storage::attachStorage() {
   recordsCount_ = accessor_->count();
   SPDLOG_INFO("record count {} on {}", recordsCount_, storageFile_);
 
-  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
+  metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
   SPDLOG_INFO("metaIndex file {} rInterval {}/{}", metaIndexFile_, rInterval_.numerator(), rInterval_.denominator());
 }
 
@@ -184,12 +184,12 @@ void storage::initializeAccessor() {
   assert(storageType_ != "");
 
   if (storageType_ == "DEFAULT") {
-    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, descriptor, descriptor.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, descriptor, descriptor.retention(),
+                                                                            percounter_);
   } else if (storageType_ == "DIRECT") {
-    accessor_ =
-        std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, descriptor, descriptor.retention(), percounter_);
+    accessor_ = std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile_, descriptor, descriptor.retention(), percounter_);
   } else if (storageType_ == "MEMORY") {
-    accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, descriptor, descriptor.policy());
+    accessor_ = std::make_unique<rdb::memoryFile>(storageFile_, descriptor, descriptor.storagePolicy());
   } else if (storageType_ == "POSIX") {
     accessor_ = std::make_unique<rdb::posixBinaryFile>(storageFile_, descriptor, percounter_);
   } else if (storageType_ == "POSIXSHD") {
@@ -207,7 +207,7 @@ void storage::initializeAccessor() {
   }
 }
 
-void storage::reset() {
+void storage::resetForUnitTest() {
   consecutiveNullCount_ = 0;
   activeGapDuration_    = 0;
   assert(storageFile_ != "");
@@ -522,14 +522,16 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
   nullFillCount_          = nullFillCount;
   gapDetectionConfigured_ = true;
 
-  // If metaDataStream already exists, recreate it with the new interval
+  // If metaDataStream already exists, recreate it with current storage settings.
   if (metaDataStream_) {
-    metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_, rInterval_);
+    metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
   }
 
-  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(),
-              rInterval_.denominator(), nullFillCount_);
+  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(), rInterval_.denominator(),
+              nullFillCount_);
 }
+
+boost::rational<int> storage::getSamplingInterval() const { return rInterval_; }
 
 void storage::flushPendingGap() {
   if (activeGapDuration_ == 0 || !metaDataStream_) return;

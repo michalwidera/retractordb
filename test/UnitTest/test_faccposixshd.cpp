@@ -14,13 +14,9 @@
 typedef unsigned char BYTE;
 
 // Helper: create a single-field Descriptor of given byte size
-static rdb::Descriptor makeDesc(size_t size) {
-  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
-}
+static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
 
-static rdb::Descriptor makeDescInt(size_t size) {
-  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::INTEGER);
-}
+static rdb::Descriptor makeDescInt(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::INTEGER); }
 
 // ctest -R '^ut-test_faccposixshd' -V
 

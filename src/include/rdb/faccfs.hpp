@@ -7,16 +7,20 @@
 
 namespace rdb {
 /**
- * @brief Definicja klasy implementującej dostęp do pliku binarnego poprzez std::fstream
+ * @brief Implementacja prostego magazynu binarnego opartego na `std::fstream`.
  *
- * Object genericBinaryFile powinien:
- * - umożliwiać odczyt i zapis danych binarnych poprzez interfejs std::fstream (GENERIC type)
- * - zapisywać każdą zarejestrowaną wartość do pliku, aby zapewnić trwałość danych
- * - implementować null-aware interfejs FileInterface: podstawowe metody wirtualne to `write(data, nullBitset, position)` i `read(data, nullBitset, position)`
- * - udostępniać niepolimorficzne przeciążenia bez parametru nullBitset via `using FileInterface::write; using FileInterface::read;`
- * - nie być używany bezpośrednio przez użytkownika rdb; jest typem wewnętrznym zapewniającym dostęp do pól binarnych
+ * Obiekt `genericBinaryFile` powinien:
+ * - realizować odczyt i zapis rekordów binarnych o długości wyznaczonej przez `Descriptor`,
+ * - implementować interfejs `FileInterface`,
+ * - obsługiwać dopisywanie danych przy `position == std::numeric_limits<size_t>::max()`,
+ * - obsługiwać zapis i odczyt od wskazanej pozycji w pliku dla operacji update/read,
+ * - ignorować parametr `nullBitset` przy zapisie i czyścić go przy odczycie,
+ * - zwracać przez `count()` liczbę rekordów wynikającą z rozmiaru pliku,
+ * - udostępniać niepolimorficzne przeciążenia bez parametru `nullBitset` przez `using FileInterface::write; using FileInterface::read;`,
+ * - pełnić rolę wewnętrznej implementacji dostępu do danych binarnych, a nie publicznego typu wysokiego poziomu.
  *
- * Type: GENERIC
+ * @note Klasa nie utrzymuje osobnych metadanych null ani dodatkowego mechanizmu trwałości poza samym zapisem do pliku.
+ * @note Obsługa purge przez `write(nullptr, ..., 0)` nie stanowi tu pełnego, ogólnego kontraktu i zależy od bieżącej implementacji.
  */
 struct genericBinaryFile : public FileInterface {
   std::string filename_;
@@ -27,8 +31,8 @@ struct genericBinaryFile : public FileInterface {
   genericBinaryFile(const std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~genericBinaryFile() override;
 
-  using FileInterface::write;
   using FileInterface::read;
+  using FileInterface::write;
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
 

@@ -14,9 +14,7 @@
 typedef unsigned char BYTE;
 
 // Helper: create a single-field Descriptor of given byte size (BYTE type)
-static rdb::Descriptor makeDesc(size_t size) {
-  return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE);
-}
+static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
 
 // ctest -R '^ut-test_faccposix' -V
 
@@ -227,7 +225,8 @@ TEST_F(PosixFileTest, test_faccposix_multibyte_record) {
   int record;
   auto recsize_int = sizeof(int);
 
-  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_multi"), rdb::Descriptor("f", static_cast<int>(recsize_int), 1, rdb::INTEGER));
+  auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_multi"),
+                                                    rdb::Descriptor("f", static_cast<int>(recsize_int), 1, rdb::INTEGER));
 
   record = 1000;
   GTEST_ASSERT_EQ(pfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);

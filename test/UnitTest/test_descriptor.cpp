@@ -43,10 +43,10 @@ bool test_descriptor() {
     if (strcmp(coutstring.str().c_str(), test) != 0) return false;
   }
 
-  if (data2.position("Control") != 2) return false;
+  if (data2.fieldIndex("Control") != 2) return false;
   if (data2.fieldSize("Control") != 1) return false;
-  if (strcmp(data2.type("Control").data(), "BYTE") != 0) return false;
-  if (data2.offsetBegArr("Control") != 14) return false;
+  if (strcmp(data2.fieldTypeName("Control").data(), "BYTE") != 0) return false;
+  if (data2.fieldByteOffset("Control") != 14) return false;
 
   return true;
 }
@@ -121,7 +121,7 @@ TEST(descriptor, retention_and_policy_defaults) {
   auto retention = desc.retention();
   EXPECT_TRUE(retention.noRetention());
 
-  auto policy = desc.policy();
+  auto policy = desc.storagePolicy();
   EXPECT_TRUE(policy.first.empty());
   EXPECT_EQ(policy.second, 0U);
 }
@@ -135,7 +135,7 @@ TEST(descriptor, retention_and_policy_values) {
   EXPECT_EQ(retention.segments, 5U);
   EXPECT_EQ(retention.capacity, 2U);
 
-  auto policy = desc.policy();
+  auto policy = desc.storagePolicy();
   EXPECT_EQ(policy.first, "MEMORY");
   EXPECT_EQ(policy.second, 7U);
 }
@@ -149,7 +149,7 @@ TEST(descriptor, clean_ref_and_flat_fields) {
   EXPECT_TRUE(desc.hasField("src.bin"));
   EXPECT_EQ(desc.flatElementCount(), 4);
 
-  auto flatFields = desc.fieldsFlat();
+  auto flatFields = desc.dataFields();
   EXPECT_EQ(flatFields.size(), 2U);
   EXPECT_EQ(flatFields[0].rname, "a");
   EXPECT_EQ(flatFields[1].rname, "s");
@@ -189,9 +189,9 @@ TEST(descriptor, flat_output_resets_after_stream) {
   auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
 
   std::stringstream flatOut;
-  flatOut << rdb::flat << desc;
+  flatOut << rdb::singleLineFormat << desc;
   EXPECT_EQ(flatOut.str(), "{ BYTE x }");
-  EXPECT_FALSE(rdb::Descriptor::getFlat());
+  EXPECT_FALSE(rdb::Descriptor::isSingleLineOutput());
 
   std::stringstream multilineOut;
   multilineOut << desc;
@@ -205,23 +205,23 @@ TEST(descriptor, offset_and_convert_for_string_and_arrays) {
 
   EXPECT_EQ(desc.flatElementCount(), 4);
 
-  EXPECT_TRUE(desc.convert(0) == std::make_pair(0, 0));
-  EXPECT_TRUE(desc.convert(1) == std::make_pair(0, 1));
-  EXPECT_TRUE(desc.convert(2) == std::make_pair(1, 0));
-  EXPECT_TRUE(desc.convert(3) == std::make_pair(2, 0));
+  EXPECT_TRUE(desc.flatIndexToDescriptorPosition(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc.flatIndexToDescriptorPosition(1) == std::make_pair(0, 1));
+  EXPECT_TRUE(desc.flatIndexToDescriptorPosition(2) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc.flatIndexToDescriptorPosition(3) == std::make_pair(2, 0));
 
-  EXPECT_EQ(desc.offset(0), 0);
-  EXPECT_EQ(desc.offset(1), 1);
-  EXPECT_EQ(desc.offset(2), 2);
-  EXPECT_EQ(desc.offset(3), 47);
+  EXPECT_EQ(desc.byteOffsetAtFlatIndex(0), 0);
+  EXPECT_EQ(desc.byteOffsetAtFlatIndex(1), 1);
+  EXPECT_EQ(desc.byteOffsetAtFlatIndex(2), 2);
+  EXPECT_EQ(desc.byteOffsetAtFlatIndex(3), 47);
 }
 
 TEST(descriptor, empty_descriptor_has_empty_flat_mapping) {
   rdb::Descriptor empty;
 
   EXPECT_EQ(empty.flatElementCount(), 0);
-  EXPECT_TRUE(empty.fieldsFlat().empty());
-  EXPECT_FALSE(empty.convert(0).has_value());
+  EXPECT_TRUE(empty.dataFields().empty());
+  EXPECT_FALSE(empty.flatIndexToDescriptorPosition(0).has_value());
 }
 
 TEST(descriptor, position_conversion_case_1) {
@@ -229,11 +229,11 @@ TEST(descriptor, position_conversion_case_1) {
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
 
-  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
-  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
-  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
-  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
-  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(1) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(2) == std::make_pair(1, 1));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(3) == std::make_pair(1, 2));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(4) == std::make_pair(2, 0));
 }
 
 TEST(descriptor, position_conversion_case_2) {
@@ -241,11 +241,11 @@ TEST(descriptor, position_conversion_case_2) {
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
 
-  EXPECT_TRUE(desc1.convert(0) == std::make_pair(0, 0));
-  EXPECT_TRUE(desc1.convert(1) == std::make_pair(1, 0));
-  EXPECT_TRUE(desc1.convert(2) == std::make_pair(1, 1));
-  EXPECT_TRUE(desc1.convert(3) == std::make_pair(1, 2));
-  EXPECT_TRUE(desc1.convert(4) == std::make_pair(2, 0));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(0) == std::make_pair(0, 0));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(1) == std::make_pair(1, 0));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(2) == std::make_pair(1, 1));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(3) == std::make_pair(1, 2));
+  EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(4) == std::make_pair(2, 0));
 }
 
 TEST(descriptor, parser) {
@@ -262,9 +262,9 @@ TEST(descriptor, assign_operator) {
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2;
   data2 = data1;
-  EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
+  EXPECT_TRUE(data2.fieldIndex("Control") == data1.fieldIndex("Control"));
   EXPECT_TRUE(data2.fieldSize("Control") == data1.fieldSize("Control"));
-  EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
+  EXPECT_TRUE(data2.fieldIndex("TLen") == data1.fieldIndex("TLen"));
 }
 
 TEST(descriptor, copy_constructor) {
@@ -272,7 +272,7 @@ TEST(descriptor, copy_constructor) {
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
   rdb::Descriptor data2{data1};
-  EXPECT_TRUE(data2.position("Control") == data1.position("Control"));
+  EXPECT_TRUE(data2.fieldIndex("Control") == data1.fieldIndex("Control"));
   EXPECT_TRUE(data2.fieldSize("Control") == data1.fieldSize("Control"));
-  EXPECT_TRUE(data2.position("TLen") == data1.position("TLen"));
+  EXPECT_TRUE(data2.fieldIndex("TLen") == data1.fieldIndex("TLen"));
 }

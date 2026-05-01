@@ -141,7 +141,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
     case STREAM_MAX:
     case STREAM_MIN:
     case STREAM_SUM: {
-      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().getMaxType();
+      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       retVal += rdb::Descriptor(id + "_0", maxLen, 1, maxType);
     } break;
     case STREAM_HASH: {
@@ -170,7 +170,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
       assert(step > 0);
-      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().getMaxType();
+      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
         retVal += rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
       }

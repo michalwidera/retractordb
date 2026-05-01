@@ -743,3 +743,352 @@ TEST(xExpressionEval, push_id_reads_value_from_payload) {
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 42);
 }
+
+TEST(xExpressionEval, push_id_null_payload_throws) {
+  std::list<token> program;
+  program.push_back(token(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0))));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program, nullptr), std::runtime_error);
+}
+
+// --- PUSH_ID2 ---
+
+TEST(xExpressionEval, push_id2_reads_value_from_payload) {
+  auto desc = rdb::Descriptor("x", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+  p.setItem(0, 99);
+
+  std::list<token> program;
+  program.push_back(token(PUSH_ID2, rdb::descFldVT(std::string("x[0]"))));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program, &p);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 99);
+}
+
+TEST(xExpressionEval, push_id2_null_payload_throws) {
+  std::list<token> program;
+  program.push_back(token(PUSH_ID2, rdb::descFldVT(std::string("x[0]"))));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program, nullptr), std::runtime_error);
+}
+
+TEST(xExpressionEval, push_id2_malformed_identifier_throws) {
+  auto desc = rdb::Descriptor("x", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+  p.setItem(0, 1);
+
+  std::list<token> program;
+  program.push_back(token(PUSH_ID2, rdb::descFldVT(std::string("fieldname"))));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program, &p), std::runtime_error);
+}
+
+// --- PUSH_IDX ---
+
+TEST(xExpressionEval, push_idx_throws) {
+  std::list<token> program;
+  program.push_back(token(PUSH_IDX, 0));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program), std::runtime_error);
+}
+
+// --- stack errors ---
+
+TEST(xExpressionEval, too_many_values_on_stack_throws) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1));
+  program.push_back(token(PUSH_VAL, 2));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program), std::runtime_error);
+}
+
+// --- CALL functions ---
+
+TEST(xExpressionEval, call_sqrt_function_double) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 4.0));
+  program.push_back(token(CALL, std::string("sqrt")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 2.0);
+}
+
+TEST(xExpressionEval, call_round_function_double) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.5));
+  program.push_back(token(CALL, std::string("round")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 2.0);
+}
+
+TEST(xExpressionEval, call_trunc_function_double) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.9));
+  program.push_back(token(CALL, std::string("trunc")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 1.0);
+}
+
+TEST(xExpressionEval, call_sin_zero) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 0.0));
+  program.push_back(token(CALL, std::string("sin")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 0.0);
+}
+
+TEST(xExpressionEval, call_cos_zero) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 0.0));
+  program.push_back(token(CALL, std::string("cos")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 1.0);
+}
+
+TEST(xExpressionEval, call_tan_zero) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 0.0));
+  program.push_back(token(CALL, std::string("tan")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 0.0);
+}
+
+TEST(xExpressionEval, call_log_of_one) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.0));
+  program.push_back(token(CALL, std::string("log")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 0.0);
+}
+
+TEST(xExpressionEval, call_log2_of_one) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.0));
+  program.push_back(token(CALL, std::string("log2")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 0.0);
+}
+
+TEST(xExpressionEval, call_function_null_propagates_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(CALL, std::string("sqrt")));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, call_function_on_string_throws) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("text"))));
+  program.push_back(token(CALL, std::string("floor")));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program), std::runtime_error);
+}
+
+// --- null propagation in remaining comparisons ---
+
+TEST(xExpressionEval, cmp_lt_null_propagates_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, 3));
+  program.push_back(token(CMP_LT));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, cmp_gt_null_propagates_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, 3));
+  program.push_back(token(CMP_GT));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, cmp_le_null_propagates_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, 3));
+  program.push_back(token(CMP_LE));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, cmp_ge_null_propagates_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, 3));
+  program.push_back(token(CMP_GE));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, cmp_not_equal_null_propagates_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, 3));
+  program.push_back(token(CMP_NOT_EQUAL));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+// --- neg on string ---
+
+TEST(xExpressionEval, neg_string_throws) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("hello"))));
+  program.push_back(token(NEGATE));
+
+  expressionEvaluator test;
+  EXPECT_THROW(test.eval(program), std::runtime_error);
+}
+
+// --- 3VL: null AND null, null OR null ---
+
+TEST(xExpressionEval, and_null_null_is_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(AND));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, or_null_null_is_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(OR));
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+// --- string comparisons ---
+
+TEST(xExpressionEval, cmp_equal_string_equal) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
+  program.push_back(token(CMP_EQUAL));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<std::string>(result));
+  EXPECT_EQ(std::get<std::string>(result), "1");
+}
+
+TEST(xExpressionEval, cmp_equal_string_not_equal) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
+  program.push_back(token(CMP_EQUAL));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<std::string>(result));
+  EXPECT_EQ(std::get<std::string>(result), "0");
+}
+
+// --- float arithmetic ---
+
+TEST(xExpressionEval, add_float_float) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 1.0f));
+  program.push_back(token(PUSH_VAL, 2.0f));
+  program.push_back(token(ADD));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<float>(result));
+  EXPECT_EQ(std::get<float>(result), 3.0f);
+}
+
+// --- unsigned arithmetic ---
+
+TEST(xExpressionEval, add_uint_uint) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 3U));
+  program.push_back(token(PUSH_VAL, 4U));
+  program.push_back(token(ADD));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<unsigned>(result));
+  EXPECT_EQ(std::get<unsigned>(result), 7U);
+}
+
+TEST(xExpressionEval, isnull_returns_1_for_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(CALL, std::string("isnull")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
+}
+
+TEST(xExpressionEval, isnull_returns_0_for_non_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 42));
+  program.push_back(token(CALL, std::string("isnull")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
+}

@@ -112,7 +112,7 @@ class crsMathTest : public ::testing::Test {
     assert(compiled && "Query set malformed according to grammar.");
 
     compiler cm(coreInstance);
-    std::string response = cm.run();
+    std::string response = cm.compile();
     EXPECT_TRUE(response == "OK");
   }
 

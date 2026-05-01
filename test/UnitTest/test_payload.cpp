@@ -4,9 +4,14 @@
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
+
+static_assert(std::is_same_v<decltype(std::declval<rdb::payload &>().span()), std::span<uint8_t>>);
+static_assert(std::is_same_v<decltype(std::declval<const rdb::payload &>().span()), std::span<const uint8_t>>);
 
 TEST(payload, position_conversion_case_3_with_payload) {
   auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) +    //
@@ -31,7 +36,7 @@ TEST(payload, position_conversion_case_3_with_payload) {
   EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()).c_str() == std::string("test"));
 
   std::stringstream coutstring;
-  coutstring << rdb::flat << payload;
+  coutstring << rdb::singleLineFormat << payload;
   EXPECT_TRUE("{ ByteW:145 Control:24 25 26 TLen:2000 Name:test }" == coutstring.str());
 }
 
@@ -86,7 +91,7 @@ TEST(payload, null_type_round_trips_as_monostate) {
   EXPECT_EQ(rewritten->type(), typeid(std::monostate));
 
   std::stringstream out;
-  out << rdb::flat << payload;
+  out << rdb::singleLineFormat << payload;
   EXPECT_EQ(out.str(), "{ nothing:null }");
 }
 
@@ -167,7 +172,7 @@ TEST(payload, operator_ostream_emits_null_for_null_field) {
   p.setItem(0, std::nullopt);
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ x:null }");
 }
 
@@ -180,7 +185,7 @@ TEST(payload, operator_ostream_mixed_null_and_value) {
   p.setItem(1, 42);
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ a:null b:42 }");
 }
 
@@ -231,6 +236,54 @@ TEST(payload, operator_ostream_null_string_field) {
   p.setItem(0, std::nullopt);
 
   std::stringstream out;
-  out << rdb::flat << p;
+  out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ name:null }");
+}
+
+TEST(payload, operator_istream_clears_null_flag_for_integer_field) {
+  auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+
+  p.setItem(0, std::nullopt);
+  EXPECT_FALSE(p.getItem(0).has_value());
+
+  std::stringstream in;
+  in << "value 123";
+  in >> p;
+
+  ASSERT_TRUE(p.getItem(0).has_value());
+  EXPECT_EQ(std::any_cast<int>(p.getItem(0).value()), 123);
+  EXPECT_EQ(p.getNullBitset(), std::vector<bool>({false}));
+}
+
+TEST(payload, operator_istream_clears_null_flag_for_string_field) {
+  auto desc = rdb::Descriptor("name", 1, 8, rdb::STRING);
+  rdb::payload p(desc);
+
+  p.setItem(0, std::nullopt);
+  EXPECT_FALSE(p.getItem(0).has_value());
+
+  std::stringstream in;
+  in << "name abc";
+  in >> p;
+
+  ASSERT_TRUE(p.getItem(0).has_value());
+  EXPECT_EQ(std::any_cast<std::string>(p.getItem(0).value()), "abc");
+  EXPECT_EQ(p.getNullBitset(), std::vector<bool>({false}));
+}
+
+TEST(payload, stream_operators_support_rational_fields) {
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+
+  std::stringstream in;
+  in << "ratio 3/4";
+  in >> p;
+
+  ASSERT_TRUE(p.getItem(0).has_value());
+  EXPECT_EQ(std::any_cast<boost::rational<int>>(p.getItem(0).value()), boost::rational<int>(3, 4));
+
+  std::stringstream out;
+  out << rdb::singleLineFormat << p;
+  EXPECT_EQ(out.str(), "{ ratio:3/4 }");
 }

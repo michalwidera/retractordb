@@ -271,7 +271,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }
   auto i{0};
-  for (auto f : payload->descriptor.fieldsFlat()) {
+  for (auto f : payload->descriptor.dataFields()) {
     auto valueOpt = payload->getItem(i++);
     if (valueOpt.has_value()) {
       retVal.push_back(any_to_variant_cast(valueOpt.value()));
