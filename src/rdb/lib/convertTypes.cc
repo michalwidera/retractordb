@@ -28,9 +28,12 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](std::pair<std::string, int> a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
                    [&retVal](const std::string &a) {
                      try {
-                       retVal = static_cast<T>(std::stoi(a));
+                       if constexpr (std::is_floating_point_v<T>)
+                         retVal = static_cast<T>(std::stod(a));
+                       else
+                         retVal = static_cast<T>(std::stoi(a));
                      } catch (std::exception &err) {
-                       SPDLOG_ERROR("Cant conv nonint string to integer.");
+                       SPDLOG_ERROR("Cant conv string to numeric type.");
                      };
                    }  //
                },
@@ -58,9 +61,12 @@ void visit_descFld(const K &inVar, K &retVal) {
       retVal = static_cast<T>(0);
     } else if (inVar.type() == typeid(std::string)) {
       try {
-        retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
+        if constexpr (std::is_floating_point_v<T>)
+          retVal = static_cast<T>(std::stod(std::any_cast<std::string>(inVar)));
+        else
+          retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
       } catch (std::exception &err) {
-        SPDLOG_ERROR("Cant conv nonint string to integer here.");
+        SPDLOG_ERROR("Cant conv string to numeric type here.");
       };
     } else {
       SPDLOG_ERROR("TODO - std::any->T");

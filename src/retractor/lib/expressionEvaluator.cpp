@@ -571,6 +571,14 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
           rStack.push(callFun(b, trunc));
         else if (tkStr == "isnull")
           rStack.push(isnull(b));
+        else if (tkStr == "to_integer")
+          rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::INTEGER));
+        else if (tkStr == "to_float")
+          rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::FLOAT));
+        else if (tkStr == "to_double")
+          rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::DOUBLE));
+        else if (tkStr == "to_string")
+          rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
           throw std::runtime_error(std::string("Unsupported function call: ") + tkStr);
         break;
