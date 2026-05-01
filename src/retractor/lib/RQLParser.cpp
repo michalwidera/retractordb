@@ -345,8 +345,20 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitExpression(RQLParser::ExpressionContext *ctx) {
+    auto outType = rdb::INTEGER;
+    int  outLen  = 4;
+    int  outArr  = 1;
+    if (!program.empty()) {
+      auto &last = program.back();
+      if (last.getCommandID() == CALL) {
+        auto fn = last.getStr_();
+        if (fn == "to_float")  { outType = rdb::FLOAT;   outLen = 4; }
+        else if (fn == "to_double") { outType = rdb::DOUBLE;  outLen = 8; }
+        else if (fn == "to_string") { outType = rdb::STRING;  outLen = 1; outArr = 32; }
+      }
+    }
     qry.lSchema.push_back(
-        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, 1, rdb::INTEGER), program));
+        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), outLen, outArr, outType), program));
     program.clear();
   }
 

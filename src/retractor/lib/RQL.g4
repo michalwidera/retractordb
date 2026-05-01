@@ -165,7 +165,11 @@ function_call       : ( 'Sqrt'
                     | 'Sum'
                     | 'IsZero'
                     | 'IsNonZero'
-                    | 'isnull' ) '(' expression_factor ( COMMA expression_factor )* ')'
+                    | 'isnull'
+                    | TO_INTEGER_FN
+                    | TO_FLOAT_FN
+                    | TO_DOUBLE_FN
+                    | TO_STRING_FN ) '(' expression_factor ( COMMA expression_factor )* ')'
                     ;
 
 // sync types with: src/include/rdb/fldType.hpp
@@ -208,6 +212,11 @@ SUMC:               'SUMC'|'sumc';
 
 TYPE_PROFILE:       'MEMORY'|'memory'|'DEFAULT'|'default'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
 STRING_PROFILE:    '\'' TYPE_PROFILE '\'';
+
+TO_INTEGER_FN:      'to_integer';
+TO_FLOAT_FN:        'to_float';
+TO_DOUBLE_FN:       'to_double';
+TO_STRING_FN:       'to_string';
 
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
