@@ -114,7 +114,12 @@ class ParserListener : public RQLBaseListener {
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext *ctx) { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
-  void exitExpString(RQLParser::ExpStringContext *ctx) { program.push_back(token(PUSH_VAL, rdb::descFldVT(ctx->getText()))); }
+  void exitExpString(RQLParser::ExpStringContext *ctx) {
+    auto text = ctx->getText();
+    // Strip surrounding single quotes
+    if (text.size() >= 2) { text.erase(text.size() - 1); text.erase(0, 1); }
+    program.push_back(token(PUSH_VAL, rdb::descFldVT(text)));
+  }
   //  void exitExpRational(RQLParser::ExpRationalContext *ctx) { program.push_back(token(PUSH_VAL, rationalResult)); }
 
   void exitSExpHash(RQLParser::SExpHashContext *ctx) { recpToken(STREAM_HASH); }
@@ -345,8 +350,29 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitExpression(RQLParser::ExpressionContext *ctx) {
+    auto outType = rdb::INTEGER;
+    int  outLen  = 4;
+    int  outArr  = 1;
+    for (auto &tk : program) {
+      if (tk.getCommandID() == CALL && tk.getStr_() == "to_string") {
+        outType = rdb::STRING; outLen = 1; outArr = 32;
+        break;
+      }
+      if (tk.getCommandID() == PUSH_VAL && tk.getVT().index() == rdb::STRING) {
+        outType = rdb::STRING; outLen = 1; outArr = 32;
+        break;
+      }
+    }
+    if (outType == rdb::INTEGER && !program.empty()) {
+      auto &last = program.back();
+      if (last.getCommandID() == CALL) {
+        auto fn = last.getStr_();
+        if (fn == "to_float")  { outType = rdb::FLOAT;   outLen = 4; }
+        else if (fn == "to_double") { outType = rdb::DOUBLE;  outLen = 8; }
+      }
+    }
     qry.lSchema.push_back(
-        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), 4, 1, rdb::INTEGER), program));
+        field(rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), outLen, outArr, outType), program));
     program.clear();
   }
 

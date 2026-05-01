@@ -21,13 +21,14 @@ public:
     RULE = 37, DISPOSABLE = 38, ONESHOT = 39, HOLD = 40, VOLATILE = 41, 
     ON = 42, WHEN = 43, DUMP = 44, SYSTEM = 45, DO = 46, TO = 47, AND_C = 48, 
     OR_C = 49, NOT_C = 50, MIN = 51, MAX = 52, AVG = 53, SUMC = 54, TYPE_PROFILE = 55, 
-    STRING_PROFILE = 56, ID = 57, STRING = 58, FLOAT = 59, DECIMAL = 60, 
-    REAL = 61, IS_EQ = 62, IS_NQ = 63, IS_GR = 64, IS_LS = 65, IS_GE = 66, 
-    IS_LE = 67, EXCLAMATION = 68, DOUBLE_BAR = 69, DOT = 70, UNDERLINE = 71, 
-    AT = 72, SHARP = 73, AND = 74, MOD = 75, DOLLAR = 76, COMMA = 77, SEMI = 78, 
-    COLON = 79, DOUBLE_COLON = 80, STAR = 81, DIVIDE = 82, PLUS = 83, MINUS = 84, 
-    BIT_NOT = 85, BIT_OR = 86, BIT_XOR = 87, SPACE = 88, COMMENT = 89, LINE_COMMENT1 = 90, 
-    LINE_COMMENT2 = 91
+    STRING_PROFILE = 56, TO_INTEGER_FN = 57, TO_FLOAT_FN = 58, TO_DOUBLE_FN = 59, 
+    TO_STRING_FN = 60, ID = 61, STRING = 62, FLOAT = 63, DECIMAL = 64, REAL = 65, 
+    IS_EQ = 66, IS_NQ = 67, IS_GR = 68, IS_LS = 69, IS_GE = 70, IS_LE = 71, 
+    EXCLAMATION = 72, DOUBLE_BAR = 73, DOT = 74, UNDERLINE = 75, AT = 76, 
+    SHARP = 77, AND = 78, MOD = 79, DOLLAR = 80, COMMA = 81, SEMI = 82, 
+    COLON = 83, DOUBLE_COLON = 84, STAR = 85, DIVIDE = 86, PLUS = 87, MINUS = 88, 
+    BIT_NOT = 89, BIT_OR = 90, BIT_XOR = 91, SPACE = 92, COMMENT = 93, LINE_COMMENT1 = 94, 
+    LINE_COMMENT2 = 95
   };
 
   enum {
@@ -1156,6 +1157,10 @@ public:
     virtual size_t getRuleIndex() const override;
     std::vector<Expression_factorContext *> expression_factor();
     Expression_factorContext* expression_factor(size_t i);
+    antlr4::tree::TerminalNode *TO_INTEGER_FN();
+    antlr4::tree::TerminalNode *TO_FLOAT_FN();
+    antlr4::tree::TerminalNode *TO_DOUBLE_FN();
+    antlr4::tree::TerminalNode *TO_STRING_FN();
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
 

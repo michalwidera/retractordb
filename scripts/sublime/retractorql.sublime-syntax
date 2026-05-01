@@ -80,5 +80,5 @@ contexts:
       scope: support.function.aggregate.rql
 
   functions:
-    - match: \b(Sqrt|Ceil|Abs|Floor|Sign|Chr|Length|ToNumber|ToTimeStamp|FloatCast|IntCast|Count|Crc|Sum|IsZero|IsNonZero)\b
+    - match: \b(Sqrt|Ceil|Abs|Floor|Sign|Chr|Length|ToNumber|ToTimeStamp|FloatCast|IntCast|Count|Crc|Sum|IsZero|IsNonZero|to_integer|to_float|to_double|to_string)\b
       scope: support.function.rql

@@ -54,6 +54,7 @@ syn keyword rqlAggregate    MIN min MAX max AVG avg SUMC sumc
 syn keyword rqlFunction     Sqrt Ceil Abs Floor Sign Chr Length
 syn keyword rqlFunction     ToNumber ToTimeStamp FloatCast IntCast
 syn keyword rqlFunction     Count Crc Sum IsZero IsNonZero
+syn keyword rqlFunction     to_integer to_float to_double to_string
 
 hi def link rqlKey          Keyword
 hi def link rqlDirective    PreProc
