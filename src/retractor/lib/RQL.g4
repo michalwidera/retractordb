@@ -164,7 +164,8 @@ function_call       : ( 'Sqrt'
                     | 'Crc'
                     | 'Sum'
                     | 'IsZero'
-                    | 'IsNonZero' ) '(' expression_factor ( COMMA expression_factor )* ')'
+                    | 'IsNonZero'
+                    | 'isnull' ) '(' expression_factor ( COMMA expression_factor )* ')'
                     ;
 
 // sync types with: src/include/rdb/fldType.hpp

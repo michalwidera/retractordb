@@ -1,0 +1,7 @@
+# make install && ctest -R issue121_isnull -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT isnull(src[0]), isnull(src[1]) STREAM dst FROM src

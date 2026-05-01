@@ -1068,3 +1068,27 @@ TEST(xExpressionEval, add_uint_uint) {
   ASSERT_TRUE(std::holds_alternative<unsigned>(result));
   EXPECT_EQ(std::get<unsigned>(result), 7U);
 }
+
+TEST(xExpressionEval, isnull_returns_1_for_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
+  program.push_back(token(CALL, std::string("isnull")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
+}
+
+TEST(xExpressionEval, isnull_returns_0_for_non_null) {
+  std::list<token> program;
+  program.push_back(token(PUSH_VAL, 42));
+  program.push_back(token(CALL, std::string("isnull")));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
+}
