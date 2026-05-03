@@ -497,6 +497,7 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
       case AND:
         a = popOrThrow("binary operator");
       case CALL:
+      case CALL2:
       case NEGATE:
       case NOT:
         b = popOrThrow("unary operator");
@@ -581,6 +582,12 @@ rdb::descFldVT expressionEvaluator::eval(std::list<token> program, rdb::payload 
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
           throw std::runtime_error(std::string("Unsupported function call: ") + tkStr);
+        break;
+      case CALL2:
+        if (tkStr == "to_string")
+          rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
+        else
+          throw std::runtime_error(std::string("Unsupported 2-arg function call: ") + tkStr);
         break;
       case PUSH_ID: {
         if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");

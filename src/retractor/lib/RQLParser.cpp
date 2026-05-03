@@ -152,7 +152,12 @@ class ParserListener : public RQLBaseListener {
     program.push_back(token(STREAM_AGSE, std::make_pair(step, window)));
   }
 
-  void exitFunction_call(RQLParser::Function_callContext *ctx) { recpToken(CALL, ctx->children[0]->getText()); }
+  void exitFunction_call(RQLParser::Function_callContext *ctx) {
+    if (ctx->TO_STRING_FN() && ctx->DECIMAL())
+      recpToken(CALL2, std::make_pair(std::string("to_string"), std::stoi(ctx->DECIMAL()->getText())));
+    else
+      recpToken(CALL, ctx->children[0]->getText());
+  }
 
   // page 119 - The Definitive ANTL4 Reference Guide
   void exitDeclare(RQLParser::DeclareContext *ctx) {
@@ -353,15 +358,27 @@ class ParserListener : public RQLBaseListener {
     auto outType = rdb::INTEGER;
     int  outLen  = 4;
     int  outArr  = 1;
-    for (auto &tk : program) {
-      if (tk.getCommandID() == CALL && tk.getStr_() == "to_string") {
-        outType = rdb::STRING; outLen = 1; outArr = 32;
+    for (auto it = program.begin(); it != program.end(); ++it) {
+      if ((it->getCommandID() == CALL || it->getCommandID() == CALL2) && it->getStr_() == "to_string") {
+        outType = rdb::STRING; outLen = 1;
         break;
       }
-      if (tk.getCommandID() == PUSH_VAL && tk.getVT().index() == rdb::STRING) {
-        outType = rdb::STRING; outLen = 1; outArr = 32;
+      if (it->getCommandID() == PUSH_VAL && it->getVT().index() == rdb::STRING) {
+        outType = rdb::STRING; outLen = 1;
         break;
       }
+    }
+    if (outType == rdb::STRING) {
+      outArr = 0;
+      for (auto &tk : program) {
+        if (tk.getCommandID() == CALL2 && tk.getStr_() == "to_string")
+          outArr += std::get<std::pair<std::string, int>>(tk.getVT()).second;
+        else if (tk.getCommandID() == CALL && tk.getStr_() == "to_string")
+          outArr += 32;
+        else if (tk.getCommandID() == PUSH_VAL && tk.getVT().index() == rdb::STRING)
+          outArr += static_cast<int>(std::get<std::string>(tk.getVT()).length());
+      }
+      if (outArr == 0) outArr = 32;
     }
     if (outType == rdb::INTEGER && !program.empty()) {
       auto &last = program.back();
