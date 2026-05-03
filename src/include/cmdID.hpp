@@ -38,16 +38,17 @@ enum command_id {
   STREAM_MAX,         // 28
   STREAM_SUM,         // 29
   CALL,               // 30
-  PUSH_STREAM,        // 31
-  STREAM_HASH,        // 32
-  STREAM_DEHASH_DIV,  // 33
-  STREAM_DEHASH_MOD,  // 34
-  STREAM_ADD,         // 35
-  STREAM_SUBTRACT,    // 36
-  STREAM_TIMEMOVE,    // 37
-  STREAM_AGSE,        // 38
-  COUNT,              // 39
-  COUNT_RANGE         // 40
+  CALL2,              // 31
+  PUSH_STREAM,        // 32
+  STREAM_HASH,        // 33
+  STREAM_DEHASH_DIV,  // 34
+  STREAM_DEHASH_MOD,  // 35
+  STREAM_ADD,         // 36
+  STREAM_SUBTRACT,    // 37
+  STREAM_TIMEMOVE,    // 38
+  STREAM_AGSE,        // 39
+  COUNT,              // 40
+  COUNT_RANGE         // 41
 };
 
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }

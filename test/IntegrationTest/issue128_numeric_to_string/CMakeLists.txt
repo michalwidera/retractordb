@@ -20,4 +20,6 @@ add_test(
     grep -F '100_test' out.txt ; \
     grep -F -- '-1.500000' out.txt ; \
     grep -F '7_test' out.txt ; \
-    grep -F '0.000000' out.txt")
+    grep -F '0.000000' out.txt ; \
+    grep -F 'STRING dst_0[21]' temp/dst.desc ; \
+    grep -F 'STRING dst_1[16]' temp/dst.desc")

@@ -168,8 +168,8 @@ function_call       : ( 'Sqrt'
                     | 'isnull'
                     | TO_INTEGER_FN
                     | TO_FLOAT_FN
-                    | TO_DOUBLE_FN
-                    | TO_STRING_FN ) '(' expression_factor ( COMMA expression_factor )* ')'
+                    | TO_DOUBLE_FN ) '(' expression_factor ( COMMA expression_factor )* ')'
+                    | TO_STRING_FN '(' expression_factor ( COLON DECIMAL )? ')'
                     ;
 
 // sync types with: src/include/rdb/fldType.hpp

@@ -1160,9 +1160,11 @@ public:
     antlr4::tree::TerminalNode *TO_INTEGER_FN();
     antlr4::tree::TerminalNode *TO_FLOAT_FN();
     antlr4::tree::TerminalNode *TO_DOUBLE_FN();
-    antlr4::tree::TerminalNode *TO_STRING_FN();
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
+    antlr4::tree::TerminalNode *TO_STRING_FN();
+    antlr4::tree::TerminalNode *COLON();
+    antlr4::tree::TerminalNode *DECIMAL();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
