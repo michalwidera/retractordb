@@ -176,3 +176,37 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## ANTLR4 Grammar — Known Pitfalls
+
+### COMMA ambiguity in `select_list` vs `function_call`
+
+`select_list` uses `COMMA` to separate expressions. ANTLR4 SLL prediction mode ignores call-stack context, so `f(a, b)` inside a multi-item SELECT is parsed as `f(a)` — the `,b` is treated as SelectList separator.
+
+**Rule**: Never use `COMMA` as separator for function arguments in `RQL.g4`. Use `COLON` or another token not present in `select_list`.
+
+Current pattern: `to_string(expr : N)` — the `:` (COLON) sets the output field width.
+
+### Adding new function call tokens
+
+When adding a function with a non-standard argument form (e.g., type-modifying parameter like output size):
+1. Add a separate grammar alternative using a non-COMMA separator — do NOT extend `( COMMA expression_factor )*`
+2. Run `ninja rqlgrammar` to regenerate `.antlr/` files
+3. Add `CALL2` (or a new `command_id`) to `src/include/cmdID.hpp`
+4. Handle in `exitFunction_call` in `src/retractor/lib/RQLParser.cpp` — store extra param in token value as `std::pair<std::string, int>` (IDXPAIR variant)
+5. In `exitExpression`: accumulate output field size from token value
+6. In `expressionEvaluator.cpp`: pop 1 arg (size is in token, not on stack)
+
+### Integration test file sync
+
+`test/CMakeLists.txt` copies `test/` → build dir at **cmake configure time** (`file(COPY ...)`). After editing test files (`.rql`, `data.txt`):
+- Either re-run `cmake` to sync, **or** manually copy changed files to `build/Debug/test/...`
+- `CTestTestfile.cmake` in build dir is CMake-generated — do NOT overwrite with `CMakeLists.txt` content; they have different formats
+
+### Descriptor field sizes for STRING expressions in SELECT
+
+`exitExpression` in `RQLParser.cpp` computes output field size by scanning `program` tokens:
+- `CALL2` + `to_string`: adds `pair.second` (the declared width)
+- `CALL` + `to_string` (no width): adds 32 (default)
+- `PUSH_VAL` string literal: adds `string.length()`
+- All contributions are **summed** — concatenation like `to_string(x:16)+'_test'` correctly yields 16+5=21
