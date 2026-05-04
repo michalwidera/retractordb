@@ -1,6 +1,13 @@
 # https://hub.docker.com/_/debian
 # Multi-stage: builder uses CI image (conan cache pre-populated), runtime is minimal.
 
+# ── Stage 0: build rsupervisor ───────────────────────────────────────────────
+FROM golang:1.24-bookworm AS gobuilder
+
+COPY src/supervisor/ /src/
+WORKDIR /src
+RUN CGO_ENABLED=0 go build -o /rsupervisor .
+
 # ── Stage 1: build ───────────────────────────────────────────────────────────
 FROM micwide/buildenv-retractordb:latest AS builder
 
@@ -52,6 +59,8 @@ COPY --from=builder \
     /home/developer/workspace/build/Release/src/rdb/xtrdb \
     /usr/local/bin/
 
+COPY --from=gobuilder /rsupervisor /usr/local/bin/rsupervisor
+
 # Extra shared libs not in trixie-slim (antlr4-cppruntime etc.)
 COPY --from=builder /home/developer/libs/ /usr/local/lib/retractordb/
 
@@ -60,7 +69,15 @@ RUN ldconfig /usr/local/lib/retractordb
 WORKDIR /home/retractor
 USER retractor
 
-CMD ["/usr/local/bin/xretractor"]
+COPY --chown=retractor:retractor src/supervisor/startup.rql /home/retractor/startup.rql
+
+ENV RDB_XRETRACTOR=/usr/local/bin/xretractor
+ENV RDB_XQRY=/usr/local/bin/xqry
+ENV RDB_XTRDB=/usr/local/bin/xtrdb
+
+EXPOSE 8080 9090
+
+CMD ["/usr/local/bin/rsupervisor"]
 
 # How to build and push:
 #   docker build -f docker/prod/Dockerfile -t retractordb:latest .
