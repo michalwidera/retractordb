@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 type apiHandler struct {
-	pm  *ProcessManager
-	cfg Config
+	pm       *ProcessManager
+	cfg      Config
+	shutdown chan<- struct{}
 }
 
-func NewAPI(pm *ProcessManager, cfg Config) http.Handler {
-	h := &apiHandler{pm: pm, cfg: cfg}
+func NewAPI(pm *ProcessManager, cfg Config, shutdown chan<- struct{}) http.Handler {
+	h := &apiHandler{pm: pm, cfg: cfg, shutdown: shutdown}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", h.health)
@@ -26,6 +30,12 @@ func NewAPI(pm *ProcessManager, cfg Config) http.Handler {
 	mux.HandleFunc("GET /api/logs", h.logs)
 	mux.HandleFunc("GET /api/xtrdb", h.xtrdb)
 	mux.HandleFunc("POST /api/stop", h.stop)
+	mux.HandleFunc("POST /api/shutdown", h.shutdownHandler)
+	mux.HandleFunc("GET /api/streams", h.streams)
+	mux.HandleFunc("GET /api/stream-info", h.streamInfo)
+	mux.HandleFunc("GET /api/dot", h.dotDiagram)
+	mux.HandleFunc("GET /api/file", h.fileRead)
+	mux.HandleFunc("POST /api/file", h.fileWrite)
 	mux.HandleFunc("GET /", h.ui)
 
 	return mux
@@ -163,6 +173,103 @@ func (h *apiHandler) xtrdb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+}
+
+func (h *apiHandler) dotDiagram(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	args := []string{"-c", "-d", "--queryfile", h.pm.CurrentFile()}
+	if q.Get("fields") == "1" {
+		args = append(args, "-f")
+	}
+	if q.Get("tags") == "1" {
+		args = append(args, "-t")
+	}
+	if q.Get("streamprogs") == "1" {
+		args = append(args, "-s")
+	}
+	if q.Get("rules") == "1" {
+		args = append(args, "-u")
+	}
+	out, err := exec.Command(h.cfg.Xretractor, args...).CombinedOutput()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "output": string(out)})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"dot": string(out)})
+}
+
+func (h *apiHandler) streams(w http.ResponseWriter, r *http.Request) {
+	out, err := h.pm.RunXqry("-y")
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error(), "output": out})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+}
+
+func (h *apiHandler) streamInfo(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name required"})
+		return
+	}
+	out, err := h.pm.RunXqry("-t", name)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error(), "output": out})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+}
+
+func (h *apiHandler) shutdownHandler(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting down"})
+	go func() { h.shutdown <- struct{}{} }()
+}
+
+func rqlPath(p string) (string, error) {
+	if !strings.HasSuffix(p, ".rql") {
+		return "", fmt.Errorf("only .rql files allowed")
+	}
+	clean := filepath.Clean(p)
+	if strings.Contains(clean, "..") {
+		return "", fmt.Errorf("path traversal not allowed")
+	}
+	return clean, nil
+}
+
+func (h *apiHandler) fileRead(w http.ResponseWriter, r *http.Request) {
+	path, err := rqlPath(r.URL.Query().Get("path"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"path": path, "content": string(data)})
+}
+
+func (h *apiHandler) fileWrite(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	path, err := rqlPath(body.Path)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := os.WriteFile(path, []byte(body.Content), 0644); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved", "path": path})
 }
 
 func (h *apiHandler) ui(w http.ResponseWriter, r *http.Request) {

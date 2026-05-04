@@ -45,9 +45,11 @@ func main() {
 		log.Printf("start xretractor: %v", err)
 	}
 
+	shutdown := make(chan struct{}, 1)
+
 	srv := &http.Server{
 		Addr:    ":" + cfg.HTTPPort,
-		Handler: NewAPI(pm, cfg),
+		Handler: NewAPI(pm, cfg, shutdown),
 	}
 
 	go func() {
@@ -63,7 +65,10 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
-	<-quit
+	select {
+	case <-quit:
+	case <-shutdown:
+	}
 
 	log.Println("shutting down...")
 	pm.StopAll()

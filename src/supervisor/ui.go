@@ -6,6 +6,7 @@ const indexHTML = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <title>RetractorDB Supervisor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@viz-js/viz/lib/viz-standalone.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { font-family: monospace; margin: 0; padding: 16px; background: #1e1e1e; color: #ccc; }
@@ -30,6 +31,10 @@ const indexHTML = `<!DOCTYPE html>
   .ok { color: #4ec9b0; } .bad { color: #f44747; }
   canvas { margin-top: 10px; max-width: 100%; }
   #streamData { max-height: 140px; }
+  #streamTable tbody tr { cursor: pointer; }
+  #streamTable tbody tr:hover td { background: #2a2d2e; }
+  #streamTable tbody tr.selected td { background: #1e3a5f; }
+  #streamTable td { padding: 4px 8px; border-bottom: 1px solid #333; }
   #statusbar { background: #252526; padding: 8px 14px; border-radius: 4px; margin-bottom: 12px;
     display: flex; align-items: center; gap: 16px; }
   .tabs { display: flex; gap: 2px; margin-bottom: 0; }
@@ -48,6 +53,7 @@ const indexHTML = `<!DOCTYPE html>
   <span id="status">...</span>
   <button onclick="fetchStatus()" style="margin-top:0">Odśwież</button>
   <button class="danger" onclick="stopXretractor()" style="margin-top:0">Zatrzymaj xretractor</button>
+  <button class="danger" onclick="shutdownSupervisor()" style="margin-top:0">Wyłącz supervisor</button>
 </div>
 
 <div class="tabs">
@@ -55,7 +61,9 @@ const indexHTML = `<!DOCTYPE html>
   <div class="tab" onclick="showTab('adhoc')">Adhoc</div>
   <div class="tab" onclick="showTab('queries')">Zapytania</div>
   <div class="tab" onclick="showTab('stream')">Podgląd</div>
+  <div class="tab" onclick="showTab('diagram')">Diagram</div>
   <div class="tab" onclick="showTab('xtrdb')">xtrdb</div>
+  <div class="tab" onclick="showTab('editor')">Edytor .rql</div>
   <div class="tab" onclick="showTab('logs')">Logi</div>
 </div>
 
@@ -76,8 +84,19 @@ const indexHTML = `<!DOCTYPE html>
 </div>
 
 <div id="tab-queries" class="tabpanel card">
-  <h2>Drzewo zapytań</h2>
-  <button onclick="fetchQueries()">Pobierz</button>
+  <h2>Strumienie i zapytania</h2>
+  <button onclick="fetchQueries()">Odśwież</button>
+  <table id="streamTable" style="width:100%;border-collapse:collapse;margin-top:10px;font-size:12px">
+    <thead><tr>
+      <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #444;color:#9cdcfe">name</th>
+      <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #444;color:#9cdcfe">delta</th>
+      <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #444;color:#9cdcfe">size</th>
+      <th style="text-align:left;padding:4px 8px;border-bottom:1px solid #444;color:#9cdcfe">count</th>
+    </tr></thead>
+    <tbody id="streamTableBody"></tbody>
+  </table>
+  <pre id="streamInfoBox" style="margin-top:8px;max-height:200px"></pre>
+  <h2 style="margin-top:14px">Drzewo zapytań</h2>
   <pre id="queriesResult"></pre>
 </div>
 
@@ -91,6 +110,30 @@ const indexHTML = `<!DOCTYPE html>
   </div>
   <pre id="streamData"></pre>
   <canvas id="streamChart" height="120"></canvas>
+</div>
+
+<div id="tab-editor" class="tabpanel card">
+  <h2>Edytor plików .rql</h2>
+  <div class="row">
+    <input id="editorPath" type="text" placeholder="ścieżka do pliku .rql" />
+    <button onclick="editorLoad()">Wczytaj</button>
+    <button onclick="editorSave()">Zapisz</button>
+  </div>
+  <textarea id="editorContent" rows="16" style="margin-top:8px;font-size:12px" placeholder="zawartość pliku..."></textarea>
+  <pre id="editorResult"></pre>
+</div>
+
+<div id="tab-diagram" class="tabpanel card">
+  <h2>Diagram zapytań (xretractor -c -d)</h2>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
+    <label><input type="checkbox" id="dFields"> fields</label>
+    <label><input type="checkbox" id="dTags" onchange="if(this.checked)document.getElementById('dFields').checked=true"> tags</label>
+    <label><input type="checkbox" id="dStreamprogs"> streamprogs</label>
+    <label><input type="checkbox" id="dRules"> rules</label>
+    <button onclick="generateDiagram()" style="margin-top:0">Generuj</button>
+  </div>
+  <div id="diagramSvg" style="background:#1a1a1a;padding:8px;overflow:auto;min-height:60px"></div>
+  <pre id="diagramError" style="color:#f44747"></pre>
 </div>
 
 <div id="tab-xtrdb" class="tabpanel card">
@@ -111,25 +154,66 @@ const indexHTML = `<!DOCTYPE html>
 
 <script>
 let sse = null, chart = null;
-const chartDataset = { labels: [], datasets: [{ label: 'wartość', data: [],
-  borderColor: '#4ec9b0', backgroundColor: 'rgba(78,201,176,0.1)', tension: 0.2, pointRadius: 2 }] };
+let chartLabels = [], chartDatasets = [];
+const palette = [
+  { border:'#4ec9b0', bg:'rgba(78,201,176,0.1)' },
+  { border:'#9cdcfe', bg:'rgba(156,220,254,0.1)' },
+  { border:'#ce9178', bg:'rgba(206,145,120,0.1)' },
+  { border:'#dcdcaa', bg:'rgba(220,220,170,0.1)' },
+  { border:'#c586c0', bg:'rgba(197,134,192,0.1)' },
+  { border:'#f44747', bg:'rgba(244,71,71,0.1)' },
+];
+function ensureDatasets(count) {
+  while (chartDatasets.length < count) {
+    const i = chartDatasets.length, c = palette[i % palette.length];
+    chartDatasets.push({ label:'kol.'+(i+1), data: new Array(chartLabels.length).fill(null),
+      borderColor:c.border, backgroundColor:c.bg, tension:0.2, pointRadius:2, spanGaps:false });
+  }
+}
+
+const tabLabels = {
+  reload:'Przeładowanie', adhoc:'Adhoc', queries:'Zapytania',
+  stream:'Podgląd', diagram:'Diagram', xtrdb:'xtrdb', editor:'Edytor .rql', logs:'Logi'
+};
 
 function showTab(name) {
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    const panels = document.querySelectorAll('.tabpanel');
-    t.classList.toggle('active', t.textContent.trim() === {
-      reload:'Przeładowanie', adhoc:'Adhoc', queries:'Zapytania',
-      stream:'Podgląd', xtrdb:'xtrdb', logs:'Logi'
-    }[name]);
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.textContent.trim() === tabLabels[name]);
   });
   document.querySelectorAll('.tabpanel').forEach(p => {
     p.classList.toggle('active', p.id === 'tab-' + name);
   });
+  if (name === 'queries') fetchQueries();
 }
 
 async function api(url, opts) {
   try { return await fetch(url, opts); }
   catch(e) { console.error(url, e); return null; }
+}
+
+async function shutdownSupervisor() {
+  if (!confirm('Wyłączyć supervisor i wszystkie zarządzane procesy?')) return;
+  await api('/api/shutdown', { method:'POST' });
+}
+
+async function editorLoad() {
+  const path = document.getElementById('editorPath').value.trim();
+  if (!path) return;
+  const r = await api('/api/file?path=' + encodeURIComponent(path));
+  const d = r ? await r.json() : {};
+  if (d.error) { document.getElementById('editorResult').textContent = 'Błąd: ' + d.error; return; }
+  document.getElementById('editorContent').value = d.content || '';
+  document.getElementById('editorResult').textContent = '';
+}
+
+async function editorSave() {
+  const path = document.getElementById('editorPath').value.trim();
+  const content = document.getElementById('editorContent').value;
+  if (!path) return;
+  const r = await api('/api/file', { method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({path, content}) });
+  const d = r ? await r.json() : {};
+  document.getElementById('editorResult').textContent = d.error ? 'Błąd: ' + d.error : 'Zapisano: ' + d.path;
 }
 
 async function stopXretractor() {
@@ -166,10 +250,70 @@ async function adhoc() {
   document.getElementById('adhocResult').textContent = r ? JSON.stringify(await r.json(), null, 2) : 'error';
 }
 
-async function fetchQueries() {
-  const r = await api('/api/queries');
+function parseStreamsYaml(yaml) {
+  const streams = [];
+  let cur = null;
+  for (const line of yaml.split('\n')) {
+    const nm = line.match(/^ {2}-\s+name:\s*(.+)/);
+    if (nm) { cur = { name: nm[1].trim() }; streams.push(cur); continue; }
+    if (!cur) continue;
+    const fld = line.match(/^ {4}(\w+):\s*(.+)/);
+    if (fld) cur[fld[1]] = fld[2].trim();
+  }
+  return streams;
+}
+
+async function generateDiagram() {
+  const fields     = document.getElementById('dFields').checked ? 1 : 0;
+  const tags       = document.getElementById('dTags').checked ? 1 : 0;
+  const streamprogs= document.getElementById('dStreamprogs').checked ? 1 : 0;
+  const rules      = document.getElementById('dRules').checked ? 1 : 0;
+  document.getElementById('diagramError').textContent = '';
+  document.getElementById('diagramSvg').innerHTML = '<span style="color:#666">Generowanie...</span>';
+  const r = await api('/api/dot?fields='+fields+'&tags='+tags+'&streamprogs='+streamprogs+'&rules='+rules);
   const d = r ? await r.json() : {};
-  document.getElementById('queriesResult').textContent = d.output || d.error || 'brak danych';
+  if (d.error) {
+    document.getElementById('diagramSvg').innerHTML = '';
+    document.getElementById('diagramError').textContent = d.error + (d.output ? '\n' + d.output : '');
+    return;
+  }
+  try {
+    const viz = await Viz.instance();
+    const svg = viz.renderSVGElement(d.dot);
+    svg.style.maxWidth = '100%';
+    const box = document.getElementById('diagramSvg');
+    box.innerHTML = '';
+    box.appendChild(svg);
+  } catch(e) {
+    document.getElementById('diagramSvg').innerHTML = '';
+    document.getElementById('diagramError').textContent = 'Błąd renderowania: ' + e.message + '\n\n' + d.dot;
+  }
+}
+
+async function fetchQueries() {
+  const [rs, rq] = await Promise.all([api('/api/streams'), api('/api/queries')]);
+  const ds = rs ? await rs.json() : {};
+  const dq = rq ? await rq.json() : {};
+
+  const streams = parseStreamsYaml(ds.output || '');
+  const tbody = document.getElementById('streamTableBody');
+  const cell = v => '<td>' + escHtml(v || '—') + '</td>';
+  tbody.innerHTML = streams.length
+    ? streams.map(s =>
+        '<tr onclick="fetchStreamInfo(' + JSON.stringify(s.name) + ',this)">' +
+        cell(s.name) + cell(s.delta) + cell(s.size) + cell(s.count) + '</tr>'
+      ).join('')
+    : '<tr><td colspan="4" style="color:#666">brak strumieni</td></tr>';
+  document.getElementById('streamInfoBox').textContent = '';
+  document.getElementById('queriesResult').textContent = dq.output || dq.error || 'brak danych';
+}
+
+async function fetchStreamInfo(name, row) {
+  document.querySelectorAll('#streamTableBody tr').forEach(r => r.classList.remove('selected'));
+  if (row) row.classList.add('selected');
+  const r = await api('/api/stream-info?name=' + encodeURIComponent(name));
+  const d = r ? await r.json() : {};
+  document.getElementById('streamInfoBox').textContent = d.output || d.error || 'brak danych';
 }
 
 function startStream() {
@@ -181,9 +325,10 @@ function startStream() {
 
   const ctx = document.getElementById('streamChart').getContext('2d');
   if (chart) chart.destroy();
-  chartDataset.labels = [];
-  chartDataset.datasets[0].data = [];
-  chart = new Chart(ctx, { type: 'line', data: chartDataset,
+  chartLabels = [];
+  chartDatasets = [];
+  chart = new Chart(ctx, { type: 'line',
+    data: { labels: chartLabels, datasets: chartDatasets },
     options: { animation: false, responsive: true,
       plugins: { legend: { labels: { color: '#ccc' } } },
       scales: { x: { ticks: { color:'#888', maxTicksLimit: 10 } },
@@ -198,14 +343,14 @@ function startStream() {
     el.textContent = lines.join('\n');
     el.scrollTop = el.scrollHeight;
 
-    const m = e.data.match(/[-\d.]+/);
-    if (m && chart) {
-      const t = new Date().toLocaleTimeString('pl');
-      chartDataset.labels.push(t);
-      chartDataset.datasets[0].data.push(parseFloat(m[0]));
-      if (chartDataset.labels.length > win) {
-        chartDataset.labels.shift();
-        chartDataset.datasets[0].data.shift();
+    const nums = (e.data.match(/[-\d.]+/g) || []).map(Number).filter(n => !isNaN(n));
+    if (nums.length > 0 && chart) {
+      ensureDatasets(nums.length);
+      chartLabels.push(new Date().toLocaleTimeString('pl'));
+      nums.forEach((v, i) => chartDatasets[i].data.push(v));
+      if (chartLabels.length > win) {
+        chartLabels.shift();
+        chartDatasets.forEach(ds => ds.data.shift());
       }
       chart.update();
     }

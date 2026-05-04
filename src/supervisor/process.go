@@ -93,7 +93,14 @@ func (pm *ProcessManager) StopRetractor() error {
 		return fmt.Errorf("xretractor not running")
 	}
 
-	log.Printf("stopping xretractor")
+	log.Printf("stopping xretractor via IPC")
+	exec.Command(pm.cfg.Xqry, "-k").Run()
+	select {
+	case <-rp.done:
+		return nil
+	case <-time.After(5 * time.Second):
+	}
+	log.Printf("IPC stop timeout, sending SIGTERM")
 	rp.cmd.Process.Signal(syscall.SIGTERM)
 	select {
 	case <-rp.done:

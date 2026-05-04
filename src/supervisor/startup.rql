@@ -1,5 +1,5 @@
 STORAGE 'temp'
 
-DECLARE a INTEGER STREAM core0, 0.1 FILE '/dev/urandom'
+DECLARE a BYTE STREAM core0, 0.1 FILE '/dev/urandom'
 
-SELECT * STREAM str1 FROM core0
+SELECT str[0], str[0] / 2 STREAM str1 FROM core0
