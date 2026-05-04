@@ -118,6 +118,7 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
 
     IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
+    IPC::named_mutex mapMutex(IPC::open_only, "RetractorMapMutex");
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
     if (netArgument != "") pt_request.put("db.argument", netArgument);
@@ -144,7 +145,11 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     assert(mymap);
 
     std::size_t processId = getpid();
-    auto it               = mymap->find(processId);
+    auto it               = mymap->end();
+    {
+      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
+      it = mymap->find(processId);
+    }
 
     // When server works under valgrid - must be 10 probes x 10ms
     constexpr int maxAcceptableFails = 10;
@@ -152,6 +157,7 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
     int cntr(maxAcceptableFails);
     while (it == mymap->end() && cntr) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
       it = mymap->find(processId);
       --cntr;
     }
@@ -163,8 +169,14 @@ ptree qry::netClient(const std::string &netCommand, const std::string &netArgume
       return pt_response;
     }
     std::stringstream strstream;
-    strstream << it->second;
-    mymap->erase(processId);
+    {
+      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
+      it = mymap->find(processId);
+      if (it != mymap->end()) {
+        strstream << it->second;
+        mymap->erase(it);
+      }
+    }
     // read_json(strstream, pt_response) ;
     // read_xml(strstream, pt_response);
     read_info(strstream, pt_response);
