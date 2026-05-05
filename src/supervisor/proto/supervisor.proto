@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package supervisor.v1;
+
+option go_package = "rsupervisor/pb";
+
+service Supervisor {
+  rpc Health(Empty) returns (HealthResponse);
+  rpc ListQueries(Empty) returns (TextResponse);
+  rpc GetQueryTree(QueryTreeRequest) returns (TextResponse);
+  rpc Reload(ReloadRequest) returns (StatusResponse);
+  rpc Adhoc(AdhocRequest) returns (StatusResponse);
+  rpc StopRetractor(Empty) returns (StatusResponse);
+  rpc Shutdown(Empty) returns (StatusResponse);
+  rpc GetLogs(Empty) returns (LogsResponse);
+  rpc StreamData(StreamRequest) returns (stream DataChunk);
+}
+
+message Empty {}
+
+message HealthResponse {
+  string status = 1;
+  bool   xretractor_running = 2;
+  string query_file = 3;
+}
+
+message TextResponse {
+  string output = 1;
+  string error  = 2;
+}
+
+message StatusResponse {
+  string status = 1;
+  string output = 2;
+  string error  = 3;
+}
+
+message ReloadRequest {
+  string file = 1;
+}
+
+message AdhocRequest {
+  string query = 1;
+}
+
+message QueryTreeRequest {
+  bool fields      = 1;
+  bool tags        = 2;
+  bool streamprogs = 3;
+  bool rules       = 4;
+}
+
+message StreamRequest {
+  string name = 1;
+}
+
+message DataChunk {
+  string line = 1;
+}
+
+message LogEntry {
+  string time    = 1;
+  string process = 2;
+  string line    = 3;
+}
+
+message LogsResponse {
+  repeated LogEntry entries = 1;
+}
