@@ -6,7 +6,6 @@
 4. Program powinien być przygotowany do działania poza kontenerem, ale powienien umożliwiać komunikację i prezentowanie danych dostarczanych przez supervisor
 
 Program uiRdbApp powinien:
-- być napisany w języku Dart/Flutter,
 - komunikować się z systemem w którym działa supervisor za pomocą gRPC,
 - umożliwiać załadowanie, przesłanie i uruchomienie wewnątrz kontenera zapytania w Języku RQL,
 - umożliwiać zatrzymanie i zamknięcie wszystkich działających procesów wewnątrz kontenera, 
@@ -16,4 +15,3 @@ Program uiRdbApp powinien:
 - umożliwiać pobranie ze supervisora schematu prezentowanych danych (kolejności i typów kolumn dla formatów CSV, JSON i RAW),
 - umożliwiać prezentację planu realizacji zapytań realizowanych w systemie w postaci graficznej (graphivz/dot/webview z embedded graphiz-js)
 - prezentacje powinny być dostępne na różnych zakładkach i aktualizowane w tle,
-

@@ -14,6 +14,7 @@ add_definitions(-Wno-deprecated-declarations)
 add_definitions(-DHAS_BOOST)
 
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
+option(BUILD_SUPERVISOR "Build Go rsupervisor binary (requires Go)" OFF)
 
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
 
