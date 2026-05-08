@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+
+project(rsupervisor LANGUAGES NONE)
+
+find_program(GO_EXECUTABLE go REQUIRED)
+
+file(
+  GLOB_RECURSE GO_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/*.go"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pb/*.go")
+
+set(SUPERVISOR_BIN ${CMAKE_CURRENT_BINARY_DIR}/rsupervisor)
+
+add_custom_command(
+  OUTPUT ${SUPERVISOR_BIN}
+  COMMAND ${GO_EXECUTABLE} build -o ${SUPERVISOR_BIN} .
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${GO_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/go.mod
+          ${CMAKE_CURRENT_SOURCE_DIR}/go.sum
+  COMMENT "Building rsupervisor (Go)")
+
+add_custom_target(supervisor ALL DEPENDS ${SUPERVISOR_BIN})
+
+install(PROGRAMS ${SUPERVISOR_BIN} DESTINATION ${CMAKE_INSTALL_BINDIR})

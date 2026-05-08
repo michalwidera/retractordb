@@ -9,11 +9,13 @@ service Supervisor {
   rpc ListQueries(Empty) returns (TextResponse);
   rpc GetQueryTree(QueryTreeRequest) returns (TextResponse);
   rpc Reload(ReloadRequest) returns (StatusResponse);
+  rpc UploadRQL(UploadRQLRequest) returns (StatusResponse);
   rpc Adhoc(AdhocRequest) returns (StatusResponse);
   rpc StopRetractor(Empty) returns (StatusResponse);
   rpc Shutdown(Empty) returns (StatusResponse);
   rpc GetLogs(Empty) returns (LogsResponse);
   rpc StreamData(StreamRequest) returns (stream DataChunk);
+  rpc GetStreamSchema(StreamRequest) returns (SchemaResponse);
 }
 
 message Empty {}
@@ -39,6 +41,11 @@ message ReloadRequest {
   string file = 1;
 }
 
+message UploadRQLRequest {
+  string path    = 1;
+  bytes  content = 2;
+}
+
 message AdhocRequest {
   string query = 1;
 }
@@ -56,6 +63,16 @@ message StreamRequest {
 
 message DataChunk {
   string line = 1;
+}
+
+message FieldInfo {
+  string name = 1;
+  string type = 2;
+}
+
+message SchemaResponse {
+  repeated FieldInfo fields = 1;
+  string error = 2;
 }
 
 message LogEntry {

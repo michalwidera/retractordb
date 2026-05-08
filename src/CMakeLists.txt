@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 add_subdirectory(rdb)
 add_subdirectory(qry)
 add_subdirectory(retractor)
+add_subdirectory(supervisor)
 
 add_custom_target(
   simple

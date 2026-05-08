@@ -33,6 +33,7 @@ func NewAPI(pm *ProcessManager, cfg Config, shutdown chan<- struct{}) http.Handl
 	mux.HandleFunc("POST /api/shutdown", h.shutdownHandler)
 	mux.HandleFunc("GET /api/querytree", h.queryTree)
 	mux.HandleFunc("POST /api/file", h.fileWrite)
+	mux.HandleFunc("GET /api/schema/{name}", h.schema)
 
 	return mux
 }
@@ -192,6 +193,33 @@ func rqlPath(p string) (string, error) {
 		return "", fmt.Errorf("path traversal not allowed")
 	}
 	return clean, nil
+}
+
+func (h *apiHandler) schema(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	out, err := h.pm.RunXqry("--detail", name)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error(), "output": out})
+		return
+	}
+	var parsed struct {
+		Fields map[string]struct {
+			Type string `yaml:"type"`
+		} `yaml:"fields"`
+	}
+	if err := yaml.Unmarshal([]byte(out), &parsed); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	type fieldInfo struct {
+		Name string `json:"name"`
+		Type string `json:"type"`
+	}
+	fields := make([]fieldInfo, 0, len(parsed.Fields))
+	for name, info := range parsed.Fields {
+		fields = append(fields, fieldInfo{Name: name, Type: info.Type})
+	}
+	writeJSON(w, http.StatusOK, fields)
 }
 
 func (h *apiHandler) fileWrite(w http.ResponseWriter, r *http.Request) {

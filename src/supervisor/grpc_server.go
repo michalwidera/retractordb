@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"context"
+	"os"
 	"os/exec"
 
 	pb "rsupervisor/pb"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v3"
 )
 
 type grpcServer struct {
@@ -73,6 +75,17 @@ func (s *grpcServer) Reload(_ context.Context, req *pb.ReloadRequest) (*pb.Statu
 	return &pb.StatusResponse{Status: "reloaded", Output: req.File}, nil
 }
 
+func (s *grpcServer) UploadRQL(_ context.Context, req *pb.UploadRQLRequest) (*pb.StatusResponse, error) {
+	path, err := rqlPath(req.Path)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	if err := os.WriteFile(path, req.Content, 0644); err != nil {
+		return &pb.StatusResponse{Status: "error", Error: err.Error()}, nil
+	}
+	return &pb.StatusResponse{Status: "saved", Output: path}, nil
+}
+
 func (s *grpcServer) Adhoc(_ context.Context, req *pb.AdhocRequest) (*pb.StatusResponse, error) {
 	if req.Query == "" {
 		return nil, status.Error(codes.InvalidArgument, "query required")
@@ -108,6 +121,29 @@ func (s *grpcServer) GetLogs(_ context.Context, _ *pb.Empty) (*pb.LogsResponse, 
 		}
 	}
 	return &pb.LogsResponse{Entries: pbEntries}, nil
+}
+
+func (s *grpcServer) GetStreamSchema(_ context.Context, req *pb.StreamRequest) (*pb.SchemaResponse, error) {
+	if req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "name required")
+	}
+	out, err := s.pm.RunXqry("--detail", req.Name)
+	if err != nil {
+		return &pb.SchemaResponse{Error: err.Error()}, nil
+	}
+	var parsed struct {
+		Fields map[string]struct {
+			Type string `yaml:"type"`
+		} `yaml:"fields"`
+	}
+	if err := yaml.Unmarshal([]byte(out), &parsed); err != nil {
+		return &pb.SchemaResponse{Error: err.Error()}, nil
+	}
+	fields := make([]*pb.FieldInfo, 0, len(parsed.Fields))
+	for name, info := range parsed.Fields {
+		fields = append(fields, &pb.FieldInfo{Name: name, Type: info.Type})
+	}
+	return &pb.SchemaResponse{Fields: fields}, nil
 }
 
 func (s *grpcServer) StreamData(req *pb.StreamRequest, stream pb.Supervisor_StreamDataServer) error {

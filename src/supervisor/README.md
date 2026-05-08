@@ -9,6 +9,7 @@ program rsupervisor powinien:
 - udostępniać interfejs API umożliwiający komunikację i zarządzanie procesami za pomocą protokołu REST,
 - udostępniać interfejs API umożliwiający komunikację i zarządzanie procesami za pomocą protokołu gRPC,
 - umożliwiać uruchomienie xretractor z plikiem zapytań (.rql) przesłanym przez API jak i zlokalizowanym w systemie plików,
+- umożliwiać przesłanie zawartości pliku zapytań (.rql) przez API (REST: POST /api/file, gRPC: UploadRQL) i zapisanie go w systemie plików kontenera,
 - umożliwiać przeładowanie xretractor z nowym plikiem zapytań (.rql) poprzez zatrzymanie procesu przez xqry (kill) i uruchomienie xretractor ponownie z nowym plikiem,
 - umożliwiać dodanie tymczasowego zapytania (adhoc),
 - umożliwiać wylistowanie funkcjonujących zapytań wraz informacją o ilości zgromadzonych rekordów (diryaml),
@@ -20,3 +21,4 @@ program rsupervisor powinien:
 - agregować i udostępniać ostatnie logi ze wszystkich zarządzanych procesów,
 - wykonywać graceful shutdown: przy odebraniu SIGTERM zatrzymać xretractor przez xqry (kill), poczekać na zakończenie procesów i zakończyć działanie xretractor,
 - umożliwić wywołanie przez API polecenia graceful shutdown oraz zakończenia procesu supervisor,
+
