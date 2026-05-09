@@ -127,13 +127,21 @@ class metaDataStream {
   /// The meta file is rewritten with only the header.
   void reset();
 
+  /// @brief Flush the pending RLE entry to disk immediately.
+  ///
+  /// Normally the pending entry is committed lazily (on pattern change,
+  /// gap, or destructor). Call this after every write() to guarantee that
+  /// null metadata survives a crash or a second storage reader opening
+  /// the same file.
+  void flushCurrentEntry();
+
  private:
   void createNullBitsetTemplate();
   void loadIndex();                                           ///< read header and restore currentEntry_ from file
   void saveHeader();                                          ///< write file header (creation time) without entries
   void appendEntry(const IndexRecord &entry);                 ///< append a single entry to end of file
   void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
-  void flushCurrentEntry();                                   ///< commit currentEntry_ to file if recordCount > 0
+  void truncateLastEntry();                                   ///< remove the last committed entry from file (for RLE retract)
   std::vector<IndexRecord> readCommittedEntries() const;      ///< read all committed entries from file
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
@@ -147,6 +155,7 @@ class metaDataStream {
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
   size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
+  size_t pendingCommittedCount_{0};                     ///< recordCount of the last entry written to disk (0 = none/invalidated)
   IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run
 };  // class metaDataStream
 
