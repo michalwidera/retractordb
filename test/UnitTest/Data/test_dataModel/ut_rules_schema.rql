@@ -1,4 +1,4 @@
-DECLARE a INTEGER STREAM core0, 1 FILE 'datafile1.txt'
-SELECT str_rule[0] STREAM str_rule FROM core0
+DECLARE a INTEGER STREAM rules_core0, 1 FILE 'datafile1.txt'
+SELECT str_rule[0] STREAM str_rule FROM rules_core0
 RULE rule1 ON str_rule WHEN str_rule[0] > 0 DO SYSTEM 'echo fired > rule_marker1.txt'
 RULE rule2 ON str_rule WHEN str_rule[0] < 0 DO SYSTEM 'echo fired > rule_marker2.txt'

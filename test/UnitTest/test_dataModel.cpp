@@ -239,41 +239,41 @@ TEST_F(xschema, getRow_1) {
 
   dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 }
-TEST_F(xschema, constructAggregate_max) {
+TEST_F(xschema, reduceFieldsToPayload_max) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → MAX = 16
-  auto result = data.constructAggregate(STREAM_MAX, "str1");
+  auto result = data.reduceFieldsToPayload(STREAM_MAX, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:16 }");
 }
 
-TEST_F(xschema, constructAggregate_min) {
+TEST_F(xschema, reduceFieldsToPayload_min) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → MIN = 15
-  auto result = data.constructAggregate(STREAM_MIN, "str1");
+  auto result = data.reduceFieldsToPayload(STREAM_MIN, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:15 }");
 }
 
-TEST_F(xschema, constructAggregate_sum) {
+TEST_F(xschema, reduceFieldsToPayload_sum) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → SUM = 31
-  auto result = data.constructAggregate(STREAM_SUM, "str1");
+  auto result = data.reduceFieldsToPayload(STREAM_SUM, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:31 }");
 }
 
-TEST_F(xschema, constructAggregate_avg) {
+TEST_F(xschema, reduceFieldsToPayload_avg) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → AVG = 31/2 = 15 (obcięcie do int)
-  auto result = data.constructAggregate(STREAM_AVG, "str1");
+  auto result = data.reduceFieldsToPayload(STREAM_AVG, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:15 }");
@@ -295,11 +295,11 @@ TEST_F(xschema, constructRulesAndUpdate_empty_rules) {
   SUCCEED();
 }
 
-TEST_F(xschema, constructAggregate_single_field) {
+TEST_F(xschema, reduceFieldsToPayload_single_field) {
   streamInstance data{coreInstance, coreInstance["str2"]};
   data.outputPayload->setDisposable(false);
   // str2 last record: {333} → single-field aggregate
-  auto result = data.constructAggregate(STREAM_MAX, "str2");
+  auto result = data.reduceFieldsToPayload(STREAM_MAX, "str2");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str2:333 }");
@@ -310,7 +310,7 @@ std::unique_ptr<dataModel> dataArea_rules;
 class xschema_rules : public ::testing::Test {
  protected:
   xschema_rules() {
-    for (auto f : {"rule_marker1.txt", "rule_marker2.txt", "str_rule", "str_rule.desc", "core0.desc"})
+    for (auto f : {"rule_marker1.txt", "rule_marker2.txt", "str_rule", "str_rule.desc", "rules_core0.desc", "datafile1.txt.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
 
     coreInstance.clear();
