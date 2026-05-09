@@ -11,11 +11,11 @@
 ///
 /// Obiekt klasy streamInstance powinien:
 /// - być inicjalizowany z instancją qTree i query, na podstawie których będzie tworzył zawartość rekordów (payload).
-/// - tworzyć payloady na podstawie zapytań, w tym agregacje i operacje na polach.
+/// - w trakcie inicjalizacji powinna być możliwość dodania dodatkowego parametru, np. ścieżki do katalogu, w którym będą przechowywane dane (storagePathParam).
+/// - tworzyć payloady na podstawie zapytań, w tym agregacje i dozwolone operacje na polach.
 /// - zarządzać regułami aktualizacji danych zgodnie z definicjami w query.
-/// - współpracować z klasą dumpManager do rejestrowania i wykonywania zadań dumpowania danych.
-/// - być odpowiedzialny za przygotowanie danych do zapisu do magazynu (storage) zgodnie z wymaganiami zapytania i strukturą danych
-/// - zapewniać mechanizmy do obsługi różnych typów danych i operacji, takich jak agregacje, przesunięcia czasowe, itp.
+/// - współpracować z klasą dumpManager do rejestrowania i wykonywania zadań dumpowania danych (akcja DUMP); wywołania systemowe (akcja SYSTEM) są wykonywane bezpośrednio.
+/// - łączyć dane wejściowe (inputPayload) z logiką zapytania, aby generować dane wyjściowe (outputPayload) gotowe do zapisania w magazynie.
 
 struct streamInstance {
   qTree &coreInstance;
