@@ -19,6 +19,7 @@
 // ctest -R '^ut-test_dataModel' -V
 
 extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
+extern dataModel *pProc;
 
 qTree coreInstance;
 
@@ -93,9 +94,11 @@ class xschema : public ::testing::Test {
 
     for (auto i : coreInstance)
       if (!i.isDeclaration()) dataArea->constructInputPayload(i.id);
+
+    pProc = dataArea.get();
   }
 
-  virtual ~xschema() override {}
+  virtual ~xschema() override { pProc = nullptr; }
 
   void SetUp() override { SPDLOG_INFO("SetUp"); }
 
@@ -274,6 +277,58 @@ TEST_F(xschema, constructAggregate_avg) {
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:15 }");
+}
+
+TEST_F(xschema, constructOutputPayload_expression) {
+  // str2: SELECT str2[0]+5 FROM core0 → core0.a=20, result=25
+  dataArea->processZeroStep();
+  dataArea->constructInputPayload("str2");
+  dataArea->qSet["str2"]->constructOutputPayload(coreInstance["str2"].lSchema);
+  std::stringstream ss;
+  ss << rdb::singleLineFormat << *(dataArea->qSet["str2"]->outputPayload->getPayload());
+  EXPECT_EQ(ss.str(), "{ str2_0:25 }");
+}
+
+TEST_F(xschema, constructRulesAndUpdate_empty_rules) {
+  // str2 has no RULE declarations → constructRulesAndUpdate is a no-op (no crash)
+  dataArea->qSet["str2"]->constructRulesAndUpdate(coreInstance["str2"]);
+  SUCCEED();
+}
+
+TEST_F(xschema, constructAggregate_single_field) {
+  streamInstance data{coreInstance, coreInstance["str2"]};
+  data.outputPayload->setDisposable(false);
+  // str2 last record: {333} → single-field aggregate
+  auto result = data.constructAggregate(STREAM_MAX, "str2");
+  std::stringstream ss;
+  ss << rdb::singleLineFormat << result;
+  EXPECT_EQ(ss.str(), "{ str2:333 }");
+}
+
+std::unique_ptr<dataModel> dataArea_rules;
+
+class xschema_rules : public ::testing::Test {
+ protected:
+  xschema_rules() {
+    for (auto f : {"rule_marker1.txt", "rule_marker2.txt", "str_rule", "str_rule.desc", "core0.desc"})
+      if (std::filesystem::exists(f)) std::filesystem::remove(f);
+
+    coreInstance.clear();
+    parserRQLFile_4Test(coreInstance, "ut_rules_schema.rql");
+    dataArea_rules = std::make_unique<dataModel>(coreInstance);
+    pProc = dataArea_rules.get();
+  }
+  ~xschema_rules() override { pProc = nullptr; }
+  void SetUp() override {}
+  void TearDown() override {}
+};
+
+TEST_F(xschema_rules, constructRulesAndUpdate_system_rule_fires) {
+  // core0 first row: a=20 → str_rule[0]=20 > 0 → rule1 fires, rule2 does not
+  dataArea_rules->processZeroStep();
+  dataArea_rules->processRows({"str_rule"});
+  EXPECT_TRUE(std::filesystem::exists("rule_marker1.txt")) << "rule1 (>0) should fire for positive data";
+  EXPECT_FALSE(std::filesystem::exists("rule_marker2.txt")) << "rule2 (<0) should not fire for positive data";
 }
 
 }  // namespace
