@@ -4,7 +4,7 @@
 # ── Stage 0: build rsupervisor ───────────────────────────────────────────────
 FROM golang:1.24-bookworm AS gobuilder
 
-COPY src/supervisor/ /src/
+COPY docker/supervisor/ /src/
 WORKDIR /src
 RUN CGO_ENABLED=0 go build -o /rsupervisor .
 
@@ -69,7 +69,7 @@ RUN ldconfig /usr/local/lib/retractordb
 WORKDIR /home/retractor
 USER retractor
 
-COPY --chown=retractor:retractor src/supervisor/startup.rql /home/retractor/startup.rql
+COPY --chown=retractor:retractor docker/supervisor/startup.rql /home/retractor/startup.rql
 
 ENV RDB_XRETRACTOR=/usr/local/bin/xretractor
 ENV RDB_XQRY=/usr/local/bin/xqry
