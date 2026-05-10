@@ -74,7 +74,7 @@ RUN python3 -m venv .venv \
     && pip install --upgrade pip \
     && pip install cmakelang conan \
     && conan profile detect \
-    && sed -i -e "s/gnu17/gnu20/g" ~/.conan2/profiles/default \
+    && sed -i -e "s/gnu17/gnu23/g" ~/.conan2/profiles/default \
     && echo '[conf]' >> ~/.conan2/profiles/default \
     && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default \
     && conan install DockerConan.txt -s build_type=Release --build missing \
@@ -96,8 +96,8 @@ CMD ["/bin/bash"]
 # docker image ls
 # dive <IMAGE ID>
 
-# How to deploy to DockerHub
-# docker build -t buildenv-retractordb .
+# How to deploy to DockerHub (run from repo root)
+# docker build -f docker/ci/Dockerfile -t buildenv-retractordb docker/ci/
 # docker run -it buildenv-retractordb
 # docker login
 # docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
