@@ -1,6 +1,10 @@
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <boost/system/error_code.hpp>
 #include <cassert>
@@ -69,6 +73,20 @@ int main(int argc, char *argv[]) {
     YELLOW            = empty;
     RESET             = empty;
     BLINK             = empty;
+  }
+
+  {
+    const auto lockPath = std::filesystem::temp_directory_path() / "xretractor_service.lock";
+    int fd              = open(lockPath.c_str(), O_RDONLY);
+    if (fd != -1) {
+      const bool running = (flock(fd, LOCK_SH | LOCK_NB) == -1 && (errno == EWOULDBLOCK || errno == EAGAIN));
+      close(fd);
+      if (running) {
+        std::cerr << "xretractor is running — stop it before using xtrdb.\n";
+        spdlog::shutdown();
+        return 1;
+      }
+    }
   }
 
   std::unique_ptr<rdb::storage> dacc;
