@@ -78,8 +78,8 @@ EXPOSE 8080 50051 9090
 
 CMD ["/usr/local/bin/rsupervisor"]
 
-# How to build and push (run from repo root):
-#   docker build -f docker/prod/Dockerfile -t retractordb:latest .
+# How to build and push (run from docker/prod/):
+#   docker build -f Dockerfile -t retractordb:latest ../..
 #   docker tag retractordb:latest micwide/retractordb:latest
 #   docker push micwide/retractordb:latest
 
