@@ -1,0 +1,8 @@
+# No substrat reduction test
+# str1 and str2 are user-defined streams with identical structure.
+# Neither is a generated substrat, so neither should be reduced.
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.dat'
+
+SELECT str1[0] STREAM str1 FROM core0>2
+SELECT str2[0] STREAM str2 FROM core0>2
