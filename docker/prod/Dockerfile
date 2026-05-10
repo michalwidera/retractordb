@@ -24,8 +24,7 @@ RUN . .venv/bin/activate \
 RUN mkdir /home/developer/libs && \
     for bin in \
         build/Release/src/retractor/xretractor \
-        build/Release/src/qry/xqry \
-        build/Release/src/rdb/xtrdb; \
+        build/Release/src/qry/xqry; \
     do \
         ldd "$bin" \
             | awk '/=> \// { print $3 }' \
@@ -56,7 +55,6 @@ RUN useradd -m -s /bin/bash retractor
 COPY --from=builder \
     /home/developer/workspace/build/Release/src/retractor/xretractor \
     /home/developer/workspace/build/Release/src/qry/xqry \
-    /home/developer/workspace/build/Release/src/rdb/xtrdb \
     /usr/local/bin/
 
 COPY --from=gobuilder /rsupervisor /usr/local/bin/rsupervisor
@@ -75,9 +73,8 @@ COPY --chown=retractor:retractor docker/supervisor/startup.rql /home/retractor/s
 
 ENV RDB_XRETRACTOR=/usr/local/bin/xretractor
 ENV RDB_XQRY=/usr/local/bin/xqry
-ENV RDB_XTRDB=/usr/local/bin/xtrdb
 
-EXPOSE 8080 9090
+EXPOSE 8080 50051 9090
 
 CMD ["/usr/local/bin/rsupervisor"]
 
@@ -85,3 +82,10 @@ CMD ["/usr/local/bin/rsupervisor"]
 #   docker build -f docker/prod/Dockerfile -t retractordb:latest .
 #   docker tag retractordb:latest micwide/retractordb:latest
 #   docker push micwide/retractordb:latest
+
+# How to run with a local directory mounted (queries + data):
+#   docker run -d \
+#     -v /path/to/local/data:/home/retractor/data \
+#     -e RDB_QUERY_FILE=/home/retractor/data/queries.rql \
+#     -p 8080:8080 -p 50051:50051 -p 9090:9090 \
+#     retractordb:latest

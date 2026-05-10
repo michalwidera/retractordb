@@ -22,7 +22,6 @@ type Config struct {
 	TCPPort    string
 	Xretractor string
 	Xqry       string
-	Xtrdb      string
 }
 
 func envOr(key, def string) string {
@@ -40,7 +39,6 @@ func configFromEnv() Config {
 		TCPPort:    envOr("RDB_TCP_PORT", "9090"),
 		Xretractor: envOr("RDB_XRETRACTOR", "xretractor"),
 		Xqry:       envOr("RDB_XQRY", "xqry"),
-		Xtrdb:      envOr("RDB_XTRDB", "xtrdb"),
 	}
 }
 
