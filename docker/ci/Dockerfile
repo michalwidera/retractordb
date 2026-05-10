@@ -96,8 +96,8 @@ CMD ["/bin/bash"]
 # docker image ls
 # dive <IMAGE ID>
 
-# How to deploy to DockerHub (run from repo root)
-# docker build -f docker/ci/Dockerfile -t buildenv-retractordb docker/ci/
+# How to deploy to DockerHub (run from docker/ci/)
+# docker build -t buildenv-retractordb .
 # docker run -it buildenv-retractordb
 # docker login
 # docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
