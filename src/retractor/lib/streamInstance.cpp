@@ -157,7 +157,7 @@ void fnOp(opType op, std::any value, std::any &valueRet) {
   }
 }
 
-rdb::payload streamInstance::constructAggregate(command_id cmd, const std::string &instance) {
+rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) {
   assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
 
   // First construct descriptor

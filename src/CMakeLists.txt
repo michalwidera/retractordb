@@ -6,6 +6,9 @@ cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 add_subdirectory(rdb)
 add_subdirectory(qry)
 add_subdirectory(retractor)
+if(BUILD_SUPERVISOR)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/docker/supervisor ${CMAKE_CURRENT_BINARY_DIR}/supervisor)
+endif()
 
 add_custom_target(
   simple

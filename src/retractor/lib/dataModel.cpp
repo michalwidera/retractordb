@@ -182,7 +182,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
     case STREAM_MAX: {
       const auto nameSrc = arg[0].getStr_();
 
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAggregate(cmd, instance + "_0");
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->reduceFieldsToPayload(cmd, instance + "_0");
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)

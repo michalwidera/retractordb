@@ -18,6 +18,8 @@
 #include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/sync/named_mutex.hpp>
+#include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/system/error_code.hpp>
@@ -306,9 +308,11 @@ void executorsm::commandProcessorLoop() {
   try {
     IPC::message_queue::remove("RetractorQueryQueue");
     IPC::shared_memory_object::remove("RetractorShmemMap");
+    IPC::named_mutex::remove("RetractorMapMutex");
     // Segment and allocator for map purposes
     IPC::managed_shared_memory mapSegment(IPC::open_or_create, "RetractorShmemMap", 65536);
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
+    IPC::named_mutex mapMutex(IPC::open_or_create, "RetractorMapMutex");
     // Create a message_queue.
     IPC::message_queue mq(IPC::open_or_create,    // open or crate
                           "RetractorQueryQueue",  // name
@@ -347,7 +351,10 @@ void executorsm::commandProcessorLoop() {
         IPCString ipcResponse(allocatorShmemMapInstance);
         ipcResponse = response_stream.str().c_str();
         // cppcheck-suppress danglingTemporaryLifetime
-        mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
+        {
+          IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
+          mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
+        }
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
@@ -606,6 +613,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
+  IPC::named_mutex::remove("RetractorMapMutex");
   for (const auto &element : id2StreamName_Relation) {
     std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
     IPC::message_queue::remove(queueName.c_str());

@@ -499,7 +499,10 @@ bool storage::write(const size_t recordIndex) {
     assert(result == 0);
     if (result == 0) recordsCount_++;
 
-    if (metaDataStream_) metaDataStream_->onRecordAppended(nullInfo);
+    if (metaDataStream_) {
+      metaDataStream_->onRecordAppended(nullInfo);
+      metaDataStream_->flushCurrentEntry();
+    }
 
   } else {
     SPDLOG_INFO("write {}", recordIndex);

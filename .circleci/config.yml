@@ -85,6 +85,16 @@ executors:
     resource_class: arm.large
 
 commands:
+  check-skipci:
+    steps:
+      - run:
+          name: Check for [skipci] in commit message
+          command: |
+            if git log -1 --pretty=%B | grep -qF '[skipci]'; then
+              echo "Commit message contains [skipci] — skipping CI."
+              circleci step halt
+            fi
+
   prep-env:
     parameters:
       gcc_version:
@@ -206,6 +216,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
+      - check-skipci
       - prep-env:
           build_package: "ninja-build"
           conan_profile1: "[conf]"
@@ -227,6 +238,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
+      - check-skipci
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
@@ -252,6 +264,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
+      - check-skipci
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -269,6 +282,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
+      - check-skipci
       - prep-env:
           build_package: make
           conan_profile1: ""
@@ -291,6 +305,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
+      - check-skipci
       - prep-env:
           build_package: ninja-build
           conan_profile1: "[conf]"
@@ -323,6 +338,7 @@ jobs:
     steps:
       - checkout:
           method: blobless
+      - check-skipci
       - prep-env:
           build_package: make
           conan_profile1: ""

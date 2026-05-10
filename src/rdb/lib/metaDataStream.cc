@@ -89,10 +89,28 @@ static constexpr size_t kHeaderSize = sizeof(int64_t);
 
 void metaDataStream::flushCurrentEntry() {
   if (currentEntry_.recordCount > 0) {
-    appendEntry(currentEntry_);
-    committedRecordCount_ += currentEntry_.recordCount;
+    if (tailDirty_) {
+      overwriteLastEntry(currentEntry_);
+      tailDirty_ = false;
+    } else {
+      appendEntry(currentEntry_);
+    }
+    committedRecordCount_    += currentEntry_.recordCount;
+    pendingCommittedCount_    = currentEntry_.recordCount;
     currentEntry_.recordCount = 0;
   }
+}
+
+void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
+  if (metaFilePath_.empty()) return;
+  std::fstream f(metaFilePath_, std::ios::binary | std::ios::in | std::ios::out);
+  if (!f.is_open()) return;
+  f.seekp(0, std::ios::end);
+  const auto fileSize = f.tellp();
+  if (fileSize < static_cast<std::streamoff>(kHeaderSize + entrySize())) return;
+  f.seekp(-static_cast<std::streamoff>(entrySize()), std::ios::end);
+  auto buf = entry.serialize();
+  f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
 }
 
 void metaDataStream::saveHeader() {
@@ -195,6 +213,7 @@ void metaDataStream::loadIndex() {
 
     // Rewrite file without the last entry (it's now in currentEntry_)
     rewriteFile(allEntries);
+    tailDirty_ = false;
   }
 
   // Compute committedRecordCount_ from what remains on disk
@@ -247,10 +266,18 @@ metaDataStream::~metaDataStream() { flushCurrentEntry(); }
 // ── Core update interface ────────────────────────────────────────────
 
 void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) {
-  if (currentEntry_.recordCount > 0 && currentEntry_.nullBitset == nullBitsetParam) {
+  if (currentEntry_.nullBitset == nullBitsetParam && (currentEntry_.recordCount > 0 || pendingCommittedCount_ > 0)) {
+    if (currentEntry_.recordCount == 0) {
+      // Last entry was flushed to disk with same bitset — mark tail dirty for lazy overwrite on next flush.
+      tailDirty_                 = true;
+      currentEntry_.recordCount  = pendingCommittedCount_;
+      committedRecordCount_     -= pendingCommittedCount_;
+      pendingCommittedCount_     = 0;
+    }
     currentEntry_.recordCount++;
   } else {
-    flushCurrentEntry();  // appends old currentEntry_ to file
+    pendingCommittedCount_ = 0;
+    flushCurrentEntry();  // overwrites or appends (noop if count==0)
     currentEntry_.nullBitset  = nullBitsetParam;
     currentEntry_.recordCount = 1;
   }
@@ -299,6 +326,7 @@ void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool
       committedRecordCount_ += entry.recordCount;
     }
 
+    pendingCommittedCount_ = 0;
     currentEntry_ = newCurrent;
     return;
   }
@@ -337,8 +365,8 @@ void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool
 
   rewriteFile(allEntries);
 
-  // Recompute committedRecordCount_
-  committedRecordCount_ = 0;
+  pendingCommittedCount_ = 0;
+  committedRecordCount_  = 0;
   for (const auto &rec : allEntries) {
     if (!rec.isGap) committedRecordCount_ += rec.recordCount;
   }
@@ -365,6 +393,7 @@ const metaDataStream::IndexRecord &metaDataStream::pendingEntry() const { return
 
 void metaDataStream::onTransmissionGap(size_t gapDuration) {
   flushCurrentEntry();
+  pendingCommittedCount_ = 0;  // gap marker follows; cannot merge with previous data entry
 
   IndexRecord gapMarker;
   gapMarker.nullBitset.resize(descriptorRef_->size(), true);
@@ -391,11 +420,10 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
 bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
 
 void metaDataStream::reset() {
-  // Clear all data and reset to initial state
   createNullBitsetTemplate();
-  committedRecordCount_ = 0;
-
-  // Rewrite file with only the header
+  committedRecordCount_  = 0;
+  pendingCommittedCount_ = 0;
+  tailDirty_             = false;
   rewriteFile(std::vector<IndexRecord>());
 
   SPDLOG_DEBUG("metaDataStream reset - all entries cleared");
