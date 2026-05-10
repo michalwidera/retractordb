@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <sstream>
 
 #include <boost/lexical_cast.hpp>
@@ -26,8 +27,10 @@ using namespace localContext;
 
 /** This procedure computes time delays (delta) for generated streams */
 std::string compiler::resolveStreamIntervals() {
+  size_t prevUnresolved = std::numeric_limits<size_t>::max();
   while (true) {
     bool bOnceAgain(false);
+    size_t unresolvedCount = 0;
     coreInstance.sort();
     for (auto &q : coreInstance) {
       if (q.lProgram.empty()) {
@@ -55,6 +58,7 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta2 = coreInstance.getDelta(t2.getStr_());
           if (delta1 == 0 || delta2 == 0) {
             bOnceAgain = true;
+            unresolvedCount++;
             continue;
           } else
             delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
@@ -66,6 +70,7 @@ std::string compiler::resolveStreamIntervals() {
           assert(delta2 != 0);
           if (delta1 == 0) {
             bOnceAgain = true;
+            unresolvedCount++;
             continue;
           } else {
             //           D_c * D_b
@@ -84,6 +89,7 @@ std::string compiler::resolveStreamIntervals() {
           assert(delta2 != 0);
           if (delta1 == 0) {
             bOnceAgain = true;
+            unresolvedCount++;
             continue;
           } else {
             //           D_c * D_a
@@ -100,6 +106,7 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           if (delta1 == 0) {
             bOnceAgain = true;
+            unresolvedCount++;
             continue;
           } else
             delta = delta1;  // deltaSubtract(delta1);
@@ -109,6 +116,7 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta2 = coreInstance.getDelta(t2.getStr_());
           if (delta1 == 0 || delta2 == 0) {
             bOnceAgain = true;
+            unresolvedCount++;
             continue;
           } else
             delta = std::min(delta1, delta2);  // deltaAdd(delta1, delta2);
@@ -122,6 +130,7 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           if (delta1 == 0) {
             bOnceAgain = true;
+            unresolvedCount++;
             continue;
           }
           delta = delta1;
@@ -152,10 +161,13 @@ std::string compiler::resolveStreamIntervals() {
       assert(delta != -1);
       q.rInterval = delta;  // There is established delta value - return value
     }  // BOOST_FOREACH ( query & q , coreInstance )
-    if (!bOnceAgain)
-      break;
-    else
-      coreInstance.sort();
+    if (!bOnceAgain) break;
+    if (unresolvedCount >= prevUnresolved) {
+      SPDLOG_ERROR("Circular dependency: stream interval resolution stalled with {} unresolved streams", unresolvedCount);
+      return std::string("Circular dependency in stream definitions");
+    }
+    prevUnresolved = unresolvedCount;
+    coreInstance.sort();
   }  // while(true)
   coreInstance.sort();
   return std::string("OK");
