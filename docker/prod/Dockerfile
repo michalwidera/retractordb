@@ -66,6 +66,8 @@ COPY --from=builder /home/developer/libs/ /usr/local/lib/retractordb/
 
 RUN ldconfig /usr/local/lib/retractordb
 
+RUN mkdir -p /home/retractor/temp && chown retractor:retractor /home/retractor/temp
+
 WORKDIR /home/retractor
 USER retractor
 
