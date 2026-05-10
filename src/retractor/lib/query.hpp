@@ -31,6 +31,7 @@ class query {
   bool isDisposable              = false;
   bool isOneShot                 = false;
   bool isHold                    = false;
+  bool isSubstrat                = false;
 
   std::list<field> lSchema;
   std::list<token> lProgram;

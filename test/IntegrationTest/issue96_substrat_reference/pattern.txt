@@ -1,0 +1,15 @@
+str1(1/10)
+	:- PUSH_STREAM(str2)
+	:- PUSH_STREAM(core1)
+	:- STREAM_ADD
+	str1_0: INTEGER
+		PUSH_ID(str1[0])
+str2(1/10)
+	:- PUSH_STREAM(core0)
+	:- STREAM_TIMEMOVE(2)
+	str2_0: INTEGER
+		PUSH_ID(str2[0])
+core0(1/10)	datafile1.dat
+	a: INTEGER
+core1(1/5)	datafile2.dat
+	a: INTEGER
