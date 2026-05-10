@@ -27,4 +27,5 @@ struct compiler {
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
+  std::string deduplicateSubstrats();
 };

@@ -20,6 +20,7 @@ void query::reset() {
   isDisposable = false;
   isOneShot    = false;
   isHold       = false;
+  isSubstrat   = false;
   policy       = std::make_pair("DEFAULT", 0);
   retention    = rdb::retention_t{0, 0};
   return;

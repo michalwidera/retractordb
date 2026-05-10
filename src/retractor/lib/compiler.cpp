@@ -233,8 +233,9 @@ std::string compiler::extractIntermediateStreams() {
           std::list<token> lTempProgram;
           lTempProgram.push_back(token(PUSH_TSCAN));
           newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
-          newQuery.policy = std::make_pair(substratType_C, 1);
-          newQuery.id     = composeStreamName(arg1, arg2, cmd);
+          newQuery.policy     = std::make_pair(substratType_C, 1);
+          newQuery.id         = composeStreamName(arg1, arg2, cmd);
+          newQuery.isSubstrat = true;
           (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           it = coreInstance.begin();
@@ -689,6 +690,45 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   return capMap;
 }
 
+std::string compiler::deduplicateSubstrats() {
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
+      if (!it->isSubstrat) continue;
+
+      for (auto it2 = coreInstance.begin(); it2 != coreInstance.end(); ++it2) {
+        if (it2 == it) continue;
+        if (it2->rInterval != it->rInterval) continue;
+        if (it2->lProgram.size() != it->lProgram.size()) continue;
+        if (it2->lSchema.size() != it->lSchema.size()) continue;
+
+        bool progMatch = std::equal(it->lProgram.begin(), it->lProgram.end(), it2->lProgram.begin(),
+                                    [](token &a, token &b) { return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT(); });
+        if (!progMatch) continue;
+
+        bool schemaMatch = std::equal(it->lSchema.begin(), it->lSchema.end(), it2->lSchema.begin(), [](const field &a, const field &b) {
+          return a.field_.rtype == b.field_.rtype && a.field_.rlen == b.field_.rlen && a.field_.rarray == b.field_.rarray;
+        });
+        if (!schemaMatch) continue;
+
+        const std::string oldName = it->id;
+        const std::string newName = it2->id;
+        SPDLOG_DEBUG("deduplicateSubstrats: replacing {} with {}", oldName, newName);
+        for (auto &q : coreInstance)
+          for (auto &tok : q.lProgram)
+            if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == oldName) tok = token(PUSH_STREAM, newName);
+
+        coreInstance.erase(it);
+        changed = true;
+        break;
+      }
+      if (changed) break;
+    }
+  }
+  return std::string("OK");
+}
+
 std::string compiler::compile() {
   std::string result;
 
@@ -699,6 +739,9 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = resolveStreamIntervals();
+  if (result != "OK") return result;
+
+  result = deduplicateSubstrats();
   if (result != "OK") return result;
 
   result = resolveFieldReferences();
