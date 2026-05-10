@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 
 // Helper: remove test file if it exists
 struct MetaTestFixture : public ::testing::Test {
@@ -696,4 +697,139 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
     auto e = meta.entries();
     EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
   }
+}
+
+// ── Lazy overwrite (tailDirty_) tests ────────────────────────────────
+
+// When the same RLE pattern resumes after a flush, the disk entry count
+// must reflect the merged total — not be split into two entries.
+TEST_F(MetaTestFixture, test_lazy_overwrite_merged_count) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> patA = {true};
+
+  meta.onRecordAppended(patA);  // rec 0
+  meta.onRecordAppended(patA);  // rec 1
+  meta.flushCurrentEntry();     // disk: [A,2]
+  meta.onRecordAppended(patA);  // rec 2 — tailDirty_=true, currentEntry_={A,3}
+  meta.onRecordAppended(patA);  // rec 3 — currentEntry_={A,4}
+  meta.flushCurrentEntry();     // overwrite disk: [A,4]
+
+  auto committed = meta.entries();
+  ASSERT_EQ(committed.size(), 1u);
+  EXPECT_EQ(committed[0].recordCount, 4u);
+  EXPECT_EQ(committed[0].nullBitset, patA);
+  EXPECT_EQ(meta.totalRecords(), 4u);
+}
+
+// File size must not shrink when the lazy overwrite path is taken.
+// The old truncate-based approach would shrink the file to header-only size;
+// seek-overwrite keeps it stable at header + one entry.
+TEST_F(MetaTestFixture, test_lazy_overwrite_file_size_stable) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  // entrySize for 1 field: uint8_t(1) + size_t(8) + size_t(8) + ceil(1/8)(1) = 18
+  // kHeaderSize = sizeof(int64_t) = 8
+  constexpr std::uintmax_t kExpectedSize = 8u + 18u;
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> patA = {true};
+
+  meta.onRecordAppended(patA);
+  meta.onRecordAppended(patA);
+  meta.flushCurrentEntry();  // disk: [A,2]
+
+  EXPECT_EQ(std::filesystem::file_size(metaFile), kExpectedSize);
+
+  meta.onRecordAppended(patA);  // triggers tailDirty_ — file must NOT shrink
+
+  EXPECT_EQ(std::filesystem::file_size(metaFile), kExpectedSize);
+
+  meta.flushCurrentEntry();  // overwrite — still same size
+
+  EXPECT_EQ(std::filesystem::file_size(metaFile), kExpectedSize);
+}
+
+// Merged count must survive a full serialize → reload round-trip.
+TEST_F(MetaTestFixture, test_lazy_overwrite_persistence) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+  std::vector<bool> patA = {false};
+
+  {
+    rdb::metaDataStream meta(descriptor, metaFile);
+    meta.onRecordAppended(patA);  // rec 0
+    meta.onRecordAppended(patA);  // rec 1
+    meta.flushCurrentEntry();     // disk: [A,2]
+    meta.onRecordAppended(patA);  // rec 2 — tailDirty_=true
+    meta.onRecordAppended(patA);  // rec 3
+    // destructor: overwrite disk → [A,4]
+  }
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  EXPECT_EQ(meta.totalRecords(), 4u);
+  for (int i = 0; i < 4; ++i)
+    EXPECT_EQ(meta.getNullBitset(i), patA) << "rec " << i;
+}
+
+// A transmission gap must trigger the overwrite of the dirty tail entry
+// before the gap marker is appended.
+TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"v", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> patA = {false};
+
+  meta.onRecordAppended(patA);  // rec 0
+  meta.onRecordAppended(patA);  // rec 1
+  meta.onRecordAppended(patA);  // rec 2
+  meta.flushCurrentEntry();     // disk: [A,3]
+  meta.onRecordAppended(patA);  // rec 3 — tailDirty_=true, currentEntry_={A,4}
+  meta.onTransmissionGap();     // must overwrite [A,3]→[A,4] then append gap
+
+  auto committed = meta.entries();
+  ASSERT_EQ(committed.size(), 2u);
+  EXPECT_FALSE(committed[0].isGap);
+  EXPECT_EQ(committed[0].recordCount, 4u);
+  EXPECT_TRUE(committed[1].isGap);
+  EXPECT_TRUE(meta.isGapBefore(4));
+  EXPECT_EQ(meta.totalRecords(), 4u);
+}
+
+// Multiple consecutive flush → re-merge cycles must each produce
+// the correct merged count without accumulating stale entries.
+TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"z", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  std::vector<bool> patA = {false};
+  std::vector<bool> patB = {true};
+
+  // Cycle 1: flush A×3, re-merge A×2 → total A×5
+  meta.onRecordAppended(patA);
+  meta.onRecordAppended(patA);
+  meta.onRecordAppended(patA);
+  meta.flushCurrentEntry();     // disk: [A,3]
+  meta.onRecordAppended(patA);  // tailDirty_=true, {A,4}
+  meta.onRecordAppended(patA);  // {A,5}
+
+  // Cycle 2: switch to B — triggers overwrite [A,3]→[A,5], then B accumulates
+  meta.onRecordAppended(patB);  // flush A×5 via overwrite, currentEntry_={B,1}
+  meta.flushCurrentEntry();     // disk: [A,5][B,1]
+  meta.onRecordAppended(patB);  // tailDirty_=true, {B,2}
+  meta.onRecordAppended(patB);  // {B,3}
+  meta.flushCurrentEntry();     // overwrite [B,1]→[B,3]
+
+  auto committed = meta.entries();
+  ASSERT_EQ(committed.size(), 2u);
+  EXPECT_EQ(committed[0].nullBitset, patA);
+  EXPECT_EQ(committed[0].recordCount, 5u);
+  EXPECT_EQ(committed[1].nullBitset, patB);
+  EXPECT_EQ(committed[1].recordCount, 3u);
+  EXPECT_EQ(meta.totalRecords(), 8u);
 }

@@ -89,21 +89,28 @@ static constexpr size_t kHeaderSize = sizeof(int64_t);
 
 void metaDataStream::flushCurrentEntry() {
   if (currentEntry_.recordCount > 0) {
-    appendEntry(currentEntry_);
+    if (tailDirty_) {
+      overwriteLastEntry(currentEntry_);
+      tailDirty_ = false;
+    } else {
+      appendEntry(currentEntry_);
+    }
     committedRecordCount_    += currentEntry_.recordCount;
     pendingCommittedCount_    = currentEntry_.recordCount;
     currentEntry_.recordCount = 0;
   }
 }
 
-void metaDataStream::truncateLastEntry() {
+void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
   if (metaFilePath_.empty()) return;
-  std::error_code ec;
-  const auto currentSize = std::filesystem::file_size(metaFilePath_, ec);
-  if (ec) return;
-  const auto newSize = static_cast<std::uintmax_t>(kHeaderSize) + entrySize();
-  if (currentSize < newSize) return;
-  std::filesystem::resize_file(metaFilePath_, currentSize - entrySize());
+  std::fstream f(metaFilePath_, std::ios::binary | std::ios::in | std::ios::out);
+  if (!f.is_open()) return;
+  f.seekp(0, std::ios::end);
+  const auto fileSize = f.tellp();
+  if (fileSize < static_cast<std::streamoff>(kHeaderSize + entrySize())) return;
+  f.seekp(-static_cast<std::streamoff>(entrySize()), std::ios::end);
+  auto buf = entry.serialize();
+  f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
 }
 
 void metaDataStream::saveHeader() {
@@ -206,6 +213,7 @@ void metaDataStream::loadIndex() {
 
     // Rewrite file without the last entry (it's now in currentEntry_)
     rewriteFile(allEntries);
+    tailDirty_ = false;
   }
 
   // Compute committedRecordCount_ from what remains on disk
@@ -260,8 +268,8 @@ metaDataStream::~metaDataStream() { flushCurrentEntry(); }
 void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) {
   if (currentEntry_.nullBitset == nullBitsetParam && (currentEntry_.recordCount > 0 || pendingCommittedCount_ > 0)) {
     if (currentEntry_.recordCount == 0) {
-      // Last entry was flushed to disk with same bitset — retract it so we can extend in memory.
-      truncateLastEntry();
+      // Last entry was flushed to disk with same bitset — mark tail dirty for lazy overwrite on next flush.
+      tailDirty_                 = true;
       currentEntry_.recordCount  = pendingCommittedCount_;
       committedRecordCount_     -= pendingCommittedCount_;
       pendingCommittedCount_     = 0;
@@ -269,7 +277,7 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
     currentEntry_.recordCount++;
   } else {
     pendingCommittedCount_ = 0;
-    flushCurrentEntry();  // appends old currentEntry_ to file (noop if count==0)
+    flushCurrentEntry();  // overwrites or appends (noop if count==0)
     currentEntry_.nullBitset  = nullBitsetParam;
     currentEntry_.recordCount = 1;
   }
@@ -415,6 +423,7 @@ void metaDataStream::reset() {
   createNullBitsetTemplate();
   committedRecordCount_  = 0;
   pendingCommittedCount_ = 0;
+  tailDirty_             = false;
   rewriteFile(std::vector<IndexRecord>());
 
   SPDLOG_DEBUG("metaDataStream reset - all entries cleared");
