@@ -44,4 +44,4 @@ docs/
 bin/*
 .venv/
 .codex
-gitbook-rdb/*
+gitbook-rdb/
