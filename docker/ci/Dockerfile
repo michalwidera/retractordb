@@ -1,9 +1,9 @@
 # https://hub.docker.com/_/debian
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.0.4"
+LABEL com.retractordb.version="0.0.5"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-04-15"
+LABEL com.retractordb.release-date="2026-05-11"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -45,7 +45,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     graphviz \
     gcovr \
     lcov \
-    xxd \
+    bsdmainutils \
     # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
