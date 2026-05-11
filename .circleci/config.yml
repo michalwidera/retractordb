@@ -229,8 +229,6 @@ jobs:
           build_tool: ninja
       - run-test:
           build_tool: ninja
-      - run-package:
-          build_tool: ninja
 
   build-debug-ninja-mydocker:
     working_directory: ~/retractordb
@@ -252,9 +250,6 @@ jobs:
           build_param: --build missing
           build_tool: ninja
       - run-test:
-          build_type: Debug
-          build_tool: ninja
-      - run-package:
           build_type: Debug
           build_tool: ninja
 
@@ -295,8 +290,6 @@ jobs:
           build_param: --build missing
       - run-test:
           build_type: Debug
-      - run-package:
-          build_type: Debug 
           
 
   build-debug-ninja:
@@ -319,9 +312,6 @@ jobs:
           build_param: --build missing
           build_tool: ninja
       - run-test:
-          build_type: Debug
-          build_tool: ninja
-      - run-package:
           build_type: Debug
           build_tool: ninja
 
