@@ -21,6 +21,9 @@ struct executorsm {
  private:
   static qTree *coreInstancePtr;
   static compiler *cmPtr;
+  // Set by commandProcessorLoop once all IPC resources are ready.
+  // run() waits on this before acquireLock(), so the lock file appears
+  // only after IPC is fully initialized and xqry can connect safely.
   static std::atomic<bool> ipcReady;
 
   static void commandProcessorLoop();
