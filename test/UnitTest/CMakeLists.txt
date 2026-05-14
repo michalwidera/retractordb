@@ -39,6 +39,14 @@ foreach(item ${V_GLOB})
     target_sources(${OUTPUT_FILE_NOEXT}
                    PRIVATE ${CMAKE_SOURCE_DIR}/src/common/uxSysTermTools.cpp)
   endif()
+  if(OUTPUT_FILE_NOEXT STREQUAL "test_formatter")
+    target_sources(${OUTPUT_FILE_NOEXT}
+                   PRIVATE ${CMAKE_SOURCE_DIR}/src/qry/formatters.cpp)
+  endif()
+  if(OUTPUT_FILE_NOEXT STREQUAL "test_ipc_transport")
+    target_sources(${OUTPUT_FILE_NOEXT}
+                   PRIVATE ${CMAKE_SOURCE_DIR}/src/qry/ipc_transport.cpp)
+  endif()
   add_test(
     NAME ut-${OUTPUT_FILE_NOEXT}-setup
     WORKING_DIRECTORY
@@ -59,8 +67,10 @@ foreach(item ${V_GLOB})
                                        ut-${OUTPUT_FILE_NOEXT}-fixture)
 endforeach()
 
-set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp test_qry.cpp
-                     launch/main.cpp)
+set(SOURCES_QRY_TEST ${CMAKE_SOURCE_DIR}/src/qry/qry.cpp
+                     ${CMAKE_SOURCE_DIR}/src/qry/ipc_transport.cpp
+                     ${CMAKE_SOURCE_DIR}/src/qry/formatters.cpp
+                     test_qry.cpp launch/main.cpp)
 add_executable(test_xqry ${SOURCES_QRY_TEST})
 target_link_libraries(test_xqry PRIVATE ${LIBRARY_TEST_SET})
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)

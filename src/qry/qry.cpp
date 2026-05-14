@@ -1,208 +1,39 @@
-/*
-How xqry terminal works
-
-1. Take a command line argument ie. xqry list
-2. Connect to server
-3. Execute command
-4. Show result (Show result,....) (wait for ctrl+c)
-5. End of process
-*/
 #include "qry.hpp"
 
 #include <unistd.h>
 
 #include <algorithm>
-#include <array>
-#include <atomic>
 #include <cassert>
 #include <chrono>
-#include <cstdio>
-#include <ctime>
-#include <deque>
 #include <iostream>
 #include <sstream>
 #include <thread>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/map.hpp>
-#include <boost/interprocess/containers/string.hpp>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
-#include <boost/property_tree/info_parser.hpp>
 #include <boost/system/system_error.hpp>
 
 #include "constants.hpp"
+#include "formatters.hpp"
+#include "ipc_transport.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
-
 using boost::property_tree::ptree;
 
-namespace IPC = boost::interprocess;
+qry::qry() : transport_(std::make_unique<IpcTransport>()), formatter_(std::make_unique<Formatter>()) {}
+qry::~qry() = default;
 
-boost::lockfree::spsc_queue<ptree, boost::lockfree::capacity<1024>> spsc_queue;
-
-static std::atomic<bool> done{false};
-
-std::vector<std::string> colors = {"red", "blue", "green", "orange", "purple", "brown", "pink", "yellow", "cyan", "magenta"};
-
-namespace {
-
-bool isNullAt(const std::string &nullmap, int index) {
-  return index >= 0 && index < static_cast<int>(nullmap.size()) && nullmap[index] == '1';
+ptree qry::netClient(const std::string& cmd, const std::string& arg) {
+  return transport_->netClient(cmd, arg);
 }
 
-bool isAllNull(const std::string &nullmap, int count) {
-  if (count <= 0) return false;
-  for (int i = 0; i < count; i++) {
-    if (!isNullAt(nullmap, i)) return false;
-  }
-  return true;
-}
-
-std::string displayedValue(const ptree &row, int index, const std::string &nullmap, formatMode mode) {
-  if (!isNullAt(nullmap, index)) return row.get(std::to_string(index), "");
-  return mode == formatMode::GNUPLOT ? "NaN" : "null";
-}
-
-}  // namespace
-
-void qry::producer() {
-  try {
-    const int messageSize = 1024;
-    std::string queueName = "brcdbr" + std::to_string(getpid());
-    IPC::message_queue mq(IPC::open_only, queueName.c_str());
-    std::array<char, messageSize> message;
-    unsigned int priority{0};
-    IPC::message_queue::size_type recvd_size = messageSize;
-    while (!done) {
-      bool messageReceived = false;
-      while (!messageReceived && !done) {
-        messageReceived = mq.try_receive(message.data(), messageSize, recvd_size, priority);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-      if (done) continue;
-      message[recvd_size] = 0;
-      std::stringstream strstream;
-      strstream << message.data();
-      memset(message.data(), 0, 1000);
-      ptree pt;
-      // read_json(strstream, pt) ;
-      // read_xml(strstream, pt);
-      read_info(strstream, pt);
-      while (!spsc_queue.push(pt))
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-  } catch (IPC::interprocess_exception &e) {
-    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(getpid()));
-    done = true;
-    return;
-  }
-}
-
-ptree qry::netClient(const std::string &netCommand, const std::string &netArgument) {
-  ptree pt_response;
-  ptree pt_request;
-  try {
-    // definitions for IPC - maps i strings (most important IPCString i IPCMap)
-    typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
-    typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-    typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
-    // typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
-    typedef int KeyType;
-    typedef std::pair<const int, IPCString> ValueType;
-    typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-    typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
-
-    IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
-    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_only, "RetractorMapMutex");
-    pt_request.put("db.message", netCommand);
-    pt_request.put("db.id", getpid());
-    if (netArgument != "") pt_request.put("db.argument", netArgument);
-    //
-    // request part
-    //
-    IPC::message_queue mq(IPC::open_only, "RetractorQueryQueue");
-    std::stringstream request_stream;
-    // write_json(request_stream, pt_request) ;
-    // write_xml(request_stream, pt_request);
-    write_info(request_stream, pt_request);
-    mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
-    // Send the request.
-    //
-    // Response part
-    //
-    // Read the response status line. The response streambuf will automatically
-    // grow to accommodate the entire line. The growth may be limited by passing
-    // a maximum size to the streambuf constructor.
-    // Check that response is OK.
-
-    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
-    IPCMap *mymap                        = ret.first;
-    assert(mymap);
-
-    std::size_t processId = getpid();
-    auto it               = mymap->end();
-    {
-      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-      it = mymap->find(processId);
-    }
-
-    // When server works under valgrid - must be 10 probes x 10ms
-    constexpr int maxAcceptableFails = 10;
-
-    int cntr(maxAcceptableFails);
-    while (it == mymap->end() && cntr) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-      it = mymap->find(processId);
-      --cntr;
-    }
-    if (it == mymap->end()) {
-      printf("server not found\n");
-      SPDLOG_ERROR("server not found");
-      done = true;
-      pt_response.put("error.response", "server not found");
-      return pt_response;
-    }
-    std::stringstream strstream;
-    {
-      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-      it = mymap->find(processId);
-      if (it != mymap->end()) {
-        strstream << it->second;
-        mymap->erase(it);
-      }
-    }
-    // read_json(strstream, pt_response) ;
-    // read_xml(strstream, pt_response);
-    read_info(strstream, pt_response);
-  } catch (IPC::interprocess_exception &e) {
-    done = true;
-    throw;
-  } catch (boost::system::system_error &e) {
-    done = true;
-    throw;
-  } catch (std::exception &e) {
-    pt_response.put("error.response", e.what());
-    done = true;
-    throw;
-  }
-  return pt_response;
-}
-
-bool qry::adhoc(const std::string &sAdhoc) {
+bool qry::adhoc(const std::string& sAdhoc) {
   assert(sAdhoc != "");
   ptree pt = netClient("adhoc", sAdhoc);
   SPDLOG_INFO("snd: adhoc {}", sAdhoc.c_str());
 
   std::string rcv("fail.");
-  for (auto &[first, second] : pt) {
+  for (auto& [first, second] : pt) {
     rcv = second.get<std::string>("");
     SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
@@ -211,18 +42,17 @@ bool qry::adhoc(const std::string &sAdhoc) {
     SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
     return system::errc::protocol_error;
   }
-
   return system::errc::success;
 }
 
-bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
-                 std::tuple<int, int, int> gnuplotDim) {
-  timeLimitCntQry = (iTimeLimit > 0) ? iTimeLimit + 1 : iTimeLimit;  // +1: sentinel 1 means "stop now", 0 means "no limit"
+bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit,
+                 const std::string& input, std::tuple<int, int, int> gnuplotDim) {
+  timeLimitCntQry = (iTimeLimit > 0) ? iTimeLimit + 1 : iTimeLimit;
   ptree pt        = netClient("get", "");
 
   const auto stream = pt.get_child("db.stream");
-  const bool found  = std::any_of(stream.begin(), stream.end(), [input, this](const auto &node) {
-    const ptree &v = node.second;
+  const bool found  = std::any_of(stream.begin(), stream.end(), [input, this](const auto& node) {
+    const ptree& v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[input] = netClient("show", input);
     return ret;
@@ -233,141 +63,68 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
     return found;
   }
 
-  //
-  // Function in this thread will start listner
-  // join is leaded in object destructor
-  //
-  std::jthread producer_thread(producer);
+  std::jthread producer_thread([this] { transport_->producer(); });
+
+  if (outputFormatMode == formatMode::GNUPLOT) Formatter::initGnuplot(gnuplotDim);
+
+  ptree schema;
+  if (outputFormatMode != formatMode::RAW) schema = netClient("detail", input);
+
+  constexpr int serverTimeoutMs = 10000;
+  int noDataCounter             = 0;
 
   ptree e_value;
-
-  if (outputFormatMode == formatMode::GNUPLOT) {
-    std::cout << "set term qt noraise\n";
-    std::cout << "set style fill transparent solid 0.5\n";
-    std::cout << "set xrange [0:" << std::get<0>(gnuplotDim) << "]\n";
-    std::cout << "set yrange [" << std::get<1>(gnuplotDim) << ":" << std::get<2>(gnuplotDim) << "]\n";
-    std::cout << "set ticslevel 0\n";
-    std::cout << "set hidden3d\n";
-    std::cout << "set view 60,30\n";
-  }
-
-  std::vector<std::deque<std::string>> output_lines;
-  constexpr int serverTimeoutMs = 10000;  // 10 seconds without data = server dead
-  int noDataCounter             = 0;
   try {
-    while (!done) {
+    while (!transport_->done) {
       if (_kbhit(vm.count("needctrlc"))) break;
       if (timeLimitCntQry == 1) {
         if (vm.count("kill")) {
           netClient("kill", "");
           SPDLOG_INFO("Time limit reached - exiting (kill on end).");
-          done = true;
+          transport_->done = true;
         }
         break;
       }
-      while (spsc_queue.pop(e_value)) {
+      while (transport_->popQueue(e_value)) {
         const std::string streamN = e_value.get("stream", "");
         const std::string nullmap = e_value.get("nullmap", "");
         if (streamN == constants::Reserved_id_oob) {
-          done = true;
+          transport_->done = true;
           break;
         }
-        for (auto &[w, k] : streamTable)
+        for (auto& [w, k] : streamTable)
           if (w == streamN) {
-            if (outputFormatMode == formatMode::RAW) {
-              const int count = std::stoi(e_value.get("count", ""));
-              if (!vm.count("null") || !isAllNull(nullmap, count)) {
-                for (int i = 0; i < count; i++)
-                  printf("%s ", displayedValue(e_value, i, nullmap, outputFormatMode).c_str());
-                printf("\r\n");
-              }
-            } else if (outputFormatMode == formatMode::GNUPLOT) {
-              const int count = std::stoi(e_value.get("count", ""));
-              if (output_lines.size() < count) output_lines.resize(count);
+            const int count = std::stoi(e_value.get("count", ""));
+            if (outputFormatMode == formatMode::RAW)
+              Formatter::renderRaw(e_value, count, nullmap, vm.count("null"));
+            else if (outputFormatMode == formatMode::GNUPLOT)
+              formatter_->renderGnuplot(e_value, count, nullmap, input, schema, gnuplotDim);
+            else if (outputFormatMode == formatMode::GRAPHITE)
+              Formatter::renderGraphite(e_value, nullmap, input, schema);
+            else if (outputFormatMode == formatMode::INFLUXDB)
+              Formatter::renderInfluxDB(e_value, nullmap, input, schema);
 
-              std::cout << "plot";
-
-              const auto schema = netClient("detail", input);
-              int colIdx{0};
-              for (const auto &v : schema.get_child("db.field")) {
-                if (colIdx != 0) std::cout << ",";
-                auto columnName = v.second.get<std::string>("");
-                std::replace(columnName.begin(), columnName.end(), '_', '-');
-                std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors[colIdx % colors.size()] << "'";
-                colIdx++;
-              }
-              std::cout << "\r\n";
-
-              for (int i = 0; i < count; i++) {
-                output_lines[i].push_front(displayedValue(e_value, i, nullmap, outputFormatMode));
-                if (output_lines[i].size() > std::get<0>(gnuplotDim)) output_lines[i].pop_back();
-              }
-
-              for (int i = 0; i < count; i++) {
-                for (int j = 0; j < output_lines[i].size(); j++) {
-                  printf("%d %s\r\n", j, output_lines[i][j].c_str());
-                }
-                printf("e\r\n");
-              }
-            } else if (outputFormatMode == formatMode::GRAPHITE) {
-              int i{0};
-              const auto schema = netClient("detail", input);
-              for (const auto &v : schema.get_child("db.field")) {
-                if (isNullAt(nullmap, i)) {
-                  ++i;
-                  continue;
-                }
-                printf("%s.%s %s %llu\n", input.c_str(), v.second.get<std::string>("").c_str(),
-                       e_value.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
-              }
-            } else if (outputFormatMode == formatMode::INFLUXDB) {
-              // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
-              using namespace std::chrono;
-              int i{0};
-              bool firstValNoComma(true);
-              std::stringstream line;
-              line << input << " ";
-              const auto schema = netClient("detail", input);
-              for (const auto &v : schema.get_child("db.field")) {
-                if (isNullAt(nullmap, i)) {
-                  ++i;
-                  continue;
-                }
-                if (firstValNoComma)
-                  firstValNoComma = false;
-                else
-                  line << ",";
-                line << v.second.get<std::string>("") << "=" << e_value.get(std::to_string(i++), "");
-              }
-              if (!firstValNoComma) {
-                line << " " << duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
-                printf("%s\n", line.str().c_str());
-              }
-            }
-            // This part is time limited (-m) resposbile
             if (timeLimitCntQry > 1) --timeLimitCntQry;
-            noDataCounter = 0;  // reset timeout on data received
+            noDataCounter = 0;
           }
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       if (++noDataCounter > serverTimeoutMs) {
         SPDLOG_WARN("No data received for {} ms, assuming server is dead.", serverTimeoutMs);
-        done = true;
+        transport_->done = true;
         break;
       }
     }
-    while (spsc_queue.pop(e_value) && !done)
+    while (transport_->popQueue(e_value) && !transport_->done)
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    if (timeLimitCntQry != 1 && !done) {
-      _getch();  // no wait ... feed key from kbhit
-    }
+    if (timeLimitCntQry != 1 && !transport_->done) _getch();
 
   } catch (...) {
     SPDLOG_ERROR("General exception catched.");
   }
 
-  done = true;
+  transport_->done = true;
   return found;
 }
 
@@ -376,8 +133,7 @@ int qry::hello() {
   SPDLOG_INFO("snd: hello");
 
   std::string rcv("fail.");
-
-  for (auto &[first, second] : pt) {
+  for (auto& [first, second] : pt) {
     rcv = second.get<std::string>("");
     SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
@@ -386,9 +142,6 @@ int qry::hello() {
     return system::errc::protocol_error;
   }
   return system::errc::success;
-  // Fail in this part of code could means that server in in json mode
-  // and query is going xml. (or otherwise)
-  // catches in regressions
 }
 
 std::string qry::dirYaml() {
@@ -397,14 +150,14 @@ std::string qry::dirYaml() {
 
   retval << "---\napiVersion: xqry/v1\n";
   retval << "streams:\n";
-  for (const auto &v : pt.get_child("db.stream")) {
+  for (const auto& v : pt.get_child("db.stream")) {
     auto location = v.second.get<std::string>("location");
     auto size     = v.second.get<std::string>("size");
 
     retval << "  - name: " << v.second.get<std::string>("") << "\n";
     retval << "    delta: " << v.second.get<std::string>("duration") << "\n";
     if (size != "-1") retval << "    size: " << size << "\n";
-    retval << "    count: " << v.second.get<std ::string>("count") << "\n";
+    retval << "    count: " << v.second.get<std::string>("count") << "\n";
     if (location != "") retval << "    location: " << location << "\n";
   }
 
@@ -418,40 +171,37 @@ std::string qry::dir() {
   std::stringstream ss;
   for (auto nName : vcols) {
     auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto &node1, const auto &node2) {
-      const ptree &v1 = node1.second;
-      const ptree &v2 = node2.second;
-
+    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto& node1, const auto& node2) {
+      const ptree& v1 = node1.second;
+      const ptree& v2 = node2.second;
       return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
     });
     if (stream.size() == 1) assert(maxSizeIt == stream.begin());
-    ss << "|%";
-    ss << maxSizeIt->second.get<std::string>(nName).length();
-    ss << "s";
+    ss << "|%" << maxSizeIt->second.get<std::string>(nName).length() << "s";
   }
   ss << "|\n";
 
   char buffer[1024];
-  for (const auto &v : pt.get_child("db.stream")) {
-    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
-            v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
-            v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
+  for (const auto& v : pt.get_child("db.stream")) {
+    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(),
+            v.second.get<std::string>("duration").c_str(), v.second.get<std::string>("size").c_str(),
+            v.second.get<std::string>("count").c_str(), v.second.get<std::string>("location").c_str(),
+            v.second.get<std::string>("cap").c_str());
     retval << buffer;
   }
 
   return retval.str();
 }
 
-const std::string indent = "  ";
+static const std::string indent = "  ";
 
-std::string qry::detailShow(const std::string &input) {
+std::string qry::detailShow(const std::string& input) {
   std::stringstream retval;
-
   ptree pt = netClient("get", "");
 
   const auto streams = pt.get_child("db.stream");
-  bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto &node) {
-    const ptree &v = node.second;
+  bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto& node) {
+    const ptree& v = node.second;
     return input == v.get<std::string>("");
   });
 
@@ -462,19 +212,16 @@ std::string qry::detailShow(const std::string &input) {
     auto id    = ptsh.get_child("db.stream");
 
     retval << "---\napiVersion: xqry/v1\n";
-
     retval << "stream:\n";
     retval << indent << "name: " << id.get_value<std::string>() << "\n";
     retval << indent << "delta: " << delta.get_value<std::string>() << "\n";
-
     retval << "query: " << query.get_value<std::string>() << "\n";
-
     retval << "fields:\n";
-    for (const auto &v : ptsh.get_child("db.field")) {
+    for (const auto& v : ptsh.get_child("db.field")) {
       retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
-      retval << indent << indent << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
+      retval << indent << indent
+             << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
     }
-
   } else
     SPDLOG_ERROR("not found");
 
