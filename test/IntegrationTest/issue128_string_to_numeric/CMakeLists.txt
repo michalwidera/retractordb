@@ -16,7 +16,7 @@ add_test(
     mkdir -p temp ; \
     xretractor query.rql -k -x & \
     while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-    xqry -s dst -k -m 3 > out.txt ; \
+    xqry -w -s dst -k -m 3 > out.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '11 10 10' out.txt ; \
     grep -F '26 25 25' out.txt ; \
