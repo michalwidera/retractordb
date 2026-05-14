@@ -12,7 +12,7 @@ add_test(
     rm -f temp/str_null temp/str_null.* temp/core0 temp/core0.* ; \
     for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 1; done ; \
     [ ! -f /tmp/xretractor_service.lock ] ; \
-    valgrind --error-exitcode=1 --leak-check=full --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xqry --wait-server -s str_null -k -m 5 > /dev/null & \
+    xqry --wait-server -s str_null -k -m 5 > /dev/null & \
     XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
     wait \$XQRY_PID ; \

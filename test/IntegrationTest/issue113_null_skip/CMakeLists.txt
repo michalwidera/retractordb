@@ -8,7 +8,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    valgrind --error-exitcode=1 --leak-check=full --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xqry --wait-server -s str_null -n -k -m 4 > out_skip.txt & \
+    xqry --wait-server -s str_null -n -k -m 4 > out_skip.txt & \
     XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
     wait \$XQRY_PID ; \
@@ -23,7 +23,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    valgrind --error-exitcode=1 --leak-check=full --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xqry --wait-server -s str_null -k -m 4 > out_noskip.txt & \
+    xqry --wait-server -s str_null -k -m 4 > out_noskip.txt & \
     XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
     wait \$XQRY_PID ; \

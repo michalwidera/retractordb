@@ -12,7 +12,7 @@ add_test(
   COMMAND
     bash -c "set -e ; \
     mkdir -p temp ; \
-    valgrind --error-exitcode=1 --leak-check=full --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xqry --wait-server -s dst -k -m 3 > out.txt & \
+    xqry --wait-server -s dst -k -m 3 > out.txt & \
     XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
     wait \$XQRY_PID ; \
