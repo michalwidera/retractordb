@@ -74,8 +74,9 @@ dataModel *pProc = nullptr;
 // when it will be set thread will exit by given time (testing purposes)
 std::atomic<int> iTimeLimitCnt{executorsm::inifitie_loop};
 
-qTree *executorsm::coreInstancePtr = nullptr;
-compiler *executorsm::cmPtr        = nullptr;
+qTree *executorsm::coreInstancePtr  = nullptr;
+compiler *executorsm::cmPtr         = nullptr;
+std::atomic<bool> executorsm::ipcReady{false};
 
 void cleanup() {
   if (iTimeLimitCnt != executorsm::stop_now) {
@@ -321,6 +322,8 @@ void executorsm::commandProcessorLoop() {
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>("MyMap")  // object name
                     (std::less<int>(), allocatorShmemMapInstance);
+    ipcReady = true;
+    cv.notify_all();
     //
     // This need to be clean up - There are some mess.
     //
@@ -495,8 +498,19 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
   auto retVal = system::errc::success;
   std::thread bt(executorsm::commandProcessorLoop);  // Sending service in thread
-  // This line - delay is ugly fix for slow machine on CI !
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+  {
+    std::unique_lock<std::mutex> lock(core_mutex);
+    cv.wait(lock, [] { return executorsm::ipcReady.load(); });
+  }
+
+  if (!guard.acquireLock()) {
+    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
+    iTimeLimitCnt = executorsm::stop_now;
+    bt.join();
+    return system::errc::no_lock_available;
+  }
+  SPDLOG_INFO("Service lock acquired successfully.");
 
   try {
     dataModel proc(*coreInstancePtr);

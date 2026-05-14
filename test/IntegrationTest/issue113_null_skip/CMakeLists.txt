@@ -10,7 +10,7 @@ add_test(
     bash -c "set -e ; \
     xretractor query.rql -k -x & \
     while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-    xqry -w -s str_null -n -k -m 4 > out_skip.txt ; \
+    xqry -s str_null -n -k -m 4 > out_skip.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '10 null' out_skip.txt ; \
     grep -F '20 30' out_skip.txt ; \

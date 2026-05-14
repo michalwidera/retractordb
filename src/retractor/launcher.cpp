@@ -216,12 +216,6 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, handleSignal);  // Terminate
   signal(SIGHUP, handleSignal);   // Hangup
 
-  if (!guard.acquireLock()) {
-    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
-    return system::errc::no_lock_available;
-  };
-
-  SPDLOG_INFO("Service lock acquired successfully.");
   SPDLOG_INFO("Current process PID: {}", getpid());
 
   bool rotation_enabled =

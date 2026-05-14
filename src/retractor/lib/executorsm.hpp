@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <set>
 #include <string>
 
@@ -20,6 +21,7 @@ struct executorsm {
  private:
   static qTree *coreInstancePtr;
   static compiler *cmPtr;
+  static std::atomic<bool> ipcReady;
 
   static void commandProcessorLoop();
   static ptree commandProcessor(ptree ptInval);
