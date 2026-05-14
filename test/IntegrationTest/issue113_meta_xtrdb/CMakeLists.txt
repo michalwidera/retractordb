@@ -14,9 +14,10 @@ add_test(
   COMMAND
     bash -c "set -e ; \
     mkdir -p temp ; \
+    valgrind --error-exitcode=1 --leak-check=full --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xqry --wait-server -s str_null -k -m 3 > /dev/null & \
+    XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-    xqry -s str_null -k -m 3 > /dev/null ; \
+    wait \$XQRY_PID ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     test -f temp/str_null.meta ; \
     test $(stat -c%s temp/str_null.meta) -gt 16 ; \

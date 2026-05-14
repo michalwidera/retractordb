@@ -1,11 +1,14 @@
 #include <spdlog/spdlog.h>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
+#include <chrono>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <utility>
 
 #include "config.h"  // Add an automatically generated configuration file
@@ -16,6 +19,21 @@ using namespace boost;
 using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
+
+static bool waitForServer(int maxSeconds = 30) {
+  const int pollIntervalMs   = 100;
+  const int maxAttempts      = maxSeconds * 1000 / pollIntervalMs;
+  for (int i = 0; i < maxAttempts; ++i) {
+    try {
+      IPC::managed_shared_memory seg(IPC::open_only, "RetractorShmemMap");
+      IPC::message_queue mq(IPC::open_only, "RetractorQueryQueue");
+      return true;
+    } catch (...) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(pollIntervalMs));
+    }
+  }
+  return false;
+}
 
 void cleanup() {
   spdlog::shutdown();  // flush logs on disk
@@ -52,7 +70,8 @@ int main(int argc, char *argv[]) {
         ("influxdb,f", "influxDB output mode")                                                            //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
         ("help,h", "produce help message")                                                                //
-        ("needctrlc,c", "force ctl+c for stop this tool");
+        ("needctrlc,c", "force ctl+c for stop this tool")                                               //
+        ("wait-server,w", "poll until xretractor server is available before executing command");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
     po::variables_map vm;
@@ -101,6 +120,12 @@ int main(int argc, char *argv[]) {
       }
       gnuplotDim = std::make_tuple(x, ymin, ymax);
       supressok  = true;
+    }
+    if (vm.count("wait-server") && !vm.count("help")) {
+      if (!waitForServer()) {
+        SPDLOG_ERROR("server not available after 30 seconds");
+        return system::errc::no_child_process;
+      }
     }
     if (vm.count("help")) {
       std::cout << argv[0] << " - data query tool." << std::endl << std::endl;

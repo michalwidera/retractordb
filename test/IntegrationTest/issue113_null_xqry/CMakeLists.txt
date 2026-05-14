@@ -8,9 +8,10 @@ add_test(
   COMMAND
     bash -c "set -e ; \
     mkdir -p temp ; \
+    valgrind --error-exitcode=1 --leak-check=full --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xqry --wait-server -s str_null -k -m 3 > out.txt & \
+    XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
-    xqry -s str_null -k -m 3 > out.txt ; \
+    wait \$XQRY_PID ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '10 null' out.txt ; \
     grep -F '20 30' out.txt")

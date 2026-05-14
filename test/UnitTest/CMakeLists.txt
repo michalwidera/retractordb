@@ -77,7 +77,8 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)
 add_test(
   NAME ut-xqry
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
-  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
+  COMMAND valgrind --error-exitcode=1 --leak-check=full
+          ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)
 add_test(
