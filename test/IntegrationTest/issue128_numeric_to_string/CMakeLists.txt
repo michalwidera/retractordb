@@ -11,10 +11,9 @@ add_test(
   COMMAND
     bash -c "set -e ; \
     mkdir -p temp ; \
-    xqry --wait-server -s dst -k -m 3 > out.txt & \
-    XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
-    wait \$XQRY_PID ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    xqry -s dst -k -m 3 > out.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '42_test' out.txt ; \
     grep -F '3.140000' out.txt ; \

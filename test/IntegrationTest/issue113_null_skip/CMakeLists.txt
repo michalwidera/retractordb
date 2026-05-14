@@ -8,10 +8,9 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    xqry --wait-server -s str_null -n -k -m 4 > out_skip.txt & \
-    XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
-    wait \$XQRY_PID ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    xqry -s str_null -n -k -m 4 > out_skip.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '10 null' out_skip.txt ; \
     grep -F '20 30' out_skip.txt ; \
@@ -23,10 +22,9 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c "set -e ; \
-    xqry --wait-server -s str_null -k -m 4 > out_noskip.txt & \
-    XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
-    wait \$XQRY_PID ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    xqry -s str_null -k -m 4 > out_noskip.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '10 null' out_noskip.txt ; \
     grep -F '20 30' out_noskip.txt ; \

@@ -12,10 +12,9 @@ add_test(
   COMMAND
     bash -c "set -e ; \
     mkdir -p temp ; \
-    xqry --wait-server -s dst -k -m 3 > out.txt & \
-    XQRY_PID=$! ; \
     xretractor query.rql -k -x & \
-    wait \$XQRY_PID ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    xqry -s dst -k -m 3 > out.txt ; \
     while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
     grep -F '0 1' out.txt ; \
     grep -F '1 0' out.txt ; \
