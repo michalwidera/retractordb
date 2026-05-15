@@ -2,11 +2,24 @@
 
 #include <spdlog/spdlog.h>
 
+#include <charconv>
 #include <istream>
 #include <stack>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+
+template <typename T, typename K>
+static void parse_string(const std::string &a, K &retVal) {
+  using P = std::conditional_t<std::is_floating_point_v<T>, double, int>;
+  P val{};
+  if (auto [p, e] = std::from_chars(a.data(), a.data() + a.size(), val); e == std::errc{})
+    retVal = static_cast<T>(val);
+  else {
+    SPDLOG_ERROR("Cant conv string to numeric type.");
+    retVal = std::monostate{};
+  }
+}
 
 template <typename T, typename K>
 void visit_descFld(const K &inVar, K &retVal) {
@@ -26,16 +39,7 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](double a) { retVal = static_cast<T>(a); },                                  //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },             //
                    [&retVal](std::pair<std::string, int> a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
-                   [&retVal](const std::string &a) {
-                     try {
-                       if constexpr (std::is_floating_point_v<T>)
-                         retVal = static_cast<T>(std::stod(a));
-                       else
-                         retVal = static_cast<T>(std::stoi(a));
-                     } catch (std::exception &err) {
-                       SPDLOG_ERROR("Cant conv string to numeric type.");
-                     };
-                   }  //
+                   [&retVal](const std::string &a) { parse_string<T>(a, retVal); }  //
                },
                inVar);
   } else {
@@ -60,14 +64,7 @@ void visit_descFld(const K &inVar, K &retVal) {
       SPDLOG_ERROR("No cast IDXPAIR to any type here");
       retVal = static_cast<T>(0);
     } else if (inVar.type() == typeid(std::string)) {
-      try {
-        if constexpr (std::is_floating_point_v<T>)
-          retVal = static_cast<T>(std::stod(std::any_cast<std::string>(inVar)));
-        else
-          retVal = static_cast<T>(std::stoi(std::any_cast<std::string>(inVar)));
-      } catch (std::exception &err) {
-        SPDLOG_ERROR("Cant conv string to numeric type here.");
-      };
+      parse_string<T>(std::any_cast<std::string>(inVar), retVal);
     } else {
       SPDLOG_ERROR("TODO - std::any->T");
     }
