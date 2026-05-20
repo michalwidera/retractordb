@@ -5,7 +5,7 @@
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
-**RetractorDB** is a specialized time series database system designed for processing and recording regular time series data in real-time. The system is optimized for continuous data streams, signal processing, telemetry, and IoT monitoring applications.
+**RetractorDB** is a specialized Edge Signal Processing Engine system designed for processing and recording regular time series data in real-time. The system is optimized for continuous data streams, signal processing, telemetry, and IoT monitoring applications.
 
 > ⚠️ **This is work in progress:** Active development is ongoing.
 
