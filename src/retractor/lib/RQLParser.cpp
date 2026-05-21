@@ -188,7 +188,7 @@ class ParserListener : public RQLBaseListener {
   void exitFraction(RQLParser::FractionContext *ctx) {
     const int nom = std::stoi(ctx->children[0]->getText());
     const int den = std::stoi(ctx->children[2]->getText());
-    if (den == 0) FATAL_ERROR("RQLParser::exitFraction: denominator is zero");
+    if (den == 0) FatalError("RQLParser::exitFraction: denominator is zero");
     rationalResult = boost::rational<int>(nom, den);
   }
 
@@ -218,7 +218,7 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      if (qry.filename.empty()) FATAL_ERROR("RQLParser: directive filename must not be empty");
+      if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
     }
 
     if (ctx->STORAGE()) {
@@ -322,7 +322,7 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    if (qry.filename.empty()) FATAL_ERROR("RQLParser: directive filename must not be empty");
+    if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
 
     // Add / at the end of path, if not present in case of STORAGE
     if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');

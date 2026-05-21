@@ -93,7 +93,7 @@ void cleanup() {
 }
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
-  if (coreInstancePtr == nullptr) FATAL_ERROR("executorsm::getAwaitedStreamsSet: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) FatalError("executorsm::getAwaitedStreamsSet: coreInstancePtr is null");
   std::set<std::string> retVal;
   for (const auto &it : *coreInstancePtr)
     if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) retVal.insert(it.id);
@@ -102,9 +102,9 @@ std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *core
 }
 
 ptree executorsm::collectStreamsParameters() {
-  if (coreInstancePtr == nullptr) FATAL_ERROR("executorsm::collectStreamsParameters: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) FatalError("executorsm::collectStreamsParameters: coreInstancePtr is null");
   ptree ptRetval;
-  if (pProc == nullptr) FATAL_ERROR("executorsm::collectStreamsParameters: pProc is null");
+  if (pProc == nullptr) FatalError("executorsm::collectStreamsParameters: pProc is null");
   for (auto &q : *coreInstancePtr) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
 
@@ -155,7 +155,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   }
 
   if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
-    FATAL_ERROR("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering — parser logic error", first_keyword);
+    FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering — parser logic error", first_keyword);
   }
 
   if (parseOut != "OK") {
@@ -175,7 +175,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   std::vector<std::string> mergedIds;
   std::string compileChainResult;
-  if (cmPtr == nullptr) FATAL_ERROR("executorsm::getAdHoc: cmPtr is null");
+  if (cmPtr == nullptr) FatalError("executorsm::getAdHoc: cmPtr is null");
 
   // These brackets are important - we need to lock coreInstancePtr as less as possible
   {
@@ -205,7 +205,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 }
 
 ptree executorsm::commandProcessor(ptree ptInval) {
-  if (coreInstancePtr == nullptr) FATAL_ERROR("executorsm::commandProcessor: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessor: coreInstancePtr is null");
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
@@ -307,7 +307,7 @@ ptree executorsm::commandProcessor(ptree ptInval) {
 
 // Thread procedure
 void executorsm::commandProcessorLoop() {
-  if (coreInstancePtr == nullptr) FATAL_ERROR("executorsm::commandProcessorLoop: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessorLoop: coreInstancePtr is null");
   try {
     IPC::message_queue::remove("RetractorQueryQueue");
     IPC::shared_memory_object::remove("RetractorShmemMap");
@@ -373,9 +373,9 @@ void executorsm::commandProcessorLoop() {
 std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
-  if (coreInstancePtr == nullptr) FATAL_ERROR("executorsm::printRowValue: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) FatalError("executorsm::printRowValue: coreInstancePtr is null");
   auto payload = pProc->getPayload(query_name, 0);
-  if (payload == nullptr) FATAL_ERROR("executorsm::printRowValue: getPayload returned null");
+  if (payload == nullptr) FatalError("executorsm::printRowValue: getPayload returned null");
 
   ptree pt;
   pt.put("stream", query_name);
@@ -422,7 +422,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 }
 
 void executorsm::boradcastOutOfBussiness() {
-  if (executorsm::coreInstancePtr == nullptr) FATAL_ERROR("executorsm::boradcastOutOfBussiness: coreInstancePtr is null");
+  if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcastOutOfBussiness: coreInstancePtr is null");
   for (const auto &element : id2StreamName_Relation) {
     using namespace boost::interprocess;
     //
@@ -452,7 +452,7 @@ void executorsm::boradcastOutOfBussiness() {
 }
 
 void executorsm::boradcast(const std::set<std::string> &inSet) {
-  if (executorsm::coreInstancePtr == nullptr) FATAL_ERROR("executorsm::boradcast: coreInstancePtr is null");
+  if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcast: coreInstancePtr is null");
   for (const auto queryName : inSet) {
     std::string row = printRowValue(queryName);
     std::list<int> eraseList;

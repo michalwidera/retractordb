@@ -165,7 +165,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
       if (step <= 0) {
-        FATAL_ERROR("query::descriptorFrom: AGSE step must be > 0, got: {}", step);
+        FatalError("query::descriptorFrom: AGSE step must be > 0, got: {}", step);
       }
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
@@ -173,7 +173,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       }
     } break;
     default:
-      FATAL_ERROR("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
+      FatalError("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
   }
 
   if (!retention.noRetention()) {
@@ -187,7 +187,7 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   std::string sArg1;
   std::string sArg2;
   if (prog.size() >= 4) {
-    FATAL_ERROR("query::GetArgs: program too large — {} tokens, expected at most 3", prog.size());
+    FatalError("query::GetArgs: program too large — {} tokens, expected at most 3", prog.size());
   }
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3

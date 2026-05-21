@@ -16,7 +16,7 @@ namespace rdb {
 auto memoryFile::name() -> std::string & { return filename_; }
 
 ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FATAL_ERROR("memoryFile::write: recordSize_ is zero");
+  if (recordSize_ == 0) FatalError("memoryFile::write: recordSize_ is zero");
   auto location = position / recordSize_;
   // If ptrData is null, clear the storage and reset removed_count
   if (ptrData == nullptr) {
@@ -54,7 +54,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 }
 
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FATAL_ERROR("memoryFile::read: recordSize_ is zero");
+  if (recordSize_ == 0) FatalError("memoryFile::read: recordSize_ is zero");
   auto location = position / recordSize_;
   if (location < removed_count_) {
     SPDLOG_ERROR("Read failed: Position out of bounds in memory storage: location {}, removed_count {}", location,

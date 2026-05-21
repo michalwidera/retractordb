@@ -39,7 +39,7 @@ size_t genericBinaryFile::count() {
 }
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  if (recordSize_ == 0) FATAL_ERROR("genericBinaryFile::write: recordSize_ is zero");
+  if (recordSize_ == 0) FatalError("genericBinaryFile::write: recordSize_ is zero");
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   if (ptrData == nullptr && recordSize_ == 0 && position == 0) {
@@ -66,7 +66,7 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
 
 ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (recordSize_ == 0) FATAL_ERROR("genericBinaryFile::read: recordSize_ is zero");
+  if (recordSize_ == 0) FatalError("genericBinaryFile::read: recordSize_ is zero");
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename_, std::ios::in | std::ios::binary);

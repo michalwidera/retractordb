@@ -65,7 +65,7 @@ void qTree::dumpCore() {
       else if (nName == vcols[3])
         size = it.id.length();
       else {
-        FATAL_ERROR("qTree::dumpCore: unknown column name");
+        FatalError("qTree::dumpCore: unknown column name");
       }
       if (maxSize < size) maxSize = size;
     }
@@ -95,7 +95,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
     if (it.rInterval == 0) {
-      FATAL_ERROR("qTree: query '{}' rInterval is zero — check :STORAGE directive", it.id);
+      FatalError("qTree: query '{}' rInterval is zero — check :STORAGE directive", it.id);
     }
     if (it.isCompilerDirective()) continue;
     lstTimeIntervals.insert(it.rInterval);
@@ -104,7 +104,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 }
 
 query &qTree::getQuery(const std::string &query_name) {
-  if (query_name.empty()) FATAL_ERROR("qTree::getQuery: query name is empty");
+  if (query_name.empty()) FatalError("qTree::getQuery: query name is empty");
 
   auto it = std::find_if(begin(), end(), [query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {

@@ -81,7 +81,7 @@ ptree IpcTransport::netClient(const std::string& netCommand, const std::string& 
 
     std::pair<IPCMap*, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
     IPCMap* mymap                       = ret.first;
-    if (!mymap) FATAL_ERROR("ipc_transport: shared memory map 'MyMap' not found — is the server running?");
+    if (!mymap) FatalError("ipc_transport: shared memory map 'MyMap' not found — is the server running?");
 
     std::size_t processId = getpid();
     auto it               = mymap->end();

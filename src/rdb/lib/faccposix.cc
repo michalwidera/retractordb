@@ -16,7 +16,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     : filename_(std::string(fileName)),
       recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
-  if (recordSize_ == 0) FATAL_ERROR("posixBinaryFile: record size must be > 0");
+  if (recordSize_ == 0) FatalError("posixBinaryFile: record size must be > 0");
 
   std::error_code fs_ec;
   const bool fileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -26,8 +26,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0) {
-    SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-    FATAL_ERROR("posixBinaryFile: failed to open file");
+    FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
   }
 
   if (fd >= 0 && fileExisted) {

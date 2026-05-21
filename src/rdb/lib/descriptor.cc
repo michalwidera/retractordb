@@ -98,7 +98,7 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
   if (this != &rhs) {
     insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
   } else {
-    FATAL_ERROR("descriptor: cannot merge descriptor with itself");
+    FatalError("descriptor: cannot merge descriptor with itself");
     // can't do safe: data | data
     // due one name policy
   }
@@ -152,8 +152,7 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   lhs.removeConfigurationFields();
   rhs.removeConfigurationFields();
   if (lhs.size() != rhs.size()) {
-    SPDLOG_ERROR("composeHashDescriptorFrom: descriptor size mismatch lhs:{} rhs:{}", lhs.size(), rhs.size());
-    FATAL_ERROR("descriptor: hash composition requires equal-size descriptors");
+    FatalError("descriptor: hash composition requires equal-size descriptors: lhs={} rhs={}", lhs.size(), rhs.size());
   }
 
   clear();
@@ -219,7 +218,7 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) {
   if (it != end())
     return std::distance(begin(), it);
   else
-    FATAL_ERROR("descriptor: field ID not found");
+    FatalError("descriptor: field ID not found");
 
   return 0;  // ProForma Error
 }
@@ -232,15 +231,14 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
-  FATAL_ERROR("descriptor: field not found by name");
+  FatalError("descriptor: field not found by name");
   return 0;  // ProForma Error
 }
 
 int Descriptor::byteOffsetAtFlatIndex(const int flatIndex) {
   rebuildFieldMappings();
   if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) {
-    SPDLOG_ERROR("byteOffsetAtFlatIndex: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
-    FATAL_ERROR("descriptor: flat index out of range");
+    FatalError("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
   }
   return fieldByteOffsets_[flatIndex];
 }
@@ -323,8 +321,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
 
   auto result = parserDESCString(rhs, strstream.str());
   if (result != "OK") {
-    SPDLOG_ERROR("Descriptor parse failed: {}", result);
-    FATAL_ERROR("descriptor parse failed");
+    FatalError("descriptor parse failed: {}", result);
   }
 
   return is;

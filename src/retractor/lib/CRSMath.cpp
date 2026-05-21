@@ -5,7 +5,7 @@
 using namespace CRationalStreamMath;
 
 TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) {
-  if (inSet.empty()) FATAL_ERROR("TimeLine: input interval set must not be empty");
+  if (inSet.empty()) FatalError("TimeLine: input interval set must not be empty");
   for (auto val : inSet) {
     // Latch - catch true if val is divided
     // bu any number from the set
@@ -42,7 +42,7 @@ bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDel
 // MAGIC Warning
 
 const boost::rational<int> &TimeLine::getNextTimeSlot() {
-  if (sr_.empty()) FATAL_ERROR("TimeLine::getNextTimeSlot: internal stream rate set is empty");
+  if (sr_.empty()) FatalError("TimeLine::getNextTimeSlot: internal stream rate set is empty");
   // In constructor we were set deltas and indexes
   // Take first value from tje edge
   // even good we can take max rational here.

@@ -53,8 +53,7 @@ void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
       payload.setItem(index, static_cast<uint8_t>(parseAs<unsigned>(token)));
       break;
     default:
-      SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(rtype));
-      FATAL_ERROR("facctxtsrc: unsupported field type");
+      FatalError("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype));
   }
 }
 
@@ -111,8 +110,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     if (item.rtype == rdb::NULLTYPE) {
       auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
       if (token.has_value() && !isNullToken(*token)) {
-        SPDLOG_ERROR("Expected NULL token for NULL field, got: {}", *token);
-        FATAL_ERROR("facctxtsrc: expected NULL token but got value");
+        FatalError("facctxtsrc: expected NULL token for NULL field, got: {}", *token);
       }
       payload_->setItem(i, std::nullopt);
       i++;

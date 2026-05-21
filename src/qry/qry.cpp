@@ -28,7 +28,7 @@ ptree qry::netClient(const std::string& cmd, const std::string& arg) {
 }
 
 bool qry::adhoc(const std::string& sAdhoc) {
-  if (sAdhoc.empty()) FATAL_ERROR("qry::adhoc: adhoc query string must not be empty");
+  if (sAdhoc.empty()) FatalError("qry::adhoc: adhoc query string must not be empty");
   ptree pt = netClient("adhoc", sAdhoc);
 
   std::string rcv("fail.");

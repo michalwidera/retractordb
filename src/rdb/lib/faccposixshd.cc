@@ -45,7 +45,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     : filename_(std::string(fileName)),
       recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
-  if (recordSize_ == 0) FATAL_ERROR("posixBinaryFileWithShadow: record size must be > 0");
+  if (recordSize_ == 0) FatalError("posixBinaryFileWithShadow: record size must be > 0");
 
   std::error_code fs_ec;
   const bool mainFileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -61,14 +61,12 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0) {
-    SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-    FATAL_ERROR("posixBinaryFileWithShadow: failed to open main file");
+    FatalError("posixBinaryFileWithShadow: failed to open '{}' (fd={})", filename_, fd);
   }
 
   fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd_shadow < 0) {
-    SPDLOG_ERROR("::open shadow {} -> {}", shadowName(), fd_shadow);
-    FATAL_ERROR("posixBinaryFileWithShadow: failed to open shadow file");
+    FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
   }
 
   if (fd >= 0 && mainFileExisted) {

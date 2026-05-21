@@ -24,13 +24,13 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   // fetch all ':*' - and remove them from coreInstance
   //
 
-  if (coreInstance_.empty()) FATAL_ERROR("dataModel: coreInstance is empty — no queries to process");
+  if (coreInstance_.empty()) FatalError("dataModel: coreInstance is empty — no queries to process");
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
       directive_[it.id] = it.filename;
       if (directive_[it.id].empty()) {
-        FATAL_ERROR("dataModel: compiler directive '{}' has empty value", it.id);
+        FatalError("dataModel: compiler directive '{}' has empty value", it.id);
       }
     }
 
@@ -83,13 +83,13 @@ void dataModel::processZeroStep() {
     if (!q.isDeclaration()) continue;
 
     if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::empty) {
-      FATAL_ERROR("dataModel::processZeroStep: stream '{}' not in empty state at start of cycle", q.id);
+      FatalError("dataModel::processZeroStep: stream '{}' not in empty state at start of cycle", q.id);
     }
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     qSet[q.id]->outputPayload->revRead(0);                            // state -> armed
     qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
     if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
-      FATAL_ERROR("dataModel::processZeroStep: stream '{}' not armed after fire()", q.id);
+      FatalError("dataModel::processZeroStep: stream '{}' not armed after fire()", q.id);
     }
   }
 }
@@ -118,7 +118,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
     if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
-      FATAL_ERROR("dataModel::processRows: stream '{}' not armed after processing", q.id);
+      FatalError("dataModel::processRows: stream '{}' not armed after processing", q.id);
     }
   }
 }
@@ -127,10 +127,10 @@ void dataModel::constructInputPayload(const std::string &instance) {
   auto qry = coreInstance_[instance];
 
   if (qry.lProgram.size() >= 4) {
-    FATAL_ERROR("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4", qry.lProgram.size(), instance);
+    FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4", qry.lProgram.size(), instance);
   }
   if (qry.lProgram.empty()) {
-    FATAL_ERROR("dataModel::constructInputPayload: empty program for query '{}' — declarations should not be processed here", instance);
+    FatalError("dataModel::constructInputPayload: empty program for query '{}' — declarations should not be processed here", instance);
   }
 
   std::vector<token> arg;
@@ -144,7 +144,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
     case PUSH_STREAM: {
       // 	:- PUSH_STREAM(core0)
       //
-      if (arg.size() != 1) FATAL_ERROR("dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
+      if (arg.size() != 1) FatalError("dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
 
       const auto nameSrc = operation.getStr_();
 
@@ -154,7 +154,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // 	:- PUSH_STREAM(core0)
       //  :- STREAM_TIMEMOVE(1)
       //
-      if (arg.size() != 2) FATAL_ERROR("dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
+      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
 
       const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
@@ -167,21 +167,21 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_VAL(2/1)
       //  :- STREAM_DEHASH_MOD
       //
-      if (arg.size() != 3) FATAL_ERROR("dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
+      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
 
       if (rationalArgument <= 0) {
-        FATAL_ERROR("dataModel::constructInputPayload: DEHASH rational argument must be positive");
+        FatalError("dataModel::constructInputPayload: DEHASH rational argument must be positive");
       }
 
       int timeOffset = -1;
       if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
       if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
       if (timeOffset < 0) {
-        FATAL_ERROR("dataModel::constructInputPayload: DEHASH timeOffset must be non-negative, got {}", timeOffset);
+        FatalError("dataModel::constructInputPayload: DEHASH timeOffset must be non-negative, got {}", timeOffset);
       }
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -197,7 +197,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_STREAM(core0)
       //  :- STREAM_SUBTRACT(1/2)
       //
-      if (arg.size() != 2) FATAL_ERROR("dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
+      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
@@ -211,7 +211,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_ADD
       //
-      if (arg.size() != 3) FATAL_ERROR("dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
+      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
 
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
@@ -225,12 +225,12 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
       //  :- STREAM_AGSE 2,3 -> window_step, window_length  (arg[1])
       //
-      if (arg.size() != 2) FATAL_ERROR("dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
+      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
 
       const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       if (step <= 0) {
-        FATAL_ERROR("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
+        FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
       }
       const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
@@ -240,7 +240,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
       //
-      if (arg.size() != 3) FATAL_ERROR("dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
+      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
 
       const auto nameSrc1     = arg[0].getStr_();
       const auto nameSrc2     = arg[1].getStr_();
@@ -255,7 +255,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
     } break;
     default:
-      FATAL_ERROR("dataModel::constructInputPayload: undefined command_id {}", static_cast<int>(cmd));
+      FatalError("dataModel::constructInputPayload: undefined command_id {}", static_cast<int>(cmd));
   }
 }
 
@@ -267,7 +267,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data());
     if (!success) {
-      FATAL_ERROR("dataModel::getRow: revRead failed for stream '{}' at timeOffset {}", instance, timeOffset);
+      FatalError("dataModel::getRow: revRead failed for stream '{}' at timeOffset {}", instance, timeOffset);
     }
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());

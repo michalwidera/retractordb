@@ -17,7 +17,7 @@ field::field(rdb::rField field_, std::list<token> lProgram)
       field_(std::move(field_)) {}
 
 token field::getFirstFieldToken() {
-  if (lProgram.empty()) FATAL_ERROR("field::getFirstFieldToken: no program tokens — should not be called on a declaration field");
+  if (lProgram.empty()) FatalError("field::getFirstFieldToken: no program tokens — should not be called on a declaration field");
   return *lProgram.begin();
 }
 

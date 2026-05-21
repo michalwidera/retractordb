@@ -16,7 +16,7 @@ extern std::unique_ptr<PersistentCounter> pCounterPtr;
 streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
     : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
-  if (qry.id.empty()) FATAL_ERROR("streamInstance: query id must not be empty");
+  if (qry.id.empty()) FatalError("streamInstance: query id must not be empty");
 
   const auto storageName{qry.filename == "" ? qry.id : qry.filename};
 
@@ -63,7 +63,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
                                                   const std::string &instance,  //
                                                   const int storedRecordCountDst) {
   if (step <= 0) {
-    FATAL_ERROR("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
+    FatalError("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
   }
 
   // temporary alias for variable - for better understand what is happening here.
@@ -155,13 +155,13 @@ void fnOp(opType op, std::any value, std::any &valueRet) {
       valueRet = val1 / val2;
       break;
     default:
-      FATAL_ERROR("streamInstance::fnOp: unsupported opType");
+      FatalError("streamInstance::fnOp: unsupported opType");
   }
 }
 
 rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) {
   if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
-    FATAL_ERROR("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
+    FatalError("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
   }
 
   // First construct descriptor
@@ -177,7 +177,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
-    FATAL_ERROR("streamInstance: aggregation not supported for this field type");
+    FatalError("streamInstance: aggregation not supported for this field type");
   }
 
   // choose aggregate operation
@@ -202,8 +202,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(std::numeric_limits<double>::max());
         break;
       default:
-        FATAL_ERROR("streamInstance: unsupported aggregation type");
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
   if (cmd == STREAM_MAX) {
@@ -223,8 +222,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(std::numeric_limits<double>::min());
         break;
       default:
-        FATAL_ERROR("streamInstance: unsupported aggregation type");
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
   if (cmd == STREAM_SUM || cmd == STREAM_AVG) {
@@ -244,12 +242,11 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(0);
         break;
       default:
-        FATAL_ERROR("streamInstance: unsupported aggregation type");
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
 
-  if (!valueRet.has_value()) FATAL_ERROR("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
+  if (!valueRet.has_value()) FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
 
   auto item{0};
   auto validItemCount{0};
@@ -268,7 +265,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       case rdb::BYTE:
       case rdb::INTEGER:
       case rdb::UINT:
-        FATAL_ERROR("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
+        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
       case rdb::RATIONAL:
         fnOp<boost::rational<int>>(op, value, valueRet);
         break;
@@ -279,8 +276,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         fnOp<double>(op, value, valueRet);
         break;
       default:
-        FATAL_ERROR("streamInstance: unsupported aggregation type");
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
 
@@ -296,7 +292,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       case rdb::BYTE:
       case rdb::INTEGER:
       case rdb::UINT:
-        FATAL_ERROR("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
+        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
       case rdb::RATIONAL:
         fnOp<boost::rational<int>>(avgop, value, valueRet);
         break;
@@ -307,14 +303,13 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         fnOp<double>(avgop, value, valueRet);
         break;
       default:
-        FATAL_ERROR("streamInstance: unsupported aggregation type");
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
 
   switch (maxType) {
     case rdb::BYTE: {
-      if (valueRet.type() != typeid(boost::rational<int>)) FATAL_ERROR("streamInstance: aggregation result must be rational at finalization");
+      if (valueRet.type() != typeid(boost::rational<int>)) FatalError("streamInstance: aggregation result must be rational at finalization");
       auto tobyte = std::any_cast<boost::rational<int>>(valueRet);
       if (tobyte > boost::rational<int>(std::numeric_limits<uint8_t>::max(), 1)) {
         valueRet = uint8_t(std::numeric_limits<uint8_t>::max());
@@ -325,7 +320,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::INTEGER: {
-      if (valueRet.type() != typeid(boost::rational<int>)) FATAL_ERROR("streamInstance: aggregation result must be rational at finalization");
+      if (valueRet.type() != typeid(boost::rational<int>)) FatalError("streamInstance: aggregation result must be rational at finalization");
       auto toint = std::any_cast<boost::rational<int>>(valueRet);
       if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
         valueRet = int(std::numeric_limits<int>::max());
@@ -336,7 +331,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::UINT: {
-      if (valueRet.type() != typeid(boost::rational<int>)) FATAL_ERROR("streamInstance: aggregation result must be rational at finalization");
+      if (valueRet.type() != typeid(boost::rational<int>)) FatalError("streamInstance: aggregation result must be rational at finalization");
       auto touint = std::any_cast<boost::rational<int>>(valueRet);
       if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
         valueRet = unsigned(std::numeric_limits<unsigned>::max());
@@ -352,8 +347,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     case rdb::DOUBLE:
       break;
     default:
-      FATAL_ERROR("streamInstance: unsupported type in aggregation finalization");
-      break;
+      FatalError("streamInstance: unsupported type in aggregation finalization");
   }
   auto postion{0};
   localPayload->setItem(postion, valueRet);
@@ -375,10 +369,10 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 
     std::any result = std::visit([](auto &&arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
 
-    if (!result.has_value()) FATAL_ERROR("streamInstance::constructOutputPayload: expression result has no value");
+    if (!result.has_value()) FatalError("streamInstance::constructOutputPayload: expression result has no value");
 
     if (program.field_.rtype != (outputPayload->descriptor[i]).rtype) {
-      FATAL_ERROR("streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i);
+      FatalError("streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i);
     }
 
     cast<std::any> castAny;
@@ -401,9 +395,9 @@ bool boolCast(const rdb::descFldVT &inVar) {
                  [&retVal](boost::rational<int> a) { retVal = (a != 0); },                      //
                  [&retVal](float a) { retVal = (a != 0); },                                     //
                  [&retVal](double a) { retVal = (a != 0); },                                    //
-                 [&retVal](std::pair<int, int>) { FATAL_ERROR("boolCast: pair<int,int> not supported"); },          //
-                 [&retVal](std::pair<std::string, int>) { FATAL_ERROR("boolCast: pair<string,int> not supported"); },  //
-                 [&retVal](const std::string &) { FATAL_ERROR("boolCast: string type not supported"); }            //
+                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },          //
+                 [&retVal](std::pair<std::string, int>) { FatalError("boolCast: pair<string,int> not supported"); },  //
+                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }            //
              },
              inVar);
 
@@ -414,8 +408,8 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
   rdb::payload payload(*outputPayload->getPayload());
 
   for (auto &r : qry.lRules) {
-    if (r.condition.empty()) FATAL_ERROR("streamInstance::constructRulesAndUpdate: rule condition is empty");
-    if (r.action != rule::DUMP && r.action != rule::SYSTEM) FATAL_ERROR("streamInstance::constructRulesAndUpdate: unsupported rule action");
+    if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
+    if (r.action != rule::DUMP && r.action != rule::SYSTEM) FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
     auto condition = r.condition;
     expressionEvaluator expression;
     auto result = expression.eval(condition, &payload);

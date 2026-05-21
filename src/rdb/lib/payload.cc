@@ -30,19 +30,17 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
       SPDLOG_ERROR("Stack: {}", message.str());
       std::cerr << message.str() << std::endl;
     }
-    FATAL_ERROR("payload: flat position out of range");
+    FatalError("payload: flat position out of range");
   }
 
   auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
   if (!positionOpt.has_value()) {
-    SPDLOG_ERROR("{} conversion failed for flat position {}", context, positionFlat);
-    FATAL_ERROR("payload: flat index to descriptor position conversion failed");
+    FatalError("payload: {} conversion failed for flat position {}", context, positionFlat);
   }
 
   const auto position = positionOpt->first;
   if (position < 0 || position >= static_cast<int>(descriptor.size())) {
-    SPDLOG_ERROR("{} converted index out of descriptor bounds: {}", context, position);
-    FATAL_ERROR("payload: converted index out of descriptor bounds");
+    FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
   }
 
   return position;
@@ -90,7 +88,7 @@ void writeValue(std::ostream &os, const std::any &value, const descFld type, con
     case rdb::TYPE:
     case rdb::RETENTION:
     case rdb::RETMEMORY:
-      FATAL_ERROR("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
+      FatalError("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
       break;
   }
 }
@@ -155,7 +153,7 @@ payload &payload::operator=(const Descriptor &other) {
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
       // pass
     } else
-      FATAL_ERROR("payload: descriptor not empty before assign — schema mismatch");
+      FatalError("payload: descriptor not empty before assign — schema mismatch");
   }
   return *this;
 }
@@ -195,8 +193,7 @@ const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
 
 void payload::setNullBitset(const std::vector<bool> &nullBitset) {
   if (nullBitset.size() != descriptor.size()) {
-    SPDLOG_ERROR("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}", nullBitset.size(), descriptor.size());
-    FATAL_ERROR("payload::setNullBitset: nullBitset size does not match descriptor size");
+    FatalError("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}", nullBitset.size(), descriptor.size());
   }
   nullBitset_ = nullBitset;
 }
@@ -236,8 +233,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
     if (destOffset + len > descriptor.getSizeInBytes()) {
-      SPDLOG_ERROR("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len, descriptor.getSizeInBytes());
-      FATAL_ERROR("payload::writeStringField: string field write out of descriptor bounds");
+      FatalError("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len, descriptor.getSizeInBytes());
     }
     std::fill(dest.begin(), dest.end(), 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
@@ -274,8 +270,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
       case rdb::RETMEMORY:
         break;
       default:
-        SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
-        FATAL_ERROR("payload::setItem: unsupported field type");
+        FatalError("payload::setItem: unsupported field type: {}", (int)requestedType);
     }
   } catch (const std::bad_any_cast &) {
     SPDLOG_ERROR("Error on payload::setItem");
@@ -304,8 +299,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptorCopy.getSizeInBytes();
     if (offsetFlat + len > descLen) {
-      SPDLOG_ERROR("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
-      FATAL_ERROR("payload::readStringField: field access out of descriptor bounds");
+      FatalError("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
     }
 
     for (auto i = 0; i < len; i++) {
@@ -342,8 +336,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
       return std::nullopt;
   }
 
-  SPDLOG_ERROR("Type not supported. {}", int(requestedType));
-  FATAL_ERROR("payload::getItem: unsupported field type");
+  FatalError("payload::getItem: unsupported field type: {}", int(requestedType));
 }
 
 // Friend operators
@@ -443,7 +436,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
-        if (!value.has_value()) FATAL_ERROR("payload: non-null array field returned no value for flat element");
+        if (!value.has_value()) FatalError("payload: non-null array field returned no value for flat element");
         writeValue(os, value.value(), r.rtype, rhs.hexFormat_);
         if (i < flatCountForField - 1) os << " ";
       }
