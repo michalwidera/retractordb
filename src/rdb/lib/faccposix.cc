@@ -5,9 +5,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <cassert>
 #include <cstring>
 #include <filesystem>
+#include "fatalError.hpp"
 namespace rdb {
 
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
@@ -16,7 +16,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     : filename_(std::string(fileName)),
       recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
-  assert(recordSize_ > 0);
+  if (recordSize_ == 0) FatalError("posixBinaryFile: record size must be > 0");
 
   std::error_code fs_ec;
   const bool fileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -25,11 +25,9 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
   }
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-  if (fd < 0)
-    SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-  else
-    SPDLOG_INFO("::open {} -> {}", filename_, fd);
-  assert(fd >= 0);
+  if (fd < 0) {
+    FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
+  }
 
   if (fd >= 0 && fileExisted) {
     const off_t fileSize = ::lseek(fd, 0, SEEK_END);
@@ -44,7 +42,6 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
           SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedSize, strerror(errno));
         }
       }
-      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedSize / recordSize_);
     }
   }
 }
@@ -61,14 +58,11 @@ posixBinaryFile::~posixBinaryFile() {
   }
 
   if (percounter_ >= 0) {
-    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
     std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
       SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
-    } else {
-      SPDLOG_INFO("Rotated file {} to {}", filename_, rotated_filename);
     }
   }
 }
@@ -89,8 +83,6 @@ size_t posixBinaryFile::count() {
 }
 
 ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  assert(recordSize_ != 0);
-  assert(fd >= 0);
   if (fd < 0) return errno;  // Error status
 
   if (ptrData == nullptr && position == 0) {
@@ -100,11 +92,9 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   }
   if (position == std::numeric_limits<size_t>::max()) {
     auto result = ::lseek(fd, 0, SEEK_END);
-    assert(result != -1);
     if (result == -1) return errno;  // Error status
   } else {
     auto result = ::lseek(fd, position, SEEK_SET);
-    assert(result != -1);
     if (result == -1) return errno;  // Error status
   }
   ssize_t sizesh(recordSize_);
@@ -118,7 +108,6 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
         SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
         return errno;
       }
-      assert(errno);
       return errno;  // Error status
     }
     retries = 0;  // Reset on successful write
@@ -130,8 +119,6 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
 
 ssize_t posixBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  assert(recordSize_ != 0);
-  assert(fd >= 0);
   if (fd < 0) return fd;
 
   constexpr int maxRetries = 5;

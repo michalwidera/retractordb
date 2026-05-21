@@ -17,15 +17,15 @@ namespace po = boost::program_options;
 
 static po::variables_map makeVM(std::vector<std::string> args) {
   po::options_description desc;
-  desc.add_options()          //
-      ("dot", "")             //
-      ("csv", "")             //
-      ("fields", "")          //
-      ("tags", "")            //
-      ("streamprogs", "")     //
-      ("rules", "")           //
-      ("hideruleprog", "")    //
-      ("transparent", "")     //
+  desc.add_options()        //
+      ("dot", "")           //
+      ("csv", "")           //
+      ("fields", "")        //
+      ("tags", "")          //
+      ("streamprogs", "")   //
+      ("rules", "")         //
+      ("hideruleprog", "")  //
+      ("transparent", "")   //
       ("diagram", po::value<std::string>(), "");
   po::variables_map vm;
   po::store(po::command_line_parser(args).options(desc).run(), vm);
@@ -60,7 +60,7 @@ TEST(presenter, default_mode_returns_success) {
   presenter p(coreInstance);
   auto vm = makeVM({});
   testing::internal::CaptureStdout();
-  int rc      = p.run(vm);
+  int rc          = p.run(vm);
   std::string out = testing::internal::GetCapturedStdout();
   EXPECT_EQ(rc, (int)boost::system::errc::success);
   EXPECT_NE(out.find("src1"), std::string::npos);
@@ -71,7 +71,7 @@ TEST(presenter, dot_mode_outputs_digraph) {
   presenter p(coreInstance);
   auto vm = makeVM({"--dot"});
   testing::internal::CaptureStdout();
-  int rc      = p.run(vm);
+  int rc          = p.run(vm);
   std::string out = testing::internal::GetCapturedStdout();
   EXPECT_EQ(rc, (int)boost::system::errc::success);
   EXPECT_NE(out.find("digraph"), std::string::npos);
@@ -83,7 +83,7 @@ TEST(presenter, dot_mode_with_fields) {
   presenter p(coreInstance);
   auto vm = makeVM({"--dot", "--fields"});
   testing::internal::CaptureStdout();
-  int rc      = p.run(vm);
+  int rc          = p.run(vm);
   std::string out = testing::internal::GetCapturedStdout();
   EXPECT_EQ(rc, (int)boost::system::errc::success);
   EXPECT_NE(out.find("digraph"), std::string::npos);
@@ -101,7 +101,7 @@ TEST(presenter, csv_mode_returns_success) {
   presenter p(coreInstance);
   auto vm = makeVM({"--csv"});
   testing::internal::CaptureStdout();
-  int rc      = p.run(vm);
+  int rc          = p.run(vm);
   std::string out = testing::internal::GetCapturedStdout();
   EXPECT_EQ(rc, (int)boost::system::errc::success);
   EXPECT_NE(out.find("id_ref"), std::string::npos);

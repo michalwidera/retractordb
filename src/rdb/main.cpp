@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <boost/system/error_code.hpp>
-#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -142,7 +141,6 @@ int main(int argc, char *argv[]) {
         dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam, storagePolicy);
       } else
         dacc = std::make_unique<rdb::storage>(file, file, storageParam, storagePolicy);
-      assert(dacc != nullptr);
       if (dacc->descriptorFileExist()) {
         dacc->attachDescriptor();  // we are sure here that descriptor file exist
       } else {

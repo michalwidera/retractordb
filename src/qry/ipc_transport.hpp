@@ -11,7 +11,7 @@ class IpcTransport {
  public:
   std::atomic<bool> done{false};
 
-  boost::property_tree::ptree netClient(const std::string& cmd, const std::string& arg);
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg);
   void producer();
-  bool popQueue(boost::property_tree::ptree& pt);
+  bool popQueue(boost::property_tree::ptree &pt);
 };

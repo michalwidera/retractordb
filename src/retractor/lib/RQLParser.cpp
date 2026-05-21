@@ -15,6 +15,7 @@
 #include ".antlr/RQLParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "constants.hpp"
+#include "fatalError.hpp"
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
 
@@ -117,7 +118,10 @@ class ParserListener : public RQLBaseListener {
   void exitExpString(RQLParser::ExpStringContext *ctx) {
     auto text = ctx->getText();
     // Strip surrounding single quotes
-    if (text.size() >= 2) { text.erase(text.size() - 1); text.erase(0, 1); }
+    if (text.size() >= 2) {
+      text.erase(text.size() - 1);
+      text.erase(0, 1);
+    }
     program.push_back(token(PUSH_VAL, rdb::descFldVT(text)));
   }
   //  void exitExpRational(RQLParser::ExpRationalContext *ctx) { program.push_back(token(PUSH_VAL, rationalResult)); }
@@ -187,7 +191,7 @@ class ParserListener : public RQLBaseListener {
   void exitFraction(RQLParser::FractionContext *ctx) {
     const int nom = std::stoi(ctx->children[0]->getText());
     const int den = std::stoi(ctx->children[2]->getText());
-    assert(den != 0);
+    if (den == 0) FatalError("RQLParser::exitFraction: denominator is zero");
     rationalResult = boost::rational<int>(nom, den);
   }
 
@@ -217,15 +221,13 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      SPDLOG_INFO("Select filename set to: {}", qry.filename);
-      assert(qry.filename.size() > 0 && "Directive must not be empty!");
+      if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
     }
 
     if (ctx->STORAGE()) {
       qry.storage_policy = ctx->type_name->getText();
       std::transform(qry.storage_policy.begin(), qry.storage_policy.end(), qry.storage_policy.begin(),
                      ::toupper);  // to upper case
-      SPDLOG_INFO("Select storage policy set to: {}", qry.storage_policy);
     }
 
     coreInstance.push_back(qry);
@@ -323,7 +325,7 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    assert(qry.filename.size() > 0 && "Directive must not be empty!");
+    if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
 
     // Add / at the end of path, if not present in case of STORAGE
     if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
@@ -356,15 +358,17 @@ class ParserListener : public RQLBaseListener {
 
   void exitExpression(RQLParser::ExpressionContext *ctx) {
     auto outType = rdb::INTEGER;
-    int  outLen  = 4;
-    int  outArr  = 1;
+    int outLen   = 4;
+    int outArr   = 1;
     for (auto it = program.begin(); it != program.end(); ++it) {
       if ((it->getCommandID() == CALL || it->getCommandID() == CALL2) && it->getStr_() == "to_string") {
-        outType = rdb::STRING; outLen = 1;
+        outType = rdb::STRING;
+        outLen  = 1;
         break;
       }
       if (it->getCommandID() == PUSH_VAL && it->getVT().index() == rdb::STRING) {
-        outType = rdb::STRING; outLen = 1;
+        outType = rdb::STRING;
+        outLen  = 1;
         break;
       }
     }
@@ -384,8 +388,13 @@ class ParserListener : public RQLBaseListener {
       auto &last = program.back();
       if (last.getCommandID() == CALL) {
         auto fn = last.getStr_();
-        if (fn == "to_float")  { outType = rdb::FLOAT;   outLen = 4; }
-        else if (fn == "to_double") { outType = rdb::DOUBLE;  outLen = 8; }
+        if (fn == "to_float") {
+          outType = rdb::FLOAT;
+          outLen  = 4;
+        } else if (fn == "to_double") {
+          outType = rdb::DOUBLE;
+          outLen  = 8;
+        }
       }
     }
     qry.lSchema.push_back(

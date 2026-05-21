@@ -3,13 +3,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string_view>
+#include "fatalError.hpp"
 
 namespace rdb {
 
@@ -90,7 +90,6 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
-      SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount_ = vec_.back()->count();
     }
   }
@@ -122,15 +121,15 @@ ssize_t groupFile<T>::purge() {
   vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
 
   spdlog::info("Purged all segments and reset group state.");
-  assert(vec_.size() == 1 && "After purge, there should be only one segment left.");
-  assert(vec_[0]->count() == 0 && "After purge, the segment should be empty.");
+  if (vec_.size() != 1) FatalError("fagrp::purge: expected exactly one segment after purge");
+  if (vec_[0]->count() != 0) FatalError("fagrp::purge: segment is not empty after purge");
 
   return EXIT_SUCCESS;
 }
 
 template <typename T>
 ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
-  assert(recordSize_ != 0);
+  if (recordSize_ == 0) FatalError("groupFile::write: recordSize_ is zero");
 
   if (ptrData == nullptr && position == 0) {
     return purge();
@@ -138,7 +137,7 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
 
   if (retention_.noRetention()) return static_cast<FileInterface *>(vec_[0].get())->write(ptrData, nullBitset, position);
 
-  assert(retention_.capacity != 0);
+  if (retention_.capacity == 0) FatalError("groupFile::write: retention capacity is zero");
 
   if (position == std::numeric_limits<size_t>::max()) {
     if (writeCount_ >= retention_.capacity) {
@@ -154,7 +153,7 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
         if (std::filesystem::exists(segmentToRemove + ".shadow")) std::filesystem::remove(segmentToRemove + ".shadow");
         vec_.erase(vec_.begin());
         removedSegments_++;
-        assert(vec_.size() > 0);
+        if (vec_.empty()) FatalError("groupFile::write: no segments remain after removing oldest");
       }
     }
     const auto rc =
@@ -178,10 +177,10 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
 
 template <typename T>
 ssize_t groupFile<T>::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
-  assert(recordSize_ != 0);
+  if (recordSize_ == 0) FatalError("groupFile::read: recordSize_ is zero");
   if (retention_.noRetention()) return static_cast<FileInterface *>(vec_[0].get())->read(ptrData, nullBitset, position);
 
-  assert(retention_.capacity != 0);
+  if (retention_.capacity == 0) FatalError("groupFile::read: retention capacity is zero");
 
   auto segmentIndex      = position / retention_.capacity;
   auto positionInSegment = position % retention_.capacity;

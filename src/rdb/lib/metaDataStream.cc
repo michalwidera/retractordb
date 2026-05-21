@@ -95,7 +95,7 @@ void metaDataStream::flushCurrentEntry() {
     } else {
       appendEntry(currentEntry_);
     }
-    committedRecordCount_    += currentEntry_.recordCount;
+    committedRecordCount_ += currentEntry_.recordCount;
     pendingCommittedCount_    = currentEntry_.recordCount;
     currentEntry_.recordCount = 0;
   }
@@ -166,7 +166,7 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
   const size_t eSize       = entrySize();
   const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
   if (payloadSize % eSize != 0) {
-    SPDLOG_DEBUG("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, eSize);
+    SPDLOG_WARN("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, eSize);
   }
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
@@ -269,10 +269,10 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
   if (currentEntry_.nullBitset == nullBitsetParam && (currentEntry_.recordCount > 0 || pendingCommittedCount_ > 0)) {
     if (currentEntry_.recordCount == 0) {
       // Last entry was flushed to disk with same bitset — mark tail dirty for lazy overwrite on next flush.
-      tailDirty_                 = true;
-      currentEntry_.recordCount  = pendingCommittedCount_;
-      committedRecordCount_     -= pendingCommittedCount_;
-      pendingCommittedCount_     = 0;
+      tailDirty_                = true;
+      currentEntry_.recordCount = pendingCommittedCount_;
+      committedRecordCount_ -= pendingCommittedCount_;
+      pendingCommittedCount_ = 0;
     }
     currentEntry_.recordCount++;
   } else {
@@ -327,7 +327,7 @@ void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool
     }
 
     pendingCommittedCount_ = 0;
-    currentEntry_ = newCurrent;
+    currentEntry_          = newCurrent;
     return;
   }
 
@@ -425,8 +425,6 @@ void metaDataStream::reset() {
   pendingCommittedCount_ = 0;
   tailDirty_             = false;
   rewriteFile(std::vector<IndexRecord>());
-
-  SPDLOG_DEBUG("metaDataStream reset - all entries cleared");
 }
 
 }  // namespace rdb

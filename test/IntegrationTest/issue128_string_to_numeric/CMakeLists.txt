@@ -2,12 +2,9 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-# Weryfikuje konwersję pól STRING do typów numerycznych
-# za pomocą funkcji to_integer(), to_float(), to_double().
-# Dane wejściowe: STRING "10", "25", "-5" →
-#   to_integer: 10, 25, -5
-#   to_float:   10, 25, -5
-#   to_double:  10, 25, -5
+# Weryfikuje konwersję pól STRING do typów numerycznych za pomocą funkcji
+# to_integer(), to_float(), to_double(). Dane wejściowe: STRING "10", "25", "-5"
+# → to_integer: 10, 25, -5 to_float:   10, 25, -5 to_double:  10, 25, -5
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

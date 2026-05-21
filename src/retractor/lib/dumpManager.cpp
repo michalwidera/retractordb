@@ -5,25 +5,31 @@
 #include <sys/stat.h>
 
 #include <algorithm>  // std::min
-#include <cassert>
-#include <cstdlib>  // std::abs
+#include <cstdlib>    // std::abs
+#include <cstring>    // strerror
 #include <filesystem>
+
+#include "fatalError.hpp"
 
 #include "dataModel.hpp"
 
 extern dataModel *pProc;
 
 dumpTask::~dumpTask() {
-  if (fd != 0 && inBook) {
-    SPDLOG_INFO("dumpTask: Destroying task: {} and fd: {}", taskName, fd);
+  if (fd >= 0 && inBook) {
     ::close(fd);
   }
 }
 
 void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
-  assert(pProc != nullptr && "dumpManager::registerTask dataModel is not set");
-  assert(pProc->qSet.find(streamName) != pProc->qSet.end() && "dumpManager::registerTask streamName not found in dataModel");
-  assert(task.range.first <= task.range.second && "dumpManager::registerTask range.first must be <= range.second");
+  if (pProc == nullptr) FatalError("dumpManager::registerTask: dataModel pointer is null");
+  if (pProc->qSet.find(streamName) == pProc->qSet.end()) {
+    FatalError("dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
+  }
+  if (task.range.first > task.range.second) {
+    FatalError("dumpManager::registerTask: range.first {} > range.second {} for stream '{}'", task.range.first,
+               task.range.second, streamName);
+  }
 
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
   task.dumpedRecordsToGo                    = abs(task.range.second - task.range.first);
@@ -47,55 +53,51 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     for (auto i = 0; i < dumpHistoryCount; ++i) {
       auto payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
-      assert(resultSeek != -1);
+      if (resultSeek == -1) FatalError("dumpManager::registerTask: lseek failed during history dump");
       ssize_t write_count_result = ::write(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes());
-      assert(write_count_result > 0);
+      if (write_count_result <= 0) FatalError("dumpManager::registerTask: write failed during history dump");
     }
-    assert(task.dumpedRecordsToGo >= dumpHistoryCount);
+    if (task.dumpedRecordsToGo < dumpHistoryCount) {
+      FatalError("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
+                 dumpHistoryCount);
+    }
     task.dumpedRecordsToGo -= dumpHistoryCount;
   } else {
     task.delayDumpRecordsToGo = task.range.first;
   }
-  SPDLOG_INFO("DumpManager: registered dump task {} for stream {}, records to go: {}", task.taskName, streamName,
-              task.dumpedRecordsToGo);
 }
 
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
 
 void dumpManager::processStreamChunk(const std::string &streamName) {
-  SPDLOG_INFO("dumpManager::processStreamChunk for stream: {} task in book: {}", streamName, bookOfTasks[streamName].size());
-
-  assert(pProc != nullptr && "dumpManager::processStreamChunk dataModel is not set");
-  assert(pProc->qSet.find(streamName) != pProc->qSet.end() &&
-         "dumpManager::processStreamChunk streamName not found in dataModel");
-  assert(bookOfTasks.find(streamName) != bookOfTasks.end() &&
-         "dumpManager::processStreamChunk streamName not found in bookOfTasks");
+  if (pProc == nullptr) FatalError("dumpManager::processStreamChunk: dataModel pointer is null");
+  if (pProc->qSet.find(streamName) == pProc->qSet.end()) {
+    FatalError("dumpManager::processStreamChunk: stream '{}' not found in dataModel", streamName);
+  }
+  if (bookOfTasks.find(streamName) == bookOfTasks.end()) return;
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
   if (currentStreamCount == 0) return;  // nothing to dump
 
   auto payLoadPtr = pProc->getPayload(streamName);
 
-  assert(payLoadPtr->descriptor.getSizeInBytes() > 0 && "dumpManager::processStreamChunk payload descriptor size is zero");
-  assert(!payLoadPtr->span().empty() && "dumpManager::processStreamChunk payload data is null");
+  if (payLoadPtr->descriptor.getSizeInBytes() == 0)
+    FatalError("dumpManager::processStreamChunk: payload descriptor size is zero");
+  if (payLoadPtr->span().empty()) FatalError("dumpManager::processStreamChunk: payload data span is empty");
 
   // enumerate all tasks for this stream
   for (auto &task : bookOfTasks[streamName]) {
     if (task.dumpedRecordsToGo == 0) continue;  // already completed task - will be removed later
 
-    if (task.fd == 0) {
+    if (task.fd < 0) {
       SPDLOG_ERROR("dumpManager::processStreamChunk file descriptor is not set for stream: {}", streamName);
       continue;
     }
     auto dumpTaskCompleted = buildDumpChunk(task, payLoadPtr);
 
     if (dumpTaskCompleted) {
-      SPDLOG_INFO("DumpManager: completed dump task {} for stream {}", task.taskName, streamName);
       ::close(task.fd);
-      task.fd = 0;  // mark fd in task as closed
-    } else {
-      SPDLOG_INFO("DumpManager: continuing dump task {} for stream {}, records to go: {}", task.taskName, streamName,
-                  task.dumpedRecordsToGo);
+      task.fd = -1;  // mark fd in task as closed
     }
   }
 
@@ -105,24 +107,21 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
 }
 
 bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
-  assert(task.dumpedRecordsToGo >= 0 && "dumpManager::buildDumpChunk dumpedRecordsToGo is negative");
-  assert(task.delayDumpRecordsToGo >= 0 && "dumpManager::buildDumpChunk delayDumpRecordsToGo is negative");
-  assert(task.fd != 0 && "dumpManager::buildDumpChunk file descriptor is not set");
+  if (task.dumpedRecordsToGo < 0) FatalError("dumpManager::buildDumpChunk: dumpedRecordsToGo is negative");
+  if (task.delayDumpRecordsToGo < 0) FatalError("dumpManager::buildDumpChunk: delayDumpRecordsToGo is negative");
+  if (task.fd < 0) FatalError("dumpManager::buildDumpChunk: file descriptor is not set");
 
   // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
   if (task.delayDumpRecordsToGo != 0) {
-    SPDLOG_INFO("DumpManager: delaying dump for task {} by {} records", task.taskName, task.delayDumpRecordsToGo);
     task.delayDumpRecordsToGo--;
     return false;
   }
 
-  SPDLOG_INFO("::lseek dump with fd: {}", task.fd);
   auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
-  assert(resultSeek != -1);
+  if (resultSeek == -1) FatalError("dumpManager::buildDumpChunk: lseek to end failed");
 
-  SPDLOG_INFO("::write dump with fd: {}", task.fd);
   ssize_t write_count_result = ::write(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes());
-  assert(write_count_result > 0);
+  if (write_count_result <= 0) FatalError("dumpManager::buildDumpChunk: write failed");
 
   if (task.dumpedRecordsToGo > 0) {
     task.dumpedRecordsToGo--;
@@ -140,10 +139,14 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
   } else {
     auto ret = (retentionCounter[key]++) % retentionSize[key];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
-    assert(ret < retentionSize[key]);
+    if (ret >= retentionSize[key]) {
+      FatalError("dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'", ret, retentionSize[key],
+                 key);
+    }
   }
   int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
-  assert(fd >= 0);
-  SPDLOG_INFO("Created dump file: {} with fd: {}", std::string(filename), fd);
+  if (fd < 0) {
+    FatalError("dumpManager::createDumpFile: failed to open '{}': {}", filename.string(), strerror(errno));
+  }
   return std::make_pair(filename, fd);
 }

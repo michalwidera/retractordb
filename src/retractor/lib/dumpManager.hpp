@@ -20,7 +20,7 @@ struct dumpTask {
   // configuration
   int dumpedRecordsToGo{0};      // How many records left to dump - 0 close task
   std::string dumpFilename{""};  // name of dump file
-  int fd{0};                     // file descriptor Linux posix file handle
+  int fd{-1};                    // file descriptor Linux posix file handle
   int delayDumpRecordsToGo{0};   // How many records to delay the dump ( for range starting in future )
   bool inBook{false};            // is task in bookOfTasks
 

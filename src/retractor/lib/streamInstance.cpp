@@ -2,9 +2,10 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cassert>
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
+
+#include "fatalError.hpp"
 
 #include "expressionEvaluator.hpp"
 #include "persistentCounter.hpp"
@@ -15,7 +16,7 @@ extern std::unique_ptr<PersistentCounter> pCounterPtr;
 streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
     : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
-  assert(!qry.id.empty());
+  if (qry.id.empty()) FatalError("streamInstance: query id must not be empty");
 
   const auto storageName{qry.filename == "" ? qry.id : qry.filename};
 
@@ -61,7 +62,9 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
                                                   const int step,               //
                                                   const std::string &instance,  //
                                                   const int storedRecordCountDst) {
-  assert(step > 0);
+  if (step <= 0) {
+    FatalError("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
+  }
 
   // temporary alias for variable - for better understand what is happening here.
   const auto &source = outputPayload;
@@ -152,13 +155,14 @@ void fnOp(opType op, std::any value, std::any &valueRet) {
       valueRet = val1 / val2;
       break;
     default:
-      SPDLOG_ERROR("non supported opType");
-      assert(false);
+      FatalError("streamInstance::fnOp: unsupported opType");
   }
 }
 
 rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) {
-  assert(cmd == STREAM_MAX || cmd == STREAM_MIN || cmd == STREAM_SUM || cmd == STREAM_AVG);
+  if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
+    FatalError("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
+  }
 
   // First construct descriptor
   outputPayload->revRead(0);
@@ -173,9 +177,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
-    SPDLOG_INFO("Not supported aggregation on type");
-    assert(false);
-    return *(localPayload.get());  // uninitialized payload
+    FatalError("streamInstance: aggregation not supported for this field type");
   }
 
   // choose aggregate operation
@@ -200,9 +202,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(std::numeric_limits<double>::max());
         break;
       default:
-        SPDLOG_ERROR("Not supported aggregation type");
-        assert(false);
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
   if (cmd == STREAM_MAX) {
@@ -222,9 +222,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(std::numeric_limits<double>::min());
         break;
       default:
-        SPDLOG_ERROR("Not supported aggregation type");
-        assert(false);
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
   if (cmd == STREAM_SUM || cmd == STREAM_AVG) {
@@ -244,13 +242,11 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(0);
         break;
       default:
-        SPDLOG_ERROR("Not supported aggregation type");
-        assert(false);
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
 
-  assert(valueRet.has_value());
+  if (!valueRet.has_value()) FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
 
   auto item{0};
   auto validItemCount{0};
@@ -269,7 +265,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       case rdb::BYTE:
       case rdb::INTEGER:
       case rdb::UINT:
-        assert(false && "Should be casted to RATIONAL");
+        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
       case rdb::RATIONAL:
         fnOp<boost::rational<int>>(op, value, valueRet);
         break;
@@ -280,9 +276,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         fnOp<double>(op, value, valueRet);
         break;
       default:
-        SPDLOG_ERROR("Not supported aggregation type");
-        assert(false);
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
 
@@ -298,7 +292,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       case rdb::BYTE:
       case rdb::INTEGER:
       case rdb::UINT:
-        assert(false && "Should be casted to RATIONAL");
+        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
       case rdb::RATIONAL:
         fnOp<boost::rational<int>>(avgop, value, valueRet);
         break;
@@ -309,15 +303,14 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         fnOp<double>(avgop, value, valueRet);
         break;
       default:
-        SPDLOG_ERROR("Not supported aggregation type");
-        assert(false);
-        break;
+        FatalError("streamInstance: unsupported aggregation type");
     }
   }
 
   switch (maxType) {
     case rdb::BYTE: {
-      assert(valueRet.type() == typeid(boost::rational<int>));
+      if (valueRet.type() != typeid(boost::rational<int>))
+        FatalError("streamInstance: aggregation result must be rational at finalization");
       auto tobyte = std::any_cast<boost::rational<int>>(valueRet);
       if (tobyte > boost::rational<int>(std::numeric_limits<uint8_t>::max(), 1)) {
         valueRet = uint8_t(std::numeric_limits<uint8_t>::max());
@@ -328,7 +321,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::INTEGER: {
-      assert(valueRet.type() == typeid(boost::rational<int>));
+      if (valueRet.type() != typeid(boost::rational<int>))
+        FatalError("streamInstance: aggregation result must be rational at finalization");
       auto toint = std::any_cast<boost::rational<int>>(valueRet);
       if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
         valueRet = int(std::numeric_limits<int>::max());
@@ -339,7 +333,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::UINT: {
-      assert(valueRet.type() == typeid(boost::rational<int>));
+      if (valueRet.type() != typeid(boost::rational<int>))
+        FatalError("streamInstance: aggregation result must be rational at finalization");
       auto touint = std::any_cast<boost::rational<int>>(valueRet);
       if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
         valueRet = unsigned(std::numeric_limits<unsigned>::max());
@@ -355,9 +350,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     case rdb::DOUBLE:
       break;
     default:
-      SPDLOG_ERROR("Not supported aggregation type");
-      assert(false);
-      break;
+      FatalError("streamInstance: unsupported type in aggregation finalization");
   }
   auto postion{0};
   localPayload->setItem(postion, valueRet);
@@ -379,9 +372,11 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) {
 
     std::any result = std::visit([](auto &&arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
 
-    assert(result.has_value());
+    if (!result.has_value()) FatalError("streamInstance::constructOutputPayload: expression result has no value");
 
-    assert(program.field_.rtype == (outputPayload->descriptor[i]).rtype);
+    if (program.field_.rtype != (outputPayload->descriptor[i]).rtype) {
+      FatalError("streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i);
+    }
 
     cast<std::any> castAny;
     std::any value = castAny(result, (outputPayload->descriptor[i]).rtype);
@@ -396,16 +391,16 @@ bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = false; },                                 //
-                 [&retVal](uint8_t a) { retVal = (a != 0); },                                   //
-                 [&retVal](int a) { retVal = (a != 0); },                                       //
-                 [&retVal](unsigned a) { retVal = (a != 0); },                                  //
-                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                      //
-                 [&retVal](float a) { retVal = (a != 0); },                                     //
-                 [&retVal](double a) { retVal = (a != 0); },                                    //
-                 [&retVal](std::pair<int, int> a) { assert(false && "no support."); },          //
-                 [&retVal](std::pair<std::string, int> a) { assert(false && "no support."); },  //
-                 [&retVal](const std::string &a) { assert(false && "no support."); }            //
+                 [&retVal](std::monostate) { retVal = false; },                                                       //
+                 [&retVal](uint8_t a) { retVal = (a != 0); },                                                         //
+                 [&retVal](int a) { retVal = (a != 0); },                                                             //
+                 [&retVal](unsigned a) { retVal = (a != 0); },                                                        //
+                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                                            //
+                 [&retVal](float a) { retVal = (a != 0); },                                                           //
+                 [&retVal](double a) { retVal = (a != 0); },                                                          //
+                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },             //
+                 [&retVal](std::pair<std::string, int>) { FatalError("boolCast: pair<string,int> not supported"); },  //
+                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }                //
              },
              inVar);
 
@@ -416,17 +411,16 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
   rdb::payload payload(*outputPayload->getPayload());
 
   for (auto &r : qry.lRules) {
-    assert(!r.condition.empty());
-    assert(r.action == rule::DUMP || r.action == rule::SYSTEM);
+    if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
+    if (r.action != rule::DUMP && r.action != rule::SYSTEM)
+      FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
     auto condition = r.condition;
     expressionEvaluator expression;
     auto result = expression.eval(condition, &payload);
     if (boolCast(result)) {
       if (r.action == rule::DUMP) {
-        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
       } else if (r.action == rule::SYSTEM) {
-        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing system command: {}", r.systemCommand);
         auto ret = system(r.systemCommand.c_str());
         if (ret == -1) {
           SPDLOG_ERROR("system() call failed");

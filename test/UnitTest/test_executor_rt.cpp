@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <sstream>
-#include <iostream>
 #include <time.h>
 #include <unistd.h>
+#include <iostream>
+#include <sstream>
 
 #include "retractor/lib/executor_rt.hpp"
 
@@ -23,8 +23,7 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
   rtAbsoluteSleep(anchor, 0);
   clock_gettime(CLOCK_MONOTONIC, &after);
 
-  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 +
-                    (after.tv_nsec - before.tv_nsec) / 1'000'000;
+  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
   EXPECT_LT(elapsed_ms, 50);
 }
 
@@ -37,8 +36,7 @@ TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
   struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &after);
 
-  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 +
-                    (after.tv_nsec - before.tv_nsec) / 1'000'000;
+  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
   EXPECT_GE(elapsed_ms, 8);
   EXPECT_LT(elapsed_ms, 500);
 }
@@ -47,16 +45,15 @@ TEST(ExecutorRtSleepTest, NanosecondCarryOverDoesNotHang) {
   // anchor.tv_nsec near 1s boundary + 200ms interval → carry triggered
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
-  anchor.tv_sec  -= 100;
-  anchor.tv_nsec  = 900'000'000L;
+  anchor.tv_sec -= 100;
+  anchor.tv_nsec = 900'000'000L;
 
   struct timespec before{}, after{};
   clock_gettime(CLOCK_MONOTONIC, &before);
   rtAbsoluteSleep(anchor, 200);
   clock_gettime(CLOCK_MONOTONIC, &after);
 
-  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 +
-                    (after.tv_nsec - before.tv_nsec) / 1'000'000;
+  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
   EXPECT_LT(elapsed_ms, 50);
 }
 
@@ -73,8 +70,7 @@ TEST(ExecutorRtSleepTest, LargeIntervalNoCarryPastAnchor) {
   rtAbsoluteSleep(anchor, 1000);  // 1s from 10s-ago anchor = still 9s in past
   clock_gettime(CLOCK_MONOTONIC, &after);
 
-  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 +
-                    (after.tv_nsec - before.tv_nsec) / 1'000'000;
+  long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
   EXPECT_LT(elapsed_ms, 50);
 }
 
@@ -82,7 +78,7 @@ TEST(ExecutorRtSleepTest, LargeIntervalNoCarryPastAnchor) {
 
 TEST(ExecutorRtCheckTest, DoesNotCrashAndReturnsBool) {
   std::ostringstream captured;
-  auto* old = std::cout.rdbuf(captured.rdbuf());
+  auto *old   = std::cout.rdbuf(captured.rdbuf());
   bool result = rtCheckAndPrint();
   std::cout.rdbuf(old);
 
@@ -91,11 +87,11 @@ TEST(ExecutorRtCheckTest, DoesNotCrashAndReturnsBool) {
 
 TEST(ExecutorRtCheckTest, OutputContainsAllRequiredSections) {
   std::ostringstream captured;
-  auto* old = std::cout.rdbuf(captured.rdbuf());
+  auto *old = std::cout.rdbuf(captured.rdbuf());
   rtCheckAndPrint();
   std::cout.rdbuf(old);
 
-  const auto& out = captured.str();
+  const auto &out = captured.str();
   EXPECT_NE(out.find("RT requirements check"), std::string::npos);
   EXPECT_NE(out.find("CAP_SYS_NICE"), std::string::npos);
   EXPECT_NE(out.find("CAP_IPC_LOCK"), std::string::npos);
@@ -107,20 +103,19 @@ TEST(ExecutorRtCheckTest, OutputContainsAllRequiredSections) {
 
 TEST(ExecutorRtCheckTest, OutputUsesOkOrFailMarkers) {
   std::ostringstream captured;
-  auto* old = std::cout.rdbuf(captured.rdbuf());
+  auto *old = std::cout.rdbuf(captured.rdbuf());
   rtCheckAndPrint();
   std::cout.rdbuf(old);
 
-  const auto& out = captured.str();
-  bool hasMarker = out.find("[OK]") != std::string::npos ||
-                   out.find("[FAIL]") != std::string::npos ||
+  const auto &out = captured.str();
+  bool hasMarker  = out.find("[OK]") != std::string::npos || out.find("[FAIL]") != std::string::npos ||
                    out.find("[WARN]") != std::string::npos;
   EXPECT_TRUE(hasMarker);
 }
 
 TEST(ExecutorRtCheckTest, FalseReturnImpliesErrorInOutput) {
   std::ostringstream captured;
-  auto* old = std::cout.rdbuf(captured.rdbuf());
+  auto *old   = std::cout.rdbuf(captured.rdbuf());
   bool result = rtCheckAndPrint();
   std::cout.rdbuf(old);
 

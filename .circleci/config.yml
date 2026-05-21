@@ -2,6 +2,11 @@ version: 2.1
 
 # https://circleci.com/developer/machine/image/ubuntu-2204#image-tags
 
+parameters:
+  run_manual_arm:
+    type: boolean
+    default: false
+
 workflows:
   commit:
     jobs:
@@ -37,6 +42,11 @@ workflows:
       - build-ARM:
           requires:
             - build-release
+  manual-arm:
+    when: << pipeline.parameters.run_manual_arm >>
+    jobs:
+      - build-ARM
+
   nightly-partial:
     triggers:
       - schedule:
@@ -331,14 +341,12 @@ jobs:
       - check-skipci
       - prep-env:
           build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
       - conan-install:
           build_type: << parameters.build_type >>
-          build_param: --build missing
+          build_param: -s compiler.cppstd=23 -s:b compiler.cppstd=23 --build missing
       - conan-build:
           build_type: << parameters.build_type >>
-          build_param: --build missing
+          build_param: -s compiler.cppstd=23 -s:b compiler.cppstd=23 --build missing
       - run:
           name: Smoke test
           command: |

@@ -21,17 +21,19 @@ TEST(Rationalize, whole_number) { EXPECT_EQ(Rationalize(3.0), boost::rational<in
 TEST(nullFallbackValue, byte) { EXPECT_EQ(std::get<uint8_t>(nullFallbackValue(rdb::BYTE)), 0); }
 TEST(nullFallbackValue, integer) { EXPECT_EQ(std::get<int>(nullFallbackValue(rdb::INTEGER)), 0); }
 TEST(nullFallbackValue, uint) { EXPECT_EQ(std::get<unsigned>(nullFallbackValue(rdb::UINT)), 0u); }
-TEST(nullFallbackValue, rational) { EXPECT_EQ(std::get<boost::rational<int>>(nullFallbackValue(rdb::RATIONAL)), boost::rational<int>(0, 1)); }
+TEST(nullFallbackValue, rational) {
+  EXPECT_EQ(std::get<boost::rational<int>>(nullFallbackValue(rdb::RATIONAL)), boost::rational<int>(0, 1));
+}
 TEST(nullFallbackValue, float_type) { EXPECT_EQ(std::get<float>(nullFallbackValue(rdb::FLOAT)), 0.0f); }
 TEST(nullFallbackValue, double_type) { EXPECT_EQ(std::get<double>(nullFallbackValue(rdb::DOUBLE)), 0.0); }
 TEST(nullFallbackValue, intpair) {
-  using P = std::pair<int, int>;
+  using P  = std::pair<int, int>;
   P result = std::get<P>(nullFallbackValue(rdb::INTPAIR));
   P expected{0, 0};
   EXPECT_EQ(result, expected);
 }
 TEST(nullFallbackValue, idxpair) {
-  using P = std::pair<std::string, int>;
+  using P  = std::pair<std::string, int>;
   P result = std::get<P>(nullFallbackValue(rdb::IDXPAIR));
   P expected{"", 0};
   EXPECT_EQ(result, expected);

@@ -1,10 +1,10 @@
 #include "rdb/faccfs.hpp"
 
-#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <limits>
 #include <memory>
+#include "fatalError.hpp"
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -39,31 +39,26 @@ size_t genericBinaryFile::count() {
 }
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  assert(recordSize_ != 0);
+  if (recordSize_ == 0) FatalError("genericBinaryFile::write: recordSize_ is zero");
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   if (ptrData == nullptr && recordSize_ == 0 && position == 0) {
     myFile.open(filename_, std::ofstream::out | std::ofstream::trunc);
-    assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.close();
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
     myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
-    assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     // Note: no seekp here!
   } else {
     myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
-    assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.seekp(position);
-    assert((myFile.rdstate() & std::ofstream::failbit) == 0);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   }
   myFile.write(static_cast<const char *>(static_cast<const void *>(ptrData)), recordSize_);
-  assert((myFile.rdstate() & std::ofstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;
@@ -71,17 +66,14 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
 
 ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  assert(recordSize_ != 0);
+  if (recordSize_ == 0) FatalError("genericBinaryFile::read: recordSize_ is zero");
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename_, std::ios::in | std::ios::binary);
-  assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.seekg(position);
-  assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.read(static_cast<char *>(static_cast<void *>(ptrData)), recordSize_);
-  assert((myFile.rdstate() & std::ifstream::failbit) == 0);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;

@@ -3,9 +3,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
 #include <sstream>
 #include <stdexcept>
+
+#include "fatalError.hpp"
 
 using namespace boost;
 
@@ -64,8 +65,7 @@ void qTree::dumpCore() {
       else if (nName == vcols[3])
         size = it.id.length();
       else {
-        assert(false && "wrong caption in dumpCore");
-        abort();
+        FatalError("qTree::dumpCore: unknown column name");
       }
       if (maxSize < size) maxSize = size;
     }
@@ -94,7 +94,9 @@ void qTree::dumpCore() {
 std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
-    assert(it.rInterval != 0);  // :STORAGE has created ugly error here
+    if (it.rInterval == 0) {
+      FatalError("qTree: query '{}' rInterval is zero — check :STORAGE directive", it.id);
+    }
     if (it.isCompilerDirective()) continue;
     lstTimeIntervals.insert(it.rInterval);
   }
@@ -102,7 +104,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 }
 
 query &qTree::getQuery(const std::string &query_name) {
-  assert(query_name != "");
+  if (query_name.empty()) FatalError("qTree::getQuery: query name is empty");
 
   auto it = std::find_if(begin(), end(), [query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {

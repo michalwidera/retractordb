@@ -20,13 +20,12 @@ class qry {
   formatMode outputFormatMode{formatMode::RAW};
 
   qry();
-  bool select(boost::program_options::variables_map& vm, const int, const std::string&,
-              std::tuple<int, int, int>);
-  bool adhoc(const std::string&);
+  bool select(boost::program_options::variables_map &vm, const int, const std::string &, std::tuple<int, int, int>);
+  bool adhoc(const std::string &);
   std::string dir();
   std::string dirYaml();
   int hello();
-  std::string detailShow(const std::string&);
-  virtual boost::property_tree::ptree netClient(const std::string&, const std::string&);
+  std::string detailShow(const std::string &);
+  virtual boost::property_tree::ptree netClient(const std::string &, const std::string &);
   virtual ~qry();
 };

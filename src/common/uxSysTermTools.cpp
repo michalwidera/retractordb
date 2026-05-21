@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <iostream>  //remove it with std::
 #include <string>
+#include "fatalError.hpp"
 
 int _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return 0;
@@ -57,7 +58,7 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
   fs::path tmp;
 
   const auto loggerFileSole = fs::path(loggerFile).filename();
-  assert(!loggerFileSole.empty());
+  if (loggerFileSole.empty()) FatalError("setupLoggerMain: loggerFile path has empty filename component");
 
   // Functional description: system first checks if in current folder
   // there is temp folder - if found we stop looking and temp folder became log folder
@@ -79,7 +80,7 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
 
   if (tmp.empty()) tmp = fs::temp_directory_path();
 
-  assert(!tmp.empty());
+  if (tmp.empty()) FatalError("setupLoggerMain: could not find a temporary directory for log file");
 
   tmp.append(loggerFileSole.string());
 

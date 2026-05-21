@@ -15,7 +15,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
-static std::string rtReadFile(const char* path) {
+static std::string rtReadFile(const char *path) {
   std::ifstream f(path);
   if (!f) return {};
   std::string v;
@@ -37,13 +37,13 @@ static uint64_t rtEffectiveCapabilities() {
 }
 
 bool rtCheckAndPrint() {
-  const uint64_t caps    = rtEffectiveCapabilities();
-  const bool isRoot      = (geteuid() == 0);
-  const bool hasSysNice  = isRoot || ((caps >> 23) & 1u);  // CAP_SYS_NICE
-  const bool hasIpcLock  = isRoot || ((caps >> 14) & 1u);  // CAP_IPC_LOCK
+  const uint64_t caps   = rtEffectiveCapabilities();
+  const bool isRoot     = (geteuid() == 0);
+  const bool hasSysNice = isRoot || ((caps >> 23) & 1u);  // CAP_SYS_NICE
+  const bool hasIpcLock = isRoot || ((caps >> 14) & 1u);  // CAP_IPC_LOCK
 
-  const std::string rtKernelVal   = rtReadFile("/sys/kernel/realtime");
-  const bool hasRTKernel          = (rtKernelVal == "1");
+  const std::string rtKernelVal = rtReadFile("/sys/kernel/realtime");
+  const bool hasRTKernel        = (rtKernelVal == "1");
 
   const std::string rtThrottleVal = rtReadFile("/proc/sys/kernel/sched_rt_runtime_us");
   const bool rtThrottleOff        = (rtThrottleVal == "-1");
@@ -52,26 +52,25 @@ bool rtCheckAndPrint() {
   getrlimit(RLIMIT_MEMLOCK, &memlockRl);
   const bool memlockUnlimited = (memlockRl.rlim_cur == RLIM_INFINITY);
 
-  const int curPolicy      = sched_getscheduler(0);
-  const char* policyName   = (curPolicy == SCHED_FIFO)    ? "SCHED_FIFO"
-                             : (curPolicy == SCHED_RR)    ? "SCHED_RR"
-                             : (curPolicy == SCHED_OTHER) ? "SCHED_OTHER"
-                                                          : "unknown";
+  const int curPolicy    = sched_getscheduler(0);
+  const char *policyName = (curPolicy == SCHED_FIFO)    ? "SCHED_FIFO"
+                           : (curPolicy == SCHED_RR)    ? "SCHED_RR"
+                           : (curPolicy == SCHED_OTHER) ? "SCHED_OTHER"
+                                                        : "unknown";
 
   auto ok  = [](bool v) { return v ? "[OK]  " : "[FAIL]"; };
   auto rec = [](bool v) { return v ? "[OK]  " : "[WARN]"; };
 
   std::cout << "\n=== RT requirements check ===\n";
-  std::cout << ok(hasSysNice)        << " CAP_SYS_NICE / root        — required for SCHED_FIFO\n";
-  std::cout << ok(hasIpcLock)        << " CAP_IPC_LOCK / root        — required for mlockall\n";
-  std::cout << rec(hasRTKernel)      << " PREEMPT_RT kernel          — /sys/kernel/realtime="
-            << (rtKernelVal.empty() ? "missing" : rtKernelVal) << "\n";
-  std::cout << rec(rtThrottleOff)    << " RT throttling disabled     — sched_rt_runtime_us="
-            << (rtThrottleVal.empty() ? "missing" : rtThrottleVal)
+  std::cout << ok(hasSysNice) << " CAP_SYS_NICE / root        — required for SCHED_FIFO\n";
+  std::cout << ok(hasIpcLock) << " CAP_IPC_LOCK / root        — required for mlockall\n";
+  std::cout << rec(hasRTKernel)
+            << " PREEMPT_RT kernel          — /sys/kernel/realtime=" << (rtKernelVal.empty() ? "missing" : rtKernelVal) << "\n";
+  std::cout << rec(rtThrottleOff)
+            << " RT throttling disabled     — sched_rt_runtime_us=" << (rtThrottleVal.empty() ? "missing" : rtThrottleVal)
             << (rtThrottleOff ? "" : "  (set to -1 to disable throttling)") << "\n";
   std::cout << rec(memlockUnlimited) << " RLIMIT_MEMLOCK unlimited   — cur="
-            << (memlockRl.rlim_cur == RLIM_INFINITY ? "unlimited"
-                                                    : std::to_string(memlockRl.rlim_cur) + " bytes") << "\n";
+            << (memlockRl.rlim_cur == RLIM_INFINITY ? "unlimited" : std::to_string(memlockRl.rlim_cur) + " bytes") << "\n";
   std::cout << "      Current scheduler      — " << policyName << "\n";
   std::cout << "=============================\n\n";
 
@@ -82,8 +81,7 @@ bool rtCheckAndPrint() {
   if (!hasRTKernel)
     std::cout << "WARN:  Standard kernel detected. Install PREEMPT_RT patch for minimal jitter.\n"
               << "       e.g.: apt install linux-image-rt-amd64  (Debian/Ubuntu)\n\n";
-  if (!rtThrottleOff)
-    std::cout << "WARN:  RT throttling active. Disable: echo -1 > /proc/sys/kernel/sched_rt_runtime_us\n\n";
+  if (!rtThrottleOff) std::cout << "WARN:  RT throttling active. Disable: echo -1 > /proc/sys/kernel/sched_rt_runtime_us\n\n";
 
   return critical;
 }
@@ -99,16 +97,14 @@ bool rtActivate() {
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(errno));
     ok = false;
-  } else {
-    SPDLOG_INFO("RT mode active, SCHED_FIFO priority {}", sp.sched_priority);
   }
   return ok;
 }
 
-void rtAbsoluteSleep(const struct timespec& anchor, long interval_ms) {
-  long ns       = interval_ms * 1'000'000L;
+void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
+  long ns           = interval_ms * 1'000'000L;
   struct timespec t = anchor;
-  t.tv_sec  += ns / 1'000'000'000L;
+  t.tv_sec += ns / 1'000'000'000L;
   t.tv_nsec += ns % 1'000'000'000L;
   if (t.tv_nsec >= 1'000'000'000L) {
     t.tv_sec++;

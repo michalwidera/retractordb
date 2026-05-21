@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 project(xqry LANGUAGES CXX)
 
-set(SOURCES_QRY qryLauncher.cpp qry.cpp ipc_transport.cpp formatters.cpp ../common/uxSysTermTools.cpp)
+set(SOURCES_QRY qryLauncher.cpp qry.cpp ipc_transport.cpp formatters.cpp
+                ../common/uxSysTermTools.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_QRY})
 

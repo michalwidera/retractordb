@@ -3,11 +3,11 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <cassert>
 #include <chrono>
 #include <iostream>
 #include <sstream>
 #include <thread>
+#include "fatalError.hpp"
 
 #include <spdlog/spdlog.h>
 #include <boost/system/system_error.hpp>
@@ -23,19 +23,18 @@ using boost::property_tree::ptree;
 qry::qry() : transport_(std::make_unique<IpcTransport>()), formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 
-ptree qry::netClient(const std::string& cmd, const std::string& arg) {
-  return transport_->netClient(cmd, arg);
-}
+ptree qry::netClient(const std::string &cmd, const std::string &arg) { return transport_->netClient(cmd, arg); }
 
-bool qry::adhoc(const std::string& sAdhoc) {
-  assert(sAdhoc != "");
+bool qry::adhoc(const std::string &sAdhoc) {
+  if (sAdhoc.empty()) {
+    SPDLOG_ERROR("qry::adhoc: adhoc query string must not be empty");
+    return system::errc::protocol_error;
+  }
   ptree pt = netClient("adhoc", sAdhoc);
-  SPDLOG_INFO("snd: adhoc {}", sAdhoc.c_str());
 
   std::string rcv("fail.");
-  for (auto& [first, second] : pt) {
+  for (auto &[first, second] : pt) {
     rcv = second.get<std::string>("");
-    SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
 
   if (rcv != "OK") {
@@ -45,14 +44,14 @@ bool qry::adhoc(const std::string& sAdhoc) {
   return system::errc::success;
 }
 
-bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit,
-                 const std::string& input, std::tuple<int, int, int> gnuplotDim) {
+bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
+                 std::tuple<int, int, int> gnuplotDim) {
   timeLimitCntQry = (iTimeLimit > 0) ? iTimeLimit + 1 : iTimeLimit;
   ptree pt        = netClient("get", "");
 
   const auto stream = pt.get_child("db.stream");
-  const bool found  = std::any_of(stream.begin(), stream.end(), [input, this](const auto& node) {
-    const ptree& v = node.second;
+  const bool found  = std::any_of(stream.begin(), stream.end(), [input, this](const auto &node) {
+    const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[input] = netClient("show", input);
     return ret;
@@ -80,7 +79,6 @@ bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit
       if (timeLimitCntQry == 1) {
         if (vm.count("kill")) {
           netClient("kill", "");
-          SPDLOG_INFO("Time limit reached - exiting (kill on end).");
           transport_->done = true;
         }
         break;
@@ -92,7 +90,7 @@ bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit
           transport_->done = true;
           break;
         }
-        for (auto& [w, k] : streamTable)
+        for (auto &[w, k] : streamTable)
           if (w == streamN) {
             const int count = std::stoi(e_value.get("count", ""));
             if (outputFormatMode == formatMode::RAW)
@@ -130,12 +128,10 @@ bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit
 
 int qry::hello() {
   ptree pt = netClient("hello", "");
-  SPDLOG_INFO("snd: hello");
 
   std::string rcv("fail.");
-  for (auto& [first, second] : pt) {
+  for (auto &[first, second] : pt) {
     rcv = second.get<std::string>("");
-    SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
   if (rcv != "world") {
     SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
@@ -150,7 +146,7 @@ std::string qry::dirYaml() {
 
   retval << "---\napiVersion: xqry/v1\n";
   retval << "streams:\n";
-  for (const auto& v : pt.get_child("db.stream")) {
+  for (const auto &v : pt.get_child("db.stream")) {
     auto location = v.second.get<std::string>("location");
     auto size     = v.second.get<std::string>("size");
 
@@ -171,22 +167,20 @@ std::string qry::dir() {
   std::stringstream ss;
   for (auto nName : vcols) {
     auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto& node1, const auto& node2) {
-      const ptree& v1 = node1.second;
-      const ptree& v2 = node2.second;
+    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto &node1, const auto &node2) {
+      const ptree &v1 = node1.second;
+      const ptree &v2 = node2.second;
       return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
     });
-    if (stream.size() == 1) assert(maxSizeIt == stream.begin());
     ss << "|%" << maxSizeIt->second.get<std::string>(nName).length() << "s";
   }
   ss << "|\n";
 
   char buffer[1024];
-  for (const auto& v : pt.get_child("db.stream")) {
-    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(),
-            v.second.get<std::string>("duration").c_str(), v.second.get<std::string>("size").c_str(),
-            v.second.get<std::string>("count").c_str(), v.second.get<std::string>("location").c_str(),
-            v.second.get<std::string>("cap").c_str());
+  for (const auto &v : pt.get_child("db.stream")) {
+    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
+            v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
+            v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
     retval << buffer;
   }
 
@@ -195,13 +189,13 @@ std::string qry::dir() {
 
 static const std::string indent = "  ";
 
-std::string qry::detailShow(const std::string& input) {
+std::string qry::detailShow(const std::string &input) {
   std::stringstream retval;
   ptree pt = netClient("get", "");
 
   const auto streams = pt.get_child("db.stream");
-  bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto& node) {
-    const ptree& v = node.second;
+  bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto &node) {
+    const ptree &v = node.second;
     return input == v.get<std::string>("");
   });
 
@@ -217,10 +211,9 @@ std::string qry::detailShow(const std::string& input) {
     retval << indent << "delta: " << delta.get_value<std::string>() << "\n";
     retval << "query: " << query.get_value<std::string>() << "\n";
     retval << "fields:\n";
-    for (const auto& v : ptsh.get_child("db.field")) {
+    for (const auto &v : ptsh.get_child("db.field")) {
       retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
-      retval << indent << indent
-             << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
+      retval << indent << indent << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
     }
   } else
     SPDLOG_ERROR("not found");

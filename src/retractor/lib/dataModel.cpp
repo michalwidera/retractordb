@@ -3,10 +3,11 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
+
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
+#include "fatalError.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -23,26 +24,20 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   // fetch all ':*' - and remove them from coreInstance
   //
 
-  assert(!coreInstance_.empty());
-  for (const auto &it : coreInstance_)
-    SPDLOG_INFO("query.id {}", it.id);
+  if (coreInstance_.empty()) FatalError("dataModel: coreInstance is empty — no queries to process");
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
       directive_[it.id] = it.filename;
-      SPDLOG_INFO("Assert - directive {}", directive_[it.id]);
-      assert(!directive_[it.id].empty());
+      if (directive_[it.id].empty()) {
+        FatalError("dataModel: compiler directive '{}' has empty value", it.id);
+      }
     }
 
   auto new_end = std::remove_if(coreInstance_.begin(), coreInstance_.end(),  //
                                 [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance_.erase(new_end, coreInstance_.end());
 
-  SPDLOG_INFO("!Storage path set to : {}", directive_[":STORAGE"]);
-  SPDLOG_INFO("!Substrat type is set: {}", directive_[":SUBSTRAT"]);
-  SPDLOG_INFO("!Rotation file is set: {}", directive_[":ROTATION"]);
-
-  SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
   for (auto const &[key, val] : qSet)
@@ -87,11 +82,15 @@ void dataModel::processZeroStep() {
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
 
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::empty);
+    if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::empty) {
+      FatalError("dataModel::processZeroStep: stream '{}' not in empty state at start of cycle", q.id);
+    }
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     qSet[q.id]->outputPayload->revRead(0);                            // state -> armed
     qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);
+    if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
+      FatalError("dataModel::processZeroStep: stream '{}' not armed after fire()", q.id);
+    }
   }
 }
 
@@ -118,15 +117,23 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
-    assert(qSet[q.id]->outputPayload->bufferState == rdb::sourceState::armed);  //
+    if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
+      FatalError("dataModel::processRows: stream '{}' not armed after processing", q.id);
+    }
   }
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {
   auto qry = coreInstance_[instance];
 
-  assert(qry.lProgram.size() < 4 && "all stream programs must be after optimization");
-  assert(qry.lProgram.size() > 0 && "constructInputPayload does not process declarations");
+  if (qry.lProgram.size() >= 4) {
+    FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4",
+               qry.lProgram.size(), instance);
+  }
+  if (qry.lProgram.empty()) {
+    FatalError("dataModel::constructInputPayload: empty program for query '{}' — declarations should not be processed here",
+               instance);
+  }
 
   std::vector<token> arg;
   std::copy(qry.lProgram.begin(), qry.lProgram.end(), std::back_inserter(arg));
@@ -139,7 +146,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
     case PUSH_STREAM: {
       // 	:- PUSH_STREAM(core0)
       //
-      assert(arg.size() == 1);
+      if (arg.size() != 1) FatalError("dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
 
       const auto nameSrc = operation.getStr_();
 
@@ -149,7 +156,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // 	:- PUSH_STREAM(core0)
       //  :- STREAM_TIMEMOVE(1)
       //
-      assert(arg.size() == 2);
+      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
 
       const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
@@ -162,18 +169,22 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_VAL(2/1)
       //  :- STREAM_DEHASH_MOD
       //
-      assert(arg.size() == 3);
+      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
 
-      assert(rationalArgument > 0);
+      if (rationalArgument <= 0) {
+        FatalError("dataModel::constructInputPayload: DEHASH rational argument must be positive");
+      }
 
-      int timeOffset = -1;  // catch on assert(false);
+      int timeOffset = -1;
       if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
       if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
-      assert(timeOffset >= 0);
+      if (timeOffset < 0) {
+        FatalError("dataModel::constructInputPayload: DEHASH timeOffset must be non-negative, got {}", timeOffset);
+      }
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
     case STREAM_SUM:
@@ -188,7 +199,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_STREAM(core0)
       //  :- STREAM_SUBTRACT(1/2)
       //
-      assert(arg.size() == 2);
+      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
@@ -202,7 +213,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_ADD
       //
-      assert(arg.size() == 3);
+      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
 
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
@@ -216,11 +227,13 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
       //  :- STREAM_AGSE 2,3 -> window_step, window_length  (arg[1])
       //
-      assert(arg.size() == 2);
+      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
 
       const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
-      assert(step > 0);
+      if (step <= 0) {
+        FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
+      }
       const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
     } break;
@@ -229,7 +242,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
       //
-      assert(arg.size() == 3);
+      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
 
       const auto nameSrc1     = arg[0].getStr_();
       const auto nameSrc2     = arg[1].getStr_();
@@ -238,24 +251,13 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
 
-      SPDLOG_INFO("STREAM_HASH a:{}|{} b:{}|{} recordOffset {}",  //
-                  nameSrc1,
-                  boost::lexical_cast<std::string>(intervalSrc1),  //
-                  nameSrc2,                                        //
-                  boost::lexical_cast<std::string>(intervalSrc2),  //
-                  recordOffset);
-
       int retPosValue                 = 0;
       bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
       *(qSet[instance]->inputPayload) = *getPayload(direction ? nameSrc1 : nameSrc2, retPosValue);
 
-      SPDLOG_INFO("STREAM_HASH retPos:{} direction:{}", retPosValue, direction ? nameSrc1 : nameSrc2);
-
     } break;
     default:
-      SPDLOG_ERROR("Undefined command_id:{}", static_cast<int>(cmd));
-      assert(false && "Undefined command_id in constructInputPayload");
-      abort();
+      FatalError("dataModel::constructInputPayload: undefined command_id {}", static_cast<int>(cmd));
   }
 }
 
@@ -266,7 +268,9 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data());
-    assert(success);
+    if (!success) {
+      FatalError("dataModel::getRow: revRead failed for stream '{}' at timeOffset {}", instance, timeOffset);
+    }
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }

@@ -5,10 +5,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <cassert>
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include "fatalError.hpp"
 
 namespace rdb {
 
@@ -45,7 +45,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     : filename_(std::string(fileName)),
       recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
-  assert(recordSize_ > 0);
+  if (recordSize_ == 0) FatalError("posixBinaryFileWithShadow: record size must be > 0");
 
   std::error_code fs_ec;
   const bool mainFileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -60,18 +60,14 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   }
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-  if (fd < 0)
-    SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-  else
-    SPDLOG_INFO("::open {} -> {}", filename_, fd);
-  assert(fd >= 0);
+  if (fd < 0) {
+    FatalError("posixBinaryFileWithShadow: failed to open '{}' (fd={})", filename_, fd);
+  }
 
   fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-  if (fd_shadow < 0)
-    SPDLOG_ERROR("::open shadow {} -> {}", shadowName(), fd_shadow);
-  else
-    SPDLOG_INFO("::open shadow {} -> {}", shadowName(), fd_shadow);
-  assert(fd_shadow >= 0);
+  if (fd_shadow < 0) {
+    FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
+  }
 
   if (fd >= 0 && mainFileExisted) {
     const off_t mainSize = ::lseek(fd, 0, SEEK_END);
@@ -86,7 +82,6 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
           SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedMainSize, strerror(errno));
         }
       }
-      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedMainSize / recordSize_);
     }
   }
 
@@ -105,7 +100,6 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
                        strerror(errno));
         }
       }
-      SPDLOG_INFO("Restored {} with {} pending shadow entries", shadowName(), alignedShadowSize / entrySize);
     }
   }
 }
@@ -132,14 +126,11 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
   }
 
   if (percounter_ >= 0) {
-    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
     std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
       SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
-    } else {
-      SPDLOG_INFO("Rotated file {} to {}", filename_, rotated_filename);
     }
   }
 }
@@ -148,8 +139,6 @@ auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
 ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/,
                                          const size_t position) {
-  assert(recordSize_ != 0);
-  assert(fd >= 0);
   if (fd < 0) return errno;
 
   if (ptrData == nullptr && position == 0) {
@@ -162,7 +151,6 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   if (position == std::numeric_limits<size_t>::max()) {
     // Append → zapis do głównego pliku
     auto result = ::lseek(fd, 0, SEEK_END);
-    assert(result != -1);
     if (result == -1) return errno;
 
     ssize_t sizesh(recordSize_);
@@ -189,7 +177,6 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
 
   // Update → zapis do pliku cienia jako para (position, data)
   auto result = ::lseek(fd_shadow, 0, SEEK_END);
-  assert(result != -1);
   if (result == -1) return errno;
 
   // Zapisz pozycję
@@ -224,8 +211,6 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
 
 ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  assert(recordSize_ != 0);
-  assert(fd >= 0);
   if (fd < 0) return fd;
 
   // Najpierw szukaj w pliku cienia
@@ -296,7 +281,6 @@ ssize_t posixBinaryFileWithShadow::merge() {
     SPDLOG_ERROR("::ftruncate shadow {} failed: {}", shadowName(), strerror(errno));
     return EXIT_FAILURE;
   }
-  SPDLOG_INFO("Merged {} shadow entries into {}", numEntries, filename_);
   return EXIT_SUCCESS;
 }
 

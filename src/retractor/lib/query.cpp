@@ -5,9 +5,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
+
 #include <cctype>
 #include <stdexcept>
+#include "fatalError.hpp"
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
@@ -90,17 +91,11 @@ rdb::Descriptor query::descriptorStorage() {
 
   if (!isDeclaration()) {
     if (!retention.noRetention()) {
-      SPDLOG_INFO("descriptorStorage/Retention: {} {}", retention.segments, retention.capacity);
       retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
-    } else {
-      SPDLOG_INFO("descriptorStorage/Retention: Empty");
     }
     if (policy.second != 0) {
-      SPDLOG_INFO("descriptorStorage/Retention memory: {}", policy.second);
       retVal += rdb::Descriptor("", policy.second, 0, rdb::RETMEMORY);
       retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
-    } else {
-      SPDLOG_INFO("descriptorStorage/Retention memory: Empty");
     }
     return retVal;
   }
@@ -129,7 +124,6 @@ void query::fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &
 
 // TODO: remove Descriptor(a,b) and use Descriptor(a,b,c) here - strings are broken if not fix
 rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
-  SPDLOG_INFO("call query::descriptorFrom()");
   rdb::Descriptor retVal{};
   if (isDeclaration()) {
     retVal += descriptorStorage();
@@ -170,19 +164,19 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
-      assert(step > 0);
+      if (step <= 0) {
+        FatalError("query::descriptorFrom: AGSE step must be > 0, got: {}", step);
+      }
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
         retVal += rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
       }
     } break;
     default:
-      SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
-      assert(false);
+      FatalError("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
   }
 
   if (!retention.noRetention()) {
-    SPDLOG_INFO("descriptorFrom/Retention: {} {}", retention.segments, retention.capacity);
     retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
   }
   return retVal;
@@ -192,7 +186,9 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   auto eIt = prog.begin();
   std::string sArg1;
   std::string sArg2;
-  assert(prog.size() < 4);
+  if (prog.size() >= 4) {
+    FatalError("query::GetArgs: program too large — {} tokens, expected at most 3", prog.size());
+  }
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr_();  // 3

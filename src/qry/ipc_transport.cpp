@@ -3,11 +3,11 @@
 #include <unistd.h>
 
 #include <array>
-#include <cassert>
 #include <chrono>
 #include <cstring>
 #include <sstream>
 #include <thread>
+#include "fatalError.hpp"
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/allocators/allocator.hpp>
@@ -23,7 +23,7 @@
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-bool IpcTransport::popQueue(ptree& pt) { return spsc_queue_.pop(pt); }
+bool IpcTransport::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
 void IpcTransport::producer() {
   try {
@@ -49,13 +49,13 @@ void IpcTransport::producer() {
       while (!spsc_queue_.push(pt))
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-  } catch (IPC::interprocess_exception& e) {
+  } catch (IPC::interprocess_exception &e) {
     SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(getpid()));
     done = true;
   }
 }
 
-ptree IpcTransport::netClient(const std::string& netCommand, const std::string& netArgument) {
+ptree IpcTransport::netClient(const std::string &netCommand, const std::string &netArgument) {
   ptree pt_response;
   ptree pt_request;
   try {
@@ -79,9 +79,14 @@ ptree IpcTransport::netClient(const std::string& netCommand, const std::string& 
     write_info(request_stream, pt_request);
     mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
 
-    std::pair<IPCMap*, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
-    IPCMap* mymap                       = ret.first;
-    assert(mymap);
+    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
+    IPCMap *mymap                        = ret.first;
+    if (!mymap) {
+      SPDLOG_ERROR("ipc_transport: shared memory map 'MyMap' not found");
+      done = true;
+      pt_response.put("error.response", "server not found");
+      return pt_response;
+    }
 
     std::size_t processId = getpid();
     auto it               = mymap->end();
@@ -116,13 +121,13 @@ ptree IpcTransport::netClient(const std::string& netCommand, const std::string& 
       }
     }
     read_info(strstream, pt_response);
-  } catch (IPC::interprocess_exception& e) {
+  } catch (IPC::interprocess_exception &e) {
     done = true;
     throw;
-  } catch (boost::system::system_error& e) {
+  } catch (boost::system::system_error &e) {
     done = true;
     throw;
-  } catch (std::exception& e) {
+  } catch (std::exception &e) {
     pt_response.put("error.response", e.what());
     done = true;
     throw;

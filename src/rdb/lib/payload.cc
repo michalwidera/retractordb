@@ -7,11 +7,12 @@
 #include <algorithm>  // std::min, std::copy, std::fill
 #include <boost/rational.hpp>
 #include <boost/stacktrace.hpp>
-#include <cassert>
+
 #include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include "fatalError.hpp"
 
 #include "rdb/convertTypes.hpp"
 
@@ -29,22 +30,17 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
       SPDLOG_ERROR("Stack: {}", message.str());
       std::cerr << message.str() << std::endl;
     }
-    assert(false && "payload flat position out of range");
-    abort();
+    FatalError("payload: flat position out of range");
   }
 
   auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
   if (!positionOpt.has_value()) {
-    SPDLOG_ERROR("{} conversion failed for flat position {}", context, positionFlat);
-    assert(false && "payload flat conversion failed");
-    abort();
+    FatalError("payload: {} conversion failed for flat position {}", context, positionFlat);
   }
 
   const auto position = positionOpt->first;
   if (position < 0 || position >= static_cast<int>(descriptor.size())) {
-    SPDLOG_ERROR("{} converted index out of descriptor bounds: {}", context, position);
-    assert(false && "payload converted index out of range");
-    abort();
+    FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
   }
 
   return position;
@@ -92,7 +88,7 @@ void writeValue(std::ostream &os, const std::any &value, const descFld type, con
     case rdb::TYPE:
     case rdb::RETENTION:
     case rdb::RETMEMORY:
-      assert(false && "Configuration fields should not be formatted");
+      FatalError("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
       break;
   }
 }
@@ -157,7 +153,7 @@ payload &payload::operator=(const Descriptor &other) {
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
       // pass
     } else
-      assert(false && "Descriptor should be empty before this assign.");
+      FatalError("payload: descriptor not empty before assign — schema mismatch");
   }
   return *this;
 }
@@ -166,13 +162,9 @@ payload &payload::operator=(const Descriptor &other) {
 
 payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
-  descSum += other.descriptor;                    // ! moving this into constructor fails
-  descSum.removeConfigurationFields();            //
-  payload result(descSum);                        //
-  SPDLOG_INFO("operator+ {} {} {}",               //
-              descriptor.getSizeInBytes(),        //
-              other.descriptor.getSizeInBytes(),  //
-              result.descriptor.getSizeInBytes());
+  descSum += other.descriptor;          // ! moving this into constructor fails
+  descSum.removeConfigurationFields();  //
+  payload result(descSum);              //
   std::copy(span().begin(), span().end(), result.span().begin());
   std::copy(other.span().begin(), other.span().end(), result.span().subspan(descriptor.getSizeInBytes()).begin());
 
@@ -200,7 +192,9 @@ void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
 
 void payload::setNullBitset(const std::vector<bool> &nullBitset) {
-  assert(nullBitset.size() == descriptor.size());
+  if (nullBitset.size() != descriptor.size()) {
+    FatalError("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}", nullBitset.size(), descriptor.size());
+  }
   nullBitset_ = nullBitset;
 }
 
@@ -238,7 +232,10 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     auto lenr       = std::min(len, static_cast<int>(data.length()));
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
-    assert(destOffset + len <= descriptor.getSizeInBytes());
+    if (destOffset + len > descriptor.getSizeInBytes()) {
+      FatalError("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len,
+                 descriptor.getSizeInBytes());
+    }
     std::fill(dest.begin(), dest.end(), 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
   };
@@ -272,12 +269,9 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
       case rdb::TYPE:
       case rdb::RETENTION:
       case rdb::RETMEMORY:
-        SPDLOG_INFO("Skip configuration field type: {}", static_cast<int>(requestedType));
         break;
       default:
-        SPDLOG_ERROR("Type not supported: {}", (int)requestedType);
-        assert(false && "setItem - Type not supported.");
-        abort();
+        FatalError("payload::setItem: unsupported field type: {}", (int)requestedType);
     }
   } catch (const std::bad_any_cast &) {
     SPDLOG_ERROR("Error on payload::setItem");
@@ -305,7 +299,9 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     auto len       = descriptorCopy[position].rlen * descriptorCopy[position].rarray;
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptorCopy.getSizeInBytes();
-    assert(offsetFlat + len <= descLen);
+    if (offsetFlat + len > descLen) {
+      FatalError("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
+    }
 
     for (auto i = 0; i < len; i++) {
       if (fieldSpan[i] == 0) {
@@ -341,9 +337,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
       return std::nullopt;
   }
 
-  SPDLOG_ERROR("Type not supported. {}", int(requestedType));
-  assert(false && "type not supported on getter.");
-  return std::nullopt;
+  FatalError("payload::getItem: unsupported field type: {}", int(requestedType));
 }
 
 // Friend operators
@@ -395,7 +389,8 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
       else if (desc.fieldTypeName(fieldName) == "DOUBLE")
         copyToMemory<double>(is, rhs, fieldName, i * sizeof(double)), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "RATIONAL")
-        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)), rhs.nullBitset_[fieldIndex] = false;
+        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)),
+            rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "REF")
         SPDLOG_ERROR("REF store not supported by this operator.");
       else if (desc.fieldTypeName(fieldName) == "TYPE")
@@ -443,7 +438,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
-        assert(value.has_value() && "Non-null array field should yield a value for each flat element");
+        if (!value.has_value()) FatalError("payload: non-null array field returned no value for flat element");
         writeValue(os, value.value(), r.rtype, rhs.hexFormat_);
         if (i < flatCountForField - 1) os << " ";
       }
