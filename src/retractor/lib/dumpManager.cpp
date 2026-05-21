@@ -63,8 +63,7 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
   assert(pProc != nullptr && "dumpManager::processStreamChunk dataModel is not set");
   assert(pProc->qSet.find(streamName) != pProc->qSet.end() &&
          "dumpManager::processStreamChunk streamName not found in dataModel");
-  assert(bookOfTasks.find(streamName) != bookOfTasks.end() &&
-         "dumpManager::processStreamChunk streamName not found in bookOfTasks");
+  if (bookOfTasks.find(streamName) == bookOfTasks.end()) return;
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
   if (currentStreamCount == 0) return;  // nothing to dump
