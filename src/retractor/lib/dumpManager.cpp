@@ -15,8 +15,40 @@
 
 extern dataModel *pProc;
 
+dumpTask::dumpTask(dumpTask &&other) noexcept
+    : taskName(std::move(other.taskName)),
+      range(other.range),
+      retentionSize(other.retentionSize),
+      dumpedRecordsToGo(other.dumpedRecordsToGo),
+      dumpFilename(std::move(other.dumpFilename)),
+      fd(other.fd),
+      delayDumpRecordsToGo(other.delayDumpRecordsToGo) {
+  other.fd = -1;
+}
+
+dumpTask &dumpTask::operator=(dumpTask &&other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+
+  if (fd >= 0) {
+    ::close(fd);
+  }
+
+  taskName             = std::move(other.taskName);
+  range                = other.range;
+  retentionSize        = other.retentionSize;
+  dumpedRecordsToGo    = other.dumpedRecordsToGo;
+  dumpFilename         = std::move(other.dumpFilename);
+  fd                   = other.fd;
+  delayDumpRecordsToGo = other.delayDumpRecordsToGo;
+
+  other.fd = -1;
+  return *this;
+}
+
 dumpTask::~dumpTask() {
-  if (fd >= 0 && inBook) {
+  if (fd >= 0) {
     ::close(fd);
   }
 }
@@ -37,8 +69,6 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   if (bookOfTasks[streamName].capacity() == 0) {
     bookOfTasks[streamName].set_capacity(task.retentionSize > 0 ? task.retentionSize : 1);
   }
-  bookOfTasks[streamName].push_back(task);
-  bookOfTasks[streamName].back().inBook = true;
   // This push_back will overwrite oldest task if retentionSize is exceeded
   // Task destructor will close file descriptor if still open
 
@@ -65,6 +95,8 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   } else {
     task.delayDumpRecordsToGo = task.range.first;
   }
+
+  bookOfTasks[streamName].push_back(std::move(task));
 }
 
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }

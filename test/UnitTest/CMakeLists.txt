@@ -91,6 +91,9 @@ add_test(
   COMMAND
     sh -c
     "set -e ; \
+    rm -f core0.desc core1.desc str1.desc str2.desc str3.desc str4.desc ; \
+    rm -f str1 str1.meta str1.shadow str2 str2.meta str2.shadow str3 str3.meta str3.shadow str4 str4.meta str4.shadow ; \
+    rm -f out.txt out_compile.txt ; \
     ${CMAKE_BINARY_DIR}/src/retractor/xretractor ut_example_schema.rql -c > out_compile.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt")
 
@@ -98,8 +101,15 @@ add_test(
   NAME ut-dataModel-compare
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
   COMMAND
-    bash -c
-    "set -e ; ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
+    bash -c "set -e ; \
+    rm -f str1 str1.meta str1.shadow str2 str2.meta str2.shadow str3 str3.meta str3.shadow str4 str4.meta str4.shadow ; \
+    ${CMAKE_COMMAND} -E copy_if_different core0.desc.tpl core0.desc ; \
+    ${CMAKE_COMMAND} -E copy_if_different core1.desc.tpl core1.desc ; \
+    ${CMAKE_COMMAND} -E copy_if_different str1.desc.tpl str1.desc ; \
+    ${CMAKE_COMMAND} -E copy_if_different str2.desc.tpl str2.desc ; \
+    ${CMAKE_COMMAND} -E copy_if_different str3.desc.tpl str3.desc ; \
+    ${CMAKE_COMMAND} -E copy_if_different str4.desc.tpl str4.desc ; \
+    ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 set_tests_properties(
