@@ -4,11 +4,11 @@
 
 #include <algorithm>
 
-#include "fatalError.hpp"
 #include <cstring>  //std::memset
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "fatalError.hpp"
 
 namespace rdb {
 
@@ -201,7 +201,8 @@ void storage::resetForUnitTest() {
   }
 
   if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
+               storageFile_);
   }
 }
 
@@ -300,7 +301,8 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   auto result = 0;
 
   if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
+               storageFile_);
   }
 
   if (isHold_) {
@@ -346,8 +348,9 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
 
   if (!isDeclared()) {
     if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(), storageFile_);
-  }
+      FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
+                 storageFile_);
+    }
     const auto recordPositionFromBack = recordsCount_ - recordIndexFromBack - 1;
     return read(recordPositionFromBack, destination);
   }
@@ -393,7 +396,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // - also for recordIndex == 0
 
   if (recordIndexFromBack >= circularBuffer_.capacity()) {
-    FatalError("storage::revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in '{}'", recordIndexFromBack, circularBuffer_.capacity(), accessor_->name());
+    FatalError("storage::revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in '{}'", recordIndexFromBack,
+               circularBuffer_.capacity(), accessor_->name());
   }
 
   // in case of accessing buffer that has no data yet - zeros are returned
@@ -442,7 +446,8 @@ bool storage::write(const size_t recordIndex) {
   }
 
   if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
+               storageFile_);
   }
 
   auto size   = descriptor.getSizeInBytes();
@@ -473,8 +478,9 @@ bool storage::write(const size_t recordIndex) {
     if (metaDataStream_) metaDataStream_->onRecordModified(recordIndex, nullInfo);
 
     if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(), storageFile_);
-  }
+      FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
+                 storageFile_);
+    }
   }
   return result == 0;
 };
@@ -488,7 +494,6 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
   if (metaDataStream_) {
     metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
   }
-
 }
 
 boost::rational<int> storage::getSamplingInterval() const { return rInterval_; }

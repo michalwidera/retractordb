@@ -8,11 +8,11 @@
 #include <boost/rational.hpp>
 #include <boost/stacktrace.hpp>
 
-#include "fatalError.hpp"
 #include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include "fatalError.hpp"
 
 #include "rdb/convertTypes.hpp"
 
@@ -162,9 +162,9 @@ payload &payload::operator=(const Descriptor &other) {
 
 payload payload::operator+(const payload &other) {
   rdb::Descriptor descSum(descriptor);
-  descSum += other.descriptor;                    // ! moving this into constructor fails
-  descSum.removeConfigurationFields();            //
-  payload result(descSum);                        //
+  descSum += other.descriptor;          // ! moving this into constructor fails
+  descSum.removeConfigurationFields();  //
+  payload result(descSum);              //
   std::copy(span().begin(), span().end(), result.span().begin());
   std::copy(other.span().begin(), other.span().end(), result.span().subspan(descriptor.getSizeInBytes()).begin());
 
@@ -233,7 +233,8 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
     if (destOffset + len > descriptor.getSizeInBytes()) {
-      FatalError("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len, descriptor.getSizeInBytes());
+      FatalError("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len,
+                 descriptor.getSizeInBytes());
     }
     std::fill(dest.begin(), dest.end(), 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
@@ -388,7 +389,8 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
       else if (desc.fieldTypeName(fieldName) == "DOUBLE")
         copyToMemory<double>(is, rhs, fieldName, i * sizeof(double)), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "RATIONAL")
-        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)), rhs.nullBitset_[fieldIndex] = false;
+        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)),
+            rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "REF")
         SPDLOG_ERROR("REF store not supported by this operator.");
       else if (desc.fieldTypeName(fieldName) == "TYPE")

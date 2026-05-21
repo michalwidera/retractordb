@@ -95,7 +95,7 @@ void metaDataStream::flushCurrentEntry() {
     } else {
       appendEntry(currentEntry_);
     }
-    committedRecordCount_    += currentEntry_.recordCount;
+    committedRecordCount_ += currentEntry_.recordCount;
     pendingCommittedCount_    = currentEntry_.recordCount;
     currentEntry_.recordCount = 0;
   }
@@ -269,10 +269,10 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
   if (currentEntry_.nullBitset == nullBitsetParam && (currentEntry_.recordCount > 0 || pendingCommittedCount_ > 0)) {
     if (currentEntry_.recordCount == 0) {
       // Last entry was flushed to disk with same bitset — mark tail dirty for lazy overwrite on next flush.
-      tailDirty_                 = true;
-      currentEntry_.recordCount  = pendingCommittedCount_;
-      committedRecordCount_     -= pendingCommittedCount_;
-      pendingCommittedCount_     = 0;
+      tailDirty_                = true;
+      currentEntry_.recordCount = pendingCommittedCount_;
+      committedRecordCount_ -= pendingCommittedCount_;
+      pendingCommittedCount_ = 0;
     }
     currentEntry_.recordCount++;
   } else {
@@ -327,7 +327,7 @@ void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool
     }
 
     pendingCommittedCount_ = 0;
-    currentEntry_ = newCurrent;
+    currentEntry_          = newCurrent;
     return;
   }
 
@@ -425,7 +425,6 @@ void metaDataStream::reset() {
   pendingCommittedCount_ = 0;
   tailDirty_             = false;
   rewriteFile(std::vector<IndexRecord>());
-
 }
 
 }  // namespace rdb

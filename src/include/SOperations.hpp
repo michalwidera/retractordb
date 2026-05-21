@@ -16,8 +16,14 @@ constexpr int ceilR(boost::rational<int> const &num) {
 }
 
 inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {
-  if (deltaA <= 0) { std::cerr << "\nFATAL: Hash: deltaA must be > 0\n"; std::exit(EXIT_FAILURE); }
-  if (deltaB <= 0) { std::cerr << "\nFATAL: Hash: deltaB must be > 0\n"; std::exit(EXIT_FAILURE); }
+  if (deltaA <= 0) {
+    std::cerr << "\nFATAL: Hash: deltaA must be > 0\n";
+    std::exit(EXIT_FAILURE);
+  }
+  if (deltaB <= 0) {
+    std::cerr << "\nFATAL: Hash: deltaB must be > 0\n";
+    std::exit(EXIT_FAILURE);
+  }
   const rational<int> delta = (deltaA * deltaB) / (deltaA + deltaB);
   const rational<int> zet   = deltaB / (deltaA + deltaB);
   bool ret                  = floorR(zet * i) == floorR(zet * (i + 1));

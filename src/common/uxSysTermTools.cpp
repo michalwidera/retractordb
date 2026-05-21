@@ -9,9 +9,9 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
-#include "fatalError.hpp"
 #include <iostream>  //remove it with std::
 #include <string>
+#include "fatalError.hpp"
 
 int _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return 0;

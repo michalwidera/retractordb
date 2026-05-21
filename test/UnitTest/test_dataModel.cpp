@@ -310,13 +310,14 @@ std::unique_ptr<dataModel> dataArea_rules;
 class xschema_rules : public ::testing::Test {
  protected:
   xschema_rules() {
-    for (auto f : {"rule_marker1.txt", "rule_marker2.txt", "str_rule", "str_rule.desc", "rules_core0.desc", "datafile1.txt.desc"})
+    for (auto f :
+         {"rule_marker1.txt", "rule_marker2.txt", "str_rule", "str_rule.desc", "rules_core0.desc", "datafile1.txt.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
 
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_rules_schema.rql");
     dataArea_rules = std::make_unique<dataModel>(coreInstance);
-    pProc = dataArea_rules.get();
+    pProc          = dataArea_rules.get();
   }
   ~xschema_rules() override { pProc = nullptr; }
   void SetUp() override {}

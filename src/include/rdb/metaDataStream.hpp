@@ -137,10 +137,10 @@ class metaDataStream {
 
  private:
   void createNullBitsetTemplate();
-  void loadIndex();                                           ///< read header and restore currentEntry_ from file
-  void saveHeader();                                          ///< write file header (creation time) without entries
-  void appendEntry(const IndexRecord &entry);                 ///< append a single entry to end of file
-  void overwriteLastEntry(const IndexRecord &entry);          ///< overwrite the last committed entry in-place (for lazy RLE retract)
+  void loadIndex();                                   ///< read header and restore currentEntry_ from file
+  void saveHeader();                                  ///< write file header (creation time) without entries
+  void appendEntry(const IndexRecord &entry);         ///< append a single entry to end of file
+  void overwriteLastEntry(const IndexRecord &entry);  ///< overwrite the last committed entry in-place (for lazy RLE retract)
   void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
   std::vector<IndexRecord> readCommittedEntries() const;      ///< read all committed entries from file
 

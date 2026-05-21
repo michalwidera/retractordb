@@ -2,9 +2,9 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-# Weryfikuje konwersję typów numerycznych (INTEGER, FLOAT) do STRING
-# za pomocą funkcji to_string().
-# Dane wejściowe: INTEGER 42 i FLOAT 3.14 → STRING "42" i "3.140000".
+# Weryfikuje konwersję typów numerycznych (INTEGER, FLOAT) do STRING za pomocą
+# funkcji to_string(). Dane wejściowe: INTEGER 42 i FLOAT 3.14 → STRING "42" i
+# "3.140000".
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

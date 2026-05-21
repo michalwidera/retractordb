@@ -9,14 +9,14 @@
 
 using boost::property_tree::ptree;
 
-const std::vector<std::string> Formatter::colors_ = {"red",    "blue",    "green",  "orange", "purple",
-                                                      "brown",  "pink",    "yellow", "cyan",   "magenta"};
+const std::vector<std::string> Formatter::colors_ = {"red",   "blue", "green",  "orange", "purple",
+                                                     "brown", "pink", "yellow", "cyan",   "magenta"};
 
-bool Formatter::isNullAt(const std::string& nullmap, int index) {
+bool Formatter::isNullAt(const std::string &nullmap, int index) {
   return index >= 0 && index < static_cast<int>(nullmap.size()) && nullmap[index] == '1';
 }
 
-bool Formatter::isAllNull(const std::string& nullmap, int count) {
+bool Formatter::isAllNull(const std::string &nullmap, int count) {
   if (count <= 0) return false;
   for (int i = 0; i < count; i++) {
     if (!isNullAt(nullmap, i)) return false;
@@ -24,8 +24,7 @@ bool Formatter::isAllNull(const std::string& nullmap, int count) {
   return true;
 }
 
-std::string Formatter::displayedValue(const ptree& row, int index, const std::string& nullmap,
-                                      formatMode mode) {
+std::string Formatter::displayedValue(const ptree &row, int index, const std::string &nullmap, formatMode mode) {
   if (!isNullAt(nullmap, index)) return row.get(std::to_string(index), "");
   return mode == formatMode::GNUPLOT ? "NaN" : "null";
 }
@@ -40,26 +39,24 @@ void Formatter::initGnuplot(std::tuple<int, int, int> dim) {
   std::cout << "set view 60,30\n";
 }
 
-void Formatter::renderRaw(const ptree& row, int count, const std::string& nullmap, bool skipNull) {
+void Formatter::renderRaw(const ptree &row, int count, const std::string &nullmap, bool skipNull) {
   if (skipNull && isAllNull(nullmap, count)) return;
   for (int i = 0; i < count; i++)
     printf("%s ", displayedValue(row, i, nullmap, formatMode::RAW).c_str());
   printf("\r\n");
 }
 
-void Formatter::renderGnuplot(const ptree& row, int count, const std::string& nullmap,
-                               const std::string& input, const ptree& schema,
-                               std::tuple<int, int, int> dim) {
+void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nullmap, const std::string &input,
+                              const ptree &schema, std::tuple<int, int, int> dim) {
   if (static_cast<int>(gnuplot_lines_.size()) < count) gnuplot_lines_.resize(count);
 
   std::cout << "plot";
   int colIdx{0};
-  for (const auto& v : schema.get_child("db.field")) {
+  for (const auto &v : schema.get_child("db.field")) {
     if (colIdx != 0) std::cout << ",";
     auto columnName = v.second.get<std::string>("");
     std::replace(columnName.begin(), columnName.end(), '_', '-');
-    std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '"
-              << colors_[colIdx % colors_.size()] << "'";
+    std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors_[colIdx % colors_.size()] << "'";
     colIdx++;
   }
   std::cout << "\r\n";
@@ -75,28 +72,26 @@ void Formatter::renderGnuplot(const ptree& row, int count, const std::string& nu
   }
 }
 
-void Formatter::renderGraphite(const ptree& row, const std::string& nullmap, const std::string& input,
-                                const ptree& schema) {
+void Formatter::renderGraphite(const ptree &row, const std::string &nullmap, const std::string &input, const ptree &schema) {
   int i{0};
-  for (const auto& v : schema.get_child("db.field")) {
+  for (const auto &v : schema.get_child("db.field")) {
     if (isNullAt(nullmap, i)) {
       ++i;
       continue;
     }
-    printf("%s.%s %s %llu\n", input.c_str(), v.second.get<std::string>("").c_str(),
-           row.get(std::to_string(i++), "").c_str(), (unsigned long long)time(nullptr));
+    printf("%s.%s %s %llu\n", input.c_str(), v.second.get<std::string>("").c_str(), row.get(std::to_string(i++), "").c_str(),
+           (unsigned long long)time(nullptr));
   }
 }
 
-void Formatter::renderInfluxDB(const ptree& row, const std::string& nullmap, const std::string& input,
-                                const ptree& schema) {
+void Formatter::renderInfluxDB(const ptree &row, const std::string &nullmap, const std::string &input, const ptree &schema) {
   // https://docs.influxdata.com/influxdb/v1.5/write_protocols/line_protocol_tutorial/
   using namespace std::chrono;
   int i{0};
   bool firstValNoComma(true);
   std::stringstream line;
   line << input << " ";
-  for (const auto& v : schema.get_child("db.field")) {
+  for (const auto &v : schema.get_child("db.field")) {
     if (isNullAt(nullmap, i)) {
       ++i;
       continue;

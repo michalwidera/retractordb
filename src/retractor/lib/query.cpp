@@ -6,9 +6,9 @@
 
 #include <algorithm>
 
-#include "fatalError.hpp"
 #include <cctype>
 #include <stdexcept>
+#include "fatalError.hpp"
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 

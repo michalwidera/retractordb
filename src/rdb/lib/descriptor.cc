@@ -212,7 +212,7 @@ std::pair<std::string, size_t> Descriptor::storagePolicy() {
 }
 
 size_t Descriptor::fieldIndex(const std::string_view fieldName) {
-  auto it = std::find_if(begin(), end(),                                                    //
+  auto it = std::find_if(begin(), end(),                                                      //
                          [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
   if (it != end())
@@ -244,7 +244,7 @@ int Descriptor::byteOffsetAtFlatIndex(const int flatIndex) {
 }
 
 std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  //
-  return GetFieldType(((*this)[fieldIndex(fieldName)]).rtype);                   //
+  return GetFieldType(((*this)[fieldIndex(fieldName)]).rtype);                  //
 }
 
 std::pair<rdb::descFld, int> Descriptor::widestFieldType() {

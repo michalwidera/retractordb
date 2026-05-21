@@ -26,10 +26,10 @@
 
 #include "constants.hpp"
 #include "dataModel.hpp"
+#include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
 #include "uxSysTermTools.hpp"
-#include "fatalError.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
 
@@ -75,8 +75,8 @@ dataModel *pProc = nullptr;
 // when it will be set thread will exit by given time (testing purposes)
 std::atomic<int> iTimeLimitCnt{executorsm::inifitie_loop};
 
-qTree *executorsm::coreInstancePtr  = nullptr;
-compiler *executorsm::cmPtr         = nullptr;
+qTree *executorsm::coreInstancePtr = nullptr;
+compiler *executorsm::cmPtr        = nullptr;
 std::atomic<bool> executorsm::ipcReady{false};
 
 static std::thread bt;
@@ -499,7 +499,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
-  bt = std::thread(executorsm::commandProcessorLoop);  // Sending service in thread
+  bt          = std::thread(executorsm::commandProcessorLoop);  // Sending service in thread
 
   {
     std::unique_lock<std::mutex> lock(core_mutex);

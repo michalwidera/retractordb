@@ -6,8 +6,8 @@
 #include <unistd.h>
 
 #include <cstring>
-#include "fatalError.hpp"
 #include <filesystem>
+#include "fatalError.hpp"
 namespace rdb {
 
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //

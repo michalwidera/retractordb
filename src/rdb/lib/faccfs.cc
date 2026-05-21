@@ -1,10 +1,10 @@
 #include "rdb/faccfs.hpp"
 
-#include "fatalError.hpp"
 #include <filesystem>
 #include <fstream>
 #include <limits>
 #include <memory>
+#include "fatalError.hpp"
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 // https://stackoverflow.com/questions/1658476/c-fopen-vs-open

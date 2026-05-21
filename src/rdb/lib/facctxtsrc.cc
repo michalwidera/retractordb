@@ -2,11 +2,11 @@
 
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
 #include <cstring>  // memcpy
 #include <memory>   // make_unique
 #include <optional>
 #include <sstream>
+#include "fatalError.hpp"
 
 namespace rdb {
 

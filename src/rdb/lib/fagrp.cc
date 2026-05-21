@@ -3,13 +3,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include "fatalError.hpp"
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string_view>
+#include "fatalError.hpp"
 
 namespace rdb {
 

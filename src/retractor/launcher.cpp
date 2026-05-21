@@ -17,12 +17,12 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/compiler.hpp"
+#include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
 #include "lib/lockManager.hpp"
 #include "lib/persistentCounter.hpp"
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
-#include "lib/executor_rt.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
-          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")  //
+          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
           ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
            "query limit, 0 - no limit")                                                             //
           ;
@@ -230,7 +230,6 @@ int main(int argc, char *argv[]) {
       dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".desc"));
       dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".meta"));
     }
-
   }
 
   executorsm exec;

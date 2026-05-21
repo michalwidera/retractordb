@@ -309,7 +309,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
 
   switch (maxType) {
     case rdb::BYTE: {
-      if (valueRet.type() != typeid(boost::rational<int>)) FatalError("streamInstance: aggregation result must be rational at finalization");
+      if (valueRet.type() != typeid(boost::rational<int>))
+        FatalError("streamInstance: aggregation result must be rational at finalization");
       auto tobyte = std::any_cast<boost::rational<int>>(valueRet);
       if (tobyte > boost::rational<int>(std::numeric_limits<uint8_t>::max(), 1)) {
         valueRet = uint8_t(std::numeric_limits<uint8_t>::max());
@@ -320,7 +321,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::INTEGER: {
-      if (valueRet.type() != typeid(boost::rational<int>)) FatalError("streamInstance: aggregation result must be rational at finalization");
+      if (valueRet.type() != typeid(boost::rational<int>))
+        FatalError("streamInstance: aggregation result must be rational at finalization");
       auto toint = std::any_cast<boost::rational<int>>(valueRet);
       if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
         valueRet = int(std::numeric_limits<int>::max());
@@ -331,7 +333,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::UINT: {
-      if (valueRet.type() != typeid(boost::rational<int>)) FatalError("streamInstance: aggregation result must be rational at finalization");
+      if (valueRet.type() != typeid(boost::rational<int>))
+        FatalError("streamInstance: aggregation result must be rational at finalization");
       auto touint = std::any_cast<boost::rational<int>>(valueRet);
       if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
         valueRet = unsigned(std::numeric_limits<unsigned>::max());
@@ -388,16 +391,16 @@ bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = false; },                                 //
-                 [&retVal](uint8_t a) { retVal = (a != 0); },                                   //
-                 [&retVal](int a) { retVal = (a != 0); },                                       //
-                 [&retVal](unsigned a) { retVal = (a != 0); },                                  //
-                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                      //
-                 [&retVal](float a) { retVal = (a != 0); },                                     //
-                 [&retVal](double a) { retVal = (a != 0); },                                    //
-                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },          //
+                 [&retVal](std::monostate) { retVal = false; },                                                       //
+                 [&retVal](uint8_t a) { retVal = (a != 0); },                                                         //
+                 [&retVal](int a) { retVal = (a != 0); },                                                             //
+                 [&retVal](unsigned a) { retVal = (a != 0); },                                                        //
+                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                                            //
+                 [&retVal](float a) { retVal = (a != 0); },                                                           //
+                 [&retVal](double a) { retVal = (a != 0); },                                                          //
+                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },             //
                  [&retVal](std::pair<std::string, int>) { FatalError("boolCast: pair<string,int> not supported"); },  //
-                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }            //
+                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }                //
              },
              inVar);
 
@@ -409,7 +412,8 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
 
   for (auto &r : qry.lRules) {
     if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
-    if (r.action != rule::DUMP && r.action != rule::SYSTEM) FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
+    if (r.action != rule::DUMP && r.action != rule::SYSTEM)
+      FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
     auto condition = r.condition;
     expressionEvaluator expression;
     auto result = expression.eval(condition, &payload);

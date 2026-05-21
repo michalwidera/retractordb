@@ -21,8 +21,8 @@ using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
 static bool waitForServer(int maxSeconds = 30) {
-  const int pollIntervalMs   = 100;
-  const int maxAttempts      = maxSeconds * 1000 / pollIntervalMs;
+  const int pollIntervalMs = 100;
+  const int maxAttempts    = maxSeconds * 1000 / pollIntervalMs;
   for (int i = 0; i < maxAttempts; ++i) {
     try {
       IPC::managed_shared_memory seg(IPC::open_only, "RetractorShmemMap");
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         ("influxdb,f", "influxDB output mode")                                                            //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
         ("help,h", "produce help message")                                                                //
-        ("needctrlc,c", "force ctl+c for stop this tool")                                               //
+        ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
         ("wait-server,w", "poll until xretractor server is available before executing command");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);

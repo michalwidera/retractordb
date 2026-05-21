@@ -2,7 +2,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
 #include <cmath>       // sqrt
 #include <functional>  // std::function
 #include <optional>
@@ -12,6 +11,7 @@
 #include <string>
 #include <typeinfo>  // operator typeid
 #include <variant>
+#include "fatalError.hpp"
 
 #include "rdb/convertTypes.hpp"
 

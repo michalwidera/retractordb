@@ -3,10 +3,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // for std::copy
-#include "fatalError.hpp"
 #include <limits>
 #include <map>
 #include <vector>
+#include "fatalError.hpp"
 
 static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 static std::map<std::string, std::vector<std::vector<bool>>> memoryNullStorage;

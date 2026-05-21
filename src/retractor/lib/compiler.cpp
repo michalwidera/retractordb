@@ -4,10 +4,10 @@
 
 #include <algorithm>
 
-#include "fatalError.hpp"
 #include <cmath>
 #include <limits>
 #include <sstream>
+#include "fatalError.hpp"
 
 #include <boost/lexical_cast.hpp>
 #include <boost/rational.hpp>
@@ -324,7 +324,8 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
 
     lRetVal = schema;
   } else {
-    FatalError("compiler: undefined stream token command in combine function: str={} cmd={}", cmd_token.getStr_(), cmd_token.getStrCommandID());
+    FatalError("compiler: undefined stream token command in combine function: str={} cmd={}", cmd_token.getStr_(),
+               cmd_token.getStrCommandID());
   }
   // Here are added to fields execution methods
   // by reference to schema position
@@ -359,7 +360,8 @@ std::string compiler::expandSchemaWildcards() {
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
       if (q.lProgram.size() >= 4) {
-        FatalError("compiler::expandSchemaWildcards: program not optimized — {} tokens for query '{}', expected < 4", q.lProgram.size(), q.id);
+        FatalError("compiler::expandSchemaWildcards: program not optimized — {} tokens for query '{}', expected < 4",
+                   q.lProgram.size(), q.id);
       }
       // fail of above check means that all streams are
       // after optimization already
@@ -371,7 +373,10 @@ std::string compiler::expandSchemaWildcards() {
           if (q.lProgram.size() == 1) {
             // we assure that on and only token is push_stream
             if ((*q.lProgram.begin()).getCommandID() != PUSH_STREAM) {
-              FatalError("compiler::expandSchemaWildcards: first token must be PUSH_STREAM for single-token program, got cmd={} for query '{}'", (*q.lProgram.begin()).getStrCommandID(), q.id);
+              FatalError(
+                  "compiler::expandSchemaWildcards: first token must be PUSH_STREAM for single-token program, got cmd={} for "
+                  "query '{}'",
+                  (*q.lProgram.begin()).getStrCommandID(), q.id);
             }
             auto nameOfscanningTable = (*q.lProgram.begin()).getStr_();
             // Remove of TSCAN
@@ -425,7 +430,9 @@ std::string compiler::expandIndexWildcards() {
           FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
         }
         if (q.lSchema.size() != 1) {
-          FatalError("compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'", q.lSchema.size(), q.id);
+          FatalError(
+              "compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'",
+              q.lSchema.size(), q.id);
         }
 
         field oldField = *q.lSchema.begin();
@@ -574,10 +581,10 @@ std::string compiler::resolveFieldReferences() {
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }
-    for (auto &f : q.lSchema) {  // for each field in query
+    for (auto &f : q.lSchema) {               // for each field in query
       resolveTokenReferences(f.lProgram, q);  // for each token in query field
     }  // end for each field in query
-    for (auto &r : q.lRules) {    // for each rule in query
+    for (auto &r : q.lRules) {                 // for each rule in query
       resolveTokenReferences(r.condition, q);  // for each token in rule
     }  // end for each rule in query
   }
@@ -590,10 +597,10 @@ std::string compiler::localizeFieldOffsets() {
   std::map<std::string, std::map<std::string, int>> offsetMap;
 
   // This loop fill&create OffsetMap structure.
-  for (auto &q : coreInstance) {            // for each query
+  for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
-    }       // that has at least two arguments
+    }  // that has at least two arguments
     auto offset{0};                         //
     std::map<std::string, int> offsetItem;  //
     for (auto &f : q.lProgram) {            // for each token in stream program
@@ -610,10 +617,10 @@ std::string compiler::localizeFieldOffsets() {
   }
 
   // This loop converts with help of offsetMap
-  for (auto &q : coreInstance) {            // for each query
+  for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
-    }       // that has at least two arguments and
+    }  // that has at least two arguments and
     for (auto &f : q.lSchema) {             // for each field in query and
       for (auto &t : f.lProgram) {          // for each token in query field - do:
         if (t.getCommandID() == PUSH_ID) {  // fix only PUSH_ID tokens
@@ -627,8 +634,8 @@ std::string compiler::localizeFieldOffsets() {
 }
 
 std::string compiler::validateConstraints() {
-  for (auto &q : coreInstance) {       // for each query
-    if (q.isDeclaration()) continue;   // do not check declaration in constraints.
+  for (auto &q : coreInstance) {      // for each query
+    if (q.isDeclaration()) continue;  // do not check declaration in constraints.
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }  // process data only with two or less arguments
@@ -655,7 +662,7 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
     if (coreInstance[q.first].isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at applyCapacities stage", q.first);
     }
-    coreInstance[q.first].policy.second = q.second;          // set memory size
+    coreInstance[q.first].policy.second = q.second;  // set memory size
   }
   return std::string("OK");
 }
@@ -668,8 +675,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
     capMap[q.id] = 1;
   }
 
-  for (auto &q : coreInstance) {       // for each query
-    if (q.isDeclaration()) continue;   // that is not declaration
+  for (auto &q : coreInstance) {      // for each query
+    if (q.isDeclaration()) continue;  // that is not declaration
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }  // process data only with two or less arguments
@@ -680,7 +687,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         //  :- STREAM_TIMEMOVE(1)
         //
         if (q.lProgram.size() != 2) {
-          FatalError("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2", q.lProgram.size(), q.id);
+          FatalError("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2",
+                     q.lProgram.size(), q.id);
         }
 
         const auto nameSrc    = arg1;
@@ -692,7 +700,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
         //
         if (q.lProgram.size() != 2) {
-          FatalError("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2", q.lProgram.size(), q.id);
+          FatalError("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2",
+                     q.lProgram.size(), q.id);
         }
 
         const auto nameSrc  = arg1;
@@ -740,13 +749,15 @@ std::string compiler::deduplicateSubstrats() {
         if (it2->lProgram.size() != it->lProgram.size()) continue;
         if (it2->lSchema.size() != it->lSchema.size()) continue;
 
-        bool progMatch = std::equal(it->lProgram.begin(), it->lProgram.end(), it2->lProgram.begin(),
-                                    [](token &a, token &b) { return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT(); });
+        bool progMatch = std::equal(it->lProgram.begin(), it->lProgram.end(), it2->lProgram.begin(), [](token &a, token &b) {
+          return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
+        });
         if (!progMatch) continue;
 
-        bool schemaMatch = std::equal(it->lSchema.begin(), it->lSchema.end(), it2->lSchema.begin(), [](const field &a, const field &b) {
-          return a.field_.rtype == b.field_.rtype && a.field_.rlen == b.field_.rlen && a.field_.rarray == b.field_.rarray;
-        });
+        bool schemaMatch =
+            std::equal(it->lSchema.begin(), it->lSchema.end(), it2->lSchema.begin(), [](const field &a, const field &b) {
+              return a.field_.rtype == b.field_.rtype && a.field_.rlen == b.field_.rlen && a.field_.rarray == b.field_.rarray;
+            });
         if (!schemaMatch) continue;
 
         const std::string oldName = it->id;

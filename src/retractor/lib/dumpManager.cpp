@@ -5,8 +5,8 @@
 #include <sys/stat.h>
 
 #include <algorithm>  // std::min
-#include <cstdlib>   // std::abs
-#include <cstring>   // strerror
+#include <cstdlib>    // std::abs
+#include <cstring>    // strerror
 #include <filesystem>
 
 #include "fatalError.hpp"
@@ -27,7 +27,8 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     FatalError("dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
   }
   if (task.range.first > task.range.second) {
-    FatalError("dumpManager::registerTask: range.first {} > range.second {} for stream '{}'", task.range.first, task.range.second, streamName);
+    FatalError("dumpManager::registerTask: range.first {} > range.second {} for stream '{}'", task.range.first,
+               task.range.second, streamName);
   }
 
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
@@ -57,7 +58,8 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
       if (write_count_result <= 0) FatalError("dumpManager::registerTask: write failed during history dump");
     }
     if (task.dumpedRecordsToGo < dumpHistoryCount) {
-      FatalError("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo, dumpHistoryCount);
+      FatalError("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
+                 dumpHistoryCount);
     }
     task.dumpedRecordsToGo -= dumpHistoryCount;
   } else {
@@ -79,7 +81,8 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
 
   auto payLoadPtr = pProc->getPayload(streamName);
 
-  if (payLoadPtr->descriptor.getSizeInBytes() == 0) FatalError("dumpManager::processStreamChunk: payload descriptor size is zero");
+  if (payLoadPtr->descriptor.getSizeInBytes() == 0)
+    FatalError("dumpManager::processStreamChunk: payload descriptor size is zero");
   if (payLoadPtr->span().empty()) FatalError("dumpManager::processStreamChunk: payload data span is empty");
 
   // enumerate all tasks for this stream
@@ -137,7 +140,8 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
     auto ret = (retentionCounter[key]++) % retentionSize[key];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
     if (ret >= retentionSize[key]) {
-      FatalError("dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'", ret, retentionSize[key], key);
+      FatalError("dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'", ret, retentionSize[key],
+                 key);
     }
   }
   int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);

@@ -4,10 +4,10 @@
 
 #include <algorithm>
 
-#include "fatalError.hpp"
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
+#include "fatalError.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -127,10 +127,12 @@ void dataModel::constructInputPayload(const std::string &instance) {
   auto qry = coreInstance_[instance];
 
   if (qry.lProgram.size() >= 4) {
-    FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4", qry.lProgram.size(), instance);
+    FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4",
+               qry.lProgram.size(), instance);
   }
   if (qry.lProgram.empty()) {
-    FatalError("dataModel::constructInputPayload: empty program for query '{}' — declarations should not be processed here", instance);
+    FatalError("dataModel::constructInputPayload: empty program for query '{}' — declarations should not be processed here",
+               instance);
   }
 
   std::vector<token> arg;

@@ -7,7 +7,7 @@
 #include "qTree.hpp"           // qTree
 #include "rdb/storageacc.hpp"  // rdb::storage (transitively includes descriptor.hpp, payload.hpp)
 
-/// @brief Klasa streamInstance umożliwia tworzenie zawartości poszczególnych rekordów 
+/// @brief Klasa streamInstance umożliwia tworzenie zawartości poszczególnych rekordów
 ///
 /// Obiekt klasy streamInstance powinien:
 /// - być inicjalizowany z instancją qTree i query, na podstawie których będzie tworzył zawartość rekordów (payload).

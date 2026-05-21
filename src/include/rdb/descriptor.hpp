@@ -51,7 +51,7 @@ class Descriptor : public std::vector<rField> {
   Descriptor(std::initializer_list<rField> fields);
   Descriptor(const std::string &fieldName, int length, int elementCount, rdb::descFld type);
 
-  Descriptor() = default;
+  Descriptor()                         = default;
   Descriptor(const Descriptor &source) = default;
 
   void append(std::initializer_list<rField> fields);
