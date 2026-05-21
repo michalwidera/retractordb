@@ -2,7 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cassert>
+#include "fatalError.hpp"
 #include <cmath>       // sqrt
 #include <functional>  // std::function
 #include <optional>
@@ -86,7 +86,7 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },       //
@@ -116,7 +116,7 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
@@ -148,7 +148,7 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
@@ -191,7 +191,7 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
     throw std::domain_error("Division by zero in expressionEvaluator");
   }
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
@@ -223,7 +223,7 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
@@ -253,7 +253,7 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
@@ -283,7 +283,7 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                 //
@@ -313,7 +313,7 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                 //
@@ -343,7 +343,7 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
@@ -373,7 +373,7 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
   auto [a, b] = normalize(aParam, bParam);
 
-  assert(typeid(a) == typeid(b));
+  if (typeid(a) != typeid(b)) FATAL_ERROR("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //

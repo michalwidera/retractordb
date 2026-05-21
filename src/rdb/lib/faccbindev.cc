@@ -5,8 +5,8 @@
 #include <sys/stat.h>
 #include <unistd.h>  // ::read, ::open ...
 
-#include <cassert>
 #include <cstring>
+#include "fatalError.hpp"
 
 namespace rdb {
 
@@ -44,8 +44,6 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
   if (fd_ < 0) return markAllNullAndZero(EXIT_FAILURE);
   if (recordSize_ == 0) return markAllNullAndZero(EXIT_FAILURE);
 
-  assert(recordSize_ != 0);
-  assert(position == 0);
   if (position != 0) {
     return markAllNullAndZero(EXIT_FAILURE);
   }

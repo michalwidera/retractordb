@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <cassert>
+#include "fatalError.hpp"
 #include <chrono>
 #include <iostream>
 #include <sstream>
@@ -28,7 +28,7 @@ ptree qry::netClient(const std::string& cmd, const std::string& arg) {
 }
 
 bool qry::adhoc(const std::string& sAdhoc) {
-  assert(sAdhoc != "");
+  if (sAdhoc.empty()) FATAL_ERROR("qry::adhoc: adhoc query string must not be empty");
   ptree pt = netClient("adhoc", sAdhoc);
 
   std::string rcv("fail.");
@@ -171,7 +171,6 @@ std::string qry::dir() {
       const ptree& v2 = node2.second;
       return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
     });
-    if (stream.size() == 1) assert(maxSizeIt == stream.begin());
     ss << "|%" << maxSizeIt->second.get<std::string>(nName).length() << "s";
   }
   ss << "|\n";

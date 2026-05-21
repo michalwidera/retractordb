@@ -3,9 +3,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
 #include <iostream>
 #include <sstream>
+
+#include "fatalError.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -97,7 +98,7 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
   if (this != &rhs) {
     insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
   } else {
-    assert(false && "can not merge same to same");
+    FATAL_ERROR("descriptor: cannot merge descriptor with itself");
     // can't do safe: data | data
     // due one name policy
   }
@@ -150,7 +151,10 @@ void Descriptor::removeConfigurationFields() {
 void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, Descriptor lhs, Descriptor rhs) {
   lhs.removeConfigurationFields();
   rhs.removeConfigurationFields();
-  assert(lhs.size() == rhs.size());
+  if (lhs.size() != rhs.size()) {
+    SPDLOG_ERROR("composeHashDescriptorFrom: descriptor size mismatch lhs:{} rhs:{}", lhs.size(), rhs.size());
+    FATAL_ERROR("descriptor: hash composition requires equal-size descriptors");
+  }
 
   clear();
   auto i{0};
@@ -215,7 +219,7 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) {
   if (it != end())
     return std::distance(begin(), it);
   else
-    assert(false && "did not find that record id Descriptor:{}");
+    FATAL_ERROR("descriptor: field ID not found");
 
   return 0;  // ProForma Error
 }
@@ -228,14 +232,16 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
-  assert(false && "field not found with that name");
+  FATAL_ERROR("descriptor: field not found by name");
   return 0;  // ProForma Error
 }
 
 int Descriptor::byteOffsetAtFlatIndex(const int flatIndex) {
   rebuildFieldMappings();
-  assert(flatIndex >= 0 && flatIndex < flattenedFieldCount_ && "flat position out of range");
-  if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) return 0;
+  if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) {
+    SPDLOG_ERROR("byteOffsetAtFlatIndex: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
+    FATAL_ERROR("descriptor: flat index out of range");
+  }
   return fieldByteOffsets_[flatIndex];
 }
 
@@ -316,7 +322,10 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
     strstream << " " << str;
 
   auto result = parserDESCString(rhs, strstream.str());
-  assert(result == "OK");
+  if (result != "OK") {
+    SPDLOG_ERROR("Descriptor parse failed: {}", result);
+    FATAL_ERROR("descriptor parse failed");
+  }
 
   return is;
 }

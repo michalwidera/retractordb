@@ -2,6 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include "fatalError.hpp"
+
 #include <charconv>
 #include <istream>
 #include <stack>
@@ -127,7 +129,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       break;
     case rdb::IDXPAIR:
       SPDLOG_ERROR("TODO - IDXPAIR->T");
-      assert(false);
+      FATAL_ERROR("convertTypes: IDXPAIR->T conversion not implemented");
       break;
     case rdb::INTPAIR:
       // Requested type is INT PAIR
@@ -196,7 +198,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                             [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
                             [&retVal](double a) { retVal = Rationalize(a); },                               //
                             [&retVal](std::pair<int, int> a) {
-                              assert(a.second != 0);
+                              if (a.second == 0) FATAL_ERROR("convertTypes: rational denominator is zero (pair<int,int>)");
                               retVal = boost::rational<int>(a.first, a.second);
                             },  //
                             [&retVal](std::pair<std::string, int> a) {
@@ -207,7 +209,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                               int nom{0};
                               int den{1};
                               in >> nom >> expect<'/'> >> den;
-                              assert(den != 0);
+                              if (den == 0) FATAL_ERROR("convertTypes: rational denominator is zero (string parse)");
                               retVal = boost::rational<int>(nom, den);
                             }},
                    inVar);
@@ -226,14 +228,14 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           retVal = Rationalize(std::any_cast<double>(inVar));
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           std::pair pairVar = std::any_cast<std::pair<int, int>>(inVar);
-          assert(pairVar.second != 0);
+          if (pairVar.second == 0) FATAL_ERROR("convertTypes: rational denominator is zero (any pair<int,int>)");
           retVal = boost::rational<int>(pairVar.first, pairVar.second);
         } else if (inVar.type() == typeid(std::string)) {
           std::istringstream in(std::any_cast<std::string>(inVar));
           int nom{0};
           int den{1};
           in >> nom >> expect<'/'> >> den;
-          assert(den != 0);
+          if (den == 0) FATAL_ERROR("convertTypes: rational denominator is zero (any string parse)");
           retVal = boost::rational<int>(nom, den);
         }
       }

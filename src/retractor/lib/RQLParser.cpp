@@ -17,6 +17,7 @@
 #include "constants.hpp"
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
+#include "fatalError.hpp"
 
 using namespace antlrcpp;
 using namespace antlr4;
@@ -187,7 +188,7 @@ class ParserListener : public RQLBaseListener {
   void exitFraction(RQLParser::FractionContext *ctx) {
     const int nom = std::stoi(ctx->children[0]->getText());
     const int den = std::stoi(ctx->children[2]->getText());
-    assert(den != 0);
+    if (den == 0) FATAL_ERROR("RQLParser::exitFraction: denominator is zero");
     rationalResult = boost::rational<int>(nom, den);
   }
 
@@ -217,7 +218,7 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      assert(qry.filename.size() > 0 && "Directive must not be empty!");
+      if (qry.filename.empty()) FATAL_ERROR("RQLParser: directive filename must not be empty");
     }
 
     if (ctx->STORAGE()) {
@@ -321,7 +322,7 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    assert(qry.filename.size() > 0 && "Directive must not be empty!");
+    if (qry.filename.empty()) FATAL_ERROR("RQLParser: directive filename must not be empty");
 
     // Add / at the end of path, if not present in case of STORAGE
     if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');

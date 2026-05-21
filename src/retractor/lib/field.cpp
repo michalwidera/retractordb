@@ -1,6 +1,6 @@
 #include "field.hpp"
 
-#include <cassert>
+#include "fatalError.hpp"
 
 /** Construktor set */
 
@@ -17,7 +17,7 @@ field::field(rdb::rField field_, std::list<token> lProgram)
       field_(std::move(field_)) {}
 
 token field::getFirstFieldToken() {
-  assert(lProgram.size() > 0);  // If this fails that means in field no program (decl!)
+  if (lProgram.empty()) FATAL_ERROR("field::getFirstFieldToken: no program tokens — should not be called on a declaration field");
   return *lProgram.begin();
 }
 

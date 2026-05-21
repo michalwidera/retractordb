@@ -1,11 +1,11 @@
 #include "CRSMath.hpp"
 
-#include <cassert>  // for assert
+#include "fatalError.hpp"
 
 using namespace CRationalStreamMath;
 
 TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) {
-  assert(inSet.size() > 0);
+  if (inSet.empty()) FATAL_ERROR("TimeLine: input interval set must not be empty");
   for (auto val : inSet) {
     // Latch - catch true if val is divided
     // bu any number from the set
@@ -42,7 +42,7 @@ bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDel
 // MAGIC Warning
 
 const boost::rational<int> &TimeLine::getNextTimeSlot() {
-  assert(sr_.size() > 0);
+  if (sr_.empty()) FATAL_ERROR("TimeLine::getNextTimeSlot: internal stream rate set is empty");
   // In constructor we were set deltas and indexes
   // Take first value from tje edge
   // even good we can take max rational here.

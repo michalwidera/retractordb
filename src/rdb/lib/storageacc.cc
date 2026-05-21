@@ -3,7 +3,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
+
+#include "fatalError.hpp"
 #include <cstring>  //std::memset
 #include <filesystem>
 #include <fstream>
@@ -24,8 +25,8 @@ storage::storage(const std::string_view qryID,         //
       isOneShot_(oneShot),
       isHold_(isHold),
       storageType_(storageType) {
-  assert(!qryID.empty());
-  assert(!fileName.empty());
+  if (qryID.empty()) FATAL_ERROR("storage: qryID must not be empty");
+  if (fileName.empty()) FATAL_ERROR("storage: fileName must not be empty");
 
   metaIndexFile_ = storageFile_ + ".meta";
 
@@ -35,8 +36,7 @@ storage::storage(const std::string_view qryID,         //
 
   if (!std::filesystem::is_directory(storageParam)) {
     SPDLOG_ERROR("Storage path {} does not point to directory.", storageParam);
-    assert(false && "Storage path does not point to directory.");
-    abort();
+    FATAL_ERROR("storage: path is not a directory");
   }
 
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
@@ -55,16 +55,14 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
     if (descriptor.getSizeInBytes() == 0) {
       SPDLOG_ERROR("Empty descriptor in file.");
       std::cerr << "Error, empty descriptor file:" << storageFile_ << ".desc\n";
-      assert(false && "Empty descriptor in file.");
-      abort();
+      FATAL_ERROR("storage: empty descriptor file");
     }
 
     if (descriptorParam != nullptr && *descriptorParam != descriptor) {
       SPDLOG_ERROR("Descriptors do not match.");
       std::cerr << "Error in data descriptor file: " << storageFile_ << ".desc\n";
       std::cerr << "Provided Descriptor:\n" << *descriptorParam << "\nExisting Descriptor:\n" << descriptor << std::endl;
-      assert(false && "Descriptors dont match - previous one have different schema? remove&restart.");
-      abort();
+      FATAL_ERROR("storage: descriptor schema mismatch — remove data files and restart");
     }
 
     moveRef();
@@ -77,8 +75,7 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
 
   if (descriptorParam == nullptr) {
     SPDLOG_ERROR("No descriptor file found, no descriptor provided.");
-    assert(false && "No descriptor found");
-    abort();
+    FATAL_ERROR("storage: no descriptor file and no descriptor provided");
   }
 
   descriptor = *descriptorParam;
@@ -87,9 +84,15 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(nullptr, 0);
   descFile.open(descriptorFile_, std::ios::out);
-  assert((descFile.rdstate() & std::ofstream::failbit) == 0);
+  if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
+    SPDLOG_ERROR("Failed to open descriptor file for writing: {}", descriptorFile_);
+    FATAL_ERROR("storage: failed to open descriptor file for writing");
+  }
   descFile << descriptor;
-  assert((descFile.rdstate() & std::ofstream::failbit) == 0);
+  if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
+    SPDLOG_ERROR("Failed to write descriptor to file: {}", descriptorFile_);
+    FATAL_ERROR("storage: failed to write descriptor file");
+  }
   descFile.close();
 
   moveRef();
@@ -116,13 +119,12 @@ void storage::moveRef() {
   // stop immediately.
   if (storageFile_ == "") {
     SPDLOG_ERROR("Storage file was not set in descriptor.");
-    assert(false && "Storage file was not set in descriptor.");
-    abort();
+    FATAL_ERROR("storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
   }
 }
 
 void storage::attachStorage() {
-  assert(storageFile_ != "");
+  if (storageFile_.empty()) FATAL_ERROR("storage: storageFile_ is empty — storage not properly configured");
 
   auto it1 = std::find_if(descriptor.begin(),
                           descriptor.end(),                                         //
@@ -157,8 +159,8 @@ storage::~storage() {
 bool storage::isDeclared() { return (storageType_ == "DEVICE") || (storageType_ == "TEXTSOURCE"); }
 
 void storage::initializeAccessor() {
-  assert(storageFile_ != "");
-  assert(storageType_ != "");
+  if (storageFile_.empty()) FATAL_ERROR("storage: storageFile_ is empty — storage not properly configured");
+  if (storageType_.empty()) FATAL_ERROR("storage: storageType_ is empty — storage type not set");
 
   if (storageType_ == "DEFAULT") {
     accessor_ = std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile_, descriptor, descriptor.retention(),
@@ -179,15 +181,14 @@ void storage::initializeAccessor() {
     accessor_ = std::make_unique<rdb::textSourceRO>(storageFile_, descriptor, !isOneShot_);
   } else {
     SPDLOG_ERROR("Unsupported storage type {}", storageType_);
-    assert(false && "Unsupported storage type");
-    abort();
+    FATAL_ERROR("storage: unsupported storage type");
   }
 }
 
 void storage::resetForUnitTest() {
   consecutiveNullCount_ = 0;
   activeGapDuration_    = 0;
-  assert(storageFile_ != "");
+  if (storageFile_.empty()) FATAL_ERROR("storage: storageFile_ is empty — storage not properly configured");
 
   if (!accessor_) return;  // no accessor initialized - no need to reset.
 
@@ -205,7 +206,10 @@ void storage::resetForUnitTest() {
     metaDataStream_->reset();
   }
 
-  assert(recordsCount_ == accessor_->count());
+  if (recordsCount_ != accessor_->count()) {
+    SPDLOG_ERROR("recordsCount_ {} != accessor_->count() {} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FATAL_ERROR("storage: internal record count mismatch");
+  }
 }
 
 void storage::cleanPayload(uint8_t *destination) {
@@ -219,8 +223,7 @@ void storage::cleanPayload(uint8_t *destination) {
 std::unique_ptr<rdb::payload>::pointer storage::getPayload() {
   if (!storagePayload_) {
     SPDLOG_ERROR("no payload attached");
-    assert(false && "no payload attached");
-    abort();
+    FATAL_ERROR("storage::getPayload: payload not attached");
   }
   return storagePayload_.get();
 }
@@ -236,23 +239,20 @@ size_t storage::getRecordsCount() { return recordsCount_; }
 void storage::abortIfStorageNotPrepared() {
   if (descriptor.empty()) {
     SPDLOG_ERROR("descriptor is Empty");
-    assert(false && "Empty descriptor");
-    abort();
+    FATAL_ERROR("storage: descriptor is empty — storage not initialized");
   }
   if (!accessor_) {
     SPDLOG_ERROR("data file is not opened");
-    assert(false && "data file didn't opened");
-    abort();
+    FATAL_ERROR("storage: data file not opened — accessor not initialized");
   }
   if (!storagePayload_) {
     SPDLOG_ERROR("no payload attached");
-    assert(false && "payload not attached");
-    abort();
+    FATAL_ERROR("storage: payload not attached");
   }
 }
 
 void storage::fire() {
-  assert(circularBuffer_.capacity() > 0);
+  if (circularBuffer_.capacity() == 0) FATAL_ERROR("storage::fire: circular buffer capacity is zero");
   *storagePayload_ = *chamber_;
   recordsCount_++;
   circularBuffer_.push_front(*storagePayload_.get());  // only one place when buffer is feed.
@@ -299,18 +299,21 @@ bool storage::isMetaIndexEmpty() const {
 }
 
 bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
-  assert(!isDeclared());
+  if (isDeclared()) FATAL_ERROR("storage::read: cannot read directly from declared (device/textsource) storage");
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {
     destination = storagePayload_->span().data();
   }
 
-  assert(destination != nullptr);
+  if (destination == nullptr) FATAL_ERROR("storage::read: destination pointer is null (payload span is empty)");
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
 
-  assert(recordsCount_ == accessor_->count());
+  if (recordsCount_ != accessor_->count()) {
+    SPDLOG_ERROR("recordsCount_ {} != accessor_->count() {} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FATAL_ERROR("storage: internal record count mismatch");
+  }
 
   if (isHold_) {
     std::memset(destination, 0, size);
@@ -319,7 +322,10 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
 
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
-    assert(result == 0);
+    if (result != 0) {
+      SPDLOG_ERROR("read from {} at pos {} failed (result={})", accessor_->name(), recordIndexFromFront, result);
+      FATAL_ERROR("storage::read: read operation failed");
+    }
     if (metaDataStream_) {
       if (recordIndexFromFront < metaDataStream_->totalRecords())
         storagePayload_->setNullBitset(metaDataStream_->getNullBitset(recordIndexFromFront));
@@ -344,7 +350,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
                       ? storagePayload_->span().data()  //
                       : destination;
 
-    assert(destination != nullptr);
+    if (destination == nullptr) FATAL_ERROR("storage::revRead: destination pointer is null in hold path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     bufferState = sourceState::armed;  // fake armed on hold position
@@ -352,7 +358,10 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   }
 
   if (!isDeclared()) {
-    assert(recordsCount_ == accessor_->count());
+    if (recordsCount_ != accessor_->count()) {
+    SPDLOG_ERROR("recordsCount_ {} != accessor_->count() {} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FATAL_ERROR("storage: internal record count mismatch");
+  }
     const auto recordPositionFromBack = recordsCount_ - recordIndexFromBack - 1;
     return read(recordPositionFromBack, destination);
   }
@@ -361,8 +370,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // In order to maintain the consistency of declared data sources,
   // it is necessary to maintain a buffer of at least 1
 
-  assert(circularBuffer_.capacity() > 0);
-  assert(isDeclared());
+  if (circularBuffer_.capacity() == 0) FATAL_ERROR("storage::revRead: circular buffer capacity is zero for declared source");
+  if (!isDeclared()) FATAL_ERROR("storage::revRead: expected declared source (DEVICE/TEXTSOURCE)");
 
   if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     //
@@ -389,7 +398,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     *(storagePayload_.get()) = *chamber_;
     return true;
   }
-  assert(recordIndexFromBack >= 0);
+  // recordIndexFromBack is size_t (unsigned), always >= 0
 
   // Read data from Circular Buffer instead of data source
   // - only for declared data sources
@@ -397,7 +406,10 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // - only for recordIndex > 0 if sourceState::flux
   // - also for recordIndex == 0
 
-  assert((recordIndexFromBack < circularBuffer_.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
+  if (recordIndexFromBack >= circularBuffer_.capacity()) {
+    SPDLOG_ERROR("revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in {}", recordIndexFromBack, circularBuffer_.capacity(), accessor_->name());
+    FATAL_ERROR("storage::revRead: index exceeds circular buffer capacity");
+  }
 
   // in case of accessing buffer that has no data yet - zeros are returned
 
@@ -406,7 +418,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
                       ? storagePayload_->span().data()  //
                       : destination;
 
-    assert(destination != nullptr);
+    if (destination == nullptr) FATAL_ERROR("storage::revRead: destination pointer is null in buffer fallback path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     SPDLOG_WARN("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
@@ -414,7 +426,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     return true;
   }
 
-  assert((recordIndexFromBack < circularBuffer_.size()) && "Stop if we have not enough elements in buffer (? - zeros?)");
+  // Note: the previous if-block handles the case where recordIndexFromBack >= circularBuffer_.size()
+  // so here recordIndexFromBack < circularBuffer_.size() is guaranteed
 
   *(storagePayload_.get()) = circularBuffer_[recordIndexFromBack];
   return true;
@@ -443,14 +456,20 @@ bool storage::write(const size_t recordIndex) {
     }
   }
 
-  assert(recordsCount_ == accessor_->count());
+  if (recordsCount_ != accessor_->count()) {
+    SPDLOG_ERROR("recordsCount_ {} != accessor_->count() {} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FATAL_ERROR("storage: internal record count mismatch");
+  }
 
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
-    assert(result == 0);
-    if (result == 0) recordsCount_++;
+    if (result != 0) {
+      SPDLOG_ERROR("append write to {} failed (result={})", storageFile_, result);
+      FATAL_ERROR("storage::write: append operation failed");
+    }
+    recordsCount_++;
 
     if (metaDataStream_) {
       metaDataStream_->onRecordAppended(nullInfo);
@@ -458,15 +477,24 @@ bool storage::write(const size_t recordIndex) {
     }
 
   } else {
-    assert(recordsCount_ > 0);
-    assert(recordIndex < recordsCount_);
+    if (recordsCount_ == 0) FATAL_ERROR("storage::write: recordsCount_ is zero but recordIndex implies overwrite");
+    if (recordIndex >= recordsCount_) {
+      SPDLOG_ERROR("write: recordIndex {} >= recordsCount_ {} in {}", recordIndex, recordsCount_, storageFile_);
+      FATAL_ERROR("storage::write: recordIndex out of bounds");
+    }
 
     result = accessor_->write(storagePayload_->span().data(), recordIndex * size);
-    assert(result == 0);
+    if (result != 0) {
+      SPDLOG_ERROR("overwrite write to {} at index {} failed (result={})", storageFile_, recordIndex, result);
+      FATAL_ERROR("storage::write: overwrite operation failed");
+    }
 
     if (metaDataStream_) metaDataStream_->onRecordModified(recordIndex, nullInfo);
 
-    assert(recordsCount_ == accessor_->count());
+    if (recordsCount_ != accessor_->count()) {
+    SPDLOG_ERROR("recordsCount_ {} != accessor_->count() {} in {}", recordsCount_, accessor_->count(), storageFile_);
+    FATAL_ERROR("storage: internal record count mismatch");
+  }
   }
   return result == 0;
 };

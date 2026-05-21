@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <cassert>
+#include "fatalError.hpp"
 #include <cstring>
 #include <filesystem>
 #include <memory>
@@ -45,7 +45,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     : filename_(std::string(fileName)),
       recordSize_(descriptor.getSizeInBytes()),
       percounter_(percounter) {
-  assert(recordSize_ > 0);
+  if (recordSize_ == 0) FATAL_ERROR("posixBinaryFileWithShadow: record size must be > 0");
 
   std::error_code fs_ec;
   const bool mainFileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -60,14 +60,16 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   }
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-  if (fd < 0)
+  if (fd < 0) {
     SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-  assert(fd >= 0);
+    FATAL_ERROR("posixBinaryFileWithShadow: failed to open main file");
+  }
 
   fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
-  if (fd_shadow < 0)
+  if (fd_shadow < 0) {
     SPDLOG_ERROR("::open shadow {} -> {}", shadowName(), fd_shadow);
-  assert(fd_shadow >= 0);
+    FATAL_ERROR("posixBinaryFileWithShadow: failed to open shadow file");
+  }
 
   if (fd >= 0 && mainFileExisted) {
     const off_t mainSize = ::lseek(fd, 0, SEEK_END);
@@ -139,8 +141,6 @@ auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
 ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/,
                                          const size_t position) {
-  assert(recordSize_ != 0);
-  assert(fd >= 0);
   if (fd < 0) return errno;
 
   if (ptrData == nullptr && position == 0) {
@@ -153,7 +153,6 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   if (position == std::numeric_limits<size_t>::max()) {
     // Append → zapis do głównego pliku
     auto result = ::lseek(fd, 0, SEEK_END);
-    assert(result != -1);
     if (result == -1) return errno;
 
     ssize_t sizesh(recordSize_);
@@ -180,7 +179,6 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
 
   // Update → zapis do pliku cienia jako para (position, data)
   auto result = ::lseek(fd_shadow, 0, SEEK_END);
-  assert(result != -1);
   if (result == -1) return errno;
 
   // Zapisz pozycję
@@ -215,8 +213,6 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
 
 ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  assert(recordSize_ != 0);
-  assert(fd >= 0);
   if (fd < 0) return fd;
 
   // Najpierw szukaj w pliku cienia

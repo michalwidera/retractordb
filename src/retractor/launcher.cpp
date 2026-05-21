@@ -194,7 +194,6 @@ int main(int argc, char *argv[]) {
                 << "Check result:" << response << std::endl;
       return system::errc::protocol_error;
     }
-    assert(response == "OK");
 
     if (onlyCompile) {
       if (!vm.count("quiet")) {

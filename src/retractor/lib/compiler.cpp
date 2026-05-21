@@ -3,7 +3,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
+
+#include "fatalError.hpp"
 #include <cmath>
 #include <limits>
 #include <sstream>
@@ -41,7 +42,9 @@ std::string compiler::resolveStreamIntervals() {
         q.rInterval = coreInstance.getDelta(tInstance.getStr_());
         continue;  // Just one stream
       }
-      assert(q.lProgram.size() == 3 || q.lProgram.size() == 2);
+      if (q.lProgram.size() != 3 && q.lProgram.size() != 2) {
+        FATAL_ERROR("compiler::prepareFields: unexpected program size {} for query '{}'", q.lProgram.size(), q.id);
+      }
       // This is shit coded (these size2 i size3) and fast fixed
       bool size3           = (q.lProgram.size() == 3);
       std::list<token> loc = q.lProgram;
@@ -67,7 +70,9 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();  // There is no second stream
           // - just fraction argument
-          assert(delta2 != 0);
+          if (delta2 == 0) {
+            FATAL_ERROR("compiler: DEHASH rational argument must not be zero for '{}'", q.id);
+          }
           if (delta1 == 0) {
             bOnceAgain = true;
             unresolvedCount++;
@@ -86,7 +91,9 @@ std::string compiler::resolveStreamIntervals() {
         case STREAM_DEHASH_MOD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();
-          assert(delta2 != 0);
+          if (delta2 == 0) {
+            FATAL_ERROR("compiler: DEHASH rational argument must not be zero for '{}'", q.id);
+          }
           if (delta1 == 0) {
             bOnceAgain = true;
             unresolvedCount++;
@@ -143,7 +150,9 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> coreDelta = coreInstance.getDelta(t1.getStr_());
           int coreWindow                 = coreInstance.getQuery(t1.getStr_()).lSchema.size();
           auto [step, windowSize]        = std::get<std::pair<int, int>>(op.getVT());
-          assert(step > 0);
+          if (step <= 0) {
+            FATAL_ERROR("compiler::prepareFields: AGSE step must be > 0, got {} for query '{}'", step, q.id);
+          }
           windowSize = abs(windowSize);
           // if (windowSize < 0) {  // windowSize < 0  (need to double-check and UT cover)
           //   delta = deltaSrc / windowSizeSrc;
@@ -158,7 +167,9 @@ std::string compiler::resolveStreamIntervals() {
           SPDLOG_ERROR("Undefined token: command={}", op.getStrCommandID());
           throw std::out_of_range("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
-      assert(delta != -1);
+      if (delta == -1) {
+        FATAL_ERROR("compiler::prepareFields: stream interval (delta) not resolved for query '{}'", q.id);
+      }
       q.rInterval = delta;  // There is established delta value - return value
     }  // BOOST_FOREACH ( query & q , coreInstance )
     if (!bOnceAgain) break;
@@ -313,10 +324,7 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
 
     lRetVal = schema;
   } else {
-    SPDLOG_ERROR("Undefined: str:{} cmd:{}", cmd_token.getStr_(), cmd_token.getStrCommandID());
-    // throw std::invalid_argument("Command stack hits undefined operation");
-    assert(false && "Undefined stream token command in combine function.");
-    abort();
+    FATAL_ERROR("compiler: undefined stream token command in combine function: str={} cmd={}", cmd_token.getStr_(), cmd_token.getStrCommandID());
   }
   // Here are added to fields execution methods
   // by reference to schema position
@@ -350,8 +358,10 @@ std::string compiler::expandSchemaWildcards() {
   coreInstance.topologicalSort();
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
-      assert(q.lProgram.size() < 4);
-      // fail of this assertion means that all streams are
+      if (q.lProgram.size() >= 4) {
+        FATAL_ERROR("compiler::expandSchemaWildcards: program not optimized — {} tokens for query '{}', expected < 4", q.lProgram.size(), q.id);
+      }
+      // fail of above check means that all streams are
       // after optimization already
       std::vector<std::list<field>::iterator> eraseList;
       auto it = q.lSchema.begin();
@@ -360,7 +370,9 @@ std::string compiler::expandSchemaWildcards() {
           // found! - and now unroll
           if (q.lProgram.size() == 1) {
             // we assure that on and only token is push_stream
-            assert((*q.lProgram.begin()).getCommandID() == PUSH_STREAM);
+            if ((*q.lProgram.begin()).getCommandID() != PUSH_STREAM) {
+              FATAL_ERROR("compiler::expandSchemaWildcards: first token must be PUSH_STREAM for single-token program, got cmd={} for query '{}'", (*q.lProgram.begin()).getStrCommandID(), q.id);
+            }
             auto nameOfscanningTable = (*q.lProgram.begin()).getStr_();
             // Remove of TSCAN
             eraseList.push_back(it);
@@ -406,9 +418,15 @@ std::string compiler::expandIndexWildcards() {
           if (size < minSizeFlat) minSizeFlat = size;
         }
 
-        assert(minSizeFlat != std::numeric_limits<int>::max());
-        assert(minSizeFlat > 0);
-        assert(q.lSchema.size() == 1);
+        if (minSizeFlat == std::numeric_limits<int>::max()) {
+          FATAL_ERROR("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
+        }
+        if (minSizeFlat <= 0) {
+          FATAL_ERROR("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
+        }
+        if (q.lSchema.size() != 1) {
+          FATAL_ERROR("compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'", q.lSchema.size(), q.id);
+        }
 
         field oldField = *q.lSchema.begin();
         q.lSchema.clear();
@@ -442,7 +460,7 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
     switch (cmd) {
       case PUSH_ID1:
         if (regex_search(text.c_str(), what, xprFieldId1)) {
-          assert(what.size() == 3);
+          if (what.size() != 3) FATAL_ERROR("compiler: PUSH_ID1 regex match has unexpected capture count");
           const std::string schema(what[1]);
           const std::string field(what[2]);
           // aim of this procedure is found schema, next field in schema
@@ -470,7 +488,7 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
         break;
       case PUSH_IDX:
         if (regex_search(text.c_str(), what, xprFieldIdX)) {
-          assert(what.size() == 2);
+          if (what.size() != 2) FATAL_ERROR("compiler: PUSH_IDX regex match has unexpected capture count");
           const std::string schema(what[1]);
           t = token(PUSH_IDX, std::make_pair(schema, 0));
         } else
@@ -478,7 +496,7 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
         break;
       case PUSH_ID2:
         if (regex_search(text.c_str(), what, xprFieldId2)) {
-          assert(what.size() == 3);
+          if (what.size() != 3) FATAL_ERROR("compiler: PUSH_ID2 regex match has unexpected capture count");
           const std::string schema(what[1]);
           const std::string sOffset1(what[2]);
           const int offset1(atoi(sOffset1.c_str()));
@@ -490,7 +508,7 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
         break;
       case PUSH_ID3:
         if (regex_search(text.c_str(), what, xprFieldId3)) {
-          assert(what.size() == 2);
+          if (what.size() != 2) FATAL_ERROR("compiler: PUSH_ID3 regex match has unexpected capture count");
           const std::string field(what[1]);
           query *pQ1(nullptr), *pQ2(nullptr);
           auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
@@ -525,7 +543,7 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
       case PUSH_ID4:
       case PUSH_ID5: {
         if (regex_search(text.c_str(), what, xprFieldId4) || regex_search(text.c_str(), what, xprFieldId5)) {
-          assert(what.size() == 4);
+          if (what.size() != 4) FATAL_ERROR("compiler: PUSH_ID4/5 regex match has unexpected capture count");
           const std::string schema(what[1]);
           const std::string sOffset1(what[2]);
           const std::string sOffset2(what[3]);
@@ -553,7 +571,9 @@ note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction */
 std::string compiler::resolveFieldReferences() {
   for (auto &q : coreInstance) {  // for each query
-    assert(!q.isReductionRequired());
+    if (q.isReductionRequired()) {
+      FATAL_ERROR("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+    }
     for (auto &f : q.lSchema) {  // for each field in query
       resolveTokenReferences(f.lProgram, q);  // for each token in query field
     }  // end for each field in query
@@ -571,7 +591,9 @@ std::string compiler::localizeFieldOffsets() {
 
   // This loop fill&create OffsetMap structure.
   for (auto &q : coreInstance) {            // for each query
-    assert(!q.isReductionRequired());       // that has at least two arguments
+    if (q.isReductionRequired()) {
+      FATAL_ERROR("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+    }       // that has at least two arguments
     auto offset{0};                         //
     std::map<std::string, int> offsetItem;  //
     for (auto &f : q.lProgram) {            // for each token in stream program
@@ -589,7 +611,9 @@ std::string compiler::localizeFieldOffsets() {
 
   // This loop converts with help of offsetMap
   for (auto &q : coreInstance) {            // for each query
-    assert(!q.isReductionRequired());       // that has at least two arguments and
+    if (q.isReductionRequired()) {
+      FATAL_ERROR("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+    }       // that has at least two arguments and
     for (auto &f : q.lSchema) {             // for each field in query and
       for (auto &t : f.lProgram) {          // for each token in query field - do:
         if (t.getCommandID() == PUSH_ID) {  // fix only PUSH_ID tokens
@@ -605,7 +629,9 @@ std::string compiler::localizeFieldOffsets() {
 std::string compiler::validateConstraints() {
   for (auto &q : coreInstance) {       // for each query
     if (q.isDeclaration()) continue;   // do not check declaration in constraints.
-    assert(!q.isReductionRequired());  // process data only with two or less arguments
+    if (q.isReductionRequired()) {
+      FATAL_ERROR("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+    }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     auto i{0};
     switch (cmd.getCommandID()) {
@@ -626,7 +652,9 @@ std::string compiler::validateConstraints() {
 std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> &capMap) {
   for (const auto &q : capMap) {                             // for each query
     if (coreInstance[q.first].policy.second == 0) continue;  // do not check declaration in constraints.
-    assert(!coreInstance[q.first].isReductionRequired());    // process data only with two or less arguments
+    if (coreInstance[q.first].isReductionRequired()) {
+      FATAL_ERROR("compiler: query '{}' requires reduction at applyCapacities stage", q.first);
+    }
     coreInstance[q.first].policy.second = q.second;          // set memory size
   }
   return std::string("OK");
@@ -642,14 +670,18 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
 
   for (auto &q : coreInstance) {       // for each query
     if (q.isDeclaration()) continue;   // that is not declaration
-    assert(!q.isReductionRequired());  // process data only with two or less arguments
+    if (q.isReductionRequired()) {
+      FATAL_ERROR("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+    }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
       case STREAM_TIMEMOVE: {
         // 	:- PUSH_STREAM(core0)
         //  :- STREAM_TIMEMOVE(1)
         //
-        assert(q.lProgram.size() == 2);
+        if (q.lProgram.size() != 2) {
+          FATAL_ERROR("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2", q.lProgram.size(), q.id);
+        }
 
         const auto nameSrc    = arg1;
         const auto timeOffset = std::get<int>(cmd.getVT());
@@ -659,11 +691,15 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
         //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
         //
-        assert(q.lProgram.size() == 2);
+        if (q.lProgram.size() != 2) {
+          FATAL_ERROR("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2", q.lProgram.size(), q.id);
+        }
 
         const auto nameSrc  = arg1;
         auto [step, length] = get<std::pair<int, int>>(cmd.getVT());
-        assert(step > 0);
+        if (step <= 0) {
+          FATAL_ERROR("compiler: AGSE step must be > 0, got {} for query '{}' in computeRequiredCapacities", step, q.id);
+        }
         length                    = abs(length);
         const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().flatElementCount();
         const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 2;
@@ -678,7 +714,9 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
     for (const auto &rule : q.lRules) {
       if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
-      assert(l < r);
+      if (l >= r) {
+        FATAL_ERROR("compiler: dump range invalid [{}..{}] for query '{}'", l, r, q.id);
+      }
       if (l < 0) {
         auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
         const auto nameSrc = arg1;

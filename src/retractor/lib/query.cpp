@@ -5,7 +5,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cassert>
+
+#include "fatalError.hpp"
 #include <cctype>
 #include <stdexcept>
 
@@ -163,15 +164,16 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
-      assert(step > 0);
+      if (step <= 0) {
+        FATAL_ERROR("query::descriptorFrom: AGSE step must be > 0, got: {}", step);
+      }
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
         retVal += rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
       }
     } break;
     default:
-      SPDLOG_ERROR("Undefined cmd: {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
-      assert(false);
+      FATAL_ERROR("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
   }
 
   if (!retention.noRetention()) {
@@ -184,7 +186,9 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   auto eIt = prog.begin();
   std::string sArg1;
   std::string sArg2;
-  assert(prog.size() < 4);
+  if (prog.size() >= 4) {
+    FATAL_ERROR("query::GetArgs: program too large — {} tokens, expected at most 3", prog.size());
+  }
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr_();  // 3

@@ -2,7 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cassert>
+#include "fatalError.hpp"
 #include <cstring>  // memcpy
 #include <memory>   // make_unique
 #include <optional>
@@ -54,8 +54,7 @@ void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
       break;
     default:
       SPDLOG_ERROR("Unsupported type in text data source: {}", static_cast<int>(rtype));
-      assert(false && "read - Unsupported type in text data source");
-      abort();
+      FATAL_ERROR("facctxtsrc: unsupported field type");
   }
 }
 
@@ -93,10 +92,8 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     return status;
   };
 
-  assert(position == 0);
   if (position != 0) return markAllNullAndZero(EXIT_FAILURE);
 
-  assert(recordSize_ != 0);
   if (recordSize_ == 0) return markAllNullAndZero(EXIT_FAILURE);
 
   if (!myFile_.is_open()) return markAllNullAndZero(EXIT_FAILURE);
@@ -115,8 +112,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
       auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
       if (token.has_value() && !isNullToken(*token)) {
         SPDLOG_ERROR("Expected NULL token for NULL field, got: {}", *token);
-        assert(false && "read - Expected NULL token for NULL field");
-        abort();
+        FATAL_ERROR("facctxtsrc: expected NULL token but got value");
       }
       payload_->setItem(i, std::nullopt);
       i++;
