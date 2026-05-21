@@ -341,8 +341,8 @@ jobs:
       - check-skipci
       - prep-env:
           build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+          conan_profile1: "[settings]"
+          conan_profile2: "compiler.cppstd=23"
       - conan-install:
           build_type: << parameters.build_type >>
           build_param: --build missing
