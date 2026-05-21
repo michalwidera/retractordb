@@ -37,6 +37,11 @@ workflows:
       - build-ARM:
           requires:
             - build-release
+  manual-arm:
+    when: manual
+    jobs:
+      - build-ARM
+
   nightly-partial:
     triggers:
       - schedule:
