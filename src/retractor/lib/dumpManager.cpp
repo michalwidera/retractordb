@@ -16,7 +16,7 @@
 extern dataModel *pProc;
 
 dumpTask::~dumpTask() {
-  if (fd != 0 && inBook) {
+  if (fd >= 0 && inBook) {
     ::close(fd);
   }
 }
@@ -89,7 +89,7 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
   for (auto &task : bookOfTasks[streamName]) {
     if (task.dumpedRecordsToGo == 0) continue;  // already completed task - will be removed later
 
-    if (task.fd == 0) {
+    if (task.fd < 0) {
       SPDLOG_ERROR("dumpManager::processStreamChunk file descriptor is not set for stream: {}", streamName);
       continue;
     }
@@ -97,7 +97,7 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
 
     if (dumpTaskCompleted) {
       ::close(task.fd);
-      task.fd = 0;  // mark fd in task as closed
+      task.fd = -1;  // mark fd in task as closed
     }
   }
 
@@ -109,7 +109,7 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
 bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
   if (task.dumpedRecordsToGo < 0) FatalError("dumpManager::buildDumpChunk: dumpedRecordsToGo is negative");
   if (task.delayDumpRecordsToGo < 0) FatalError("dumpManager::buildDumpChunk: delayDumpRecordsToGo is negative");
-  if (task.fd == 0) FatalError("dumpManager::buildDumpChunk: file descriptor is not set");
+  if (task.fd < 0) FatalError("dumpManager::buildDumpChunk: file descriptor is not set");
 
   // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
   if (task.delayDumpRecordsToGo != 0) {

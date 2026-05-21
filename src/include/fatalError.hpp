@@ -15,8 +15,10 @@ struct FatalError {
   [[noreturn]] FatalError(fmt::format_string<Args...> fmt_str, Args &&...args,
                           std::source_location loc = std::source_location::current()) {
     auto msg = fmt::format(fmt_str, std::forward<Args>(args)...);
-    spdlog::default_logger_raw()->log(spdlog::source_loc{loc.file_name(), static_cast<int>(loc.line()), loc.function_name()},
-                                      spdlog::level::critical, msg);
+    if (auto logger = spdlog::default_logger(); logger) {
+      logger->log(spdlog::source_loc{loc.file_name(), static_cast<int>(loc.line()), loc.function_name()},
+                  spdlog::level::critical, msg);
+    }
     spdlog::shutdown();
     std::cerr << "\nFATAL: " << msg << "\n";
     std::exit(EXIT_FAILURE);

@@ -35,6 +35,10 @@ foreach(item ${V_GLOB})
     target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=pread
                         -Wl,--wrap=write)
   endif()
+  if(OUTPUT_FILE_NOEXT STREQUAL "test_dumpManager")
+    target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
+                        -Wl,--wrap=write)
+  endif()
   if(OUTPUT_FILE_NOEXT STREQUAL "test_uxSysTermTools")
     target_sources(${OUTPUT_FILE_NOEXT}
                    PRIVATE ${CMAKE_SOURCE_DIR}/src/common/uxSysTermTools.cpp)
