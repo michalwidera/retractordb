@@ -341,14 +341,12 @@ jobs:
       - check-skipci
       - prep-env:
           build_package: make
-          conan_profile1: "[settings]"
-          conan_profile2: "compiler.cppstd=23"
       - conan-install:
           build_type: << parameters.build_type >>
-          build_param: --build missing
+          build_param: -s compiler.cppstd=23 --build missing
       - conan-build:
           build_type: << parameters.build_type >>
-          build_param: --build missing
+          build_param: -s compiler.cppstd=23 --build missing
       - run:
           name: Smoke test
           command: |
