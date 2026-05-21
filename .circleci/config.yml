@@ -2,6 +2,11 @@ version: 2.1
 
 # https://circleci.com/developer/machine/image/ubuntu-2204#image-tags
 
+parameters:
+  run_manual_arm:
+    type: boolean
+    default: false
+
 workflows:
   commit:
     jobs:
@@ -38,7 +43,7 @@ workflows:
           requires:
             - build-release
   manual-arm:
-    when: manual
+    when: << pipeline.parameters.run_manual_arm >>
     jobs:
       - build-ARM
 
