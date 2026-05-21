@@ -62,15 +62,11 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-  else
-    SPDLOG_INFO("::open {} -> {}", filename_, fd);
   assert(fd >= 0);
 
   fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd_shadow < 0)
     SPDLOG_ERROR("::open shadow {} -> {}", shadowName(), fd_shadow);
-  else
-    SPDLOG_INFO("::open shadow {} -> {}", shadowName(), fd_shadow);
   assert(fd_shadow >= 0);
 
   if (fd >= 0 && mainFileExisted) {
@@ -86,7 +82,6 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
           SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedMainSize, strerror(errno));
         }
       }
-      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedMainSize / recordSize_);
     }
   }
 
@@ -105,7 +100,6 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
                        strerror(errno));
         }
       }
-      SPDLOG_INFO("Restored {} with {} pending shadow entries", shadowName(), alignedShadowSize / entrySize);
     }
   }
 }
@@ -132,14 +126,11 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
   }
 
   if (percounter_ >= 0) {
-    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
     std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
       SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
-    } else {
-      SPDLOG_INFO("Rotated file {} to {}", filename_, rotated_filename);
     }
   }
 }
@@ -296,7 +287,6 @@ ssize_t posixBinaryFileWithShadow::merge() {
     SPDLOG_ERROR("::ftruncate shadow {} failed: {}", shadowName(), strerror(errno));
     return EXIT_FAILURE;
   }
-  SPDLOG_INFO("Merged {} shadow entries into {}", numEntries, filename_);
   return EXIT_SUCCESS;
 }
 

@@ -173,7 +173,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
-    SPDLOG_INFO("Not supported aggregation on type");
+    SPDLOG_ERROR("Not supported aggregation on type");
     assert(false);
     return *(localPayload.get());  // uninitialized payload
   }
@@ -423,10 +423,8 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
     auto result = expression.eval(condition, &payload);
     if (boolCast(result)) {
       if (r.action == rule::DUMP) {
-        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing dump rule: {} for stream: {}", r.name, qry.id);
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
       } else if (r.action == rule::SYSTEM) {
-        SPDLOG_INFO("streamInstance::constructRulesAndUpdate executing system command: {}", r.systemCommand);
         auto ret = system(r.systemCommand.c_str());
         if (ret == -1) {
           SPDLOG_ERROR("system() call failed");

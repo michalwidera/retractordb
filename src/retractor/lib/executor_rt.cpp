@@ -99,8 +99,6 @@ bool rtActivate() {
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(errno));
     ok = false;
-  } else {
-    SPDLOG_INFO("RT mode active, SCHED_FIFO priority {}", sp.sched_priority);
   }
   return ok;
 }

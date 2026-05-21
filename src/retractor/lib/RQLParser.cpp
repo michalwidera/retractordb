@@ -217,7 +217,6 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      SPDLOG_INFO("Select filename set to: {}", qry.filename);
       assert(qry.filename.size() > 0 && "Directive must not be empty!");
     }
 
@@ -225,7 +224,6 @@ class ParserListener : public RQLBaseListener {
       qry.storage_policy = ctx->type_name->getText();
       std::transform(qry.storage_policy.begin(), qry.storage_policy.end(), qry.storage_policy.begin(),
                      ::toupper);  // to upper case
-      SPDLOG_INFO("Select storage policy set to: {}", qry.storage_policy);
     }
 
     coreInstance.push_back(qry);

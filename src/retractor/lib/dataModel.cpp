@@ -24,13 +24,10 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
 
   assert(!coreInstance_.empty());
-  for (const auto &it : coreInstance_)
-    SPDLOG_INFO("query.id {}", it.id);
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
       directive_[it.id] = it.filename;
-      SPDLOG_INFO("Assert - directive {}", directive_[it.id]);
       assert(!directive_[it.id].empty());
     }
 
@@ -38,11 +35,6 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
                                 [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance_.erase(new_end, coreInstance_.end());
 
-  SPDLOG_INFO("!Storage path set to : {}", directive_[":STORAGE"]);
-  SPDLOG_INFO("!Substrat type is set: {}", directive_[":SUBSTRAT"]);
-  SPDLOG_INFO("!Rotation file is set: {}", directive_[":ROTATION"]);
-
-  SPDLOG_INFO("Create struct on CORE INSTANCE");
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
   for (auto const &[key, val] : qSet)
@@ -238,18 +230,9 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
 
-      SPDLOG_INFO("STREAM_HASH a:{}|{} b:{}|{} recordOffset {}",  //
-                  nameSrc1,
-                  boost::lexical_cast<std::string>(intervalSrc1),  //
-                  nameSrc2,                                        //
-                  boost::lexical_cast<std::string>(intervalSrc2),  //
-                  recordOffset);
-
       int retPosValue                 = 0;
       bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
       *(qSet[instance]->inputPayload) = *getPayload(direction ? nameSrc1 : nameSrc2, retPosValue);
-
-      SPDLOG_INFO("STREAM_HASH retPos:{} direction:{}", retPosValue, direction ? nameSrc1 : nameSrc2);
 
     } break;
     default:

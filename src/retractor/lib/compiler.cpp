@@ -678,7 +678,6 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
     for (const auto &rule : q.lRules) {
       if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
-      SPDLOG_DEBUG("Rule dumpRange: {}..{} for query: {}", l, r, q.id);
       assert(l < r);
       if (l < 0) {
         auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
@@ -714,7 +713,6 @@ std::string compiler::deduplicateSubstrats() {
 
         const std::string oldName = it->id;
         const std::string newName = it2->id;
-        SPDLOG_DEBUG("deduplicateSubstrats: replacing {} with {}", oldName, newName);
         for (auto &q : coreInstance)
           for (auto &tok : q.lProgram)
             if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == oldName) tok = token(PUSH_STREAM, newName);
@@ -766,11 +764,9 @@ std::string compiler::compile() {
 
 std::vector<std::string> compiler::importFrom(qTree &source) {
   std::vector<std::string> retVal;
-  SPDLOG_INFO("Merging core instances - current size: {}, new size: {}", coreInstance.size(), source.size());
   for (auto &q : source) {
     if (q.isCompilerDirective()) continue;
     if (coreInstance.exists(q.id)) continue;
-    SPDLOG_INFO("Merging query id: {}", q.id);
     coreInstance.push_back(q);
     retVal.push_back(q.id);
   }

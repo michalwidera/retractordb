@@ -166,7 +166,7 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
   const size_t eSize       = entrySize();
   const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
   if (payloadSize % eSize != 0) {
-    SPDLOG_DEBUG("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, eSize);
+    SPDLOG_WARN("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, eSize);
   }
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
@@ -426,7 +426,6 @@ void metaDataStream::reset() {
   tailDirty_             = false;
   rewriteFile(std::vector<IndexRecord>());
 
-  SPDLOG_DEBUG("metaDataStream reset - all entries cleared");
 }
 
 }  // namespace rdb

@@ -16,15 +16,11 @@ FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
       isLocked(false),
       lockFilePath("") {
   lockFilePath = std::filesystem::temp_directory_path() / (serviceName + ".lock");
-  SPDLOG_INFO("Service guard for {} initialized", serviceName);
-  SPDLOG_INFO("Lock file path: {}", lockFilePath);
 }
 
 FlockServiceGuard::~FlockServiceGuard() { releaseLock(); }
 
 bool FlockServiceGuard::acquireLock() {
-  SPDLOG_INFO("Attempting to acquire lock...");
-
   // Open or create the lock file
   lockFileDescriptor = open(lockFilePath.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
@@ -32,8 +28,6 @@ bool FlockServiceGuard::acquireLock() {
     SPDLOG_ERROR("Failed to open lock file: {} ,errno: {}", lockFilePath, strerror(errno));
     return false;
   }
-
-  SPDLOG_INFO("Lock file opened (FD: {})", lockFileDescriptor);
 
   // Non-blocking exclusive lock
   int flockResult = flock(lockFileDescriptor, LOCK_EX | LOCK_NB);
@@ -51,7 +45,6 @@ bool FlockServiceGuard::acquireLock() {
     return false;
   }
 
-  SPDLOG_INFO("Lock acquired on file: {}", lockFilePath);
   isLocked = true;
 
   if (!writeLockInfo()) {
@@ -65,8 +58,6 @@ bool FlockServiceGuard::isLockActive() const { return isLocked && lockFileDescri
 
 void FlockServiceGuard::releaseLock() {
   if (isLocked && lockFileDescriptor != -1) {
-    SPDLOG_INFO("Releasing lock on file: {}", lockFilePath);
-
     if (flock(lockFileDescriptor, LOCK_UN) == -1) {
       SPDLOG_WARN("Failed to release lock: {} , errno: {}", lockFilePath, strerror(errno));
     }
@@ -79,8 +70,6 @@ void FlockServiceGuard::releaseLock() {
     isLocked           = false;
 
     cleanupLockFile();
-
-    SPDLOG_INFO("Lock released and cleaned up: {}", lockFilePath);
   }
 }
 
@@ -127,12 +116,7 @@ bool FlockServiceGuard::writeLockInfo() {
     return false;
   }
 
-  SPDLOG_INFO("Process info written to lock file: {}", lockFilePath);
   return true;
 }
 
-void FlockServiceGuard::cleanupLockFile() {
-  if (unlink(lockFilePath.c_str()) == 0) {
-    SPDLOG_INFO("Lock file removed: {}", lockFilePath);
-  }
-}
+void FlockServiceGuard::cleanupLockFile() { unlink(lockFilePath.c_str()); }

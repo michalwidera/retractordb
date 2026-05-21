@@ -38,16 +38,16 @@ extern std::vector<std::pair<std::string, std::string>> processedLines;
 static void handleSignal(int signum) {
   switch (signum) {
     case SIGINT:
-      SPDLOG_INFO("Received SIGINT, initiating shutdown...");
+      SPDLOG_WARN("Received SIGINT, initiating shutdown...");
       break;
     case SIGTERM:
-      SPDLOG_INFO("Received SIGTERM, initiating shutdown...");
+      SPDLOG_WARN("Received SIGTERM, initiating shutdown...");
       break;
     case SIGHUP:
-      SPDLOG_INFO("Received SIGHUP, initiating shutdown...");
+      SPDLOG_WARN("Received SIGHUP, initiating shutdown...");
       break;
     default:
-      SPDLOG_INFO("Received unknown signal: {}", signum);
+      SPDLOG_WARN("Received unknown signal: {}", signum);
       break;
   }
 
@@ -60,12 +60,8 @@ void dropArtifactFile(const std::filesystem::path &artifact_filename) {
     std::error_code ec;
     std::filesystem::remove(artifact_filename, ec);
     if (ec) {
-      SPDLOG_INFO("Info - Failed to remove file {}: {}", artifact_filename.string(), ec.message());
-    } else {
-      SPDLOG_INFO("Removed file: {}", artifact_filename.string());
+      SPDLOG_WARN("Failed to remove file {}: {}", artifact_filename.string(), ec.message());
     }
-  } else {
-    SPDLOG_INFO("No file found {}", artifact_filename.string());
   }
 }
 
@@ -216,13 +212,10 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, handleSignal);  // Terminate
   signal(SIGHUP, handleSignal);   // Hangup
 
-  SPDLOG_INFO("Current process PID: {}", getpid());
-
   bool rotation_enabled =
       std::any_of(coreInstance.begin(), coreInstance.end(), [](const auto &it) { return it.id == ":ROTATION"; });
 
   if (!rotation_enabled) {
-    SPDLOG_INFO("Cleanup mode activated, removing artifact files.");
     std::string storage_location{""};
 
     for (const auto &it : coreInstance)
@@ -239,9 +232,6 @@ int main(int argc, char *argv[]) {
       dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".meta"));
     }
 
-    SPDLOG_INFO("Cleanup completed.");
-  } else {
-    SPDLOG_INFO("Percounter mode - data rotation on exit, no cleanup");
   }
 
   executorsm exec;

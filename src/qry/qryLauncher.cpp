@@ -45,7 +45,6 @@ int main(int argc, char *argv[]) {
   /* const int result_atexit = */
   std::atexit(cleanup);
 
-  bool supressok = false;
   try {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
@@ -119,7 +118,6 @@ int main(int argc, char *argv[]) {
         return system::errc::invalid_argument;
       }
       gnuplotDim = std::make_tuple(x, ymin, ymax);
-      supressok  = true;
     }
     if (vm.count("wait-server") && !vm.count("help")) {
       if (!waitForServer()) {
@@ -139,12 +137,10 @@ int main(int argc, char *argv[]) {
     if (vm.count("hello"))
       return obj.hello();
     else if (vm.count("kill") && timeLimit == 0) {
-      ptree pt = obj.netClient("kill", "");
-      SPDLOG_INFO("kill sent to server");
+      obj.netClient("kill", "");
     } else if (vm.count("dir")) {
       std::cout << obj.dir();
     } else if (vm.count("diryaml")) {
-      supressok = true;
       std::cout << obj.dirYaml();
     } else if (vm.count("adhoc") && sAdHoc != "") {
       if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
@@ -152,7 +148,6 @@ int main(int argc, char *argv[]) {
       auto ret = obj.detailShow(sDetailStream);
       if (ret != "") {
         std::cout << ret;
-        supressok = true;
       } else
         return system::errc::no_such_file_or_directory;
     } else if (vm.count("select") && sInputStream != "none") {
@@ -168,7 +163,5 @@ int main(int argc, char *argv[]) {
     SPDLOG_ERROR("Std: {}", e.what());
     return system::errc::interrupted;
   }
-  if (!supressok) SPDLOG_INFO("ok.");
-
   return system::errc::success;
 }

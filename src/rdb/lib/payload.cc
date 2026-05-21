@@ -169,10 +169,6 @@ payload payload::operator+(const payload &other) {
   descSum += other.descriptor;                    // ! moving this into constructor fails
   descSum.removeConfigurationFields();            //
   payload result(descSum);                        //
-  SPDLOG_INFO("operator+ {} {} {}",               //
-              descriptor.getSizeInBytes(),        //
-              other.descriptor.getSizeInBytes(),  //
-              result.descriptor.getSizeInBytes());
   std::copy(span().begin(), span().end(), result.span().begin());
   std::copy(other.span().begin(), other.span().end(), result.span().subspan(descriptor.getSizeInBytes()).begin());
 
@@ -272,7 +268,6 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
       case rdb::TYPE:
       case rdb::RETENTION:
       case rdb::RETMEMORY:
-        SPDLOG_INFO("Skip configuration field type: {}", static_cast<int>(requestedType));
         break;
       default:
         SPDLOG_ERROR("Type not supported: {}", (int)requestedType);

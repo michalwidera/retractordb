@@ -90,7 +90,6 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
-      SPDLOG_INFO("Adding existing segment: {}", name());
       writeCount_ = vec_.back()->count();
     }
   }

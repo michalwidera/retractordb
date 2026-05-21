@@ -27,8 +27,6 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     SPDLOG_ERROR("::open {} -> {}", filename_, fd);
-  else
-    SPDLOG_INFO("::open {} -> {}", filename_, fd);
   assert(fd >= 0);
 
   if (fd >= 0 && fileExisted) {
@@ -44,7 +42,6 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
           SPDLOG_ERROR("::ftruncate {} to {} failed during state restore: {}", filename_, alignedSize, strerror(errno));
         }
       }
-      SPDLOG_INFO("Restored {} with {} persisted records", filename_, alignedSize / recordSize_);
     }
   }
 }
@@ -61,14 +58,11 @@ posixBinaryFile::~posixBinaryFile() {
   }
 
   if (percounter_ >= 0) {
-    SPDLOG_INFO("Percounter mode - rotating file on close: {}", filename_);
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
     std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
       SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
-    } else {
-      SPDLOG_INFO("Rotated file {} to {}", filename_, rotated_filename);
     }
   }
 }

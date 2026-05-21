@@ -15,7 +15,6 @@ extern dataModel *pProc;
 
 dumpTask::~dumpTask() {
   if (fd != 0 && inBook) {
-    SPDLOG_INFO("dumpTask: Destroying task: {} and fd: {}", taskName, fd);
     ::close(fd);
   }
 }
@@ -56,15 +55,11 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   } else {
     task.delayDumpRecordsToGo = task.range.first;
   }
-  SPDLOG_INFO("DumpManager: registered dump task {} for stream {}, records to go: {}", task.taskName, streamName,
-              task.dumpedRecordsToGo);
 }
 
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
 
 void dumpManager::processStreamChunk(const std::string &streamName) {
-  SPDLOG_INFO("dumpManager::processStreamChunk for stream: {} task in book: {}", streamName, bookOfTasks[streamName].size());
-
   assert(pProc != nullptr && "dumpManager::processStreamChunk dataModel is not set");
   assert(pProc->qSet.find(streamName) != pProc->qSet.end() &&
          "dumpManager::processStreamChunk streamName not found in dataModel");
@@ -90,12 +85,8 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
     auto dumpTaskCompleted = buildDumpChunk(task, payLoadPtr);
 
     if (dumpTaskCompleted) {
-      SPDLOG_INFO("DumpManager: completed dump task {} for stream {}", task.taskName, streamName);
       ::close(task.fd);
       task.fd = 0;  // mark fd in task as closed
-    } else {
-      SPDLOG_INFO("DumpManager: continuing dump task {} for stream {}, records to go: {}", task.taskName, streamName,
-                  task.dumpedRecordsToGo);
     }
   }
 
@@ -111,16 +102,13 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
 
   // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
   if (task.delayDumpRecordsToGo != 0) {
-    SPDLOG_INFO("DumpManager: delaying dump for task {} by {} records", task.taskName, task.delayDumpRecordsToGo);
     task.delayDumpRecordsToGo--;
     return false;
   }
 
-  SPDLOG_INFO("::lseek dump with fd: {}", task.fd);
   auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
   assert(resultSeek != -1);
 
-  SPDLOG_INFO("::write dump with fd: {}", task.fd);
   ssize_t write_count_result = ::write(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes());
   assert(write_count_result > 0);
 
@@ -144,6 +132,5 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
   }
   int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
   assert(fd >= 0);
-  SPDLOG_INFO("Created dump file: {} with fd: {}", std::string(filename), fd);
   return std::make_pair(filename, fd);
 }

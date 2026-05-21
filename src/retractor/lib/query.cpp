@@ -90,17 +90,11 @@ rdb::Descriptor query::descriptorStorage() {
 
   if (!isDeclaration()) {
     if (!retention.noRetention()) {
-      SPDLOG_INFO("descriptorStorage/Retention: {} {}", retention.segments, retention.capacity);
       retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
-    } else {
-      SPDLOG_INFO("descriptorStorage/Retention: Empty");
     }
     if (policy.second != 0) {
-      SPDLOG_INFO("descriptorStorage/Retention memory: {}", policy.second);
       retVal += rdb::Descriptor("", policy.second, 0, rdb::RETMEMORY);
       retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
-    } else {
-      SPDLOG_INFO("descriptorStorage/Retention memory: Empty");
     }
     return retVal;
   }
@@ -129,7 +123,6 @@ void query::fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &
 
 // TODO: remove Descriptor(a,b) and use Descriptor(a,b,c) here - strings are broken if not fix
 rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
-  SPDLOG_INFO("call query::descriptorFrom()");
   rdb::Descriptor retVal{};
   if (isDeclaration()) {
     retVal += descriptorStorage();
@@ -182,7 +175,6 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
   }
 
   if (!retention.noRetention()) {
-    SPDLOG_INFO("descriptorFrom/Retention: {} {}", retention.segments, retention.capacity);
     retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
   }
   return retVal;

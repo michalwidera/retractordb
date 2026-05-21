@@ -30,12 +30,10 @@ ptree qry::netClient(const std::string& cmd, const std::string& arg) {
 bool qry::adhoc(const std::string& sAdhoc) {
   assert(sAdhoc != "");
   ptree pt = netClient("adhoc", sAdhoc);
-  SPDLOG_INFO("snd: adhoc {}", sAdhoc.c_str());
 
   std::string rcv("fail.");
   for (auto& [first, second] : pt) {
     rcv = second.get<std::string>("");
-    SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
 
   if (rcv != "OK") {
@@ -80,7 +78,6 @@ bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit
       if (timeLimitCntQry == 1) {
         if (vm.count("kill")) {
           netClient("kill", "");
-          SPDLOG_INFO("Time limit reached - exiting (kill on end).");
           transport_->done = true;
         }
         break;
@@ -130,12 +127,10 @@ bool qry::select(boost::program_options::variables_map& vm, const int iTimeLimit
 
 int qry::hello() {
   ptree pt = netClient("hello", "");
-  SPDLOG_INFO("snd: hello");
 
   std::string rcv("fail.");
   for (auto& [first, second] : pt) {
     rcv = second.get<std::string>("");
-    SPDLOG_INFO("rcv: {} {}", first.c_str(), rcv.c_str());
   }
   if (rcv != "world") {
     SPDLOG_ERROR("bad rcv: {}", rcv.c_str());

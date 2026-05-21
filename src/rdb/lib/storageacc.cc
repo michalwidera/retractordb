@@ -27,15 +27,9 @@ storage::storage(const std::string_view qryID,         //
   assert(!qryID.empty());
   assert(!fileName.empty());
 
-  if (isHold_) {
-    SPDLOG_INFO("Stream file '{}' created in HOLD state", storageFile_);
-  }
-
   metaIndexFile_ = storageFile_ + ".meta";
 
   if (storageParam.empty()) {
-    SPDLOG_INFO("That's OK. Storage path is empty - no change of storageFile");
-    SPDLOG_INFO("Meta index path {}", metaIndexFile_);
     return;  // no change
   }
 
@@ -45,16 +39,9 @@ storage::storage(const std::string_view qryID,         //
     abort();
   }
 
-  SPDLOG_INFO("Storage path before {}", storageFile_);
-  SPDLOG_INFO("Descriptor path before {}", descriptorFile_);
-
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
   storageFile_    = std::filesystem::path(storageParam) / std::filesystem::path(storageFile_);
   metaIndexFile_  = storageFile_ + ".meta";
-
-  SPDLOG_INFO("Meta index path {}", metaIndexFile_);
-  SPDLOG_INFO("Storage path changed to {}", storageFile_);
-  SPDLOG_INFO("Descriptor path changed to {}", descriptorFile_);
 }
 
 void storage::attachDescriptor(const Descriptor *descriptorParam) {
@@ -84,8 +71,6 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
     storagePayload_ = std::make_unique<rdb::payload>(descriptor);
     chamber_        = std::make_unique<rdb::payload>(descriptor);
 
-    SPDLOG_INFO("Payload created, Descriptor from file used.");
-
     attachStorage();
     return;
   }
@@ -111,7 +96,6 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
   storagePayload_ = std::make_unique<rdb::payload>(descriptor);
   chamber_        = std::make_unique<rdb::payload>(descriptor);
 
-  SPDLOG_INFO("Payload & Descriptor created.");
   attachStorage();
 }
 
@@ -125,8 +109,6 @@ void storage::moveRef() {
   if (it != descriptor.end()) {
     storageFile_   = (*it).rname;
     metaIndexFile_ = storageFile_ + ".meta";
-    SPDLOG_INFO("Storage ref from descriptor changed to {}", storageFile_);
-    SPDLOG_INFO("Meta index path changed to {}", metaIndexFile_);
   }
 
   // if storage object was created with default storage as ""
@@ -149,22 +131,18 @@ void storage::attachStorage() {
 
   if (it1 != descriptor.end()) {
     storageType_ = (*it1).rname;
-    SPDLOG_INFO("Storage type from descriptor {}", storageType_);
   }
 
   initializeAccessor();
 
   if (isDeclared()) {
-    SPDLOG_INFO("records declared source on {}", storageFile_);
     // Note: no meta index on declared sources, as they are read-only and not expected to have null values.
     return;
   }
 
   recordsCount_ = accessor_->count();
-  SPDLOG_INFO("record count {} on {}", recordsCount_, storageFile_);
 
   metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
-  SPDLOG_INFO("metaIndex file {} rInterval {}/{}", metaIndexFile_, rInterval_.numerator(), rInterval_.denominator());
 }
 
 storage::~storage() {
@@ -173,7 +151,6 @@ storage::~storage() {
     if (storageFile_ != "") auto statusRemove1 = remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
     if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) remove(metaIndexFile_.c_str());
-    SPDLOG_INFO("Disposable - drop storage, drop descriptor, drop meta");
   }
 }
 
@@ -201,7 +178,7 @@ void storage::initializeAccessor() {
   } else if (storageType_ == "TEXTSOURCE") {
     accessor_ = std::make_unique<rdb::textSourceRO>(storageFile_, descriptor, !isOneShot_);
   } else {
-    SPDLOG_INFO("Unsupported storage type {}", storageType_);
+    SPDLOG_ERROR("Unsupported storage type {}", storageType_);
     assert(false && "Unsupported storage type");
     abort();
   }
@@ -229,8 +206,6 @@ void storage::resetForUnitTest() {
   }
 
   assert(recordsCount_ == accessor_->count());
-
-  SPDLOG_INFO("reset - drop & recreate storage and meta index.");
 }
 
 void storage::cleanPayload(uint8_t *destination) {
@@ -254,12 +229,7 @@ bool storage::descriptorFileExist() { return std::filesystem::exists(descriptorF
 
 void storage::setDisposable(bool value) { isDisposable_ = value; }
 
-void storage::releaseOnHold() {
-  if (isHold_ == true) {
-    SPDLOG_INFO("RELEASE stream file '{}' from HOLD state", storageFile_);
-  }
-  isHold_ = false;
-}
+void storage::releaseOnHold() { isHold_ = false; }
 
 size_t storage::getRecordsCount() { return recordsCount_; }
 
@@ -300,10 +270,7 @@ void storage::purge() {
   // Reset meta index if it exists
   if (metaDataStream_) {
     metaDataStream_->reset();
-    SPDLOG_INFO("metaDataStream reset during purge");
   }
-
-  SPDLOG_INFO("purge - storage and meta index cleared");
 }
 
 void storage::markTransmissionGap(size_t gapDuration) {
@@ -313,7 +280,6 @@ void storage::markTransmissionGap(size_t gapDuration) {
   }
 
   metaDataStream_->onTransmissionGap(gapDuration);
-  SPDLOG_INFO("Transmission gap (duration={}) marked at record position {}", gapDuration, recordsCount_);
 }
 
 bool storage::hasGapBefore(size_t recordIndex) const {
@@ -348,7 +314,6 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
 
   if (isHold_) {
     std::memset(destination, 0, size);
-    SPDLOG_INFO("read on HOLD {} - fake data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront, recordsCount_);
     return true;
   }
 
@@ -361,7 +326,6 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
       else
         storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
     }
-    SPDLOG_INFO("read from file {} pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront, recordsCount_);
   } else {
     std::memset(destination, 0, size);
     storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
@@ -372,14 +336,10 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
 }
 
 bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
-  if (recordsCount_ == accessor_->count())
-    SPDLOG_INFO("revRead {}: recordsCount:{} ->count():{}", storageFile_, recordsCount_, accessor_->count());
-  else
+  if (recordsCount_ != accessor_->count())
     SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", storageFile_, recordsCount_, accessor_->count());
 
   if (isHold_) {
-    SPDLOG_INFO("revRead on HOLD {} - fake data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromBack,
-                recordsCount_);
     destination = (destination == nullptr)              //
                       ? storagePayload_->span().data()  //
                       : destination;
@@ -409,7 +369,6 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     // THIS IS ONLY ONE PLACE WHERE DATA ARE READ FROM SOURCE
     //
     auto result = accessor_->read(chamber_->span().data(), 0);
-    SPDLOG_INFO("Physical read from source {} into chamber_ result={}", accessor_->name(), result);
 
     if (auto *textSource = dynamic_cast<rdb::textSourceRO *>(accessor_.get())) {
       chamber_->setNullBitset(textSource->lastNullBitset());
@@ -438,8 +397,6 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // - only for recordIndex > 0 if sourceState::flux
   // - also for recordIndex == 0
 
-  SPDLOG_INFO("Buffer capacity = {}, recordIndex = {}, file = {}", circularBuffer_.capacity(), recordIndexFromBack,
-              storageFile_);
   assert((recordIndexFromBack < circularBuffer_.capacity()) && "Stop if we are accessing over Circular Buffer Size.");
 
   // in case of accessing buffer that has no data yet - zeros are returned
@@ -478,10 +435,8 @@ bool storage::write(const size_t recordIndex) {
       consecutiveNullCount_++;
       if (consecutiveNullCount_ > static_cast<size_t>(nullFillCount_)) {
         activeGapDuration_++;
-        SPDLOG_INFO("Gap phase: skipping write, activeGapDuration={}", activeGapDuration_);
         return true;
       }
-      SPDLOG_INFO("Nullfill phase: null record {}/{}", consecutiveNullCount_, nullFillCount_);
     } else {
       flushPendingGap();
       consecutiveNullCount_ = 0;
@@ -493,8 +448,6 @@ bool storage::write(const size_t recordIndex) {
   auto size   = descriptor.getSizeInBytes();
   auto result = 0;
   if (recordIndex >= recordsCount_) {
-    SPDLOG_INFO("append");
-
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     assert(result == 0);
     if (result == 0) recordsCount_++;
@@ -505,8 +458,6 @@ bool storage::write(const size_t recordIndex) {
     }
 
   } else {
-    SPDLOG_INFO("write {}", recordIndex);
-
     assert(recordsCount_ > 0);
     assert(recordIndex < recordsCount_);
 
@@ -530,8 +481,6 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
     metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
   }
 
-  SPDLOG_INFO("configureGapDetection rInterval={}/{} nullFillCount={}", rInterval_.numerator(), rInterval_.denominator(),
-              nullFillCount_);
 }
 
 boost::rational<int> storage::getSamplingInterval() const { return rInterval_; }
@@ -539,7 +488,6 @@ boost::rational<int> storage::getSamplingInterval() const { return rInterval_; }
 void storage::flushPendingGap() {
   if (activeGapDuration_ == 0 || !metaDataStream_) return;
   markTransmissionGap(activeGapDuration_);
-  SPDLOG_INFO("Flushed pending gap: duration={}", activeGapDuration_);
   activeGapDuration_ = 0;
 }
 

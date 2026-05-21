@@ -80,7 +80,7 @@ std::atomic<bool> executorsm::ipcReady{false};
 
 void cleanup() {
   if (iTimeLimitCnt != executorsm::stop_now) {
-    SPDLOG_INFO("Cleanup: Setting iTimeLimitCnt to stop_now.");
+    SPDLOG_WARN("Cleanup: Setting iTimeLimitCnt to stop_now.");
     iTimeLimitCnt = executorsm::stop_now;
     std::cout << "Cleanup!" << std::endl;
   }
@@ -99,7 +99,6 @@ ptree executorsm::collectStreamsParameters() {
   assert(coreInstancePtr != nullptr);
   ptree ptRetval;
   assert(pProc != nullptr && "pProc must be checked before procedure call.");
-  SPDLOG_DEBUG("get cmd rcv.");
   for (auto &q : *coreInstancePtr) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
 
@@ -124,7 +123,6 @@ ptree executorsm::collectStreamsParameters() {
 ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   qTree coreCopy;
   ptree ptRetval;
-  SPDLOG_INFO("got adhoc {} rcv.", adHocQuery);
 
   qTree coreInstanceCopy = *coreInstancePtr;
 
@@ -185,8 +183,6 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
-  SPDLOG_INFO("Compile chain OK, merged {} streams", mergedIds.size());
-
   for (const auto &id : mergedIds) {
     auto result = pProc->addQueryToModel(id);
     if (!result) {
@@ -196,8 +192,6 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     }
     processedLines.push_back({id, adHocQuery});
   }
-
-  SPDLOG_INFO("Adding to model OK, merged {} streams", mergedIds.size());
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;
@@ -220,7 +214,6 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     if (command == "detail" && pProc != nullptr) {
       std::string streamName = ptInval.get("db.argument", "");
       assert(streamName != "");
-      SPDLOG_DEBUG("got detail {} rcv.", streamName);
       for (const auto &s : (*coreInstancePtr)[streamName].lSchema) {
         ptRetval.put(std::string("db.field.") + s.field_.rname, s.field_.rname);
         ptRetval.put(std::string("db.field_type.") + s.field_.rname, GetStringdescFld(s.field_.rtype));
@@ -258,8 +251,6 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       assert(streamName != "");
       // check if command present id of process
       assert(ptInval.get("db.id", "") != "");
-      // Testing purposes only - get it off after testing
-      SPDLOG_DEBUG("got show {} rcv.", streamName);
       // Here we set that for process of given id we send appropriate data stream
       int streamId                     = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       id2StreamName_Relation[streamId] = streamName;
@@ -281,19 +272,13 @@ ptree executorsm::commandProcessor(ptree ptInval) {
     // This command stop (kills) server process
     //
     if (command == "kill") {
-      SPDLOG_DEBUG("got kill rcv.");
       iTimeLimitCnt = executorsm::stop_now;
     }
     //
     // Diagnostic method
     //
     if (command == "hello") {
-      SPDLOG_DEBUG("got hello.");
       ptRetval.put(std::string("db"), std::string("world"));
-      using boost::property_tree::ptree;
-      std::stringstream strstream;
-      write_info(strstream, ptRetval);
-      SPDLOG_DEBUG("reply: {}", strstream.str());
     }
   } catch (const boost::property_tree::ptree_error &e) {
     SPDLOG_ERROR("ptree fail: {}", e.what());
@@ -510,19 +495,15 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     bt.join();
     return system::errc::no_lock_available;
   }
-  SPDLOG_INFO("Service lock acquired successfully.");
-
   try {
     dataModel proc(*coreInstancePtr);
     pProc = &proc;
 
     if (vm.count("xqrywait")) {
-      SPDLOG_INFO("Waiting for first query to process.");
       if (vm.count("verbose")) std::cout << "Waiting for first query to start process.\n";
       std::unique_lock<std::mutex> scoped_lock(core_mutex);
       iTimeLimitCnt = executorsm::waitForXqry;
       cv.wait(scoped_lock, [this] { return iTimeLimitCnt != executorsm::waitForXqry; });
-      SPDLOG_INFO("First query received, starting processing loop. timeLimit:{}", static_cast<int>(iTimeLimitCnt));
       if (vm.count("verbose")) std::cout << "First query received, starting processing loop.\n";
     }
 
@@ -542,13 +523,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       if (it.isDeclaration()) inSet.insert(it.id);
     proc.processZeroStep();
     boradcast(inSet);
-
-    {
-      std::stringstream dummy;
-      for (const auto &p : inSet)
-        dummy << p << " ";
-      SPDLOG_INFO("ZERO-step processed for streams: {}", dummy.str());
-    }
     // End of ZERO-step
 
     // Loop of data processing
@@ -600,13 +574,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
       proc.processRows(inSet);
       boradcast(inSet);
-
-      {
-        std::stringstream dummy;
-        for (const auto &p : inSet)
-          dummy << p << " ";
-        SPDLOG_INFO("NEXT-step processed for streams: {}", dummy.str());
-      }
       // End of loop while( ! _kbhit(ignoreanykey) )
     }
     //
