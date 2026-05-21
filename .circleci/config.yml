@@ -343,10 +343,10 @@ jobs:
           build_package: make
       - conan-install:
           build_type: << parameters.build_type >>
-          build_param: -s compiler.cppstd=23 --build missing
+          build_param: -s compiler.cppstd=23 -s:b compiler.cppstd=23 --build missing
       - conan-build:
           build_type: << parameters.build_type >>
-          build_param: -s compiler.cppstd=23 --build missing
+          build_param: -s compiler.cppstd=23 -s:b compiler.cppstd=23 --build missing
       - run:
           name: Smoke test
           command: |
