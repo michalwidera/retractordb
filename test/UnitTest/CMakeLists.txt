@@ -101,7 +101,8 @@ add_test(
   NAME ut-dataModel-compare
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
   COMMAND
-    bash -c "set -e ; \
+    bash -c
+    "set -e ; \
     rm -f str1 str1.meta str1.shadow str2 str2.meta str2.shadow str3 str3.meta str3.shadow str4 str4.meta str4.shadow ; \
     ${CMAKE_COMMAND} -E copy_if_different core0.desc.tpl core0.desc ; \
     ${CMAKE_COMMAND} -E copy_if_different core1.desc.tpl core1.desc ; \

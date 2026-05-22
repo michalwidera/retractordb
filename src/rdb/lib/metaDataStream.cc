@@ -77,8 +77,8 @@ void writeEntry(std::ostream &out, const metaDataStream::IndexRecord &entry) {
   out.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
 }
 
-std::vector<metaDataStream::IndexRecord> splitSegment(
-    const metaDataStream::IndexRecord &seg, size_t offset, const std::vector<bool> &newBitset) {
+std::vector<metaDataStream::IndexRecord> splitSegment(const metaDataStream::IndexRecord &seg, size_t offset,
+                                                      const std::vector<bool> &newBitset) {
   std::vector<metaDataStream::IndexRecord> result;
   if (offset > 0) result.push_back({seg.nullBitset, offset, false});
   result.push_back({newBitset, 1, false});
@@ -149,7 +149,8 @@ void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
   std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
   if (!out.is_open()) return;
   writeHeader(out, creationTime_);
-  for (const auto &rec : entries) writeEntry(out, rec);
+  for (const auto &rec : entries)
+    writeEntry(out, rec);
   out.close();
   std::filesystem::rename(tmpPath, metaFilePath_);
 }
@@ -218,6 +219,7 @@ std::pair<size_t, size_t> metaDataStream::locateRecord(size_t recordIndex) const
       if (recordIndex < cumulative + entries[i].recordCount) return {i, recordIndex - cumulative};
       cumulative += entries[i].recordCount;
     }
+    throw std::logic_error("metaDataStream: committedRecordCount_ inconsistent with on-disk entries");
   }
 
   if (recordIndex < committedRecordCount_ + currentEntry_.recordCount)

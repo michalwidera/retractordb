@@ -154,7 +154,7 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   EXPECT_TRUE(meta.isGapBefore(4));
 
   {
-    auto segs    = meta.segments();
+    auto segs     = meta.segments();
     size_t gapCnt = std::count_if(segs.begin(), segs.end(), [](const auto &e) { return e.isGap; });
     EXPECT_EQ(gapCnt, 2u);
   }

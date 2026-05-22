@@ -60,7 +60,7 @@ TEST_F(UsageFixture, scenariusz_nagrywanie_rekordow) {
   // Odczyt wzorca null dla dowolnego rekordu po fakcie:
   EXPECT_EQ(meta.getNullBitset(0), allPresent);
   EXPECT_EQ(meta.getNullBitset(1), allPresent);
-  EXPECT_EQ(meta.getNullBitset(2), valNull);   // rekord 2 miał null
+  EXPECT_EQ(meta.getNullBitset(2), valNull);  // rekord 2 miał null
   EXPECT_EQ(meta.getNullBitset(3), allPresent);
 
   // Indywidualne pole: czy pole 'val' (indeks 0) rekordu 2 jest null?
@@ -80,8 +80,10 @@ TEST_F(UsageFixture, scenariusz_kompresja_rle) {
   rdb::metaDataStream meta(descriptor, file);
 
   // 500 rekordów z czujnika online (allPresent), po nich 200 rekordów offline.
-  for (int i = 0; i < 500; ++i) meta.onRecordAppended(allPresent);
-  for (int i = 0; i < 200; ++i) meta.onRecordAppended(allNull);
+  for (int i = 0; i < 500; ++i)
+    meta.onRecordAppended(allPresent);
+  for (int i = 0; i < 200; ++i)
+    meta.onRecordAppended(allNull);
 
   EXPECT_EQ(meta.totalRecords(), 700u);
 
@@ -164,7 +166,7 @@ TEST_F(UsageFixture, scenariusz_przerwa_w_transmisji) {
   EXPECT_FALSE(meta.isGapBefore(4));
 
   // Segment gap widoczny w strukturze RLE.
-  auto segs = meta.segments();
+  auto segs       = meta.segments();
   size_t gapCount = 0;
   for (const auto &s : segs)
     if (s.isGap) ++gapCount;
@@ -218,7 +220,8 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
   rdb::metaDataStream meta(descriptor, file);
 
   // 5 rekordów: wszystkie allNull (np. czujnik był offline).
-  for (int i = 0; i < 5; ++i) meta.onRecordAppended(allNull);
+  for (int i = 0; i < 5; ++i)
+    meta.onRecordAppended(allNull);
 
   // Okazuje się, że rekord 2 jednak miał dane — korekta po fakcie.
   meta.onRecordModified(2, allPresent);
@@ -254,7 +257,8 @@ TEST_F(UsageFixture, scenariusz_reset_strumienia) {
   rdb::metaDataStream meta(descriptor, file);
 
   // Pierwsza seria — 10 rekordów.
-  for (int i = 0; i < 10; ++i) meta.onRecordAppended(allPresent);
+  for (int i = 0; i < 10; ++i)
+    meta.onRecordAppended(allPresent);
   EXPECT_EQ(meta.totalRecords(), 10u);
   EXPECT_FALSE(meta.isEmpty());
 
