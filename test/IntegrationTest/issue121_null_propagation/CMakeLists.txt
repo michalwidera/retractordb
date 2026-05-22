@@ -7,6 +7,7 @@
 # przeniosły się wartości null.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 # Verify that null values from the source file propagate correctly through a
 # SELECT query into the destination stream.

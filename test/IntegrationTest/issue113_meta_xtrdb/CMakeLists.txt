@@ -1,6 +1,7 @@
 # cd build/Debug && make install && ctest -R issue113_meta_xtrdb -V
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 # Step 1: run xretractor to produce str_null stream + meta index
 

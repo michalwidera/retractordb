@@ -1,6 +1,7 @@
 # cd build/Debug make install ; ctest -R issue42_rule -V
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 add_test(
   NAME ${TestID}-compile

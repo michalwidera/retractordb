@@ -186,7 +186,7 @@ commands:
             xqry -h
             xtrdb -h
       - run:
-          name: Regression & Unit test
+          name: Integration & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
@@ -359,7 +359,7 @@ jobs:
             xqry -h
             xtrdb -h
       - run:
-          name: Regression & Unit test
+          name: Integration & Unit test
           command: |
             export PATH="$HOME/retractordb/bin:$PATH"
             cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml

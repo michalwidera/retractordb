@@ -1,6 +1,7 @@
 # cd build/Debug && make install && ctest -R issue128_string_to_numeric -V
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 # Weryfikuje konwersję pól STRING do typów numerycznych za pomocą funkcji
 # to_integer(), to_float(), to_double(). Dane wejściowe: STRING "10", "25", "-5"
