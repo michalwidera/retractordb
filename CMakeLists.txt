@@ -57,6 +57,9 @@ endif()
 include(CTest)
 enable_testing()
 
+file(WRITE ${CMAKE_BINARY_DIR}/CTestCustom.cmake
+     "set(CTEST_PARALLEL_LEVEL 0)\n")
+
 include_directories(
   ${Boost_INCLUDE_DIR}
   ${Boost_LIBRARY_DIRS}
