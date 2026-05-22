@@ -10,12 +10,12 @@ add_test(
     "set -e ; \
     mkdir -p temp ; \
     rm -f temp/str_null temp/str_null.* temp/core0 temp/core0.* ; \
-    for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 1; done ; \
+    for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 0.1; done ; \
     [ ! -f /tmp/xretractor_service.lock ] ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     xqry -s str_null -k -m 5 > /dev/null ; \
-    for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 1; done ; \
+    for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 0.1; done ; \
     [ ! -f /tmp/xretractor_service.lock ] ; \
     ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
     grep -Fq 'header size: 8' out.txt ; \

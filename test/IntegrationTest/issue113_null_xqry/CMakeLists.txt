@@ -9,8 +9,8 @@ add_test(
     bash -c "set -e ; \
     mkdir -p temp ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     xqry -s str_null -k -m 3 > out.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     grep -F '10 null' out.txt ; \
     grep -F '20 30' out.txt")

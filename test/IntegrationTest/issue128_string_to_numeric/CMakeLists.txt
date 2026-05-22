@@ -12,9 +12,9 @@ add_test(
     bash -c "set -e ; \
     mkdir -p temp ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     xqry -s dst -k -m 4 > out.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     grep -F '11 10 10' out.txt ; \
     grep -F '26 25 25' out.txt ; \
     grep -F -- '-4 -5 -5' out.txt ; \
