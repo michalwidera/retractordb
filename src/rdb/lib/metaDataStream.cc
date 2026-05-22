@@ -12,29 +12,21 @@
 namespace rdb {
 
 // ── IndexRecord serialization ────────────────────────────────────────
-// Format (all fields little-endian, native size_t):
-//   [recordCount : size_t]    // 0 = transmission gap marker
-//   [bitsetSize  : size_t]
-//   [bitset bytes: ceil(bitsetSize/8)]
 
 std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   const size_t bitsetSize = nullBitset.size();
   const size_t byteCount  = (bitsetSize + 7) / 8;
-
-  const size_t totalSize = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + byteCount;
-  std::vector<std::byte> buf(totalSize, std::byte{0});
+  std::vector<std::byte> buf(sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + byteCount, std::byte{0});
   std::byte *ptr = buf.data();
 
-  uint8_t gapFlag = isGap ? 1 : 0;
-  std::memcpy(ptr, &gapFlag, sizeof(gapFlag));
-  ptr += sizeof(gapFlag);
+  auto write = [&]<typename T>(const T &val) {
+    std::memcpy(ptr, &val, sizeof(T));
+    ptr += sizeof(T);
+  };
 
-  std::memcpy(ptr, &recordCount, sizeof(recordCount));
-  ptr += sizeof(recordCount);
-
-  std::memcpy(ptr, &bitsetSize, sizeof(bitsetSize));
-  ptr += sizeof(bitsetSize);
-
+  write(static_cast<uint8_t>(isGap ? 1 : 0));
+  write(recordCount);
+  write(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
     if (nullBitset[i]) ptr[i / 8] |= static_cast<std::byte>(1u << (i % 8));
 
@@ -51,17 +43,14 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
     ptr += sizeof(T);
   };
 
-  metaDataStream::IndexRecord rec;
-
+  IndexRecord rec;
   uint8_t gapFlag = 0;
   read(gapFlag);
   rec.isGap = (gapFlag != 0);
-
   read(rec.recordCount);
 
   size_t bitsetSize = 0;
   read(bitsetSize);
-
   const size_t byteCount = (bitsetSize + 7) / 8;
   if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in bitset data");
 
@@ -69,9 +58,42 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
   for (size_t i = 0; i < bitsetSize; ++i)
     rec.nullBitset[i] = (std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1u;
 
-  ptr += byteCount;
   return rec;
 }
+
+// ── File I/O helpers ─────────────────────────────────────────────────
+
+namespace {
+
+constexpr size_t kHeaderSize = sizeof(int64_t);
+
+void writeHeader(std::ostream &out, std::chrono::system_clock::time_point t) {
+  int64_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+  out.write(reinterpret_cast<const char *>(&ns), sizeof(ns));
+}
+
+void writeEntry(std::ostream &out, const metaDataStream::IndexRecord &entry) {
+  auto buf = entry.serialize();
+  out.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+}
+
+std::vector<metaDataStream::IndexRecord> splitSegment(
+    const metaDataStream::IndexRecord &seg, size_t offset, const std::vector<bool> &newBitset) {
+  std::vector<metaDataStream::IndexRecord> result;
+  if (offset > 0) result.push_back({seg.nullBitset, offset, false});
+  result.push_back({newBitset, 1, false});
+  if (offset + 1 < seg.recordCount) result.push_back({seg.nullBitset, seg.recordCount - offset - 1, false});
+  return result;
+}
+
+size_t sumNonGapRecords(const std::vector<metaDataStream::IndexRecord> &entries) {
+  size_t total = 0;
+  for (const auto &e : entries)
+    if (!e.isGap) total += e.recordCount;
+  return total;
+}
+
+}  // namespace
 
 // ── Private helpers ──────────────────────────────────────────────────
 
@@ -81,11 +103,8 @@ void metaDataStream::createNullBitsetTemplate() {
 }
 
 size_t metaDataStream::entrySize() const {
-  const size_t bitsetBytes = (descriptorRef_->size() + 7) / 8;
-  return sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
+  return sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + (descriptorRef_->size() + 7) / 8;
 }
-
-static constexpr size_t kHeaderSize = sizeof(int64_t);
 
 void metaDataStream::flushCurrentEntry() {
   if (currentEntry_.recordCount > 0) {
@@ -106,8 +125,7 @@ void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
   std::fstream f(metaFilePath_, std::ios::binary | std::ios::in | std::ios::out);
   if (!f.is_open()) return;
   f.seekp(0, std::ios::end);
-  const auto fileSize = f.tellp();
-  if (fileSize < static_cast<std::streamoff>(kHeaderSize + entrySize())) return;
+  if (f.tellp() < static_cast<std::streamoff>(kHeaderSize + entrySize())) return;
   f.seekp(-static_cast<std::streamoff>(entrySize()), std::ios::end);
   auto buf = entry.serialize();
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
@@ -115,39 +133,23 @@ void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
 
 void metaDataStream::saveHeader() {
   if (metaFilePath_.empty()) return;
-
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::trunc);
-  if (!out.is_open()) return;
-
-  int64_t creationTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(creationTime_.time_since_epoch()).count();
-  out.write(reinterpret_cast<const char *>(&creationTimeNs), sizeof(creationTimeNs));
+  if (out.is_open()) writeHeader(out, creationTime_);
 }
 
 void metaDataStream::appendEntry(const IndexRecord &entry) {
   if (metaFilePath_.empty()) return;
-
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::app);
-  if (!out.is_open()) return;
-
-  auto buf = entry.serialize();
-  out.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+  if (out.is_open()) writeEntry(out, entry);
 }
 
 void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
   if (metaFilePath_.empty()) return;
-
   const std::string tmpPath = metaFilePath_ + ".tmp";
   std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
   if (!out.is_open()) return;
-
-  int64_t creationTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(creationTime_.time_since_epoch()).count();
-  out.write(reinterpret_cast<const char *>(&creationTimeNs), sizeof(creationTimeNs));
-
-  for (const auto &rec : entries) {
-    auto buf = rec.serialize();
-    out.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
-  }
-
+  writeHeader(out, creationTime_);
+  for (const auto &rec : entries) writeEntry(out, rec);
   out.close();
   std::filesystem::rename(tmpPath, metaFilePath_);
 }
@@ -165,20 +167,16 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
 
   const size_t eSize       = entrySize();
   const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
-  if (payloadSize % eSize != 0) {
+  if (payloadSize % eSize != 0)
     SPDLOG_WARN("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, eSize);
-  }
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
-
   std::vector<std::byte> fileData(payloadSize);
   in.read(reinterpret_cast<char *>(fileData.data()), static_cast<std::streamsize>(payloadSize));
 
   std::span<const std::byte> remaining(fileData);
-
   while (remaining.size() >= eSize) {
-    auto rec = IndexRecord::deserialize(remaining.subspan(0, eSize));
-    result.push_back(std::move(rec));
+    result.push_back(IndexRecord::deserialize(remaining.subspan(0, eSize)));
     remaining = remaining.subspan(eSize);
   }
 
@@ -191,56 +189,39 @@ void metaDataStream::loadIndex() {
 
   in.seekg(0, std::ios::end);
   const auto fileSize = in.tellg();
-  if (fileSize <= 0) return;
+  if (fileSize <= 0 || static_cast<size_t>(fileSize) < kHeaderSize) return;
   in.seekg(0, std::ios::beg);
-
-  if (static_cast<size_t>(fileSize) < kHeaderSize) return;
 
   int64_t creationTimeNs = 0;
   in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
+  in.close();
 
   creationTime_ = std::chrono::system_clock::time_point(std::chrono::nanoseconds(creationTimeNs));
 
-  in.close();
-
-  // Read all committed entries from file
   auto allEntries = readCommittedEntries();
 
-  // Restore currentEntry_ from the last non-gap entry for RLE continuation
   if (!allEntries.empty() && !allEntries.back().isGap) {
     currentEntry_ = allEntries.back();
     allEntries.pop_back();
-
-    // Rewrite file without the last entry (it's now in currentEntry_)
     rewriteFile(allEntries);
-    tailDirty_ = false;
   }
 
-  // Compute committedRecordCount_ from what remains on disk
-  committedRecordCount_ = 0;
-  for (const auto &rec : allEntries) {
-    if (!rec.isGap) committedRecordCount_ += rec.recordCount;
-  }
+  committedRecordCount_ = sumNonGapRecords(allEntries);
 }
 
 std::pair<size_t, size_t> metaDataStream::locateRecord(size_t recordIndex) const {
-  // First check committed entries on disk
   if (recordIndex < committedRecordCount_) {
     auto entries      = readCommittedEntries();
     size_t cumulative = 0;
     for (size_t i = 0; i < entries.size(); ++i) {
       if (entries[i].isGap) continue;
-      if (recordIndex < cumulative + entries[i].recordCount) {
-        return {i, recordIndex - cumulative};
-      }
+      if (recordIndex < cumulative + entries[i].recordCount) return {i, recordIndex - cumulative};
       cumulative += entries[i].recordCount;
     }
   }
 
-  // Check the currentEntry_
-  if (recordIndex < committedRecordCount_ + currentEntry_.recordCount) {
+  if (recordIndex < committedRecordCount_ + currentEntry_.recordCount)
     return {std::numeric_limits<size_t>::max(), recordIndex - committedRecordCount_};
-  }
 
   throw std::out_of_range("recordIndex out of range in metaDataStream::locateRecord");
 }
@@ -252,13 +233,8 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &
       metaFilePath_(metaFilePath),
       creationTime_(std::chrono::system_clock::now()) {
   createNullBitsetTemplate();
-  loadIndex();  // may overwrite creationTime_ from file header
-
-  // Persist header even when there are no entries yet,
-  // so that the file exists on disk for external tools / crash recovery.
-  if (!metaFilePath_.empty() && !std::filesystem::exists(metaFilePath_)) {
-    saveHeader();
-  }
+  loadIndex();
+  if (!metaFilePath_.empty() && !std::filesystem::exists(metaFilePath_)) saveHeader();
 }
 
 metaDataStream::~metaDataStream() { flushCurrentEntry(); }
@@ -268,7 +244,6 @@ metaDataStream::~metaDataStream() { flushCurrentEntry(); }
 void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) {
   if (currentEntry_.nullBitset == nullBitsetParam && (currentEntry_.recordCount > 0 || pendingCommittedCount_ > 0)) {
     if (currentEntry_.recordCount == 0) {
-      // Last entry was flushed to disk with same bitset — mark tail dirty for lazy overwrite on next flush.
       tailDirty_                = true;
       currentEntry_.recordCount = pendingCommittedCount_;
       committedRecordCount_ -= pendingCommittedCount_;
@@ -277,110 +252,52 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
     currentEntry_.recordCount++;
   } else {
     pendingCommittedCount_ = 0;
-    flushCurrentEntry();  // overwrites or appends (noop if count==0)
+    flushCurrentEntry();
     currentEntry_.nullBitset  = nullBitsetParam;
     currentEntry_.recordCount = 1;
   }
 }
 
 void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
-  auto [segIdx, offset] = locateRecord(recordIndex);
-
+  auto [segIdx, offset]     = locateRecord(recordIndex);
   const bool inCurrentEntry = (segIdx == std::numeric_limits<size_t>::max());
 
   if (inCurrentEntry) {
-    // Modify within currentEntry_ (in memory only)
     if (currentEntry_.nullBitset == nullBitsetParam) return;
 
-    // Split currentEntry_ into up to 3 parts: commit prefix to file, keep tail in currentEntry_
-    std::vector<IndexRecord> toCommit;
+    auto parts         = splitSegment(currentEntry_, offset, nullBitsetParam);
+    IndexRecord newCur = parts.back();
+    parts.pop_back();
 
-    if (offset > 0) {
-      IndexRecord before;
-      before.nullBitset  = currentEntry_.nullBitset;
-      before.recordCount = offset;
-      toCommit.push_back(std::move(before));
-    }
-
-    {
-      IndexRecord modified;
-      modified.nullBitset  = nullBitsetParam;
-      modified.recordCount = 1;
-      toCommit.push_back(std::move(modified));
-    }
-
-    size_t tailCount = currentEntry_.recordCount - offset - 1;
-
-    // Commit all parts except the last one to file; the last stays as currentEntry_
-    IndexRecord newCurrent;
-    if (tailCount > 0) {
-      newCurrent.nullBitset  = currentEntry_.nullBitset;
-      newCurrent.recordCount = tailCount;
-    } else {
-      newCurrent = toCommit.back();
-      toCommit.pop_back();
-    }
-
-    for (const auto &entry : toCommit) {
+    for (const auto &entry : parts) {
       appendEntry(entry);
       committedRecordCount_ += entry.recordCount;
     }
 
     pendingCommittedCount_ = 0;
-    currentEntry_          = newCurrent;
+    currentEntry_          = newCur;
     return;
   }
 
-  // Modify a committed entry on disk — read, split, rewrite
   auto allEntries = readCommittedEntries();
-
-  auto &seg = allEntries[segIdx];
+  auto &seg       = allEntries[segIdx];
   if (seg.nullBitset == nullBitsetParam) return;
 
-  std::vector<IndexRecord> replacement;
-
-  if (offset > 0) {
-    IndexRecord before;
-    before.nullBitset  = seg.nullBitset;
-    before.recordCount = offset;
-    replacement.push_back(std::move(before));
-  }
-
-  {
-    IndexRecord modified;
-    modified.nullBitset  = nullBitsetParam;
-    modified.recordCount = 1;
-    replacement.push_back(std::move(modified));
-  }
-
-  if (offset + 1 < seg.recordCount) {
-    IndexRecord after;
-    after.nullBitset  = seg.nullBitset;
-    after.recordCount = seg.recordCount - offset - 1;
-    replacement.push_back(std::move(after));
-  }
-
+  auto replacement = splitSegment(seg, offset, nullBitsetParam);
   allEntries.erase(allEntries.begin() + static_cast<std::ptrdiff_t>(segIdx));
   allEntries.insert(allEntries.begin() + static_cast<std::ptrdiff_t>(segIdx), replacement.begin(), replacement.end());
 
   rewriteFile(allEntries);
-
   pendingCommittedCount_ = 0;
-  committedRecordCount_  = 0;
-  for (const auto &rec : allEntries) {
-    if (!rec.isGap) committedRecordCount_ += rec.recordCount;
-  }
+  committedRecordCount_  = sumNonGapRecords(allEntries);
 }
 
 // ── Query interface ──────────────────────────────────────────────────
 
 std::vector<bool> metaDataStream::getNullBitset(size_t recordIndex) const {
   auto [segIdx, offset] = locateRecord(recordIndex);
-  if (segIdx == std::numeric_limits<size_t>::max()) {
-    return currentEntry_.nullBitset;
-  }
-  auto entries = readCommittedEntries();
-  return entries[segIdx].nullBitset;
+  if (segIdx == std::numeric_limits<size_t>::max()) return currentEntry_.nullBitset;
+  return readCommittedEntries()[segIdx].nullBitset;
 }
 
 size_t metaDataStream::totalRecords() const { return committedRecordCount_ + currentEntry_.recordCount; }
@@ -393,7 +310,7 @@ const metaDataStream::IndexRecord &metaDataStream::pendingEntry() const { return
 
 void metaDataStream::onTransmissionGap(size_t gapDuration) {
   flushCurrentEntry();
-  pendingCommittedCount_ = 0;  // gap marker follows; cannot merge with previous data entry
+  pendingCommittedCount_ = 0;
 
   IndexRecord gapMarker;
   gapMarker.nullBitset.resize(descriptorRef_->size(), true);
@@ -405,14 +322,13 @@ void metaDataStream::onTransmissionGap(size_t gapDuration) {
 bool metaDataStream::isGapBefore(size_t recordIndex) const {
   if (recordIndex == 0) return false;
 
-  auto allEntries   = readCommittedEntries();
   size_t cumulative = 0;
-  for (size_t i = 0; i < allEntries.size(); ++i) {
-    if (allEntries[i].isGap) {
+  for (const auto &e : readCommittedEntries()) {
+    if (e.isGap) {
       if (cumulative == recordIndex) return true;
       continue;
     }
-    cumulative += allEntries[i].recordCount;
+    cumulative += e.recordCount;
   }
   return false;
 }
@@ -424,7 +340,7 @@ void metaDataStream::reset() {
   committedRecordCount_  = 0;
   pendingCommittedCount_ = 0;
   tailDirty_             = false;
-  rewriteFile(std::vector<IndexRecord>());
+  saveHeader();
 }
 
 }  // namespace rdb
