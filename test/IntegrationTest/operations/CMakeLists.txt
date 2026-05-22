@@ -13,6 +13,7 @@
 # odporne na utratę pierwszych pakietów z powodu race connection.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -21,9 +22,9 @@ add_test(
     "set -e ; \
     rm -f *.meta *.desc str1 str2 str3 core0 core1 ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     xqry -s str3 -k -m 9 > out.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     awk 'BEGIN{lc1=0;lc0=0;between=0;seen_c1=0} \
          /^[0-9]/{v=\$1+0; \
            if(v>=100){ \

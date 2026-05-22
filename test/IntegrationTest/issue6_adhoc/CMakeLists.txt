@@ -1,6 +1,7 @@
 # cd build/Debug make install ; ctest -R issue6_adhoc -V
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 add_test(
   NAME ${TestID}-run

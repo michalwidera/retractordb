@@ -7,6 +7,7 @@
 # przeniosły się wartości null.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 # Verify that null values from the source file propagate correctly through a
 # SELECT query into the destination stream.
@@ -17,9 +18,9 @@ add_test(
     bash -c "set -e ; \
     mkdir -p temp ; \
     xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     xqry -s dst -k -m 3 > out.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 1; done ; \
+    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
     grep -F '10 null' out.txt ; \
     grep -F 'null 20' out.txt ; \
     grep -F '30 40' out.txt")

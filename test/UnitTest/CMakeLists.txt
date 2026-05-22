@@ -25,6 +25,7 @@ set(LIBRARY_TEST_SET
 
 foreach(item ${V_GLOB})
   get_filename_component(OUTPUT_FILE_NOEXT ${item} NAME_WLE)
+  string(REGEX REPLACE "^test_" "" TEST_SHORT ${OUTPUT_FILE_NOEXT})
   set(SOURCES_${OUTPUT_FILE_NOEXT}_TEST ${item} launch/main.cpp)
   add_executable(${OUTPUT_FILE_NOEXT} ${SOURCES_${OUTPUT_FILE_NOEXT}_TEST})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
@@ -52,23 +53,23 @@ foreach(item ${V_GLOB})
                    PRIVATE ${CMAKE_SOURCE_DIR}/src/qry/ipc_transport.cpp)
   endif()
   add_test(
-    NAME ut-${OUTPUT_FILE_NOEXT}-setup
+    NAME ut_${TEST_SHORT}-setup
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND bash -c "rm -f *.meta *.desc")
   set_tests_properties(
-    ut-${OUTPUT_FILE_NOEXT}-setup PROPERTIES FIXTURES_SETUP
-                                             ut-${OUTPUT_FILE_NOEXT}-fixture)
+    ut_${TEST_SHORT}-setup PROPERTIES FIXTURES_SETUP
+                                      ut_${TEST_SHORT}-fixture)
 
   add_test(
-    NAME ut-${OUTPUT_FILE_NOEXT}
+    NAME ut_${TEST_SHORT}
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND valgrind --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
   set_tests_properties(
-    ut-${OUTPUT_FILE_NOEXT} PROPERTIES FIXTURES_REQUIRED
-                                       ut-${OUTPUT_FILE_NOEXT}-fixture)
+    ut_${TEST_SHORT} PROPERTIES FIXTURES_REQUIRED
+                                ut_${TEST_SHORT}-fixture)
 endforeach()
 
 set(SOURCES_QRY_TEST
@@ -79,14 +80,14 @@ add_executable(test_xqry ${SOURCES_QRY_TEST})
 target_link_libraries(test_xqry PRIVATE ${LIBRARY_TEST_SET})
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)
 add_test(
-  NAME ut-xqry
+  NAME ut_xqry
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
   COMMAND valgrind --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)
 add_test(
-  NAME ut-dataModel-compile
+  NAME ut_dataModel-compile
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
   COMMAND
     sh -c
@@ -98,7 +99,7 @@ add_test(
     ${CMAKE_COMMAND} -E compare_files pattern_compile.txt out_compile.txt")
 
 add_test(
-  NAME ut-dataModel-compare
+  NAME ut_dataModel-compare
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel
   COMMAND
     bash -c
@@ -114,9 +115,9 @@ add_test(
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
 set_tests_properties(
-  ut-dataModel-compare PROPERTIES DEPENDS
-                                  "ut-dataModel-compile;ut-test_dataModel")
+  ut_dataModel-compare PROPERTIES DEPENDS
+                                  "ut_dataModel-compile;ut_dataModel")
 
 set_tests_properties(
-  ut-test_rdb ut-xqry ut-test_dataModel ut-dataModel-compile
-  ut-dataModel-compare ut-test_soperations PROPERTIES RUN_SERIAL TRUE)
+  ut_rdb ut_xqry ut_dataModel ut_dataModel-compile
+  ut_dataModel-compare ut_soperations PROPERTIES RUN_SERIAL TRUE)

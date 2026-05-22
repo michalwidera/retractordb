@@ -2,6 +2,7 @@
 # issue31_doc -V
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
 
 # Graph parameters
 set(XRETRACTOR_GRAPH_PARAM_0 "-d -p")
