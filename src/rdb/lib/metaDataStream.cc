@@ -302,9 +302,11 @@ std::vector<bool> metaDataStream::getNullBitset(size_t recordIndex) const {
 
 size_t metaDataStream::totalRecords() const { return committedRecordCount_ + currentEntry_.recordCount; }
 
-std::vector<metaDataStream::IndexRecord> metaDataStream::entries() const { return readCommittedEntries(); }
-
-const metaDataStream::IndexRecord &metaDataStream::pendingEntry() const { return currentEntry_; }
+std::vector<metaDataStream::IndexRecord> metaDataStream::segments() const {
+  auto result = readCommittedEntries();
+  if (currentEntry_.recordCount > 0) result.push_back(currentEntry_);
+  return result;
+}
 
 // ── Transmission-gap interface ───────────────────────────────────────
 

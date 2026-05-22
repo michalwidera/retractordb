@@ -89,12 +89,9 @@ class metaDataStream {
   ///        (sum of recordCount across all committed entries + pending entry).
   size_t totalRecords() const;
 
-  /// @brief Read-only access to all committed RLE entries (loaded from file).
-  std::vector<IndexRecord> entries() const;
-
-  /// @brief Read-only access to the pending (not yet committed) RLE entry.
-  /// Returns the in-memory accumulator; recordCount == 0 if nothing is pending.
-  const IndexRecord &pendingEntry() const;
+  /// @brief All RLE segments: committed (on-disk) entries followed by the pending
+  ///        in-memory entry if it is non-empty. Use this for inspection and testing.
+  std::vector<IndexRecord> segments() const;
 
   // ── Transmission-gap interface ─────────────────────────────────────
 

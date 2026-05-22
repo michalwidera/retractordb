@@ -131,7 +131,7 @@ TEST_F(MetaTestFixture, test_transmission_gap_positioning) {
   // Gap inserted after one record should be at record index 1.
   meta.onTransmissionGap();
   size_t gapCount = 0, gapPos = 0, cumulative = 0;
-  for (const auto &e : meta.entries()) {
+  for (const auto &e : meta.segments()) {
     if (e.isGap) {
       gapPos = cumulative;
       ++gapCount;
@@ -157,8 +157,8 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   meta.onRecordAppended(null_);    // rec 2
   meta.onRecordAppended(noNull_);  // rec 3 — forces recs 0-2 to disk
 
-  // recs 0-2 are now committed on disk, rec 3 is in currentEntry_
-  EXPECT_EQ(meta.entries().size(), 1u);  // one committed segment {null_, 3}
+  // recs 0-2 are now committed on disk, rec 3 is pending in memory
+  EXPECT_EQ(meta.segments().size(), 2u);
 
   // Modify rec 1 (committed on disk) — triggers rewriteFile
   meta.onRecordModified(1, noNull_);
@@ -169,8 +169,8 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   EXPECT_EQ(meta.getNullBitset(2), null_);
   EXPECT_EQ(meta.getNullBitset(3), noNull_);
 
-  // Verify persistence after rewriteFile
-  EXPECT_EQ(meta.entries().size(), 3u);  // split: {null_,1}, {noNull_,1}, {null_,1}
+  // Verify: 3 committed segments + 1 pending = 4 total
+  EXPECT_EQ(meta.segments().size(), 4u);
 }
 
 // R6: All data in file except last entry buffered in memory
@@ -182,19 +182,19 @@ TEST_F(MetaTestFixture, test_committed_on_disk_current_in_memory) {
   std::vector<bool> patA = {true};
   std::vector<bool> patB = {false};
 
-  // Same pattern — stays only in currentEntry_, nothing on disk
-  meta.onRecordAppended(patA);                     // rec 0
-  meta.onRecordAppended(patA);                     // rec 1
-  EXPECT_EQ(meta.entries().size(), 0u);            // nothing committed yet
-  EXPECT_EQ(meta.pendingEntry().recordCount, 2u);  // buffered in memory
+  // Same pattern — only one segment visible
+  meta.onRecordAppended(patA);                    // rec 0
+  meta.onRecordAppended(patA);                    // rec 1
+  EXPECT_EQ(meta.segments().size(), 1u);
+  EXPECT_EQ(meta.segments()[0].recordCount, 2u);
 
-  // Different pattern — flushes patA to disk, patB becomes currentEntry_
+  // Different pattern — patA flushed, patB becomes current
   meta.onRecordAppended(patB);           // rec 2
-  EXPECT_EQ(meta.entries().size(), 1u);  // patA committed to disk
-  EXPECT_EQ(meta.entries()[0].recordCount, 2u);
-  EXPECT_EQ(meta.entries()[0].nullBitset, patA);
-  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);  // patB in memory only
-  EXPECT_EQ(meta.pendingEntry().nullBitset, patB);
+  EXPECT_EQ(meta.segments().size(), 2u);
+  EXPECT_EQ(meta.segments()[0].recordCount, 2u);
+  EXPECT_EQ(meta.segments()[0].nullBitset, patA);
+  EXPECT_EQ(meta.segments().back().recordCount, 1u);
+  EXPECT_EQ(meta.segments().back().nullBitset, patB);
 }
 
 // R10: Handle large amounts of data
@@ -242,22 +242,22 @@ TEST_F(MetaTestFixture, test_rle_compression_structure) {
   for (int i = 0; i < 1000; ++i)
     meta.onRecordAppended(pat);
 
-  // All 1000 should be in a single currentEntry_ (no committed entries)
-  EXPECT_EQ(meta.entries().size(), 0u);
-  EXPECT_EQ(meta.pendingEntry().recordCount, 1000u);
+  // All 1000 in a single segment
+  EXPECT_EQ(meta.segments().size(), 1u);
+  EXPECT_EQ(meta.segments()[0].recordCount, 1000u);
   EXPECT_EQ(meta.totalRecords(), 1000u);
 
   // Force commit by switching pattern
   std::vector<bool> pat2 = {false};
   meta.onRecordAppended(pat2);
 
-  // Now the 1000-record run should be one committed entry
-  auto committed = meta.entries();
-  EXPECT_EQ(committed.size(), 1u);
-  EXPECT_EQ(committed[0].recordCount, 1000u);
-  EXPECT_EQ(committed[0].nullBitset, pat);
-  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);
-  EXPECT_EQ(meta.pendingEntry().nullBitset, pat2);
+  // Now: 1000-record run + pat2 run = 2 segments
+  auto segs = meta.segments();
+  EXPECT_EQ(segs.size(), 2u);
+  EXPECT_EQ(segs[0].recordCount, 1000u);
+  EXPECT_EQ(segs[0].nullBitset, pat);
+  EXPECT_EQ(segs[1].recordCount, 1u);
+  EXPECT_EQ(segs[1].nullBitset, pat2);
 }
 
 // ── Integration tests: null data arrival → IndexRecord aggregation ───
@@ -274,13 +274,13 @@ TEST_F(MetaTestFixture, integration_all_null_stream_aggregated_into_single_index
   for (int i = 0; i < 10; ++i)
     meta.onRecordAppended(allNull);
 
-  // All 10 records share the same pattern — must stay in one in-memory entry
+  // All 10 records share the same pattern — one segment
   EXPECT_EQ(meta.totalRecords(), 10u);
-  EXPECT_EQ(meta.entries().size(), 0u);             // nothing committed to disk yet
-  EXPECT_EQ(meta.pendingEntry().recordCount, 10u);  // single RLE run
-  EXPECT_EQ(meta.pendingEntry().nullBitset, allNull);
-  EXPECT_TRUE(meta.pendingEntry().nullBitset[0]);
-  EXPECT_TRUE(meta.pendingEntry().nullBitset[1]);
+  EXPECT_EQ(meta.segments().size(), 1u);
+  EXPECT_EQ(meta.segments()[0].recordCount, 10u);
+  EXPECT_EQ(meta.segments()[0].nullBitset, allNull);
+  EXPECT_TRUE(meta.segments()[0].nullBitset[0]);
+  EXPECT_TRUE(meta.segments()[0].nullBitset[1]);
 }
 
 // When the null pattern changes after all-null records, the all-null
@@ -298,14 +298,12 @@ TEST_F(MetaTestFixture, integration_all_null_run_committed_when_pattern_changes)
   meta.onRecordAppended(allNull);  // rec 2
   meta.onRecordAppended(mixed);    // rec 3 — triggers flush of all-null run
 
-  auto committed = meta.entries();
-  ASSERT_EQ(committed.size(), 1u);
-  EXPECT_EQ(committed[0].recordCount, 3u);
-  EXPECT_EQ(committed[0].nullBitset, allNull);
-
-  // Current in-memory entry holds the mixed record
-  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);
-  EXPECT_EQ(meta.pendingEntry().nullBitset, mixed);
+  auto segs = meta.segments();
+  ASSERT_EQ(segs.size(), 2u);
+  EXPECT_EQ(segs[0].recordCount, 3u);
+  EXPECT_EQ(segs[0].nullBitset, allNull);
+  EXPECT_EQ(segs[1].recordCount, 1u);
+  EXPECT_EQ(segs[1].nullBitset, mixed);
 }
 
 // A realistic data sequence: all-null, mixed-null, no-null records
@@ -332,18 +330,17 @@ TEST_F(MetaTestFixture, integration_realistic_sequence_produces_correct_index_re
 
   EXPECT_EQ(meta.totalRecords(), 9u);
 
-  // Two runs are committed; the last (noNull) is still in currentEntry_
-  auto committed = meta.entries();
-  ASSERT_EQ(committed.size(), 2u);
+  auto segs = meta.segments();
+  ASSERT_EQ(segs.size(), 3u);
 
-  EXPECT_EQ(committed[0].nullBitset, allNull);
-  EXPECT_EQ(committed[0].recordCount, 2u);
+  EXPECT_EQ(segs[0].nullBitset, allNull);
+  EXPECT_EQ(segs[0].recordCount, 2u);
 
-  EXPECT_EQ(committed[1].nullBitset, mixed);
-  EXPECT_EQ(committed[1].recordCount, 3u);
+  EXPECT_EQ(segs[1].nullBitset, mixed);
+  EXPECT_EQ(segs[1].recordCount, 3u);
 
-  EXPECT_EQ(meta.pendingEntry().nullBitset, noNull);
-  EXPECT_EQ(meta.pendingEntry().recordCount, 4u);
+  EXPECT_EQ(segs[2].nullBitset, noNull);
+  EXPECT_EQ(segs[2].recordCount, 4u);
 
   // Null-bitset queries must be consistent with the RLE structure
   EXPECT_EQ(meta.getNullBitset(0), allNull);
@@ -378,14 +375,9 @@ TEST_F(MetaTestFixture, integration_persistence_restores_aggregated_index_record
     rdb::metaDataStream meta(descriptor, metaFile);
     EXPECT_EQ(meta.totalRecords(), 7u);
 
-    auto committed = meta.entries();
-    // After reload all entries are committed (currentEntry_ is the last one
-    // restored as the in-memory accumulator with count=0 or the last segment)
-    // Total must account for all 7 records across the segments
     size_t total = 0;
-    for (const auto &e : committed)
+    for (const auto &e : meta.segments())
       total += e.recordCount;
-    total += meta.pendingEntry().recordCount;
     EXPECT_EQ(total, 7u);
 
     EXPECT_EQ(meta.getNullBitset(0), allNull);
@@ -472,8 +464,8 @@ TEST_F(MetaTestFixture, integration_storage_operations_with_meta) {
   meta.onRecordAppended(patB);  // rec 4 - forces patA to disk
 
   EXPECT_EQ(meta.totalRecords(), 5u);
-  EXPECT_EQ(meta.entries().size(), 1u);            // patA committed to disk
-  EXPECT_EQ(meta.pendingEntry().recordCount, 1u);  // patB in memory
+  EXPECT_EQ(meta.segments().size(), 2u);
+  EXPECT_EQ(meta.segments().back().recordCount, 1u);
 
   // Test modify on committed entry
   meta.onRecordModified(0, patB);
@@ -509,8 +501,8 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   EXPECT_TRUE(meta.isGapBefore(4));  // gap before recovery
 
   {
-    auto allEntries = meta.entries();
-    size_t gapCnt   = std::count_if(allEntries.begin(), allEntries.end(), [](const auto &e) { return e.isGap; });
+    auto segs    = meta.segments();
+    size_t gapCnt = std::count_if(segs.begin(), segs.end(), [](const auto &e) { return e.isGap; });
     EXPECT_EQ(gapCnt, 2u);
   }
 
@@ -539,7 +531,7 @@ TEST_F(MetaTestFixture, integration_reset_after_complex_operations) {
 
   EXPECT_EQ(meta.totalRecords(), 100u);
   {
-    auto e1 = meta.entries();
+    auto e1 = meta.segments();
     EXPECT_EQ(std::count_if(e1.begin(), e1.end(), [](const auto &e) { return e.isGap; }), 1u);
   }
 
@@ -549,7 +541,7 @@ TEST_F(MetaTestFixture, integration_reset_after_complex_operations) {
   EXPECT_TRUE(meta.isEmpty());
   EXPECT_EQ(meta.totalRecords(), 0u);
   {
-    auto e2 = meta.entries();
+    auto e2 = meta.segments();
     EXPECT_EQ(std::count_if(e2.begin(), e2.end(), [](const auto &e) { return e.isGap; }), 0u);
   }
 
@@ -601,7 +593,6 @@ TEST_F(MetaTestFixture, test_reset_clears_all_data) {
 
     EXPECT_EQ(meta.totalRecords(), 0u);
     EXPECT_TRUE(meta.isEmpty());
-    EXPECT_EQ(meta.pendingEntry().recordCount, 0u);
   }
 
   // Verify file is empty after reload
@@ -645,7 +636,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_retrieval) {
 
   std::vector<size_t> gapPositions;
   size_t cum = 0;
-  for (const auto &e : meta.entries()) {
+  for (const auto &e : meta.segments()) {
     if (e.isGap)
       gapPositions.push_back(cum);
     else
@@ -667,7 +658,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_empty) {
   meta.onRecordAppended(pat);
 
   {
-    auto e = meta.entries();
+    auto e = meta.segments();
     EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 0u);
   }
 }
@@ -686,7 +677,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
     meta.onTransmissionGap();
 
     {
-      auto e = meta.entries();
+      auto e = meta.segments();
       EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
     }
   }
@@ -694,7 +685,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
   // Reload and verify gaps are persisted
   {
     rdb::metaDataStream meta(descriptor, metaFile);
-    auto e = meta.entries();
+    auto e = meta.segments();
     EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
   }
 }
@@ -717,7 +708,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_merged_count) {
   meta.onRecordAppended(patA);  // rec 3 — currentEntry_={A,4}
   meta.flushCurrentEntry();     // overwrite disk: [A,4]
 
-  auto committed = meta.entries();
+  auto committed = meta.segments();
   ASSERT_EQ(committed.size(), 1u);
   EXPECT_EQ(committed[0].recordCount, 4u);
   EXPECT_EQ(committed[0].nullBitset, patA);
@@ -791,7 +782,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
   meta.onRecordAppended(patA);  // rec 3 — tailDirty_=true, currentEntry_={A,4}
   meta.onTransmissionGap();     // must overwrite [A,3]→[A,4] then append gap
 
-  auto committed = meta.entries();
+  auto committed = meta.segments();
   ASSERT_EQ(committed.size(), 2u);
   EXPECT_FALSE(committed[0].isGap);
   EXPECT_EQ(committed[0].recordCount, 4u);
@@ -825,7 +816,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
   meta.onRecordAppended(patB);  // {B,3}
   meta.flushCurrentEntry();     // overwrite [B,1]→[B,3]
 
-  auto committed = meta.entries();
+  auto committed = meta.segments();
   ASSERT_EQ(committed.size(), 2u);
   EXPECT_EQ(committed[0].nullBitset, patA);
   EXPECT_EQ(committed[0].recordCount, 5u);

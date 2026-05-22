@@ -1,45 +1,54 @@
 #!/bin/sh
 
-if [ -z "$1" ]
-  then
-    echo "No argument supplied. Try query-lnx.rql str2 str3"
-    exit 1
-fi
-
-if [ -z "$2" ]
-  then
-    echo "No argument supplied. Try query-lnx.rql str2 str3"
-    exit 1
-fi
-
-if [ -z "$3" ]
-  then
-    echo "No argument supplied. Try query-lnx.rql str2 str3"
-    exit 1
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+  echo "Usage: $0 <query.rql> <stream1> <stream2>"
+  exit 1
 fi
 
 pkill xretractor 2>/dev/null
-sleep 1
+sleep 0.5
 rm -f core*
 rm -f str*
 
-if ! xretractor $1 -c ; then exit 1 ; fi
+if ! xretractor "$1" -c; then exit 1; fi
 
-xretractor $1 -m 100 -k &
+xretractor "$1" -m 100 -k &
 XRETRACTOR_PID=$!
 
-sleep 1
+# Poll until xretractor accepts IPC queries (up to 5 seconds)
+READY=0
+for i in $(seq 1 10); do
+  sleep 0.5
+  if ! kill -0 $XRETRACTOR_PID 2>/dev/null; then
+    echo "xretractor exited unexpectedly"
+    exit 1
+  fi
+  if xqry -d > /dev/null 2>&1; then
+    READY=1
+    break
+  fi
+done
 
-if ! kill -0 $XRETRACTOR_PID 2>/dev/null; then
-  echo "xretractor failed to start"
+if [ $READY -ne 1 ]; then
+  echo "xretractor not ready after 5 seconds"
+  kill $XRETRACTOR_PID 2>/dev/null
   exit 1
 fi
 
 xqry -d
-xqry -s $2 -m 3
-xqry -s $3 -m 3
+
+if ! xqry -s "$2" -m 3; then
+  kill $XRETRACTOR_PID 2>/dev/null
+  exit 1
+fi
+
+if ! xqry -s "$3" -m 3; then
+  kill $XRETRACTOR_PID 2>/dev/null
+  exit 1
+fi
+
 xqry -l
-xqry -k
+xqry -k || true
 
 kill $XRETRACTOR_PID 2>/dev/null
 wait $XRETRACTOR_PID 2>/dev/null
