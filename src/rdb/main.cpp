@@ -397,8 +397,7 @@ int main(int argc, char *argv[]) {
         continue;
       }
       rdb::metaDataStream metaView(dacc->descriptor, metaFilePath);
-      auto committed       = metaView.entries();
-      const auto &cur      = metaView.pendingEntry();
+      const auto segs      = metaView.segments();
       const size_t nFields = dacc->descriptor.size();
 
       std::cout << BLUE << "meta: " << metaFilePath << "\n";
@@ -406,7 +405,7 @@ int main(int argc, char *argv[]) {
       std::cout << "total records: " << metaView.totalRecords() << "\n" << RESET;
 
       size_t segIdx = 0;
-      for (const auto &entry : committed) {
+      for (const auto &entry : segs) {
         std::cout << YELLOW << "[" << segIdx++ << "] ";
         if (entry.isGap) {
           std::cout << "gap (duration:" << entry.recordCount << ")\n";
@@ -421,16 +420,7 @@ int main(int argc, char *argv[]) {
         }
         std::cout << RESET;
       }
-      if (cur.recordCount > 0) {
-        std::cout << YELLOW << "[cur] [";
-        for (size_t fi = 0; fi < nFields; ++fi) {
-          if (fi > 0) std::cout << " ";
-          std::cout << dacc->descriptor[fi].rname << ":";
-          std::cout << (fi < cur.nullBitset.size() && cur.nullBitset[fi] ? "null" : "ok");
-        }
-        std::cout << "] runs:" << cur.recordCount << "\n" << RESET;
-      }
-      std::cout << BLUE << committed.size() + (cur.recordCount > 0 ? 1 : 0) << " segment(s)\n" << RESET;
+      std::cout << BLUE << segs.size() << " segment(s)\n" << RESET;
       continue;
     } else if (cmd == "metaraw") {
       const std::string metaFilePath =
