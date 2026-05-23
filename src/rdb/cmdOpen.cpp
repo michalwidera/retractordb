@@ -14,29 +14,27 @@ std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
 
 bool OpenCmd::execute(CommandContext& ctx) {
   std::cin >> ctx.file;
-  if (ctx.file.find('{') != std::string::npos) {
+  if (ctx.file.contains('{')) {
     std::cout << ctx.colors.RED << "unrecognized or missing file:" << ctx.file << "\n" << ctx.colors.RESET;
     return false;
   }
-  auto oldPos = ctx.file.find(".old");
-  if (oldPos != std::string::npos) {
-    ctx.dacc = std::make_unique<rdb::storage>(ctx.file.substr(0, oldPos), ctx.file, ctx.storageParam, ctx.storagePolicy);
-  } else {
-    ctx.dacc = std::make_unique<rdb::storage>(ctx.file, ctx.file, ctx.storageParam, ctx.storagePolicy);
-  }
+  const auto oldPos = ctx.file.find(".old");
+  const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
+  ctx.dacc = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+
   if (ctx.dacc->descriptorFileExist()) {
     ctx.dacc->attachDescriptor();
   } else {
-    std::string sschema;
-    std::string object;
+    std::string schema;
+    std::string token;
     do {
-      std::cin >> object;
-      sschema.append(object);
-      sschema.append(" ");
-    } while (object.find("}") == std::string::npos);
-    std::stringstream scheamStringStream(sschema);
+      std::cin >> token;
+      schema += token;
+      schema += ' ';
+    } while (!token.contains('}'));
+    std::stringstream schemaStream(schema);
     rdb::Descriptor desc;
-    scheamStringStream >> desc;
+    schemaStream >> desc;
     ctx.dacc->attachDescriptor(&desc);
   }
   ctx.payloadStatus = clean;

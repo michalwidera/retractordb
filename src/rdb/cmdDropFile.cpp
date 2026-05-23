@@ -10,12 +10,10 @@ std::pair<std::string, std::vector<std::string>> DropFileCmd::usage() const {
 bool DropFileCmd::execute(CommandContext& ctx) {
   std::string object;
   do {
-    object.clear();
     std::cin >> object;
-    if (!ctx.storageParam.empty() && object.find(ctx.storageParam) == std::string::npos) {
-      object = ctx.storageParam + "/" + object;
-    }
-    if (std::filesystem::exists(object)) std::filesystem::remove(object);
-  } while (object.find("}") == std::string::npos);
+    if (!ctx.storageParam.empty() && !object.contains(ctx.storageParam))
+      object = (std::filesystem::path(ctx.storageParam) / object).string();
+    std::filesystem::remove(object);
+  } while (!object.contains('}'));
   return true;
 }

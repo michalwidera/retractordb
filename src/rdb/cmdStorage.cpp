@@ -24,8 +24,8 @@ bool ReadCmd::execute(CommandContext& ctx) {
 bool ListCmd::execute(CommandContext& ctx) {
   int record{0};
   std::cin >> record;
-  for (auto i = 0; i < record; i++) {
-    if (i >= ctx.dacc->getRecordsCount()) {
+  for (int i = 0; i < record; i++) {
+    if (static_cast<size_t>(i) >= ctx.dacc->getRecordsCount()) {
       std::cout << ctx.colors.RED << "record out of range - list command\n" << ctx.colors.RESET;
       continue;
     }
@@ -35,7 +35,7 @@ bool ListCmd::execute(CommandContext& ctx) {
       std::cout << ctx.colors.RED << "fetch error\n" << ctx.colors.RESET;
       continue;
     }
-    std::cout << ctx.colors.ORANGE << rdb::singleLineFormat << *(ctx.dacc->getPayload()) << ctx.colors.RESET << std::endl;
+    std::cout << ctx.colors.ORANGE << rdb::singleLineFormat << *(ctx.dacc->getPayload()) << ctx.colors.RESET << "\n";
   }
   return false;
 }
@@ -100,9 +100,9 @@ bool SizeCmd::execute(CommandContext& ctx) {
 
 bool DescCmd::execute(CommandContext& ctx) {
   if (compact_)
-    std::cout << ctx.colors.YELLOW << rdb::singleLineFormat << ctx.dacc->descriptor << ctx.colors.RESET << std::endl;
+    std::cout << ctx.colors.YELLOW << rdb::singleLineFormat << ctx.dacc->descriptor << ctx.colors.RESET << "\n";
   else
-    std::cout << ctx.colors.YELLOW << ctx.dacc->descriptor << ctx.colors.RESET << std::endl;
+    std::cout << ctx.colors.YELLOW << ctx.dacc->descriptor << ctx.colors.RESET << "\n";
   return false;
 }
 
@@ -111,7 +111,7 @@ std::pair<std::string, std::vector<std::string>> CapCmd::usage() const {
 }
 
 bool CapCmd::execute(CommandContext& ctx) {
-  int backCapacityValue;
+  int backCapacityValue{};
   std::cin >> backCapacityValue;
   ctx.dacc->setCapacity(backCapacityValue);
   return true;

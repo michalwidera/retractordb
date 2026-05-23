@@ -2,32 +2,32 @@
 
 #include <any>
 #include <iostream>
-#include <string>
 
 std::pair<std::string, std::vector<std::string>> SetPosCmd::usage() const {
   return {"setpos [position][number value]", {"set payload field number value"}};
 }
 
 bool SetPosCmd::execute(CommandContext& ctx) {
-  int position{0};
+  int position{};
   std::cin >> position;
-  auto fieldName = ctx.dacc->descriptor[position].rname;
-  if (ctx.dacc->descriptor.fieldTypeName(fieldName) == "INTEGER") {
-    int value{0};
+  const auto fieldName = ctx.dacc->descriptor[position].rname;
+  const auto typeName  = ctx.dacc->descriptor.fieldTypeName(fieldName);
+  if (typeName == "INTEGER") {
+    int value{};
     std::cin >> value;
     ctx.dacc->getPayload()->setItem(position, value);
-  } else if (ctx.dacc->descriptor.fieldTypeName(fieldName) == "DOUBLE") {
-    double value{0};
+  } else if (typeName == "DOUBLE") {
+    double value{};
     std::cin >> value;
     ctx.dacc->getPayload()->setItem(position, value);
-  } else if (ctx.dacc->descriptor.fieldTypeName(fieldName) == "BYTE") {
-    uint8_t value{0};
+  } else if (typeName == "BYTE") {
+    uint8_t value{};
     std::cin >> value;
     ctx.dacc->getPayload()->setItem(position, value);
-  } else if (ctx.dacc->descriptor.fieldTypeName(fieldName) == "STRING") {
-    std::string record{""};
-    std::cin >> record;
-    ctx.dacc->getPayload()->setItem(position, record);
+  } else if (typeName == "STRING") {
+    std::string value;
+    std::cin >> value;
+    ctx.dacc->getPayload()->setItem(position, value);
   } else {
     std::cerr << "field not found\n";
   }
@@ -42,18 +42,18 @@ std::pair<std::string, std::vector<std::string>> GetPosCmd::usage() const {
 bool GetPosCmd::execute(CommandContext& ctx) {
   int position;
   std::cin >> position;
-  auto fieldName = ctx.dacc->descriptor[position].rname;
-  auto valueOpt  = ctx.dacc->getPayload()->getItem(position);
+  const auto fieldName = ctx.dacc->descriptor[position].rname;
+  const auto valueOpt  = ctx.dacc->getPayload()->getItem(position);
   if (!valueOpt.has_value()) {
-    std::cout << fieldName << ": null" << std::endl;
+    std::cout << fieldName << ": null\n";
     return false;
   }
-  std::any value = valueOpt.value();
-  if (value.type() == typeid(std::monostate)) std::cout << "null" << std::endl;
-  if (value.type() == typeid(std::string)) std::cout << std::any_cast<std::string>(value) << std::endl;
-  if (value.type() == typeid(int)) std::cout << std::any_cast<int>(value) << std::endl;
-  if (value.type() == typeid(uint8_t)) std::cout << std::any_cast<uint8_t>(value) << std::endl;
-  if (value.type() == typeid(float)) std::cout << std::any_cast<float>(value) << std::endl;
-  if (value.type() == typeid(double)) std::cout << std::any_cast<double>(value) << std::endl;
+  const std::any& value = *valueOpt;
+  if (value.type() == typeid(std::monostate))  std::cout << "null\n";
+  else if (value.type() == typeid(std::string)) std::cout << std::any_cast<std::string>(value) << "\n";
+  else if (value.type() == typeid(int))         std::cout << std::any_cast<int>(value) << "\n";
+  else if (value.type() == typeid(uint8_t))     std::cout << std::any_cast<uint8_t>(value) << "\n";
+  else if (value.type() == typeid(float))       std::cout << std::any_cast<float>(value) << "\n";
+  else if (value.type() == typeid(double))      std::cout << std::any_cast<double>(value) << "\n";
   return true;
 }

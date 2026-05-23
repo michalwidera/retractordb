@@ -17,7 +17,7 @@ bool SetCmd::execute(CommandContext& ctx) {
 
 bool PrintCmd::execute(CommandContext& ctx) {
   if (tabular_)
-    std::cout << ctx.colors.ORANGE << rdb::singleLineFormat << *(ctx.dacc->getPayload()) << ctx.colors.RESET << std::endl;
+    std::cout << ctx.colors.ORANGE << rdb::singleLineFormat << *(ctx.dacc->getPayload()) << ctx.colors.RESET << "\n";
   else
     std::cout << ctx.colors.ORANGE << *(ctx.dacc->getPayload()) << ctx.colors.RESET;
   return false;
@@ -28,7 +28,7 @@ std::pair<std::string, std::vector<std::string>> InputCmd::usage() const {
 }
 
 bool InputCmd::execute(CommandContext& ctx) {
-  for (auto i : ctx.dacc->descriptor)
+  for ([[maybe_unused]] const auto& _ : ctx.dacc->descriptor)
     std::cin >> *(ctx.dacc->getPayload());
   return false;
 }
