@@ -14,6 +14,7 @@ struct CommandContext {
   std::string& storageParam;
   std::string& storagePolicy;
   const Colors& colors;
+  bool& rox;
 };
 
 class ICommand {

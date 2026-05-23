@@ -90,10 +90,11 @@ int main(int argc, char *argv[]) {
   std::string prompt       = cliNoPrompt ? "" : ".";
   std::string ok           = cliNoPrompt ? "" : "ok\n";
 
-  CommandContext ctx{dacc, payloadStatus, file, storageParam, storagePolicy, colors};
+  CommandContext ctx{dacc, payloadStatus, file, storageParam, storagePolicy, colors, rox};
 
   std::map<std::string, std::unique_ptr<ICommand>> commands;
   commands["append"]   = std::make_unique<AppendCmd>();
+  commands["cap"]      = std::make_unique<CapCmd>();
   commands["dec"]      = std::make_unique<HexCmd>(false);
   commands["desc"]     = std::make_unique<DescCmd>(false);
   commands["descc"]    = std::make_unique<DescCmd>(true);
@@ -111,6 +112,7 @@ int main(int argc, char *argv[]) {
   commands["purge"]    = std::make_unique<PurgeCmd>();
   commands["read"]     = std::make_unique<ReadCmd>(false);
   commands["rlist"]    = std::make_unique<ListCmd>(true);
+  commands["rox"]      = std::make_unique<RoxCmd>();
   commands["rread"]    = std::make_unique<ReadCmd>(true);
   commands["set"]      = std::make_unique<SetCmd>();
   commands["setpos"]   = std::make_unique<SetPosCmd>();
@@ -167,8 +169,6 @@ int main(int argc, char *argv[]) {
       std::cout << "quitdrop|qd                     exit & drop artifacts (data, .desc, .meta)\n";
       std::cout << "storage [path]                  set storage path for database\n";
       std::cout << "policy [name]                   set storage policy\n";
-      std::cout << "rox                             remove on exit flip (data, .desc, .meta)\n";
-      std::cout << "cap [value]                     set device stream backread capacity\n";
       std::cout << "echo                            print message on terminal\n";
       std::cout << "system                          execute system command\n";
       std::cout << "#|rem [text]                    comment line\n";
@@ -197,13 +197,6 @@ int main(int argc, char *argv[]) {
       if (returnCode != 0) {
         std::cout << colors.RED << "system command error: " << returnCode << "\n" << colors.RESET;
       }
-    } else if (cmd == "cap") {
-      int backCapacityValue;
-      std::cin >> backCapacityValue;
-      dacc->setCapacity(backCapacityValue);
-    } else if (cmd == "rox") {
-      rox = !rox;
-      dacc->setDisposable(rox);
     } else {
       std::cout << colors.RED << "?\n" << colors.RESET;
       continue;

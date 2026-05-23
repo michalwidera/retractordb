@@ -105,3 +105,24 @@ bool DescCmd::execute(CommandContext& ctx) {
     std::cout << ctx.colors.YELLOW << ctx.dacc->descriptor << ctx.colors.RESET << std::endl;
   return false;
 }
+
+std::pair<std::string, std::vector<std::string>> CapCmd::usage() const {
+  return {"cap [value]", {"set device stream backread capacity"}};
+}
+
+bool CapCmd::execute(CommandContext& ctx) {
+  int backCapacityValue;
+  std::cin >> backCapacityValue;
+  ctx.dacc->setCapacity(backCapacityValue);
+  return true;
+}
+
+std::pair<std::string, std::vector<std::string>> RoxCmd::usage() const {
+  return {"rox", {"remove on exit flip (data, .desc, .meta)"}};
+}
+
+bool RoxCmd::execute(CommandContext& ctx) {
+  ctx.rox = !ctx.rox;
+  ctx.dacc->setDisposable(ctx.rox);
+  return true;
+}
