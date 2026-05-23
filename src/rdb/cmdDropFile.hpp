@@ -1,7 +1,7 @@
 #pragma once
 #include "ICommand.hpp"
 
-class OpenCmd : public ICommand {
+class DropFileCmd : public ICommand {
  public:
   std::pair<std::string, std::vector<std::string>> usage() const override;
   bool requiresConnection() const override { return false; }

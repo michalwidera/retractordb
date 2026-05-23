@@ -1,6 +1,14 @@
 #pragma once
-#include "rdb/storageacc.hpp"
-#include "xtrdbTypes.hpp"
+#include "ICommand.hpp"
 
-void executeSetPos(rdb::storage& dacc, payloadStatusType& payloadStatus);
-void executeGetPos(rdb::storage& dacc);
+class SetPosCmd : public ICommand {
+ public:
+  std::pair<std::string, std::vector<std::string>> usage() const override;
+  bool execute(CommandContext& ctx) override;
+};
+
+class GetPosCmd : public ICommand {
+ public:
+  std::pair<std::string, std::vector<std::string>> usage() const override;
+  bool execute(CommandContext& ctx) override;
+};

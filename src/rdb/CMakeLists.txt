@@ -7,7 +7,16 @@ find_package(antlr4 REQUIRED)
 
 add_subdirectory(lib)
 
-set(SOURCES_RDB main.cpp cmdOpen.cpp cmdMeta.cpp cmdFieldAccess.cpp ../common/uxSysTermTools.cpp)
+set(SOURCES_RDB
+    main.cpp
+    cmdDropFile.cpp
+    cmdFieldAccess.cpp
+    cmdMeta.cpp
+    cmdOpen.cpp
+    cmdPayload.cpp
+    cmdStatus.cpp
+    cmdStorage.cpp
+    ../common/uxSysTermTools.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 
