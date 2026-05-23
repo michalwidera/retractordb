@@ -10,20 +10,20 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>  // make_unique
 #include <string>
 
+#include "cmdFieldAccess.hpp"
+#include "cmdMeta.hpp"
+#include "cmdOpen.hpp"
 #include "config.h"
 #include "rdb/descriptor.hpp"
-#include "rdb/faccfs.hpp"
-#include "rdb/faccposix.hpp"
-#include "rdb/metaDataStream.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storageacc.hpp"
 #include "uxSysTermTools.hpp"
+#include "xtrdbTypes.hpp"
 
 using namespace boost;
 
@@ -31,18 +31,18 @@ using namespace boost;
  * This code creates xtrdb executable file.
  */
 
-enum payloadStatusType { fetched, clean, stored, changed, error };
-
 int main(int argc, char *argv[]) {
   payloadStatusType payloadStatus{clean};
 
-  std::string GREEN  = "\x1B[32m";
-  std::string RED    = "\x1B[31m";
-  std::string ORANGE = "\x1B[33m";
-  std::string BLUE   = "\x1B[34m";
-  std::string YELLOW = "\x1B[93m";
-  std::string RESET  = "\033[0m";
-  std::string BLINK  = "\x1b[5m";
+  Colors colors{
+      .GREEN  = "\x1B[32m",
+      .RED    = "\x1B[31m",
+      .ORANGE = "\x1B[33m",
+      .BLUE   = "\x1B[34m",
+      .YELLOW = "\x1B[93m",
+      .RESET  = "\033[0m",
+      .BLINK  = "\x1b[5m",
+  };
 
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
 
@@ -63,16 +63,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (cliNoPrompt) {
-    std::string empty = "";
-    GREEN             = empty;
-    RED               = empty;
-    ORANGE            = empty;
-    BLUE              = empty;
-    YELLOW            = empty;
-    RESET             = empty;
-    BLINK             = empty;
-  }
+  if (cliNoPrompt) colors = {};
 
   {
     const auto lockPath = std::filesystem::temp_directory_path() / "xretractor_service.lock";
@@ -118,7 +109,7 @@ int main(int argc, char *argv[]) {
     }
     if (cmd == "echo") {
       std::getline(std::cin, wasteComment);
-      std::cout << BLINK << wasteComment << std::endl << RESET;
+      std::cout << colors.BLINK << wasteComment << std::endl << colors.RESET;
       continue;
     }
     if (cmd == "storage") {
@@ -131,39 +122,9 @@ int main(int argc, char *argv[]) {
       continue;
     }
     if (cmd == "open") {
-      std::cin >> file;
-      if (file.find('{') != std::string::npos) {
-        std::cout << RED << "unrecognized or missing file:" << file << "\n" << RESET;
-        continue;
-      }
-      auto oldPos = file.find(".old");
-      if (oldPos != std::string::npos) {
-        dacc = std::make_unique<rdb::storage>(file.substr(0, oldPos), file, storageParam, storagePolicy);
-      } else
-        dacc = std::make_unique<rdb::storage>(file, file, storageParam, storagePolicy);
-      if (dacc->descriptorFileExist()) {
-        dacc->attachDescriptor();  // we are sure here that descriptor file exist
-      } else {
-        //
-        // no descriptor found - need to create
-        //
-        std::string sschema;
-        std::string object;
-        do {
-          std::cin >> object;
-          sschema.append(object);
-          sschema.append(" ");
-        } while (object.find("}") == std::string::npos);
-        std::stringstream scheamStringStream(sschema);
-        rdb::Descriptor desc;
-        scheamStringStream >> desc;
-        dacc->attachDescriptor(&desc);
-      }
-      payloadStatus = clean;
-      dacc->setDisposable(false);
-      if (dacc->isDeclared()) dacc->setCapacity(1);
+      if (!executeOpen(dacc, file, storageParam, storagePolicy, payloadStatus, colors)) continue;
     } else if (cmd == "help" || cmd == "h") {
-      std::cout << GREEN;
+      std::cout << colors.GREEN;
       std::cout << "exit|quit|q                     exit\n";
       std::cout << "quitdrop|qd                     exit & drop artifacts (data, .desc, .meta)\n";
       std::cout << "open file [schema]              open or create database with schema\n";
@@ -194,15 +155,11 @@ int main(int argc, char *argv[]) {
       std::cout << "system                          execute system command\n";
       std::cout << "#|rem [text]                    comment line\n";
       std::cout << "help|h                          show this help\n";
-
       std::cout << argv[0] << " - data accessing tool." << std::endl << std::endl;
-      // std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
-      // std::cout << desc;
       std::cout << config_line << std::endl;
       std::cout << "Log: " << filelog << std::endl;
       std::cout << warranty << std::endl;
-
-      std::cout << RESET;
+      std::cout << colors.RESET;
     } else if (cmd == "dropfile") {
       std::string object;
       do {
@@ -216,19 +173,19 @@ int main(int argc, char *argv[]) {
         }
       } while (object.find("}") == std::string::npos);
     } else if (!dacc) {
-      std::cout << RED << "unconnected\n" << RESET;
+      std::cout << colors.RED << "unconnected\n" << colors.RESET;
       continue;
     } else if (cmd == "desc") {
-      std::cout << YELLOW << dacc->descriptor << RESET << std::endl;
+      std::cout << colors.YELLOW << dacc->descriptor << colors.RESET << std::endl;
       continue;
     } else if (cmd == "descc") {
-      std::cout << YELLOW << rdb::singleLineFormat << dacc->descriptor << RESET << std::endl;
+      std::cout << colors.YELLOW << rdb::singleLineFormat << dacc->descriptor << colors.RESET << std::endl;
       continue;
     } else if (cmd == "read" || cmd == "rread") {
       int record;
       std::cin >> record;
       if (!dacc->isDeclared() && record >= dacc->getRecordsCount()) {
-        std::cout << RED << "record out of range - read command\n" << RESET;
+        std::cout << colors.RED << "record out of range - read command\n" << colors.RESET;
         continue;
       }
       if (dacc->isDeclared()) {
@@ -239,70 +196,22 @@ int main(int argc, char *argv[]) {
         dacc->fire();
       }
       payloadStatus = returnStatus ? fetched : error;
-
     } else if (cmd == "system") {
       std::string systemCommand;
       std::getline(std::cin, systemCommand);
       int returnCode = std::system(systemCommand.c_str());
       if (returnCode != 0) {
-        std::cout << RED << "system command error: " << returnCode << "\n" << RESET;
+        std::cout << colors.RED << "system command error: " << returnCode << "\n" << colors.RESET;
       }
     } else if (cmd == "set") {
       std::cin >> *(dacc->getPayload());
       payloadStatus = changed;
       continue;
     } else if (cmd == "setpos") {
-      int position{0};
-      std::cin >> position;
-      auto fieldName = dacc->descriptor[position].rname;
-      if (dacc->descriptor.fieldTypeName(fieldName) == "INTEGER") {
-        int value{0};
-        std::cin >> value;
-        dacc->getPayload()->setItem(position, value);
-      } else if (dacc->descriptor.fieldTypeName(fieldName) == "DOUBLE") {
-        double value{0};
-        std::cin >> value;
-        dacc->getPayload()->setItem(position, value);
-      } else if (dacc->descriptor.fieldTypeName(fieldName) == "BYTE") {
-        uint8_t value{0};
-        std::cin >> value;
-        dacc->getPayload()->setItem(position, value);
-      } else if (dacc->descriptor.fieldTypeName(fieldName) == "STRING") {
-        std::string record{""};
-        std::cin >> record;
-        dacc->getPayload()->setItem(position, record);
-      } else
-        std::cerr << "field not found\n";
-      payloadStatus = changed;
+      executeSetPos(*dacc, payloadStatus);
       continue;
     } else if (cmd == "getpos") {
-      int position;
-      std::cin >> position;
-      auto fieldName = dacc->descriptor[position].rname;
-      auto valueOpt  = dacc->getPayload()->getItem(position);
-      if (!valueOpt.has_value()) {
-        std::cout << fieldName << ": null" << std::endl;
-        continue;
-      }
-      std::any value = valueOpt.value();
-      if (value.type() == typeid(std::monostate)) {
-        std::cout << "null" << std::endl;
-      }
-      if (value.type() == typeid(std::string)) {
-        std::cout << std::any_cast<std::string>(value) << std::endl;
-      }
-      if (value.type() == typeid(int)) {
-        std::cout << std::any_cast<int>(value) << std::endl;
-      }
-      if (value.type() == typeid(uint8_t)) {
-        std::cout << std::any_cast<uint8_t>(value) << std::endl;
-      }
-      if (value.type() == typeid(float)) {
-        std::cout << std::any_cast<float>(value) << std::endl;
-      }
-      if (value.type() == typeid(double)) {
-        std::cout << std::any_cast<double>(value) << std::endl;
-      }
+      executeGetPos(*dacc);
     } else if (cmd == "cap") {
       int backCapacityValue;
       std::cin >> backCapacityValue;
@@ -311,27 +220,27 @@ int main(int argc, char *argv[]) {
       rox = !rox;
       dacc->setDisposable(rox);
     } else if (cmd == "print") {
-      std::cout << ORANGE << *(dacc->getPayload()) << RESET;
+      std::cout << colors.ORANGE << *(dacc->getPayload()) << colors.RESET;
       continue;
     } else if (cmd == "printt") {
-      std::cout << ORANGE << rdb::singleLineFormat << *(dacc->getPayload()) << RESET << std::endl;
+      std::cout << colors.ORANGE << rdb::singleLineFormat << *(dacc->getPayload()) << colors.RESET << std::endl;
       continue;
     } else if (cmd == "list" || cmd == "rlist") {
       int record{0};
       std::cin >> record;
       for (auto i = 0; i < record; i++) {
         if (i >= dacc->getRecordsCount()) {
-          std::cout << RED << "record out of range - list command\n" << RESET;
+          std::cout << colors.RED << "record out of range - list command\n" << colors.RESET;
           continue;
         }
         auto returnStatus = (cmd == "rlist") ? dacc->revRead(i) : dacc->read(i);
         payloadStatus     = returnStatus ? fetched : error;
 
         if (payloadStatus == error) {
-          std::cout << RED << "fetch error\n" << RESET;
+          std::cout << colors.RED << "fetch error\n" << colors.RESET;
           continue;
         }
-        std::cout << ORANGE << rdb::singleLineFormat << *(dacc->getPayload()) << RESET << std::endl;
+        std::cout << colors.ORANGE << rdb::singleLineFormat << *(dacc->getPayload()) << colors.RESET << std::endl;
       }
       continue;
     } else if (cmd == "input") {
@@ -342,7 +251,7 @@ int main(int argc, char *argv[]) {
       size_t record{0};
       std::cin >> record;
       if (record >= dacc->getRecordsCount()) {
-        std::cout << RED << "record out of range - Check append command.\n" << RESET;
+        std::cout << colors.RED << "record out of range - Check append command.\n" << colors.RESET;
         continue;
       }
       auto writeStatus = dacc->write(record);
@@ -390,108 +299,13 @@ int main(int argc, char *argv[]) {
       }
       std::cout << "\n";
     } else if (cmd == "meta") {
-      const std::string metaFilePath =
-          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() + ".meta";
-      if (!std::filesystem::exists(metaFilePath)) {
-        std::cout << RED << "meta file not found: " << metaFilePath << "\n" << RESET;
-        continue;
-      }
-      rdb::metaDataStream metaView(dacc->descriptor, metaFilePath);
-      const auto segs      = metaView.segments();
-      const size_t nFields = dacc->descriptor.size();
-
-      std::cout << BLUE << "meta: " << metaFilePath << "\n";
-      std::cout << "interval: " << dacc->getSamplingInterval() << "  ";
-      std::cout << "total records: " << metaView.totalRecords() << "\n" << RESET;
-
-      size_t segIdx = 0;
-      for (const auto &entry : segs) {
-        std::cout << YELLOW << "[" << segIdx++ << "] ";
-        if (entry.isGap) {
-          std::cout << "gap (duration:" << entry.recordCount << ")\n";
-        } else {
-          std::cout << "[";
-          for (size_t fi = 0; fi < nFields; ++fi) {
-            if (fi > 0) std::cout << " ";
-            std::cout << dacc->descriptor[fi].rname << ":";
-            std::cout << (fi < entry.nullBitset.size() && entry.nullBitset[fi] ? "null" : "ok");
-          }
-          std::cout << "] runs:" << entry.recordCount << "\n";
-        }
-        std::cout << RESET;
-      }
-      std::cout << BLUE << segs.size() << " segment(s)\n" << RESET;
+      executeMeta(*dacc, file, storageParam, colors);
       continue;
     } else if (cmd == "metaraw") {
-      const std::string metaFilePath =
-          (storageParam.empty() ? std::filesystem::path(file) : std::filesystem::path(storageParam) / file).string() + ".meta";
-      if (!std::filesystem::exists(metaFilePath)) {
-        std::cout << RED << "meta file not found: " << metaFilePath << "\n" << RESET;
-        continue;
-      }
-
-      constexpr size_t headerSize = sizeof(int64_t);
-      const size_t bitsetBytes    = (dacc->descriptor.size() + 7) / 8;
-      const size_t entrySize      = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
-
-      std::ifstream in(metaFilePath, std::ios::binary);
-      if (!in.is_open()) {
-        std::cout << RED << "cannot open meta file: " << metaFilePath << "\n" << RESET;
-        continue;
-      }
-
-      in.seekg(0, std::ios::end);
-      const auto fileSize = in.tellg();
-      in.seekg(0, std::ios::beg);
-
-      size_t effectiveHeaderSize = headerSize;
-      if (fileSize >= 0) {
-        const auto fs = static_cast<size_t>(fileSize);
-        if (!(fs >= headerSize && (fs - headerSize) % entrySize == 0)) {
-          std::cout << YELLOW << "warning: unexpected meta payload alignment\n" << RESET;
-        }
-      }
-
-      int64_t creationTimeNs = 0;
-      in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
-
-      std::cout << BLUE << "meta raw: " << metaFilePath << "\n" << RESET;
-      std::cout << "header size: " << effectiveHeaderSize << "\n";
-      std::cout << "entry size: " << entrySize << "\n";
-      std::cout << "sampling interval: " << dacc->getSamplingInterval() << "\n";
-
-      size_t entryIdx = 0;
-      while (true) {
-        std::vector<std::byte> raw(entrySize);
-        in.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(entrySize));
-        const auto bytesRead = in.gcount();
-        if (bytesRead == 0) break;
-        if (static_cast<size_t>(bytesRead) != entrySize) {
-          std::cout << RED << "truncated entry at index: " << entryIdx << "\n" << RESET;
-          break;
-        }
-
-        auto rec = rdb::metaDataStream::IndexRecord::deserialize(std::span<const std::byte>(raw));
-        std::cout << "entry[" << entryIdx << "] ";
-        std::cout << "count:" << rec.recordCount << " ";
-        std::cout << "gap:" << (rec.isGap ? 1 : 0) << " ";
-        std::cout << "bitsetSize:" << rec.nullBitset.size() << " ";
-        std::cout << "bitsetHex:";
-        for (size_t bi = 0; bi < bitsetBytes; ++bi) {
-          uint8_t byteVal = 0;
-          for (size_t bit = 0; bit < 8; ++bit) {
-            const size_t fieldIdx = bi * 8 + bit;
-            if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1u << bit);
-          }
-          std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byteVal) << std::dec;
-        }
-        std::cout << "\n";
-        ++entryIdx;
-      }
-      std::cout << "entries: " << entryIdx << "\n";
+      executeMetaRaw(*dacc, file, storageParam, colors);
       continue;
     } else {
-      std::cout << RED << "?\n" << RESET;
+      std::cout << colors.RED << "?\n" << colors.RESET;
       continue;
     }
     std::cout << ok;
