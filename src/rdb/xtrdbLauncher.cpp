@@ -30,6 +30,7 @@
 #include "ICommand.hpp"
 #include "rdb/storageacc.hpp"
 #include "uxSysTermTools.hpp"
+#include "xtrdbStorageMap.hpp"
 #include "xtrdbTypes.hpp"
 
 int main(int argc, char *argv[]) {
@@ -37,10 +38,12 @@ int main(int argc, char *argv[]) {
 
   namespace po = boost::program_options;
   po::options_description desc("Allowed options");
+  std::string mapDatafile{""};
   // clang-format off
   desc.add_options()
-      ("help,h",     "produce help message")
-      ("noprompt,n", "suppress prompt and ok output");
+      ("help,h",       "produce help message")
+      ("storagemap,s", po::value<std::string>(&mapDatafile), "show storage structure for specified file")
+      ("noprompt,n",   "suppress prompt and ok output");
   // clang-format on
 
   // Legacy: bare "noprompt" positional arg (used in test scripts as: xtrdb noprompt < script)
@@ -64,6 +67,12 @@ int main(int argc, char *argv[]) {
               << "Usage: " << argv[0] << " [option]\n\n"
               << desc << config_line << "\nLog: " << filelog << "\n"
               << warranty << "\n";
+    spdlog::shutdown();
+    return 0;
+  }
+
+  if (vm.count("storagemap")) {
+    showStorageMap(mapDatafile);
     spdlog::shutdown();
     return 0;
   }

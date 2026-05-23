@@ -167,7 +167,7 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   fieldMappingsDirty_ = true;
 }
 
-constexpr int Descriptor::fieldSize(const rdb::rField &field) const {
+int Descriptor::fieldSize(const rdb::rField &field) const {
   if (isConfigurationField(field.rtype)) return 0;
   if (field.rtype == rdb::NULLTYPE) return 0;
   return field.rlen * field.rarray;

@@ -9,6 +9,7 @@ add_subdirectory(lib)
 
 set(SOURCES_RDB
     xtrdbLauncher.cpp
+    xtrdbStorageMap.cpp
     cmdDropFile.cpp
     cmdFieldAccess.cpp
     cmdMeta.cpp
