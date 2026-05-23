@@ -520,17 +520,17 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
     // ~storage → ~posixBinaryFile: renames dataFile → dataFile.old0
   }
 
-  EXPECT_FALSE(std::filesystem::exists(dataFile));   // renamed by destructor
+  EXPECT_FALSE(std::filesystem::exists(dataFile));  // renamed by destructor
   EXPECT_TRUE(std::filesystem::exists(dataOld));
-  EXPECT_TRUE(std::filesystem::exists(metaFile));    // meta survives
+  EXPECT_TRUE(std::filesystem::exists(metaFile));  // meta survives
 
   // Second lifecycle: new empty data file, old meta still has 3 records.
   {
     rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    s.attachDescriptor(&desc);                   // creates new empty data file
-    s.configureGapDetection({1, 10});            // detectStartupState: rotation! → rotate(0)
+    s.attachDescriptor(&desc);         // creates new empty data file
+    s.configureGapDetection({1, 10});  // detectStartupState: rotation! → rotate(0)
 
-    EXPECT_TRUE(s.isMetaIndexEmpty());           // meta rotated to initial state
+    EXPECT_TRUE(s.isMetaIndexEmpty());              // meta rotated to initial state
     EXPECT_TRUE(std::filesystem::exists(metaOld));  // old meta preserved
   }
 
@@ -559,7 +559,7 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
     }
   }
 
-  EXPECT_TRUE(std::filesystem::exists(dataFile2));   // not renamed
+  EXPECT_TRUE(std::filesystem::exists(dataFile2));  // not renamed
   EXPECT_TRUE(std::filesystem::exists(metaFile2));
 
   // Second lifecycle: counts match → no rotation.
@@ -573,5 +573,6 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
     EXPECT_EQ(s.getRecordsCount(), 3u);
   }
 
-  for (const auto &f : {dataFile2, descFile2, metaFile2}) std::filesystem::remove(f);
+  for (const auto &f : {dataFile2, descFile2, metaFile2})
+    std::filesystem::remove(f);
 }

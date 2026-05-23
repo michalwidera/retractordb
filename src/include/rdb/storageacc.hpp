@@ -62,8 +62,8 @@ class storage {
   size_t activeGapDuration_{0};         ///< accumulated gap duration not yet flushed to meta index
   bool gapDetectionConfigured_{false};  ///< true only when configureGapDetection() was explicitly called
 
-  void flushPendingGap();      ///< flush accumulated gap duration to meta index
-  void detectStartupState();   ///< detect rotation or startup gap after meta index is ready
+  void flushPendingGap();     ///< flush accumulated gap duration to meta index
+  void detectStartupState();  ///< detect rotation or startup gap after meta index is ready
   void moveRef();
   void attachStorage();
 

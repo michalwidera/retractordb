@@ -519,8 +519,8 @@ void storage::detectStartupState() {
   const auto elapsedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastWriteSC).count();
   if (elapsedNs <= 0) return;
 
-  const auto intervalNs = static_cast<int64_t>(
-      static_cast<double>(rInterval_.numerator()) / rInterval_.denominator() * 1'000'000'000.0);
+  const auto intervalNs =
+      static_cast<int64_t>(static_cast<double>(rInterval_.numerator()) / rInterval_.denominator() * 1'000'000'000.0);
   if (intervalNs <= 0) return;
 
   const auto gapDuration = static_cast<size_t>(elapsedNs / intervalNs);

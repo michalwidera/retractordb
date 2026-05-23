@@ -275,7 +275,8 @@ struct RotateFixture : public ::testing::Test {
 
   void SetUp() override { descriptor.append({{"v", 4, 0, rdb::INTEGER}}); }
   void TearDown() override {
-    for (const auto &f : {meta, metaOld0, metaOld1}) std::remove(f.c_str());
+    for (const auto &f : {meta, metaOld0, metaOld1})
+      std::remove(f.c_str());
   }
 };
 
@@ -324,7 +325,10 @@ TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
     m.onRecordAppended({true});
   }
 
-  { rdb::metaDataStream m(descriptor, meta); m.rotate(1); }
+  {
+    rdb::metaDataStream m(descriptor, meta);
+    m.rotate(1);
+  }
 
   rdb::metaDataStream old(descriptor, metaOld1);
   EXPECT_EQ(old.totalRecords(), 2u);
@@ -336,7 +340,8 @@ TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
 TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
   {
     rdb::metaDataStream m(descriptor, meta);
-    for (int i = 0; i < 5; ++i) m.onRecordAppended({false});
+    for (int i = 0; i < 5; ++i)
+      m.onRecordAppended({false});
   }
 
   rdb::metaDataStream m(descriptor, meta);

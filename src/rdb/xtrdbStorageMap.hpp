@@ -2,4 +2,4 @@
 
 #include <string>
 
-void showStorageMap(const std::string& baseName);
+void showStorageMap(const std::string &baseName);
