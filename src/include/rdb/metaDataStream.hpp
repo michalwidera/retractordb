@@ -24,11 +24,13 @@ namespace rdb {
 /// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie,
 /// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
 /// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
-/// - interwał próbkowania pobierany jest z klasy storage i służy do obliczania długości przerw w transmisji w jednostkach próbkowania,
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
-///
+/// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
+/// - przyjąć od obiektu storage informację o rotacji pliku danych i zresetować indeks do stanu początkowego (bez wpisu gap),
+/// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
+/// - umożliwić rotację indeksu podobnie jak obiekty klasy storage, tworząc kopię obecnego pliku indeksu z rozszerzeniem .old/percounter i tworząc nowy, czysty plik indeksu.
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
-/// @note Wpisy gap są markerami przerw między rekordami i nie zwiększają numeracji logicznych rekordów zwracanej przez totalRecords().
+/// @note Wpisy gap są markerami przerw transmisji danych między rekordami i nie są wliczane do numeracji logicznych rekordów zwracanej przez totalRecords().
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
 
 class metaDataStream {
@@ -116,6 +118,15 @@ class metaDataStream {
   /// @brief Check whether the index is empty (no records registered).
   /// @return true if totalRecords() == 0
   bool isEmpty() const;
+
+  /// @brief Rotate the meta index file: rename current to .old<percounter>, reset to initial state.
+  ///
+  /// Called by storage when it detects at startup that the data file was rotated
+  /// (empty data file but non-empty meta index). Renames the current meta file to
+  /// `<metaFilePath>.old<percounter>` and creates a fresh, empty meta file.
+  /// If percounter < 0, the rename is skipped and the index is simply reset.
+  /// @param percounter rotation counter (same suffix used for data file rotation)
+  void rotate(int percounter);
 
   /// @brief Clear all index data and reset to initial state.
   ///

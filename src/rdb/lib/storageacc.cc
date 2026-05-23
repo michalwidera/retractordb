@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <chrono>
 
 #include <cstring>  //std::memset
 #include <filesystem>
@@ -140,6 +141,7 @@ void storage::attachStorage() {
   recordsCount_ = accessor_->count();
 
   metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
+  detectStartupState();
 }
 
 storage::~storage() {
@@ -490,10 +492,39 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
   nullFillCount_          = nullFillCount;
   gapDetectionConfigured_ = true;
 
-  // If metaDataStream already exists, recreate it with current storage settings.
-  if (metaDataStream_) {
-    metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
+  detectStartupState();
+}
+
+void storage::detectStartupState() {
+  if (!metaDataStream_ || !gapDetectionConfigured_) return;
+
+  // Detect rotation: data file is fresh/empty but meta index has records from previous run
+  if (recordsCount_ == 0 && !metaDataStream_->isEmpty()) {
+    metaDataStream_->rotate(percounter_);
+    return;
   }
+
+  // Fresh start with no previous records — nothing to gap from
+  if (metaDataStream_->isEmpty()) return;
+
+  // Existing data: compute gap since data file was last written
+  if (!std::filesystem::exists(storageFile_) || rInterval_.numerator() <= 0) return;
+
+  std::error_code ec;
+  auto lastWriteFT = std::filesystem::last_write_time(storageFile_, ec);
+  if (ec) return;
+
+  auto lastWriteSC     = std::chrono::file_clock::to_sys(lastWriteFT);
+  auto now             = std::chrono::system_clock::now();
+  const auto elapsedNs = std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastWriteSC).count();
+  if (elapsedNs <= 0) return;
+
+  const auto intervalNs = static_cast<int64_t>(
+      static_cast<double>(rInterval_.numerator()) / rInterval_.denominator() * 1'000'000'000.0);
+  if (intervalNs <= 0) return;
+
+  const auto gapDuration = static_cast<size_t>(elapsedNs / intervalNs);
+  if (gapDuration > 0) metaDataStream_->onTransmissionGap(gapDuration);
 }
 
 boost::rational<int> storage::getSamplingInterval() const { return rInterval_; }

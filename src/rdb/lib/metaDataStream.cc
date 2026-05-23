@@ -339,6 +339,18 @@ bool metaDataStream::isGapBefore(size_t recordIndex) const {
 
 bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
 
+void metaDataStream::rotate(int percounter) {
+  flushCurrentEntry();
+  if (percounter >= 0 && !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_)) {
+    std::string rotatedPath = metaFilePath_ + ".old" + std::to_string(percounter);
+    std::error_code ec;
+    std::filesystem::rename(metaFilePath_, rotatedPath, ec);
+    if (ec) SPDLOG_WARN("metaDataStream::rotate: failed to rename '{}' to '{}': {}", metaFilePath_, rotatedPath, ec.message());
+  }
+  creationTime_ = std::chrono::system_clock::now();
+  reset();
+}
+
 void metaDataStream::reset() {
   createNullBitsetTemplate();
   committedRecordCount_  = 0;
