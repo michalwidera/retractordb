@@ -1,0 +1,38 @@
+┌──────────────────────────────────────────────────────────────┐
+│   Storage map: ret_file                                      │
+├──────────────────────────────────────────────────────────────┤
+│ [shadow]   │ [binary data] │ [meta index]                    │
+├────────────┼───────────────┼─────────────────────────────────┤
+│ s0 1u      │ s0 0-3        │ [====] 2 records, no nulls      │
+│ s1         │ s1 3-4        │ [----] 1 records, some nulls    │
+│            │               │ [~~~~] 1 records, all nulls     │
+│ 1 updates  │               │ [XXXX] 1 records, gap           │
+├────────────┴───────────────┴─────────────────────────────────┤
+│   DESCRIPTOR  ret_file.desc                             35 B │
+│   BYTE  a                                                1 B │
+│   BYTE  b                                                1 B │
+│   Record size:                                           2 B │
+├──────────────────────────────────────────────────────────────┤
+│   DATA TOTAL  rec=4 src=0 seg=4                          8 B │
+│   Records: 4                                                 │
+│   Source: ret_file   Segments: ret_file_segment_*            │
+│   Segmented data (RETENTION): 2                              │
+│   Policy: segments=2 capacity=3                              │
+│   Retention cap records: 6                                   │
+│   Retention cap bytes: 12                                    │
+│   Total records: 4                                           │
+│     current=0  segments=4                                    │
+│   Total bytes: 8                                             │
+│     current=0  segments=8                                    │
+│     [0] ret_file_segment_0 rec:3 range:0-3                   │
+│     [1] ret_file_segment_1 rec:1 range:3-4                   │
+├──────────────────────────────────────────────────────────────┤
+│   META        ret_file.meta                             80 B │
+│   Segments: 4   Records: 4                                   │
+│   [===========2===========][----1----][~~~~1~~~~][XXgap:1XX] │
+│   Legend: [====] data  [----] partial null                   │
+│           [~~~~] nullfill  [XXXX] gap                        │
+├──────────────────────────────────────────────────────────────┤
+│   SHADOW      ret_file.shadow                           10 B │
+│   Updates: 1                                                 │
+└──────────────────────────────────────────────────────────────┘
