@@ -8,7 +8,7 @@ find_package(antlr4 REQUIRED)
 add_subdirectory(lib)
 
 set(SOURCES_RDB
-    main.cpp
+    xtrdbLauncher.cpp
     cmdDropFile.cpp
     cmdFieldAccess.cpp
     cmdMeta.cpp

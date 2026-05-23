@@ -1,6 +1,8 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 
+#include <boost/program_options.hpp>
+
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
@@ -15,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "ICommand.hpp"
 #include "cmdDropFile.hpp"
@@ -30,6 +33,44 @@
 #include "xtrdbTypes.hpp"
 
 int main(int argc, char* argv[]) {
+  const auto filelog = setupLoggerMain(std::string(argv[0]), false);
+
+  namespace po = boost::program_options;
+  po::options_description desc("Allowed options");
+  // clang-format off
+  desc.add_options()
+      ("help,h",     "produce help message")
+      ("noprompt,n", "suppress prompt and ok output");
+  // clang-format on
+
+  // Legacy: bare "noprompt" positional arg (used in test scripts as: xtrdb noprompt < script)
+  bool cliNoPrompt = false;
+  std::vector<char*> filteredArgs{argv[0]};
+  for (int i = 1; i < argc; ++i) {
+    if (std::string_view(argv[i]) == "noprompt")
+      cliNoPrompt = true;
+    else
+      filteredArgs.push_back(argv[i]);
+  }
+
+  po::variables_map vm;
+  po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data())
+                .options(desc)
+                .run(),
+            vm);
+  po::notify(vm);
+
+  if (vm.count("noprompt")) cliNoPrompt = true;
+
+  if (vm.count("help")) {
+    std::cout << argv[0] << " - data accessing tool.\n\n"
+              << "Usage: " << argv[0] << " [option]\n\n"
+              << desc << config_line << "\nLog: " << filelog << "\n"
+              << warranty << "\n";
+    spdlog::shutdown();
+    return 0;
+  }
+
   payloadStatusType payloadStatus{clean};
 
   Colors colors{
@@ -42,20 +83,7 @@ int main(int argc, char* argv[]) {
       .BLINK  = "\x1b[5m",
   };
 
-  const auto filelog    = setupLoggerMain(std::string(argv[0]), false);
   std::string storagePolicy = "DEFAULT";
-  bool cliNoPrompt      = false;
-
-  for (std::string_view arg : std::span(argv + 1, static_cast<size_t>(argc - 1))) {
-    if (arg == "-h") {
-      std::cout << argv[0] << " - data accessing tool.\n\n"
-                << config_line << "\nLog: " << filelog << "\n"
-                << warranty << "\n";
-      spdlog::shutdown();
-      return 0;
-    }
-    if (arg == "noprompt") cliNoPrompt = true;
-  }
 
   if (cliNoPrompt) colors = {};
 
