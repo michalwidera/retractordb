@@ -272,7 +272,7 @@ void showStorageMap(const std::string& baseName) {
   const auto dataSegments = readDataSegments(baseName, retention, recordSize);
   const bool hasSegmentData = !dataSegments.empty();
   const bool hasDataFile = fs::exists(dataFile);
-  const bool hasData   = segmentedData ? hasSegmentData : hasDataFile;
+  const bool hasData   = segmentedData ? (hasSegmentData || hasDataFile) : hasDataFile;
   const bool hasMeta   = fs::exists(metaFile);
   const bool hasRootShadow = fs::exists(shadowFile);
 
@@ -288,11 +288,13 @@ void showStorageMap(const std::string& baseName) {
   const bool hasShadow = segmentedData ? (hasRootShadow || totalSegmentShadowSize > 0) : hasRootShadow;
 
   const uintmax_t descSize   = fs::file_size(descFile);
+  const uintmax_t currentDataSize = hasDataFile ? fs::file_size(dataFile) : 0;
   uintmax_t dataSize = 0;
   if (segmentedData) {
     for (const auto& seg : dataSegments) dataSize += seg.bytes;
-  } else if (hasData) {
-    dataSize = fs::file_size(dataFile);
+    dataSize += currentDataSize;
+  } else if (hasDataFile) {
+    dataSize = currentDataSize;
   }
   const uintmax_t metaSize   = hasMeta   ? fs::file_size(metaFile)   : 0;
   uintmax_t shadowSize = 0;
@@ -304,8 +306,16 @@ void showStorageMap(const std::string& baseName) {
   }
 
   size_t dataRecords = 0;
+  const size_t currentDataRecords = (recordSize > 0 && hasDataFile)
+                                        ? static_cast<size_t>(currentDataSize / recordSize)
+                                        : 0;
+  size_t segmentDataRecords = 0;
+  const bool hasBoundedRetention = segmentedData && retention.segments > 0 && retention.capacity > 0;
+  const size_t retentionCapacityRecords = hasBoundedRetention ? retention.segments * retention.capacity : 0;
+  const uintmax_t retentionCapacityBytes = static_cast<uintmax_t>(retentionCapacityRecords) * recordSize;
   if (segmentedData) {
-    for (const auto& seg : dataSegments) dataRecords += seg.records;
+    for (const auto& seg : dataSegments) segmentDataRecords += seg.records;
+    dataRecords = segmentDataRecords + currentDataRecords;
   } else {
     dataRecords = (recordSize > 0 && hasData) ? static_cast<size_t>(dataSize / recordSize) : 0;
   }
@@ -448,24 +458,45 @@ void showStorageMap(const std::string& baseName) {
   hline("├", "─", "┤", W);
 
   // ── DATA ────────────────────────────────────────────────────────────
-    fmtSize("  DATA        ",
-      hasData ? (segmentedData ? dataFile + "_segment_*" : dataFile)
-        : (segmentedData ? dataFile + "_segment_* (missing)" : dataFile + " (missing)"),
-      dataSize);
+  const uintmax_t segmentDataSize = segmentedData ? (dataSize - currentDataSize) : 0;
+  if (segmentedData) {
+    fmtSize("  DATA TOTAL  ",
+            "rec=" + std::to_string(dataRecords) +
+                " src=" + std::to_string(currentDataRecords) +
+                " seg=" + std::to_string(segmentDataRecords),
+            dataSize);
+  } else {
+    fmtSize("  DATA        ", hasData ? dataFile : dataFile + " (missing)", dataSize);
+  }
   row("  Records: " + std::to_string(dataRecords), W);
-    if (segmentedData) {
-      row("  Segmented data (RETENTION): " + std::to_string(dataSegments.size()), W);
-      row("  Policy: segments=" + std::to_string(retention.segments) +
-        " capacity=" + std::to_string(retention.capacity),
-    W);
-      for (const auto& seg : dataSegments) {
-        const fs::path segPath(seg.path);
-        row("    [" + std::to_string(seg.index) + "] " + segPath.filename().string() +
-          " rec:" + std::to_string(seg.records) +
-          " range:" + std::to_string(seg.begin) + "-" + std::to_string(seg.end),
-      W);
-      }
+  if (segmentedData) {
+    row("  Source: " + dataFile + "   Segments: " + dataFile + "_segment_*", W);
+    row("  Segmented data (RETENTION): " + std::to_string(dataSegments.size()), W);
+    row("  Policy: segments=" + std::to_string(retention.segments) +
+            " capacity=" + std::to_string(retention.capacity),
+        W);
+    if (hasBoundedRetention) {
+      row("  Retention cap records: " + std::to_string(retentionCapacityRecords), W);
+      row("  Retention cap bytes: " + std::to_string(retentionCapacityBytes), W);
+    } else {
+      row("  Retention cap: unbounded", W);
     }
+    row("  Total records: " + std::to_string(dataRecords), W);
+    row("    current=" + std::to_string(currentDataRecords) +
+            "  segments=" + std::to_string(segmentDataRecords),
+        W);
+    row("  Total bytes: " + std::to_string(dataSize), W);
+    row("    current=" + std::to_string(currentDataSize) +
+            "  segments=" + std::to_string(segmentDataSize),
+        W);
+    for (const auto& seg : dataSegments) {
+      const fs::path segPath(seg.path);
+      row("    [" + std::to_string(seg.index) + "] " + segPath.filename().string() +
+              " rec:" + std::to_string(seg.records) +
+              " range:" + std::to_string(seg.begin) + "-" + std::to_string(seg.end),
+          W);
+    }
+  }
   hline("├", "─", "┤", W);
 
   // ── META ────────────────────────────────────────────────────────────
