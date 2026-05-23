@@ -6,13 +6,11 @@
 #include "rdb/descriptor.hpp"
 
 std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
-  return {"open file [schema]", {
-    "open or create database with schema",
-    "example: open test_db { INTEGER dane STRING name[3] }"
-  }};
+  return {"open file [schema]",
+          {"open or create database with schema", "example: open test_db { INTEGER dane STRING name[3] }"}};
 }
 
-bool OpenCmd::execute(CommandContext& ctx) {
+bool OpenCmd::execute(CommandContext &ctx) {
   std::cin >> ctx.file;
   if (ctx.file.contains('{')) {
     std::cout << ctx.colors.RED << "unrecognized or missing file:" << ctx.file << "\n" << ctx.colors.RESET;
@@ -20,7 +18,7 @@ bool OpenCmd::execute(CommandContext& ctx) {
   }
   const auto oldPos = ctx.file.find(".old");
   const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
-  ctx.dacc = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
 
   if (ctx.dacc->descriptorFileExist()) {
     ctx.dacc->attachDescriptor();

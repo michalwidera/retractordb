@@ -4,7 +4,7 @@
 class SetCmd : public ICommand {
  public:
   std::pair<std::string, std::vector<std::string>> usage() const override;
-  bool execute(CommandContext& ctx) override;
+  bool execute(CommandContext &ctx) override;
 };
 
 class PrintCmd : public ICommand {
@@ -17,13 +17,13 @@ class PrintCmd : public ICommand {
     if (tabular_) return {};
     return {"print|printt", {"show payload (printt: single-line tabular)"}};
   }
-  bool execute(CommandContext& ctx) override;
+  bool execute(CommandContext &ctx) override;
 };
 
 class InputCmd : public ICommand {
  public:
   std::pair<std::string, std::vector<std::string>> usage() const override;
-  bool execute(CommandContext& ctx) override;
+  bool execute(CommandContext &ctx) override;
 };
 
 class HexCmd : public ICommand {
@@ -36,5 +36,5 @@ class HexCmd : public ICommand {
     if (!hex_) return {};
     return {"hex|dec", {"type of input/output of byte/number fields"}};
   }
-  bool execute(CommandContext& ctx) override;
+  bool execute(CommandContext &ctx) override;
 };

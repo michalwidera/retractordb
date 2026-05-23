@@ -9,9 +9,8 @@
 
 #include "rdb/metaDataStream.hpp"
 
-static std::string resolveMetaPath(const CommandContext& ctx) {
-  return (ctx.storageParam.empty() ? std::filesystem::path(ctx.file)
-                                   : std::filesystem::path(ctx.storageParam) / ctx.file)
+static std::string resolveMetaPath(const CommandContext &ctx) {
+  return (ctx.storageParam.empty() ? std::filesystem::path(ctx.file) : std::filesystem::path(ctx.storageParam) / ctx.file)
              .string() +
          ".meta";
 }
@@ -20,7 +19,7 @@ std::pair<std::string, std::vector<std::string>> MetaCmd::usage() const {
   return {"meta", {"show meta index (null patterns) for open db"}};
 }
 
-bool MetaCmd::execute(CommandContext& ctx) {
+bool MetaCmd::execute(CommandContext &ctx) {
   const auto path = resolveMetaPath(ctx);
   if (!std::filesystem::exists(path)) {
     std::cout << ctx.colors.RED << "meta file not found: " << path << "\n" << ctx.colors.RESET;
@@ -35,7 +34,7 @@ bool MetaCmd::execute(CommandContext& ctx) {
   std::cout << "total records: " << metaView.totalRecords() << "\n" << ctx.colors.RESET;
 
   size_t segIdx = 0;
-  for (const auto& entry : segs) {
+  for (const auto &entry : segs) {
     std::cout << ctx.colors.YELLOW << "[" << segIdx++ << "] ";
     if (entry.isGap) {
       std::cout << "gap (duration:" << entry.recordCount << ")\n";
@@ -58,7 +57,7 @@ std::pair<std::string, std::vector<std::string>> MetaRawCmd::usage() const {
   return {"metaraw", {"show internal meta file structure"}};
 }
 
-bool MetaRawCmd::execute(CommandContext& ctx) {
+bool MetaRawCmd::execute(CommandContext &ctx) {
   const auto path = resolveMetaPath(ctx);
   if (!std::filesystem::exists(path)) {
     std::cout << ctx.colors.RED << "meta file not found: " << path << "\n" << ctx.colors.RESET;
@@ -87,7 +86,7 @@ bool MetaRawCmd::execute(CommandContext& ctx) {
   }
 
   int64_t creationTimeNs = 0;
-  in.read(reinterpret_cast<char*>(&creationTimeNs), sizeof(creationTimeNs));
+  in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
 
   std::cout << ctx.colors.BLUE << "meta raw: " << path << "\n" << ctx.colors.RESET;
   std::cout << "header size: " << effectiveHeaderSize << "\n";
@@ -97,7 +96,7 @@ bool MetaRawCmd::execute(CommandContext& ctx) {
   size_t entryIdx = 0;
   while (true) {
     std::vector<std::byte> raw(entrySize);
-    in.read(reinterpret_cast<char*>(raw.data()), static_cast<std::streamsize>(entrySize));
+    in.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(entrySize));
     const auto bytesRead = in.gcount();
     if (bytesRead == 0) break;
     if (static_cast<size_t>(bytesRead) != entrySize) {

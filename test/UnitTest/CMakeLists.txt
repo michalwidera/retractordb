@@ -57,9 +57,8 @@ foreach(item ${V_GLOB})
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND bash -c "rm -f *.meta *.desc")
-  set_tests_properties(
-    ut_${TEST_SHORT}-setup PROPERTIES FIXTURES_SETUP
-                                      ut_${TEST_SHORT}-fixture)
+  set_tests_properties(ut_${TEST_SHORT}-setup
+                       PROPERTIES FIXTURES_SETUP ut_${TEST_SHORT}-fixture)
 
   add_test(
     NAME ut_${TEST_SHORT}
@@ -67,9 +66,8 @@ foreach(item ${V_GLOB})
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
     COMMAND valgrind --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
-  set_tests_properties(
-    ut_${TEST_SHORT} PROPERTIES FIXTURES_REQUIRED
-                                ut_${TEST_SHORT}-fixture)
+  set_tests_properties(ut_${TEST_SHORT} PROPERTIES FIXTURES_REQUIRED
+                                                   ut_${TEST_SHORT}-fixture)
 endforeach()
 
 set(SOURCES_QRY_TEST
@@ -114,10 +112,9 @@ add_test(
     ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
     ${CMAKE_COMMAND} -E compare_files pattern.txt out.txt")
 
-set_tests_properties(
-  ut_dataModel-compare PROPERTIES DEPENDS
-                                  "ut_dataModel-compile;ut_dataModel")
+set_tests_properties(ut_dataModel-compare
+                     PROPERTIES DEPENDS "ut_dataModel-compile;ut_dataModel")
 
 set_tests_properties(
-  ut_rdb ut_xqry ut_dataModel ut_dataModel-compile
-  ut_dataModel-compare ut_soperations PROPERTIES RUN_SERIAL TRUE)
+  ut_rdb ut_xqry ut_dataModel ut_dataModel-compile ut_dataModel-compare
+  ut_soperations PROPERTIES RUN_SERIAL TRUE)

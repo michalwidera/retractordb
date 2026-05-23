@@ -19,7 +19,6 @@
 #include <string_view>
 #include <vector>
 
-#include "ICommand.hpp"
 #include "cmdDropFile.hpp"
 #include "cmdFieldAccess.hpp"
 #include "cmdMeta.hpp"
@@ -28,11 +27,12 @@
 #include "cmdStatus.hpp"
 #include "cmdStorage.hpp"
 #include "config.h"
+#include "ICommand.hpp"
 #include "rdb/storageacc.hpp"
 #include "uxSysTermTools.hpp"
 #include "xtrdbTypes.hpp"
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
 
   namespace po = boost::program_options;
@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
 
   // Legacy: bare "noprompt" positional arg (used in test scripts as: xtrdb noprompt < script)
   bool cliNoPrompt = false;
-  std::vector<char*> filteredArgs{argv[0]};
+  std::vector<char *> filteredArgs{argv[0]};
   for (int i = 1; i < argc; ++i) {
     if (std::string_view(argv[i]) == "noprompt")
       cliNoPrompt = true;
@@ -54,10 +54,7 @@ int main(int argc, char* argv[]) {
   }
 
   po::variables_map vm;
-  po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data())
-                .options(desc)
-                .run(),
-            vm);
+  po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data()).options(desc).run(), vm);
   po::notify(vm);
 
   if (vm.count("noprompt")) cliNoPrompt = true;
@@ -104,9 +101,9 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<rdb::storage> dacc;
   std::string file;
   std::string storageParam;
-  bool rox                  = true;
-  std::string_view prompt   = cliNoPrompt ? "" : ".";
-  std::string_view ok       = cliNoPrompt ? "" : "ok\n";
+  bool rox                = true;
+  std::string_view prompt = cliNoPrompt ? "" : ".";
+  std::string_view ok     = cliNoPrompt ? "" : "ok\n";
 
   CommandContext ctx{dacc, payloadStatus, file, storageParam, storagePolicy, colors, rox};
 
@@ -161,7 +158,10 @@ int main(int argc, char* argv[]) {
       std::cout << colors.BLINK << rest << "\n" << colors.RESET;
       continue;
     }
-    if (cmd == "storage") { std::cin >> storageParam; continue; }
+    if (cmd == "storage") {
+      std::cin >> storageParam;
+      continue;
+    }
     if (cmd == "policy") {
       std::cin >> storagePolicy;
       std::ranges::transform(storagePolicy, storagePolicy.begin(), ::toupper);
@@ -177,17 +177,17 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "help" || cmd == "h") {
       std::cout << colors.GREEN;
       for (auto [c, d] : std::initializer_list<std::pair<std::string_view, std::string_view>>{
-               {"exit|quit|q",    "exit"},
-               {"quitdrop|qd",    "exit & drop artifacts (data, .desc, .meta)"},
+               {"exit|quit|q", "exit"},
+               {"quitdrop|qd", "exit & drop artifacts (data, .desc, .meta)"},
                {"storage [path]", "set storage path for database"},
-               {"policy [name]",  "set storage policy"},
-               {"echo",           "print message on terminal"},
-               {"system",         "execute system command"},
-               {"#|rem [text]",   "comment line"},
-               {"help|h",         "show this help"},
+               {"policy [name]", "set storage policy"},
+               {"echo", "print message on terminal"},
+               {"system", "execute system command"},
+               {"#|rem [text]", "comment line"},
+               {"help|h", "show this help"},
            })
         std::cout << std::left << std::setw(32) << c << d << "\n";
-      for (auto& [name, cmdPtr] : commands) {
+      for (auto &[name, cmdPtr] : commands) {
         auto [cmd, desc] = cmdPtr->usage();
         if (cmd.empty()) continue;
         std::cout << std::left << std::setw(32) << cmd;
@@ -198,7 +198,8 @@ int main(int argc, char* argv[]) {
       }
       std::cout << argv[0] << " - data accessing tool.\n\n"
                 << config_line << "\nLog: " << filelog << "\n"
-                << warranty << "\n" << colors.RESET;
+                << warranty << "\n"
+                << colors.RESET;
     } else if (!dacc) {
       std::cout << colors.RED << "unconnected\n" << colors.RESET;
       continue;

@@ -11,7 +11,8 @@ macro(add_test)
   # other: they share /tmp/xretractor_service.lock and boost shared memory.
   # Detection: -m N (run mode), -k (background daemon), xqry (IPC client),
   # workflow.sh (integration workflow), xretractor_service (lock file access).
-  if(_it_argv_str MATCHES "[; ]-m[ ;]|[; ]-k[ ;]|xqry|workflow\\.sh|xlaunch\\.sh|xretractor_service")
+  if(_it_argv_str MATCHES
+     "[; ]-m[ ;]|[; ]-k[ ;]|xqry|workflow\\.sh|xlaunch\\.sh|xretractor_service")
     set_tests_properties(${_it_test_name} PROPERTIES RUN_SERIAL TRUE)
   endif()
   unset(_it_argv_str)

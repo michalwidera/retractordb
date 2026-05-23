@@ -7,7 +7,7 @@ std::pair<std::string, std::vector<std::string>> DropFileCmd::usage() const {
   return {"dropfile [file1] [file2] ... }", {"remove listed file(s), end with }"}};
 }
 
-bool DropFileCmd::execute(CommandContext& ctx) {
+bool DropFileCmd::execute(CommandContext &ctx) {
   std::string object;
   do {
     std::cin >> object;

@@ -7,7 +7,7 @@
 #include "rdb/payload.hpp"
 #include "rdb/storageacc.hpp"
 
-bool ReadCmd::execute(CommandContext& ctx) {
+bool ReadCmd::execute(CommandContext &ctx) {
   int record;
   std::cin >> record;
   if (!ctx.dacc->isDeclared() && record >= ctx.dacc->getRecordsCount()) {
@@ -21,7 +21,7 @@ bool ReadCmd::execute(CommandContext& ctx) {
   return true;
 }
 
-bool ListCmd::execute(CommandContext& ctx) {
+bool ListCmd::execute(CommandContext &ctx) {
   int record{0};
   std::cin >> record;
   for (int i = 0; i < record; i++) {
@@ -44,7 +44,7 @@ std::pair<std::string, std::vector<std::string>> WriteCmd::usage() const {
   return {"write [n]", {"from payload send record to database"}};
 }
 
-bool WriteCmd::execute(CommandContext& ctx) {
+bool WriteCmd::execute(CommandContext &ctx) {
   size_t record{0};
   std::cin >> record;
   if (record >= ctx.dacc->getRecordsCount()) {
@@ -56,11 +56,9 @@ bool WriteCmd::execute(CommandContext& ctx) {
   return true;
 }
 
-std::pair<std::string, std::vector<std::string>> DumpCmd::usage() const {
-  return {"dump", {"show payload memory"}};
-}
+std::pair<std::string, std::vector<std::string>> DumpCmd::usage() const { return {"dump", {"show payload memory"}}; }
 
-bool DumpCmd::execute(CommandContext& ctx) {
+bool DumpCmd::execute(CommandContext &ctx) {
   auto payloadSpan = ctx.dacc->getPayload()->span();
   for (auto byte : payloadSpan) {
     std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byte) << std::dec << " ";
@@ -69,11 +67,9 @@ bool DumpCmd::execute(CommandContext& ctx) {
   return true;
 }
 
-std::pair<std::string, std::vector<std::string>> AppendCmd::usage() const {
-  return {"append", {"append payload to database"}};
-}
+std::pair<std::string, std::vector<std::string>> AppendCmd::usage() const { return {"append", {"append payload to database"}}; }
 
-bool AppendCmd::execute(CommandContext& ctx) {
+bool AppendCmd::execute(CommandContext &ctx) {
   ctx.dacc->write();
   ctx.payloadStatus = stored;
   return true;
@@ -83,22 +79,20 @@ std::pair<std::string, std::vector<std::string>> PurgeCmd::usage() const {
   return {"purge", {"remove all records from database"}};
 }
 
-bool PurgeCmd::execute(CommandContext& ctx) {
+bool PurgeCmd::execute(CommandContext &ctx) {
   ctx.dacc->purge();
   return true;
 }
 
-std::pair<std::string, std::vector<std::string>> SizeCmd::usage() const {
-  return {"size", {"show database size in records"}};
-}
+std::pair<std::string, std::vector<std::string>> SizeCmd::usage() const { return {"size", {"show database size in records"}}; }
 
-bool SizeCmd::execute(CommandContext& ctx) {
+bool SizeCmd::execute(CommandContext &ctx) {
   std::cout << ctx.dacc->getRecordsCount() << " Record(s)\n";
   std::cout << ctx.dacc->descriptor.getSizeInBytes() << " Byte(s) per record.\n";
   return false;
 }
 
-bool DescCmd::execute(CommandContext& ctx) {
+bool DescCmd::execute(CommandContext &ctx) {
   if (compact_)
     std::cout << ctx.colors.YELLOW << rdb::singleLineFormat << ctx.dacc->descriptor << ctx.colors.RESET << "\n";
   else
@@ -110,7 +104,7 @@ std::pair<std::string, std::vector<std::string>> CapCmd::usage() const {
   return {"cap [value]", {"set device stream backread capacity"}};
 }
 
-bool CapCmd::execute(CommandContext& ctx) {
+bool CapCmd::execute(CommandContext &ctx) {
   int backCapacityValue{};
   std::cin >> backCapacityValue;
   ctx.dacc->setCapacity(backCapacityValue);
@@ -121,7 +115,7 @@ std::pair<std::string, std::vector<std::string>> RoxCmd::usage() const {
   return {"rox", {"remove on exit flip (data, .desc, .meta)"}};
 }
 
-bool RoxCmd::execute(CommandContext& ctx) {
+bool RoxCmd::execute(CommandContext &ctx) {
   ctx.rox = !ctx.rox;
   ctx.dacc->setDisposable(ctx.rox);
   return true;
