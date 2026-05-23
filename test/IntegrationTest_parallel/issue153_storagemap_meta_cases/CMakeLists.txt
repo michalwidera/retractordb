@@ -21,4 +21,13 @@ add_test(
   grep -Fq '[====]' out-ret.txt ; \
   grep -Fq '[----]' out-ret.txt ; \
   grep -Fq '[~~~~]' out-ret.txt ; \
-  grep -Fq '[XXXX]' out-ret.txt")
+  grep -Fq '[XXXX]' out-ret.txt ; \
+  grep -Fq 'ROTATED FILES' out-plain.txt ; \
+  grep -Fq '[1]' out-plain.txt ; \
+  grep -Fq '[0]' out-plain.txt ; \
+  grep -Fq 'plain_file.old1' out-plain.txt ; \
+  grep -Fq 'plain_file.old0' out-plain.txt ; \
+  grep -Fq 'plain_file.meta.old0' out-plain.txt ; \
+  grep -Fq 'plain_file.shadow.old0' out-plain.txt ; \
+  grep -Fq 'ROTATED FILES' out-ret.txt ; \
+  grep -Fq 'ret_file.meta.old2' out-ret.txt")

@@ -15,7 +15,7 @@
 
 // Prezentacja mapy pliku (przykład)
 //
-// ┌────────────────────────────────────────────────────────────────┐
+// ┌──────────────────────────────────────────────────────────────┐
 // │  Storage map: test_file                                      │
 // ├──────────────────────────────────────────────────────────────┤
 // │ [shadow]   │ [binary data] │ [meta index]                    │
@@ -24,7 +24,7 @@
 // │ 1 updates  │ s1 3-4        │                                 │
 // ├────────────┴───────────────┴─────────────────────────────────┤
 // │  DESCRIPTOR  test_file.desc                             28 B │
-// │  BYTE dane                                              1 B │
+// │  BYTE dane                                               1 B │
 // │  Record size:                                            1 B │
 // ├──────────────────────────────────────────────────────────────┤
 // │  DATA TOTAL  rec=4 src=0 seg=4                           4 B │
@@ -43,12 +43,17 @@
 // ├──────────────────────────────────────────────────────────────┤
 // │  META        test_file.meta                             26 B │
 // │  Segments: 1   Records: 4                                    │
-// │  [===========================4============================] │
+// │  [===========================4============================]  │
 // │  Legend: [====] data  [----] partial null                    │
 // │          [~~~~] nullfill  [XXXX] gap                         │
 // ├──────────────────────────────────────────────────────────────┤
 // │  SHADOW      test_file.shadow                            9 B │
 // │  Updates: 1                                                  │
+// ├──────────────────────────────────────────────────────────────┤
+// │  ROTATED FILES                                               │
+// │  [2] test_file.old2                                      4 B │
+// │      test_file.meta.old2                                26 B │
+// │  [1] test_file.old1                                      4 B │
 // └──────────────────────────────────────────────────────────────┘
 
 namespace fs = std::filesystem;
@@ -64,6 +69,13 @@ struct DataSegmentInfo {
   size_t end{};
   uintmax_t shadowBytes{};
   size_t shadowUpdates{};
+};
+
+struct RotatedFileInfo {
+  int counter{};
+  std::string ext;  // middle part between stem and .old<N>, e.g. "" / ".meta" / ".shadow"
+  std::string path;
+  uintmax_t bytes{};
 };
 
 struct DataStats {
@@ -90,6 +102,38 @@ struct DataStats {
 };
 
 static std::string metaLabel(const Segment& seg, const std::vector<size_t>& dataIdx);
+
+static std::vector<RotatedFileInfo> readRotatedFiles(const std::string& baseName) {
+  const fs::path basePath(baseName);
+  const fs::path dirPath = basePath.has_parent_path() ? basePath.parent_path() : fs::path(".");
+  const std::string stem = basePath.filename().string();
+  constexpr std::string_view oldMarker = ".old";
+
+  std::vector<RotatedFileInfo> out;
+  if (!fs::exists(dirPath) || !fs::is_directory(dirPath)) return out;
+
+  for (const auto& entry : fs::directory_iterator(dirPath)) {
+    if (!entry.is_regular_file()) continue;
+    const std::string fname = entry.path().filename().string();
+    if (!fname.starts_with(stem)) continue;
+    const auto oldPos = fname.find(oldMarker, stem.size());
+    if (oldPos == std::string::npos) continue;
+    const std::string suffix = fname.substr(oldPos + oldMarker.size());
+    if (suffix.empty()) continue;
+    if (!std::all_of(suffix.begin(), suffix.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
+    RotatedFileInfo info;
+    info.counter = std::stoi(suffix);
+    info.ext = fname.substr(stem.size(), oldPos - stem.size());
+    info.path = entry.path().string();
+    info.bytes = fs::file_size(entry.path());
+    out.push_back(std::move(info));
+  }
+
+  std::ranges::sort(out, [](const auto& a, const auto& b) {
+    return a.counter != b.counter ? a.counter > b.counter : a.ext < b.ext;
+  });
+  return out;
+}
 
 static size_t recordCount(uintmax_t bytes, size_t recordSize) {
   return (recordSize > 0) ? static_cast<size_t>(bytes / recordSize) : 0;
@@ -420,6 +464,7 @@ void showStorageMap(const std::string& baseName) {
   const std::string dataFile   = baseName;
   const std::string metaFile   = baseName + ".meta";
   const std::string shadowFile = baseName + ".shadow";
+  const auto rotatedFiles      = readRotatedFiles(baseName);
 
   if (!fs::exists(descFile)) {
     std::cerr << "Descriptor not found: " << descFile << "\n";
@@ -565,5 +610,19 @@ void showStorageMap(const std::string& baseName) {
   table.sizeRow("  SHADOW      ", stats.hasShadow ? shadowFile : shadowFile + " (missing)", stats.shadowSize);
   if (stats.hasShadow)
     table.row("  Updates: " + std::to_string(stats.shadowUpdates));
+
+  // ── ROTATED FILES ────────────────────────────────────────────────────
+  if (!rotatedFiles.empty()) {
+    table.hline("├", "─", "┤");
+    table.row("  ROTATED FILES");
+    int lastCounter = -1;
+    for (const auto& rf : rotatedFiles) {
+      const fs::path rp(rf.path);
+      const std::string label = (rf.counter != lastCounter ? "[" + std::to_string(rf.counter) + "] " : "    ") +
+                                rp.filename().string();
+      lastCounter = rf.counter;
+      table.valueRow("  " + label, std::to_string(rf.bytes) + " B");
+    }
+  }
   table.hline("└", "─", "┘");
 }

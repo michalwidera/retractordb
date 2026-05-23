@@ -63,6 +63,12 @@ def main() -> None:
     (root / "plain_file.shadow").write_bytes(b"\x00" * shadow_record_size)
     write_meta(root / "plain_file.meta", field_count=2)
 
+    # Rotation fixtures for plain_file: two rotations (.old0 and .old1)
+    (root / "plain_file.old0").write_bytes(bytes([5, 50, 6, 60]))
+    write_meta(root / "plain_file.meta.old0", field_count=2)
+    (root / "plain_file.shadow.old0").write_bytes(b"\x00" * shadow_record_size)
+    (root / "plain_file.old1").write_bytes(bytes([7, 70]))
+
     # Retention case (capacity=3, segments=2), same logical 4 records split into two segment files.
     write_desc(root / "ret_file.desc", with_retention=True)
     (root / "ret_file_segment_0").write_bytes(bytes([1, 10, 2, 20, 3, 30]))
@@ -70,6 +76,9 @@ def main() -> None:
     (root / "ret_file_segment_0.shadow").write_bytes(b"\x00" * shadow_record_size)
     (root / "ret_file_segment_1.shadow").write_bytes(b"")
     write_meta(root / "ret_file.meta", field_count=3)
+
+    # Rotation fixtures for ret_file: meta rotation
+    write_meta(root / "ret_file.meta.old2", field_count=3)
 
 
 if __name__ == "__main__":
