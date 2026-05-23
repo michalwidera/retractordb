@@ -63,7 +63,7 @@ class Descriptor : public std::vector<rField> {
   size_t getSizeInBytes() const;
   size_t fieldIndex(const std::string_view fieldName);
   int fieldSize(const std::string_view fieldName);
-  constexpr int fieldSize(const rdb::rField &field) const;
+  int fieldSize(const rdb::rField &field) const;
   size_t fieldByteOffset(const std::string_view fieldName);
   int byteOffsetAtFlatIndex(int flatIndex);
   std::string_view fieldTypeName(const std::string_view fieldName);

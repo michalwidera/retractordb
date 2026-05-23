@@ -265,7 +265,90 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
   EXPECT_EQ(meta.totalRecords(), 4u);
 }
 
-// Multiple consecutive flush → re-merge cycles must each produce
+// ── metaDataStream::rotate() ────────────────────────────────────────────────
+
+struct RotateFixture : public ::testing::Test {
+  const std::string meta     = "rotate_test.meta";
+  const std::string metaOld0 = meta + ".old0";
+  const std::string metaOld1 = meta + ".old1";
+  rdb::Descriptor descriptor;
+
+  void SetUp() override { descriptor.append({{"v", 4, 0, rdb::INTEGER}}); }
+  void TearDown() override {
+    for (const auto &f : {meta, metaOld0, metaOld1}) std::remove(f.c_str());
+  }
+};
+
+// rotate() renames current file to .old<N> and clears all in-memory state.
+TEST_F(RotateFixture, rotate_renames_file_and_clears_state) {
+  {
+    rdb::metaDataStream m(descriptor, meta);
+    m.onRecordAppended({false});
+    m.onRecordAppended({false});
+    m.onRecordAppended({true});
+  }
+
+  rdb::metaDataStream m(descriptor, meta);
+  ASSERT_EQ(m.totalRecords(), 3u);
+
+  m.rotate(0);
+
+  EXPECT_TRUE(m.isEmpty());
+  EXPECT_EQ(m.totalRecords(), 0u);
+  EXPECT_TRUE(std::filesystem::exists(metaOld0));
+  EXPECT_TRUE(std::filesystem::exists(meta));
+}
+
+// rotate(-1) resets state without renaming the file.
+TEST_F(RotateFixture, rotate_negative_percounter_resets_without_rename) {
+  {
+    rdb::metaDataStream m(descriptor, meta);
+    m.onRecordAppended({false});
+    m.onRecordAppended({true});
+  }
+
+  rdb::metaDataStream m(descriptor, meta);
+  ASSERT_EQ(m.totalRecords(), 2u);
+
+  m.rotate(-1);
+
+  EXPECT_TRUE(m.isEmpty());
+  EXPECT_FALSE(std::filesystem::exists(meta + ".old-1"));
+}
+
+// Renamed .old file contains the original records.
+TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
+  {
+    rdb::metaDataStream m(descriptor, meta);
+    m.onRecordAppended({false});
+    m.onRecordAppended({true});
+  }
+
+  { rdb::metaDataStream m(descriptor, meta); m.rotate(1); }
+
+  rdb::metaDataStream old(descriptor, metaOld1);
+  EXPECT_EQ(old.totalRecords(), 2u);
+  EXPECT_EQ(old.getNullBitset(0), (std::vector<bool>{false}));
+  EXPECT_EQ(old.getNullBitset(1), (std::vector<bool>{true}));
+}
+
+// After rotation, new records can be appended and queried correctly.
+TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
+  {
+    rdb::metaDataStream m(descriptor, meta);
+    for (int i = 0; i < 5; ++i) m.onRecordAppended({false});
+  }
+
+  rdb::metaDataStream m(descriptor, meta);
+  m.rotate(0);
+
+  m.onRecordAppended({false});
+  m.onRecordAppended({true});
+  EXPECT_EQ(m.totalRecords(), 2u);
+  EXPECT_EQ(m.getNullBitset(1), (std::vector<bool>{true}));
+}
+
+// ── Multiple consecutive flush → re-merge cycles must each produce
 // the correct merged count without accumulating stale entries.
 TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
   rdb::Descriptor descriptor;

@@ -1,0 +1,5 @@
+{
+	BYTE a
+	BYTE b
+	RETENTION 3 2
+}

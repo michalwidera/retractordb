@@ -1,0 +1,3 @@
+open _tmp { BYTE x }
+system python3 generate_storage_map_fixtures.py
+quitdrop
