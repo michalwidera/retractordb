@@ -16,37 +16,40 @@
 // Prezentacja mapy pliku (przykład)
 //
 // ┌────────────────────────────────────────────────────────────────┐
-// │  Storage map: /path/to/file                                    │
-// ├────────────────────────────────────────────────────────────────┤
-// │ [shadow]   │ [binary data] │ [meta index]                      │
-// ├────────────┼───────────────┼───────────────────────────────────┤
-// │            │ 0-100         │ [====] 100 records, no nulls      │
-// │            │ 100-150       │ [----] 60 records, some nulls     │
-// │ 10 records │ 150-160       │                                   │
-// │            │ 160-200       │ [~~~~] 40 records, all nulls      │
-// │            │               │ [XXXX] 50 records, gap (missing)  │
-// │            │ 200-210       │ [====] 110 records, no nulls      │
-// │ 10 records │ 210-250       │                                   │
-// └────────────┴───────────────┴───────────────────────────────────┘
-// ┌────────────────────────────────────────────────────────────────┐
-// │  DESCRIPTOR  file.desc (123 B)                                 │
-// │  int id (4 B)                                                  │
-// │  char name[20] (20 B)                                          │
-// │  float value (4 B)                                             │  
-// │  Record size: 28 B                                             │
-// ├────────────────────────────────────────────────────────────────┤
-// │  DATA        file (5000 B)                                     │
-// │  Records: 250                                                  │
-// ├────────────────────────────────────────────────────────────────┤
-// │  META        file.meta (800 B)                                 │
-// │  Segments: 3   Records: 178                                    │
-// │  [====] 100 records, no nulls                                  │
-// │  [----] 60 records, some nulls                                 │
-// │  [~~~~] 18 records, all nulls                                  │
-// ├────────────────────────────────────────────────────────────────┤
-// │  SHADOW      file.shadow (280 B)                               │
-// │  Updates: 20                                                   │  
-// └────────────────────────────────────────────────────────────────┘
+// │  Storage map: test_file                                      │
+// ├──────────────────────────────────────────────────────────────┤
+// │ [shadow]   │ [binary data] │ [meta index]                    │
+// ├────────────┼───────────────┼─────────────────────────────────┤
+// │ s0 1u      │ s0 0-3        │ [====] 4 records, no nulls      │
+// │ 1 updates  │ s1 3-4        │                                 │
+// ├────────────┴───────────────┴─────────────────────────────────┤
+// │  DESCRIPTOR  test_file.desc                             28 B │
+// │  BYTE dane                                              1 B │
+// │  Record size:                                            1 B │
+// ├──────────────────────────────────────────────────────────────┤
+// │  DATA TOTAL  rec=4 src=0 seg=4                           4 B │
+// │  Records: 4                                                  │
+// │  Source: test_file   Segments: test_file_segment_*           │
+// │  Segmented data (RETENTION): 2                               │
+// │  Policy: segments=2 capacity=3                               │
+// │  Retention cap records: 6                                    │
+// │  Retention cap bytes: 6                                      │
+// │  Total records: 4                                            │
+// │    current=0  segments=4                                     │
+// │  Total bytes: 4                                              │
+// │    current=0  segments=4                                     │
+// │    [0] test_file_segment_0 rec:3 range:0-3                   │
+// │    [1] test_file_segment_1 rec:1 range:3-4                   │
+// ├──────────────────────────────────────────────────────────────┤
+// │  META        test_file.meta                             26 B │
+// │  Segments: 1   Records: 4                                    │
+// │  [===========================4============================] │
+// │  Legend: [====] data  [----] partial null                    │
+// │          [~~~~] nullfill  [XXXX] gap                         │
+// ├──────────────────────────────────────────────────────────────┤
+// │  SHADOW      test_file.shadow                            9 B │
+// │  Updates: 1                                                  │
+// └──────────────────────────────────────────────────────────────┘
 
 namespace fs = std::filesystem;
 
