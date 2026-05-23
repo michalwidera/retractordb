@@ -7,7 +7,7 @@
 #include <iostream>
 #include <span>
 #include <string>
-#include <unordered_map>
+#include <string_view>
 #include <vector>
 
 #include "rdb/descriptor.hpp"
@@ -66,6 +66,35 @@ struct DataSegmentInfo {
   size_t shadowUpdates{};
 };
 
+struct DataStats {
+  bool segmentedData{};
+  bool hasData{};
+  bool hasMeta{};
+  bool hasShadow{};
+
+  uintmax_t descSize{};
+  uintmax_t currentDataSize{};
+  uintmax_t segmentDataSize{};
+  uintmax_t dataSize{};
+  uintmax_t metaSize{};
+  uintmax_t shadowSize{};
+
+  size_t currentDataRecords{};
+  size_t segmentDataRecords{};
+  size_t dataRecords{};
+  size_t shadowUpdates{};
+
+  bool hasBoundedRetention{};
+  size_t retentionCapacityRecords{};
+  uintmax_t retentionCapacityBytes{};
+};
+
+static std::string metaLabel(const Segment& seg, const std::vector<size_t>& dataIdx);
+
+static size_t recordCount(uintmax_t bytes, size_t recordSize) {
+  return (recordSize > 0) ? static_cast<size_t>(bytes / recordSize) : 0;
+}
+
 static std::vector<DataSegmentInfo> readDataSegments(const std::string& baseName,
                                                      const rdb::retention_t& retention,
                                                      size_t recordSize) {
@@ -104,13 +133,133 @@ static std::vector<DataSegmentInfo> readDataSegments(const std::string& baseName
     out.push_back(std::move(info));
   }
 
-  std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.index < b.index; });
+  std::ranges::sort(out, [](const auto& a, const auto& b) { return a.index < b.index; });
   return out;
 }
 
-static std::string segmentLabel(size_t first, size_t last) {
-  if (first == last) return "s" + std::to_string(first);
-  return "s" + std::to_string(first) + "-" + std::to_string(last);
+static std::string segmentLabel(size_t index) {
+  return "s" + std::to_string(index);
+}
+
+static DataStats collectDataStats(const std::string& descFile,
+                                  const std::string& dataFile,
+                                  const std::string& metaFile,
+                                  const std::string& shadowFile,
+                                  const std::vector<DataSegmentInfo>& dataSegments,
+                                  const rdb::retention_t& retention,
+                                  size_t recordSize) {
+  DataStats stats;
+  stats.segmentedData = !retention.noRetention();
+
+  const bool hasDataFile = fs::exists(dataFile);
+  const bool hasSegmentData = !dataSegments.empty();
+  const bool hasRootShadow = fs::exists(shadowFile);
+
+  stats.hasData = stats.segmentedData ? (hasSegmentData || hasDataFile) : hasDataFile;
+  stats.hasMeta = fs::exists(metaFile);
+
+  stats.descSize = fs::file_size(descFile);
+  stats.currentDataSize = hasDataFile ? fs::file_size(dataFile) : 0;
+
+  uintmax_t segmentShadowSize = 0;
+  size_t segmentShadowUpdates = 0;
+  for (const auto& seg : dataSegments) {
+    stats.segmentDataSize += seg.bytes;
+    stats.segmentDataRecords += seg.records;
+    segmentShadowSize += seg.shadowBytes;
+    segmentShadowUpdates += seg.shadowUpdates;
+  }
+
+  stats.dataSize = stats.segmentDataSize + stats.currentDataSize;
+  stats.currentDataRecords = recordCount(stats.currentDataSize, recordSize);
+  stats.dataRecords = stats.segmentDataRecords + stats.currentDataRecords;
+
+  if (!stats.segmentedData) {
+    stats.dataSize = hasDataFile ? stats.currentDataSize : 0;
+    stats.dataRecords = hasDataFile ? stats.currentDataRecords : 0;
+  }
+
+  stats.metaSize = stats.hasMeta ? fs::file_size(metaFile) : 0;
+
+  if (stats.segmentedData) {
+    stats.shadowSize = segmentShadowSize + (hasRootShadow ? fs::file_size(shadowFile) : 0);
+    stats.shadowUpdates = segmentShadowUpdates;
+    if (hasRootShadow) stats.shadowUpdates += recordCount(fs::file_size(shadowFile), sizeof(size_t) + recordSize);
+    stats.hasShadow = hasRootShadow || segmentShadowSize > 0;
+  } else {
+    stats.shadowSize = hasRootShadow ? fs::file_size(shadowFile) : 0;
+    stats.shadowUpdates = hasRootShadow ? recordCount(stats.shadowSize, sizeof(size_t) + recordSize) : 0;
+    stats.hasShadow = hasRootShadow;
+  }
+
+  stats.hasBoundedRetention = stats.segmentedData && retention.segments > 0 && retention.capacity > 0;
+  if (stats.hasBoundedRetention) {
+    stats.retentionCapacityRecords = retention.segments * retention.capacity;
+    stats.retentionCapacityBytes = static_cast<uintmax_t>(stats.retentionCapacityRecords) * recordSize;
+  }
+
+  return stats;
+}
+
+static void buildMainMapColumns(const std::vector<DataSegmentInfo>& dataSegments,
+                                bool segmentedData,
+                                bool hasMeta,
+                                bool hasData,
+                                size_t dataRecords,
+                                const std::vector<Segment>& segs,
+                                const std::vector<size_t>& dataIdx,
+                                std::vector<std::string>& shadowCol,
+                                std::vector<std::string>& dataCol,
+                                std::vector<std::string>& metaCol) {
+  if (segmentedData) {
+    for (const auto& ds : dataSegments) {
+      const std::string segLbl = segmentLabel(ds.index);
+      shadowCol.push_back(ds.shadowUpdates > 0 ? segLbl + " " + std::to_string(ds.shadowUpdates) + "u" : segLbl);
+      dataCol.push_back(segLbl + " " + std::to_string(ds.begin) + "-" + std::to_string(ds.end));
+      metaCol.emplace_back("");
+    }
+
+    if (hasMeta && !segs.empty()) {
+      for (size_t i = 0; i < segs.size(); ++i) {
+        if (i < metaCol.size()) {
+          metaCol[i] = metaLabel(segs[i], dataIdx);
+        } else {
+          shadowCol.emplace_back("");
+          dataCol.emplace_back("");
+          metaCol.push_back(metaLabel(segs[i], dataIdx));
+        }
+      }
+      return;
+    }
+
+    if (metaCol.empty()) {
+      shadowCol.emplace_back("");
+      dataCol.emplace_back("");
+      metaCol.emplace_back(hasMeta ? "meta file is empty" : "meta missing");
+    }
+    return;
+  }
+
+  if (hasMeta && !segs.empty()) {
+    size_t dataPos = 0;
+    for (const auto& seg : segs) {
+      shadowCol.emplace_back("");
+      if (seg.isGap) {
+        dataCol.emplace_back("");
+      } else {
+        const size_t begin = dataPos;
+        const size_t end = dataPos + seg.recordCount;
+        dataPos = end;
+        dataCol.push_back(std::to_string(begin) + "-" + std::to_string(end));
+      }
+      metaCol.push_back(metaLabel(seg, dataIdx));
+    }
+    return;
+  }
+
+  shadowCol.emplace_back("");
+  dataCol.push_back((hasData && dataRecords > 0) ? ("0-" + std::to_string(dataRecords)) : "");
+  metaCol.emplace_back(hasMeta ? "meta file is empty" : "meta missing");
 }
 
 static std::vector<Segment> readMetaFile(const std::string& path, size_t fieldCount) {
@@ -204,6 +353,57 @@ static std::string repeatGlyph(const std::string& glyph, int count) {
   return out;
 }
 
+class TablePrinter {
+ public:
+  explicit TablePrinter(int width) : width_(width), inner_(width - 4) {}
+
+  int inner() const { return inner_; }
+  int metaBarWidth() const { return inner_ - 2; }
+
+  void hline(std::string_view l, std::string_view m, std::string_view r) const {
+    std::cout << l << repeatGlyph(std::string(m), width_ - 2) << r << "\n";
+  }
+
+  void row(const std::string& s) const {
+    std::cout << "│ " << std::left << std::setw(inner_) << s.substr(0, inner_) << " │\n";
+  }
+
+  void valueRow(const std::string& left, const std::string& right) const {
+    const int leftMax = inner_ - static_cast<int>(right.size()) - 1;
+    const std::string leftFit = fit(left, std::max(0, leftMax));
+    const int gap = std::max(1, inner_ - static_cast<int>(leftFit.size()) - static_cast<int>(right.size()));
+    std::cout << "│ " << leftFit << std::string(gap, ' ') << right << " │\n";
+  }
+
+  void sizeRow(const std::string& tag, const std::string& name, uintmax_t bytes) const {
+    valueRow(tag + name, std::to_string(bytes) + " B");
+  }
+
+  void mapHLine(std::string_view l,
+                std::string_view j1,
+                std::string_view j2,
+                std::string_view r,
+                int c1,
+                int c2,
+                int c3) const {
+    std::cout << l << repeatGlyph("─", c1 + 2) << j1 << repeatGlyph("─", c2 + 2) << j2
+              << repeatGlyph("─", c3 + 2) << r << "\n";
+  }
+
+  void mapRow(const std::string& s1,
+              const std::string& s2,
+              const std::string& s3,
+              int c1,
+              int c2,
+              int c3) const {
+    std::cout << "│ " << fit(s1, c1) << " │ " << fit(s2, c2) << " │ " << fit(s3, c3) << " │\n";
+  }
+
+ private:
+  int width_;
+  int inner_;
+};
+
 static std::string metaLabel(const Segment& seg, const std::vector<size_t>& dataIdx) {
   if (seg.isGap) return "[XXXX] " + std::to_string(seg.recordCount) + " records, gap";
 
@@ -213,35 +413,6 @@ static std::string metaLabel(const Segment& seg, const std::vector<size_t>& data
   if (fill == '~') state = "all nulls";
 
   return "[" + std::string(4, fill) + "] " + std::to_string(seg.recordCount) + " records, " + state;
-}
-
-static void mapHLine(const std::string& l,
-                     const std::string& j1,
-                     const std::string& j2,
-                     const std::string& r,
-                     int c1,
-                     int c2,
-                     int c3) {
-  std::cout << l << repeatGlyph("─", c1 + 2) << j1 << repeatGlyph("─", c2 + 2) << j2
-            << repeatGlyph("─", c3 + 2) << r << "\n";
-}
-
-static void mapRow(const std::string& s1,
-                   const std::string& s2,
-                   const std::string& s3,
-                   int c1,
-                   int c2,
-                   int c3) {
-  std::cout << "│ " << fit(s1, c1) << " │ " << fit(s2, c2) << " │ " << fit(s3, c3) << " │\n";
-}
-
-static void hline(const std::string& l, const std::string& m, const std::string& r, int W) {
-  std::cout << l << repeatGlyph(m, W - 2) << r << "\n";
-}
-
-static void row(const std::string& s, int W) {
-  const int inner = W - 4;
-  std::cout << "│ " << std::left << std::setw(inner) << s.substr(0, inner) << " │\n";
 }
 
 void showStorageMap(const std::string& baseName) {
@@ -264,7 +435,6 @@ void showStorageMap(const std::string& baseName) {
   const size_t recordSize  = desc.getSizeInBytes();
   const size_t fieldCount  = desc.size();
   const auto retention = desc.retention();
-  const bool segmentedData = !retention.noRetention();
 
   // indices of data fields (non-config, non-null) in the descriptor vector
   std::vector<size_t> dataIdx;
@@ -273,252 +443,127 @@ void showStorageMap(const std::string& baseName) {
       dataIdx.push_back(i);
 
   const auto dataSegments = readDataSegments(baseName, retention, recordSize);
-  const bool hasSegmentData = !dataSegments.empty();
-  const bool hasDataFile = fs::exists(dataFile);
-  const bool hasData   = segmentedData ? (hasSegmentData || hasDataFile) : hasDataFile;
-  const bool hasMeta   = fs::exists(metaFile);
-  const bool hasRootShadow = fs::exists(shadowFile);
+  const DataStats stats = collectDataStats(descFile, dataFile, metaFile, shadowFile, dataSegments, retention, recordSize);
 
-  uintmax_t totalSegmentShadowSize = 0;
-  size_t totalSegmentShadowUpdates = 0;
-  std::unordered_map<size_t, size_t> segmentShadowUpdates;
-  for (const auto& ds : dataSegments) {
-    totalSegmentShadowSize += ds.shadowBytes;
-    totalSegmentShadowUpdates += ds.shadowUpdates;
-    segmentShadowUpdates.emplace(ds.index, ds.shadowUpdates);
-  }
-
-  const bool hasShadow = segmentedData ? (hasRootShadow || totalSegmentShadowSize > 0) : hasRootShadow;
-
-  const uintmax_t descSize   = fs::file_size(descFile);
-  const uintmax_t currentDataSize = hasDataFile ? fs::file_size(dataFile) : 0;
-  uintmax_t dataSize = 0;
-  if (segmentedData) {
-    for (const auto& seg : dataSegments) dataSize += seg.bytes;
-    dataSize += currentDataSize;
-  } else if (hasDataFile) {
-    dataSize = currentDataSize;
-  }
-  const uintmax_t metaSize   = hasMeta   ? fs::file_size(metaFile)   : 0;
-  uintmax_t shadowSize = 0;
-  if (segmentedData) {
-    shadowSize = totalSegmentShadowSize;
-    if (hasRootShadow) shadowSize += fs::file_size(shadowFile);
-  } else if (hasShadow) {
-    shadowSize = fs::file_size(shadowFile);
-  }
-
-  size_t dataRecords = 0;
-  const size_t currentDataRecords = (recordSize > 0 && hasDataFile)
-                                        ? static_cast<size_t>(currentDataSize / recordSize)
-                                        : 0;
-  size_t segmentDataRecords = 0;
-  const bool hasBoundedRetention = segmentedData && retention.segments > 0 && retention.capacity > 0;
-  const size_t retentionCapacityRecords = hasBoundedRetention ? retention.segments * retention.capacity : 0;
-  const uintmax_t retentionCapacityBytes = static_cast<uintmax_t>(retentionCapacityRecords) * recordSize;
-  if (segmentedData) {
-    for (const auto& seg : dataSegments) segmentDataRecords += seg.records;
-    dataRecords = segmentDataRecords + currentDataRecords;
-  } else {
-    dataRecords = (recordSize > 0 && hasData) ? static_cast<size_t>(dataSize / recordSize) : 0;
-  }
-  size_t shadowUpdates = 0;
-  if (segmentedData) {
-    shadowUpdates = totalSegmentShadowUpdates;
-    if (hasRootShadow && recordSize > 0)
-      shadowUpdates += static_cast<size_t>(fs::file_size(shadowFile) / (sizeof(size_t) + recordSize));
-  } else if (hasShadow && recordSize > 0) {
-    shadowUpdates = static_cast<size_t>(shadowSize / (sizeof(size_t) + recordSize));
-  }
-
-  auto segs = hasMeta ? readMetaFile(metaFile, fieldCount) : std::vector<Segment>{};
+  auto segs = stats.hasMeta ? readMetaFile(metaFile, fieldCount) : std::vector<Segment>{};
   size_t metaRecords = 0;
-  for (const auto& s : segs) if (!s.isGap) metaRecords += s.recordCount;
+  for (const auto& s : segs)
+    if (!s.isGap) metaRecords += s.recordCount;
 
-  constexpr int W       = 64;
-  constexpr int inner   = W - 4;  // content width between "| " and " |"
-  constexpr int barWidth = inner - 2;
-
-  auto fmtSize = [&](const std::string& tag, const std::string& name, uintmax_t bytes) {
-    const std::string right = std::to_string(bytes) + " B";
-    const int leftMax = inner - static_cast<int>(right.size()) - 1;
-    const std::string left = fit(tag + name, std::max(0, leftMax));
-    const int gap = std::max(1, inner - static_cast<int>(left.size()) - static_cast<int>(right.size()));
-    std::cout << "│ " << left << std::string(gap, ' ') << right << " │\n";
-  };
-
-  auto fmtField = [&](const rdb::rField& f) {
-    std::string left = "  " + std::string(rdb::GetStringdescFld(f.rtype)) + "  " + f.rname;
-    if (f.rarray > 1) left += "[" + std::to_string(f.rarray) + "]";
-    const std::string right = std::to_string(desc.fieldSize(f)) + " B";
-    const int leftMax = inner - static_cast<int>(right.size()) - 1;
-    left = fit(left, std::max(0, leftMax));
-    int gap = inner - static_cast<int>(left.size()) - static_cast<int>(right.size());
-    if (gap < 1) gap = 1;
-    std::cout << "│ " << left << std::string(gap, ' ') << right << " │\n";
-  };
-
-  hline("┌", "─", "┐", W);
-  {
-    const std::string hdr = "  Storage map: " + baseName;
-    std::cout << "│ " << std::left << std::setw(inner) << hdr << " │\n";
-  }
-  hline("├", "─", "┤", W);
-
-  // Primary three-column map, similar to the visual example in the header comment.
+  constexpr int W = 64;
   constexpr int c1 = 10;
   constexpr int c2 = 13;
   constexpr int c3 = 31;
-  mapRow("[shadow]", "[binary data]", "[meta index]", c1, c2, c3);
-  mapHLine("├", "┼", "┼", "┤", c1, c2, c3);
+
+  const TablePrinter table(W);
+
+  auto printField = [&](const rdb::rField& f) {
+    std::string left = "  " + std::string(rdb::GetStringdescFld(f.rtype)) + "  " + f.rname;
+    if (f.rarray > 1) left += "[" + std::to_string(f.rarray) + "]";
+    table.valueRow(left, std::to_string(desc.fieldSize(f)) + " B");
+  };
+
+  table.hline("┌", "─", "┐");
+  {
+    table.row("  Storage map: " + baseName);
+  }
+  table.hline("├", "─", "┤");
+
+  // Primary three-column map, similar to the visual example in the header comment.
+  table.mapRow("[shadow]", "[binary data]", "[meta index]", c1, c2, c3);
+  table.mapHLine("├", "┼", "┼", "┤", c1, c2, c3);
 
   std::vector<std::string> shadowCol;
   std::vector<std::string> dataCol;
   std::vector<std::string> metaCol;
 
-  if (segmentedData) {
-    // For RETENTION, always render binary-data segments sequentially: s0, s1, s2...
-    for (const auto& ds : dataSegments) {
-      const std::string segLbl = segmentLabel(ds.index, ds.index);
-      shadowCol.push_back(ds.shadowUpdates > 0 ? segLbl + " " + std::to_string(ds.shadowUpdates) + "u" : segLbl);
-      dataCol.push_back(segLbl + " " + std::to_string(ds.begin) + "-" + std::to_string(ds.end));
-      metaCol.emplace_back("");
-    }
+  buildMainMapColumns(dataSegments,
+                      stats.segmentedData,
+                      stats.hasMeta,
+                      stats.hasData,
+                      stats.dataRecords,
+                      segs,
+                      dataIdx,
+                      shadowCol,
+                      dataCol,
+                      metaCol);
 
-    if (hasMeta && !segs.empty()) {
-      for (size_t i = 0; i < segs.size(); ++i) {
-        if (i < metaCol.size()) {
-          metaCol[i] = metaLabel(segs[i], dataIdx);
-        } else {
-          shadowCol.emplace_back("");
-          dataCol.emplace_back("");
-          metaCol.push_back(metaLabel(segs[i], dataIdx));
-        }
-      }
-    } else if (!hasMeta && metaCol.empty()) {
-      shadowCol.emplace_back("");
-      dataCol.emplace_back("");
-      metaCol.emplace_back("meta missing");
-    } else if (hasMeta && metaCol.empty()) {
-      shadowCol.emplace_back("");
-      dataCol.emplace_back("");
-      metaCol.emplace_back("meta file is empty");
-    }
-  } else if (hasMeta && !segs.empty()) {
-    size_t dataPos = 0;
-    for (const auto& seg : segs) {
-      shadowCol.emplace_back("");
-      if (seg.isGap) {
-        dataCol.emplace_back("");
-      } else {
-        const size_t begin = dataPos;
-        const size_t end = dataPos + seg.recordCount;
-        dataPos = end;
-        dataCol.push_back(std::to_string(begin) + "-" + std::to_string(end));
-      }
-      metaCol.push_back(metaLabel(seg, dataIdx));
-    }
-  } else {
-    shadowCol.emplace_back("");
-    if (hasData && dataRecords > 0) {
-      dataCol.push_back("0-" + std::to_string(dataRecords));
-    } else {
-      dataCol.emplace_back("");
-    }
-    if (hasMeta) {
-      metaCol.emplace_back("meta file is empty");
-    } else {
-      metaCol.emplace_back("meta missing");
-    }
-  }
-
-  if (hasShadow && shadowUpdates > 0) {
+  if (stats.hasShadow && stats.shadowUpdates > 0) {
     if (shadowCol.size() == 1) {
-      shadowCol[0] = std::to_string(shadowUpdates) + " updates";
+      shadowCol[0] = std::to_string(stats.shadowUpdates) + " updates";
     } else {
-      const size_t top = shadowUpdates / 2;
-      const size_t bottom = shadowUpdates - top;
+      const size_t top = stats.shadowUpdates / 2;
+      const size_t bottom = stats.shadowUpdates - top;
       if (top > 0) shadowCol.front() = std::to_string(top) + " updates";
       if (bottom > 0) shadowCol.back() = std::to_string(bottom) + " updates";
     }
   }
 
   for (size_t i = 0; i < metaCol.size(); ++i)
-    mapRow(shadowCol[i], dataCol[i], metaCol[i], c1, c2, c3);
+    table.mapRow(shadowCol[i], dataCol[i], metaCol[i], c1, c2, c3);
 
-  mapHLine("├", "┴", "┴", "┤", c1, c2, c3);
+  table.mapHLine("├", "┴", "┴", "┤", c1, c2, c3);
 
   // ── DESCRIPTOR ──────────────────────────────────────────────────────
-  fmtSize("  DESCRIPTOR  ", descFile, descSize);
-  for (const auto& f : desc.dataFields()) fmtField(f);
-  {
-    const std::string right = std::to_string(recordSize) + " B";
-    const int leftMax = inner - static_cast<int>(right.size()) - 1;
-    const std::string left = fit("  Record size:", std::max(0, leftMax));
-    int gap = inner - static_cast<int>(left.size()) - static_cast<int>(right.size());
-    std::cout << "│ " << left << std::string(std::max(1, gap), ' ') << right << " │\n";
-  }
-  hline("├", "─", "┤", W);
+  table.sizeRow("  DESCRIPTOR  ", descFile, stats.descSize);
+  for (const auto& f : desc.dataFields()) printField(f);
+  table.valueRow("  Record size:", std::to_string(recordSize) + " B");
+  table.hline("├", "─", "┤");
 
   // ── DATA ────────────────────────────────────────────────────────────
-  const uintmax_t segmentDataSize = segmentedData ? (dataSize - currentDataSize) : 0;
-  if (segmentedData) {
-    fmtSize("  DATA TOTAL  ",
-            "rec=" + std::to_string(dataRecords) +
-                " src=" + std::to_string(currentDataRecords) +
-                " seg=" + std::to_string(segmentDataRecords),
-            dataSize);
+  if (stats.segmentedData) {
+    table.sizeRow("  DATA TOTAL  ",
+                  "rec=" + std::to_string(stats.dataRecords) +
+                      " src=" + std::to_string(stats.currentDataRecords) +
+                      " seg=" + std::to_string(stats.segmentDataRecords),
+                  stats.dataSize);
   } else {
-    fmtSize("  DATA        ", hasData ? dataFile : dataFile + " (missing)", dataSize);
+    table.sizeRow("  DATA        ", stats.hasData ? dataFile : dataFile + " (missing)", stats.dataSize);
   }
-  row("  Records: " + std::to_string(dataRecords), W);
-  if (segmentedData) {
-    row("  Source: " + dataFile + "   Segments: " + dataFile + "_segment_*", W);
-    row("  Segmented data (RETENTION): " + std::to_string(dataSegments.size()), W);
-    row("  Policy: segments=" + std::to_string(retention.segments) +
-            " capacity=" + std::to_string(retention.capacity),
-        W);
-    if (hasBoundedRetention) {
-      row("  Retention cap records: " + std::to_string(retentionCapacityRecords), W);
-      row("  Retention cap bytes: " + std::to_string(retentionCapacityBytes), W);
+  table.row("  Records: " + std::to_string(stats.dataRecords));
+  if (stats.segmentedData) {
+    table.row("  Source: " + dataFile + "   Segments: " + dataFile + "_segment_*");
+    table.row("  Segmented data (RETENTION): " + std::to_string(dataSegments.size()));
+    table.row("  Policy: segments=" + std::to_string(retention.segments) +
+              " capacity=" + std::to_string(retention.capacity));
+    if (stats.hasBoundedRetention) {
+      table.row("  Retention cap records: " + std::to_string(stats.retentionCapacityRecords));
+      table.row("  Retention cap bytes: " + std::to_string(stats.retentionCapacityBytes));
     } else {
-      row("  Retention cap: unbounded", W);
+      table.row("  Retention cap: unbounded");
     }
-    row("  Total records: " + std::to_string(dataRecords), W);
-    row("    current=" + std::to_string(currentDataRecords) +
-            "  segments=" + std::to_string(segmentDataRecords),
-        W);
-    row("  Total bytes: " + std::to_string(dataSize), W);
-    row("    current=" + std::to_string(currentDataSize) +
-            "  segments=" + std::to_string(segmentDataSize),
-        W);
+    table.row("  Total records: " + std::to_string(stats.dataRecords));
+    table.row("    current=" + std::to_string(stats.currentDataRecords) +
+              "  segments=" + std::to_string(stats.segmentDataRecords));
+    table.row("  Total bytes: " + std::to_string(stats.dataSize));
+    table.row("    current=" + std::to_string(stats.currentDataSize) +
+              "  segments=" + std::to_string(stats.segmentDataSize));
     for (const auto& seg : dataSegments) {
       const fs::path segPath(seg.path);
-      row("    [" + std::to_string(seg.index) + "] " + segPath.filename().string() +
-              " rec:" + std::to_string(seg.records) +
-              " range:" + std::to_string(seg.begin) + "-" + std::to_string(seg.end),
-          W);
+      table.row("    [" + std::to_string(seg.index) + "] " + segPath.filename().string() +
+                " rec:" + std::to_string(seg.records) +
+                " range:" + std::to_string(seg.begin) + "-" + std::to_string(seg.end));
     }
   }
-  hline("├", "─", "┤", W);
+  table.hline("├", "─", "┤");
 
   // ── META ────────────────────────────────────────────────────────────
-  fmtSize("  META        ", hasMeta ? metaFile : metaFile + " (missing)", metaSize);
-  if (hasMeta) {
-    row("  Segments: " + std::to_string(segs.size()) +
-        "   Records: " + std::to_string(metaRecords), W);
+  table.sizeRow("  META        ", stats.hasMeta ? metaFile : metaFile + " (missing)", stats.metaSize);
+  if (stats.hasMeta) {
+    table.row("  Segments: " + std::to_string(segs.size()) +
+              "   Records: " + std::to_string(metaRecords));
     if (!segs.empty()) {
-      const std::string bar = makeMetaBar(segs, dataIdx, barWidth);
-      row("  " + bar, W);
-      row("  Legend: [====] data  [----] partial null", W);
-      row("          [~~~~] nullfill  [XXXX] gap", W);
+      const std::string bar = makeMetaBar(segs, dataIdx, table.metaBarWidth());
+      table.row("  " + bar);
+      table.row("  Legend: [====] data  [----] partial null");
+      table.row("          [~~~~] nullfill  [XXXX] gap");
     }
   }
-  hline("├", "─", "┤", W);
+  table.hline("├", "─", "┤");
 
   // ── SHADOW ──────────────────────────────────────────────────────────
-  fmtSize("  SHADOW      ", hasShadow ? shadowFile : shadowFile + " (missing)", shadowSize);
-  if (hasShadow)
-    row("  Updates: " + std::to_string(shadowUpdates), W);
-  hline("└", "─", "┘", W);
+  table.sizeRow("  SHADOW      ", stats.hasShadow ? shadowFile : shadowFile + " (missing)", stats.shadowSize);
+  if (stats.hasShadow)
+    table.row("  Updates: " + std::to_string(stats.shadowUpdates));
+  table.hline("└", "─", "┘");
 }
