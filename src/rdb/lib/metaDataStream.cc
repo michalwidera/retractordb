@@ -129,18 +129,21 @@ void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
   f.seekp(-static_cast<std::streamoff>(entrySize()), std::ios::end);
   auto buf = entry.serialize();
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+  cacheValid_ = false;
 }
 
 void metaDataStream::saveHeader() {
   if (metaFilePath_.empty()) return;
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::trunc);
   if (out.is_open()) writeHeader(out, creationTime_);
+  cacheValid_ = false;
 }
 
 void metaDataStream::appendEntry(const IndexRecord &entry) {
   if (metaFilePath_.empty()) return;
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::app);
   if (out.is_open()) writeEntry(out, entry);
+  cacheValid_ = false;
 }
 
 void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
@@ -153,18 +156,30 @@ void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
     writeEntry(out, rec);
   out.close();
   std::filesystem::rename(tmpPath, metaFilePath_);
+  cacheValid_ = false;
 }
 
 std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() const {
-  std::vector<IndexRecord> result;
-  if (metaFilePath_.empty()) return result;
+  if (cacheValid_) return entriesCache_;
+
+  entriesCache_.clear();
+  if (metaFilePath_.empty()) {
+    cacheValid_ = true;
+    return entriesCache_;
+  }
 
   std::ifstream in(metaFilePath_, std::ios::binary);
-  if (!in.is_open()) return result;
+  if (!in.is_open()) {
+    cacheValid_ = true;
+    return entriesCache_;
+  }
 
   in.seekg(0, std::ios::end);
   const auto fileSize = in.tellg();
-  if (fileSize <= 0 || static_cast<size_t>(fileSize) <= kHeaderSize) return result;
+  if (fileSize <= 0 || static_cast<size_t>(fileSize) <= kHeaderSize) {
+    cacheValid_ = true;
+    return entriesCache_;
+  }
 
   const size_t eSize       = entrySize();
   const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
@@ -177,11 +192,12 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= eSize) {
-    result.push_back(IndexRecord::deserialize(remaining.subspan(0, eSize)));
+    entriesCache_.push_back(IndexRecord::deserialize(remaining.subspan(0, eSize)));
     remaining = remaining.subspan(eSize);
   }
 
-  return result;
+  cacheValid_ = true;
+  return entriesCache_;
 }
 
 void metaDataStream::loadIndex() {
@@ -271,9 +287,14 @@ void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool
     IndexRecord newCur = parts.back();
     parts.pop_back();
 
-    for (const auto &entry : parts) {
-      appendEntry(entry);
-      committedRecordCount_ += entry.recordCount;
+    for (size_t i = 0; i < parts.size(); ++i) {
+      if (i == 0 && tailDirty_) {
+        overwriteLastEntry(parts[i]);  // replace stale on-disk entry, not append after it
+        tailDirty_ = false;
+      } else {
+        appendEntry(parts[i]);
+      }
+      committedRecordCount_ += parts[i].recordCount;
     }
 
     pendingCommittedCount_ = 0;

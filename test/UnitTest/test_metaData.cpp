@@ -384,3 +384,50 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
   EXPECT_EQ(committed[1].recordCount, 3u);
   EXPECT_EQ(meta.totalRecords(), 8u);
 }
+
+// ── tailDirty_ + onRecordModified interaction ────────────────────────
+//
+// Bug: when tailDirty_=true, onRecordModified() on a non-last record in
+// currentEntry_ used to appendEntry() after the stale on-disk entry
+// instead of overwriting it. The stale entry remained on disk and shadowed
+// the new split entries, causing getNullBitset() to return the wrong pattern.
+
+TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  const std::vector<bool> A = {false};
+  const std::vector<bool> B = {true};
+
+  // Set up tailDirty_: flush 3 records, then append same-pattern record (no flush).
+  meta.onRecordAppended(A);   // rec 0
+  meta.onRecordAppended(A);   // rec 1
+  meta.onRecordAppended(A);   // rec 2
+  meta.flushCurrentEntry();   // disk: [{A,3}], pendingCommittedCount_=3
+
+  meta.onRecordAppended(A);   // rec 3 — tailDirty_=true, currentEntry_={A,4}, committed=0
+
+  // Modify non-last record in currentEntry_ (rec 1, offset 1, two records follow).
+  // The stale on-disk entry [{A,3}] must be overwritten with the prefix [{A,1}],
+  // not left as-is with new entries appended after it.
+  meta.onRecordModified(1, B);
+
+  meta.flushCurrentEntry();   // flush suffix {A,2}
+
+  ASSERT_EQ(meta.totalRecords(), 4u);
+  EXPECT_EQ(meta.getNullBitset(0), A);  // prefix
+  EXPECT_EQ(meta.getNullBitset(1), B);  // modified
+  EXPECT_EQ(meta.getNullBitset(2), A);  // suffix
+  EXPECT_EQ(meta.getNullBitset(3), A);  // suffix (cont.)
+
+  // Disk must contain exactly 3 segments: [{A,1},{B,1},{A,2}].
+  auto segs = meta.segments();
+  ASSERT_EQ(segs.size(), 3u);
+  EXPECT_EQ(segs[0].recordCount, 1u);
+  EXPECT_EQ(segs[0].nullBitset, A);
+  EXPECT_EQ(segs[1].recordCount, 1u);
+  EXPECT_EQ(segs[1].nullBitset, B);
+  EXPECT_EQ(segs[2].recordCount, 2u);
+  EXPECT_EQ(segs[2].nullBitset, A);
+}

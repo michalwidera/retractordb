@@ -29,6 +29,7 @@ namespace rdb {
 /// - przyjąć od obiektu storage informację o rotacji pliku danych i zresetować indeks do stanu początkowego (bez wpisu gap),
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
 /// - umożliwić rotację indeksu podobnie jak obiekty klasy storage, tworząc kopię obecnego pliku indeksu z rozszerzeniem .old/percounter i tworząc nowy, czysty plik indeksu.
+/// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
 /// @note Wpisy gap są markerami przerw transmisji danych między rekordami i nie są wliczane do numeracji logicznych rekordów zwracanej przez totalRecords().
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
@@ -166,6 +167,8 @@ class metaDataStream {
   size_t pendingCommittedCount_{0};                     ///< recordCount of the last entry written to disk (0 = none/invalidated)
   bool tailDirty_{false};                               ///< last disk entry is stale and must be overwritten on next flush
   IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run
+  mutable std::vector<IndexRecord> entriesCache_;       ///< in-memory copy of committed on-disk entries
+  mutable bool cacheValid_{false};                      ///< true when entriesCache_ matches the file; cleared on every write
 };  // class metaDataStream
 
 }  // namespace rdb
