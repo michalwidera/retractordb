@@ -6,6 +6,9 @@ parameters:
   run_manual_arm:
     type: boolean
     default: false
+  run_manual_nightly_full:
+    type: boolean
+    default: false
 
 workflows:
   commit:
@@ -46,6 +49,22 @@ workflows:
     when: << pipeline.parameters.run_manual_arm >>
     jobs:
       - build-ARM
+
+  manual-nightly-full:
+    when: << pipeline.parameters.run_manual_nightly_full >>
+    jobs:
+      - build-release
+      - build-release-ninja-mydocker
+      - build-debug-ninja-mydocker
+      - build-debug:
+          requires:
+            - build-release
+      - build-debug-ninja:
+          requires:
+            - build-release
+      - build-ARM:
+          requires:
+            - build-release
 
   nightly-partial:
     triggers:
