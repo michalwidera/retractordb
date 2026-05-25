@@ -10,9 +10,9 @@
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
+#include <boost/container/map.hpp>
+#include <boost/container/string.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/map.hpp>
-#include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
@@ -39,13 +39,13 @@ namespace IPC = boost::interprocess;
 typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
 
 typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
+typedef boost::container::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
 typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
 
 typedef std::pair<const int, IPCString> ValueType;
 
 typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-typedef IPC::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
+typedef boost::container::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
 
 using namespace CRationalStreamMath;
 
@@ -271,11 +271,10 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       id2StreamName_Relation[streamId] = streamName;
       // Create a message_queue
       std::string queueName = "brcdbr" + ptInval.get("db.id", "");
-      // let's assume that we have 1/10 duration
-      // that means 10 elements are going in second
-      // so - we need 10 elements for one second buffer
-      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval);
-      maxElements     = (maxElements < 2) ? 2 : maxElements;
+      // 10-second buffer to prevent overflow on loaded systems
+      // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
+      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * 10;
+      maxElements     = std::max(maxElements, 100);
       IPC::message_queue mq(IPC::open_or_create,  // open or crate
                             queueName.c_str(),    // name
                             maxElements,          // max message number
@@ -424,27 +423,28 @@ void executorsm::boradcastOutOfBussiness() {
   for (const auto &element : id2StreamName_Relation) {
     using namespace boost::interprocess;
     //
-    // Query discovery. queues are created by show command
+    // Queue may have been removed earlier (try_send overflow in boradcast).
+    // Wrap in try-catch to avoid crash on open_only failure.
     //
     std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-    IPC::message_queue mq(IPC::open_only, queueName.c_str());
-    //
-    // Sending out-of-bussiness message
-    //
+    try {
+      IPC::message_queue mq(IPC::open_only, queueName.c_str());
+      //
+      // Sending out-of-bussiness message
+      //
+      ptree pt;
+      pt.put("stream", constants::Reserved_id_oob);
+      std::stringstream strstream;
+      write_info(strstream, pt);
+      std::string row = strstream.str();
 
-    ptree pt;
-    pt.put("stream", constants::Reserved_id_oob);
-    std::stringstream strstream;
-    write_info(strstream, pt);
-    std::string row = strstream.str();
-
-    if (!mq.try_send(row.c_str(), row.length(), 0)) {
-      message_queue::remove(queueName.c_str());
+      if (!mq.try_send(row.c_str(), row.length(), 0)) {
+        message_queue::remove(queueName.c_str());
+      }
+      SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
+    } catch (IPC::interprocess_exception &e) {
+      SPDLOG_WARN("boradcastOutOfBussiness: queue {} already removed, procId={}: {}", queueName, element.first, e.what());
     }
-    //
-    // cleaning form clients map that are not receiving data from queue
-    //
-    SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
   }
   id2StreamName_Relation.clear();
 }

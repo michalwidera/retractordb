@@ -9,9 +9,9 @@
 #include <thread>
 
 #include <spdlog/spdlog.h>
+#include <boost/container/map.hpp>
+#include <boost/container/string.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/containers/map.hpp>
-#include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
@@ -60,11 +60,11 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
   try {
     typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
     typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-    typedef IPC::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
+    typedef boost::container::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
     typedef int KeyType;
     typedef std::pair<const int, IPCString> ValueType;
     typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-    typedef IPC::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
+    typedef boost::container::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
 
     IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());

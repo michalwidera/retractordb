@@ -728,7 +728,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
       if (l < 0) {
         auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
         const auto nameSrc = arg1;
-        capMap[nameSrc]    = std::max(capMap[nameSrc], abs(l));
+        capMap[nameSrc]    = std::max(capMap[nameSrc], static_cast<int>(abs(l)));
       }
     }
   }
