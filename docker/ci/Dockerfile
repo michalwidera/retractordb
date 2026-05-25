@@ -46,6 +46,11 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     gcovr \
     lcov \
     bsdmainutils \
+    graphviz \
+    feh \
+    tmux \
+    gnuplot \
+    ripgrep \
     # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
