@@ -106,6 +106,10 @@ commands:
             fi
 
   prep-env-ci:
+    parameters:
+      use_ninja:
+        type: boolean
+        default: false
     steps:
       - run:
           name: Install build toolchain (minimal, CI only)
@@ -121,6 +125,12 @@ commands:
           command: |
             source ~/.venv/bin/activate
             scripts/buildrdb.sh conan
+      - when:
+          condition: << parameters.use_ninja >>
+          steps:
+            - run:
+                name: Configure Ninja generator
+                command: scripts/buildrdb.sh ninja
 
   prep-env:
     parameters:
@@ -282,7 +292,7 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env
+      - prep-env-ci
       - conan-install:
           build_param: --build missing
       - conan-build:
@@ -297,7 +307,7 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env
+      - prep-env-ci
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -314,7 +324,7 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env:
+      - prep-env-ci:
           use_ninja: true
       - conan-install:
           build_type: Debug
