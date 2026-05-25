@@ -15,6 +15,15 @@
 
 #include <spdlog/spdlog.h>
 
+// Pozycje bitów w CapEff (linux/capability.h) — wartości standardu POSIX.1e.
+// Bity w /proc/self/status CapEff odpowiadają numerom capability z <sys/capability.h>.
+constexpr int kCapSysNiceBit = 23;  // CAP_SYS_NICE  — wymagane do SCHED_FIFO
+constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  — wymagane do mlockall
+
+// Stałe konwersji czasu — używane przy obliczaniu timespec dla clock_nanosleep.
+constexpr long kNsPerMs  = 1'000'000L;    // nanosekundy na milisekundę
+constexpr long kNsPerSec = 1'000'000'000L;  // nanosekundy na sekundę
+
 static std::string rtReadFile(const char *path) {
   std::ifstream f(path);
   if (!f) return {};
@@ -39,8 +48,8 @@ static uint64_t rtEffectiveCapabilities() {
 bool rtCheckAndPrint() {
   const uint64_t caps   = rtEffectiveCapabilities();
   const bool isRoot     = (geteuid() == 0);
-  const bool hasSysNice = isRoot || ((caps >> 23) & 1u);  // CAP_SYS_NICE
-  const bool hasIpcLock = isRoot || ((caps >> 14) & 1u);  // CAP_IPC_LOCK
+  const bool hasSysNice = isRoot || ((caps >> kCapSysNiceBit) & 1u);  // CAP_SYS_NICE
+  const bool hasIpcLock = isRoot || ((caps >> kCapIpcLockBit) & 1u);  // CAP_IPC_LOCK
 
   const std::string rtKernelVal = rtReadFile("/sys/kernel/realtime");
   const bool hasRTKernel        = (rtKernelVal == "1");
@@ -102,13 +111,13 @@ bool rtActivate() {
 }
 
 void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
-  long ns           = interval_ms * 1'000'000L;
+  long ns           = interval_ms * kNsPerMs;
   struct timespec t = anchor;
-  t.tv_sec += ns / 1'000'000'000L;
-  t.tv_nsec += ns % 1'000'000'000L;
-  if (t.tv_nsec >= 1'000'000'000L) {
+  t.tv_sec += ns / kNsPerSec;
+  t.tv_nsec += ns % kNsPerSec;
+  if (t.tv_nsec >= kNsPerSec) {
     t.tv_sec++;
-    t.tv_nsec -= 1'000'000'000L;
+    t.tv_nsec -= kNsPerSec;
   }
   clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, nullptr);
 }

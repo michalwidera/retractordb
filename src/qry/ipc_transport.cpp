@@ -19,6 +19,8 @@
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/system/system_error.hpp>
 
+#include "constants.hpp"
+
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
@@ -26,30 +28,29 @@ bool IpcTransport::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
 void IpcTransport::producer() {
   try {
-    const int messageSize = 1024;
-    std::string queueName = "brcdbr" + std::to_string(getpid());
+    std::string queueName = std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid());
     IPC::message_queue mq(IPC::open_only, queueName.c_str());
-    std::array<char, messageSize> message;
+    std::array<char, ipc::kResponseQueueMaxMessageSize> message;
     unsigned int priority{0};
-    IPC::message_queue::size_type recvd_size = messageSize;
+    IPC::message_queue::size_type recvd_size = ipc::kResponseQueueMaxMessageSize;
     while (!done) {
       bool messageReceived = false;
       while (!messageReceived && !done) {
-        messageReceived = mq.try_receive(message.data(), messageSize, recvd_size, priority);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        messageReceived = mq.try_receive(message.data(), ipc::kResponseQueueMaxMessageSize, recvd_size, priority);
+        std::this_thread::sleep_for(ipc::kQueuePollInterval);
       }
       if (done) continue;
       message[recvd_size] = 0;
       std::stringstream strstream;
       strstream << message.data();
-      memset(message.data(), 0, 1000);
+      memset(message.data(), 0, ipc::kResponseQueueMaxMessageSize);
       ptree pt;
       read_info(strstream, pt);
       while (!spsc_queue_.push(pt))
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
   } catch (IPC::interprocess_exception &e) {
-    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), "brcdbr" + std::to_string(getpid()));
+    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid()));
     done = true;
   }
 }
@@ -66,22 +67,22 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
     typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
     typedef boost::container::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
 
-    IPC::managed_shared_memory mapSegment(IPC::open_only, "RetractorShmemMap");
+    IPC::managed_shared_memory mapSegment(IPC::open_only, ipc::kShmemSegment.data());
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_only, "RetractorMapMutex");
+    IPC::named_mutex mapMutex(IPC::open_only, ipc::kMapMutex.data());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
     if (netArgument != "") pt_request.put("db.argument", netArgument);
 
-    IPC::message_queue mq(IPC::open_only, "RetractorQueryQueue");
+    IPC::message_queue mq(IPC::open_only, ipc::kQueryQueue.data());
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
     mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
 
-    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>("MyMap");
+    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>(ipc::kMapObject.data());
     IPCMap *mymap                        = ret.first;
     if (!mymap) {
-      SPDLOG_ERROR("ipc_transport: shared memory map 'MyMap' not found");
+      SPDLOG_ERROR("ipc_transport: shared memory map '{}' not found", ipc::kMapObject);
       done = true;
       pt_response.put("error.response", "server not found");
       return pt_response;
@@ -98,7 +99,7 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
     constexpr int maxAcceptableFails = 10;
     int cntr(maxAcceptableFails);
     while (it == mymap->end() && cntr) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
       IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
       it = mymap->find(processId);
       --cntr;

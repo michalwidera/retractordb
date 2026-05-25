@@ -12,7 +12,7 @@ rm -f str*
 
 if ! xretractor "$1" -c; then exit 1; fi
 
-xretractor "$1" -m 100 -k &
+xretractor "$1" -m 100 -k -x &
 XRETRACTOR_PID=$!
 
 # Poll until xretractor accepts IPC queries (up to 5 seconds)

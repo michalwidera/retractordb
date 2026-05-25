@@ -12,6 +12,7 @@
 #include <boost/system/error_code.hpp>
 
 #include "config.h"  // Add an automatically generated configuration file
+#include "constants.hpp"
 #include "qry.hpp"
 #include "uxSysTermTools.hpp"
 
@@ -20,16 +21,22 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
-static bool waitForServer(int maxSeconds = 30) {
-  const int pollIntervalMs = 100;
-  const int maxAttempts    = maxSeconds * 1000 / pollIntervalMs;
+// Domyślny czas oczekiwania na gotowość serwera xretractor przed wykonaniem komendy.
+constexpr int kDefaultServerWaitSeconds = 30;
+
+// Interwał odpytywania IPC podczas czekania na serwer — kompromis między
+// latencją startu a obciążeniem CPU przy czekaniu.
+constexpr int kServerWaitPollIntervalMs = 100;
+
+static bool waitForServer(int maxSeconds = kDefaultServerWaitSeconds) {
+  const int maxAttempts = maxSeconds * 1000 / kServerWaitPollIntervalMs;
   for (int i = 0; i < maxAttempts; ++i) {
     try {
-      IPC::managed_shared_memory seg(IPC::open_only, "RetractorShmemMap");
-      IPC::message_queue mq(IPC::open_only, "RetractorQueryQueue");
+      IPC::managed_shared_memory seg(IPC::open_only, ipc::kShmemSegment.data());
+      IPC::message_queue mq(IPC::open_only, ipc::kQueryQueue.data());
       return true;
     } catch (...) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(pollIntervalMs));
+      std::this_thread::sleep_for(std::chrono::milliseconds(kServerWaitPollIntervalMs));
     }
   }
   return false;
@@ -121,7 +128,7 @@ int main(int argc, char *argv[]) {
     }
     if (vm.count("wait-server") && !vm.count("help")) {
       if (!waitForServer()) {
-        SPDLOG_ERROR("server not available after 30 seconds");
+        SPDLOG_ERROR("server not available after {} seconds", kDefaultServerWaitSeconds);
         return system::errc::no_child_process;
       }
     }

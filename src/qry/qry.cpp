@@ -20,6 +20,10 @@
 using namespace boost;
 using boost::property_tree::ptree;
 
+// Rozmiar bufora dla formatowania wyjścia kolumnowego w dir() (sprintf).
+// Musi pomieścić jedną sformatowaną linię z nazwami wszystkich kolumn strumienia.
+constexpr int kDirLineBufferSize = 1024;
+
 qry::qry() : transport_(std::make_unique<IpcTransport>()), formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 
@@ -106,7 +110,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
             noDataCounter = 0;
           }
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(ipc::kQueuePollInterval);
       if (++noDataCounter > serverTimeoutMs) {
         SPDLOG_WARN("No data received for {} ms, assuming server is dead.", serverTimeoutMs);
         transport_->done = true;
@@ -114,7 +118,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
       }
     }
     while (transport_->popQueue(e_value) && !transport_->done)
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
     if (timeLimitCntQry != 1 && !transport_->done) _getch();
 
@@ -176,7 +180,7 @@ std::string qry::dir() {
   }
   ss << "|\n";
 
-  char buffer[1024];
+  char buffer[kDirLineBufferSize];
   for (const auto &v : pt.get_child("db.stream")) {
     sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
             v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),

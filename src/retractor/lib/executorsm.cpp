@@ -270,17 +270,17 @@ ptree executorsm::commandProcessor(ptree ptInval) {
       int streamId                     = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       id2StreamName_Relation[streamId] = streamName;
       // Create a message_queue
-      std::string queueName = "brcdbr" + ptInval.get("db.id", "");
+      std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
       int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * 10;
       maxElements     = std::max(maxElements, 100);
-      IPC::message_queue mq(IPC::open_or_create,  // open or crate
-                            queueName.c_str(),    // name
-                            maxElements,          // max message number
-                            1024                  // max message size
+      IPC::message_queue mq(IPC::open_or_create,               // open or crate
+                            queueName.c_str(),                 // name
+                            maxElements,                       // max message number
+                            ipc::kResponseQueueMaxMessageSize  // max message size
       );
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
     //
     // This command stop (kills) server process
@@ -306,33 +306,33 @@ ptree executorsm::commandProcessor(ptree ptInval) {
 void executorsm::commandProcessorLoop() {
   if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessorLoop: coreInstancePtr is null");
   try {
-    IPC::message_queue::remove("RetractorQueryQueue");
-    IPC::shared_memory_object::remove("RetractorShmemMap");
-    IPC::named_mutex::remove("RetractorMapMutex");
+    IPC::message_queue::remove(ipc::kQueryQueue.data());
+    IPC::shared_memory_object::remove(ipc::kShmemSegment.data());
+    IPC::named_mutex::remove(ipc::kMapMutex.data());
     // Segment and allocator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, "RetractorShmemMap", 65536);
+    IPC::managed_shared_memory mapSegment(IPC::open_or_create, ipc::kShmemSegment.data(), ipc::kShmemSegmentSize);
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, "RetractorMapMutex");
+    IPC::named_mutex mapMutex(IPC::open_or_create, ipc::kMapMutex.data());
     // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,    // open or crate
-                          "RetractorQueryQueue",  // name
-                          1000,                   // max message number
-                          1000                    // max message size
+    IPC::message_queue mq(IPC::open_or_create,            // open or crate
+                          ipc::kQueryQueue.data(),        // name
+                          ipc::kQueryQueueMaxMessages,    // max message number
+                          ipc::kQueryQueueMaxMessageSize  // max message size
     );
-    IPCMap *mymap = mapSegment.construct<IPCMap>("MyMap")  // object name
+    IPCMap *mymap = mapSegment.construct<IPCMap>(ipc::kMapObject.data())  // object name
                     (std::less<int>(), allocatorShmemMapInstance);
     ipcReady = true;
     cv.notify_all();
     //
     // This need to be clean up - There are some mess.
     //
-    std::array<char, 1000> message;
+    std::array<char, ipc::kQueryQueueMaxMessageSize> message;
     unsigned int priority;
     IPC::message_queue::size_type recvd_size;
 
     bool loopRunning = true;
     while (loopRunning) {
-      while (mq.try_receive(message.data(), 1000, recvd_size, priority)) {
+      while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
         if (iTimeLimitCnt == executorsm::waitForXqry) {
           // Notify main thread that first query is received
           iTimeLimitCnt = executorsm::inifitie_loop;
@@ -342,7 +342,7 @@ void executorsm::commandProcessorLoop() {
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
-        memset(message.data(), 0, 1000);
+        memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
         ptree pt;
         read_info(strstream, pt);
         ptree pt_retval     = commandProcessor(pt);
@@ -358,7 +358,7 @@ void executorsm::commandProcessorLoop() {
           mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
         }
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
       if (iTimeLimitCnt == executorsm::stop_now) loopRunning = false;
     }
