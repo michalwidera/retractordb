@@ -28,8 +28,8 @@ ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 
 **Single test:**
 ```bash
-ctest -R ut-test_payload     # by name
-ctest -R ut-test_payload -V  # verbose
+ctest -R ut_payload     # by name
+ctest -R ut_payload -V  # verbose
 ```
 
 Unit tests: valgrind + leak check. Integration tests: output matched against `test/IntegrationTest_serial/*/Pattern*/` and `test/IntegrationTest_parallel/*/Pattern*/`.
