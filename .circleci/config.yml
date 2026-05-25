@@ -105,6 +105,23 @@ commands:
               circleci step halt
             fi
 
+  prep-env-ci:
+    steps:
+      - run:
+          name: Install build toolchain (minimal, CI only)
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y gcc g++ cmake make ninja-build build-essential python3 python3-pip python3-venv mold valgrind clang-format
+            python3 -m venv ~/.venv
+            source ~/.venv/bin/activate
+            pip install --upgrade pip
+            pip install conan
+      - run:
+          name: Configure Conan profile (gnu23)
+          command: |
+            source ~/.venv/bin/activate
+            scripts/buildrdb.sh conan
+
   prep-env:
     parameters:
       use_ninja:
@@ -325,7 +342,7 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env
+      - prep-env-ci
       - conan-install:
           build_type: << parameters.build_type >>
           build_param: --build missing
