@@ -116,6 +116,33 @@ CI runs on CircleCI for branches matching `master` or `issue_*`.
 - **Dependencies**: Boost, spdlog (header-only), fmt (header-only), ANTLR4 runtime, GTest, magic_enum — all managed by Conan.
 - Comments in source are frequently in Polish; this is intentional.
 
+### Header inclusion order
+
+Includes are grouped into **five blocks separated by blank lines**, in this order:
+
+```cpp
+#include "own.hpp"            // 1. own header (only in .cpp — the matching .hpp)
+
+#include <fcntl.h>            // 2. C / POSIX system headers  (<*.h>)
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <algorithm>          // 3. C++ standard library  (<name>, no .h)
+#include <string>
+#include <vector>
+
+#include <spdlog/spdlog.h>    // 4. third-party libraries  (Boost, spdlog, …)
+#include <boost/rational.hpp>
+
+#include "myproject.hpp"      // 5. project headers  ("…")
+```
+
+Within each block, entries are sorted **case-insensitively** (enforced by `ninja cformat`).
+
+`IncludeBlocks: Preserve` in the clang-format style means blank lines act as **block barriers** — `cformat` sorts within a block but never moves an include across a blank line. The block structure must therefore be maintained manually.
+
+**Do not use `<time.h>` and similar C headers directly — use the C++ wrappers (`<ctime>`, `<cstdlib>`, `<cerrno>`, …).**
+
 ## Code Guidelines
 
 ### 1. Think Before Coding
