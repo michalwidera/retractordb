@@ -5,8 +5,8 @@ trap control_c SIGINT
 control_c()
 {
     echo "Trapped CTRL-C"
-    xqry -k
-    stty sane
+    xqry -k || true
+    if [ -t 0 ]; then stty sane; fi
 }
 
 STREAM=${1:-str1}
@@ -28,4 +28,7 @@ if [ -z "$DISPLAY" ]
 then
 export DISPLAY=:0
 fi
-xqry -s $STREAM -p $SIZE | gnuplot
+{ printf 'bind "Close" "exit gnuplot"\n'; xqry -s $STREAM -p $SIZE; } | gnuplot || true
+# gnuplot closed (window X or Ctrl+C) — cleanup
+xqry -k || true
+if [ -t 0 ]; then stty sane; fi
