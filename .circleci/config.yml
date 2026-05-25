@@ -107,34 +107,30 @@ commands:
 
   prep-env:
     parameters:
-      gcc_version:
-        type: string
-        default: "gcc"
-      conan_profile1:
-        type: string
-        default: ""
-      conan_profile2:
-        type: string
-        default: ""
-      build_package:
-        type: string
-        default: "make"
+      use_ninja:
+        type: boolean
+        default: false
     steps:
       - run:
-          name: Install toolchain - conan 2.0
+          name: Install toolchain (C++23 verified)
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            sudo apt-get update
-            sudo apt-get -y install <<parameters.gcc_version>> cmake <<parameters.build_package>> build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz lcov gcovr bsdmainutils
-            python3 -m venv .venv
-            source .venv/bin/activate
-            pip3 install --upgrade pip 
-            pip3 install conan
-            if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect && echo '<<parameters.conan_profile1>>' >> ~/.conan2/profiles/default && echo '<<parameters.conan_profile2>>' >> ~/.conan2/profiles/default ; fi
-            conan profile show
+            scripts/buildrdb.sh toolchain
+      - run:
+          name: Configure Conan profile (gnu23)
+          command: |
+            source ~/.venv/bin/activate
+            scripts/buildrdb.sh conan
+      - when:
+          condition: << parameters.use_ninja >>
+          steps:
+            - run:
+                name: Configure Ninja generator
+                command: scripts/buildrdb.sh ninja
+
   conan-install:
     parameters:
-      build_type: 
+      build_type:
         type: string
         default: "Release"
       build_param:
@@ -147,12 +143,12 @@ commands:
       - run:
           name: Conan install
           command: |
-            source .venv/bin/activate
+            source ~/.venv/bin/activate
             conan source .
             conan install . -s build_type=<< parameters.build_type >> << parameters.build_param >>
   conan-build:
     parameters:
-      build_type: 
+      build_type:
         type: string
         default: "Release"
       build_param:
@@ -165,7 +161,7 @@ commands:
       - run:
           name: "Conan build (<< parameters.build_tool >>)"
           command: |
-            source .venv/bin/activate
+            source ~/.venv/bin/activate
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> install
   run-test:
@@ -231,9 +227,7 @@ jobs:
           method: blobless
       - check-skipci
       - prep-env:
-          build_package: "ninja-build"
-          conan_profile1: "[conf]"
-          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+          use_ninja: true
       - conan-install:
           build_param: --build missing
           build_tool: ninja
@@ -251,9 +245,7 @@ jobs:
           method: blobless
       - check-skipci
       - prep-env:
-          build_package: ninja-build
-          conan_profile1: "[conf]"
-          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+          use_ninja: true
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -273,10 +265,7 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env:
-          build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+      - prep-env
       - conan-install:
           build_param: --build missing
       - conan-build:
@@ -291,10 +280,7 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env:
-          build_package: make
-          conan_profile1: ""
-          conan_profile2: ""
+      - prep-env
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -303,7 +289,6 @@ jobs:
           build_param: --build missing
       - run-test:
           build_type: Debug
-          
 
   build-debug-ninja:
     working_directory: ~/retractordb
@@ -313,9 +298,7 @@ jobs:
           method: blobless
       - check-skipci
       - prep-env:
-          build_package: ninja-build
-          conan_profile1: "[conf]"
-          conan_profile2: "tools.cmake.cmaketoolchain:generator=Ninja"
+          use_ninja: true
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -342,29 +325,14 @@ jobs:
       - checkout:
           method: blobless
       - check-skipci
-      - prep-env:
-          build_package: make
+      - prep-env
       - conan-install:
           build_type: << parameters.build_type >>
-          build_param: -s compiler.cppstd=23 -s:b compiler.cppstd=23 --build missing
+          build_param: --build missing
       - conan-build:
           build_type: << parameters.build_type >>
-          build_param: -s compiler.cppstd=23 -s:b compiler.cppstd=23 --build missing
-      - run:
-          name: Smoke test
-          command: |
-            export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<< parameters.build_type >> && << parameters.build_tool >> showelf
-            xretractor -h
-            xqry -h
-            xtrdb -h
-      - run:
-          name: Integration & Unit test
-          command: |
-            export PATH="$HOME/retractordb/bin:$PATH"
-            cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
-      - store_test_results:
-          path: build/<< parameters.build_type >>/test
-      - store_artifacts:
-          path: build/<< parameters.build_type >>/test/test_results.xml
-          destination: test_results.xml
+          build_param: --build missing
+          build_tool: << parameters.build_tool >>
+      - run-test:
+          build_type: << parameters.build_type >>
+          build_tool: << parameters.build_tool >>

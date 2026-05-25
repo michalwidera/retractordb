@@ -1,9 +1,9 @@
 # https://hub.docker.com/_/debian
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.0.5"
+LABEL com.retractordb.version="0.0.6"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-05-11"
+LABEL com.retractordb.release-date="2026-05-25"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -49,6 +49,23 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     # Clean up to reduce image size
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Verify C++23 support.
+# Tests std::ranges::fold_left (<algorithm>) and the uz size_t literal — both C++23,
+# both used in the RetractorDB codebase.  Build fails here if the compiler is too old.
+RUN echo '#include <algorithm>'                                                           > /tmp/cxx23check.cpp \
+    && echo '#include <cstddef>'                                                         >> /tmp/cxx23check.cpp \
+    && echo '#include <vector>'                                                          >> /tmp/cxx23check.cpp \
+    && echo 'int main() {'                                                               >> /tmp/cxx23check.cpp \
+    && echo '  std::vector<int> v{1, 2, 3};'                                            >> /tmp/cxx23check.cpp \
+    && echo '  std::size_t s = std::ranges::fold_left(v, 0uz,'                          >> /tmp/cxx23check.cpp \
+    && echo '      [](std::size_t a, int x){ return a + std::size_t(x); });'            >> /tmp/cxx23check.cpp \
+    && echo '  return s == 6 ? 0 : 1;'                                                  >> /tmp/cxx23check.cpp \
+    && echo '}'                                                                          >> /tmp/cxx23check.cpp \
+    && g++ -std=c++23 -o /tmp/cxx23check /tmp/cxx23check.cpp \
+    && /tmp/cxx23check \
+    && rm /tmp/cxx23check.cpp /tmp/cxx23check \
+    && echo "C++23 OK — g++ $(g++ -dumpversion)"
 
 # Create a non-root user for development (optional but recommended)
 RUN useradd -m -s /bin/bash developer && \

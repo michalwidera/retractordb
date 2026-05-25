@@ -22,6 +22,30 @@ esac
 
 echo "-- Note: Current folder is [ $foldername ] and will start build in [ $build_folder ]"
 
+# Compile and run a small C++23 probe.
+# Tests std::ranges::fold_left and the uz size_t literal — both C++23 and used in the codebase.
+# Requires GCC 13+.  Returns 0 on success.
+check_cxx23() {
+    local tmpdir rc
+    tmpdir=$(mktemp -d)
+    cat > "$tmpdir/cxx23check.cpp" << 'EOF'
+#include <algorithm>
+#include <cstddef>
+#include <vector>
+int main() {
+  std::vector<int> v{1, 2, 3};
+  std::size_t s = std::ranges::fold_left(v, 0uz,
+      [](std::size_t a, int x){ return a + std::size_t(x); });
+  return s == 6 ? 0 : 1;
+}
+EOF
+    g++ -std=c++23 -o "$tmpdir/cxx23check" "$tmpdir/cxx23check.cpp" 2>/dev/null \
+        && "$tmpdir/cxx23check"
+    rc=$?
+    rm -rf "$tmpdir"
+    return $rc
+}
+
 run_option() {
     local opt="$1"
     case "$opt" in
@@ -47,10 +71,25 @@ run_option() {
             pip3 install conan
             if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect ; fi
             conan profile show
+            echo "-- Verifying C++23 support..."
+            if ! check_cxx23; then
+                gcc_ver=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
+                echo "-- C++23 not supported (GCC ${gcc_ver:-unknown}). Minimum required: GCC 13."
+                echo "-- Attempting to install gcc-13 g++-13..."
+                sudo apt-get -y install gcc-13 g++-13 \
+                    && sudo update-alternatives \
+                        --install /usr/bin/gcc  gcc  /usr/bin/gcc-13  130 \
+                        --slave   /usr/bin/g++  g++  /usr/bin/g++-13 \
+                        --slave   /usr/bin/gcov gcov /usr/bin/gcov-13 \
+                    || { echo "Error: Could not install GCC 13. Please install a C++23-capable compiler manually."; exit 1; }
+                check_cxx23 || { echo "Error: C++23 unavailable after GCC 13 install. Aborting."; exit 1; }
+            fi
+            echo "-- C++23 OK — g++ $(g++ -dumpversion)"
             ;;
         "conan")
+            check_cxx23 || { echo "Error: C++23 not supported by g++ $(g++ -dumpversion 2>/dev/null). Run 'toolchain' first."; exit 1; }
             conan profile detect -f
-            sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
+            sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             ;;
         "ninja")
             echo '[conf]' >> ~/.conan2/profiles/default

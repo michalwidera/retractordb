@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -145,6 +146,24 @@ class metaDataStream {
   void flushCurrentEntry();
 
  private:
+  /// @brief State of the lazy-overwrite optimisation for the last on-disk RLE entry.
+  ///
+  /// Invariant:
+  ///   dirty == false, committedCount == 0  →  no tracked last entry (initial / after reset)
+  ///   dirty == false, committedCount  > 0  →  on-disk tail is valid; may be re-absorbed on same-pattern append
+  ///   dirty == true                        →  on-disk tail is stale; must overwrite before next append
+  struct DiskTailState {
+    size_t committedCount{0};  ///< recordCount of the last entry written to disk (0 = none)
+    bool   dirty{false};       ///< on-disk tail entry is stale; must overwrite, not append
+
+    void reset()               noexcept { committedCount = 0; dirty = false; }
+    void markWritten(size_t n) noexcept { committedCount = n; dirty = false; }
+    void markDirty()           noexcept { dirty = true; committedCount = 0; }
+    void clearPending()        noexcept { committedCount = 0; }
+    bool shouldOverwrite() const noexcept { return dirty; }
+    bool hasPending()      const noexcept { return committedCount > 0; }
+  };
+
   void createNullBitsetTemplate();
   void loadIndex();                                   ///< read header and restore currentEntry_ from file
   void saveHeader();                                  ///< write file header (creation time) without entries
@@ -154,18 +173,15 @@ class metaDataStream {
   std::vector<IndexRecord> readCommittedEntries() const;      ///< read all committed entries from file
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
-  /// @return pair(segment index in committed entries, offset within that segment)
-  ///         If segment index == committed entry count, the record is in currentEntry_.
-  std::pair<size_t, size_t> locateRecord(size_t recordIndex) const;
-
-  size_t entrySize() const;  ///< byte size of one serialized IndexRecord
+  /// @return {segment index in committed entries (nullopt = currentEntry_), offset within segment}
+  std::pair<std::optional<size_t>, size_t> locateRecord(size_t recordIndex) const;
 
   std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
+  const size_t entrySize_;                              ///< byte size of one serialized IndexRecord; computed once at construction
   size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
-  size_t pendingCommittedCount_{0};                     ///< recordCount of the last entry written to disk (0 = none/invalidated)
-  bool tailDirty_{false};                               ///< last disk entry is stale and must be overwritten on next flush
+  DiskTailState tail_{};                                ///< lazy-overwrite state for the last on-disk entry
   IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run
   mutable std::vector<IndexRecord> entriesCache_;       ///< in-memory copy of committed on-disk entries
   mutable bool cacheValid_{false};                      ///< true when entriesCache_ matches the file; cleared on every write
