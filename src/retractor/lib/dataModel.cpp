@@ -1,16 +1,14 @@
 #include "dataModel.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
-
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
-#include "fatalError.hpp"
 
+#include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
+#include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "SOperations.hpp"
 

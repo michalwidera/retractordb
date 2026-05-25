@@ -401,19 +401,19 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
   const std::vector<bool> B = {true};
 
   // Set up tailDirty_: flush 3 records, then append same-pattern record (no flush).
-  meta.onRecordAppended(A);   // rec 0
-  meta.onRecordAppended(A);   // rec 1
-  meta.onRecordAppended(A);   // rec 2
-  meta.flushCurrentEntry();   // disk: [{A,3}], pendingCommittedCount_=3
+  meta.onRecordAppended(A);  // rec 0
+  meta.onRecordAppended(A);  // rec 1
+  meta.onRecordAppended(A);  // rec 2
+  meta.flushCurrentEntry();  // disk: [{A,3}], pendingCommittedCount_=3
 
-  meta.onRecordAppended(A);   // rec 3 — tailDirty_=true, currentEntry_={A,4}, committed=0
+  meta.onRecordAppended(A);  // rec 3 — tailDirty_=true, currentEntry_={A,4}, committed=0
 
   // Modify non-last record in currentEntry_ (rec 1, offset 1, two records follow).
   // The stale on-disk entry [{A,3}] must be overwritten with the prefix [{A,1}],
   // not left as-is with new entries appended after it.
   meta.onRecordModified(1, B);
 
-  meta.flushCurrentEntry();   // flush suffix {A,2}
+  meta.flushCurrentEntry();  // flush suffix {A,2}
 
   ASSERT_EQ(meta.totalRecords(), 4u);
   EXPECT_EQ(meta.getNullBitset(0), A);  // prefix

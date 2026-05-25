@@ -1,10 +1,10 @@
 #pragma once
 
-#include "descriptor.hpp"
-#include "fainterface.hpp"
-
 #include <memory>
 #include <vector>
+
+#include "descriptor.hpp"
+#include "fainterface.hpp"
 
 namespace rdb {
 

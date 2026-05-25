@@ -1,12 +1,4 @@
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/program_options.hpp>
-#include <boost/regex.hpp>
-#include <boost/system/error_code.hpp>
 #include <csignal>
 #include <filesystem>
 #include <fstream>
@@ -14,6 +6,14 @@
 #include <memory>
 #include <sstream>
 #include <vector>
+
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/program_options.hpp>
+#include <boost/regex.hpp>
+#include <boost/system/error_code.hpp>
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/compiler.hpp"

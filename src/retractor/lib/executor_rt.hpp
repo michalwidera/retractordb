@@ -2,7 +2,7 @@
 
 #ifdef __linux__
 
-#include <time.h>
+#include <ctime>
 
 bool rtCheckAndPrint();
 bool rtActivate();

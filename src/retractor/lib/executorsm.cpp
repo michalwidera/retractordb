@@ -1,8 +1,5 @@
 #include "executorsm.hpp"
 
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/spdlog.h>
-
 #include <array>
 #include <atomic>
 #include <condition_variable>
@@ -11,8 +8,8 @@
 #include <mutex>
 #include <thread>
 
-#include "executor_rt.hpp"
-
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/map.hpp>
 #include <boost/interprocess/containers/string.hpp>
@@ -26,6 +23,7 @@
 
 #include "constants.hpp"
 #include "dataModel.hpp"
+#include "executor_rt.hpp"
 #include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"

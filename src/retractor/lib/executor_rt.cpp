@@ -2,7 +2,10 @@
 
 #include "executor_rt.hpp"
 
-#include <spdlog/spdlog.h>
+#include <sched.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <unistd.h>
 
 #include <cinttypes>
 #include <cstring>
@@ -10,10 +13,7 @@
 #include <iostream>
 #include <string>
 
-#include <sched.h>
-#include <sys/mman.h>
-#include <sys/resource.h>
-#include <unistd.h>
+#include <spdlog/spdlog.h>
 
 static std::string rtReadFile(const char *path) {
   std::ifstream f(path);

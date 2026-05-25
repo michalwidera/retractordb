@@ -7,7 +7,6 @@
 #include <cstring>
 #include <sstream>
 #include <thread>
-#include "fatalError.hpp"
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/allocators/allocator.hpp>

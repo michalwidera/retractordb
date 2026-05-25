@@ -1,8 +1,6 @@
+#include "uxSysTermTools.hpp"
+
 #include <fcntl.h>
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/sinks/daily_file_sink.h>
-#include <spdlog/sinks/stdout_sinks.h>
-#include <spdlog/spdlog.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -11,6 +9,12 @@
 #include <filesystem>
 #include <iostream>  //remove it with std::
 #include <string>
+
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/sinks/daily_file_sink.h>
+#include <spdlog/sinks/stdout_sinks.h>
+#include <spdlog/spdlog.h>
+
 #include "fatalError.hpp"
 
 int _kbhit(bool ignoreAnyKey) {

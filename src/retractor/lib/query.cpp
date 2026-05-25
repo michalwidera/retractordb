@@ -1,14 +1,13 @@
 #include "query.hpp"
 
-#include "qTree.hpp"
+#include <algorithm>
+#include <cctype>
+#include <stdexcept>
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
-
-#include <cctype>
-#include <stdexcept>
 #include "fatalError.hpp"
+#include "qTree.hpp"
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "descriptor.hpp"
-
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +8,8 @@
 #include <span>
 #include <string>
 #include <vector>
+
+#include "descriptor.hpp"
 
 namespace rdb {
 
@@ -154,14 +154,23 @@ class metaDataStream {
   ///   dirty == true                        →  on-disk tail is stale; must overwrite before next append
   struct DiskTailState {
     size_t committedCount{0};  ///< recordCount of the last entry written to disk (0 = none)
-    bool   dirty{false};       ///< on-disk tail entry is stale; must overwrite, not append
+    bool dirty{false};         ///< on-disk tail entry is stale; must overwrite, not append
 
-    void reset()               noexcept { committedCount = 0; dirty = false; }
-    void markWritten(size_t n) noexcept { committedCount = n; dirty = false; }
-    void markDirty()           noexcept { dirty = true; committedCount = 0; }
-    void clearPending()        noexcept { committedCount = 0; }
+    void reset() noexcept {
+      committedCount = 0;
+      dirty          = false;
+    }
+    void markWritten(size_t n) noexcept {
+      committedCount = n;
+      dirty          = false;
+    }
+    void markDirty() noexcept {
+      dirty          = true;
+      committedCount = 0;
+    }
+    void clearPending() noexcept { committedCount = 0; }
     bool shouldOverwrite() const noexcept { return dirty; }
-    bool hasPending()      const noexcept { return committedCount > 0; }
+    bool hasPending() const noexcept { return committedCount > 0; }
   };
 
   void createNullBitsetTemplate();
@@ -179,12 +188,12 @@ class metaDataStream {
   std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
-  const size_t entrySize_;                              ///< byte size of one serialized IndexRecord; computed once at construction
-  size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
-  DiskTailState tail_{};                                ///< lazy-overwrite state for the last on-disk entry
-  IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run
-  mutable std::vector<IndexRecord> entriesCache_;       ///< in-memory copy of committed on-disk entries
-  mutable bool cacheValid_{false};                      ///< true when entriesCache_ matches the file; cleared on every write
+  const size_t entrySize_;                         ///< byte size of one serialized IndexRecord; computed once at construction
+  size_t committedRecordCount_{0};                 ///< cached total records in committed entries on disk
+  DiskTailState tail_{};                           ///< lazy-overwrite state for the last on-disk entry
+  IndexRecord currentEntry_;                       ///< accumulator for the pending (not yet committed) RLE run
+  mutable std::vector<IndexRecord> entriesCache_;  ///< in-memory copy of committed on-disk entries
+  mutable bool cacheValid_{false};                 ///< true when entriesCache_ matches the file; cleared on every write
 };  // class metaDataStream
 
 }  // namespace rdb

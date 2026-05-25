@@ -1,8 +1,9 @@
 #pragma once
 
-#include <boost/rational.hpp>
 #include <cstdlib>
 #include <iostream>
+
+#include <boost/rational.hpp>
 
 using namespace boost;
 

@@ -1,8 +1,3 @@
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/spdlog.h>
-
-#include <boost/program_options.hpp>
-
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
@@ -18,6 +13,10 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/spdlog.h>
+#include <boost/program_options.hpp>
 
 #include "cmdDropFile.hpp"
 #include "cmdFieldAccess.hpp"

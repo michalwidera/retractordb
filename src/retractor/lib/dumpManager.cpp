@@ -1,7 +1,6 @@
 #include "dumpManager.hpp"
 
 #include <fcntl.h>
-#include <spdlog/spdlog.h>
 #include <sys/stat.h>
 
 #include <algorithm>  // std::min
@@ -9,9 +8,10 @@
 #include <cstring>    // strerror
 #include <filesystem>
 
-#include "fatalError.hpp"
+#include <spdlog/spdlog.h>
 
 #include "dataModel.hpp"
+#include "fatalError.hpp"
 
 extern dataModel *pProc;
 

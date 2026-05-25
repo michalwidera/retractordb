@@ -88,9 +88,7 @@ std::vector<metaDataStream::IndexRecord> splitSegment(const metaDataStream::Inde
 }
 
 size_t sumNonGapRecords(const std::vector<metaDataStream::IndexRecord> &entries) {
-  return std::ranges::fold_left(entries, 0uz, [](size_t acc, const auto &e) {
-    return acc + (e.isGap ? 0uz : e.recordCount);
-  });
+  return std::ranges::fold_left(entries, 0uz, [](size_t acc, const auto &e) { return acc + (e.isGap ? 0uz : e.recordCount); });
 }
 
 }  // namespace
@@ -258,8 +256,8 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
   if (currentEntry_.nullBitset == nullBitsetParam && (currentEntry_.recordCount > 0 || tail_.hasPending())) {
     if (currentEntry_.recordCount == 0) {
       // Re-absorb last committed entry for lazy extension (lazy overwrite)
-      currentEntry_.recordCount  = tail_.committedCount;
-      committedRecordCount_     -= tail_.committedCount;
+      currentEntry_.recordCount = tail_.committedCount;
+      committedRecordCount_ -= tail_.committedCount;
       tail_.markDirty();
     }
     currentEntry_.recordCount++;

@@ -7,12 +7,12 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
-#include "fatalError.hpp"
 
 #include <spdlog/spdlog.h>
 #include <boost/system/system_error.hpp>
 
 #include "constants.hpp"
+#include "fatalError.hpp"
 #include "formatters.hpp"
 #include "ipc_transport.hpp"
 #include "uxSysTermTools.hpp"

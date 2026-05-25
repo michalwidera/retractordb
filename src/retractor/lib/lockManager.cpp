@@ -1,7 +1,6 @@
 #include "lockManager.hpp"
 
 #include <fcntl.h>
-#include <spdlog/spdlog.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -10,6 +9,8 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+
+#include <spdlog/spdlog.h>
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
     : lockFileDescriptor(-1),

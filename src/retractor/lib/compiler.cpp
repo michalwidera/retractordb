@@ -1,17 +1,16 @@
 #include "compiler.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
-
 #include <cmath>
 #include <limits>
 #include <sstream>
-#include "fatalError.hpp"
 
+#include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/rational.hpp>
 #include <boost/regex.hpp>
+
+#include "fatalError.hpp"
 
 using boost::lexical_cast;
 

@@ -1,9 +1,9 @@
 #pragma once
 
+#include <memory>
+
 #include "descriptor.hpp"
 #include "fainterface.hpp"
-
-#include <memory>
 
 namespace rdb {
 

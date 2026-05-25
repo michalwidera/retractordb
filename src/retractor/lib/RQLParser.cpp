@@ -1,14 +1,14 @@
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
-#include <spdlog/spdlog.h>
-
-// please note that the order of includes is important here
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <string>
 
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <spdlog/spdlog.h>
 #include <boost/cerrno.hpp>
 #include <boost/lexical_cast.hpp>
+
+// please note that the order of includes is important here
 
 #include ".antlr/RQLBaseListener.h"
 #include ".antlr/RQLLexer.h"
