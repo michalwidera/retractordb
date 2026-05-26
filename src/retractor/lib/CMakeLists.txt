@@ -35,7 +35,8 @@ endif()
 
 # Precompiled headers — te same co rdb, skraca czas kompilacji ~20 plików .cpp.
 target_precompile_headers(
-  ${PROJECT_NAME} PRIVATE #
+  ${PROJECT_NAME}
+  PRIVATE #
   <algorithm> #
   <filesystem> #
   <memory> #

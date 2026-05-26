@@ -24,17 +24,18 @@ set(LIBRARY_TEST_SET
     rqlparser
     descparser)
 
-# launch/main.cpp kompilowany raz jako OBJECT library — reużywany przez wszystkie
-# testy zamiast być kompilowany 26× oddzielnie.
+# launch/main.cpp kompilowany raz jako OBJECT library — reużywany przez
+# wszystkie testy zamiast być kompilowany 26× oddzielnie.
 add_library(test_main_obj OBJECT launch/main.cpp)
-target_link_libraries(test_main_obj PRIVATE gtest::gtest spdlog::spdlog_header_only)
+target_link_libraries(test_main_obj PRIVATE gtest::gtest
+                                            spdlog::spdlog_header_only)
 
 foreach(item ${V_GLOB})
   get_filename_component(OUTPUT_FILE_NOEXT ${item} NAME_WLE)
   string(REGEX REPLACE "^test_" "" TEST_SHORT ${OUTPUT_FILE_NOEXT})
   set(SOURCES_${OUTPUT_FILE_NOEXT}_TEST ${item})
   add_executable(${OUTPUT_FILE_NOEXT} ${SOURCES_${OUTPUT_FILE_NOEXT}_TEST}
-                 $<TARGET_OBJECTS:test_main_obj>)
+                                      $<TARGET_OBJECTS:test_main_obj>)
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   file(MAKE_DIRECTORY
        ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT})
@@ -47,8 +48,9 @@ foreach(item ${V_GLOB})
     target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
                         -Wl,--wrap=write)
   endif()
-  # test_uxSysTermTools: symbole uxSysTermTools dostępne przez retractor → common (PUBLIC)
-  # test_formatter i test_ipc_transport: symbole dostępne przez bibliotekę qry (w LIBRARY_TEST_SET)
+  # test_uxSysTermTools: symbole uxSysTermTools dostępne przez retractor →
+  # common (PUBLIC) test_formatter i test_ipc_transport: symbole dostępne przez
+  # bibliotekę qry (w LIBRARY_TEST_SET)
   add_test(
     NAME ut_${TEST_SHORT}-setup
     WORKING_DIRECTORY

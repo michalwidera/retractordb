@@ -35,7 +35,8 @@ endif()
 # Precompiled headers dla najczęściej dołączanych nagłówków w bibliotece rdb.
 # Skraca czas ponownej kompilacji po zmianach w plikach .cc.
 target_precompile_headers(
-  ${PROJECT_NAME} PRIVATE #
+  ${PROJECT_NAME}
+  PRIVATE #
   <algorithm> #
   <filesystem> #
   <memory> #

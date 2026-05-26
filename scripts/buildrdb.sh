@@ -64,7 +64,7 @@ run_option() {
         "toolchain")
             sudo apt-get update
             sudo apt-get upgrade -y
-            sudo apt-get -y install git gcc g++ gdb cmake make ninja-build build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz feh tmux gnuplot clang-format ripgrep
+            sudo apt-get -y install git gcc g++ gdb cmake make ninja-build build-essential python3 python3-pip python3-venv valgrind cppcheck mold graphviz feh tmux gnuplot clang-format ripgrep cmake-format
             python3 -m venv ~/.venv
             source ~/.venv/bin/activate
             pip3 install --upgrade pip 

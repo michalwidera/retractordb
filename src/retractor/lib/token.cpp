@@ -21,7 +21,7 @@ boost::rational<int> token::getRI() {
 
 std::string token::getStr_() {
   return std::visit(
-      [](const auto& v) -> std::string {
+      [](const auto &v) -> std::string {
         using T = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<T, std::monostate>)
           return "null";
@@ -50,7 +50,7 @@ token::token(command_id id, rdb::descFldVT value)
 
 std::ostream &operator<<(std::ostream &os, const rdb::descFldVT &rhs) {
   std::visit(
-      [&os](const auto& v) {
+      [&os](const auto &v) {
         using T = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<T, std::monostate>)
           os << "null";

@@ -20,7 +20,13 @@ set(SOURCES_RDB
 
 add_executable(${PROJECT_NAME} ${SOURCES_RDB})
 
-target_link_libraries(${PROJECT_NAME} boost::boost spdlog::spdlog_header_only
-                      magic_enum::magic_enum rdb descparser common)
+target_link_libraries(
+  ${PROJECT_NAME}
+  boost::boost
+  spdlog::spdlog_header_only
+  magic_enum::magic_enum
+  rdb
+  descparser
+  common)
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
