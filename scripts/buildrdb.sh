@@ -46,6 +46,44 @@ EOF
     return $rc
 }
 
+# Install the highest available GCC from a descending version ladder,
+# switch system alternatives to it, and verify C++23 support.
+install_best_gcc_for_cxx23() {
+    local ver priority
+    for ver in 20 19 18 17 16 15 14 13; do
+        if ! apt-cache show "gcc-$ver" >/dev/null 2>&1 || ! apt-cache show "g++-$ver" >/dev/null 2>&1; then
+            continue
+        fi
+
+        echo "-- Attempting GCC $ver (highest available candidate)..."
+        if ! sudo apt-get -y install "gcc-$ver" "g++-$ver"; then
+            echo "-- Install failed for GCC $ver, trying lower version..."
+            continue
+        fi
+
+        priority=$((100 + ver))
+        if [ -x "/usr/bin/gcov-$ver" ]; then
+            sudo update-alternatives \
+                --install /usr/bin/gcc  gcc  "/usr/bin/gcc-$ver"  "$priority" \
+                --slave   /usr/bin/g++  g++  "/usr/bin/g++-$ver" \
+                --slave   /usr/bin/gcov gcov "/usr/bin/gcov-$ver"
+        else
+            sudo update-alternatives \
+                --install /usr/bin/gcc  gcc  "/usr/bin/gcc-$ver"  "$priority" \
+                --slave   /usr/bin/g++  g++  "/usr/bin/g++-$ver"
+        fi
+
+        if check_cxx23; then
+            echo "-- Selected GCC $ver with working C++23 support."
+            return 0
+        fi
+
+        echo "-- GCC $ver installed, but C++23 probe failed. Trying lower version..."
+    done
+
+    return 1
+}
+
 run_option() {
     local opt="$1"
     case "$opt" in
@@ -75,14 +113,8 @@ run_option() {
             if ! check_cxx23; then
                 gcc_ver=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
                 echo "-- C++23 not supported (GCC ${gcc_ver:-unknown}). Minimum required: GCC 13."
-                echo "-- Attempting to install gcc-13 g++-13..."
-                sudo apt-get -y install gcc-13 g++-13 \
-                    && sudo update-alternatives \
-                        --install /usr/bin/gcc  gcc  /usr/bin/gcc-13  130 \
-                        --slave   /usr/bin/g++  g++  /usr/bin/g++-13 \
-                        --slave   /usr/bin/gcov gcov /usr/bin/gcov-13 \
-                    || { echo "Error: Could not install GCC 13. Please install a C++23-capable compiler manually."; exit 1; }
-                check_cxx23 || { echo "Error: C++23 unavailable after GCC 13 install. Aborting."; exit 1; }
+                echo "-- Attempting GCC ladder install (highest available first)..."
+                install_best_gcc_for_cxx23 || { echo "Error: Could not install a C++23-capable GCC (tried versions 20..13). Please install one manually."; exit 1; }
             fi
             echo "-- C++23 OK — g++ $(g++ -dumpversion)"
             ;;
