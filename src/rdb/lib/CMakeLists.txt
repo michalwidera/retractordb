@@ -27,3 +27,18 @@ target_include_directories(
           ${spdlog_INCLUDE_DIR} #
           ${fmt_INCLUDE_DIR} #
           ${magic_enum_INCLUDE_DIR})
+
+if(ENABLE_UNITY_BUILD)
+  set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
+endif()
+
+# Precompiled headers dla najczęściej dołączanych nagłówków w bibliotece rdb.
+# Skraca czas ponownej kompilacji po zmianach w plikach .cc.
+target_precompile_headers(
+  ${PROJECT_NAME} PRIVATE #
+  <algorithm> #
+  <filesystem> #
+  <memory> #
+  <string> #
+  <vector> #
+  <spdlog/spdlog.h>)

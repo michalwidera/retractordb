@@ -5,9 +5,8 @@ project(retractor LANGUAGES CXX)
 add_subdirectory(.antlr)
 
 file(GLOB BUILDSRCS_CPP "*.cpp")
-file(GLOB BUILDCOMMON_CPP "../../common/*.cpp")
 
-add_library(${PROJECT_NAME} STATIC ${BUILDSRCS_CPP} ${BUILDCOMMON_CPP})
+add_library(${PROJECT_NAME} STATIC ${BUILDSRCS_CPP})
 
 message(STATUS "setup rqlgrammar in PROJECT_SOURCE_DIR=" ${PROJECT_SOURCE_DIR})
 
@@ -26,3 +25,21 @@ target_include_directories(
           ${Boost_INCLUDE_DIR} #
           ${spdlog_INCLUDE_DIR} #
           ${fmt_INCLUDE_DIR})
+
+# uxSysTermTools (używane przez executorsm.cpp) pochodzi z biblioteki common
+target_link_libraries(${PROJECT_NAME} PUBLIC common)
+
+if(ENABLE_UNITY_BUILD)
+  set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
+endif()
+
+# Precompiled headers — te same co rdb, skraca czas kompilacji ~20 plików .cpp.
+target_precompile_headers(
+  ${PROJECT_NAME} PRIVATE #
+  <algorithm> #
+  <filesystem> #
+  <memory> #
+  <string> #
+  <vector> #
+  <boost/rational.hpp> #
+  <spdlog/spdlog.h>)

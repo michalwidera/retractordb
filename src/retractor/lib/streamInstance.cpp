@@ -421,7 +421,7 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
       if (r.action == rule::DUMP) {
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
       } else if (r.action == rule::SYSTEM) {
-        auto ret = system(r.systemCommand.c_str());
+        auto ret = ::system(r.systemCommand.c_str());
         if (ret == -1) {
           SPDLOG_ERROR("system() call failed");
         } else {

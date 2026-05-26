@@ -15,6 +15,11 @@ add_definitions(-DHAS_BOOST)
 
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 option(BUILD_SUPERVISOR "Build Go rsupervisor binary (requires Go)" OFF)
+# Unity Build łączy wiele .cpp w jedną jednostkę kompilacji, zmniejszając liczbę
+# uruchomień kompilatora i wielokrotne parsowanie nagłówków. Może ujawnić konflikty
+# nazw między TU (np. anonimowe namespace, statyczne zmienne) — testuj przed włączeniem.
+# Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
+option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
 
