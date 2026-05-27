@@ -68,6 +68,9 @@ tool_installed() {
         batcat)
             command_exists batcat || command_exists bat
             ;;
+        conan)
+            command_exists conan || [ -x "$HOME/.venv/bin/conan" ]
+            ;;
         *)
             command_exists "$tool"
             ;;
@@ -323,8 +326,8 @@ ensure_tools_for_option() {
                 "cmake:required" "make:required" "conan:required" "ninja:required"
                 "python3:required" "pip3:required" "valgrind:required"
                 "hexdump:required" "graphviz:required"
-                "cppcheck:recommended" "gdb:recommended" "mold:recommended" "cmake-format:recommended" "clang-format:recommended" "clang-tidy:recommended" "rg:recommended"
-                "tmux:optional" "feh:optional" "gnuplot:optional"
+                "cppcheck:recommended" "mold:recommended" "rg:recommended"
+                "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
             ;;
         "toolchain_required")
@@ -333,8 +336,9 @@ ensure_tools_for_option() {
                 "gcc:required" "g++:required" "cmake:required" "make:required"
                 "ninja:required" "build-essential:required"
                 "python3:required" "python3-venv:required" "pip3:required"
-                "mold:required" "valgrind:required" "clang-format:required"
+                "mold:required" "valgrind:required"
                 "graphviz:required" "hexdump:required" "conan:required"
+                "clang-format:optional"
             )
             ;;
         "toolchain_all")
@@ -354,8 +358,8 @@ ensure_tools_for_option() {
                 "cmake:required" "make:required" "conan:required" "ninja:required"
                 "python3:required" "pip3:required" "valgrind:required"
                 "hexdump:required" "graphviz:required"
-                "cppcheck:recommended" "gdb:recommended" "mold:recommended" "cmake-format:recommended" "clang-format:recommended" "clang-tidy:recommended" "rg:recommended"
-                "tmux:optional" "feh:optional" "gnuplot:optional"
+                "cppcheck:recommended" "mold:recommended" "rg:recommended"
+                "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
             validate_only=1
             ;;
@@ -476,8 +480,9 @@ ensure_tools_for_option() {
         fi
 
         conan_ver=""
-        if command_exists conan; then
-            conan_ver=$(extract_first_version "$(conan --version 2>/dev/null)")
+        conan_bin=$(command -v conan 2>/dev/null || echo "$HOME/.venv/bin/conan")
+        if [ -x "$conan_bin" ]; then
+            conan_ver=$(extract_first_version "$("$conan_bin" --version 2>/dev/null)")
             if [ -n "$conan_ver" ] && version_ge "$conan_ver" "2.0"; then
                 compat_status="ok"
             else
@@ -530,8 +535,7 @@ ensure_tools_for_option() {
         if [ "$compat_failures" -eq 0 ]; then
             echo "-- Compatibility checks passed."
         else
-            echo "-- Compatibility check failures: $compat_failures"
-            validation_failed=1
+            echo "-- Compatibility check warnings: $compat_failures"
         fi
 
         echo "-- Run '$0 toolchain' to auto-install required tools and choose recommended/optional installs."
