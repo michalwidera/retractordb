@@ -45,7 +45,7 @@ class metaDataStream {
     std::vector<bool> nullBitset;                                     ///< one bit per descriptor field (true = null)
     size_t recordCount{0};                                            ///< number of consecutive records with this pattern
     bool isGap{false};                                                ///< true if this entry represents a transmission gap
-    std::vector<std::byte> serialize() const;                         ///< serialize the entry to a vector of bytes
+    [[nodiscard]] std::vector<std::byte> serialize() const;           ///< serialize the entry to a vector of bytes
     static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
   };
 
@@ -57,7 +57,7 @@ class metaDataStream {
   /// into the in-memory index (loadIndex).
   /// @param descriptor  descriptor of the indexed data stream
   /// @param metaFilePath path of the file to save/load the meta index
-  explicit metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath);
+  explicit metaDataStream(const Descriptor &descriptor, std::string metaFilePath);
 
   /// @brief Destructor – flushes the pending entry to file.
   ~metaDataStream();
@@ -169,8 +169,8 @@ class metaDataStream {
       committedCount = 0;
     }
     void clearPending() noexcept { committedCount = 0; }
-    bool shouldOverwrite() const noexcept { return dirty; }
-    bool hasPending() const noexcept { return committedCount > 0; }
+    [[nodiscard]] bool shouldOverwrite() const noexcept { return dirty; }
+    [[nodiscard]] bool hasPending() const noexcept { return committedCount > 0; }
   };
 
   void createNullBitsetTemplate();
@@ -185,7 +185,7 @@ class metaDataStream {
   /// @return {segment index in committed entries (nullopt = currentEntry_), offset within segment}
   std::pair<std::optional<size_t>, size_t> locateRecord(size_t recordIndex) const;
 
-  std::string metaFilePath_{};                          ///< file path for saving/loading the meta index
+  std::string metaFilePath_;                            ///< file path for saving/loading the meta index
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
   const size_t entrySize_;                         ///< byte size of one serialized IndexRecord; computed once at construction

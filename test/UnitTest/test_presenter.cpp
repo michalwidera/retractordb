@@ -11,7 +11,7 @@
 
 // ctest -R '^ut-test_presenter' -V
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 namespace po = boost::program_options;
 

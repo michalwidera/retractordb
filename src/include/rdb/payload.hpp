@@ -32,7 +32,7 @@ class payload {
   bool hexFormat_ = false;
 
   template <typename T>
-  void setItemBy(const int position, std::optional<std::any> value);
+  void setItemBy(int position, std::optional<std::any> value);
 
   payload &operator=(const Descriptor &other);
 
@@ -44,7 +44,7 @@ class payload {
   /// @brief Span accessor to payload (modern, bounds-aware)
   /// @return  std::span over the payload memory
   std::span<uint8_t> span();
-  std::span<const uint8_t> span() const;
+  [[nodiscard]] std::span<const uint8_t> span() const;
 
   /// @brief Constructor of payload object
   /// @param descriptor descriptor of payload area
@@ -61,20 +61,20 @@ class payload {
   /// @param position position according to descriptor
   /// @param valueParam value of given type according to descriptor that will be set
   /// in payload
-  void setItem(const int position, std::optional<std::any> valueParam);
+  void setItem(int position, std::optional<std::any> valueParam);
 
   /// @brief Direct getter
   /// @param position position according to descriptor
   /// @return address of beginning memory that contains data described by
   /// descriptor
-  std::optional<std::any> getItem(const int position) const;
+  [[nodiscard]] std::optional<std::any> getItem(int position) const;
 
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
 
   /// @brief Expose null metadata for external persistence (metaDataStream)
-  const std::vector<bool> &getNullBitset() const;
+  [[nodiscard]] const std::vector<bool> &getNullBitset() const;
 
   /// @brief Restore null metadata read from metaDataStream/text source
   void setNullBitset(const std::vector<bool> &nullBitset);

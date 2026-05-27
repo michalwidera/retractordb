@@ -63,7 +63,7 @@ textSourceRO::textSourceRO(const std::string_view fileName,    //
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
-      readCount_(0),
+
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
   myFile_.rdbuf()->pubsetbuf(nullptr, 0);
   myFile_.open(filename_, std::ios::in);
@@ -106,7 +106,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   if (myFile_.fail()) return markAllNullAndZero(EXIT_FAILURE);
 
   auto i = 0;
-  for (auto item : descriptor_) {
+  for (const auto &item : descriptor_) {
     if (item.rtype == rdb::NULLTYPE) {
       auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
       if (token.has_value() && !isNullToken(*token)) {

@@ -20,7 +20,7 @@ genericBinaryFile::genericBinaryFile(  //
     const Descriptor &descriptor,      //
     int percounter)                    //
     : filename_(std::string(fileName)),
-      recordSize_(descriptor.getSizeInBytes()),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {}
 
 genericBinaryFile::~genericBinaryFile() {
@@ -55,10 +55,10 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
   } else {
     myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
-    myFile.seekp(position);
+    myFile.seekp(static_cast<std::streamoff>(position));
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   }
-  myFile.write(static_cast<const char *>(static_cast<const void *>(ptrData)), recordSize_);
+  myFile.write(reinterpret_cast<const char *>(ptrData), recordSize_);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;
@@ -71,9 +71,9 @@ ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset,
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename_, std::ios::in | std::ios::binary);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
-  myFile.seekg(position);
+  myFile.seekg(static_cast<std::streamoff>(position));
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
-  myFile.read(static_cast<char *>(static_cast<void *>(ptrData)), recordSize_);
+  myFile.read(reinterpret_cast<char *>(ptrData), recordSize_);
   if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
   myFile.close();
   return EXIT_SUCCESS;

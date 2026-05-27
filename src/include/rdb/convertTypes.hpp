@@ -30,4 +30,4 @@ rdb::descFldVT nullFallbackValue(rdb::descFld type);
 /// @param DIFF precision threshold used to stop approximation
 /// @param ttl_const maximum number of continued-fraction iterations
 /// @return rational approximation of input value
-boost::rational<int> Rationalize(const double inValue, const double DIFF = 1E-6, const int ttl_const = 11);
+boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6, int ttl_const = 11);

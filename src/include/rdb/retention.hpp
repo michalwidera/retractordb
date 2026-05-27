@@ -9,12 +9,12 @@ namespace rdb {
  * Type: DEFAULT (NEW)
  */
 
-typedef size_t segments_t;  // silos_count
-typedef size_t capacity_t;  // silos_size
+using segments_t = size_t;  // silos_count
+using capacity_t = size_t;  // silos_size
 struct retention_t {
   segments_t segments;
   capacity_t capacity;
-  bool noRetention() const { return segments == 0 && capacity == 0; };
+  [[nodiscard]] bool noRetention() const { return segments == 0 && capacity == 0; };
   retention_t &operator=(const std::pair<segments_t, capacity_t> &p) {
     segments = p.first;
     capacity = p.second;

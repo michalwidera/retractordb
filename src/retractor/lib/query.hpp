@@ -20,13 +20,13 @@ class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
  public:
-  explicit query(boost::rational<int> rInterval, const std::string &id);
+  explicit query(boost::rational<int> rInterval, std::string id);
   query();
 
   std::list<std::string> getFieldNamesList();
 
-  std::string id                 = "";
-  std::string filename           = "";
+  std::string id;
+  std::string filename;
   boost::rational<int> rInterval = 0;
   bool isDisposable              = false;
   bool isOneShot                 = false;
@@ -42,10 +42,10 @@ class query {
   std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFile::no_retention);
   std::string storage_policy            = "DEFAULT";
 
-  bool isDeclaration() const { return lProgram.empty(); }
+  [[nodiscard]] bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();
-  bool isGenerated() const { return !id.compare(0, 7, "STREAM_"); }
-  bool isCompilerDirective() const { return id.size() > 0 && id[0] == ':'; }
+  [[nodiscard]] bool isGenerated() const { return !id.compare(0, 7, "STREAM_"); }
+  [[nodiscard]] bool isCompilerDirective() const { return !id.empty() && id[0] == ':'; }
   bool is(command_id command);
 
   std::vector<std::string> getDepStream();

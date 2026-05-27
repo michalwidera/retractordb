@@ -9,6 +9,7 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace rdb {
 
@@ -29,7 +30,7 @@ std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   write(recordCount);
   write(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    if (nullBitset[i]) ptr[i / 8] |= static_cast<std::byte>(1u << (i % 8));
+    if (nullBitset[i]) ptr[i / 8] |= static_cast<std::byte>(1U << (i % 8));
 
   return buf;
 }
@@ -57,7 +58,7 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 
   rec.nullBitset.resize(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    rec.nullBitset[i] = (std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1u;
+    rec.nullBitset[i] = (std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1U;
 
   return rec;
 }
@@ -88,7 +89,7 @@ std::vector<metaDataStream::IndexRecord> splitSegment(const metaDataStream::Inde
 }
 
 size_t sumNonGapRecords(const std::vector<metaDataStream::IndexRecord> &entries) {
-  return std::ranges::fold_left(entries, 0uz, [](size_t acc, const auto &e) { return acc + (e.isGap ? 0uz : e.recordCount); });
+  return std::ranges::fold_left(entries, 0UZ, [](size_t acc, const auto &e) { return acc + (e.isGap ? 0UZ : e.recordCount); });
 }
 
 }  // namespace
@@ -238,8 +239,8 @@ std::pair<std::optional<size_t>, size_t> metaDataStream::locateRecord(size_t rec
 
 // ── Construction / destruction ───────────────────────────────────────
 
-metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath)
-    : metaFilePath_(metaFilePath),
+metaDataStream::metaDataStream(const Descriptor &descriptor, std::string metaFilePath)
+    : metaFilePath_(std::move(metaFilePath)),
       descriptorRef_(std::make_shared<Descriptor>(descriptor)),
       creationTime_(std::chrono::system_clock::now()),
       entrySize_(sizeof(uint8_t) + 2 * sizeof(size_t) + (descriptor.size() + 7) / 8) {

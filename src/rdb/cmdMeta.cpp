@@ -81,7 +81,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
   size_t effectiveHeaderSize = headerSize;
   if (fileSize >= 0) {
     const auto fs = static_cast<size_t>(fileSize);
-    if (!(fs >= headerSize && (fs - headerSize) % entrySize == 0))
+    if (fs < headerSize || (fs - headerSize) % entrySize != 0)
       std::cout << ctx.colors.YELLOW << "warning: unexpected meta payload alignment\n" << ctx.colors.RESET;
   }
 
@@ -113,7 +113,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
       uint8_t byteVal = 0;
       for (size_t bit = 0; bit < 8; ++bit) {
         const size_t fieldIdx = bi * 8 + bit;
-        if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1u << bit);
+        if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1U << bit);
       }
       std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byteVal) << std::dec;
     }

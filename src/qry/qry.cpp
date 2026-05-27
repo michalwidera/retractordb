@@ -158,7 +158,7 @@ std::string qry::dirYaml() {
     retval << "    delta: " << v.second.get<std::string>("duration") << "\n";
     if (size != "-1") retval << "    size: " << size << "\n";
     retval << "    count: " << v.second.get<std::string>("count") << "\n";
-    if (location != "") retval << "    location: " << location << "\n";
+    if (!location.empty()) retval << "    location: " << location << "\n";
   }
 
   return retval.str();

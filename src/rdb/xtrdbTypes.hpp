@@ -1,7 +1,8 @@
 #pragma once
+#include <cstdint>
 #include <string_view>
 
-enum payloadStatusType { fetched, clean, stored, changed, error };
+enum payloadStatusType : std::uint8_t { fetched, clean, stored, changed, error };
 
 struct Colors {
   std::string_view GREEN;

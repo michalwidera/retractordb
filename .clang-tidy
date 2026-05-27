@@ -9,12 +9,13 @@ Checks: >
   readability-*,
   -modernize-use-trailing-return-type,
   -readability-identifier-naming,
+  -readability-identifier-length,
+  -readability-braces-around-statements,
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
   -readability-convert-member-functions-to-static
 WarningsAsErrors: ''
-HeaderFilterRegex: '^(src|test|.*/src/.*|.*/test/.*|.*/src/include/.*)$'
-ExcludeHeaderFilterRegex: '(.*/(\.conan2|conan|third_party|3rdparty|external|vendor|_deps|deps)/.*|.*/(boost|fmt|spdlog|antlr4-runtime|antlr4|gtest|magic_enum)/.*)'
+HeaderFilterRegex: '^(.*/)?(src|test)(/[^./][^/]*)*/[^/]*$'
 SystemHeaders: false
 FormatStyle: file
 CheckOptions:

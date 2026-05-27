@@ -56,10 +56,10 @@ int main(int argc, char *argv[]) {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     int timeLimit{0};
-    std::string sInputStream{""};
-    std::string sDetailStream{""};
-    std::string sAdHoc{""};
-    std::string sGnuplotDim{""};
+    std::string sInputStream;
+    std::string sDetailStream;
+    std::string sAdHoc;
+    std::string sGnuplotDim;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
     qry obj;
 
     if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
-      std::cout << "Only one output format could be selected." << std::endl;
+      std::cout << "Only one output format could be selected." << '\n';
       return system::errc::invalid_argument;
     }
     if (vm.count("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
@@ -101,7 +101,9 @@ int main(int argc, char *argv[]) {
       auto delimetersCnt = std::count_if(sGnuplotDim.begin(), sGnuplotDim.end(), [](char c) { return c == ',' || c == ':'; });
 
       char c;
-      int x = 0, ymax = 0, ymin = 0;
+      int x    = 0;
+      int ymax = 0;
+      int ymin = 0;
 
       if (delimetersCnt == 1) {
         ss >> x >> c >> ymax;  // expected format is x,y or x:y
@@ -133,27 +135,26 @@ int main(int argc, char *argv[]) {
       }
     }
     if (vm.count("help")) {
-      std::cout << argv[0] << " - data query tool." << std::endl << std::endl;
-      std::cout << "Usage: " << argv[0] << " [option]" << std::endl << std::endl;
+      std::cout << argv[0] << " - data query tool." << '\n' << '\n';
+      std::cout << "Usage: " << argv[0] << " [option]" << '\n' << '\n';
       std::cout << desc;
-      std::cout << config_line << std::endl;
-      std::cout << "Log: " << tempLocation << std::endl;
-      std::cout << warranty << std::endl;
+      std::cout << config_line << '\n';
+      std::cout << "Log: " << tempLocation << '\n';
+      std::cout << warranty << '\n';
       return system::errc::success;
     }
-    if (vm.count("hello"))
-      return obj.hello();
-    else if (vm.count("kill") && timeLimit == 0) {
+    if (vm.count("hello")) return obj.hello();
+    if (vm.count("kill") && timeLimit == 0) {
       obj.netClient("kill", "");
     } else if (vm.count("dir")) {
       std::cout << obj.dir();
     } else if (vm.count("diryaml")) {
       std::cout << obj.dirYaml();
-    } else if (vm.count("adhoc") && sAdHoc != "") {
+    } else if (vm.count("adhoc") && !sAdHoc.empty()) {
       if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.count("detail")) {
       auto ret = obj.detailShow(sDetailStream);
-      if (ret != "") {
+      if (!ret.empty()) {
         std::cout << ret;
       } else
         return system::errc::no_such_file_or_directory;

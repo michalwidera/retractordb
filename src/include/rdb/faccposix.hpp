@@ -33,13 +33,13 @@ class posixBinaryFile : public FileInterface {
   int percounter_;
 
  public:
-  posixBinaryFile(const std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
+  posixBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~posixBinaryFile() override;
 
   using FileInterface::read;
   using FileInterface::write;
-  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
-  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
 
   auto name() -> std::string & override;
   size_t count() override;

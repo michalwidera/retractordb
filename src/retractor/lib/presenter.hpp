@@ -20,5 +20,5 @@ struct presenter {
   void qSet();
   void qRules();
   void onlyCompileShowProgram();
-  void sequenceDiagram(int gridCount, int cycleCount);
+  void sequenceDiagram(int gridType, int cycleCount);
 };

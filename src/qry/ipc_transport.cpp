@@ -65,14 +65,14 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
     typedef int KeyType;
     typedef std::pair<const int, IPCString> ValueType;
     typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-    typedef boost::container::map<KeyType, IPCString, std::less<KeyType>, ShmemAllocator> IPCMap;
+    typedef boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator> IPCMap;
 
     IPC::managed_shared_memory mapSegment(IPC::open_only, ipc::kShmemSegment.data());
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     IPC::named_mutex mapMutex(IPC::open_only, ipc::kMapMutex.data());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
-    if (netArgument != "") pt_request.put("db.argument", netArgument);
+    if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
 
     IPC::message_queue mq(IPC::open_only, ipc::kQueryQueue.data());
     std::stringstream request_stream;

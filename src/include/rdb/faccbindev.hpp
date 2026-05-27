@@ -37,14 +37,14 @@ class binaryDeviceRO : public FileInterface {
   std::vector<bool> lastNullBitset_;
 
  public:
-  explicit binaryDeviceRO(const std::string_view fileName,    //
+  explicit binaryDeviceRO(std::string_view fileName,          //
                           const rdb::Descriptor &descriptor,  //
                           bool loopToBeginningIfEOF);
   ~binaryDeviceRO() override;
 
   using FileInterface::read;
   using FileInterface::write;
-  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override {
     return EXIT_FAILURE;
   };
@@ -52,6 +52,6 @@ class binaryDeviceRO : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
 
-  const std::vector<bool> &lastNullBitset() const;
+  [[nodiscard]] const std::vector<bool> &lastNullBitset() const;
 };
 }  // namespace rdb

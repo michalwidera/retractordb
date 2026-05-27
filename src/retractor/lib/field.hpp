@@ -10,7 +10,7 @@ struct field {
 
   rdb::rField field_;
 
-  explicit field(rdb::rField field_, token lToken);
+  explicit field(rdb::rField field_, const token &lToken);
   explicit field(rdb::rField field_, std::list<token> lProgram);
 
   token getFirstFieldToken();

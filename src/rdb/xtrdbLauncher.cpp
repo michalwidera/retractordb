@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
   namespace po = boost::program_options;
   po::options_description desc("Allowed options");
-  std::string mapDatafile{""};
+  std::string mapDatafile;
   // clang-format off
   desc.add_options()
       ("help,h",       "produce help message")

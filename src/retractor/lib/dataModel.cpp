@@ -42,7 +42,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
     val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
-dataModel::~dataModel() {}
+dataModel::~dataModel() = default;
 
 bool dataModel::addQueryToModel(const std::string &id) {
   if (qSet.find(id) != qSet.end()) {
@@ -96,7 +96,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   std::lock_guard<std::mutex> scoped_lock(core_mutex);
 
   // first - process all non-declaration queries
-  for (auto q : coreInstance_) {
+  for (const auto &q : coreInstance_) {
     if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;                // Declarations already processed
 
@@ -178,8 +178,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
       }
 
       int timeOffset = -1;
-      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
-      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
+      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
+      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, static_cast<int>(lengthOfSrc));
       if (timeOffset < 0) {
         FatalError("dataModel::constructInputPayload: DEHASH timeOffset must be non-negative, got {}", timeOffset);
       }
@@ -202,7 +202,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset       = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      const auto timeOffset =
+          Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -232,7 +233,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       if (step <= 0) {
         FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
       }
-      const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
+      const int storedRecordsInOutput = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
     } break;
     case STREAM_HASH: {
@@ -247,7 +248,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
+      const auto recordOffset = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount()) + 1;
 
       int retPosValue                 = 0;
       bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
@@ -273,7 +274,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }
   auto i{0};
-  for (auto f : payload->descriptor.dataFields()) {
+  for (const auto &f : payload->descriptor.dataFields()) {
     auto valueOpt = payload->getItem(i++);
     if (valueOpt.has_value()) {
       retVal.push_back(any_to_variant_cast(valueOpt.value()));

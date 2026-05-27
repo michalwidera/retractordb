@@ -47,13 +47,13 @@ class groupFile : public FileInterface {
   int percounter_;
 
  public:
-  groupFile(const std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter);
+  groupFile(std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter);
   ~groupFile() override;
 
   using FileInterface::read;
   using FileInterface::write;
-  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
-  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
   ssize_t purge();
 
   auto name() -> std::string & override;

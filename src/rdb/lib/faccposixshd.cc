@@ -17,22 +17,22 @@ std::string posixBinaryFileWithShadow::shadowName() const { return filename_ + "
 /// @brief Wyszukuje rekord w pliku cienia na podstawie pozycji.
 /// Shadow file przechowuje pary (size_t position, uint8_t data[recordSize_]).
 /// Przeszukuje wpisy od końca — ostatni wpis z daną pozycją jest aktualny.
-ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position) {
+ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position) const {
   struct stat stat_buf;
   if (fstat(fd_shadow, &stat_buf) != 0) return EXIT_FAILURE;
 
-  const ssize_t entrySize  = sizeof(size_t) + recordSize_;
+  const ssize_t entrySize  = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
   const ssize_t numEntries = stat_buf.st_size / entrySize;
   if (numEntries == 0) return EXIT_FAILURE;
 
   // Szukaj od końca — ostatni wpis z daną pozycją ma najnowsze dane
   for (ssize_t i = numEntries - 1; i >= 0; --i) {
     size_t storedPos;
-    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), i * entrySize);
+    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
     if (rd != sizeof(size_t)) continue;
 
     if (storedPos == position) {
-      rd = ::pread(fd_shadow, ptrData, recordSize_, i * entrySize + sizeof(size_t));
+      rd = ::pread(fd_shadow, ptrData, recordSize_, static_cast<__off_t>(i * entrySize) + static_cast<__off_t>(sizeof(size_t)));
       if (rd != recordSize_) return EXIT_FAILURE;
       return EXIT_SUCCESS;
     }
@@ -43,7 +43,7 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
 posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor,
                                                      int percounter)
     : filename_(std::string(fileName)),
-      recordSize_(descriptor.getSizeInBytes()),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
   if (recordSize_ == 0) FatalError("posixBinaryFileWithShadow: record size must be > 0");
 
@@ -86,7 +86,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   }
 
   if (fd_shadow >= 0 && shadowFileExisted) {
-    const ssize_t entrySize = sizeof(size_t) + recordSize_;
+    const ssize_t entrySize = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
     const off_t shadowSize  = ::lseek(fd_shadow, 0, SEEK_END);
     if (shadowSize < 0) {
       SPDLOG_ERROR("::lseek shadow {} failed during state restore: {}", shadowName(), strerror(errno));
@@ -253,7 +253,7 @@ ssize_t posixBinaryFileWithShadow::merge() {
     return EXIT_FAILURE;
   }
 
-  const ssize_t entrySize  = sizeof(size_t) + recordSize_;
+  const ssize_t entrySize  = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
   const ssize_t numEntries = shadow_stat.st_size / entrySize;
   if (numEntries == 0) return EXIT_SUCCESS;
 
@@ -261,10 +261,11 @@ ssize_t posixBinaryFileWithShadow::merge() {
 
   for (ssize_t i = 0; i < numEntries; ++i) {
     size_t storedPos;
-    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), i * entrySize);
+    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
     if (rd != sizeof(size_t)) continue;
 
-    rd = ::pread(fd_shadow, buffer.get(), recordSize_, i * entrySize + sizeof(size_t));
+    rd = ::pread(fd_shadow, buffer.get(), recordSize_,
+                 static_cast<__off_t>(i * entrySize) + static_cast<__off_t>(sizeof(size_t)));
     if (rd != recordSize_) continue;
 
     // Nadpisz rekord w głównym pliku

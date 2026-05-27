@@ -41,7 +41,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
                         int percounter)                   //
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
-      recordSize_(descriptor.getSizeInBytes()),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       retention_(retention),
       percounter_(percounter) {
   writeCount_      = 0;
@@ -78,7 +78,8 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       --firstContiguousIdx;
     }
 
-    std::vector<size_t> restoredSegments(existingSegments.begin() + firstContiguousIdx, existingSegments.end());
+    std::vector<size_t> restoredSegments(existingSegments.begin() + static_cast<std::ptrdiff_t>(firstContiguousIdx),
+                                         existingSegments.end());
 
     if (retention_.segments != 0 && restoredSegments.size() > retention_.segments) {
       restoredSegments.erase(restoredSegments.begin(),
@@ -95,7 +96,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
   }
 }
 template <typename T>
-groupFile<T>::~groupFile() {}
+groupFile<T>::~groupFile() = default;
 
 template <typename T>
 auto groupFile<T>::name() -> std::string & {

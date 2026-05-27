@@ -10,7 +10,7 @@
 
 #include <magic_enum/magic_enum.hpp>
 
-extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
 
 namespace rdb {
 
@@ -35,7 +35,7 @@ constexpr auto isConfigurationField(const rdb::descFld index) {
 Descriptor::Descriptor(std::initializer_list<rField> fields) : std::vector<rField>(fields) {}
 
 Descriptor::Descriptor(const std::string &fieldName, int length, int elementCount, rdb::descFld type) {  //
-  emplace_back(std::move(fieldName), length, elementCount, type);                                        //
+  emplace_back(fieldName, length, elementCount, type);                                                   //
 }
 
 void Descriptor::rebuildFieldMappings() {
@@ -52,7 +52,7 @@ void Descriptor::rebuildFieldMappings() {
 
     const int flatCount = (field.rtype == rdb::STRING) ? 1 : field.rarray;
     for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
-      flatToDescriptorIndexMap_.push_back(std::make_pair(static_cast<int>(descriptorFieldIdx), arrayIndex));
+      flatToDescriptorIndexMap_.emplace_back(static_cast<int>(descriptorFieldIdx), arrayIndex);
       fieldByteOffsets_.push_back(offset);
       offset += (field.rtype == rdb::STRING) ? fieldSize(field) : field.rlen;
       ++flattenedFieldCount_;
@@ -175,7 +175,7 @@ int Descriptor::fieldSize(const rdb::rField &field) const {
 
 size_t Descriptor::getSizeInBytes() const {
   auto size{0};
-  for (auto const i : *this)
+  for (auto const &i : *this)
     size += fieldSize(i);
   return size;
 }
@@ -201,7 +201,7 @@ std::pair<std::string, size_t> Descriptor::storagePolicy() {
 
   if (it1 != end()) retval = (*it1).rlen;
 
-  std::string retvalType{""};
+  std::string retvalType;
   auto it2 = std::find_if(begin(), end(),                                           //
                           [](const auto &item) { return item.rtype == rdb::TYPE; }  //
   );
@@ -215,10 +215,8 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) {
   auto it = std::find_if(begin(), end(),                                                      //
                          [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
-  if (it != end())
-    return std::distance(begin(), it);
-  else
-    FatalError("descriptor: field ID not found");
+  if (it != end()) return std::distance(begin(), it);
+  FatalError("descriptor: field ID not found");
 
   return 0;  // ProForma Error
 }
@@ -227,7 +225,7 @@ int Descriptor::fieldSize(const std::string_view fieldName) { return fieldSize((
 
 size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
   auto offset{0};
-  for (auto const field : *this) {
+  for (auto const &field : *this) {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
@@ -250,7 +248,7 @@ std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  
 std::pair<rdb::descFld, int> Descriptor::widestFieldType() {
   rdb::descFld retVal{rdb::BYTE};
   auto size{1};
-  for (auto const field : *this) {
+  for (auto const &field : *this) {
     if (isConfigurationField(field.rtype)) continue;
     if (retVal <= field.rtype) {
       retVal = field.rtype;
@@ -301,7 +299,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << r.rarray << "]";
     else if (r.rtype == rdb::STRING)
       os << "[" << r.rlen << "]";
-    if (!Descriptor::singleLineOutput_) os << std::endl;
+    if (!Descriptor::singleLineOutput_) os << '\n';
   }
   if (rhs.empty())
     os << "Empty";

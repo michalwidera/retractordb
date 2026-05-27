@@ -36,7 +36,7 @@ static uint64_t rtEffectiveCapabilities() {
   std::ifstream f("/proc/self/status");
   std::string line;
   while (std::getline(f, line)) {
-    if (line.rfind("CapEff:", 0) == 0) {
+    if (line.starts_with("CapEff:")) {
       uint64_t caps = 0;
       std::sscanf(line.c_str() + 7, "%" SCNx64, &caps);
       return caps;
@@ -48,8 +48,8 @@ static uint64_t rtEffectiveCapabilities() {
 bool rtCheckAndPrint() {
   const uint64_t caps   = rtEffectiveCapabilities();
   const bool isRoot     = (geteuid() == 0);
-  const bool hasSysNice = isRoot || ((caps >> kCapSysNiceBit) & 1u);  // CAP_SYS_NICE
-  const bool hasIpcLock = isRoot || ((caps >> kCapIpcLockBit) & 1u);  // CAP_IPC_LOCK
+  const bool hasSysNice = isRoot || ((caps >> kCapSysNiceBit) & 1U);  // CAP_SYS_NICE
+  const bool hasIpcLock = isRoot || ((caps >> kCapIpcLockBit) & 1U);  // CAP_IPC_LOCK
 
   const std::string rtKernelVal = rtReadFile("/sys/kernel/realtime");
   const bool hasRTKernel        = (rtKernelVal == "1");

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 
@@ -23,7 +24,6 @@ void query::reset() {
   isSubstrat   = false;
   policy       = std::make_pair("DEFAULT", 0);
   retention    = rdb::retention_t{0, 0};
-  return;
 }
 
 bool isThere(const std::vector<query> &v, const std::string &query_name) {
@@ -32,13 +32,13 @@ bool isThere(const std::vector<query> &v, const std::string &query_name) {
 
 /** Construktor set */
 
-query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}
+query::query(boost::rational<int> rInterval, std::string id) : rInterval(rInterval), id(std::move(id)) {}
 
-query::query() {}
+query::query() = default;
 
 int query::getFieldIndex(const field &f_arg) {
   int idx(0);
-  for (auto f : lSchema) {
+  for (const auto &f : lSchema) {
     if (f.field_.rname == f_arg.field_.rname)  // Todo
       return idx;
     ++idx;
@@ -90,10 +90,10 @@ rdb::Descriptor query::descriptorStorage() {
 
   if (!isDeclaration()) {
     if (!retention.noRetention()) {
-      retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
+      retVal += rdb::Descriptor("", static_cast<int>(retention.segments), static_cast<int>(retention.capacity), rdb::RETENTION);
     }
     if (policy.second != 0) {
-      retVal += rdb::Descriptor("", policy.second, 0, rdb::RETMEMORY);
+      retVal += rdb::Descriptor("", static_cast<int>(policy.second), 0, rdb::RETMEMORY);
       retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
     }
     return retVal;
@@ -202,10 +202,10 @@ std::ostream &operator<<(std::ostream &os, const query &s) {
   os << "filename:" << s.filename << ",";
   os << "rInterval:" << s.rInterval << ",";
   os << "lSchema:";
-  for (auto &i : s.lSchema)
+  for (const auto &i : s.lSchema)
     os << i << ",";
   os << "lProgram:";
-  for (auto &i : s.lProgram)
+  for (const auto &i : s.lProgram)
     os << i << ",";
   return os;
 }

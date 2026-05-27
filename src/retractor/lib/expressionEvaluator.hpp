@@ -25,7 +25,7 @@ class expressionEvaluator {
   /* data */
  public:
   expressionEvaluator(/* args */);
-  ~expressionEvaluator();
+  ~expressionEvaluator() = default;
 
-  rdb::descFldVT eval(std::list<token> program, rdb::payload *payload = nullptr);
+  rdb::descFldVT eval(const std::list<token> &program, rdb::payload *payload = nullptr);
 };

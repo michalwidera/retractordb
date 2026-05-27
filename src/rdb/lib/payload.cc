@@ -106,9 +106,7 @@ void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldNa
 
 // default constructor
 
-payload::payload(const Descriptor &descriptor)
-    : descriptor(descriptor),  //
-      hexFormat_(false) {
+payload::payload(const Descriptor &descriptor) : descriptor(descriptor) {
   payloadData_ = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
   std::fill(span().begin(), span().end(), 0);
 
@@ -142,7 +140,7 @@ payload &payload::operator=(const Descriptor &other) {
   // * Plan: when descriptor is empty =Descriptor or =payload
   // * will create descriptor or descriptor with payload
   // * if non empty - this goes strange
-  if (descriptor.size() == 0) {
+  if (descriptor.empty()) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
     descriptor   = other;
     payloadData_ = std::make_unique<uint8_t[]>(other.getSizeInBytes());
@@ -376,8 +374,8 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
       if (desc.fieldTypeName(fieldName) == "BYTE") {
         int data;
         is >> data;
-        uint8_t data8 = static_cast<uint8_t>(data);
-        auto dest     = rhs.span().subspan(desc.fieldByteOffset(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
+        auto data8 = static_cast<uint8_t>(data);
+        auto dest  = rhs.span().subspan(desc.fieldByteOffset(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
         std::memcpy(dest.data(), &data8, sizeof(uint8_t));
         rhs.nullBitset_[fieldIndex] = false;
       } else if (desc.fieldTypeName(fieldName) == "UINT")

@@ -12,7 +12,7 @@ using namespace boost;
 
 void qTree::dfs(const std::string &v) {
   visited_[v] = true;
-  for (auto u : adj_[v]) {
+  for (const auto &u : adj_[v]) {
     if (!visited_[u]) dfs(u);
   }
   ans_.push_back(v);
@@ -26,11 +26,11 @@ void qTree::topologicalSort() {
   qTree &coreInstance{*this};
 
   ans_.clear();
-  for (auto q : coreInstance)
+  for (const auto &q : coreInstance)
     visited_[q.id] = false;
   for (auto q : coreInstance)
     adj_[q.id] = q.getDepStream();
-  for (auto q : coreInstance)
+  for (const auto &q : coreInstance)
     if (!visited_[q.id]) dfs(q.id);
 
   qTree tempInstance;
@@ -52,18 +52,19 @@ void qTree::dumpCore() {
   std::stringstream ss;
   std::stringstream sp;
 
-  for (const auto nName : vcols) {
-    int maxSize = nName.length();
+  for (const auto &nName : vcols) {
+    int maxSize = static_cast<int>(nName.length());
     int size{0};
     for (const auto &it : *this) {
       if (nName == vcols[0])
-        size = std::to_string(getSeqNr(it.id)).length();
+        size = static_cast<int>(std::to_string(getSeqNr(it.id)).length());
       else if (nName == vcols[1])
-        size = (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length();
+        size = static_cast<int>(
+            (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length());
       else if (nName == vcols[2])
-        size = std::to_string(maxCapacity[it.id]).length();
+        size = static_cast<int>(std::to_string(maxCapacity[it.id]).length());
       else if (nName == vcols[3])
-        size = it.id.length();
+        size = static_cast<int>(it.id.length());
       else {
         FatalError("qTree::dumpCore: unknown column name");
       }
@@ -117,10 +118,8 @@ query &qTree::getQuery(const std::string &query_name) {
 int qTree::getSeqNr(const std::string &query_name) {
   int cnt(0);
   for (auto &q : *this) {
-    if (query_name == q.id)
-      return cnt;
-    else
-      ++cnt;
+    if (query_name == q.id) return cnt;
+    ++cnt;
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
   throw std::logic_error("No such stream in set.");

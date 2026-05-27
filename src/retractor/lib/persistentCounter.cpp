@@ -3,7 +3,7 @@
 #include <fstream>
 
 PersistentCounter::PersistentCounter(std::string initFilename)
-    : count_(0),                                           //
+    :                                                      //
       persistentCounterFilename_(std::move(initFilename))  //
 {
   try {

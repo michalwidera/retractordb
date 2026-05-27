@@ -36,20 +36,20 @@
 namespace IPC = boost::interprocess;
 
 // Define for IPC purposes - maps & strings (most important IPCString i IPCMap)
-typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
+using segment_manager_t = IPC::managed_shared_memory::segment_manager;
 
-typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-typedef boost::container::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
-typedef IPC::allocator<IPCString, segment_manager_t> StringAllocator;
+using CharAllocator   = IPC::allocator<char, segment_manager_t>;
+using IPCString       = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
+using StringAllocator = IPC::allocator<IPCString, segment_manager_t>;
 
-typedef std::pair<const int, IPCString> ValueType;
+using ValueType = std::pair<const int, IPCString>;
 
-typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-typedef boost::container::map<int, IPCString, std::less<int>, ShmemAllocator> IPCMap;
+using ShmemAllocator = IPC::allocator<ValueType, segment_manager_t>;
+using IPCMap         = boost::container::map<int, IPCString, std::less<int>, ShmemAllocator>;
 
 using namespace CRationalStreamMath;
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 std::unique_ptr<PersistentCounter> pCounterPtr;
 
@@ -83,7 +83,7 @@ void cleanup() {
   if (iTimeLimitCnt != executorsm::stop_now) {
     SPDLOG_WARN("Cleanup: Setting iTimeLimitCnt to stop_now.");
     iTimeLimitCnt = executorsm::stop_now;
-    std::cout << "Cleanup!" << std::endl;
+    std::cout << "Cleanup!" << '\n';
   }
   if (bt.joinable()) bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
@@ -114,7 +114,7 @@ ptree executorsm::collectStreamsParameters() {
       ptRetval.put(std::string("db.stream.") + q.id + std::string(".duration"), boost::lexical_cast<std::string>(duration));
 
     long recordsCount = -1;
-    if (!q.isDeclaration()) recordsCount = pProc->streamStoredSize(q.id);
+    if (!q.isDeclaration()) recordsCount = static_cast<long>(pProc->streamStoredSize(q.id));
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".size"), boost::lexical_cast<std::string>(recordsCount));
     ptRetval.put(std::string("db.stream.") + q.id + std::string(".count"),
                  boost::lexical_cast<std::string>(pProc->getStreamCount(q.id)));
@@ -195,14 +195,14 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", id);
       return ptRetval;
     }
-    processedLines.push_back({id, adHocQuery});
+    processedLines.emplace_back(id, adHocQuery);
   }
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;
 }
 
-ptree executorsm::commandProcessor(ptree ptInval) {
+ptree executorsm::commandProcessor(const ptree &ptInval) {
   if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessor: coreInstancePtr is null");
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
@@ -363,7 +363,7 @@ void executorsm::commandProcessorLoop() {
       if (iTimeLimitCnt == executorsm::stop_now) loopRunning = false;
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cout << "Exception on server." << std::endl << ex.what() << std::endl;
+    std::cout << "Exception on server." << '\n' << ex.what() << '\n';
   }
 }
 
@@ -371,7 +371,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
   if (coreInstancePtr == nullptr) FatalError("executorsm::printRowValue: coreInstancePtr is null");
-  auto payload = pProc->getPayload(query_name, 0);
+  auto *payload = pProc->getPayload(query_name, 0);
   if (payload == nullptr) FatalError("executorsm::printRowValue: getPayload returned null");
 
   ptree pt;
@@ -397,18 +397,19 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 
     std::stringstream coutstring;
 
-    std::visit(Overload{                                                                                                    //
-                        [&coutstring](std::monostate) { coutstring << "null"; },                                            //
-                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
-                        [&coutstring](int a) { coutstring << a; },                                                          //
-                        [&coutstring](unsigned a) { coutstring << a; },                                                     //
-                        [&coutstring](float a) { coutstring << a; },                                                        //
-                        [&coutstring](double a) { coutstring << a; },                                                       //
-                        [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
-                        [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                        [&coutstring](const std::string &a) { coutstring << a; },                                           //
-                        [&coutstring](boost::rational<int> a) { coutstring << a; }},
-               value);
+    std::visit(
+        Overload{                                                                                                           //
+                 [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
+                 [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
+                 [&coutstring](int a) { coutstring << a; },                                                                 //
+                 [&coutstring](unsigned a) { coutstring << a; },                                                            //
+                 [&coutstring](float a) { coutstring << a; },                                                               //
+                 [&coutstring](double a) { coutstring << a; },                                                              //
+                 [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                        //
+                 [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                 [&coutstring](const std::string &a) { coutstring << a; },                                                  //
+                 [&coutstring](boost::rational<int> a) { coutstring << a; }},
+        value);
 
     pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
   }
@@ -451,7 +452,7 @@ void executorsm::boradcastOutOfBussiness() {
 
 void executorsm::boradcast(const std::set<std::string> &inSet) {
   if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcast: coreInstancePtr is null");
-  for (const auto queryName : inSet) {
+  for (const auto &queryName : inSet) {
     std::string row = printRowValue(queryName);
     std::list<int> eraseList;
     for (const auto &element : id2StreamName_Relation) {
@@ -596,11 +597,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     //
     if (iTimeLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
-    std::cerr << ex.what() << std::endl << "IPC::interprocess exception" << std::endl;
+    std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;
   } catch (std::exception &e) {
-    std::cerr << "IPC Fail." << std::endl;
-    std::cerr << e.what() << std::endl;
+    std::cerr << "IPC Fail." << '\n';
+    std::cerr << e.what() << '\n';
     SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
   }
