@@ -135,14 +135,14 @@ commands:
           command: |
             scripts/buildrdb.sh toolchain_required
       - run:
-          name: Validate installed toolchain
-          command: |
-            scripts/buildrdb.sh validate
-      - run:
-          name: Configure Conan profile (gnu23)
+          name: Install Conan toolchain
           command: |
             source ~/.venv/bin/activate
             scripts/buildrdb.sh conan
+      - run:
+          name: Validate installed toolchain
+          command: |
+            scripts/buildrdb.sh validate
       - when:
           condition: << parameters.use_ninja >>
           steps:
@@ -162,14 +162,14 @@ commands:
             uname -a && cat /proc/version && cat /etc/issue
             scripts/buildrdb.sh toolchain
       - run:
-          name: Validate installed toolchain
-          command: |
-            scripts/buildrdb.sh validate
-      - run:
-          name: Configure Conan profile (gnu23)
+          name: Install Conan toolchain
           command: |
             source ~/.venv/bin/activate
             scripts/buildrdb.sh conan
+      - run:
+          name: Validate installed toolchain
+          command: |
+            scripts/buildrdb.sh validate
       - when:
           condition: << parameters.use_ninja >>
           steps:
