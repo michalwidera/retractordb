@@ -224,7 +224,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
 
   auto writeStringField = [&]() {
     const auto len = descriptor[position].rlen * descriptor[position].rarray;
-    std::string data(std::any_cast<std::string>(value));
+    auto data = std::any_cast<std::string>(value);
     auto lenr       = std::min(len, static_cast<int>(data.length()));
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
@@ -305,7 +305,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
         break;
       }
     }
-    return std::string(fieldSpan.begin(), fieldSpan.begin() + len);
+    return {fieldSpan.begin(), fieldSpan.begin() + len};
   };
 
   switch (requestedType) {
@@ -377,15 +377,15 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
         std::memcpy(dest.data(), &data8, sizeof(uint8_t));
         rhs.nullBitset_[fieldIndex] = false;
       } else if (desc.fieldTypeName(fieldName) == "UINT")
-        copyToMemory<uint>(is, rhs, fieldName, i * sizeof(unsigned)), rhs.nullBitset_[fieldIndex] = false;
+        copyToMemory<uint>(is, rhs, fieldName, i * static_cast<int>(sizeof(unsigned))), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "INTEGER")
-        copyToMemory<int>(is, rhs, fieldName, i * sizeof(int)), rhs.nullBitset_[fieldIndex] = false;
+        copyToMemory<int>(is, rhs, fieldName, i * static_cast<int>(sizeof(int))), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "FLOAT")
-        copyToMemory<float>(is, rhs, fieldName, i * sizeof(float)), rhs.nullBitset_[fieldIndex] = false;
+        copyToMemory<float>(is, rhs, fieldName, i * static_cast<int>(sizeof(float))), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "DOUBLE")
-        copyToMemory<double>(is, rhs, fieldName, i * sizeof(double)), rhs.nullBitset_[fieldIndex] = false;
+        copyToMemory<double>(is, rhs, fieldName, i * static_cast<int>(sizeof(double))), rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "RATIONAL")
-        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * sizeof(boost::rational<int>)),
+        copyToMemory<boost::rational<int>>(is, rhs, fieldName, i * static_cast<int>(sizeof(boost::rational<int>))),
             rhs.nullBitset_[fieldIndex] = false;
       else if (desc.fieldTypeName(fieldName) == "REF")
         SPDLOG_ERROR("REF store not supported by this operator.");

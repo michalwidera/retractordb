@@ -5,7 +5,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccmemory.hpp"
 
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", size, 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
 using BYTE = unsigned char;
 

@@ -13,7 +13,7 @@
 
 using BYTE = unsigned char;
 
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
 // --- Test fixture ---
 
@@ -202,7 +202,7 @@ TEST_F(FaccfsTest, destructor_rotates_file_when_percounter_set) {
   // Verify rotated file contents are intact
   std::ifstream in(path + ".old3", std::ios::binary);
   uint8_t rData[10] = {};
-  in.read(reinterpret_cast<char *>(rData), AREA_SIZE);
+  in.read(reinterpret_cast<char *>(rData), static_cast<std::streamsize>(AREA_SIZE));
   EXPECT_EQ(std::memcmp(rData, "rotate dat", AREA_SIZE), 0);
 }
 

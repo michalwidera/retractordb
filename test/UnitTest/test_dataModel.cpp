@@ -68,8 +68,8 @@ class xschema : public ::testing::Test {
 
     // This simplified dataModel::load
     coreInstance.clear();
-    auto compiled = parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
-    dataArea      = std::make_unique<dataModel>(coreInstance);
+    parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
+    dataArea = std::make_unique<dataModel>(coreInstance);
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);
@@ -92,7 +92,7 @@ class xschema : public ::testing::Test {
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 333);
     dataArea->qSet["str2"]->outputPayload->write();
 
-    for (auto i : coreInstance)
+    for (const auto &i : coreInstance)
       if (!i.isDeclaration()) dataArea->constructInputPayload(i.id);
 
     pProc = dataArea.get();
@@ -120,9 +120,9 @@ TEST_F(xschema, check_construct_payload) {
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 2));
     std::stringstream coutstring1;
-    coutstring1 << rdb::singleLineFormat << payload.get()->descriptor;
+    coutstring1 << rdb::singleLineFormat << payload->descriptor;
     std::stringstream coutstring2;
-    coutstring2 << rdb::singleLineFormat << *(payload.get());
+    coutstring2 << rdb::singleLineFormat << *payload;
     std::cerr << rdb::singleLineFormat << *(payload.get()) << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:null str1_2:null str1_3:null }");
@@ -145,11 +145,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 2));
     std::stringstream coutstring1;
-    coutstring1 << rdb::singleLineFormat << payload.get()->descriptor;
+    coutstring1 << rdb::singleLineFormat << payload->descriptor;
 
     std::stringstream coutstring2;
-    coutstring2 << rdb::singleLineFormat << *(payload.get());
-    std::cout << rdb::singleLineFormat << *(payload.get()) << '\n';
+    coutstring2 << rdb::singleLineFormat << *payload;
+    std::cout << rdb::singleLineFormat << *payload << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:null str1_1:null str1_2:null str1_3:11 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -204,10 +204,10 @@ auto print(const std::vector<rdb::descFldVT> &row) {
                         [&coutstring](unsigned a) { coutstring << a; },                                                     //
                         [&coutstring](float a) { coutstring << a; },                                                        //
                         [&coutstring](double a) { coutstring << a; },                                                       //
-                        [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
-                        [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                        [&coutstring](const std::string &a) { coutstring << a; },                                           //
-                        [&coutstring](boost::rational<int> a) { coutstring << a; }},
+                        [&coutstring](const std::pair<int, int> &a) { coutstring << a.first << "," << a.second; },                 //
+                        [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                        [&coutstring](const std::string &a) { coutstring << a; },                                                   //
+                        [&coutstring](const boost::rational<int> &a) { coutstring << a; }},
                v);
 
     coutstring << " ";

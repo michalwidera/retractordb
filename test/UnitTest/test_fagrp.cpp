@@ -10,7 +10,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/fagrp.hpp"
 
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", size, 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
 using BYTE = unsigned char;
 
@@ -28,7 +28,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());  // NOLINT(modernize-return-braced-init-list)
 }
 
 struct fileInfo {
@@ -72,7 +72,7 @@ class GroupFileTest : public ::testing::Test {
       if (name.ends_with(".shadow") || name.ends_with(".meta")) {
         continue;
       }
-      mapOfFiles[entry.path().string()] = fileInfo(filesize(entry.path().string()), readFile(entry.path().string()));
+      mapOfFiles[entry.path().string()] = fileInfo(static_cast<int>(filesize(entry.path().string())), readFile(entry.path().string()));  // NOLINT(bugprone-narrowing-conversions)
     }
     return mapOfFiles;
   }

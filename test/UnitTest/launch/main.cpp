@@ -5,7 +5,7 @@
 
 #include "config.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {  // NOLINT(bugprone-exception-escape)
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
   constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";

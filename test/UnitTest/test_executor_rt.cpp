@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <time.h>
+#include <ctime>
 #include <unistd.h>
 #include <iostream>
 #include <sstream>
@@ -18,7 +18,8 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
   clock_gettime(CLOCK_MONOTONIC, &anchor);
   anchor.tv_sec -= 100;
 
-  struct timespec before{}, after{};
+  struct timespec before{};
+  struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &before);
   rtAbsoluteSleep(anchor, 0);
   clock_gettime(CLOCK_MONOTONIC, &after);
@@ -48,7 +49,8 @@ TEST(ExecutorRtSleepTest, NanosecondCarryOverDoesNotHang) {
   anchor.tv_sec -= 100;
   anchor.tv_nsec = 900'000'000L;
 
-  struct timespec before{}, after{};
+  struct timespec before{};
+  struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &before);
   rtAbsoluteSleep(anchor, 200);
   clock_gettime(CLOCK_MONOTONIC, &after);
@@ -65,7 +67,8 @@ TEST(ExecutorRtSleepTest, LargeIntervalNoCarryPastAnchor) {
   anchor.tv_sec -= 10;
   anchor.tv_nsec = 0;
 
-  struct timespec before{}, after{};
+  struct timespec before{};
+  struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &before);
   rtAbsoluteSleep(anchor, 1000);  // 1s from 10s-ago anchor = still 9s in past
   clock_gettime(CLOCK_MONOTONIC, &after);

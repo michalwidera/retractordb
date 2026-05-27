@@ -7,7 +7,7 @@
 
 #include "rdb/descriptor.hpp"
 
-extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
 
 namespace {
 

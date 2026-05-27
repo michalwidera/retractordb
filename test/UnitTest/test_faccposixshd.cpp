@@ -14,9 +14,9 @@
 using BYTE = unsigned char;
 
 // Helper: create a single-field Descriptor of given byte size
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
-static rdb::Descriptor makeDescInt(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::INTEGER); }
+static rdb::Descriptor makeDescInt(size_t size) { return {"f", static_cast<int>(size), 1, rdb::INTEGER}; }
 
 // ctest -R '^ut-test_faccposixshd' -V
 
@@ -562,7 +562,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file
 
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
-  const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);
+  const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);  // NOLINT(bugprone-narrowing-conversions)
   GTEST_ASSERT_EQ(filesize(path + ".shadow"), expectedShadowSize);
 
   BYTE record = 0;

@@ -14,7 +14,7 @@
 using BYTE = unsigned char;
 
 // Helper: create a single-field Descriptor of given byte size (BYTE type)
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
 // ctest -R '^ut-test_faccposix' -V
 

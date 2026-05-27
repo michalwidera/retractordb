@@ -266,7 +266,7 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
     lRetVal = coreInstance.getQuery(sName1).lSchema;
   } else if (cmd == STREAM_DEHASH_DIV || cmd == STREAM_DEHASH_MOD)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
+    lRetVal = coreInstance.getQuery(sName1).lSchema;  // NOLINT(bugprone-branch-clone)
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
     int i            = 0;

@@ -61,11 +61,16 @@ bool rtCheckAndPrint() {
   getrlimit(RLIMIT_MEMLOCK, &memlockRl);
   const bool memlockUnlimited = (memlockRl.rlim_cur == RLIM_INFINITY);
 
-  const int curPolicy    = sched_getscheduler(0);
-  const char *policyName = (curPolicy == SCHED_FIFO)    ? "SCHED_FIFO"
-                           : (curPolicy == SCHED_RR)    ? "SCHED_RR"
-                           : (curPolicy == SCHED_OTHER) ? "SCHED_OTHER"
-                                                        : "unknown";
+  const int curPolicy = sched_getscheduler(0);
+  const char *policyName;
+  if (curPolicy == SCHED_FIFO)
+    policyName = "SCHED_FIFO";
+  else if (curPolicy == SCHED_RR)
+    policyName = "SCHED_RR";
+  else if (curPolicy == SCHED_OTHER)
+    policyName = "SCHED_OTHER";
+  else
+    policyName = "unknown";
 
   auto ok  = [](bool v) { return v ? "[OK]  " : "[FAIL]"; };
   auto rec = [](bool v) { return v ? "[OK]  " : "[WARN]"; };

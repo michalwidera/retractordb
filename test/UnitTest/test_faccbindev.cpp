@@ -21,7 +21,7 @@ class BinaryDeviceROTest : public ::testing::Test {
 
   void TearDown() override { std::filesystem::remove_all(sandBoxFolder); }
 
-  std::string sandboxPath(const std::string &name) const { return (sandBoxFolder / name).string(); }
+  [[nodiscard]] std::string sandboxPath(const std::string &name) const { return (sandBoxFolder / name).string(); }
 
   void writeBinaryFile(const std::string &path, const std::vector<uint8_t> &bytes) {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);

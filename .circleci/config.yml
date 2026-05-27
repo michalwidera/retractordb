@@ -180,7 +180,7 @@ commands:
         default: "make"
     steps:
       - run:
-          name: Conan install
+          name: Conan install (project dependencies)
           command: |
             source ~/.venv/bin/activate
             conan source .

@@ -12,7 +12,7 @@
 
 class qry_fake : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 } obj;
 
 boost::property_tree::ptree qry_fake::netClient(const std::string &arg1, const std::string &arg2) {
@@ -46,7 +46,7 @@ TEST(xqry, test_dir) { EXPECT_TRUE(obj.dir() == "|core0|1|123|345|/dev/location|
 
 class qry_fake_detail : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
 boost::property_tree::ptree qry_fake_detail::netClient(const std::string &arg1, const std::string &arg2) {
@@ -114,7 +114,7 @@ TEST(xqry, test_adhoc_success) {
 
 class qry_fake_adhoc_fail : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
 boost::property_tree::ptree qry_fake_adhoc_fail::netClient(const std::string &arg1, const std::string &arg2) {
@@ -135,10 +135,10 @@ TEST(xqry, test_adhoc_failure) {
 
 class qry_fake_hello_fail : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
-boost::property_tree::ptree qry_fake_hello_fail::netClient(const std::string &, const std::string &) {
+boost::property_tree::ptree qry_fake_hello_fail::netClient(const std::string &cmd, const std::string &arg) {
   boost::property_tree::ptree retval;
   retval.put("db", "unexpected_response");
   return retval;
@@ -152,10 +152,10 @@ TEST(xqry, test_hello_failure) {
 
 class qry_fake_hello_empty : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
-boost::property_tree::ptree qry_fake_hello_empty::netClient(const std::string &, const std::string &) { return {}; }
+boost::property_tree::ptree qry_fake_hello_empty::netClient(const std::string &cmd, const std::string &arg) { return {}; }
 
 // Verify hello() returns protocol_error when server responds with an empty payload
 TEST(xqry, test_hello_empty_response) {
@@ -197,7 +197,7 @@ TEST(xqry, test_dirYaml_exact_output) {
 
 class qry_fake_multi : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
 boost::property_tree::ptree qry_fake_multi::netClient(const std::string &arg1, const std::string &arg2) {
@@ -298,7 +298,7 @@ TEST(xqry, test_detailShow_exact_output) {
 
 class qry_fake_nosize : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
+  boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
 boost::property_tree::ptree qry_fake_nosize::netClient(const std::string &arg1, const std::string &arg2) {
