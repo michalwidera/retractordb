@@ -99,7 +99,7 @@ TEST_F(TextSourceROTest, test_read_float) {
 
   float value;
   std::memcpy(&value, buffer.get(), sizeof(float));
-  EXPECT_NEAR(value, 3.14f, 0.001f);
+  EXPECT_NEAR(value, 3.14F, 0.001F);
 }
 
 // Verify reading a double value
@@ -135,7 +135,7 @@ TEST_F(TextSourceROTest, test_read_uint) {
 
   unsigned value;
   std::memcpy(&value, buffer.get(), sizeof(unsigned));
-  GTEST_ASSERT_EQ(value, 100u);
+  GTEST_ASSERT_EQ(value, 100U);
 }
 
 // Verify reading BYTE type (read as unsigned, stored as uint8_t)
@@ -192,7 +192,7 @@ TEST_F(TextSourceROTest, test_read_missing_file_returns_null_row) {
   auto nulls = src->lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);
   EXPECT_TRUE(nulls[0]);
-  EXPECT_EQ(src->count(), 1u);
+  EXPECT_EQ(src->count(), 1U);
 }
 
 // ============================================================
@@ -269,7 +269,7 @@ TEST_F(TextSourceROTest, test_read_multi_field) {
 
   float floatVal;
   std::memcpy(&floatVal, buffer.get() + sizeof(int), sizeof(float));
-  EXPECT_NEAR(floatVal, 2.5f, 0.001f);
+  EXPECT_NEAR(floatVal, 2.5F, 0.001F);
 }
 
 // Verify null bitset exported by source for mixed token record
@@ -381,17 +381,17 @@ TEST_F(TextSourceROTest, test_count_increments) {
 
   auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
-  GTEST_ASSERT_EQ(src->count(), 0u);
+  GTEST_ASSERT_EQ(src->count(), 0U);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   src->read(buffer.get(), 0);
-  GTEST_ASSERT_EQ(src->count(), 1u);
+  GTEST_ASSERT_EQ(src->count(), 1U);
 
   src->read(buffer.get(), 0);
-  GTEST_ASSERT_EQ(src->count(), 2u);
+  GTEST_ASSERT_EQ(src->count(), 2U);
 
   src->read(buffer.get(), 0);
-  GTEST_ASSERT_EQ(src->count(), 3u);
+  GTEST_ASSERT_EQ(src->count(), 3U);
 }
 
 // ============================================================

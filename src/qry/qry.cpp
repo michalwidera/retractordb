@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <sstream>
@@ -180,12 +181,12 @@ std::string qry::dir() {
   }
   ss << "|\n";
 
-  char buffer[kDirLineBufferSize];
+  std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
   for (const auto &v : pt.get_child("db.stream")) {
-    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
+    sprintf(buffer.data(), ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
             v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
             v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
-    retval << buffer;
+    retval << buffer.data();
   }
 
   return retval.str();

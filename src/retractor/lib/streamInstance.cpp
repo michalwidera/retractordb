@@ -114,10 +114,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     auto locSrc = fp.rem;
     if (locSrc >= 0) {
       auto valueOpt = source->getPayload()->getItem(locSrc);
-      if (valueOpt.has_value())
-        result->setItem(flip ? lengthAbs - i - 1 : i, valueOpt.value());
-      else
-        result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
+      result->setItem(flip ? lengthAbs - i - 1 : i, valueOpt);
     } else
       result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
   }
@@ -343,7 +340,6 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::RATIONAL:
-      break;
     case rdb::FLOAT:
     case rdb::DOUBLE:
       break;

@@ -241,7 +241,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       if (t.getStrCommandID() == "PUSH_STREAM") {
         if (q.isDeclaration()) continue;
         std::string relation(q.id + " -> " + t.getStr_());
-        if (bShowStreamProgs) relation = "prg_" + relation;
+        if (bShowStreamProgs) relation.insert(0, "prg_");
         streamRelationsSet.insert(relation);
       }
     }
@@ -357,11 +357,9 @@ void presenter::onlyCompileShowProgram() {
       std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
       std::cout << '\n';
       for (auto tf : f.lProgram)
-        if (tf.getStrCommandID() == "PUSH_ID") {
+        if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL"))
           std::cout << "\t\t" << tf << '\n';
-        } else if ((tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf << '\n';
-        } else
+        else
           std::cout << "\t\t" << tf.getStrCommandID() << '\n';
     }
 
@@ -369,11 +367,9 @@ void presenter::onlyCompileShowProgram() {
       std::cout << "\tRULE " << r.name << '\n';
 
       for (auto tf1 : r.condition) {
-        if (tf1.getStrCommandID() == "PUSH_ID") {
+        if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL"))
           std::cout << "\t\t" << tf1 << '\n';
-        } else if ((tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf1 << '\n';
-        } else
+        else
           std::cout << "\t\t" << tf1.getStrCommandID() << '\n';
       }
 

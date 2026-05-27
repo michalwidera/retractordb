@@ -34,7 +34,7 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
   auto serialized   = gap.serialize();
   auto deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
   EXPECT_TRUE(deserialized.isGap);
-  EXPECT_EQ(deserialized.recordCount, 5u);
+  EXPECT_EQ(deserialized.recordCount, 5U);
   EXPECT_EQ(deserialized.nullBitset, gap.nullBitset);
 }
 
@@ -57,18 +57,18 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   meta.onRecordAppended(null_);    // rec 2
   meta.onRecordAppended(noNull_);  // rec 3 — forces recs 0-2 to disk
 
-  EXPECT_EQ(meta.segments().size(), 2u);
+  EXPECT_EQ(meta.segments().size(), 2U);
 
   meta.onRecordModified(1, noNull_);  // triggers rewriteFile
 
-  EXPECT_EQ(meta.totalRecords(), 4u);
+  EXPECT_EQ(meta.totalRecords(), 4U);
   EXPECT_EQ(meta.getNullBitset(0), null_);
   EXPECT_EQ(meta.getNullBitset(1), noNull_);
   EXPECT_EQ(meta.getNullBitset(2), null_);
   EXPECT_EQ(meta.getNullBitset(3), noNull_);
 
   // [null_,2] split → [null_,1][noNull_,1][null_,1] + pending [noNull_,1] = 4 segments
-  EXPECT_EQ(meta.segments().size(), 4u);
+  EXPECT_EQ(meta.segments().size(), 4U);
 }
 
 // ── Stress ───────────────────────────────────────────────────────────
@@ -115,15 +115,15 @@ TEST_F(MetaTestFixture, test_reset_clears_all_data) {
     std::vector<bool> pat = {true};
     for (int i = 0; i < 10; ++i)
       meta.onRecordAppended(pat);
-    EXPECT_EQ(meta.totalRecords(), 10u);
+    EXPECT_EQ(meta.totalRecords(), 10U);
     meta.reset();
-    EXPECT_EQ(meta.totalRecords(), 0u);
+    EXPECT_EQ(meta.totalRecords(), 0U);
     EXPECT_TRUE(meta.isEmpty());
   }
 
   rdb::metaDataStream meta(descriptor, metaFile);
   EXPECT_TRUE(meta.isEmpty());
-  EXPECT_EQ(meta.totalRecords(), 0u);
+  EXPECT_EQ(meta.totalRecords(), 0U);
 }
 
 // ── Gap + modify interaction ─────────────────────────────────────────
@@ -145,7 +145,7 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   meta.onRecordAppended(normal);  // rec 4
   meta.onRecordAppended(normal);  // rec 5
 
-  EXPECT_EQ(meta.totalRecords(), 6u);
+  EXPECT_EQ(meta.totalRecords(), 6U);
 
   EXPECT_FALSE(meta.isGapBefore(0));
   EXPECT_FALSE(meta.isGapBefore(1));
@@ -156,7 +156,7 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   {
     auto segs     = meta.segments();
     size_t gapCnt = std::count_if(segs.begin(), segs.end(), [](const auto &e) { return e.isGap; });
-    EXPECT_EQ(gapCnt, 2u);
+    EXPECT_EQ(gapCnt, 2U);
   }
 
   meta.onRecordModified(2, normal);
@@ -181,12 +181,12 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
     meta.onTransmissionGap();
 
     auto e = meta.segments();
-    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
+    EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2U);
   }
 
   rdb::metaDataStream meta(descriptor, metaFile);
   auto e = meta.segments();
-  EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2u);
+  EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2U);
 }
 
 // ── Lazy overwrite (tailDirty_) ──────────────────────────────────────
@@ -198,7 +198,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_file_size_stable) {
 
   // entrySize for 1 field: uint8_t(1) + size_t(8) + size_t(8) + ceil(1/8)(1) = 18
   // kHeaderSize = sizeof(int64_t) = 8
-  constexpr std::uintmax_t kExpectedSize = 8u + 18u;
+  constexpr std::uintmax_t kExpectedSize = 8U + 18U;
 
   rdb::metaDataStream meta(descriptor, metaFile);
   std::vector<bool> patA = {true};
@@ -235,7 +235,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_persistence) {
   }
 
   rdb::metaDataStream meta(descriptor, metaFile);
-  EXPECT_EQ(meta.totalRecords(), 4u);
+  EXPECT_EQ(meta.totalRecords(), 4U);
   for (int i = 0; i < 4; ++i)
     EXPECT_EQ(meta.getNullBitset(i), patA) << "rec " << i;
 }
@@ -257,12 +257,12 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
   meta.onTransmissionGap();     // must overwrite [A,3]→[A,4] then append gap
 
   auto committed = meta.segments();
-  ASSERT_EQ(committed.size(), 2u);
+  ASSERT_EQ(committed.size(), 2U);
   EXPECT_FALSE(committed[0].isGap);
-  EXPECT_EQ(committed[0].recordCount, 4u);
+  EXPECT_EQ(committed[0].recordCount, 4U);
   EXPECT_TRUE(committed[1].isGap);
   EXPECT_TRUE(meta.isGapBefore(4));
-  EXPECT_EQ(meta.totalRecords(), 4u);
+  EXPECT_EQ(meta.totalRecords(), 4U);
 }
 
 // ── metaDataStream::rotate() ────────────────────────────────────────────────
@@ -290,12 +290,12 @@ TEST_F(RotateFixture, rotate_renames_file_and_clears_state) {
   }
 
   rdb::metaDataStream m(descriptor, meta);
-  ASSERT_EQ(m.totalRecords(), 3u);
+  ASSERT_EQ(m.totalRecords(), 3U);
 
   m.rotate(0);
 
   EXPECT_TRUE(m.isEmpty());
-  EXPECT_EQ(m.totalRecords(), 0u);
+  EXPECT_EQ(m.totalRecords(), 0U);
   EXPECT_TRUE(std::filesystem::exists(metaOld0));
   EXPECT_TRUE(std::filesystem::exists(meta));
 }
@@ -309,7 +309,7 @@ TEST_F(RotateFixture, rotate_negative_percounter_resets_without_rename) {
   }
 
   rdb::metaDataStream m(descriptor, meta);
-  ASSERT_EQ(m.totalRecords(), 2u);
+  ASSERT_EQ(m.totalRecords(), 2U);
 
   m.rotate(-1);
 
@@ -331,7 +331,7 @@ TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
   }
 
   rdb::metaDataStream old(descriptor, metaOld1);
-  EXPECT_EQ(old.totalRecords(), 2u);
+  EXPECT_EQ(old.totalRecords(), 2U);
   EXPECT_EQ(old.getNullBitset(0), (std::vector<bool>{false}));
   EXPECT_EQ(old.getNullBitset(1), (std::vector<bool>{true}));
 }
@@ -349,7 +349,7 @@ TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
 
   m.onRecordAppended({false});
   m.onRecordAppended({true});
-  EXPECT_EQ(m.totalRecords(), 2u);
+  EXPECT_EQ(m.totalRecords(), 2U);
   EXPECT_EQ(m.getNullBitset(1), (std::vector<bool>{true}));
 }
 
@@ -377,12 +377,12 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
   meta.flushCurrentEntry();     // overwrite [B,1]→[B,3]
 
   auto committed = meta.segments();
-  ASSERT_EQ(committed.size(), 2u);
+  ASSERT_EQ(committed.size(), 2U);
   EXPECT_EQ(committed[0].nullBitset, patA);
-  EXPECT_EQ(committed[0].recordCount, 5u);
+  EXPECT_EQ(committed[0].recordCount, 5U);
   EXPECT_EQ(committed[1].nullBitset, patB);
-  EXPECT_EQ(committed[1].recordCount, 3u);
-  EXPECT_EQ(meta.totalRecords(), 8u);
+  EXPECT_EQ(committed[1].recordCount, 3U);
+  EXPECT_EQ(meta.totalRecords(), 8U);
 }
 
 // ── tailDirty_ + onRecordModified interaction ────────────────────────
@@ -415,7 +415,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
 
   meta.flushCurrentEntry();  // flush suffix {A,2}
 
-  ASSERT_EQ(meta.totalRecords(), 4u);
+  ASSERT_EQ(meta.totalRecords(), 4U);
   EXPECT_EQ(meta.getNullBitset(0), A);  // prefix
   EXPECT_EQ(meta.getNullBitset(1), B);  // modified
   EXPECT_EQ(meta.getNullBitset(2), A);  // suffix
@@ -423,11 +423,11 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
 
   // Disk must contain exactly 3 segments: [{A,1},{B,1},{A,2}].
   auto segs = meta.segments();
-  ASSERT_EQ(segs.size(), 3u);
-  EXPECT_EQ(segs[0].recordCount, 1u);
+  ASSERT_EQ(segs.size(), 3U);
+  EXPECT_EQ(segs[0].recordCount, 1U);
   EXPECT_EQ(segs[0].nullBitset, A);
-  EXPECT_EQ(segs[1].recordCount, 1u);
+  EXPECT_EQ(segs[1].recordCount, 1U);
   EXPECT_EQ(segs[1].nullBitset, B);
-  EXPECT_EQ(segs[2].recordCount, 2u);
+  EXPECT_EQ(segs[2].recordCount, 2U);
   EXPECT_EQ(segs[2].nullBitset, A);
 }

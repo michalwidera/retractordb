@@ -159,13 +159,13 @@ size_t DESCParser::DescContext::getRuleIndex() const {
 }
 
 void DESCParser::DescContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterDesc(this);
 }
 
 void DESCParser::DescContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitDesc(this);
 }
@@ -242,12 +242,12 @@ tree::TerminalNode* DESCParser::UnsignedIDContext::DECIMAL() {
 DESCParser::UnsignedIDContext::UnsignedIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::UnsignedIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterUnsignedID(this);
 }
 void DESCParser::UnsignedIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitUnsignedID(this);
 }
@@ -264,12 +264,12 @@ tree::TerminalNode* DESCParser::TypeIDContext::ID() {
 DESCParser::TypeIDContext::TypeIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::TypeIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeID(this);
 }
 void DESCParser::TypeIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeID(this);
 }
@@ -290,12 +290,12 @@ tree::TerminalNode* DESCParser::StringIDContext::DECIMAL() {
 DESCParser::StringIDContext::StringIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::StringIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterStringID(this);
 }
 void DESCParser::StringIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStringID(this);
 }
@@ -316,12 +316,12 @@ tree::TerminalNode* DESCParser::IntegerIDContext::DECIMAL() {
 DESCParser::IntegerIDContext::IntegerIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::IntegerIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterIntegerID(this);
 }
 void DESCParser::IntegerIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitIntegerID(this);
 }
@@ -342,12 +342,12 @@ tree::TerminalNode* DESCParser::RetentionIDContext::DECIMAL(size_t i) {
 DESCParser::RetentionIDContext::RetentionIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::RetentionIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRetentionID(this);
 }
 void DESCParser::RetentionIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRetentionID(this);
 }
@@ -364,12 +364,12 @@ tree::TerminalNode* DESCParser::RetentionMemoryIDContext::DECIMAL() {
 DESCParser::RetentionMemoryIDContext::RetentionMemoryIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::RetentionMemoryIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRetentionMemoryID(this);
 }
 void DESCParser::RetentionMemoryIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRetentionMemoryID(this);
 }
@@ -390,12 +390,12 @@ tree::TerminalNode* DESCParser::RationalIDContext::DECIMAL() {
 DESCParser::RationalIDContext::RationalIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::RationalIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRationalID(this);
 }
 void DESCParser::RationalIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRationalID(this);
 }
@@ -416,12 +416,12 @@ tree::TerminalNode* DESCParser::ByteIDContext::DECIMAL() {
 DESCParser::ByteIDContext::ByteIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::ByteIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterByteID(this);
 }
 void DESCParser::ByteIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitByteID(this);
 }
@@ -438,12 +438,12 @@ tree::TerminalNode* DESCParser::RefIDContext::FILENAME() {
 DESCParser::RefIDContext::RefIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::RefIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRefID(this);
 }
 void DESCParser::RefIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRefID(this);
 }
@@ -464,12 +464,12 @@ tree::TerminalNode* DESCParser::FloatIDContext::DECIMAL() {
 DESCParser::FloatIDContext::FloatIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::FloatIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFloatID(this);
 }
 void DESCParser::FloatIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFloatID(this);
 }
@@ -490,12 +490,12 @@ tree::TerminalNode* DESCParser::DoubleIDContext::DECIMAL() {
 DESCParser::DoubleIDContext::DoubleIDContext(CommandContext *ctx) { copyFrom(ctx); }
 
 void DESCParser::DoubleIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterDoubleID(this);
 }
 void DESCParser::DoubleIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<DESCListener *>(listener);
+  auto *parserListener = dynamic_cast<DESCListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitDoubleID(this);
 }

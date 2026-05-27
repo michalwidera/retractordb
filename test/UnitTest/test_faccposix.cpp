@@ -11,7 +11,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccposix.hpp"
 
-typedef unsigned char BYTE;
+using BYTE = unsigned char;
 
 // Helper: create a single-field Descriptor of given byte size (BYTE type)
 static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
@@ -61,7 +61,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()); // NOLINT(modernize-return-braced-init-list)
 }
 
 struct fileInfo {

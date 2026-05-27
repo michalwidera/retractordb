@@ -33,7 +33,7 @@ TEST(payload, position_conversion_case_3_with_payload) {
   EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2).value()) == 25);
   EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3).value()) == 26);
   EXPECT_TRUE(std::any_cast<int>(payload.getItem(4).value()) == 2000);
-  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()).c_str() == std::string("test"));
+  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()) == std::string("test"));
 
   std::stringstream coutstring;
   coutstring << rdb::singleLineFormat << payload;

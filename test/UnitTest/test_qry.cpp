@@ -12,14 +12,14 @@
 
 class qry_fake : public qry {
  public:
-  boost::property_tree::ptree netClient(const std::string &, const std::string &);
+  boost::property_tree::ptree netClient(const std::string &, const std::string &) override;
 } obj;
 
 boost::property_tree::ptree qry_fake::netClient(const std::string &arg1, const std::string &arg2) {
   boost::property_tree::ptree retval;
 
   retval.put("db.message", arg1);
-  if (arg2 != "") retval.put("db.argument", arg2);
+  if (!arg2.empty()) retval.put("db.argument", arg2);
   retval.put("db.id", "core0");
 
   retval.put("db.stream.core0", "core0");

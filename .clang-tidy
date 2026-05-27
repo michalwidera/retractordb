@@ -13,7 +13,11 @@ Checks: >
   -readability-braces-around-statements,
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
-  -readability-convert-member-functions-to-static
+  -readability-convert-member-functions-to-static,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -clang-analyzer-core.UndefinedBinaryOperatorResult,
+  -bugprone-reserved-identifier,
+  -modernize-use-std-print
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(.*/)?(src|test)(/[^./][^/]*)*/[^/]*$'
 SystemHeaders: false

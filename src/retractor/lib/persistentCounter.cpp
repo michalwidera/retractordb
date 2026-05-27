@@ -17,7 +17,7 @@ PersistentCounter::~PersistentCounter() {
   try {
     increment();
     save();
-  } catch (...) {
+  } catch (...) {  // NOLINT(bugprone-empty-catch)
     // Destructor must not throw
   }
 }

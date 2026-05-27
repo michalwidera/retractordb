@@ -20,11 +20,11 @@ TEST(Rationalize, whole_number) { EXPECT_EQ(Rationalize(3.0), boost::rational<in
 
 TEST(nullFallbackValue, byte) { EXPECT_EQ(std::get<uint8_t>(nullFallbackValue(rdb::BYTE)), 0); }
 TEST(nullFallbackValue, integer) { EXPECT_EQ(std::get<int>(nullFallbackValue(rdb::INTEGER)), 0); }
-TEST(nullFallbackValue, uint) { EXPECT_EQ(std::get<unsigned>(nullFallbackValue(rdb::UINT)), 0u); }
+TEST(nullFallbackValue, uint) { EXPECT_EQ(std::get<unsigned>(nullFallbackValue(rdb::UINT)), 0U); }
 TEST(nullFallbackValue, rational) {
   EXPECT_EQ(std::get<boost::rational<int>>(nullFallbackValue(rdb::RATIONAL)), boost::rational<int>(0, 1));
 }
-TEST(nullFallbackValue, float_type) { EXPECT_EQ(std::get<float>(nullFallbackValue(rdb::FLOAT)), 0.0f); }
+TEST(nullFallbackValue, float_type) { EXPECT_EQ(std::get<float>(nullFallbackValue(rdb::FLOAT)), 0.0F); }
 TEST(nullFallbackValue, double_type) { EXPECT_EQ(std::get<double>(nullFallbackValue(rdb::DOUBLE)), 0.0); }
 TEST(nullFallbackValue, intpair) {
   using P  = std::pair<int, int>;
@@ -59,15 +59,15 @@ TEST(any_to_variant_cast, uint8_input) {
 }
 TEST(any_to_variant_cast, unsigned_input) {
   auto result = any_to_variant_cast(std::any(unsigned(99)));
-  EXPECT_EQ(std::get<unsigned>(result), 99u);
+  EXPECT_EQ(std::get<unsigned>(result), 99U);
 }
 TEST(any_to_variant_cast, double_input) {
   auto result = any_to_variant_cast(std::any(3.14));
   EXPECT_DOUBLE_EQ(std::get<double>(result), 3.14);
 }
 TEST(any_to_variant_cast, float_input) {
-  auto result = any_to_variant_cast(std::any(1.5f));
-  EXPECT_FLOAT_EQ(std::get<float>(result), 1.5f);
+  auto result = any_to_variant_cast(std::any(1.5F));
+  EXPECT_FLOAT_EQ(std::get<float>(result), 1.5F);
 }
 TEST(any_to_variant_cast, string_input) {
   auto result = any_to_variant_cast(std::any(std::string("hello")));
@@ -113,13 +113,13 @@ TEST(cast_variant, double_to_integer) {
 }
 TEST(cast_variant, float_to_double) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = float(1.5f);
-  EXPECT_DOUBLE_EQ(std::get<double>(c(in, rdb::DOUBLE)), double(1.5f));
+  rdb::descFldVT in = float(1.5F);
+  EXPECT_DOUBLE_EQ(std::get<double>(c(in, rdb::DOUBLE)), double(1.5F));
 }
 TEST(cast_variant, uint8_to_uint) {
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = uint8_t(42);
-  EXPECT_EQ(std::get<unsigned>(c(in, rdb::UINT)), 42u);
+  EXPECT_EQ(std::get<unsigned>(c(in, rdb::UINT)), 42U);
 }
 TEST(cast_variant, string_numeric_to_integer) {
   cast<rdb::descFldVT> c;
@@ -134,7 +134,7 @@ TEST(cast_variant, string_float_to_double) {
 TEST(cast_variant, rational_to_float) {
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = boost::rational<int>(1, 2);
-  EXPECT_FLOAT_EQ(std::get<float>(c(in, rdb::FLOAT)), 0.5f);
+  EXPECT_FLOAT_EQ(std::get<float>(c(in, rdb::FLOAT)), 0.5F);
 }
 
 // ── cast<descFldVT> — STRING ──────────────────────────────────────────────────

@@ -42,7 +42,6 @@ struct memoryFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
 
- private:
   memoryFile()                                    = delete;
   memoryFile(const memoryFile &)                  = delete;
   const memoryFile &operator=(const memoryFile &) = delete;

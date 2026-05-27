@@ -68,13 +68,13 @@ const rdb::descFldVT &logicResultTypeRef(const rdb::descFldVT &a, const rdb::des
 }
 
 pairVar normalize(const rdb::descFldVT &a, const rdb::descFldVT &b) {
-  if (a.index() == b.index()) return pairVar(a, b);
+  if (a.index() == b.index()) return {a, b};
 
   pairVar retVal;
   if (a.index() > b.index()) {
-    return pairVar(a, castFldVT(b, static_cast<rdb::descFld>(a.index())));
+    return {a, castFldVT(b, static_cast<rdb::descFld>(a.index()))};
   }
-  return pairVar(castFldVT(a, static_cast<rdb::descFld>(b.index())), b);
+  return {castFldVT(a, static_cast<rdb::descFld>(b.index())), b};
 }
 
 rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {

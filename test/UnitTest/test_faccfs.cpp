@@ -11,7 +11,7 @@
 
 // ctest -R '^ut-test_faccfs' -V
 
-typedef unsigned char BYTE;
+using BYTE = unsigned char;
 
 static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
 
@@ -67,7 +67,7 @@ TEST_F(FaccfsTest, count_returns_zero_for_new_file) {
   std::ofstream(sandboxPath(filename), std::ios::binary).close();
 
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
-  EXPECT_EQ(gf.count(), 0u);
+  EXPECT_EQ(gf.count(), 0U);
 }
 
 TEST_F(FaccfsTest, count_returns_correct_number_of_records) {
@@ -84,7 +84,7 @@ TEST_F(FaccfsTest, count_returns_correct_number_of_records) {
   std::memcpy(data, "record ccc", AREA_SIZE);
   ASSERT_EQ(gf.write(data), EXIT_SUCCESS);
 
-  EXPECT_EQ(gf.count(), 3u);
+  EXPECT_EQ(gf.count(), 3U);
 }
 
 TEST_F(FaccfsTest, count_after_update_does_not_change) {
@@ -97,13 +97,13 @@ TEST_F(FaccfsTest, count_after_update_does_not_change) {
   std::memcpy(data, "record bbb", AREA_SIZE);
   gf.write(data);
 
-  EXPECT_EQ(gf.count(), 2u);
+  EXPECT_EQ(gf.count(), 2U);
 
   // Update record 0 (in-place) should not change count
   std::memcpy(data, "record xxx", AREA_SIZE);
   gf.write(data, 0);
 
-  EXPECT_EQ(gf.count(), 2u);
+  EXPECT_EQ(gf.count(), 2U);
 }
 
 // ============================================================
@@ -134,7 +134,7 @@ TEST_F(FaccfsTest, append_multiple_and_read_back) {
     ASSERT_EQ(gf.write(data), EXIT_SUCCESS);
   }
 
-  EXPECT_EQ(gf.count(), 4u);
+  EXPECT_EQ(gf.count(), 4U);
 
   for (size_t i = 0; i < 4; ++i) {
     uint8_t rData[10] = {};
@@ -309,7 +309,7 @@ TEST_F(FaccfsTest, single_byte_record_size) {
   w = 0xCD;
   ASSERT_EQ(gf.write(&w), EXIT_SUCCESS);
 
-  EXPECT_EQ(gf.count(), 2u);
+  EXPECT_EQ(gf.count(), 2U);
 
   uint8_t r = 0;
   gf.read(&r, 0);
@@ -334,7 +334,7 @@ TEST_F(FaccfsTest, large_record_size) {
   std::memset(wData.data(), 0xBB, LARGE);
   ASSERT_EQ(gf.write(wData.data()), EXIT_SUCCESS);
 
-  EXPECT_EQ(gf.count(), 2u);
+  EXPECT_EQ(gf.count(), 2U);
 
   std::vector<uint8_t> rData(LARGE, 0);
   gf.read(rData.data(), 0);
@@ -376,14 +376,14 @@ TEST_F(FaccfsTest, append_and_update_first_record) {
   std::memcpy(data, "second rec", AREA_SIZE);
   gf.write(data);
 
-  EXPECT_EQ(gf.count(), 2u);
+  EXPECT_EQ(gf.count(), 2U);
 
   // Update first record at position 0
   std::memcpy(data, "MODIFIED!a", AREA_SIZE);
   gf.write(data, 0);
 
   // Count should remain the same
-  EXPECT_EQ(gf.count(), 2u);
+  EXPECT_EQ(gf.count(), 2U);
 
   uint8_t rData[10] = {};
   gf.read(rData, 0);

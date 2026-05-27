@@ -98,7 +98,7 @@ class xschema : public ::testing::Test {
     pProc = dataArea.get();
   }
 
-  virtual ~xschema() override { pProc = nullptr; }
+  ~xschema() override { pProc = nullptr; }
 
   void SetUp() override { SPDLOG_INFO("SetUp"); }
 
@@ -123,7 +123,7 @@ TEST_F(xschema, check_construct_payload) {
     coutstring1 << rdb::singleLineFormat << payload.get()->descriptor;
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << *(payload.get());
-    std::cerr << rdb::singleLineFormat << *(payload.get()) << std::endl;
+    std::cerr << rdb::singleLineFormat << *(payload.get()) << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:null str1_2:null str1_3:null }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -149,7 +149,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
 
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << *(payload.get());
-    std::cout << rdb::singleLineFormat << *(payload.get()) << std::endl;
+    std::cout << rdb::singleLineFormat << *(payload.get()) << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:null str1_1:null str1_2:null str1_3:11 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -181,11 +181,11 @@ TEST_F(xschema, check_sum) {
 
     std::stringstream coutstring1;
     coutstring1 << rdb::singleLineFormat << payload.descriptor;
-    std::cout << coutstring1.str() << std::endl;
+    std::cout << coutstring1.str() << '\n';
 
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << payload;
-    std::cout << "!" << coutstring2.str() << std::endl;
+    std::cout << "!" << coutstring2.str() << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:16 str2_0:333 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");
@@ -194,7 +194,7 @@ TEST_F(xschema, check_sum) {
 
 auto print(const std::vector<rdb::descFldVT> &row) {
   std::string res("{ ");
-  for (auto &v : row) {
+  for (const auto &v : row) {
     std::stringstream coutstring;
 
     std::visit(Overload{                                                                                                    //
@@ -310,7 +310,7 @@ std::unique_ptr<dataModel> dataArea_rules;
 class xschema_rules : public ::testing::Test {
  protected:
   xschema_rules() {
-    for (auto f :
+    for (const auto *f :
          {"rule_marker1.txt", "rule_marker2.txt", "str_rule", "str_rule.desc", "rules_core0.desc", "datafile1.txt.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
 
@@ -339,7 +339,7 @@ class xschema_all_null : public ::testing::Test {
   xschema_all_null() {
     // Destroy first so its metaDataStream flushes before files are removed
     dataArea_null.reset();
-    for (auto f : {"core0.desc", "core1.desc", "str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
+    for (const auto *f : {"core0.desc", "core1.desc", "str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
@@ -389,7 +389,7 @@ class xschema_partial_null : public ::testing::Test {
  protected:
   xschema_partial_null() {
     dataArea_null.reset();
-    for (auto f : {"core0.desc", "core1.desc", "str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
+    for (const auto *f : {"core0.desc", "core1.desc", "str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
@@ -464,7 +464,7 @@ class xschema_compare_restore : public ::testing::Test {
  protected:
   xschema_compare_restore() {
     dataArea_null.reset();
-    for (auto f : {"str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
+    for (const auto *f : {"str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");

@@ -41,6 +41,18 @@ find_package(GTest CONFIG REQUIRED)
 find_package(antlr4 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 
+# Oznacz wszystkie importowane targety (Conan) jako systemowe — clang-tidy z
+# SystemHeaders:false pomija ich nagłówki (brak ostrzeżeń i notatek z .conan2/).
+get_property(_imported_targets DIRECTORY . PROPERTY IMPORTED_TARGETS)
+foreach(_target ${_imported_targets})
+  if(TARGET ${_target})
+    get_target_property(_inc ${_target} INTERFACE_INCLUDE_DIRECTORIES)
+    if(_inc)
+      set_target_properties(${_target} PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_inc}")
+    endif()
+  endif()
+endforeach()
+
 find_program(PROG_VALGRIND valgrind REQUIRED)
 message(STATUS "Required tool: ${PROG_VALGRIND}")
 

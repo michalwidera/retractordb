@@ -1,6 +1,6 @@
 #include "rdb/payload.hpp"
 
-#define BOOST_STACKTRACE_USE_BACKTRACE
+#define BOOST_STACKTRACE_USE_ADDR2LINE
 
 #include <spdlog/spdlog.h>
 
@@ -28,7 +28,7 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
       std::stringstream message;
       message << boost::stacktrace::stacktrace();
       SPDLOG_ERROR("Stack: {}", message.str());
-      std::cerr << message.str() << std::endl;
+      std::cerr << message.str() << '\n';
     }
     FatalError("payload: flat position out of range");
   }
@@ -38,7 +38,7 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
     FatalError("payload: {} conversion failed for flat position {}", context, positionFlat);
   }
 
-  const auto position = positionOpt->first;
+  const auto position = positionOpt->first;  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
   if (position < 0 || position >= static_cast<int>(descriptor.size())) {
     FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
   }
@@ -107,8 +107,7 @@ void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldNa
 // default constructor
 
 payload::payload(const Descriptor &descriptor) : descriptor(descriptor) {
-  payloadData_ = std::make_unique<uint8_t[]>(descriptor.getSizeInBytes());
-  std::fill(span().begin(), span().end(), 0);
+  payloadData_.assign(descriptor.getSizeInBytes(), 0);
 
   nullBitset_.resize(descriptor.size(), false);
 }
@@ -117,7 +116,7 @@ payload::payload(const Descriptor &descriptor) : descriptor(descriptor) {
 
 payload::payload(const payload &other) {
   descriptor   = other.descriptor;
-  payloadData_ = std::make_unique<uint8_t[]>(other.descriptor.getSizeInBytes());
+  payloadData_.assign(other.descriptor.getSizeInBytes(), 0);
   std::copy(other.span().begin(), other.span().end(), span().begin());
   nullBitset_ = other.nullBitset_;
 }
@@ -143,8 +142,7 @@ payload &payload::operator=(const Descriptor &other) {
   if (descriptor.empty()) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
     descriptor   = other;
-    payloadData_ = std::make_unique<uint8_t[]>(other.getSizeInBytes());
-    std::fill(span().begin(), span().end(), 0);
+    payloadData_.assign(other.getSizeInBytes(), 0);
     nullBitset_.assign(descriptor.size(), false);
   } else {
     if (descriptor == other) {  // compare rlen and rtype only here
@@ -196,13 +194,13 @@ void payload::setNullBitset(const std::vector<bool> &nullBitset) {
   nullBitset_ = nullBitset;
 }
 
-std::span<uint8_t> payload::span() { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
+std::span<uint8_t> payload::span() { return {payloadData_.data(), descriptor.getSizeInBytes()}; }
 
-std::span<const uint8_t> payload::span() const { return {payloadData_.get(), descriptor.getSizeInBytes()}; }
+std::span<const uint8_t> payload::span() const { return {payloadData_.data(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
-void payload::setItemBy(const int positionFlat, std::optional<std::any> value) {
-  T data          = std::any_cast<T>(value.value());
+void payload::setItemBy(const int positionFlat, std::any value) {
+  T data          = std::any_cast<T>(value);
   auto position   = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
   auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);
   auto dest       = span().subspan(offsetFlat, descriptor[position].rlen);
@@ -437,12 +435,12 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
         if (!value.has_value()) FatalError("payload: non-null array field returned no value for flat element");
-        writeValue(os, value.value(), r.rtype, rhs.hexFormat_);
+        writeValue(os, value.value(), r.rtype, rhs.hexFormat_);  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
         if (i < flatCountForField - 1) os << " ";
       }
       flatIndex += flatCountForField;
     }
-    if (!Descriptor::isSingleLineOutput()) os << std::endl;
+    if (!Descriptor::isSingleLineOutput()) os << '\n';
   }
   if (rhs.descriptor.empty()) {
     os << "Empty";
@@ -450,7 +448,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
   }
   if (Descriptor::isSingleLineOutput()) os << " ";
   os << "}";
-  if (!Descriptor::isSingleLineOutput()) os << std::endl;
+  if (!Descriptor::isSingleLineOutput()) os << '\n';
   Descriptor::setSingleLineOutput(false);
   return os;
 }

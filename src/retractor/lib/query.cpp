@@ -176,7 +176,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
   }
 
   if (!retention.noRetention()) {
-    retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
+    retVal += rdb::Descriptor("", static_cast<int>(retention.segments), static_cast<int>(retention.capacity), rdb::RETENTION);
   }
   return retVal;
 }

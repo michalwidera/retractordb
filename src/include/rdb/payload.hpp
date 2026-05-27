@@ -1,7 +1,6 @@
 #pragma once
 
 #include <any>
-#include <memory>  // std::unique_ptr
 #include <optional>
 #include <span>
 #include <vector>
@@ -26,13 +25,13 @@ namespace rdb {
 /// This is accessor for payload memory area that supports applying descriptor type over memory area.
 class payload {
   /// @brief Payload memory area
-  std::unique_ptr<uint8_t[]> payloadData_;
+  std::vector<uint8_t> payloadData_;
 
   /// @brief Type of dumped or read numeric formats
   bool hexFormat_ = false;
 
   template <typename T>
-  void setItemBy(int position, std::optional<std::any> value);
+  void setItemBy(int position, std::any value);
 
   payload &operator=(const Descriptor &other);
 

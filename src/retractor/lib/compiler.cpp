@@ -172,13 +172,13 @@ std::string compiler::resolveStreamIntervals() {
     if (!bOnceAgain) break;
     if (unresolvedCount >= prevUnresolved) {
       SPDLOG_ERROR("Circular dependency: stream interval resolution stalled with {} unresolved streams", unresolvedCount);
-      return std::string("Circular dependency in stream definitions");
+      return {"Circular dependency in stream definitions"};
     }
     prevUnresolved = unresolvedCount;
     coreInstance.sort();
   }  // while(true)
   coreInstance.sort();
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
@@ -252,7 +252,7 @@ std::string compiler::extractIntermediateStreams() {
       }  // Endfor
     }  // Endif
   }  // Endfor
-  return std::string("OK");
+  return {"OK"};
 }
 
 // Goal of this procedure is to unroll schema based of given command
@@ -265,9 +265,7 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
         coreInstance.getQuery(sName2).descriptorStorage().flatElementCount())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
     lRetVal = coreInstance.getQuery(sName1).lSchema;
-  } else if (cmd == STREAM_DEHASH_DIV)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
-  else if (cmd == STREAM_DEHASH_MOD)
+  } else if (cmd == STREAM_DEHASH_DIV || cmd == STREAM_DEHASH_MOD)
     lRetVal = coreInstance.getQuery(sName1).lSchema;
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
@@ -327,15 +325,7 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
   int offset(0);
   for (auto &f : lRetVal) {
     std::stringstream s;
-    if (cmd == STREAM_HASH)
-      s << sName1;
-    else if (cmd == STREAM_TIMEMOVE)
-      s << sName1;
-    else if (cmd == STREAM_AGSE)
-      s << sName1;
-    else {
-      s << sName1;  // generateStreamName( sName2, sName1, cmd ) ;
-    }
+    s << sName1;  // generateStreamName( sName2, sName1, cmd )
     s << "[";
     s << offset++;
     s << "]";
@@ -400,7 +390,7 @@ std::string compiler::expandSchemaWildcards() {
     }
   }
   coreInstance.sort();
-  return std::string("OK");
+  return {"OK"};
 }
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
@@ -451,7 +441,7 @@ std::string compiler::expandIndexWildcards() {
       }
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
@@ -586,7 +576,7 @@ std::string compiler::resolveFieldReferences() {
       resolveTokenReferences(r.condition, q);  // for each token in rule
     }  // end for each rule in query
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 /* This function will convert fields list where stream a from b#c
@@ -628,7 +618,7 @@ std::string compiler::localizeFieldOffsets() {
       }
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::validateConstraints() {
@@ -664,7 +654,7 @@ std::string compiler::validateConstraints() {
                    GetStringcommand_id(cmd.getCommandID()), q.id);
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> &capMap) {
@@ -675,7 +665,7 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
     }
     coreInstance[q.first].policy.second = q.second;  // set memory size
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::map<std::string, int> compiler::computeRequiredCapacities() {
@@ -728,7 +718,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         }
         length                    = abs(length);
         const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().flatElementCount();
-        const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 2;
+        const auto timeBufferSize = static_cast<int>(ceil(static_cast<double>(length + step) / static_cast<double>(lengthOfSrc))) + 2;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;
@@ -802,7 +792,7 @@ std::string compiler::deduplicateSubstrats() {
       if (changed) break;
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::compile() {
@@ -837,7 +827,7 @@ std::string compiler::compile() {
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
   if (result != "OK") return result;
 
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::vector<std::string> compiler::importFrom(qTree &source) {

@@ -312,7 +312,7 @@ boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6
     startx = 1 / diff;
     if (startx > (1 / DIFF)) break;
   }
-  if (st.empty()) return boost::rational<int>(0, 1);
+  if (st.empty()) return {0, 1};
   boost::rational<int> result1(0, 1);
   boost::rational<int> result2(0, 1);
   while (!st.empty()) {

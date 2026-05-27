@@ -39,7 +39,6 @@ struct genericBinaryFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
 
- private:
   genericBinaryFile()                                           = delete;
   genericBinaryFile(const genericBinaryFile &)                  = delete;
   const genericBinaryFile &operator=(const genericBinaryFile &) = delete;
