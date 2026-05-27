@@ -86,6 +86,16 @@ append_unique() {
     return 0
 }
 
+ensure_venv() {
+    if [ ! -d "$HOME/.venv" ]; then
+        python3 -m venv ~/.venv
+    fi
+    export PATH="$HOME/.venv/bin:$PATH"
+    # shellcheck source=/dev/null
+    source ~/.venv/bin/activate
+    pip install --upgrade pip
+}
+
 install_conan_if_missing() {
     if command_exists conan; then
         return 0
@@ -96,11 +106,8 @@ install_conan_if_missing() {
         return 0
     fi
 
-    python3 -m venv ~/.venv
-    ~/.venv/bin/pip install --upgrade pip
-    ~/.venv/bin/pip install conan
-    export PATH="$HOME/.venv/bin:$PATH"
-
+    ensure_venv
+    pip install conan
     command_exists conan
 }
 
@@ -672,16 +679,8 @@ run_option() {
             conan build $build_folder -s build_type=Debug --build missing
             ;;
         "toolchain"|"toolchain_all")
-            if ! command_exists conan; then
-                install_conan_if_missing || { echo "Error: Failed to install conan"; exit 1; }
-            fi
-            python3 -m venv ~/.venv
-            source ~/.venv/bin/activate
-            pip3 install --upgrade pip 
-            if ! command_exists conan; then
-                pip3 install conan
-            fi
-            if [ ! -f ~/.conan2/profiles/default ] ; then conan profile detect ; fi
+            ensure_venv
+            if [ ! -f ~/.conan2/profiles/default ]; then conan profile detect; fi
             conan profile show
             echo "-- Verifying C++23 support..."
             if ! check_cxx23; then
@@ -696,15 +695,7 @@ run_option() {
             fi
             ;;
         "toolchain_required")
-            if ! command_exists conan; then
-                install_conan_if_missing || { echo "Error: Failed to install conan"; exit 1; }
-            fi
-            python3 -m venv ~/.venv
-            source ~/.venv/bin/activate
-            pip3 install --upgrade pip
-            if ! command_exists conan; then
-                pip3 install conan
-            fi
+            ensure_venv
             echo "-- Minimal CI-like toolchain installation complete."
             ;;
         "validate")

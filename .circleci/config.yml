@@ -133,12 +133,7 @@ commands:
       - run:
           name: Install build toolchain (minimal, CI only)
           command: |
-            scripts/buildrdb.sh toolchain_required
-      - run:
-          name: Install Conan toolchain
-          command: |
-            source ~/.venv/bin/activate
-            scripts/buildrdb.sh conan
+            scripts/buildrdb.sh toolchain_required conan
       - run:
           name: Validate installed toolchain
           command: |
@@ -160,12 +155,7 @@ commands:
           name: Install toolchain (C++23 verified)
           command: |
             uname -a && cat /proc/version && cat /etc/issue
-            scripts/buildrdb.sh toolchain
-      - run:
-          name: Install Conan toolchain
-          command: |
-            source ~/.venv/bin/activate
-            scripts/buildrdb.sh conan
+            scripts/buildrdb.sh toolchain conan
       - run:
           name: Validate installed toolchain
           command: |
