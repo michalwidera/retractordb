@@ -639,7 +639,6 @@ std::string compiler::validateConstraints() {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
-    auto i{0};
     switch (cmd.getCommandID()) {
       case STREAM_HASH: {
         if (coreInstance.getQuery(arg1).descriptorStorage().flatElementCount() !=
@@ -648,8 +647,22 @@ std::string compiler::validateConstraints() {
           return std::string("HASH operation constraint failed on " + q.id);
         }
       } break;
-      default:
+      case PUSH_STREAM:
+      case STREAM_DEHASH_DIV:
+      case STREAM_DEHASH_MOD:
+      case STREAM_ADD:
+      case STREAM_SUBTRACT:
+      case STREAM_TIMEMOVE:
+      case STREAM_AGSE:
+      case STREAM_AVG:
+      case STREAM_MIN:
+      case STREAM_MAX:
+      case STREAM_SUM:
+        // No additional constraints for these commands in this phase.
         break;
+      default:
+        FatalError("compiler::validateConstraints: unsupported command '{}' for query '{}'",
+                   GetStringcommand_id(cmd.getCommandID()), q.id);
     }
   }
   return std::string("OK");
@@ -681,13 +694,19 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
+      case PUSH_STREAM:
       case STREAM_TIMEMOVE: {
         // 	:- PUSH_STREAM(core0)
         //  :- STREAM_TIMEMOVE(1)
         //
-        if (q.lProgram.size() != 2) {
+        if (cmd.getCommandID() == STREAM_TIMEMOVE && q.lProgram.size() != 2) {
           FatalError("compiler: unexpected program size in computeRequiredCapacities: {} tokens for query '{}', expected 2",
                      q.lProgram.size(), q.id);
+        }
+
+        if (cmd.getCommandID() == PUSH_STREAM) {
+          // Pass-through stream does not increase source history requirement.
+          break;
         }
 
         const auto nameSrc    = arg1;
@@ -714,8 +733,20 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;
-      default:
+      case STREAM_HASH:
+      case STREAM_DEHASH_DIV:
+      case STREAM_DEHASH_MOD:
+      case STREAM_ADD:
+      case STREAM_SUBTRACT:
+      case STREAM_AVG:
+      case STREAM_MIN:
+      case STREAM_MAX:
+      case STREAM_SUM:
+        // These commands do not increase source history requirement here.
         break;
+      default:
+        FatalError("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
+                   GetStringcommand_id(cmd.getCommandID()), q.id);
     }
 
     // Bump capMap with dumpRange from rules (if they are negative and attached to query declaration)

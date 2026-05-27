@@ -133,12 +133,11 @@ commands:
       - run:
           name: Install build toolchain (minimal, CI only)
           command: |
-            sudo apt-get update
-            sudo apt-get install -y gcc g++ cmake make ninja-build build-essential python3 python3-pip python3-venv mold valgrind clang-format graphviz bsdmainutils
-            python3 -m venv ~/.venv
-            source ~/.venv/bin/activate
-            pip install --upgrade pip
-            pip install conan
+            scripts/buildrdb.sh toolchain_required
+      - run:
+          name: Validate installed toolchain
+          command: |
+            scripts/buildrdb.sh validate
       - run:
           name: Configure Conan profile (gnu23)
           command: |
@@ -162,6 +161,10 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             scripts/buildrdb.sh toolchain
+      - run:
+          name: Validate installed toolchain
+          command: |
+            scripts/buildrdb.sh validate
       - run:
           name: Configure Conan profile (gnu23)
           command: |

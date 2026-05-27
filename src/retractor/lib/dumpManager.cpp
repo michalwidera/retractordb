@@ -79,7 +79,6 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     // CHECK IF WE HAVE ENOUGH HISTORY
     // CHECK SEQUENCE IF THIS IS IN REVERSE ORDER
     size_t dumpHistoryCount   = abs(task.range.first);
-    size_t currentStreamCount = pProc->getStreamCount(streamName);
     for (auto i = 0; i < dumpHistoryCount; ++i) {
       auto payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);

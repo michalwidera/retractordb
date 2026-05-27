@@ -1,0 +1,30 @@
+---
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  modernize-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -readability-identifier-naming,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-convert-member-functions-to-static
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(src|test|.*/src/.*|.*/test/.*|.*/src/include/.*)$'
+ExcludeHeaderFilterRegex: '(.*/(\.conan2|conan|third_party|3rdparty|external|vendor|_deps|deps)/.*|.*/(boost|fmt|spdlog|antlr4-runtime|antlr4|gtest|magic_enum)/.*)'
+SystemHeaders: false
+FormatStyle: file
+CheckOptions:
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: readability-implicit-bool-conversion.AllowIntegerConditions
+    value: '1'
+  - key: readability-identifier-length
+    value: '2:3:4:5:6:7:8:9:10:11:12:13:14:15:16:17:18:19:20'
+  - key: portability-avoid-pragma-once
+    value: '0'
+  - key: readability-braces-around-statements
+    value: 'MultiLine'

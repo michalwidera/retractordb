@@ -88,10 +88,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // 2. Construct payload
   std::unique_ptr<rdb::payload> result = std::make_unique<rdb::payload>(descriptor);
 
-  auto deltaSrc = coreInstance[instance].rInterval;
   auto deltaDst = boost::rational<int>(step) / descriptorSrcSize;
-
-  auto outFasterThanIn = deltaDst < deltaSrc;
 
   auto storedRecordCountDst_{storedRecordCountDst};
 

@@ -67,74 +67,37 @@ add_custom_target(
 # https://zed0.co.uk/clang-format-configurator/ | $clang-format --version
 # clang-format version 21.1.7
 
-# cmake-format: off
-set(CSTYLE
-    '{
-    BasedOnStyle: Google, 
-    Standard: c++17,
-    ColumnLimit: 129,
-    IndentWidth: 2,
-    TabWidth: 2,
-    UseTab: Never,
-    AccessModifierOffset: -1,
-    ConstructorInitializerIndentWidth: 4,
-    ContinuationIndentWidth: 4,
-    DerivePointerAlignment: false,
-    PointerAlignment: Right,
-    ReferenceAlignment: Right,
-    QualifierAlignment: Leave,
-    AlignAfterOpenBracket: Align,
-    AlignConsecutiveAssignments: true,
-    AlignConsecutiveDeclarations: false,
-    AlignConsecutiveMacros: true,
-    AlignEscapedNewlines: Left,
-    AlignOperands: Align,
-    AlignTrailingComments: true,
-    AllowShortBlocksOnASingleLine: Empty,
-    AllowShortEnumsOnASingleLine: true,
-    AllowShortFunctionsOnASingleLine: All,
-    AllowShortIfStatementsOnASingleLine: WithoutElse,
-    AllowShortLambdasOnASingleLine: All,
-    AllowShortLoopsOnASingleLine: false,
-    BinPackArguments: true,
-    BinPackParameters: true,
-    BreakBeforeBraces: Attach,
-    BreakBeforeTernaryOperators: true,
-    BreakConstructorInitializers: BeforeColon,
-    PackConstructorInitializers: CurrentLine,
-    Cpp11BracedListStyle: true,
-    EmptyLineAfterAccessModifier: Never,
-    EmptyLineBeforeAccessModifier: LogicalBlock,
-    FixNamespaceComments: true,
-    IncludeBlocks: Preserve,
-    IndentCaseBlocks: false,
-    IndentCaseLabels: true,
-    InsertNewlineAtEOF: true,
-    KeepEmptyLinesAtTheStartOfBlocks: false,
-    MaxEmptyLinesToKeep: 1,
-    NamespaceIndentation: None,
-    ReflowComments: false,
-    SeparateDefinitionBlocks: Leave,
-    SortIncludes: CaseInsensitive,
-    SpaceAfterTemplateKeyword: true,
-    SpaceBeforeCpp11BracedList: false,
-    SpaceBeforeParens: ControlStatements,
-    SpacesBeforeTrailingComments: 2
-    }'
-)
-# cmake-format: on
-
 add_custom_target(
   cformat
   COMMAND
     find ${CMAKE_SOURCE_DIR}/src -iname "*.h" -o -iname "*.cpp" -o -iname
     "*.hpp" -o -iname "*.cc" | grep --invert-match '.antlr/' | xargs
-    clang-format -i --style=${CSTYLE}
+    clang-format -i
   COMMAND find ${CMAKE_SOURCE_DIR}/test -iname "*.h" -o -iname "*.cpp" -o -iname
-          "*.hpp" -o -iname "*.cc" | xargs clang-format -i --style=${CSTYLE}
+          "*.hpp" -o -iname "*.cc" | xargs clang-format -i
   COMMAND find ${CMAKE_SOURCE_DIR} -name CMakeLists.txt | xargs cmake-format -i
           --line-width=80
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+find_program(
+  PROG_CLANG_TIDY
+  NAMES clang-tidy clang-tidy-19 clang-tidy-18 clang-tidy-17 clang-tidy-16
+        clang-tidy-15)
+
+if(PROG_CLANG_TIDY)
+  add_custom_target(
+    ctidy
+    COMMAND
+      find ${CMAKE_SOURCE_DIR}/src -iname "*.cpp" -o -iname "*.cc" | grep
+      --invert-match '.antlr/' | xargs -r ${PROG_CLANG_TIDY}
+      -p=${CMAKE_BINARY_DIR}
+    COMMAND
+      find ${CMAKE_SOURCE_DIR}/test -iname "*.cpp" -o -iname "*.cc" | xargs
+      -r ${PROG_CLANG_TIDY} -p=${CMAKE_BINARY_DIR}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+else()
+  message(STATUS "Optional tool not found: clang-tidy (ctidy target disabled)")
+endif()
 
 add_custom_target(
   showelf
