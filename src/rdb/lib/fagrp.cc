@@ -16,6 +16,9 @@ namespace rdb {
 
 namespace {
 
+constexpr int kDecimalBase = 10;
+constexpr size_t kDefaultSegmentReserve = 8;
+
 auto parseSegmentIndex(const std::string &candidate, const std::string &baseName) -> std::optional<size_t> {
   const std::string prefix = baseName + "_segment_";
   if (!candidate.starts_with(prefix)) return std::nullopt;
@@ -24,7 +27,7 @@ auto parseSegmentIndex(const std::string &candidate, const std::string &baseName
   if (suffix.empty()) return std::nullopt;
   if (!std::ranges::all_of(suffix, ::isdigit)) return std::nullopt;
 
-  return static_cast<size_t>(std::strtoull(suffix.c_str(), nullptr, 10));
+  return static_cast<size_t>(std::strtoull(suffix.c_str(), nullptr, kDecimalBase));
 }
 
 }  // namespace
@@ -52,7 +55,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
     vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
   } else {
     std::vector<size_t> existingSegments;
-    existingSegments.reserve(retention_.segments == 0 ? 8 : retention_.segments);
+    existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
 
     for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
       const auto filenameEx = entry.path().filename().string();

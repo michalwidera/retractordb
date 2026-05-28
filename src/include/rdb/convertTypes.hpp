@@ -5,6 +5,9 @@
 
 #include "fldType.hpp"
 
+inline constexpr double kDefaultRationalizeDiff = 1E-6;
+inline constexpr int kDefaultRationalizeIterations = 11;
+
 template <typename T>
 struct cast {
   /// @brief Convert input value to requested descriptor type.
@@ -30,4 +33,5 @@ rdb::descFldVT nullFallbackValue(rdb::descFld type);
 /// @param DIFF precision threshold used to stop approximation
 /// @param ttl_const maximum number of continued-fraction iterations
 /// @return rational approximation of input value
-boost::rational<int> Rationalize(double inValue, double DIFF = 1E-6, int ttl_const = 11);
+boost::rational<int> Rationalize(double inValue, double DIFF = kDefaultRationalizeDiff,
+                                 int ttl_const = kDefaultRationalizeIterations);

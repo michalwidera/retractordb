@@ -32,6 +32,10 @@
 #include "xtrdbStorageMap.hpp"
 #include "xtrdbTypes.hpp"
 
+namespace {
+constexpr int kHelpColumnWidth = 32;
+}
+
 int main(int argc, char *argv[]) {
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
 
@@ -194,15 +198,15 @@ int main(int argc, char *argv[]) {
                {"#|rem [text]", "comment line"},
                {"help|h", "show this help"},
            })
-        std::cout << std::left << std::setw(32) << c << d << "\n";
+        std::cout << std::left << std::setw(kHelpColumnWidth) << c << d << "\n";
       for (auto &[name, cmdPtr] : commands) {
         auto [cmd, desc] = cmdPtr->usage();
         if (cmd.empty()) continue;
-        std::cout << std::left << std::setw(32) << cmd;
+        std::cout << std::left << std::setw(kHelpColumnWidth) << cmd;
         if (!desc.empty()) std::cout << desc[0];
         std::cout << "\n";
         for (size_t i = 1; i < desc.size(); ++i)
-          std::cout << std::string(32, ' ') << desc[i] << "\n";
+          std::cout << std::string(kHelpColumnWidth, ' ') << desc[i] << "\n";
       }
       std::cout << argv[0] << " - data accessing tool.\n\n"
                 << config_line << "\nLog: " << filelog << "\n"

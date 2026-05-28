@@ -49,6 +49,11 @@ using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemA
 
 using namespace CRationalStreamMath;
 
+namespace {
+constexpr int kQueueBufferSeconds = 10;
+constexpr int kMinimumQueueElements = 100;
+}
+
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 std::unique_ptr<PersistentCounter> pCounterPtr;
@@ -274,8 +279,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
-      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * 10;
-      maxElements     = std::max(maxElements, 100);
+      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * kQueueBufferSeconds;
+      maxElements     = std::max(maxElements, kMinimumQueueElements);
       IPC::message_queue mq(IPC::open_or_create,               // open or crate
                             queueName.c_str(),                 // name
                             maxElements,                       // max message number

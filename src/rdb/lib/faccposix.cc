@@ -10,6 +10,10 @@
 #include "fatalError.hpp"
 namespace rdb {
 
+namespace {
+constexpr mode_t kDefaultFileMode = 0644;
+}
+
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
                                  const Descriptor &descriptor,     //
                                  int percounter)                   //
@@ -24,7 +28,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     SPDLOG_WARN("Failed to check if {} exists: {}", filename_, fs_ec.message());
   }
 
-  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
     FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
   }

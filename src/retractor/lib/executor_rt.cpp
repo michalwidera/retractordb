@@ -23,6 +23,8 @@ constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  — wymagane do mlockall
 // Stałe konwersji czasu — używane przy obliczaniu timespec dla clock_nanosleep.
 constexpr long kNsPerMs  = 1'000'000L;      // nanosekundy na milisekundę
 constexpr long kNsPerSec = 1'000'000'000L;  // nanosekundy na sekundę
+constexpr size_t kCapEffPrefixLength = 7;
+constexpr int kRtSchedulerPriority = 50;
 
 static std::string rtReadFile(const char *path) {
   std::ifstream f(path);
@@ -38,7 +40,7 @@ static uint64_t rtEffectiveCapabilities() {
   while (std::getline(f, line)) {
     if (line.starts_with("CapEff:")) {
       uint64_t caps = 0;
-      std::sscanf(line.c_str() + 7, "%" SCNx64, &caps);
+      std::sscanf(line.c_str() + kCapEffPrefixLength, "%" SCNx64, &caps);
       return caps;
     }
   }
@@ -107,7 +109,7 @@ bool rtActivate() {
     ok = false;
   }
   struct sched_param sp{};
-  sp.sched_priority = 50;
+  sp.sched_priority = kRtSchedulerPriority;
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(errno));
     ok = false;

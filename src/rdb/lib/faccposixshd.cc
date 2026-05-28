@@ -11,6 +11,10 @@
 
 namespace rdb {
 
+namespace {
+constexpr mode_t kDefaultFileMode = 0644;
+}
+
 std::string posixBinaryFileWithShadow::shadowName() const { return filename_ + ".shadow"; }
 
 /// @brief Wyszukuje rekord w pliku cienia na podstawie pozycji.
@@ -58,12 +62,12 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     SPDLOG_WARN("Failed to check if {} exists: {}", shadowName(), fs_ec.message());
   }
 
-  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
     FatalError("posixBinaryFileWithShadow: failed to open '{}' (fd={})", filename_, fd);
   }
 
-  fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd_shadow < 0) {
     FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
   }

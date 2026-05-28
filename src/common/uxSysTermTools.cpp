@@ -17,6 +17,10 @@
 
 #include "fatalError.hpp"
 
+namespace {
+constexpr char kCarriageReturn = '\r';
+}
+
 bool _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return false;
   struct termios oldt = {};
@@ -52,7 +56,7 @@ void fixArgcv(int argc, char **argv) {
     for (int i = 0; i < argc; ++i) {
       auto len = strlen(argv[i]);
       if (len > 0)
-        if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
+        if (argv[i][len - 1] == kCarriageReturn) argv[i][len - 1] = 0;
     }
 }
 

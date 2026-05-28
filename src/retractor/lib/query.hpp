@@ -16,6 +16,8 @@
 
 class qTree;
 
+inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -44,7 +46,7 @@ class query {
 
   [[nodiscard]] bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();
-  [[nodiscard]] bool isGenerated() const { return id.compare(0, 7, "STREAM_") == 0; }
+  [[nodiscard]] bool isGenerated() const { return id.compare(0, kGeneratedPrefixLength, "STREAM_") == 0; }
   [[nodiscard]] bool isCompilerDirective() const { return !id.empty() && id[0] == ':'; }
   bool is(command_id command);
 

@@ -13,11 +13,13 @@
 
 namespace rdb {
 
+constexpr size_t kBitsPerByte = 8;
+
 // ── IndexRecord serialization ────────────────────────────────────────
 
 std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   const size_t bitsetSize = nullBitset.size();
-  const size_t byteCount  = (bitsetSize + 7) / 8;
+  const size_t byteCount  = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
   std::vector<std::byte> buf(sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + byteCount, std::byte{0});
   std::byte *ptr = buf.data();
 
@@ -30,7 +32,7 @@ std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   write(recordCount);
   write(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    if (nullBitset[i]) ptr[i / 8] |= static_cast<std::byte>(1U << (i % 8));
+    if (nullBitset[i]) ptr[i / kBitsPerByte] |= static_cast<std::byte>(1U << (i % kBitsPerByte));
 
   return buf;
 }
@@ -53,12 +55,12 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 
   size_t bitsetSize = 0;
   read(bitsetSize);
-  const size_t byteCount = (bitsetSize + 7) / 8;
+  const size_t byteCount = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
   if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in bitset data");
 
   rec.nullBitset.resize(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    rec.nullBitset[i] = ((std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1U) != 0;
+    rec.nullBitset[i] = ((std::to_integer<uint8_t>(ptr[i / kBitsPerByte]) >> (i % kBitsPerByte)) & 1U) != 0;
 
   return rec;
 }
@@ -247,7 +249,7 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, std::string metaFil
     : metaFilePath_(std::move(metaFilePath)),
       descriptorRef_(std::make_shared<Descriptor>(descriptor)),
       creationTime_(std::chrono::system_clock::now()),
-      entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + 7) / 8)) {
+      entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte)) {
   createNullBitsetTemplate();
   loadIndex();
   if (!metaFilePath_.empty() && !std::filesystem::exists(metaFilePath_)) saveHeader();

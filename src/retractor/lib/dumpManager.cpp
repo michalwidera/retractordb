@@ -15,6 +15,10 @@
 
 extern dataModel *pProc;
 
+namespace {
+constexpr mode_t kDefaultDumpFileMode = 0644;
+}
+
 dumpTask::dumpTask(dumpTask &&other) noexcept
     : taskName(std::move(other.taskName)),
       range(other.range),
@@ -175,7 +179,7 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
                  key);
     }
   }
-  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, kDefaultDumpFileMode);
   if (fd < 0) {
     FatalError("dumpManager::createDumpFile: failed to open '{}': {}", filename.string(), strerror(errno));
   }

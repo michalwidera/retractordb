@@ -22,6 +22,9 @@ namespace rdb {
 
 namespace {
 
+constexpr int kHexByteWidth = 2;
+constexpr int kHexWordWidth = 8;
+
 int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, const char *context) {
   const auto flatCount = descriptor.flatElementCount();
   if (positionFlat < 0 || positionFlat > flatCount - 1) {
@@ -58,21 +61,21 @@ void writeValue(std::ostream &os, const std::any &value, const descFld type, con
       break;
     case rdb::BYTE: {
       if (hexFormat) {
-        os << std::setfill('0') << std::setw(2);
+        os << std::setfill('0') << std::setw(kHexByteWidth);
       }
       os << static_cast<int>(std::any_cast<uint8_t>(value));
       break;
     }
     case rdb::INTEGER: {
       if (hexFormat) {
-        os << std::setfill('0') << std::setw(8);
+        os << std::setfill('0') << std::setw(kHexWordWidth);
       }
       os << std::any_cast<int>(value);
       break;
     }
     case rdb::UINT: {
       if (hexFormat) {
-        os << std::setfill('0') << std::setw(8);
+        os << std::setfill('0') << std::setw(kHexWordWidth);
       }
       os << std::any_cast<unsigned>(value);
       break;

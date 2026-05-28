@@ -10,6 +10,10 @@
 
 #include "rdb/metaDataStream.hpp"
 
+namespace {
+constexpr size_t kBitsPerByte = 8;
+}
+
 static std::string resolveMetaPath(const CommandContext &ctx) {
   return (ctx.storageParam.empty() ? std::filesystem::path(ctx.file) : std::filesystem::path(ctx.storageParam) / ctx.file)
              .string() +
@@ -66,7 +70,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
   }
 
   constexpr size_t headerSize = sizeof(int64_t);
-  const size_t bitsetBytes    = (ctx.dacc->descriptor.size() + 7) / 8;
+  const size_t bitsetBytes    = (ctx.dacc->descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte;
   const size_t entrySize      = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
 
   std::ifstream in(path, std::ios::binary);
@@ -112,8 +116,8 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
     std::cout << "bitsetHex:";
     for (size_t bi = 0; bi < bitsetBytes; ++bi) {
       uint8_t byteVal = 0;
-      for (size_t bit = 0; bit < 8; ++bit) {
-        const size_t fieldIdx = (bi * 8) + bit;
+      for (size_t bit = 0; bit < kBitsPerByte; ++bit) {
+        const size_t fieldIdx = (bi * kBitsPerByte) + bit;
         if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1U << bit);
       }
       std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byteVal) << std::dec;

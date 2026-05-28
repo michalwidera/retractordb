@@ -24,6 +24,11 @@ using namespace antlr4;
 
 std::string status = "OK";
 
+namespace {
+constexpr size_t kAgseWindowSignChildIndex = 5;
+constexpr int kFallbackToStringOutputLength = 32;
+}
+
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
 class LexerErrorListener : public BaseErrorListener {
@@ -148,7 +153,7 @@ class ParserListener : public RQLBaseListener {
   void exitSExpAgse(RQLParser::SExpAgseContext *ctx) override {
     int window{0};
     int step{0};
-    if (ctx->children[5]->getText() == "-")
+    if (ctx->children[kAgseWindowSignChildIndex]->getText() == "-")
       window = -std::stoi(ctx->window->getText());
     else
       window = std::stoi(ctx->window->getText());
@@ -380,11 +385,11 @@ class ParserListener : public RQLBaseListener {
         if (tk.getCommandID() == CALL2 && tk.getStr_() == "to_string")
           outArr += std::get<std::pair<std::string, int>>(tk.getVT()).second;
         else if (tk.getCommandID() == CALL && tk.getStr_() == "to_string")
-          outArr += 32;
+          outArr += kFallbackToStringOutputLength;
         else if (tk.getCommandID() == PUSH_VAL && tk.getVT().index() == rdb::STRING)
           outArr += static_cast<int>(std::get<std::string>(tk.getVT()).length());
       }
-      if (outArr == 0) outArr = 32;
+      if (outArr == 0) outArr = kFallbackToStringOutputLength;
     }
     if (outType == rdb::INTEGER && !program.empty()) {
       auto &last = program.back();
@@ -395,7 +400,7 @@ class ParserListener : public RQLBaseListener {
           outLen  = 4;
         } else if (fn == "to_double") {
           outType = rdb::DOUBLE;
-          outLen  = 8;
+          outLen  = static_cast<int>(sizeof(double));
         }
       }
     }
