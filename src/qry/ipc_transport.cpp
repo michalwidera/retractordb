@@ -59,13 +59,13 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
   ptree pt_response;
   ptree pt_request;
   try {
-    typedef IPC::managed_shared_memory::segment_manager segment_manager_t;
-    typedef IPC::allocator<char, segment_manager_t> CharAllocator;
-    typedef boost::container::basic_string<char, std::char_traits<char>, CharAllocator> IPCString;
-    typedef int KeyType;
-    typedef std::pair<const int, IPCString> ValueType;
-    typedef IPC::allocator<ValueType, segment_manager_t> ShmemAllocator;
-    typedef boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator> IPCMap;
+    using segment_manager_t = IPC::managed_shared_memory::segment_manager;
+    using CharAllocator = IPC::allocator<char, segment_manager_t>;
+    using IPCString = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
+    using KeyType = int;
+    using ValueType = std::pair<const int, IPCString>;
+    using ShmemAllocator = IPC::allocator<ValueType, segment_manager_t>;
+    using IPCMap = boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator>;
 
     IPC::managed_shared_memory mapSegment(IPC::open_only, ipc::kShmemSegment.data());
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
@@ -81,7 +81,7 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
 
     std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>(ipc::kMapObject.data());
     IPCMap *mymap                        = ret.first;
-    if (!mymap) {
+    if (mymap == nullptr) {
       SPDLOG_ERROR("ipc_transport: shared memory map '{}' not found", ipc::kMapObject);
       done = true;
       pt_response.put("error.response", "server not found");
@@ -98,7 +98,7 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
     // When server works under valgrind - must be 10 probes x 10ms
     constexpr int maxAcceptableFails = 10;
     int cntr(maxAcceptableFails);
-    while (it == mymap->end() && cntr) {
+    while (it == mymap->end() && cntr != 0) {
       std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
       IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
       it = mymap->find(processId);

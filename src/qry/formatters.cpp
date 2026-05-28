@@ -6,6 +6,7 @@
 #include <ctime>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 using boost::property_tree::ptree;
 
@@ -13,7 +14,7 @@ const std::vector<std::string> Formatter::colors_ = {"red",   "blue", "green",  
                                                      "brown", "pink", "yellow", "cyan",   "magenta"};
 
 bool Formatter::isNullAt(const std::string &nullmap, int index) {
-  return index >= 0 && index < static_cast<int>(nullmap.size()) && nullmap[index] == '1';
+  return index >= 0 && std::cmp_less(index, nullmap.size()) && nullmap[static_cast<std::size_t>(index)] == '1';
 }
 
 bool Formatter::isAllNull(const std::string &nullmap, int count) {
@@ -48,14 +49,14 @@ void Formatter::renderRaw(const ptree &row, int count, const std::string &nullma
 
 void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nullmap, const std::string &input,
                               const ptree &schema, std::tuple<int, int, int> dim) {
-  if (static_cast<int>(gnuplot_lines_.size()) < count) gnuplot_lines_.resize(count);
+  if (std::cmp_less(gnuplot_lines_.size(), count)) gnuplot_lines_.resize(static_cast<std::size_t>(count));
 
   std::cout << "plot";
   int colIdx{0};
   for (const auto &v : schema.get_child("db.field")) {
     if (colIdx != 0) std::cout << ",";
     auto columnName = v.second.get<std::string>("");
-    std::replace(columnName.begin(), columnName.end(), '_', '-');
+    std::ranges::replace(columnName, '_', '-');
     std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors_[colIdx % colors_.size()] << "'";
     colIdx++;
   }

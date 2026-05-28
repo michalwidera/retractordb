@@ -91,10 +91,10 @@ int main(int argc, char *argv[]) {
       std::cout << "Only one output format could be selected." << '\n';
       return system::errc::invalid_argument;
     }
-    if (vm.count("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
-    if (vm.count("raw")) obj.outputFormatMode = formatMode::RAW;
-    if (vm.count("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
-    if (vm.count("gnuplot")) {
+    if (vm.contains("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
+    if (vm.contains("raw")) obj.outputFormatMode = formatMode::RAW;
+    if (vm.contains("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
+    if (vm.contains("gnuplot")) {
       obj.outputFormatMode = formatMode::GNUPLOT;
       std::stringstream ss(sGnuplotDim);
 
@@ -128,13 +128,13 @@ int main(int argc, char *argv[]) {
       }
       gnuplotDim = std::make_tuple(x, ymin, ymax);
     }
-    if (vm.count("wait-server") && !vm.count("help")) {
+    if (vm.contains("wait-server") && !vm.contains("help")) {
       if (!waitForServer()) {
         SPDLOG_ERROR("server not available after {} seconds", kDefaultServerWaitSeconds);
         return system::errc::no_child_process;
       }
     }
-    if (vm.count("help")) {
+    if (vm.contains("help")) {
       std::cout << argv[0] << " - data query tool." << '\n' << '\n';
       std::cout << "Usage: " << argv[0] << " [option]" << '\n' << '\n';
       std::cout << desc;
@@ -143,22 +143,22 @@ int main(int argc, char *argv[]) {
       std::cout << warranty << '\n';
       return system::errc::success;
     }
-    if (vm.count("hello")) return obj.hello();
-    if (vm.count("kill") && timeLimit == 0) {
+    if (vm.contains("hello")) return obj.hello();
+    if (vm.contains("kill") && timeLimit == 0) {
       obj.netClient("kill", "");
-    } else if (vm.count("dir")) {
+    } else if (vm.contains("dir")) {
       std::cout << obj.dir();
-    } else if (vm.count("diryaml")) {
+    } else if (vm.contains("diryaml")) {
       std::cout << obj.dirYaml();
-    } else if (vm.count("adhoc") && !sAdHoc.empty()) {
+    } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
       if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
-    } else if (vm.count("detail")) {
+    } else if (vm.contains("detail")) {
       auto ret = obj.detailShow(sDetailStream);
       if (!ret.empty()) {
         std::cout << ret;
       } else
         return system::errc::no_such_file_or_directory;
-    } else if (vm.count("select") && sInputStream != "none") {
+    } else if (vm.contains("select") && sInputStream != "none") {
       if (!obj.select(vm, timeLimit, sInputStream, gnuplotDim)) return system::errc::no_such_file_or_directory;
     } else {
       SPDLOG_ERROR("no argument.");

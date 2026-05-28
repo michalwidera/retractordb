@@ -75,7 +75,7 @@ class Descriptor : public std::vector<rField> {
   std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex);
 
   [[nodiscard]] bool hasField(const std::string_view fieldName) const {
-    return std::any_of(begin(), end(), [fieldName](const auto &f) { return f.rname == fieldName; });
+    return std::ranges::any_of(*this, [fieldName](const auto &f) { return f.rname == fieldName; });
   }
 
   friend std::ostream &operator<<(std::ostream &os, const Descriptor &rhs);

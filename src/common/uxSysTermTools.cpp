@@ -17,8 +17,8 @@
 
 #include "fatalError.hpp"
 
-int _kbhit(bool ignoreAnyKey) {
-  if (ignoreAnyKey) return 0;
+bool _kbhit(bool ignoreAnyKey) {
+  if (ignoreAnyKey) return false;
   struct termios oldt = {};
   struct termios newt = {};
   int ch;
@@ -34,9 +34,9 @@ int _kbhit(bool ignoreAnyKey) {
   fcntl(STDIN_FILENO, F_SETFL, oldf);
   if (ch != EOF) {
     ungetc(ch, stdin);
-    return 1;
+    return true;
   }
-  return 0;
+  return false;
 }
 
 int _getch() { return getchar(); }

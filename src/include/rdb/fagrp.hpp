@@ -35,7 +35,7 @@ class groupFile : public FileInterface {
   Descriptor descriptor_;
   const ssize_t recordSize_;
 
-  retention_t retention_{0, 0};
+  retention_t retention_{.segments = 0, .capacity = 0};
 
   std::vector<std::unique_ptr<T>> vec_;
 

@@ -17,7 +17,10 @@ Checks: >
   -clang-analyzer-optin.core.EnumCastOutOfRange,
   -clang-analyzer-core.UndefinedBinaryOperatorResult,
   -bugprone-reserved-identifier,
-  -modernize-use-std-print
+  -bugprone-easily-swappable-parameters,
+  -bugprone-suspicious-stringview-data-usage,
+  -modernize-use-std-print,
+  -portability-avoid-pragma-once
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(.*/)?(src|test)(/[^./][^/]*)*/[^/]*$'
 SystemHeaders: false
@@ -29,7 +32,5 @@ CheckOptions:
     value: '1'
   - key: readability-identifier-length
     value: '2:3:4:5:6:7:8:9:10:11:12:13:14:15:16:17:18:19:20'
-  - key: portability-avoid-pragma-once
-    value: '0'
   - key: readability-braces-around-statements
     value: 'MultiLine'
