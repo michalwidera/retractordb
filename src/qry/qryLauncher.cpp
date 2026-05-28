@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
     } else if (vm.contains("diryaml")) {
       std::cout << obj.dirYaml();
     } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
-      if (!obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
+      if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
       auto ret = obj.detailShow(sDetailStream);
       if (!ret.empty()) {

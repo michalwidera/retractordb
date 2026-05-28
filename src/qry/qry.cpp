@@ -33,7 +33,7 @@ ptree qry::netClient(const std::string &cmd, const std::string &arg) { return tr
 bool qry::adhoc(const std::string &sAdhoc) {
   if (sAdhoc.empty()) {
     SPDLOG_ERROR("qry::adhoc: adhoc query string must not be empty");
-    return false;
+    return true;
   }
   ptree pt = netClient("adhoc", sAdhoc);
 
@@ -44,9 +44,9 @@ bool qry::adhoc(const std::string &sAdhoc) {
 
   if (rcv != "OK") {
     SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 
 bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
