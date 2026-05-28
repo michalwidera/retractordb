@@ -60,12 +60,12 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
   ptree pt_request;
   try {
     using segment_manager_t = IPC::managed_shared_memory::segment_manager;
-    using CharAllocator = IPC::allocator<char, segment_manager_t>;
-    using IPCString = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
-    using KeyType = int;
-    using ValueType = std::pair<const int, IPCString>;
-    using ShmemAllocator = IPC::allocator<ValueType, segment_manager_t>;
-    using IPCMap = boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator>;
+    using CharAllocator     = IPC::allocator<char, segment_manager_t>;
+    using IPCString         = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
+    using KeyType           = int;
+    using ValueType         = std::pair<const int, IPCString>;
+    using ShmemAllocator    = IPC::allocator<ValueType, segment_manager_t>;
+    using IPCMap            = boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator>;
 
     IPC::managed_shared_memory mapSegment(IPC::open_only, ipc::kShmemSegment.data());
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());

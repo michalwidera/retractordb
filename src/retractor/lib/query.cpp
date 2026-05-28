@@ -23,11 +23,11 @@ void query::reset() {
   isHold       = false;
   isSubstrat   = false;
   policy       = std::make_pair("DEFAULT", 0);
-  retention    = rdb::retention_t{0, 0};
+  retention    = rdb::retention_t{.segments = 0, .capacity = 0};
 }
 
 bool isThere(const std::vector<query> &v, const std::string &query_name) {
-  return std::any_of(v.begin(), v.end(), [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
+  return std::ranges::any_of(v, [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
 }
 
 /** Construktor set */
@@ -101,7 +101,7 @@ rdb::Descriptor query::descriptorStorage() {
   retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);
 
   auto filenameShdw{filename};
-  std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
+  std::ranges::transform(filenameShdw, filenameShdw.begin(), ::tolower);
   if (filenameShdw.find(".txt") != std::string::npos)
     retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
   else

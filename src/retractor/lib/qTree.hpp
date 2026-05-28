@@ -24,7 +24,10 @@ class qTree : public std::vector<query> {
 
   query &getQuery(const std::string &query_name);
 
-  void sort() { std::sort(begin(), end()); };
+  // Keep explicit comparator: std::ranges::less is not invocable for query on newer GCC.
+  void sort() {
+    std::ranges::sort(*this, [](const query &lhs, const query &rhs) { return lhs < rhs; });
+  };
   void topologicalSort();
   bool exists(const std::string &query_name);
 

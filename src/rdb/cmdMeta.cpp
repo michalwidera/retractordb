@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "rdb/metaDataStream.hpp"
@@ -99,7 +100,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
     in.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(entrySize));
     const auto bytesRead = in.gcount();
     if (bytesRead == 0) break;
-    if (static_cast<size_t>(bytesRead) != entrySize) {
+    if (std::cmp_not_equal(bytesRead, entrySize)) {
       std::cout << ctx.colors.RED << "truncated entry at index: " << entryIdx << "\n" << ctx.colors.RESET;
       break;
     }
@@ -112,7 +113,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
     for (size_t bi = 0; bi < bitsetBytes; ++bi) {
       uint8_t byteVal = 0;
       for (size_t bit = 0; bit < 8; ++bit) {
-        const size_t fieldIdx = bi * 8 + bit;
+        const size_t fieldIdx = (bi * 8) + bit;
         if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1U << bit);
       }
       std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byteVal) << std::dec;

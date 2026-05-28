@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <ranges>
 #include <string_view>
 #include "fatalError.hpp"
 
@@ -21,7 +22,7 @@ auto parseSegmentIndex(const std::string &candidate, const std::string &baseName
 
   const std::string suffix = candidate.substr(prefix.size());
   if (suffix.empty()) return std::nullopt;
-  if (!std::all_of(suffix.begin(), suffix.end(), ::isdigit)) return std::nullopt;
+  if (!std::ranges::all_of(suffix, ::isdigit)) return std::nullopt;
 
   return static_cast<size_t>(std::strtoull(suffix.c_str(), nullptr, 10));
 }
@@ -65,8 +66,8 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       existingSegments.push_back(0);
     }
 
-    std::sort(existingSegments.begin(), existingSegments.end());
-    existingSegments.erase(std::unique(existingSegments.begin(), existingSegments.end()), existingSegments.end());
+    std::ranges::sort(existingSegments);
+    existingSegments.erase(std::ranges::unique(existingSegments).begin(), existingSegments.end());
 
     // Restore only a contiguous suffix ending at the latest segment. This guarantees
     // global-position mapping remains valid after restart even if older files are missing.
@@ -199,7 +200,7 @@ size_t groupFile<T>::count() {
   size_t sumCount = 0;
   for (auto &v : vec_)
     sumCount += v->count();
-  return sumCount + removedSegments_ * retention_.capacity;  // compensate for removed segments
+  return sumCount + (removedSegments_ * retention_.capacity);  // compensate for removed segments
 }
 
 }  // namespace rdb

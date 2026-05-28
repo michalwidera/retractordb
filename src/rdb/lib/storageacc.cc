@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <ranges>
+#include <utility>
 #include "fatalError.hpp"
 
 namespace rdb {

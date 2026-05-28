@@ -61,7 +61,7 @@ rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef) {
       typeRef);
 }
 
-const rdb::descFldVT &logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT &b) {
+rdb::descFldVT logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT &b) {
   if (!isNullValue(a)) return a;
   if (!isNullValue(b)) return b;
   return a;

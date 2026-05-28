@@ -55,7 +55,7 @@ dumpTask::~dumpTask() {
 
 void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   if (pProc == nullptr) FatalError("dumpManager::registerTask: dataModel pointer is null");
-  if (pProc->qSet.find(streamName) == pProc->qSet.end()) {
+  if (!pProc->qSet.contains(streamName)) {
     FatalError("dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
   }
   if (task.range.first > task.range.second) {
@@ -102,10 +102,10 @@ void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = s
 
 void dumpManager::processStreamChunk(const std::string &streamName) {
   if (pProc == nullptr) FatalError("dumpManager::processStreamChunk: dataModel pointer is null");
-  if (pProc->qSet.find(streamName) == pProc->qSet.end()) {
+  if (!pProc->qSet.contains(streamName)) {
     FatalError("dumpManager::processStreamChunk: stream '{}' not found in dataModel", streamName);
   }
-  if (bookOfTasks.find(streamName) == bookOfTasks.end()) return;
+  if (!bookOfTasks.contains(streamName)) return;
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
   if (currentStreamCount == 0) return;  // nothing to dump

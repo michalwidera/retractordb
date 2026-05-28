@@ -58,7 +58,7 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 
   rec.nullBitset.resize(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    rec.nullBitset[i] = (std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1U;
+    rec.nullBitset[i] = ((std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1U) != 0;
 
   return rec;
 }
@@ -119,7 +119,9 @@ void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
   std::fstream f(metaFilePath_, std::ios::binary | std::ios::in | std::ios::out);
   if (!f.is_open()) return;
   f.seekp(0, std::ios::end);
-  if (f.tellp() < static_cast<std::streamoff>(kHeaderSize + entrySize_)) return;
+  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
+  const auto fileSize = static_cast<std::streamoff>(f.tellp());
+  if (fileSize < static_cast<std::streamoff>(kHeaderSize + entrySize_)) return;
   f.seekp(-static_cast<std::streamoff>(entrySize_), std::ios::end);
   auto buf = entry.serialize();
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
@@ -169,13 +171,14 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
   }
 
   in.seekg(0, std::ios::end);
-  const auto fileSize = in.tellg();
-  if (fileSize <= 0 || static_cast<size_t>(fileSize) <= kHeaderSize) {
+  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
+  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  if (fileSize <= 0 || fileSize <= static_cast<std::streamoff>(kHeaderSize)) {
     cacheValid_ = true;
     return entriesCache_;
   }
 
-  const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
+  const size_t payloadSize = static_cast<size_t>(fileSize - static_cast<std::streamoff>(kHeaderSize));
   if (payloadSize % entrySize_ != 0)
     SPDLOG_WARN("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, entrySize_);
 
@@ -198,8 +201,9 @@ void metaDataStream::loadIndex() {
   if (!in.is_open()) return;
 
   in.seekg(0, std::ios::end);
-  const auto fileSize = in.tellg();
-  if (fileSize <= 0 || static_cast<size_t>(fileSize) < kHeaderSize) return;
+  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
+  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  if (fileSize <= 0 || fileSize < static_cast<std::streamoff>(kHeaderSize)) return;
   in.seekg(0, std::ios::beg);
 
   int64_t creationTimeNs = 0;
@@ -243,7 +247,7 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, std::string metaFil
     : metaFilePath_(std::move(metaFilePath)),
       descriptorRef_(std::make_shared<Descriptor>(descriptor)),
       creationTime_(std::chrono::system_clock::now()),
-      entrySize_(sizeof(uint8_t) + 2 * sizeof(size_t) + (descriptor.size() + 7) / 8) {
+      entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + 7) / 8)) {
   createNullBitsetTemplate();
   loadIndex();
   if (!metaFilePath_.empty() && !std::filesystem::exists(metaFilePath_)) saveHeader();

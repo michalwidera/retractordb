@@ -127,14 +127,14 @@ int main(int argc, char *argv[]) {
 
     iTimeLimitCnt = timeLimitVar;  // std::atomic assignment
 
-    if (vm.count("status")) {
+    if (vm.contains("status")) {
       std::cout << "Checking service status." << '\n';
       bool isRunning = guard.isAnotherInstanceRunning();
       std::cout << serviceName << ": " << (isRunning ? "Running" : "Stopped") << '\n';
       return isRunning ? system::errc::no_lock_available : system::errc::success;
     }
 
-    if (vm.count("help")) {
+    if (vm.contains("help")) {
       std::cout << argv[0] << " - compiler & data processing tool." << '\n' << '\n';
       std::cout << "Usage: " << argv[0];
       if (onlyCompile) std::cout << " -c";
@@ -142,12 +142,12 @@ int main(int argc, char *argv[]) {
       std::cout << desc;
       std::cout << config_line << '\n';
       std::cout << "Log: " << tempLocation << '\n';
-      if (vm.count("realtime")) rtCheckAndPrint();
+      if (vm.contains("realtime")) rtCheckAndPrint();
       std::cout << warranty << '\n';
       return system::errc::success;
     }
 
-    if (!vm.count("queryfile")) {
+    if (!vm.contains("queryfile")) {
       std::cout << argv[0] << ": fatal error: no input file" << '\n';
       return EPERM;  // ERROR defined in errno-base.h
     }
@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (onlyCompile) {
-      if (!vm.count("quiet")) {
+      if (!vm.contains("quiet")) {
         presenter dm(coreInstance);
         return dm.run(vm);
       }
@@ -211,8 +211,7 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, handleSignal);  // Terminate
   signal(SIGHUP, handleSignal);   // Hangup
 
-  bool rotation_enabled =
-      std::any_of(coreInstance.begin(), coreInstance.end(), [](const auto &it) { return it.id == ":ROTATION"; });
+  bool rotation_enabled = std::ranges::any_of(coreInstance, [](const auto &it) { return it.id == ":ROTATION"; });
 
   if (!rotation_enabled) {
     std::string storage_location;

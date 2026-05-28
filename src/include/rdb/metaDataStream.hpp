@@ -188,12 +188,12 @@ class metaDataStream {
   std::string metaFilePath_;                            ///< file path for saving/loading the meta index
   std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
   std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
-  const size_t entrySize_;  // NOLINT(modernize-use-default-member-init)
-  size_t committedRecordCount_{0};                 ///< cached total records in committed entries on disk
-  DiskTailState tail_{};                           ///< lazy-overwrite state for the last on-disk entry
-  IndexRecord currentEntry_;                       ///< accumulator for the pending (not yet committed) RLE run
-  mutable std::vector<IndexRecord> entriesCache_;  ///< in-memory copy of committed on-disk entries
-  mutable bool cacheValid_{false};                 ///< true when entriesCache_ matches the file; cleared on every write
+  const size_t entrySize_;                              // NOLINT(modernize-use-default-member-init)
+  size_t committedRecordCount_{0};                      ///< cached total records in committed entries on disk
+  DiskTailState tail_{};                                ///< lazy-overwrite state for the last on-disk entry
+  IndexRecord currentEntry_;                            ///< accumulator for the pending (not yet committed) RLE run
+  mutable std::vector<IndexRecord> entriesCache_;       ///< in-memory copy of committed on-disk entries
+  mutable bool cacheValid_{false};                      ///< true when entriesCache_ matches the file; cleared on every write
 };  // class metaDataStream
 
 }  // namespace rdb

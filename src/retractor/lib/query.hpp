@@ -38,13 +38,13 @@ class query {
 
   std::list<rule> lRules;
 
-  rdb::retention_t retention            = rdb::retention_t{0, 0};  // Retention segments and capacity
+  rdb::retention_t retention            = rdb::retention_t{.segments = 0, .capacity = 0};  // Retention segments and capacity
   std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFile::no_retention);
   std::string storage_policy            = "DEFAULT";
 
   [[nodiscard]] bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();
-  [[nodiscard]] bool isGenerated() const { return !id.compare(0, 7, "STREAM_"); }
+  [[nodiscard]] bool isGenerated() const { return id.compare(0, 7, "STREAM_") == 0; }
   [[nodiscard]] bool isCompilerDirective() const { return !id.empty() && id[0] == ':'; }
   bool is(command_id command);
 

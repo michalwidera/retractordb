@@ -106,9 +106,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   for (auto i = 0; i < lengthAbs; ++i) {
     auto fp = std::div(storedRecordCountDst_ - i, descriptorSrcSize);
     auto readPosition{recordsCountSrc - fp.quot - 1};
-    if (recordsCountSrc > fp.quot)
-      source->revRead(readPosition);
-    else
+    // Guard negative quotient before revRead: out-of-range windows must stay null, not stale 0.
+    if (fp.quot >= 0 && static_cast<size_t>(fp.quot) < recordsCountSrc) {
+      if (!source->revRead(static_cast<int>(readPosition))) fp.rem = -1;
+    } else
       fp.rem = -1;  // skip to undefined(-1) as value
 
     auto locSrc = fp.rem;

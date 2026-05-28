@@ -48,8 +48,8 @@ static uint64_t rtEffectiveCapabilities() {
 bool rtCheckAndPrint() {
   const uint64_t caps   = rtEffectiveCapabilities();
   const bool isRoot     = (geteuid() == 0);
-  const bool hasSysNice = isRoot || ((caps >> kCapSysNiceBit) & 1U);  // CAP_SYS_NICE
-  const bool hasIpcLock = isRoot || ((caps >> kCapIpcLockBit) & 1U);  // CAP_IPC_LOCK
+  const bool hasSysNice = isRoot || (((caps >> kCapSysNiceBit) & 1U) != 0U);  // CAP_SYS_NICE
+  const bool hasIpcLock = isRoot || (((caps >> kCapIpcLockBit) & 1U) != 0U);  // CAP_IPC_LOCK
 
   const std::string rtKernelVal = rtReadFile("/sys/kernel/realtime");
   const bool hasRTKernel        = (rtKernelVal == "1");

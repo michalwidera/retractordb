@@ -2,9 +2,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstring>  // memcpy
 #include <memory>   // make_unique
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include "fatalError.hpp"
 
@@ -154,7 +156,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
           while (myFile_.get(c) && c != '"')
             var += c;
         }
-        var.erase(remove(var.begin(), var.end(), '"'), var.end());
+        var.erase(std::ranges::remove(var, '"').begin(), var.end());
         var.resize(strLen);
         payload_->setItem(i, var);
       } else {

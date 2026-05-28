@@ -158,7 +158,7 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitFunction_call(RQLParser::Function_callContext *ctx) override {
-    if (ctx->TO_STRING_FN() && ctx->DECIMAL())
+    if (ctx->TO_STRING_FN() != nullptr && ctx->DECIMAL() != nullptr)
       recpToken(CALL2, std::make_pair(std::string("to_string"), std::stoi(ctx->DECIMAL()->getText())));
     else
       recpToken(CALL, ctx->children[0]->getText());
@@ -201,7 +201,7 @@ class ParserListener : public RQLBaseListener {
   void exitSelect(RQLParser::SelectContext *ctx) override {
     // this loop creates field names in streamName + "_" + counter++
     for (auto &i : qry.lSchema) {
-      if ((i.field_.rname).substr(0, 1) == "_") (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
+      if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
     }
 
     qry.id = ctx->ID()->getText();
@@ -213,11 +213,11 @@ class ParserListener : public RQLBaseListener {
     }
 
     qry.lProgram = program;
-    if (ctx->VOLATILE()) {
+    if (ctx->VOLATILE() != nullptr) {
       qry.policy = std::make_pair("MEMORY", 1);
     }
 
-    if (ctx->FILE()) {
+    if (ctx->FILE() != nullptr) {
       qry.filename = ctx->file_name->getText();
 
       // This removes ''
@@ -227,10 +227,9 @@ class ParserListener : public RQLBaseListener {
       if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
     }
 
-    if (ctx->STORAGE()) {
+    if (ctx->STORAGE() != nullptr) {
       qry.storage_policy = ctx->type_name->getText();
-      std::transform(qry.storage_policy.begin(), qry.storage_policy.end(), qry.storage_policy.begin(),
-                     ::toupper);  // to upper case
+      std::ranges::transform(qry.storage_policy, qry.storage_policy.begin(), ::toupper);  // to upper case
     }
 
     coreInstance.push_back(qry);
@@ -240,7 +239,7 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitRetention(RQLParser::RetentionContext *ctx) override {
-    if (ctx->segments) {
+    if (ctx->segments != nullptr) {
       // retention {capacity} !{segments}
       qry.retention = std::pair<int, int>(      //
           std::stoi(ctx->segments->getText()),  //
@@ -305,7 +304,7 @@ class ParserListener : public RQLBaseListener {
     dump_right = std::stoi(ctx->step_forward->getText());
     if (ctx->children[4]->getText() == "-" || ctx->children[3]->getText() == "−") dump_right = -dump_right;
 
-    if (ctx->rule_retnetion)
+    if (ctx->rule_retnetion != nullptr)
       dump_retention = std::stoi(ctx->rule_retnetion->getText());
     else
       dump_retention = 0;  // Default: no retention
@@ -321,7 +320,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitCoption(RQLParser::CoptionContext *ctx) override {
     qry.id = ":" + ctx->directive->getText();
-    std::transform(qry.id.begin(), qry.id.end(), qry.id.begin(), ::toupper);  // to upper case
+    std::ranges::transform(qry.id, qry.id.begin(), ::toupper);  // to upper case
     qry.filename = ctx->value->getText();
 
     // This removes ''
@@ -433,7 +432,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) override {
     auto fTypeSizeArray = 1;  // Default:1
-    if (ctx->type_size) fTypeSizeArray = std::stoi(ctx->type_size->getText());
+    if (ctx->type_size != nullptr) fTypeSizeArray = std::stoi(ctx->type_size->getText());
     std::list<token> emptyProgram;
     qry.lSchema.emplace_back(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram);
     fType = rdb::BYTE;
@@ -461,7 +460,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   tree::ParseTree *tree  = parser.prog();
   std::string firsttoken = "UNRECOGNIZED";
   if (!tree->children.empty() && !tree->children[0]->children.empty()) firsttoken = tree->children[0]->children[0]->getText();
-  std::transform(firsttoken.begin(), firsttoken.end(), firsttoken.begin(), ::toupper);
+  std::ranges::transform(firsttoken, firsttoken.begin(), ::toupper);
 
   std::string streamName;  // tree->children[1]->children[0]->getText();
   if (!tree->children.empty()) {

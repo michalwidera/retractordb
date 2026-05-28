@@ -45,7 +45,7 @@ using StringAllocator = IPC::allocator<IPCString, segment_manager_t>;
 using ValueType = std::pair<const int, IPCString>;
 
 using ShmemAllocator = IPC::allocator<ValueType, segment_manager_t>;
-using IPCMap         = boost::container::map<int, IPCString, std::less<int>, ShmemAllocator>;
+using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemAllocator>;
 
 using namespace CRationalStreamMath;
 
@@ -177,7 +177,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   // These brackets are important - we need to lock coreInstancePtr as less as possible
   {
-    std::lock_guard<std::mutex> scoped_lock(core_mutex);
+    std::scoped_lock scoped_lock(core_mutex);
     mergedIds          = cmPtr->importFrom(coreInstanceCopy);
     compileChainResult = cmPtr->compile();
   }
@@ -244,8 +244,9 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       ptRetval.put(std::string("db.is_generated"), ((*coreInstancePtr)[streamName].isGenerated() ? "true" : "false"));
       ptRetval.put(std::string("db.query"),
                    boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lProgram.size()) + " tokens");
-      auto it               = std::find_if(processedLines.begin(), processedLines.end(),
-                                           [&streamName](const std::pair<std::string, std::string> &p) { return p.first == streamName; });
+      auto it =
+          std::ranges::find_if(processedLines,  //
+                               [&streamName](const std::pair<std::string, std::string> &p) { return p.first == streamName; });
       std::string queryLine = (it != processedLines.end()) ? it->second : "{not found}";
       ptRetval.put(std::string("db.processed_line"), queryLine);
     }
@@ -320,7 +321,7 @@ void executorsm::commandProcessorLoop() {
                           ipc::kQueryQueueMaxMessageSize  // max message size
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>(ipc::kMapObject.data())  // object name
-                    (std::less<int>(), allocatorShmemMapInstance);
+                    (std::less<>(), allocatorShmemMapInstance);
     ipcReady = true;
     cv.notify_all();
     //
@@ -515,15 +516,15 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     dataModel proc(*coreInstancePtr);
     pProc = &proc;
 
-    if (vm.count("xqrywait")) {
-      if (vm.count("verbose")) std::cout << "Waiting for first query to start process.\n";
+    if (vm.contains("xqrywait")) {
+      if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
       std::unique_lock<std::mutex> scoped_lock(core_mutex);
       iTimeLimitCnt = executorsm::waitForXqry;
       cv.wait(scoped_lock, [this] { return iTimeLimitCnt != executorsm::waitForXqry; });
-      if (vm.count("verbose")) std::cout << "First query received, starting processing loop.\n";
+      if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
     }
 
-    if (vm.count("verbose")) coreInstancePtr->dumpCore();
+    if (vm.contains("verbose")) coreInstancePtr->dumpCore();
 
     TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
     //
@@ -531,7 +532,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (iTimeLimitCnt == executorsm::inifitie_loop && vm.count("verbose")) std::cout << "Press any key to stop.\n";
+    if (iTimeLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
     std::set<std::string> inSet;
@@ -542,13 +543,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     // End of ZERO-step
 
     // Loop of data processing
-    bool ignoreanykey = vm.count("noanykey") > 0;
+    bool ignoreanykey = vm.contains("noanykey");
     boost::rational<int> prev_interval(0);
 
 #ifdef __linux__
     struct timespec loop_anchor{};
     clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
-    const bool rt_mode = vm.count("realtime") > 0;
+    const bool rt_mode = vm.contains("realtime");
     if (rt_mode) {
       if (rtCheckAndPrint()) rtActivate();
     }

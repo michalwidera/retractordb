@@ -11,7 +11,9 @@
 #include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <sstream>
+#include <utility>
 #include "fatalError.hpp"
 
 #include "rdb/convertTypes.hpp"
@@ -39,7 +41,7 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
   }
 
   const auto position = positionOpt->first;  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
-  if (position < 0 || position >= static_cast<int>(descriptor.size())) {
+  if (position < 0 || std::cmp_greater_equal(position, descriptor.size())) {
     FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
   }
 
@@ -232,7 +234,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
       FatalError("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len,
                  descriptor.getSizeInBytes());
     }
-    std::fill(dest.begin(), dest.end(), 0);
+    std::ranges::fill(dest, 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
   };
 
@@ -295,7 +297,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     auto len       = descriptorCopy[position].rlen * descriptorCopy[position].rarray;
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptorCopy.getSizeInBytes();
-    if (offsetFlat + len > descLen) {
+    if (offsetFlat + static_cast<size_t>(len) > descLen) {
       FatalError("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
     }
 
@@ -364,7 +366,7 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
     is >> record;
     auto fieldLen  = desc.fieldSize(fieldName);
     auto fieldSpan = rhs.span().subspan(desc.fieldByteOffset(fieldName), fieldLen);
-    std::fill(fieldSpan.begin(), fieldSpan.end(), 0);
+    std::ranges::fill(fieldSpan, 0);
     std::copy_n(record.c_str(), std::min((size_t)fieldLen, record.size()), fieldSpan.begin());
     rhs.nullBitset_[fieldIndex] = false;
   } else
@@ -373,7 +375,7 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
         int data;
         is >> data;
         auto data8 = static_cast<uint8_t>(data);
-        auto dest  = rhs.span().subspan(desc.fieldByteOffset(fieldName) + i * sizeof(uint8_t), sizeof(uint8_t));
+        auto dest  = rhs.span().subspan(desc.fieldByteOffset(fieldName) + (i * sizeof(uint8_t)), sizeof(uint8_t));
         std::memcpy(dest.data(), &data8, sizeof(uint8_t));
         rhs.nullBitset_[fieldIndex] = false;
       } else if (desc.fieldTypeName(fieldName) == "UINT")

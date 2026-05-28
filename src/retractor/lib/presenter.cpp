@@ -1,5 +1,6 @@
 #include "presenter.hpp"
 
+#include <algorithm>
 #include <iostream>  // for operator<<
 
 #include <boost/lexical_cast.hpp>  // for lexical_cast
@@ -19,12 +20,12 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
-  bool bShowFileds      = (vm.count("fields") != 0);
-  bool bShowStreamProgs = (vm.count("streamprogs") != 0);
-  bool bShowTags        = (vm.count("tags") != 0);
-  bool bShowRules       = (vm.count("rules") != 0);
-  bool bTransparent     = (vm.count("transparent") != 0);
-  bool bShowRuleProgram = !(vm.count("hideruleprog") != 0);
+  bool bShowFileds      = vm.contains("fields");
+  bool bShowStreamProgs = vm.contains("streamprogs");
+  bool bShowTags        = vm.contains("tags");
+  bool bShowRules       = vm.contains("rules");
+  bool bTransparent     = vm.contains("transparent");
+  bool bShowRuleProgram = !vm.contains("hideruleprog");
 
   xout << "digraph structs {" << '\n';
   xout << " node\t[shape=record];" << '\n';
@@ -78,8 +79,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         // dot program is using { as important sign - we need to convert { to <
         //
         std::string name(f.field_.rname);
-        std::replace(name.begin(), name.end(), '{', '/');
-        std::replace(name.begin(), name.end(), '}', '/');
+        std::ranges::replace(name, '{', '/');
+        std::ranges::replace(name, '}', '/');
         xout << name;
         std::cout << "(" << GetStringdescFld(f.field_.rtype) << ")";
       }
@@ -135,8 +136,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
             if (r.dump_retention != 0) xout << "\\n RETENTION " << r.dump_retention;
           } else if (r.action == rule::SYSTEM) {
             std::string cmd(r.systemCommand);
-            std::replace(cmd.begin(), cmd.end(), '"', '=');
-            std::replace(cmd.begin(), cmd.end(), '\'', '=');
+            std::ranges::replace(cmd, '"', '=');
+            std::ranges::replace(cmd, '\'', '=');
             xout << "DO SYSTEM \\n'" << cmd << "'";
           } else {
             xout << "UNKNOWN_ACTION";
@@ -156,8 +157,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
               if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
                 xout << t;
               else {
-                std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
-                std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
+                std::ranges::replace(sTokenName, '{', '/');
+                std::ranges::replace(sTokenName, '}', '/');
                 xout << sTokenName;
               }
             }
@@ -197,8 +198,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         else
           xout << "[shape=record,label=\"";
         std::string sFieldName(f.field_.rname);
-        std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
-        std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
+        std::ranges::replace(sFieldName, '{', '/');
+        std::ranges::replace(sFieldName, '}', '/');
         xout << sFieldName;
         xout << "|";
         xout << "{";
@@ -216,8 +217,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
             if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
               xout << t;
             else {
-              std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
-              std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
+              std::ranges::replace(sTokenName, '{', '/');
+              std::ranges::replace(sTokenName, '}', '/');
               xout << sTokenName;
             }
           }
@@ -442,13 +443,13 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     int period(boost::rational_cast<int>(interval - prev_interval));
     prev_interval = interval;
 
-    proc.push_back(proc_t{procSetVar, period});
+    proc.push_back(proc_t{.procSet = procSetVar, .interval = period});
     stepCounter++;
     if (stepCounter >= stepLimit) break;
     int emptyCount = period / grid;
 
     for (int j = 0; j < emptyCount - 1; j++) {
-      proc.push_back(proc_t{std::set<std::string>{}, grid});
+      proc.push_back(proc_t{.procSet = std::set<std::string>{}, .interval = grid});
       stepCounter++;
       if (stepCounter >= stepLimit) break;
     }
@@ -466,7 +467,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     std::cout << stateChar;
     if (isGridOn) std::cout << gridChar;
     for (const auto &p : proc) {
-      if (p.procSet.find(q.id) != p.procSet.end())
+      if (p.procSet.contains(q.id))
         std::cout << objChar;
       else
         std::cout << stateChar;
@@ -488,8 +489,8 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     if (q.isCompilerDirective()) continue;
     if (q.isDeclaration()) continue;
 
-    auto it = std::find_if(processedLines.begin(), processedLines.end(),
-                           [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
+    auto it =
+        std::ranges::find_if(processedLines, [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
     if (it != processedLines.end()) {
       std::cout << "> " << it->second << '\n';
       std::cout << '\n';
@@ -497,7 +498,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     std::cout << stateChar;
     if (isGridOn) std::cout << gridChar;
     for (const auto &p : proc) {
-      if (p.procSet.find(q.id) != p.procSet.end())
+      if (p.procSet.contains(q.id))
         std::cout << objChar;
       else
         std::cout << stateChar;
@@ -517,20 +518,20 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
 
 int presenter::run(const boost::program_options::variables_map &vm) {
   try {
-    if (vm.count("tags") != 0 && vm.count("fields") == 0) {
+    if (vm.contains("tags") && !vm.contains("fields")) {
       std::cerr << "Conflicting parameters." << '\n';
       std::cerr << "Tags are referencing fields - when you set tags, leave field in dots" << '\n';
       return system::errc::invalid_argument;
     }
-    if (vm.count("dot")) {
+    if (vm.contains("dot")) {
       graphiz(std::cout, vm);
-    } else if (vm.count("csv")) {
+    } else if (vm.contains("csv")) {
       qSet();
       qPrograms();
       qFields();
       qFieldsProgram();
       qRules();
-    } else if (vm.count("diagram")) {
+    } else if (vm.contains("diagram")) {
       std::string sDiagramArgument = vm["diagram"].as<std::string>();
 
       std::string::size_type const secondArgLocation(sDiagramArgument.find_last_of(':'));

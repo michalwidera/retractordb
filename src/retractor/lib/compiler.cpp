@@ -193,10 +193,10 @@ std::string compiler::extractIntermediateStreams() {
   coreInstance.sort();
 
   auto substratType_C = std::string("DEFAULT");
-  auto substratTypeIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
-                                     [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
+  auto substratTypeIt = std::ranges::find_if(coreInstance,  //
+                                             [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
   if (substratTypeIt != std::end(coreInstance)) substratType_C = substratTypeIt->filename;
-  std::transform(substratType_C.begin(), substratType_C.end(), substratType_C.begin(), ::toupper);
+  std::ranges::transform(substratType_C, substratType_C.begin(), ::toupper);
 
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
     // Optimization phase 2
@@ -404,8 +404,8 @@ std::string compiler::expandIndexWildcards() {
       if (!usedSchemaX.empty()) {
         int minSizeFlat{std::numeric_limits<int>::max()};
         for (const auto &schema : usedSchemaX) {
-          auto size = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
-          if (size < minSizeFlat) minSizeFlat = size;
+          auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
+          minSizeFlat = std::min(minSizeFlat, size);
         }
 
         if (minSizeFlat == std::numeric_limits<int>::max()) {
@@ -548,7 +548,7 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
               ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
 
           if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
-          t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));
+          t = token(PUSH_ID, std::make_pair(schema, offset1 + (offset2 * static_cast<int>(q.lSchema.size()))));
         } else
           throw std::out_of_range("No mach on type conversion ID4");
         break;

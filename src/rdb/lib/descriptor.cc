@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 
 #include "fatalError.hpp"
@@ -139,11 +140,11 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 void Descriptor::removeConfigurationFields() {
   Descriptor rhs(*this);
   clear();
-  std::copy_if(rhs.begin(), rhs.end(),     //
-               std::back_inserter(*this),  //
-               [](const rField &i) {       //
-                 return !isConfigurationField(i.rtype);
-               });
+  std::ranges::copy_if(rhs,                        //
+                       std::back_inserter(*this),  //
+                       [](const rField &i) {       //
+                         return !isConfigurationField(i.rtype);
+                       });
 
   fieldMappingsDirty_ = true;
 }
@@ -181,10 +182,10 @@ size_t Descriptor::getSizeInBytes() const {
 }
 
 rdb::retention_t Descriptor::retention() {
-  rdb::retention_t retval{0, 0};
+  rdb::retention_t retval{.segments = 0, .capacity = 0};
 
-  auto it = std::find_if(begin(), end(),                                                //
-                         [](const auto &item) { return item.rtype == rdb::RETENTION; }  //
+  auto it = std::ranges::find_if(*this,                                                         //
+                                 [](const auto &item) { return item.rtype == rdb::RETENTION; }  //
   );
 
   if (it != end()) retval = std::pair<int, int>((*it).rlen, (*it).rarray);
@@ -195,15 +196,15 @@ rdb::retention_t Descriptor::retention() {
 std::pair<std::string, size_t> Descriptor::storagePolicy() {
   int retval{0};
 
-  auto it1 = std::find_if(begin(), end(),                                                //
-                          [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
+  auto it1 = std::ranges::find_if(*this,                                                         //
+                                  [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
   );
 
   if (it1 != end()) retval = (*it1).rlen;
 
   std::string retvalType;
-  auto it2 = std::find_if(begin(), end(),                                           //
-                          [](const auto &item) { return item.rtype == rdb::TYPE; }  //
+  auto it2 = std::ranges::find_if(*this,                                                    //
+                                  [](const auto &item) { return item.rtype == rdb::TYPE; }  //
   );
 
   if (it2 != end()) retvalType = (*it2).rname;
@@ -212,8 +213,8 @@ std::pair<std::string, size_t> Descriptor::storagePolicy() {
 }
 
 size_t Descriptor::fieldIndex(const std::string_view fieldName) {
-  auto it = std::find_if(begin(), end(),                                                      //
-                         [fieldName](const auto &item) { return item.rname == fieldName; });  //
+  auto it = std::ranges::find_if(*this,                                                               //
+                                 [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
   if (it != end()) return std::distance(begin(), it);
   FatalError("descriptor: field ID not found");
@@ -252,7 +253,7 @@ std::pair<rdb::descFld, int> Descriptor::widestFieldType() {
     if (isConfigurationField(field.rtype)) continue;
     if (retVal <= field.rtype) {
       retVal = field.rtype;
-      if (size < fieldSize(field)) size = fieldSize(field);
+      size   = std::max(size, fieldSize(field));
     }
   }
   return std::make_pair(retVal, size);

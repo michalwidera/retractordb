@@ -32,9 +32,9 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
       }
     }
 
-  auto new_end = std::remove_if(coreInstance_.begin(), coreInstance_.end(),  //
-                                [](const query &qry) { return qry.isCompilerDirective(); });
-  coreInstance_.erase(new_end, coreInstance_.end());
+  auto removed = std::ranges::remove_if(coreInstance_,  //
+                                        [](const query &qry) { return qry.isCompilerDirective(); });
+  coreInstance_.erase(removed.begin(), removed.end());
 
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
@@ -45,12 +45,12 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
 dataModel::~dataModel() = default;
 
 bool dataModel::addQueryToModel(const std::string &id) {
-  if (qSet.find(id) != qSet.end()) {
+  if (qSet.contains(id)) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
     return false;
   }
 
-  auto it = std::find_if(coreInstance_.begin(), coreInstance_.end(), [&](const auto &qry) { return qry.id == id; });
+  auto it = std::ranges::find_if(coreInstance_, [&](const auto &qry) { return qry.id == id; });
   if (it == coreInstance_.end()) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
     return false;
@@ -76,7 +76,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
 }
 
 void dataModel::processZeroStep() {
-  std::lock_guard<std::mutex> scoped_lock(core_mutex);
+  std::scoped_lock scoped_lock(core_mutex);
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
 
@@ -93,12 +93,12 @@ void dataModel::processZeroStep() {
 }
 
 void dataModel::processRows(const std::set<std::string> &inSet) {
-  std::lock_guard<std::mutex> scoped_lock(core_mutex);
+  std::scoped_lock scoped_lock(core_mutex);
 
   // first - process all non-declaration queries
   for (const auto &q : coreInstance_) {
-    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) continue;                // Declarations already processed
+    if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
+    if (q.isDeclaration()) continue;      // Declarations already processed
 
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
@@ -108,8 +108,8 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
 
   // Then - process all declarations to unlock them for next step
   for (auto q : coreInstance_) {
-    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;               // first declarations need to be processed
+    if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;     // first declarations need to be processed
 
     if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
@@ -134,7 +134,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
   }
 
   std::vector<token> arg;
-  std::copy(qry.lProgram.begin(), qry.lProgram.end(), std::back_inserter(arg));
+  std::ranges::copy(qry.lProgram, std::back_inserter(arg));
   // same: for (auto tk : qry.lProgram) arg.push_back(tk);
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack

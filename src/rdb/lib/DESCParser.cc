@@ -54,42 +54,42 @@ class ParserDESCListener : public DESCBaseListener {
 
   void exitByteID(DESCParser::ByteIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(uint8_t), count, rdb::BYTE)});
   }
 
   void exitIntegerID(DESCParser::IntegerIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(int), count, rdb::INTEGER)});
   }
 
   void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(unsigned), count, rdb::UINT)});
   }
 
   void exitFloatID(DESCParser::FloatIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(float), count, rdb::FLOAT)});
   }
 
   void exitDoubleID(DESCParser::DoubleIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(double), count, rdb::DOUBLE)});
   }
 
   void exitRationalID(DESCParser::RationalIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(boost::rational<int>), count, rdb::RATIONAL)});
   }

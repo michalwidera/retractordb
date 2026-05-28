@@ -52,7 +52,7 @@ bool WriteCmd::execute(CommandContext &ctx) {
     return false;
   }
   auto writeStatus  = ctx.dacc->write(record);
-  ctx.payloadStatus = (writeStatus == 0) ? stored : error;
+  ctx.payloadStatus = (!writeStatus) ? stored : error;
   return true;
 }
 
