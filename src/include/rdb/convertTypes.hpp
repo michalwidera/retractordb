@@ -5,7 +5,7 @@
 
 #include "fldType.hpp"
 
-inline constexpr double kDefaultRationalizeDiff = 1E-6;
+inline constexpr double kDefaultRationalizeDiff    = 1E-6;
 inline constexpr int kDefaultRationalizeIterations = 11;
 
 template <typename T>

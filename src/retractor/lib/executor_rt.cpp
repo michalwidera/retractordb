@@ -21,10 +21,10 @@ constexpr int kCapSysNiceBit = 23;  // CAP_SYS_NICE  — wymagane do SCHED_FIFO
 constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  — wymagane do mlockall
 
 // Stałe konwersji czasu — używane przy obliczaniu timespec dla clock_nanosleep.
-constexpr long kNsPerMs  = 1'000'000L;      // nanosekundy na milisekundę
-constexpr long kNsPerSec = 1'000'000'000L;  // nanosekundy na sekundę
+constexpr long kNsPerMs              = 1'000'000L;      // nanosekundy na milisekundę
+constexpr long kNsPerSec             = 1'000'000'000L;  // nanosekundy na sekundę
 constexpr size_t kCapEffPrefixLength = 7;
-constexpr int kRtSchedulerPriority = 50;
+constexpr int kRtSchedulerPriority   = 50;
 
 static std::string rtReadFile(const char *path) {
   std::ifstream f(path);

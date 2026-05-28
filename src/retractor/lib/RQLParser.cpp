@@ -25,9 +25,9 @@ using namespace antlr4;
 std::string status = "OK";
 
 namespace {
-constexpr size_t kAgseWindowSignChildIndex = 5;
+constexpr size_t kAgseWindowSignChildIndex  = 5;
 constexpr int kFallbackToStringOutputLength = 32;
-}
+}  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 

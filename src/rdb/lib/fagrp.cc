@@ -16,7 +16,7 @@ namespace rdb {
 
 namespace {
 
-constexpr int kDecimalBase = 10;
+constexpr int kDecimalBase              = 10;
 constexpr size_t kDefaultSegmentReserve = 8;
 
 auto parseSegmentIndex(const std::string &candidate, const std::string &baseName) -> std::optional<size_t> {

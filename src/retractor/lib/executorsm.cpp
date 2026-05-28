@@ -50,9 +50,9 @@ using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemA
 using namespace CRationalStreamMath;
 
 namespace {
-constexpr int kQueueBufferSeconds = 10;
+constexpr int kQueueBufferSeconds   = 10;
 constexpr int kMinimumQueueElements = 100;
-}
+}  // namespace
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
