@@ -431,14 +431,13 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << "null";
       flatIndex += flatCountForField;
     } else if (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) {
-      writeValue(os, firstValue.value(), r.rtype, rhs.hexFormat_);
+      writeValue(os, *firstValue, r.rtype, rhs.hexFormat_);
       ++flatIndex;
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
         if (!value.has_value()) FatalError("payload: non-null array field returned no value for flat element");
-        writeValue(os, value.value(), r.rtype,
-                   rhs.hexFormat_);  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
+        writeValue(os, *value, r.rtype, rhs.hexFormat_);  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
         if (i < flatCountForField - 1) os << " ";
       }
       flatIndex += flatCountForField;

@@ -9,6 +9,9 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccfs.hpp"
 
+// Tests intentionally use raw byte buffers for low-level I/O API verification.
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+
 // ctest -R '^ut-test_faccfs' -V
 
 using BYTE = unsigned char;
@@ -392,3 +395,5 @@ TEST_F(FaccfsTest, append_and_update_first_record) {
   gf.read(rData, AREA_SIZE);
   EXPECT_EQ(std::memcmp(rData, "second rec", AREA_SIZE), 0);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays)

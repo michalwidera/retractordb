@@ -59,9 +59,9 @@ int main(int argc, char *argv[]) {
   po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data()).options(desc).run(), vm);
   po::notify(vm);
 
-  if (vm.count("noprompt")) cliNoPrompt = true;
+  if (vm.count("noprompt") != 0U) cliNoPrompt = true;
 
-  if (vm.count("help")) {
+  if (vm.count("help") != 0U) {
     std::cout << argv[0] << " - data accessing tool.\n\n"
               << "Usage: " << argv[0] << " [option]\n\n"
               << desc << config_line << "\nLog: " << filelog << "\n"
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  if (vm.count("storagemap")) {
+  if (vm.count("storagemap") != 0U) {
     showStorageMap(mapDatafile);
     spdlog::shutdown();
     return 0;

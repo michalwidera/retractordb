@@ -11,6 +11,9 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccposixshd.hpp"
 
+// Tests intentionally use raw byte arrays for low-level shared-file behavior checks.
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+
 using BYTE = unsigned char;
 
 // Helper: create a single-field Descriptor of given byte size
@@ -63,8 +66,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());  // NOLINT(modernize-return-braced-init-list)
+  return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 }
 
 // --- Test fixture ---
@@ -651,3 +653,5 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails)
   data                = 0xEE;
   ASSERT_NE(pfa->write(&data, 0), EXIT_SUCCESS);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays)

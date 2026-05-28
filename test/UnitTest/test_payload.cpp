@@ -10,6 +10,9 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
 
+// Tests intentionally access optionals and raw buffers directly to validate low-level payload behavior.
+// NOLINTBEGIN(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)
+
 static_assert(std::is_same_v<decltype(std::declval<rdb::payload &>().span()), std::span<uint8_t>>);
 static_assert(std::is_same_v<decltype(std::declval<const rdb::payload &>().span()), std::span<const uint8_t>>);
 
@@ -288,3 +291,5 @@ TEST(payload, stream_operators_support_rational_fields) {
   out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ ratio:3/4 }");
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)

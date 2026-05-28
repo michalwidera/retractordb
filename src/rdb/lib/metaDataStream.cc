@@ -178,7 +178,7 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
     return entriesCache_;
   }
 
-  const size_t payloadSize = static_cast<size_t>(fileSize - static_cast<std::streamoff>(kHeaderSize));
+  const auto payloadSize = static_cast<size_t>(fileSize - static_cast<std::streamoff>(kHeaderSize));
   if (payloadSize % entrySize_ != 0)
     SPDLOG_WARN("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, entrySize_);
 

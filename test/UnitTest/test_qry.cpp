@@ -15,11 +15,11 @@ class qry_fake : public qry {
   boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 } obj;
 
-boost::property_tree::ptree qry_fake::netClient(const std::string &arg1, const std::string &arg2) {
+boost::property_tree::ptree qry_fake::netClient(const std::string &cmd, const std::string &arg) {
   boost::property_tree::ptree retval;
 
-  retval.put("db.message", arg1);
-  if (!arg2.empty()) retval.put("db.argument", arg2);
+  retval.put("db.message", cmd);
+  if (!arg.empty()) retval.put("db.argument", arg);
   retval.put("db.id", "core0");
 
   retval.put("db.stream.core0", "core0");
@@ -49,30 +49,30 @@ class qry_fake_detail : public qry {
   boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
-boost::property_tree::ptree qry_fake_detail::netClient(const std::string &arg1, const std::string &arg2) {
+boost::property_tree::ptree qry_fake_detail::netClient(const std::string &cmd, const std::string &arg) {
   boost::property_tree::ptree retval;
 
-  if (arg1 == "hello") {
+  if (cmd == "hello") {
     retval.put("db", "world");
-  } else if (arg1 == "get") {
+  } else if (cmd == "get") {
     retval.put("db.stream.core0", "core0");
     retval.put("db.stream.core0.duration", "1");
     retval.put("db.stream.core0.size", "123");
     retval.put("db.stream.core0.count", "345");
     retval.put("db.stream.core0.location", "/dev/location");
     retval.put("db.stream.core0.cap", "789");
-  } else if (arg1 == "detail") {
-    retval.put("db.stream", arg2);
+  } else if (cmd == "detail") {
+    retval.put("db.stream", arg);
     retval.put("db.duration", "1");
-    retval.put("db.processed_line", "SELECT * STREAM " + arg2 + " FROM source");
+    retval.put("db.processed_line", "SELECT * STREAM " + arg + " FROM source");
     retval.put("db.field.rname1", "rname1");
     retval.put("db.field.rname2", "rname2");
     retval.put("db.field_type.rname1", "INTEGER");
     retval.put("db.field_type.rname2", "FLOAT");
-  } else if (arg1 == "adhoc") {
+  } else if (cmd == "adhoc") {
     retval.put("db", "OK");
-  } else if (arg1 == "show") {
-    retval.put("db.stream", arg2);
+  } else if (cmd == "show") {
+    retval.put("db.stream", arg);
   }
 
   return retval;
@@ -117,7 +117,9 @@ class qry_fake_adhoc_fail : public qry {
   boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
-boost::property_tree::ptree qry_fake_adhoc_fail::netClient(const std::string &arg1, const std::string &arg2) {
+boost::property_tree::ptree qry_fake_adhoc_fail::netClient(const std::string &cmd, const std::string &arg) {
+  (void)cmd;
+  (void)arg;
   boost::property_tree::ptree retval;
   retval.put("db", "FAIL");
   return retval;
@@ -200,12 +202,12 @@ class qry_fake_multi : public qry {
   boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
-boost::property_tree::ptree qry_fake_multi::netClient(const std::string &arg1, const std::string &arg2) {
+boost::property_tree::ptree qry_fake_multi::netClient(const std::string &cmd, const std::string &arg) {
   boost::property_tree::ptree retval;
 
-  if (arg1 == "hello") {
+  if (cmd == "hello") {
     retval.put("db", "world");
-  } else if (arg1 == "get") {
+  } else if (cmd == "get") {
     retval.put("db.stream.core0", "core0");
     retval.put("db.stream.core0.duration", "1");
     retval.put("db.stream.core0.size", "100");
@@ -219,10 +221,10 @@ boost::property_tree::ptree qry_fake_multi::netClient(const std::string &arg1, c
     retval.put("db.stream.core1.count", "500");
     retval.put("db.stream.core1.location", "/dev/loc1");
     retval.put("db.stream.core1.cap", "600");
-  } else if (arg1 == "detail") {
-    retval.put("db.stream", arg2);
-    retval.put("db.duration", arg2 == "core0" ? "1" : "0.5");
-    retval.put("db.processed_line", "DECLARE a INTEGER STREAM " + arg2);
+  } else if (cmd == "detail") {
+    retval.put("db.stream", arg);
+    retval.put("db.duration", arg == "core0" ? "1" : "0.5");
+    retval.put("db.processed_line", "DECLARE a INTEGER STREAM " + arg);
     retval.put("db.field.a", "a");
     retval.put("db.field_type.a", "INTEGER");
   }
@@ -301,10 +303,11 @@ class qry_fake_nosize : public qry {
   boost::property_tree::ptree netClient(const std::string &cmd, const std::string &arg) override;
 };
 
-boost::property_tree::ptree qry_fake_nosize::netClient(const std::string &arg1, const std::string &arg2) {
+boost::property_tree::ptree qry_fake_nosize::netClient(const std::string &cmd, const std::string &arg) {
+  (void)arg;
   boost::property_tree::ptree retval;
 
-  if (arg1 == "get") {
+  if (cmd == "get") {
     retval.put("db.stream.str0", "str0");
     retval.put("db.stream.str0.duration", "2");
     retval.put("db.stream.str0.size", "-1");

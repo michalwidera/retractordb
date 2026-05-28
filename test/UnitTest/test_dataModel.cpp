@@ -123,7 +123,7 @@ TEST_F(xschema, check_construct_payload) {
     coutstring1 << rdb::singleLineFormat << payload->descriptor;
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << *payload;
-    std::cerr << rdb::singleLineFormat << *(payload.get()) << '\n';
+    std::cerr << rdb::singleLineFormat << *(payload) << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:null str1_2:null str1_3:null }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");

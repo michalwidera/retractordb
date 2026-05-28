@@ -8,6 +8,9 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccbindev.hpp"
 
+// Tests intentionally use raw byte buffers for binary device I/O coverage.
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+
 namespace {
 
 class BinaryDeviceROTest : public ::testing::Test {
@@ -161,3 +164,5 @@ TEST_F(BinaryDeviceROTest, name_and_write_contract) {
   EXPECT_EQ(dev.name(), path);
   EXPECT_EQ(dev.write(out, 0), EXIT_FAILURE);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays)

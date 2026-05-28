@@ -12,12 +12,15 @@
 #include "rdb/payload.hpp"
 #include "rdb/storageacc.hpp"
 
+// Tests intentionally use raw arrays and direct optional access to exercise binary storage semantics.
+// NOLINTBEGIN(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)
+
 // ctest -R '^ut-test_rdb' -V
 
 const uint AREA_SIZE = 10;
 
 // Helper: build a single-field Descriptor matching AREA_SIZE bytes
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
 template <typename T, typename K>
 bool test_1() {
@@ -570,3 +573,5 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
   for (const auto &f : {dataFile2, descFile2, metaFile2})
     std::filesystem::remove(f);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)

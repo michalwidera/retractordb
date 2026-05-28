@@ -85,7 +85,7 @@ TEST(any_to_variant_cast, unsupported_type_throws) {
 
 TEST(cast_variant, nulltype_returns_monostate) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = int{5};
+  rdb::descFldVT in = 5;
   auto result       = c(in, rdb::NULLTYPE);
   EXPECT_TRUE(std::holds_alternative<std::monostate>(result));
 }
@@ -103,17 +103,17 @@ TEST(cast_variant, monostate_input_returns_fallback_for_integer) {
 
 TEST(cast_variant, int_to_byte) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = int{200};
+  rdb::descFldVT in = 200;
   EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), uint8_t(200));
 }
 TEST(cast_variant, double_to_integer) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = double{3.9};
+  rdb::descFldVT in = 3.9;
   EXPECT_EQ(std::get<int>(c(in, rdb::INTEGER)), 3);
 }
 TEST(cast_variant, float_to_double) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = float{1.5F};
+  rdb::descFldVT in = 1.5F;
   EXPECT_DOUBLE_EQ(std::get<double>(c(in, rdb::DOUBLE)), double(1.5F));
 }
 TEST(cast_variant, uint8_to_uint) {
@@ -141,12 +141,12 @@ TEST(cast_variant, rational_to_float) {
 
 TEST(cast_variant, int_to_string) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = int{42};
+  rdb::descFldVT in = 42;
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), "42");
 }
 TEST(cast_variant, double_to_string) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = double{1.0};
+  rdb::descFldVT in = 1.0;
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), std::to_string(1.0));
 }
 TEST(cast_variant, string_to_string) {
@@ -174,12 +174,12 @@ TEST(cast_variant, rational_to_string) {
 
 TEST(cast_variant, int_to_rational) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = int{5};
+  rdb::descFldVT in = 5;
   EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(5));
 }
 TEST(cast_variant, double_to_rational) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = double{0.5};
+  rdb::descFldVT in = 0.5;
   EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(1, 2));
 }
 TEST(cast_variant, intpair_to_rational) {
@@ -198,7 +198,7 @@ TEST(cast_variant, string_to_rational) {
 TEST(cast_variant, int_to_intpair) {
   using P = std::pair<int, int>;
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = int{7};
+  rdb::descFldVT in = 7;
   P result          = std::get<P>(c(in, rdb::INTPAIR));
   P expected{0, 7};
   EXPECT_EQ(result, expected);
@@ -206,7 +206,7 @@ TEST(cast_variant, int_to_intpair) {
 TEST(cast_variant, double_to_intpair) {
   using P = std::pair<int, int>;
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = double{0.5};
+  rdb::descFldVT in = 0.5;
   P result          = std::get<P>(c(in, rdb::INTPAIR));
   P expected{1, 2};
   EXPECT_EQ(result, expected);
@@ -232,7 +232,7 @@ TEST(cast_variant, string_to_intpair) {
 
 TEST(cast_any, nulltype_returns_monostate) {
   cast<std::any> c;
-  std::any in = int{5};
+  std::any in = 5;
   auto result = c(in, rdb::NULLTYPE);
   EXPECT_EQ(result.type(), typeid(std::monostate));
 }
@@ -244,12 +244,12 @@ TEST(cast_any, monostate_input_returns_integer_fallback) {
 }
 TEST(cast_any, int_to_double) {
   cast<std::any> c;
-  std::any in = int{3};
+  std::any in = 3;
   EXPECT_DOUBLE_EQ(std::any_cast<double>(c(in, rdb::DOUBLE)), 3.0);
 }
 TEST(cast_any, double_to_integer) {
   cast<std::any> c;
-  std::any in = double{4.9};
+  std::any in = 4.9;
   EXPECT_EQ(std::any_cast<int>(c(in, rdb::INTEGER)), 4);
 }
 TEST(cast_any, string_numeric_to_integer) {
@@ -259,7 +259,7 @@ TEST(cast_any, string_numeric_to_integer) {
 }
 TEST(cast_any, int_to_string) {
   cast<std::any> c;
-  std::any in = int{9};
+  std::any in = 9;
   EXPECT_EQ(std::any_cast<std::string>(c(in, rdb::STRING)), "9");
 }
 TEST(cast_any, rational_to_string) {
@@ -269,7 +269,7 @@ TEST(cast_any, rational_to_string) {
 }
 TEST(cast_any, double_to_rational) {
   cast<std::any> c;
-  std::any in = double{0.75};
+  std::any in = 0.75;
   EXPECT_EQ(std::any_cast<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(3, 4));
 }
 TEST(cast_any, string_to_rational) {
@@ -280,7 +280,7 @@ TEST(cast_any, string_to_rational) {
 TEST(cast_any, int_to_intpair) {
   using P = std::pair<int, int>;
   cast<std::any> c;
-  std::any in = int{8};
+  std::any in = 8;
   P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
   P expected{0, 8};
   EXPECT_EQ(result, expected);
@@ -304,7 +304,7 @@ TEST(cast_any, intpair_to_intpair) {
 TEST(cast_any, double_to_intpair) {
   using P = std::pair<int, int>;
   cast<std::any> c;
-  std::any in = double{0.5};
+  std::any in = 0.5;
   P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
   P expected{1, 2};
   EXPECT_EQ(result, expected);

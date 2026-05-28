@@ -9,6 +9,9 @@
 
 #include "rdb/facctxtsrc.hpp"
 
+// Tests intentionally use raw byte buffers for parser and file-interface validation.
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+
 // ctest -R '^ut-test_facctxtsrc' -V
 
 // Source under test:
@@ -472,3 +475,5 @@ TEST_F(TextSourceROTest, test_read_string_no_loop_eof_zero_padded) {
   EXPECT_EQ(buffer[1], 0);
   EXPECT_EQ(buffer[2], 0);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays)
