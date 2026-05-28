@@ -115,7 +115,7 @@ payload::payload(const Descriptor &descriptor) : descriptor(descriptor) {
 // copy constructor
 
 payload::payload(const payload &other) {
-  descriptor   = other.descriptor;
+  descriptor = other.descriptor;
   payloadData_.assign(other.descriptor.getSizeInBytes(), 0);
   std::copy(other.span().begin(), other.span().end(), span().begin());
   nullBitset_ = other.nullBitset_;
@@ -141,7 +141,7 @@ payload &payload::operator=(const Descriptor &other) {
   // * if non empty - this goes strange
   if (descriptor.empty()) {
     // default descriptor constructor (=default) has been used and descriptor is empty and ready to assign.
-    descriptor   = other;
+    descriptor = other;
     payloadData_.assign(other.getSizeInBytes(), 0);
     nullBitset_.assign(descriptor.size(), false);
   } else {
@@ -223,8 +223,8 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
   }
 
   auto writeStringField = [&]() {
-    const auto len = descriptor[position].rlen * descriptor[position].rarray;
-    auto data = std::any_cast<std::string>(value);
+    const auto len  = descriptor[position].rlen * descriptor[position].rarray;
+    auto data       = std::any_cast<std::string>(value);
     auto lenr       = std::min(len, static_cast<int>(data.length()));
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
@@ -435,7 +435,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
         if (!value.has_value()) FatalError("payload: non-null array field returned no value for flat element");
-        writeValue(os, value.value(), r.rtype, rhs.hexFormat_);  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
+        writeValue(os, value.value(), r.rtype,
+                   rhs.hexFormat_);  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
         if (i < flatCountForField - 1) os << " ";
       }
       flatIndex += flatCountForField;

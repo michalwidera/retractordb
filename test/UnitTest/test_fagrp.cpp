@@ -28,7 +28,8 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());  // NOLINT(modernize-return-braced-init-list)
+  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());  // NOLINT(modernize-return-braced-init-list)
 }
 
 struct fileInfo {
@@ -72,7 +73,8 @@ class GroupFileTest : public ::testing::Test {
       if (name.ends_with(".shadow") || name.ends_with(".meta")) {
         continue;
       }
-      mapOfFiles[entry.path().string()] = fileInfo(static_cast<int>(filesize(entry.path().string())), readFile(entry.path().string()));  // NOLINT(bugprone-narrowing-conversions)
+      mapOfFiles[entry.path().string()] = fileInfo(static_cast<int>(filesize(entry.path().string())),
+                                                   readFile(entry.path().string()));  // NOLINT(bugprone-narrowing-conversions)
     }
     return mapOfFiles;
   }

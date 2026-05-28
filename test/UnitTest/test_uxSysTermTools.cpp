@@ -11,9 +11,9 @@
 // --- fixArgcv tests ---
 
 TEST(FixArgcv, strips_trailing_cr_from_arguments) {
-  std::string arg0 = "program\r";
-  std::string arg1 = "hello\r";
-  std::array<char*, 2> argv = {arg0.data(), arg1.data()};
+  std::string arg0           = "program\r";
+  std::string arg1           = "hello\r";
+  std::array<char *, 2> argv = {arg0.data(), arg1.data()};
 
   fixArgcv(2, argv.data());
 
@@ -22,9 +22,9 @@ TEST(FixArgcv, strips_trailing_cr_from_arguments) {
 }
 
 TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
-  std::string arg0 = "program";
-  std::string arg1 = "--flag";
-  std::array<char*, 2> argv = {arg0.data(), arg1.data()};
+  std::string arg0           = "program";
+  std::string arg1           = "--flag";
+  std::array<char *, 2> argv = {arg0.data(), arg1.data()};
 
   fixArgcv(2, argv.data());
 
@@ -34,7 +34,7 @@ TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
 
 TEST(FixArgcv, handles_empty_string_argument) {
   std::string arg0;
-  std::array<char*, 1> argv = {arg0.data()};
+  std::array<char *, 1> argv = {arg0.data()};
 
   fixArgcv(1, argv.data());
 
@@ -42,7 +42,7 @@ TEST(FixArgcv, handles_empty_string_argument) {
 }
 
 TEST(FixArgcv, handles_argc_zero) {
-  std::array<char*, 1> argv = {nullptr};
+  std::array<char *, 1> argv = {nullptr};
   fixArgcv(0, argv.data());
   // No crash expected
 }
@@ -53,8 +53,8 @@ TEST(FixArgcv, handles_null_argv) {
 }
 
 TEST(FixArgcv, only_strips_last_character_if_cr) {
-  std::string arg0 = "a\rb\r";
-  std::array<char*, 1> argv = {arg0.data()};
+  std::string arg0           = "a\rb\r";
+  std::array<char *, 1> argv = {arg0.data()};
 
   fixArgcv(1, argv.data());
 

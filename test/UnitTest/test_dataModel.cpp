@@ -197,18 +197,19 @@ auto print(const std::vector<rdb::descFldVT> &row) {
   for (const auto &v : row) {
     std::stringstream coutstring;
 
-    std::visit(Overload{                                                                                                    //
-                        [&coutstring](std::monostate) { coutstring << "null"; },                                            //
-                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
-                        [&coutstring](int a) { coutstring << a; },                                                          //
-                        [&coutstring](unsigned a) { coutstring << a; },                                                     //
-                        [&coutstring](float a) { coutstring << a; },                                                        //
-                        [&coutstring](double a) { coutstring << a; },                                                       //
-                        [&coutstring](const std::pair<int, int> &a) { coutstring << a.first << "," << a.second; },                 //
-                        [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                        [&coutstring](const std::string &a) { coutstring << a; },                                                   //
-                        [&coutstring](const boost::rational<int> &a) { coutstring << a; }},
-               v);
+    std::visit(
+        Overload{                                                                                                           //
+                 [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
+                 [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
+                 [&coutstring](int a) { coutstring << a; },                                                                 //
+                 [&coutstring](unsigned a) { coutstring << a; },                                                            //
+                 [&coutstring](float a) { coutstring << a; },                                                               //
+                 [&coutstring](double a) { coutstring << a; },                                                              //
+                 [&coutstring](const std::pair<int, int> &a) { coutstring << a.first << "," << a.second; },                 //
+                 [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                 [&coutstring](const std::string &a) { coutstring << a; },                                                  //
+                 [&coutstring](const boost::rational<int> &a) { coutstring << a; }},
+        v);
 
     coutstring << " ";
     res.append(coutstring.str());

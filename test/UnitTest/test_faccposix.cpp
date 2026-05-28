@@ -61,7 +61,8 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()); // NOLINT(modernize-return-braced-init-list)
+  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());  // NOLINT(modernize-return-braced-init-list)
 }
 
 struct fileInfo {

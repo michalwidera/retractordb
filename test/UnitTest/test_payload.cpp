@@ -28,12 +28,13 @@ TEST(payload, position_conversion_case_3_with_payload) {
   payload.setItem(4, 2000);
   payload.setItem(5, std::string("test"));
 
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0).value()) == 145);   // NOLINT(bugprone-unchecked-optional-access)
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1).value()) == 24);    // NOLINT(bugprone-unchecked-optional-access)
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2).value()) == 25);    // NOLINT(bugprone-unchecked-optional-access)
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3).value()) == 26);    // NOLINT(bugprone-unchecked-optional-access)
-  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4).value()) == 2000);      // NOLINT(bugprone-unchecked-optional-access)
-  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()) == std::string("test"));  // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0).value()) == 145);  // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1).value()) == 24);   // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2).value()) == 25);   // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3).value()) == 26);   // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4).value()) == 2000);     // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()) ==
+              std::string("test"));  // NOLINT(bugprone-unchecked-optional-access)
 
   std::stringstream coutstring;
   coutstring << rdb::singleLineFormat << payload;

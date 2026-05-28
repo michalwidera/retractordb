@@ -716,9 +716,10 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         if (step <= 0) {
           FatalError("compiler: AGSE step must be > 0, got {} for query '{}' in computeRequiredCapacities", step, q.id);
         }
-        length                    = abs(length);
-        const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().flatElementCount();
-        const auto timeBufferSize = static_cast<int>(ceil(static_cast<double>(length + step) / static_cast<double>(lengthOfSrc))) + 2;
+        length                 = abs(length);
+        const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().flatElementCount();
+        const auto timeBufferSize =
+            static_cast<int>(ceil(static_cast<double>(length + step) / static_cast<double>(lengthOfSrc))) + 2;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;

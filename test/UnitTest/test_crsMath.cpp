@@ -212,18 +212,19 @@ std::string print(const std::string &query_name, dataModel &proc) {
   std::stringstream coutstring;
   auto cnt = proc.getPayload(query_name)->descriptor.flatElementCount();
   for (auto value : proc.getRow(query_name, 0)) {
-    std::visit(Overload{                                                                                                           //
-                        [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
-                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
-                        [&coutstring](int a) { coutstring << a; },                                                                 //
-                        [&coutstring](unsigned a) { coutstring << a; },                                                            //
-                        [&coutstring](float a) { coutstring << a; },                                                               //
-                        [&coutstring](double a) { coutstring << a; },                                                              //
-                        [&coutstring](const std::pair<int, int> &a) { coutstring << a.first << "," << a.second; },                 //
-                        [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                        [&coutstring](const std::string &a) { coutstring << a; },                                                  //
-                        [&coutstring](const boost::rational<int> &a) { coutstring << a; }},
-               value);
+    std::visit(
+        Overload{                                                                                                           //
+                 [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
+                 [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
+                 [&coutstring](int a) { coutstring << a; },                                                                 //
+                 [&coutstring](unsigned a) { coutstring << a; },                                                            //
+                 [&coutstring](float a) { coutstring << a; },                                                               //
+                 [&coutstring](double a) { coutstring << a; },                                                              //
+                 [&coutstring](const std::pair<int, int> &a) { coutstring << a.first << "," << a.second; },                 //
+                 [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                 [&coutstring](const std::string &a) { coutstring << a; },                                                  //
+                 [&coutstring](const boost::rational<int> &a) { coutstring << a; }},
+        value);
     if (--cnt) coutstring << ",";
   }  // endfor
   return coutstring.str();

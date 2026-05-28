@@ -63,7 +63,8 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()); // NOLINT(modernize-return-braced-init-list)
+  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)),
+                           std::istreambuf_iterator<char>());  // NOLINT(modernize-return-braced-init-list)
 }
 
 // --- Test fixture ---
@@ -562,7 +563,8 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file
 
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
-  const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);  // NOLINT(bugprone-narrowing-conversions)
+  const auto expectedShadowSize =
+      static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);  // NOLINT(bugprone-narrowing-conversions)
   GTEST_ASSERT_EQ(filesize(path + ".shadow"), expectedShadowSize);
 
   BYTE record = 0;
