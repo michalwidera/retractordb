@@ -183,17 +183,20 @@ std::string qry::dir() {
 
   std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
   for (const auto &v : pt.get_child("db.stream")) {
-    int n = snprintf(buffer.data(), buffer.size(), ss.str().c_str(),
-                     v.second.get<std::string>("").c_str(),
-                     v.second.get<std::string>("duration").c_str(),
-                     v.second.get<std::string>("size").c_str(),
-                     v.second.get<std::string>("count").c_str(),
-                     v.second.get<std::string>("location").c_str(),
+    int n = snprintf(buffer.data(), buffer.size(), ss.str().c_str(),  //
+                     v.second.get<std::string>("").c_str(),           //
+                     v.second.get<std::string>("duration").c_str(),   //
+                     v.second.get<std::string>("size").c_str(),       //
+                     v.second.get<std::string>("count").c_str(),      //
+                     v.second.get<std::string>("location").c_str(),   //
                      v.second.get<std::string>("cap").c_str());
     if (n < 0) {
+      SPDLOG_ERROR("qry::dir: snprintf failed while formatting stream '{}'", v.second.get<std::string>(""));
       continue;
     }
     if (static_cast<std::size_t>(n) >= buffer.size()) {
+      SPDLOG_ERROR("qry::dir: formatted output truncated for stream '{}' (required {}, buffer {})",
+                   v.second.get<std::string>(""), n, buffer.size());
       buffer[buffer.size() - 1] = '\0';
     }
     retval << buffer.data();
