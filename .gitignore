@@ -45,3 +45,4 @@ bin/*
 .venv/
 .codex
 gitbook-rdb/
+docker/ci/DockerConan.txt

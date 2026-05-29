@@ -88,8 +88,12 @@ RUN chown -R developer:developer /home/developer/workspace
 # Switch to non-root user
 USER developer
 
-# Copy any local files if needed (uncomment and modify as needed)
-COPY DockerConan.txt /home/developer/workspace/
+# Generuj DockerConan.txt wewnątrz kontenera na podstawie conanfile.py.
+# docker build wywołuj z katalogu głównego repo: docker build -f docker/ci/Dockerfile .
+COPY conanfile.py /tmp/conanfile.py
+COPY docker/ci/gen_dockerconan.sh /tmp/gen_dockerconan.sh
+RUN bash /tmp/gen_dockerconan.sh /tmp/conanfile.py /home/developer/workspace/DockerConan.txt \
+    && rm /tmp/conanfile.py /tmp/gen_dockerconan.sh
 
 RUN python3 -m venv .venv \
     && . .venv/bin/activate \
