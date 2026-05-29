@@ -39,16 +39,14 @@ int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, con
   }
 
   auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
-  if (!positionOpt.has_value()) {
-    FatalError("payload: {} conversion failed for flat position {}", context, positionFlat);
+  if (positionOpt.has_value()) {
+    const auto position = positionOpt->first;
+    if (position < 0 || std::cmp_greater_equal(position, descriptor.size())) {
+      FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
+    }
+    return position;
   }
-
-  const auto position = positionOpt->first;  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
-  if (position < 0 || std::cmp_greater_equal(position, descriptor.size())) {
-    FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
-  }
-
-  return position;
+  FatalError("payload: {} conversion failed for flat position {}", context, positionFlat);
 }
 
 void writeValue(std::ostream &os, const std::any &value, const descFld type, const bool hexFormat) {
@@ -439,9 +437,10 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
-        if (!value.has_value()) FatalError("payload: non-null array field returned no value for flat element");
-        writeValue(os, *value, r.rtype,
-                   rhs.hexFormat_);  // NOLINT(bugprone-unchecked-optional-access) — guarded by FatalError above
+        if (value.has_value())
+          writeValue(os, *value, r.rtype, rhs.hexFormat_);
+        else
+          FatalError("payload: non-null array field returned no value for flat element");
         if (i < flatCountForField - 1) os << " ";
       }
       flatIndex += flatCountForField;

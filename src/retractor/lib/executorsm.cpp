@@ -321,10 +321,10 @@ void executorsm::commandProcessorLoop() {
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     IPC::named_mutex mapMutex(IPC::open_or_create, std::string(ipc::kMapMutex).c_str());
     // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,                          // open or crate
-                          std::string(ipc::kQueryQueue).c_str(),        // name
-                          ipc::kQueryQueueMaxMessages,                  // max message number
-                          ipc::kQueryQueueMaxMessageSize                // max message size
+    IPC::message_queue mq(IPC::open_or_create,                    // open or crate
+                          std::string(ipc::kQueryQueue).c_str(),  // name
+                          ipc::kQueryQueueMaxMessages,            // max message number
+                          ipc::kQueryQueueMaxMessageSize          // max message size
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
                     (std::less<>(), allocatorShmemMapInstance);
