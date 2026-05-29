@@ -22,7 +22,7 @@ class dataModel {
   bool addQueryToModel(const std::string &id);
 
   std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
-                                                    const int revOffset = 0);
+                                                    int revOffset = 0);
 
   /*
    * This function creates Input payload for ConstructOutputPayload data source
@@ -33,7 +33,7 @@ class dataModel {
   void processRows(const std::set<std::string> &inSet);
   void processZeroStep();
 
-  std::vector<rdb::descFldVT> getRow(const std::string &instance, const int timeOffset);
+  std::vector<rdb::descFldVT> getRow(const std::string &instance, int timeOffset);
 
   size_t streamStoredSize(const std::string &instance);
 

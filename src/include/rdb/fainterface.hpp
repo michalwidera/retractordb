@@ -32,14 +32,14 @@ struct FileInterface {
   /// @param nullBitset one bool per descriptor field, true = null
   /// @param position   byte position (std::numeric_limits<size_t>::max() = append)
   /// @return status of operation - 0/EXIT_SUCCESS success
-  virtual ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) = 0;
+  virtual ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) = 0;
 
   /// @brief Null-aware read: retrieves data and fills nullBitset for the record.
   /// @param ptrData    pointer to destination buffer
   /// @param nullBitset output: one bool per descriptor field, true = null
   /// @param position   byte position
   /// @return status of operation - 0/EXIT_SUCCESS success
-  virtual ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) = 0;
+  virtual ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) = 0;
 
   /// @brief Convenience wrapper: Updates or appends data without null tracking.
   /// @param ptrData  pointer to data bytes; nullptr with position=0 triggers purge

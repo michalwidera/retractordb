@@ -4,13 +4,14 @@
 
 #include <algorithm>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 
 #include "fatalError.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 
-extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
 
 namespace rdb {
 
@@ -35,7 +36,7 @@ constexpr auto isConfigurationField(const rdb::descFld index) {
 Descriptor::Descriptor(std::initializer_list<rField> fields) : std::vector<rField>(fields) {}
 
 Descriptor::Descriptor(const std::string &fieldName, int length, int elementCount, rdb::descFld type) {  //
-  emplace_back(std::move(fieldName), length, elementCount, type);                                        //
+  emplace_back(fieldName, length, elementCount, type);                                                   //
 }
 
 void Descriptor::rebuildFieldMappings() {
@@ -52,7 +53,7 @@ void Descriptor::rebuildFieldMappings() {
 
     const int flatCount = (field.rtype == rdb::STRING) ? 1 : field.rarray;
     for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
-      flatToDescriptorIndexMap_.push_back(std::make_pair(static_cast<int>(descriptorFieldIdx), arrayIndex));
+      flatToDescriptorIndexMap_.emplace_back(static_cast<int>(descriptorFieldIdx), arrayIndex);
       fieldByteOffsets_.push_back(offset);
       offset += (field.rtype == rdb::STRING) ? fieldSize(field) : field.rlen;
       ++flattenedFieldCount_;
@@ -139,11 +140,11 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 void Descriptor::removeConfigurationFields() {
   Descriptor rhs(*this);
   clear();
-  std::copy_if(rhs.begin(), rhs.end(),     //
-               std::back_inserter(*this),  //
-               [](const rField &i) {       //
-                 return !isConfigurationField(i.rtype);
-               });
+  std::ranges::copy_if(rhs,                        //
+                       std::back_inserter(*this),  //
+                       [](const rField &i) {       //
+                         return !isConfigurationField(i.rtype);
+                       });
 
   fieldMappingsDirty_ = true;
 }
@@ -175,16 +176,16 @@ int Descriptor::fieldSize(const rdb::rField &field) const {
 
 size_t Descriptor::getSizeInBytes() const {
   auto size{0};
-  for (auto const i : *this)
+  for (auto const &i : *this)
     size += fieldSize(i);
   return size;
 }
 
 rdb::retention_t Descriptor::retention() {
-  rdb::retention_t retval{0, 0};
+  rdb::retention_t retval{.segments = 0, .capacity = 0};
 
-  auto it = std::find_if(begin(), end(),                                                //
-                         [](const auto &item) { return item.rtype == rdb::RETENTION; }  //
+  auto it = std::ranges::find_if(*this,                                                         //
+                                 [](const auto &item) { return item.rtype == rdb::RETENTION; }  //
   );
 
   if (it != end()) retval = std::pair<int, int>((*it).rlen, (*it).rarray);
@@ -195,15 +196,15 @@ rdb::retention_t Descriptor::retention() {
 std::pair<std::string, size_t> Descriptor::storagePolicy() {
   int retval{0};
 
-  auto it1 = std::find_if(begin(), end(),                                                //
-                          [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
+  auto it1 = std::ranges::find_if(*this,                                                         //
+                                  [](const auto &item) { return item.rtype == rdb::RETMEMORY; }  //
   );
 
   if (it1 != end()) retval = (*it1).rlen;
 
-  std::string retvalType{""};
-  auto it2 = std::find_if(begin(), end(),                                           //
-                          [](const auto &item) { return item.rtype == rdb::TYPE; }  //
+  std::string retvalType;
+  auto it2 = std::ranges::find_if(*this,                                                    //
+                                  [](const auto &item) { return item.rtype == rdb::TYPE; }  //
   );
 
   if (it2 != end()) retvalType = (*it2).rname;
@@ -212,13 +213,11 @@ std::pair<std::string, size_t> Descriptor::storagePolicy() {
 }
 
 size_t Descriptor::fieldIndex(const std::string_view fieldName) {
-  auto it = std::find_if(begin(), end(),                                                      //
-                         [fieldName](const auto &item) { return item.rname == fieldName; });  //
+  auto it = std::ranges::find_if(*this,                                                               //
+                                 [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
-  if (it != end())
-    return std::distance(begin(), it);
-  else
-    FatalError("descriptor: field ID not found");
+  if (it != end()) return std::distance(begin(), it);
+  FatalError("descriptor: field ID not found");
 
   return 0;  // ProForma Error
 }
@@ -227,7 +226,7 @@ int Descriptor::fieldSize(const std::string_view fieldName) { return fieldSize((
 
 size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
   auto offset{0};
-  for (auto const field : *this) {
+  for (auto const &field : *this) {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
@@ -250,11 +249,11 @@ std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  
 std::pair<rdb::descFld, int> Descriptor::widestFieldType() {
   rdb::descFld retVal{rdb::BYTE};
   auto size{1};
-  for (auto const field : *this) {
+  for (auto const &field : *this) {
     if (isConfigurationField(field.rtype)) continue;
     if (retVal <= field.rtype) {
       retVal = field.rtype;
-      if (size < fieldSize(field)) size = fieldSize(field);
+      size   = std::max(size, fieldSize(field));
     }
   }
   return std::make_pair(retVal, size);
@@ -301,7 +300,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << r.rarray << "]";
     else if (r.rtype == rdb::STRING)
       os << "[" << r.rlen << "]";
-    if (!Descriptor::singleLineOutput_) os << std::endl;
+    if (!Descriptor::singleLineOutput_) os << '\n';
   }
   if (rhs.empty())
     os << "Empty";

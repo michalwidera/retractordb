@@ -29,7 +29,7 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 extern std::atomic<int> iTimeLimitCnt;
 
@@ -86,8 +86,8 @@ int main(int argc, char *argv[]) {
 
   int timeLimitVar{executorsm::inifitie_loop};
   try {
-    std::string sInputFile{""};
-    std::string sDiagram{""};
+    std::string sInputFile;
+    std::string sDiagram;
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
@@ -127,38 +127,38 @@ int main(int argc, char *argv[]) {
 
     iTimeLimitCnt = timeLimitVar;  // std::atomic assignment
 
-    if (vm.count("status")) {
-      std::cout << "Checking service status." << std::endl;
+    if (vm.contains("status")) {
+      std::cout << "Checking service status." << '\n';
       bool isRunning = guard.isAnotherInstanceRunning();
-      std::cout << serviceName << ": " << (isRunning ? "Running" : "Stopped") << std::endl;
+      std::cout << serviceName << ": " << (isRunning ? "Running" : "Stopped") << '\n';
       return isRunning ? system::errc::no_lock_available : system::errc::success;
     }
 
-    if (vm.count("help")) {
-      std::cout << argv[0] << " - compiler & data processing tool." << std::endl << std::endl;
+    if (vm.contains("help")) {
+      std::cout << argv[0] << " - compiler & data processing tool." << '\n' << '\n';
       std::cout << "Usage: " << argv[0];
       if (onlyCompile) std::cout << " -c";
-      std::cout << " queryfile [option]" << std::endl << std::endl;
+      std::cout << " queryfile [option]" << '\n' << '\n';
       std::cout << desc;
-      std::cout << config_line << std::endl;
-      std::cout << "Log: " << tempLocation << std::endl;
-      if (vm.count("realtime")) rtCheckAndPrint();
-      std::cout << warranty << std::endl;
+      std::cout << config_line << '\n';
+      std::cout << "Log: " << tempLocation << '\n';
+      if (vm.contains("realtime")) rtCheckAndPrint();
+      std::cout << warranty << '\n';
       return system::errc::success;
     }
 
-    if (!vm.count("queryfile")) {
-      std::cout << argv[0] << ": fatal error: no input file" << std::endl;
+    if (!vm.contains("queryfile")) {
+      std::cout << argv[0] << ": fatal error: no input file" << '\n';
       return EPERM;  // ERROR defined in errno-base.h
     }
     if (!std::filesystem::exists(sInputFile)) {
-      std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << std::endl;
+      std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
       return EPERM;  // ERROR defined in errno-base.h
     }
 
     std::ifstream file(sInputFile);
     if (!file.is_open()) {
-      std::cerr << "Error: Unable to open file!" << std::endl;
+      std::cerr << "Error: Unable to open file!" << '\n';
       return system::errc::protocol_error;
     }
 
@@ -169,14 +169,14 @@ int main(int argc, char *argv[]) {
       auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, line);
       parseOut                                  = status;
       if (status != "OK") break;  // Return error if parsing fails
-      processedLines.push_back({stream_name, line});
+      processedLines.emplace_back(stream_name, line);
     }
 
     file.close();
 
     if (parseOut != "OK") {
-      std::cerr << "Input file:" << sInputFile << std::endl  //
-                << "Parse result:" << parseOut << std::endl;
+      std::cerr << "Input file:" << sInputFile << '\n'  //
+                << "Parse result:" << parseOut << '\n';
       return system::errc::protocol_error;
     }
 
@@ -190,13 +190,13 @@ int main(int argc, char *argv[]) {
     response = cm.compile();
 
     if (response != "OK") {
-      std::cerr << "Input file:" << sInputFile << std::endl  //
-                << "Check result:" << response << std::endl;
+      std::cerr << "Input file:" << sInputFile << '\n'  //
+                << "Check result:" << response << '\n';
       return system::errc::protocol_error;
     }
 
     if (onlyCompile) {
-      if (!vm.count("quiet")) {
+      if (!vm.contains("quiet")) {
         presenter dm(coreInstance);
         return dm.run(vm);
       }
@@ -211,11 +211,10 @@ int main(int argc, char *argv[]) {
   signal(SIGTERM, handleSignal);  // Terminate
   signal(SIGHUP, handleSignal);   // Hangup
 
-  bool rotation_enabled =
-      std::any_of(coreInstance.begin(), coreInstance.end(), [](const auto &it) { return it.id == ":ROTATION"; });
+  bool rotation_enabled = std::ranges::any_of(coreInstance, [](const auto &it) { return it.id == ":ROTATION"; });
 
   if (!rotation_enabled) {
-    std::string storage_location{""};
+    std::string storage_location;
 
     for (const auto &it : coreInstance)
       if (it.id == ":STORAGE") {
@@ -223,7 +222,7 @@ int main(int argc, char *argv[]) {
       }
 
     for (const auto &[stream_id, query_text] : processedLines) {
-      if (stream_id == "") continue;
+      if (stream_id.empty()) continue;
       if (coreInstance[stream_id].isDeclaration()) continue;
       if (coreInstance[stream_id].isCompilerDirective()) continue;
       dropArtifactFile(std::filesystem::path(storage_location) / stream_id);

@@ -40,17 +40,17 @@ class posixBinaryFileWithShadow : public FileInterface {
   int fd_shadow;
   int percounter_;
 
-  std::string shadowName() const;
-  ssize_t shadowFind(uint8_t *ptrData, size_t position);
+  [[nodiscard]] std::string shadowName() const;
+  ssize_t shadowFind(uint8_t *ptrData, size_t position) const;
 
  public:
-  posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
+  posixBinaryFileWithShadow(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~posixBinaryFileWithShadow() override;
 
   using FileInterface::read;
   using FileInterface::write;
-  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override;
-  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
 
   auto name() -> std::string & override;
   size_t count() override;

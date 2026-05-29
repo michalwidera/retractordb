@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdint>
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
 
@@ -18,7 +19,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   // only objects with REF has storageNameParam filled.
   if (qry.id.empty()) FatalError("streamInstance: query id must not be empty");
 
-  const auto storageName{qry.filename == "" ? qry.id : qry.filename};
+  const auto storageName{qry.filename.empty() ? qry.id : qry.filename};
 
   int percounter = -1;
   if (pCounterPtr) percounter = pCounterPtr->getCount();
@@ -61,7 +62,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
 rdb::payload streamInstance::constructAgsePayload(const int length,             //
                                                   const int step,               //
                                                   const std::string &instance,  //
-                                                  const int storedRecordCountDst) {
+                                                  const int storedRecordCountDst) const {
   if (step <= 0) {
     FatalError("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
   }
@@ -105,18 +106,16 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   for (auto i = 0; i < lengthAbs; ++i) {
     auto fp = std::div(storedRecordCountDst_ - i, descriptorSrcSize);
     auto readPosition{recordsCountSrc - fp.quot - 1};
-    if (recordsCountSrc > fp.quot)
-      source->revRead(readPosition);
-    else
+    // Guard negative quotient before revRead: out-of-range windows must stay null, not stale 0.
+    if (fp.quot >= 0 && static_cast<size_t>(fp.quot) < recordsCountSrc) {
+      if (!source->revRead(static_cast<size_t>(readPosition))) fp.rem = -1;
+    } else
       fp.rem = -1;  // skip to undefined(-1) as value
 
     auto locSrc = fp.rem;
     if (locSrc >= 0) {
       auto valueOpt = source->getPayload()->getItem(locSrc);
-      if (valueOpt.has_value())
-        result->setItem(flip ? lengthAbs - i - 1 : i, valueOpt.value());
-      else
-        result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
+      result->setItem(flip ? lengthAbs - i - 1 : i, valueOpt);
     } else
       result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
   }
@@ -125,10 +124,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   source->revRead(0);  // Reset source
 
   // 4. Return constructed object.
-  return *(result.get());
+  return *(result);
 }
 
-enum opType { maxop, minop, sumop, avgop };
+enum opType : std::uint8_t { maxop, minop, sumop, avgop };
 
 template <typename T>
 void fnOp(opType op, std::any value, std::any &valueRet) {
@@ -156,7 +155,7 @@ void fnOp(opType op, std::any value, std::any &valueRet) {
   }
 }
 
-rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) {
+rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) const {
   if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
     FatalError("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
   }
@@ -193,10 +192,10 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         maxType_ = rdb::RATIONAL;
         break;
       case rdb::FLOAT:
-        valueRet = float(std::numeric_limits<float>::max());
+        valueRet = std::numeric_limits<float>::max();
         break;
       case rdb::DOUBLE:
-        valueRet = double(std::numeric_limits<double>::max());
+        valueRet = std::numeric_limits<double>::max();
         break;
       default:
         FatalError("streamInstance: unsupported aggregation type");
@@ -213,10 +212,10 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         maxType_ = rdb::RATIONAL;
         break;
       case rdb::FLOAT:
-        valueRet = float(std::numeric_limits<float>::min());
+        valueRet = std::numeric_limits<float>::min();
         break;
       case rdb::DOUBLE:
-        valueRet = double(std::numeric_limits<double>::min());
+        valueRet = std::numeric_limits<double>::min();
         break;
       default:
         FatalError("streamInstance: unsupported aggregation type");
@@ -247,7 +246,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
 
   auto item{0};
   auto validItemCount{0};
-  for (auto const it : outputPayload->descriptor) {
+  for (auto const &it : outputPayload->descriptor) {
     if (it.rtype == rdb::REF) continue;
     if (it.rtype == rdb::TYPE) continue;
     if (it.rtype == rdb::RETENTION) continue;
@@ -280,7 +279,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   if (validItemCount == 0) {
     auto postion{0};
     localPayload->setItem(postion, std::nullopt);
-    return *(localPayload.get());
+    return *(localPayload);
   }
 
   if (cmd == STREAM_AVG) {
@@ -322,9 +321,9 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         FatalError("streamInstance: aggregation result must be rational at finalization");
       auto toint = std::any_cast<boost::rational<int>>(valueRet);
       if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
-        valueRet = int(std::numeric_limits<int>::max());
+        valueRet = std::numeric_limits<int>::max();
       else if (toint < boost::rational<int>(std::numeric_limits<int>::min(), 1))
-        valueRet = int(std::numeric_limits<int>::min());
+        valueRet = std::numeric_limits<int>::min();
       else
         valueRet = int(rational_cast<int>(toint));
     } break;
@@ -334,7 +333,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         FatalError("streamInstance: aggregation result must be rational at finalization");
       auto touint = std::any_cast<boost::rational<int>>(valueRet);
       if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
-        valueRet = unsigned(std::numeric_limits<unsigned>::max());
+        valueRet = std::numeric_limits<unsigned>::max();
       else if (touint < boost::rational<int>(0, 1))
         valueRet = unsigned(0);
       else
@@ -342,7 +341,6 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::RATIONAL:
-      break;
     case rdb::FLOAT:
     case rdb::DOUBLE:
       break;
@@ -352,10 +350,10 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   auto postion{0};
   localPayload->setItem(postion, valueRet);
 
-  return *(localPayload.get());
+  return *(localPayload);
 }
 
-void streamInstance::constructOutputPayload(const std::list<field> &fields) {
+void streamInstance::constructOutputPayload(const std::list<field> &fields) const {
   auto i{0};
   for (const auto &program : fields) {
     expressionEvaluator expression;
@@ -388,16 +386,16 @@ bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = false; },                                                       //
-                 [&retVal](uint8_t a) { retVal = (a != 0); },                                                         //
-                 [&retVal](int a) { retVal = (a != 0); },                                                             //
-                 [&retVal](unsigned a) { retVal = (a != 0); },                                                        //
-                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                                            //
-                 [&retVal](float a) { retVal = (a != 0); },                                                           //
-                 [&retVal](double a) { retVal = (a != 0); },                                                          //
-                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },             //
-                 [&retVal](std::pair<std::string, int>) { FatalError("boolCast: pair<string,int> not supported"); },  //
-                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }                //
+                 [&retVal](std::monostate) { retVal = false; },                                                               //
+                 [&retVal](uint8_t a) { retVal = (a != 0); },                                                                 //
+                 [&retVal](int a) { retVal = (a != 0); },                                                                     //
+                 [&retVal](unsigned a) { retVal = (a != 0); },                                                                //
+                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                                                    //
+                 [&retVal](float a) { retVal = (a != 0); },                                                                   //
+                 [&retVal](double a) { retVal = (a != 0); },                                                                  //
+                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },                     //
+                 [&retVal](const std::pair<std::string, int> &) { FatalError("boolCast: pair<string,int> not supported"); },  //
+                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }                        //
              },
              inVar);
 
@@ -407,7 +405,7 @@ bool boolCast(const rdb::descFldVT &inVar) {
 void streamInstance::constructRulesAndUpdate(const query &qry) {
   rdb::payload payload(*outputPayload->getPayload());
 
-  for (auto &r : qry.lRules) {
+  for (const auto &r : qry.lRules) {
     if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
     if (r.action != rule::DUMP && r.action != rule::SYSTEM)
       FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");

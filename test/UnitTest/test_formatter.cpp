@@ -86,7 +86,8 @@ TEST(Formatter, renderRaw_skipNull_false_outputs_all_null_row) {
 TEST(Formatter, renderGnuplot_accumulates_state) {
   ptree schema;
   schema.put("db.field.x", "x");
-  ptree row1, row2;
+  ptree row1;
+  ptree row2;
   row1.put("0", "10");
   row2.put("0", "20");
 

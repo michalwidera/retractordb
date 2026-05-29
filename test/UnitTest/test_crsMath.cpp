@@ -20,7 +20,7 @@
 
 using namespace CRationalStreamMath;
 
-extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);
 extern dataModel *pProc;
 
 qTree coreInstance;
@@ -94,20 +94,20 @@ struct crsMathTestInit {
     assert(std::filesystem::exists("ut_crsmath.rql") && "file ut_crsmath.rql does not exist!");
     std::ifstream infl("ut_crsmath.rql");
     for (std::string line; std::getline(infl, line);)
-      std::cout << line << std::endl;
+      std::cout << line << '\n';
   }
 
-  ~crsMathTestInit() {}
+  ~crsMathTestInit() = default;
 
 } crsMathTestInstance_;
 
 class crsMathTest : public ::testing::Test {
  protected:
-  crsMathTest() {}
+  crsMathTest() = default;
 
-  virtual ~crsMathTest() {}
+  ~crsMathTest() override = default;
 
-  virtual void SetUp() {
+  void SetUp() override {
     auto compiled = parserRQLFile_4Test(coreInstance, "ut_crsmath.rql") == "OK";
     assert(compiled && "Query set malformed according to grammar.");
 
@@ -116,7 +116,7 @@ class crsMathTest : public ::testing::Test {
     EXPECT_TRUE(response == "OK");
   }
 
-  virtual void TearDown() {
+  void TearDown() override {
     coreInstance.clear();
 
     // This magic is clearing all files that have .desc and are .desc - so called artifacts
@@ -134,7 +134,7 @@ const std::vector<std::string> allStreams = {"cx", "s1x", "s2x", "s3x", "s4x", "
 
 TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   const auto colSize = 4;
-  const auto expectedResult =
+  const auto *const expectedResult =
       "Dlt: { 1/1}{ 1/3}{ 2/3}{ 1/3}{ 1/1}{ 1/1}{ 1/1}{ 2/3}{ 2/3}\n"
       " 000:{  cx}{    }{    }{    }{    }{    }{    }{    }{    }\n"
       " 333 {    }{ s1x}{    }{ s3x}{    }{    }{    }{    }{    }\n"
@@ -166,7 +166,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
   for (const auto &x : allStreams)
     strstream << "{" << std::setw(colSize) << coreInstance.getDelta(x) << "}";
-  strstream << std::endl;
+  strstream << '\n';
 
   // Init row - process all declaration
 
@@ -180,7 +180,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   for (const auto &x : allStreams)
     strstream << "{" << std::setw(colSize) << (initSet.contains(x) ? x : "") << "}";
 
-  strstream << std::endl;
+  strstream << '\n';
 
   // Process declarations and queries in time slots
 
@@ -200,7 +200,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
     for (const auto &x : allStreams)
       strstream << "{" << std::setw(colSize) << (procSet.contains(x) ? x : "") << "}";
 
-    strstream << std::endl;
+    strstream << '\n';
 
     proc.processRows(procSet);
   }
@@ -208,22 +208,23 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   EXPECT_TRUE(strstream.str() == expectedResult);
 }
 
-std::string print(std::string query_name, dataModel &proc) {
+std::string print(const std::string &query_name, dataModel &proc) {
   std::stringstream coutstring;
   auto cnt = proc.getPayload(query_name)->descriptor.flatElementCount();
   for (auto value : proc.getRow(query_name, 0)) {
-    std::visit(Overload{                                                                                                    //
-                        [&coutstring](std::monostate) { coutstring << "null"; },                                            //
-                        [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                            //
-                        [&coutstring](int a) { coutstring << a; },                                                          //
-                        [&coutstring](unsigned a) { coutstring << a; },                                                     //
-                        [&coutstring](float a) { coutstring << a; },                                                        //
-                        [&coutstring](double a) { coutstring << a; },                                                       //
-                        [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                 //
-                        [&coutstring](std::pair<std::string, int> a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                        [&coutstring](const std::string &a) { coutstring << a; },                                           //
-                        [&coutstring](boost::rational<int> a) { coutstring << a; }},
-               value);
+    std::visit(
+        Overload{                                                                                                           //
+                 [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
+                 [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
+                 [&coutstring](int a) { coutstring << a; },                                                                 //
+                 [&coutstring](unsigned a) { coutstring << a; },                                                            //
+                 [&coutstring](float a) { coutstring << a; },                                                               //
+                 [&coutstring](double a) { coutstring << a; },                                                              //
+                 [&coutstring](const std::pair<int, int> &a) { coutstring << a.first << "," << a.second; },                 //
+                 [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                 [&coutstring](const std::string &a) { coutstring << a; },                                                  //
+                 [&coutstring](const boost::rational<int> &a) { coutstring << a; }},
+        value);
     if (--cnt) coutstring << ",";
   }  // endfor
   return coutstring.str();
@@ -231,7 +232,7 @@ std::string print(std::string query_name, dataModel &proc) {
 
 TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   const auto colSize = 9;
-  const auto expectedResult =
+  const auto *const expectedResult =
       " Dlt:|      1/1|      1/3|      2/3|      1/3|      1/1|      1/1|      1/1|      2/3|      2/3|\n"
       "Name:|       cx|      s1x|      s2x|      s3x|      s4x|      s5x|      s6x|      s7x|      s8x|\n"
       " 000 |    1,2,3|         |         |         |         |         |         |         |         |\n"
@@ -261,13 +262,13 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   strstream << std::setw(4) << " Dlt:";
   for (const auto &x : allStreams)
     strstream << "|" << std::setw(colSize) << coreInstance.getDelta(x);
-  strstream << "|" << std::endl;
+  strstream << "|" << '\n';
 
   // Names
   strstream << std::setw(4) << "Name:";
   for (const auto &x : allStreams)
     strstream << "|" << std::setw(colSize) << x;
-  strstream << "|" << std::endl;
+  strstream << "|" << '\n';
 
   // Init row - process all declaration
 
@@ -281,7 +282,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   for (const auto &x : allStreams)
     strstream << "|" << std::setw(colSize) << (initSet.contains(x) ? print(x, proc) : "");
 
-  strstream << "|" << std::endl;
+  strstream << "|" << '\n';
 
   // Process declarations and queries in time slots
 
@@ -302,11 +303,11 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
     for (const auto &x : allStreams)
       strstream << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
-    strstream << "|" << std::endl;
+    strstream << "|" << '\n';
   }
 
-  std::cerr << strstream.str().c_str() << std::endl;
-  std::cerr << expectedResult << std::endl;
+  std::cerr << strstream.str().c_str() << '\n';
+  std::cerr << expectedResult << '\n';
   EXPECT_TRUE(strstream.str() == expectedResult);
 }
 

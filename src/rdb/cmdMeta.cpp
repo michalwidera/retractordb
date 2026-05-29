@@ -5,9 +5,14 @@
 #include <iomanip>
 #include <iostream>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "rdb/metaDataStream.hpp"
+
+namespace {
+constexpr size_t kBitsPerByte = 8;
+}
 
 static std::string resolveMetaPath(const CommandContext &ctx) {
   return (ctx.storageParam.empty() ? std::filesystem::path(ctx.file) : std::filesystem::path(ctx.storageParam) / ctx.file)
@@ -65,7 +70,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
   }
 
   constexpr size_t headerSize = sizeof(int64_t);
-  const size_t bitsetBytes    = (ctx.dacc->descriptor.size() + 7) / 8;
+  const size_t bitsetBytes    = (ctx.dacc->descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte;
   const size_t entrySize      = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + bitsetBytes;
 
   std::ifstream in(path, std::ios::binary);
@@ -81,7 +86,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
   size_t effectiveHeaderSize = headerSize;
   if (fileSize >= 0) {
     const auto fs = static_cast<size_t>(fileSize);
-    if (!(fs >= headerSize && (fs - headerSize) % entrySize == 0))
+    if (fs < headerSize || (fs - headerSize) % entrySize != 0)
       std::cout << ctx.colors.YELLOW << "warning: unexpected meta payload alignment\n" << ctx.colors.RESET;
   }
 
@@ -99,7 +104,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
     in.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(entrySize));
     const auto bytesRead = in.gcount();
     if (bytesRead == 0) break;
-    if (static_cast<size_t>(bytesRead) != entrySize) {
+    if (std::cmp_not_equal(bytesRead, entrySize)) {
       std::cout << ctx.colors.RED << "truncated entry at index: " << entryIdx << "\n" << ctx.colors.RESET;
       break;
     }
@@ -111,9 +116,9 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
     std::cout << "bitsetHex:";
     for (size_t bi = 0; bi < bitsetBytes; ++bi) {
       uint8_t byteVal = 0;
-      for (size_t bit = 0; bit < 8; ++bit) {
-        const size_t fieldIdx = bi * 8 + bit;
-        if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1u << bit);
+      for (size_t bit = 0; bit < kBitsPerByte; ++bit) {
+        const size_t fieldIdx = (bi * kBitsPerByte) + bit;
+        if (fieldIdx < rec.nullBitset.size() && rec.nullBitset[fieldIdx]) byteVal |= static_cast<uint8_t>(1U << bit);
       }
       std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(byteVal) << std::dec;
     }

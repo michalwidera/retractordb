@@ -19,9 +19,9 @@ struct CommandContext {
 
 class ICommand {
  public:
-  virtual ~ICommand()                                                    = default;
-  virtual std::pair<std::string, std::vector<std::string>> usage() const = 0;
-  virtual bool requiresConnection() const { return true; }
+  virtual ~ICommand()                                                                  = default;
+  [[nodiscard]] virtual std::pair<std::string, std::vector<std::string>> usage() const = 0;
+  [[nodiscard]] virtual bool requiresConnection() const { return true; }
   // true → print "ok"; false → skip ok (continue)
   virtual bool execute(CommandContext &ctx) = 0;
 };

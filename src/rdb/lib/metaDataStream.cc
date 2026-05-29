@@ -9,14 +9,17 @@
 #include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace rdb {
+
+constexpr size_t kBitsPerByte = 8;
 
 // ── IndexRecord serialization ────────────────────────────────────────
 
 std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   const size_t bitsetSize = nullBitset.size();
-  const size_t byteCount  = (bitsetSize + 7) / 8;
+  const size_t byteCount  = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
   std::vector<std::byte> buf(sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + byteCount, std::byte{0});
   std::byte *ptr = buf.data();
 
@@ -29,7 +32,7 @@ std::vector<std::byte> metaDataStream::IndexRecord::serialize() const {
   write(recordCount);
   write(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    if (nullBitset[i]) ptr[i / 8] |= static_cast<std::byte>(1u << (i % 8));
+    if (nullBitset[i]) ptr[i / kBitsPerByte] |= static_cast<std::byte>(1U << (i % kBitsPerByte));
 
   return buf;
 }
@@ -52,12 +55,12 @@ metaDataStream::IndexRecord metaDataStream::IndexRecord::deserialize(std::span<c
 
   size_t bitsetSize = 0;
   read(bitsetSize);
-  const size_t byteCount = (bitsetSize + 7) / 8;
+  const size_t byteCount = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
   if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in bitset data");
 
   rec.nullBitset.resize(bitsetSize);
   for (size_t i = 0; i < bitsetSize; ++i)
-    rec.nullBitset[i] = (std::to_integer<uint8_t>(ptr[i / 8]) >> (i % 8)) & 1u;
+    rec.nullBitset[i] = ((std::to_integer<uint8_t>(ptr[i / kBitsPerByte]) >> (i % kBitsPerByte)) & 1U) != 0;
 
   return rec;
 }
@@ -88,7 +91,7 @@ std::vector<metaDataStream::IndexRecord> splitSegment(const metaDataStream::Inde
 }
 
 size_t sumNonGapRecords(const std::vector<metaDataStream::IndexRecord> &entries) {
-  return std::ranges::fold_left(entries, 0uz, [](size_t acc, const auto &e) { return acc + (e.isGap ? 0uz : e.recordCount); });
+  return std::ranges::fold_left(entries, 0UZ, [](size_t acc, const auto &e) { return acc + (e.isGap ? 0UZ : e.recordCount); });
 }
 
 }  // namespace
@@ -118,7 +121,9 @@ void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
   std::fstream f(metaFilePath_, std::ios::binary | std::ios::in | std::ios::out);
   if (!f.is_open()) return;
   f.seekp(0, std::ios::end);
-  if (f.tellp() < static_cast<std::streamoff>(kHeaderSize + entrySize_)) return;
+  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
+  const auto fileSize = static_cast<std::streamoff>(f.tellp());
+  if (fileSize < static_cast<std::streamoff>(kHeaderSize + entrySize_)) return;
   f.seekp(-static_cast<std::streamoff>(entrySize_), std::ios::end);
   auto buf = entry.serialize();
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
@@ -168,13 +173,14 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
   }
 
   in.seekg(0, std::ios::end);
-  const auto fileSize = in.tellg();
-  if (fileSize <= 0 || static_cast<size_t>(fileSize) <= kHeaderSize) {
+  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
+  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  if (fileSize <= 0 || fileSize <= static_cast<std::streamoff>(kHeaderSize)) {
     cacheValid_ = true;
     return entriesCache_;
   }
 
-  const size_t payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
+  const auto payloadSize = static_cast<size_t>(fileSize - static_cast<std::streamoff>(kHeaderSize));
   if (payloadSize % entrySize_ != 0)
     SPDLOG_WARN("metaDataStream: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, entrySize_);
 
@@ -197,8 +203,9 @@ void metaDataStream::loadIndex() {
   if (!in.is_open()) return;
 
   in.seekg(0, std::ios::end);
-  const auto fileSize = in.tellg();
-  if (fileSize <= 0 || static_cast<size_t>(fileSize) < kHeaderSize) return;
+  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
+  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  if (fileSize <= 0 || fileSize < static_cast<std::streamoff>(kHeaderSize)) return;
   in.seekg(0, std::ios::beg);
 
   int64_t creationTimeNs = 0;
@@ -238,11 +245,11 @@ std::pair<std::optional<size_t>, size_t> metaDataStream::locateRecord(size_t rec
 
 // ── Construction / destruction ───────────────────────────────────────
 
-metaDataStream::metaDataStream(const Descriptor &descriptor, const std::string &metaFilePath)
-    : metaFilePath_(metaFilePath),
+metaDataStream::metaDataStream(const Descriptor &descriptor, std::string metaFilePath)
+    : metaFilePath_(std::move(metaFilePath)),
       descriptorRef_(std::make_shared<Descriptor>(descriptor)),
       creationTime_(std::chrono::system_clock::now()),
-      entrySize_(sizeof(uint8_t) + 2 * sizeof(size_t) + (descriptor.size() + 7) / 8) {
+      entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte)) {
   createNullBitsetTemplate();
   loadIndex();
   if (!metaFilePath_.empty() && !std::filesystem::exists(metaFilePath_)) saveHeader();

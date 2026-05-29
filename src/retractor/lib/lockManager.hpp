@@ -5,19 +5,19 @@
 class FlockServiceGuard {
  private:
   std::string lockFilePath;
-  int lockFileDescriptor;
-  bool isLocked;
+  int lockFileDescriptor{-1};
+  bool isLocked{false};
 
  public:
   explicit FlockServiceGuard(const std::string &serviceName);
   ~FlockServiceGuard();
 
   bool acquireLock();
-  bool isLockActive() const;
+  [[nodiscard]] bool isLockActive() const;
   void releaseLock();
-  bool isAnotherInstanceRunning() const;
+  [[nodiscard]] bool isAnotherInstanceRunning() const;
 
  private:
-  bool writeLockInfo();
+  [[nodiscard]] bool writeLockInfo() const;
   void cleanupLockFile();
 };

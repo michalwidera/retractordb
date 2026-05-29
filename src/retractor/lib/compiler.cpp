@@ -15,12 +15,12 @@
 using boost::lexical_cast;
 
 namespace localContext {
-boost::regex xprFieldId5("(\\w*)\\[(\\d*)\\]\\[(\\d*)\\]");  // something[1][1]
-boost::regex xprFieldId4("(\\w*)\\[(\\d*)\\,(\\d*)\\]");     // something[1,1]
-boost::regex xprFieldId2("(\\w*)\\[(\\d*)\\]");              // something[1]
-boost::regex xprFieldIdX("(\\w*)\\[_]");                     // something[_]
-boost::regex xprFieldId1("(\\w*).(\\w*)");                   // something.in_schema
-boost::regex xprFieldId3("(\\w*)");                          // field_of_corn
+boost::regex xprFieldId5(R"((\w*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
+boost::regex xprFieldId4(R"((\w*)\[(\d*)\,(\d*)\])");    // something[1,1]
+boost::regex xprFieldId2(R"((\w*)\[(\d*)\])");           // something[1]
+boost::regex xprFieldIdX("(\\w*)\\[_]");                 // something[_]
+boost::regex xprFieldId1("(\\w*).(\\w*)");               // something.in_schema
+boost::regex xprFieldId3("(\\w*)");                      // field_of_corn
 }  // namespace localContext
 
 using namespace localContext;
@@ -62,8 +62,8 @@ std::string compiler::resolveStreamIntervals() {
             bOnceAgain = true;
             unresolvedCount++;
             continue;
-          } else
-            delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
+          }
+          delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -76,12 +76,11 @@ std::string compiler::resolveStreamIntervals() {
             bOnceAgain = true;
             unresolvedCount++;
             continue;
-          } else {
-            //           D_c * D_b
-            //   D_a = --------------
-            //         abs(D_c - D_b)
-            delta = (delta1 * delta2) / abs(delta1 - delta2);  // deltaDivMod(delta1, delta2);
-          }
+          }  //           D_c * D_b
+          //   D_a = --------------
+          //         abs(D_c - D_b)
+          delta = (delta1 * delta2) / abs(delta1 - delta2);  // deltaDivMod(delta1, delta2);
+
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
             throw std::out_of_range("You cannot make faster div from slower source");
@@ -97,12 +96,11 @@ std::string compiler::resolveStreamIntervals() {
             bOnceAgain = true;
             unresolvedCount++;
             continue;
-          } else {
-            //           D_c * D_a
-            //   D_b = --------------
-            //         abs(D_c - D_a)
-            delta = (delta2 * delta1) / abs(delta2 - delta1);  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
-          }
+          }  //           D_c * D_a
+          //   D_b = --------------
+          //         abs(D_c - D_a)
+          delta = (delta2 * delta1) / abs(delta2 - delta1);  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
+
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
             throw std::out_of_range("You cannot make faster mod from slower source");
@@ -114,8 +112,8 @@ std::string compiler::resolveStreamIntervals() {
             bOnceAgain = true;
             unresolvedCount++;
             continue;
-          } else
-            delta = delta1;  // deltaSubtract(delta1);
+          }
+          delta = delta1;  // deltaSubtract(delta1);
         } break;
         case STREAM_ADD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -124,8 +122,8 @@ std::string compiler::resolveStreamIntervals() {
             bOnceAgain = true;
             unresolvedCount++;
             continue;
-          } else
-            delta = std::min(delta1, delta2);  // deltaAdd(delta1, delta2);
+          }
+          delta = std::min(delta1, delta2);  // deltaAdd(delta1, delta2);
         } break;
         case STREAM_AVG:
         case STREAM_MIN:
@@ -147,7 +145,7 @@ std::string compiler::resolveStreamIntervals() {
           // push_stream core0 -> deltaSrc
           // stream agse <5,3> -> step_of_window,size_of_window
           boost::rational<int> coreDelta = coreInstance.getDelta(t1.getStr_());
-          int coreWindow                 = coreInstance.getQuery(t1.getStr_()).lSchema.size();
+          int coreWindow                 = static_cast<int>(coreInstance.getQuery(t1.getStr_()).lSchema.size());
           auto [step, windowSize]        = std::get<std::pair<int, int>>(op.getVT());
           if (step <= 0) {
             FatalError("compiler::prepareFields: AGSE step must be > 0, got {} for query '{}'", step, q.id);
@@ -174,20 +172,18 @@ std::string compiler::resolveStreamIntervals() {
     if (!bOnceAgain) break;
     if (unresolvedCount >= prevUnresolved) {
       SPDLOG_ERROR("Circular dependency: stream interval resolution stalled with {} unresolved streams", unresolvedCount);
-      return std::string("Circular dependency in stream definitions");
+      return {"Circular dependency in stream definitions"};
     }
     prevUnresolved = unresolvedCount;
     coreInstance.sort();
   }  // while(true)
   coreInstance.sort();
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
-  if (sName2 == "")
-    return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
-  else
-    return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
+  if (sName2.empty()) return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
+  return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
 }
 
 /* Goal of this procedure is to provide stream to canonical form
@@ -197,10 +193,10 @@ std::string compiler::extractIntermediateStreams() {
   coreInstance.sort();
 
   auto substratType_C = std::string("DEFAULT");
-  auto substratTypeIt = std::find_if(coreInstance.begin(), coreInstance.end(),  //
-                                     [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
+  auto substratTypeIt = std::ranges::find_if(coreInstance,  //
+                                             [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
   if (substratTypeIt != std::end(coreInstance)) substratType_C = substratTypeIt->filename;
-  std::transform(substratType_C.begin(), substratType_C.end(), substratType_C.begin(), ::toupper);
+  std::ranges::transform(substratType_C, substratType_C.begin(), ::toupper);
 
   for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
     // Optimization phase 2
@@ -210,8 +206,8 @@ std::string compiler::extractIntermediateStreams() {
             (*it2).getStrCommandID() != "PUSH_STREAM" &&  //
             (*it2).getStrCommandID() != "PUSH_VAL") {
           query newQuery;
-          std::string arg1 = "";
-          std::string arg2 = "";
+          std::string arg1;
+          std::string arg2;
 
           token newVal(*it2);
           newQuery.lProgram.push_front(newVal);
@@ -241,8 +237,8 @@ std::string compiler::extractIntermediateStreams() {
           ++it2;
 
           std::list<token> lTempProgram;
-          lTempProgram.push_back(token(PUSH_TSCAN));
-          newQuery.lSchema.push_back(field(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram));
+          lTempProgram.emplace_back(PUSH_TSCAN);
+          newQuery.lSchema.emplace_back(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram);
           newQuery.policy     = std::make_pair(substratType_C, 1);
           newQuery.id         = composeStreamName(arg1, arg2, cmd);
           newQuery.isSubstrat = true;
@@ -256,7 +252,7 @@ std::string compiler::extractIntermediateStreams() {
       }  // Endfor
     }  // Endif
   }  // Endfor
-  return std::string("OK");
+  return {"OK"};
 }
 
 // Goal of this procedure is to unroll schema based of given command
@@ -269,21 +265,19 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
         coreInstance.getQuery(sName2).descriptorStorage().flatElementCount())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
     lRetVal = coreInstance.getQuery(sName1).lSchema;
-  } else if (cmd == STREAM_DEHASH_DIV)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
-  else if (cmd == STREAM_DEHASH_MOD)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
+  } else if (cmd == STREAM_DEHASH_DIV || cmd == STREAM_DEHASH_MOD)
+    lRetVal = coreInstance.getQuery(sName1).lSchema;  // NOLINT(bugprone-branch-clone)
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
     int i            = 0;
-    for (auto f : coreInstance.getQuery(sName1).lSchema) {
+    for (const auto &f : coreInstance.getQuery(sName1).lSchema) {
       field intf(rdb::rField(sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray,
                              f.field_.rtype),
                  token(PUSH_ID, std::make_pair(sName1, i++)));
       lRetVal.push_back(intf);
     }
     i = 0;
-    for (auto f : coreInstance.getQuery(sName2).lSchema) {
+    for (const auto &f : coreInstance.getQuery(sName2).lSchema) {
       field intf(rdb::rField(sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray,
                              f.field_.rtype),
                  token(PUSH_ID, std::make_pair(sName2, i++)));
@@ -331,20 +325,12 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
   int offset(0);
   for (auto &f : lRetVal) {
     std::stringstream s;
-    if (cmd == STREAM_HASH)
-      s << sName1;
-    else if (cmd == STREAM_TIMEMOVE)
-      s << sName1;
-    else if (cmd == STREAM_AGSE)
-      s << sName1;
-    else {
-      s << sName1;  // generateStreamName( sName2, sName1, cmd ) ;
-    }
+    s << sName1;  // generateStreamName( sName2, sName1, cmd )
     s << "[";
     s << offset++;
     s << "]";
-    if (f.lProgram.size() > 0) f.lProgram.pop_front();
-    f.lProgram.push_front(token(PUSH_ID2, std::make_pair(s.str(), 0)));
+    if (!f.lProgram.empty()) f.lProgram.pop_front();
+    f.lProgram.emplace_front(PUSH_ID2, std::make_pair(s.str(), 0));
   }
   return lRetVal;
 }
@@ -385,9 +371,9 @@ std::string compiler::expandSchemaWildcards() {
             int filedPosition = 0;
             for (auto s : coreInstance.getQuery(t.getStr_()).lSchema) {
               std::list<token> lTempProgram;
-              lTempProgram.push_back(token(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++)));
+              lTempProgram.emplace_back(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++));
               std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCountSh++);
-              q.lSchema.push_back(field(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram));
+              q.lSchema.emplace_back(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram);
             }
             break;
           }
@@ -404,7 +390,7 @@ std::string compiler::expandSchemaWildcards() {
     }
   }
   coreInstance.sort();
-  return std::string("OK");
+  return {"OK"};
 }
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
@@ -415,11 +401,11 @@ std::string compiler::expandIndexWildcards() {
       for (auto &t : f.lProgram)             // for each token in query field
         if (t.getCommandID() == PUSH_IDX)
           usedSchemaX.push_back(get<std::pair<std::string, int>>(t.getVT()).first);  // .second arg is always 0
-      if (usedSchemaX.size() != 0) {
+      if (!usedSchemaX.empty()) {
         int minSizeFlat{std::numeric_limits<int>::max()};
-        for (auto schema : usedSchemaX) {
-          auto size = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
-          if (size < minSizeFlat) minSizeFlat = size;
+        for (const auto &schema : usedSchemaX) {
+          auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
+          minSizeFlat = std::min(minSizeFlat, size);
         }
 
         if (minSizeFlat == std::numeric_limits<int>::max()) {
@@ -440,9 +426,9 @@ std::string compiler::expandIndexWildcards() {
           std::list<token> lTempProgram;
           for (auto &t : oldField.lProgram) {
             if (t.getCommandID() == PUSH_IDX)
-              lTempProgram.push_back(token(PUSH_ID, std::make_pair(t.getStr_(), i)));
+              lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
             else
-              lTempProgram.push_back(token(t.getCommandID(), t.getVT()));
+              lTempProgram.emplace_back(t.getCommandID(), t.getVT());
           }
           field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
                                      oldField.field_.rlen,                       //
@@ -455,7 +441,7 @@ std::string compiler::expandIndexWildcards() {
       }
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
@@ -478,8 +464,8 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
                 if (f1.field_.rname == field) {
                   t = token(PUSH_ID, std::make_pair(schema, offset1));
                   break;
-                } else
-                  ++offset1;
+                }
+                ++offset1;
               }
               if (offset1 == q1.lSchema.size())
                 throw std::out_of_range(
@@ -516,7 +502,8 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
         if (regex_search(text.c_str(), what, xprFieldId3)) {
           if (what.size() != 2) FatalError("compiler: PUSH_ID3 regex match has unexpected capture count");
           const std::string field(what[1]);
-          query *pQ1(nullptr), *pQ2(nullptr);
+          query *pQ1(nullptr);
+          query *pQ2(nullptr);
           auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
           pQ1 = &coreInstance.getQuery(schema1);
           if (q.lProgram.size() == 3) pQ2 = &coreInstance.getQuery(schema2);
@@ -561,11 +548,13 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
               ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
 
           if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
-          t = token(PUSH_ID, std::make_pair(schema, offset1 + offset2 * q.lSchema.size()));
+          t = token(PUSH_ID, std::make_pair(schema, offset1 + (offset2 * static_cast<int>(q.lSchema.size()))));
         } else
           throw std::out_of_range("No mach on type conversion ID4");
         break;
       }
+      default:
+        break;
     }
   }
 }
@@ -587,7 +576,7 @@ std::string compiler::resolveFieldReferences() {
       resolveTokenReferences(r.condition, q);  // for each token in rule
     }  // end for each rule in query
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 /* This function will convert fields list where stream a from b#c
@@ -629,7 +618,7 @@ std::string compiler::localizeFieldOffsets() {
       }
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::validateConstraints() {
@@ -665,7 +654,7 @@ std::string compiler::validateConstraints() {
                    GetStringcommand_id(cmd.getCommandID()), q.id);
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> &capMap) {
@@ -676,7 +665,7 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
     }
     coreInstance[q.first].policy.second = q.second;  // set memory size
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::map<std::string, int> compiler::computeRequiredCapacities() {
@@ -727,9 +716,10 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         if (step <= 0) {
           FatalError("compiler: AGSE step must be > 0, got {} for query '{}' in computeRequiredCapacities", step, q.id);
         }
-        length                    = abs(length);
-        const auto lengthOfSrc    = coreInstance[nameSrc].descriptorStorage().flatElementCount();
-        const auto timeBufferSize = int(ceil((length + step) / lengthOfSrc)) + 2;
+        length                 = abs(length);
+        const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().flatElementCount();
+        const auto timeBufferSize =
+            static_cast<int>(ceil(static_cast<double>(length + step) / static_cast<double>(lengthOfSrc))) + 2;
 
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;
@@ -803,7 +793,7 @@ std::string compiler::deduplicateSubstrats() {
       if (changed) break;
     }
   }
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::string compiler::compile() {
@@ -838,7 +828,7 @@ std::string compiler::compile() {
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
   if (result != "OK") return result;
 
-  return std::string("OK");
+  return {"OK"};
 }
 
 std::vector<std::string> compiler::importFrom(qTree &source) {

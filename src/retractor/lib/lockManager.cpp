@@ -13,9 +13,8 @@
 #include <spdlog/spdlog.h>
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
-    : lockFileDescriptor(-1),
-      isLocked(false),
-      lockFilePath("") {
+
+{
   lockFilePath = std::filesystem::temp_directory_path() / (serviceName + ".lock");
 }
 
@@ -34,7 +33,7 @@ bool FlockServiceGuard::acquireLock() {
   int flockResult = flock(lockFileDescriptor, LOCK_EX | LOCK_NB);
 
   if (flockResult == -1) {
-    std::cerr << "Another instance is running, errno: " << strerror(errno) << std::endl;
+    std::cerr << "Another instance is running, errno: " << strerror(errno) << '\n';
     if (errno == EWOULDBLOCK || errno == EAGAIN) {
       SPDLOG_WARN("Other instance is already running, cannot acquire lock on: {}", lockFilePath);
     } else {
@@ -87,7 +86,7 @@ bool FlockServiceGuard::isAnotherInstanceRunning() const {
   return isRunning;
 }
 
-bool FlockServiceGuard::writeLockInfo() {
+bool FlockServiceGuard::writeLockInfo() const {
   if (lockFileDescriptor == -1) {
     return false;
   }

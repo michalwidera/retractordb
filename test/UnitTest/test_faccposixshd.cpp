@@ -11,12 +11,15 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccposixshd.hpp"
 
-typedef unsigned char BYTE;
+// Tests intentionally use raw byte arrays for low-level shared-file behavior checks.
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+
+using BYTE = unsigned char;
 
 // Helper: create a single-field Descriptor of given byte size
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
-static rdb::Descriptor makeDescInt(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::INTEGER); }
+static rdb::Descriptor makeDescInt(size_t size) { return {"f", static_cast<int>(size), 1, rdb::INTEGER}; }
 
 // ctest -R '^ut-test_faccposixshd' -V
 
@@ -63,7 +66,7 @@ std::ifstream::pos_type filesize(const std::string &filename) {
 
 std::vector<BYTE> readFile(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
-  return std::vector<BYTE>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 }
 
 // --- Test fixture ---
@@ -562,7 +565,8 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file
 
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
-  const auto expectedShadowSize = static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);
+  const auto expectedShadowSize =
+      static_cast<std::ifstream::pos_type>(sizeof(size_t) + recsize);  // NOLINT(bugprone-narrowing-conversions)
   GTEST_ASSERT_EQ(filesize(path + ".shadow"), expectedShadowSize);
 
   BYTE record = 0;
@@ -649,3 +653,5 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails)
   data                = 0xEE;
   ASSERT_NE(pfa->write(&data, 0), EXIT_SUCCESS);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays)

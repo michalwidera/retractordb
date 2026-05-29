@@ -13,9 +13,9 @@ class token {
   rdb::descFldVT valueVT_;
 
  public:
-  std::string getStr_();
-  boost::rational<int> getRI();
-  constexpr rdb::descFldVT getVT() const { return valueVT_; };
+  [[nodiscard]] std::string getStr_() const;
+  [[nodiscard]] boost::rational<int> getRI() const;
+  [[nodiscard]] constexpr rdb::descFldVT getVT() const { return valueVT_; };
 
   explicit token(command_id id = VOID_COMMAND, rdb::descFldVT value = 0);
 

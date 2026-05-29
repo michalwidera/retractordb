@@ -3,7 +3,7 @@
 
 class OpenCmd : public ICommand {
  public:
-  std::pair<std::string, std::vector<std::string>> usage() const override;
-  bool requiresConnection() const override { return false; }
+  [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
+  [[nodiscard]] bool requiresConnection() const override { return false; }
   bool execute(CommandContext &ctx) override;
 };

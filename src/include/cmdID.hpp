@@ -1,12 +1,14 @@
 #pragma once
 
+#include <cstdint>
+
 #include <magic_enum/magic_enum.hpp>  // magic_enum::enum_name
 #include <string>                     // std::string
 
 // Based on
 // https://github.com/Neargye/magic_enum
 
-enum command_id {
+enum command_id : std::uint8_t {
   VOID_COMMAND,       // 0
   VOID_VALUE,         // 1
   PUSH_ID,            // 2

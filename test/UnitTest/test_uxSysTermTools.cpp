@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 
+#include <array>
 #include <cstring>
 #include <filesystem>
 #include <string>
@@ -10,39 +11,39 @@
 // --- fixArgcv tests ---
 
 TEST(FixArgcv, strips_trailing_cr_from_arguments) {
-  char arg0[]  = "program\r";
-  char arg1[]  = "hello\r";
-  char *argv[] = {arg0, arg1};
+  std::string arg0           = "program\r";
+  std::string arg1           = "hello\r";
+  std::array<char *, 2> argv = {arg0.data(), arg1.data()};
 
-  fixArgcv(2, argv);
+  fixArgcv(2, argv.data());
 
   EXPECT_STREQ(argv[0], "program");
   EXPECT_STREQ(argv[1], "hello");
 }
 
 TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
-  char arg0[]  = "program";
-  char arg1[]  = "--flag";
-  char *argv[] = {arg0, arg1};
+  std::string arg0           = "program";
+  std::string arg1           = "--flag";
+  std::array<char *, 2> argv = {arg0.data(), arg1.data()};
 
-  fixArgcv(2, argv);
+  fixArgcv(2, argv.data());
 
   EXPECT_STREQ(argv[0], "program");
   EXPECT_STREQ(argv[1], "--flag");
 }
 
 TEST(FixArgcv, handles_empty_string_argument) {
-  char arg0[]  = "";
-  char *argv[] = {arg0};
+  std::string arg0;
+  std::array<char *, 1> argv = {arg0.data()};
 
-  fixArgcv(1, argv);
+  fixArgcv(1, argv.data());
 
   EXPECT_STREQ(argv[0], "");
 }
 
 TEST(FixArgcv, handles_argc_zero) {
-  char *argv[] = {nullptr};
-  fixArgcv(0, argv);
+  std::array<char *, 1> argv = {nullptr};
+  fixArgcv(0, argv.data());
   // No crash expected
 }
 
@@ -52,10 +53,10 @@ TEST(FixArgcv, handles_null_argv) {
 }
 
 TEST(FixArgcv, only_strips_last_character_if_cr) {
-  char arg0[]  = "a\rb\r";
-  char *argv[] = {arg0};
+  std::string arg0           = "a\rb\r";
+  std::array<char *, 1> argv = {arg0.data()};
 
-  fixArgcv(1, argv);
+  fixArgcv(1, argv.data());
 
   EXPECT_STREQ(argv[0], "a\rb");
 }

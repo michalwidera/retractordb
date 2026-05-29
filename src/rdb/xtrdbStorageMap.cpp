@@ -319,7 +319,8 @@ static std::vector<Segment> readMetaFile(const std::string &path, size_t fieldCo
 
 static char nullChar(const Segment &seg, const std::vector<size_t> &dataIdx) {
   if (dataIdx.empty()) return '=';
-  bool anyNull = false, allNull = true;
+  bool anyNull = false;
+  bool allNull = true;
   for (size_t i : dataIdx) {
     const bool n = (i < seg.nullBitset.size()) && seg.nullBitset[i];
     if (n)
@@ -388,8 +389,8 @@ class TablePrinter {
  public:
   explicit TablePrinter(int width) : width_(width), inner_(width - 4) {}
 
-  int inner() const { return inner_; }
-  int metaBarWidth() const { return inner_ - 2; }
+  [[nodiscard]] int inner() const { return inner_; }
+  [[nodiscard]] int metaBarWidth() const { return inner_ - 2; }
 
   void hline(std::string_view l, std::string_view m, std::string_view r) const {
     std::cout << l << repeatGlyph(std::string(m), width_ - 2) << r << "\n";
@@ -434,7 +435,7 @@ static std::string metaLabel(const Segment &seg, const std::vector<size_t> &data
 
 void showStorageMap(const std::string &baseName) {
   const std::string descFile   = baseName + ".desc";
-  const std::string dataFile   = baseName;
+  const std::string &dataFile  = baseName;
   const std::string metaFile   = baseName + ".meta";
   const std::string shadowFile = baseName + ".shadow";
   const auto rotatedFiles      = readRotatedFiles(baseName);

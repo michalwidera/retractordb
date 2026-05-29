@@ -18,12 +18,11 @@ class LexerErrorListenerDesc : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Descriptor" << std::endl;
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
-    std::cerr << "msg:" << msg << std::endl;
+    std::cerr << "Syntax error @Descriptor" << '\n';
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
+    std::cerr << "msg:" << msg << '\n';
     statusDesc = "Fail";
     exit(EPERM);
-    return;
   }
 };
 
@@ -31,12 +30,11 @@ class ParserErrorListenerDesc : public BaseErrorListener {
  public:
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Descriptor" << std::endl;
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << std::endl;
-    std::cerr << "msg:" << msg << std::endl;
+    std::cerr << "Syntax error @Descriptor" << '\n';
+    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
+    std::cerr << "msg:" << msg << '\n';
     statusDesc = "Fail";
     exit(EPERM);
-    return;
   }
 };
 
@@ -46,71 +44,71 @@ class ParserDESCListener : public DESCBaseListener {
  public:
   ParserDESCListener(rdb::Descriptor &desc) : desc(desc) {};
 
-  void enterDesc(DESCParser::DescContext *ctx) {
+  void enterDesc(DESCParser::DescContext *ctx) override {
     // std::cerr << "enterDesc" << std::endl;
   }
 
-  void exitDesc(DESCParser::DescContext *ctx) {
+  void exitDesc(DESCParser::DescContext *ctx) override {
     // std::cerr << "exitDesc:" << desc << std::endl;
   }
 
-  void exitByteID(DESCParser::ByteIDContext *ctx) {
+  void exitByteID(DESCParser::ByteIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(uint8_t), count, rdb::BYTE)});
   }
 
-  void exitIntegerID(DESCParser::IntegerIDContext *ctx) {
+  void exitIntegerID(DESCParser::IntegerIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(int), count, rdb::INTEGER)});
   }
 
-  void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) {
+  void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(unsigned), count, rdb::UINT)});
   }
 
-  void exitFloatID(DESCParser::FloatIDContext *ctx) {
+  void exitFloatID(DESCParser::FloatIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(float), count, rdb::FLOAT)});
   }
 
-  void exitDoubleID(DESCParser::DoubleIDContext *ctx) {
+  void exitDoubleID(DESCParser::DoubleIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(double), count, rdb::DOUBLE)});
   }
 
-  void exitRationalID(DESCParser::RationalIDContext *ctx) {
+  void exitRationalID(DESCParser::RationalIDContext *ctx) override {
     int count = 1;
-    if (ctx->arr) count = std::stoi(ctx->arr->getText());
+    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
 
     desc.append({rdb::rField(ctx->name->getText(), sizeof(boost::rational<int>), count, rdb::RATIONAL)});
   }
 
-  void exitStringID(DESCParser::StringIDContext *ctx) {
+  void exitStringID(DESCParser::StringIDContext *ctx) override {
     int count = std::stoi(ctx->strsize->getText());
     desc.append({rdb::rField(ctx->name->getText(), sizeof(char), count, rdb::STRING)});
   }
 
-  void exitRefID(DESCParser::RefIDContext *ctx) { desc.append({rdb::rField(ctx->file->getText(), 0, 0, rdb::REF)}); }
+  void exitRefID(DESCParser::RefIDContext *ctx) override { desc.append({rdb::rField(ctx->file->getText(), 0, 0, rdb::REF)}); }
 
-  void exitTypeID(DESCParser::TypeIDContext *ctx) { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
+  void exitTypeID(DESCParser::TypeIDContext *ctx) override { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
 
-  void exitRetentionID(DESCParser::RetentionIDContext *ctx) {
+  void exitRetentionID(DESCParser::RetentionIDContext *ctx) override {
     // retention {capacity} !{segments} <- in grammar.
     desc.append({rdb::rField("", std::stoi(ctx->segment->getText()), std::stoi(ctx->capacity->getText()), rdb::RETENTION)});
   }
 
-  void exitRetentionMemoryID(DESCParser::RetentionMemoryIDContext *ctx) {
+  void exitRetentionMemoryID(DESCParser::RetentionMemoryIDContext *ctx) override {
     desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
   }
 };
@@ -133,6 +131,6 @@ std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserDescListener);
-  tree::ParseTree *tree = parser.desc();
+  (void)parser.desc();
   return statusDesc;
 }

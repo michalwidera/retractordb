@@ -21,8 +21,10 @@ constexpr int kCapSysNiceBit = 23;  // CAP_SYS_NICE  — wymagane do SCHED_FIFO
 constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  — wymagane do mlockall
 
 // Stałe konwersji czasu — używane przy obliczaniu timespec dla clock_nanosleep.
-constexpr long kNsPerMs  = 1'000'000L;      // nanosekundy na milisekundę
-constexpr long kNsPerSec = 1'000'000'000L;  // nanosekundy na sekundę
+constexpr long kNsPerMs              = 1'000'000L;      // nanosekundy na milisekundę
+constexpr long kNsPerSec             = 1'000'000'000L;  // nanosekundy na sekundę
+constexpr size_t kCapEffPrefixLength = 7;
+constexpr int kRtSchedulerPriority   = 50;
 
 static std::string rtReadFile(const char *path) {
   std::ifstream f(path);
@@ -36,9 +38,9 @@ static uint64_t rtEffectiveCapabilities() {
   std::ifstream f("/proc/self/status");
   std::string line;
   while (std::getline(f, line)) {
-    if (line.rfind("CapEff:", 0) == 0) {
+    if (line.starts_with("CapEff:")) {
       uint64_t caps = 0;
-      std::sscanf(line.c_str() + 7, "%" SCNx64, &caps);
+      std::sscanf(line.c_str() + kCapEffPrefixLength, "%" SCNx64, &caps);
       return caps;
     }
   }
@@ -48,8 +50,8 @@ static uint64_t rtEffectiveCapabilities() {
 bool rtCheckAndPrint() {
   const uint64_t caps   = rtEffectiveCapabilities();
   const bool isRoot     = (geteuid() == 0);
-  const bool hasSysNice = isRoot || ((caps >> kCapSysNiceBit) & 1u);  // CAP_SYS_NICE
-  const bool hasIpcLock = isRoot || ((caps >> kCapIpcLockBit) & 1u);  // CAP_IPC_LOCK
+  const bool hasSysNice = isRoot || (((caps >> kCapSysNiceBit) & 1U) != 0U);  // CAP_SYS_NICE
+  const bool hasIpcLock = isRoot || (((caps >> kCapIpcLockBit) & 1U) != 0U);  // CAP_IPC_LOCK
 
   const std::string rtKernelVal = rtReadFile("/sys/kernel/realtime");
   const bool hasRTKernel        = (rtKernelVal == "1");
@@ -61,11 +63,16 @@ bool rtCheckAndPrint() {
   getrlimit(RLIMIT_MEMLOCK, &memlockRl);
   const bool memlockUnlimited = (memlockRl.rlim_cur == RLIM_INFINITY);
 
-  const int curPolicy    = sched_getscheduler(0);
-  const char *policyName = (curPolicy == SCHED_FIFO)    ? "SCHED_FIFO"
-                           : (curPolicy == SCHED_RR)    ? "SCHED_RR"
-                           : (curPolicy == SCHED_OTHER) ? "SCHED_OTHER"
-                                                        : "unknown";
+  const int curPolicy = sched_getscheduler(0);
+  const char *policyName;
+  if (curPolicy == SCHED_FIFO)
+    policyName = "SCHED_FIFO";
+  else if (curPolicy == SCHED_RR)
+    policyName = "SCHED_RR";
+  else if (curPolicy == SCHED_OTHER)
+    policyName = "SCHED_OTHER";
+  else
+    policyName = "unknown";
 
   auto ok  = [](bool v) { return v ? "[OK]  " : "[FAIL]"; };
   auto rec = [](bool v) { return v ? "[OK]  " : "[WARN]"; };
@@ -102,7 +109,7 @@ bool rtActivate() {
     ok = false;
   }
   struct sched_param sp{};
-  sp.sched_priority = 50;
+  sp.sched_priority = kRtSchedulerPriority;
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(errno));
     ok = false;

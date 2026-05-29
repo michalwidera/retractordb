@@ -7,32 +7,35 @@
 
 #include <cstring>
 #include <filesystem>
-#include <memory>
 #include "fatalError.hpp"
 
 namespace rdb {
+
+namespace {
+constexpr mode_t kDefaultFileMode = 0644;
+}
 
 std::string posixBinaryFileWithShadow::shadowName() const { return filename_ + ".shadow"; }
 
 /// @brief Wyszukuje rekord w pliku cienia na podstawie pozycji.
 /// Shadow file przechowuje pary (size_t position, uint8_t data[recordSize_]).
 /// Przeszukuje wpisy od końca — ostatni wpis z daną pozycją jest aktualny.
-ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position) {
+ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position) const {
   struct stat stat_buf;
   if (fstat(fd_shadow, &stat_buf) != 0) return EXIT_FAILURE;
 
-  const ssize_t entrySize  = sizeof(size_t) + recordSize_;
+  const ssize_t entrySize  = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
   const ssize_t numEntries = stat_buf.st_size / entrySize;
   if (numEntries == 0) return EXIT_FAILURE;
 
   // Szukaj od końca — ostatni wpis z daną pozycją ma najnowsze dane
   for (ssize_t i = numEntries - 1; i >= 0; --i) {
     size_t storedPos;
-    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), i * entrySize);
+    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
     if (rd != sizeof(size_t)) continue;
 
     if (storedPos == position) {
-      rd = ::pread(fd_shadow, ptrData, recordSize_, i * entrySize + sizeof(size_t));
+      rd = ::pread(fd_shadow, ptrData, recordSize_, static_cast<__off_t>(i * entrySize) + static_cast<__off_t>(sizeof(size_t)));
       if (rd != recordSize_) return EXIT_FAILURE;
       return EXIT_SUCCESS;
     }
@@ -43,7 +46,7 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
 posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor,
                                                      int percounter)
     : filename_(std::string(fileName)),
-      recordSize_(descriptor.getSizeInBytes()),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
   if (recordSize_ == 0) FatalError("posixBinaryFileWithShadow: record size must be > 0");
 
@@ -59,12 +62,12 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     SPDLOG_WARN("Failed to check if {} exists: {}", shadowName(), fs_ec.message());
   }
 
-  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
     FatalError("posixBinaryFileWithShadow: failed to open '{}' (fd={})", filename_, fd);
   }
 
-  fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd_shadow < 0) {
     FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
   }
@@ -86,7 +89,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   }
 
   if (fd_shadow >= 0 && shadowFileExisted) {
-    const ssize_t entrySize = sizeof(size_t) + recordSize_;
+    const ssize_t entrySize = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
     const off_t shadowSize  = ::lseek(fd_shadow, 0, SEEK_END);
     if (shadowSize < 0) {
       SPDLOG_ERROR("::lseek shadow {} failed during state restore: {}", shadowName(), strerror(errno));
@@ -253,22 +256,23 @@ ssize_t posixBinaryFileWithShadow::merge() {
     return EXIT_FAILURE;
   }
 
-  const ssize_t entrySize  = sizeof(size_t) + recordSize_;
+  const ssize_t entrySize  = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
   const ssize_t numEntries = shadow_stat.st_size / entrySize;
   if (numEntries == 0) return EXIT_SUCCESS;
 
-  auto buffer = std::make_unique<uint8_t[]>(recordSize_);
+  std::vector<uint8_t> buffer(static_cast<std::size_t>(recordSize_));
 
   for (ssize_t i = 0; i < numEntries; ++i) {
     size_t storedPos;
-    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), i * entrySize);
+    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
     if (rd != sizeof(size_t)) continue;
 
-    rd = ::pread(fd_shadow, buffer.get(), recordSize_, i * entrySize + sizeof(size_t));
+    rd = ::pread(fd_shadow, buffer.data(), recordSize_,
+                 static_cast<__off_t>(i * entrySize) + static_cast<__off_t>(sizeof(size_t)));
     if (rd != recordSize_) continue;
 
     // Nadpisz rekord w głównym pliku
-    ssize_t wr = ::pwrite(fd, buffer.get(), recordSize_, static_cast<off_t>(storedPos));
+    ssize_t wr = ::pwrite(fd, buffer.data(), recordSize_, static_cast<off_t>(storedPos));
     if (wr != recordSize_) {
       SPDLOG_ERROR("::pwrite {} failed at pos {}: {}", filename_, storedPos, strerror(errno));
       return EXIT_FAILURE;

@@ -32,9 +32,9 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
       }
     }
 
-  auto new_end = std::remove_if(coreInstance_.begin(), coreInstance_.end(),  //
-                                [](const query &qry) { return qry.isCompilerDirective(); });
-  coreInstance_.erase(new_end, coreInstance_.end());
+  auto removed = std::ranges::remove_if(coreInstance_,  //
+                                        [](const query &qry) { return qry.isCompilerDirective(); });
+  coreInstance_.erase(removed.begin(), removed.end());
 
   for (auto &qry : coreInstance_)
     qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
@@ -42,15 +42,15 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
     val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
 
-dataModel::~dataModel() {}
+dataModel::~dataModel() = default;
 
 bool dataModel::addQueryToModel(const std::string &id) {
-  if (qSet.find(id) != qSet.end()) {
+  if (qSet.contains(id)) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
     return false;
   }
 
-  auto it = std::find_if(coreInstance_.begin(), coreInstance_.end(), [&](const auto &qry) { return qry.id == id; });
+  auto it = std::ranges::find_if(coreInstance_, [&](const auto &qry) { return qry.id == id; });
   if (it == coreInstance_.end()) {
     SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
     return false;
@@ -76,7 +76,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
 }
 
 void dataModel::processZeroStep() {
-  std::lock_guard<std::mutex> scoped_lock(core_mutex);
+  std::scoped_lock scoped_lock(core_mutex);
   for (auto q : coreInstance_) {
     if (!q.isDeclaration()) continue;
 
@@ -93,12 +93,12 @@ void dataModel::processZeroStep() {
 }
 
 void dataModel::processRows(const std::set<std::string> &inSet) {
-  std::lock_guard<std::mutex> scoped_lock(core_mutex);
+  std::scoped_lock scoped_lock(core_mutex);
 
   // first - process all non-declaration queries
-  for (auto q : coreInstance_) {
-    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) continue;                // Declarations already processed
+  for (const auto &q : coreInstance_) {
+    if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
+    if (q.isDeclaration()) continue;      // Declarations already processed
 
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
@@ -108,8 +108,8 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
 
   // Then - process all declarations to unlock them for next step
   for (auto q : coreInstance_) {
-    if (inSet.find(q.id) == inSet.end()) continue;  // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;               // first declarations need to be processed
+    if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
+    if (!q.isDeclaration()) continue;     // first declarations need to be processed
 
     if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
@@ -134,7 +134,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
   }
 
   std::vector<token> arg;
-  std::copy(qry.lProgram.begin(), qry.lProgram.end(), std::back_inserter(arg));
+  std::ranges::copy(qry.lProgram, std::back_inserter(arg));
   // same: for (auto tk : qry.lProgram) arg.push_back(tk);
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
@@ -178,8 +178,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
       }
 
       int timeOffset = -1;
-      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, lengthOfSrc);
-      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, lengthOfSrc);
+      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
+      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, static_cast<int>(lengthOfSrc));
       if (timeOffset < 0) {
         FatalError("dataModel::constructInputPayload: DEHASH timeOffset must be non-negative, got {}", timeOffset);
       }
@@ -202,7 +202,8 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
       const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset       = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, lengthOfSrc);
+      const auto timeOffset =
+          Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
 
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
     } break;
@@ -232,7 +233,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       if (step <= 0) {
         FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
       }
-      const int storedRecordsInOutput = qSet[instance]->outputPayload->getRecordsCount();
+      const int storedRecordsInOutput = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
     } break;
     case STREAM_HASH: {
@@ -247,7 +248,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = qSet[instance]->outputPayload->getRecordsCount() + 1;
+      const auto recordOffset = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount()) + 1;
 
       int retPosValue                 = 0;
       bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
@@ -273,7 +274,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
     *payload = *(qSet[instance]->outputPayload->getPayload());
   }
   auto i{0};
-  for (auto f : payload->descriptor.dataFields()) {
+  for (const auto &f : payload->descriptor.dataFields()) {
     auto valueOpt = payload->getItem(i++);
     if (valueOpt.has_value()) {
       retVal.push_back(any_to_variant_cast(valueOpt.value()));

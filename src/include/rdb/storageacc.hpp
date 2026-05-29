@@ -18,7 +18,7 @@
 #include "payload.hpp"
 
 namespace rdb {
-enum class sourceState { empty, flux, armed };
+enum class sourceState : std::uint8_t { empty, flux, armed };
 
 /// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
@@ -46,15 +46,15 @@ class storage {
   std::unique_ptr<rdb::payload> storagePayload_;
   std::unique_ptr<rdb::payload> chamber_;
 
-  bool isDisposable_          = false;  // if true - storage and descriptor will be deleted after use
-  bool isOneShot_             = false;  // if false - storage will be looped when end is reached
-  bool isHold_                = false;  // if true - no processing until first query appear
-  size_t recordsCount_        = 0;
-  std::string descriptorFile_ = "";
-  std::string storageFile_    = "";
-  std::string metaIndexFile_  = "";  // file path for saving/loading the meta index
-  std::string storageType_    = "";
-  int percounter_             = -1;
+  bool isDisposable_   = false;  // if true - storage and descriptor will be deleted after use
+  bool isOneShot_      = false;  // if false - storage will be looped when end is reached
+  bool isHold_         = false;  // if true - no processing until first query appear
+  size_t recordsCount_ = 0;
+  std::string descriptorFile_;
+  std::string storageFile_;
+  std::string metaIndexFile_;  // file path for saving/loading the meta index
+  std::string storageType_;
+  int percounter_ = -1;
 
   boost::rational<int> rInterval_{1};   ///< sampling interval for time calculations
   int nullFillCount_{2};                ///< number of nullfill records written before a gap is marked (R17)
@@ -76,13 +76,13 @@ class storage {
 
  public:
   storage() = delete;
-  explicit storage(const std::string_view qryID,                    //
-                   const std::string_view fileName,                 //
-                   const std::string_view storageParam,             //
-                   const std::string_view storageType = "DEFAULT",  //
-                   bool oneShot                       = false,      //
-                   bool isHold                        = false,      //
-                   int percounter                     = -1          //
+  explicit storage(std::string_view qryID,                    //
+                   std::string_view fileName,                 //
+                   std::string_view storageParam,             //
+                   std::string_view storageType = "DEFAULT",  //
+                   bool oneShot                 = false,      //
+                   bool isHold                  = false,      //
+                   int percounter               = -1          //
   );
   virtual ~storage();
 
@@ -92,9 +92,9 @@ class storage {
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
-  bool write(const size_t recordIndex = std::numeric_limits<size_t>::max());
-  bool revRead(const size_t recordIndexFromBack, uint8_t *destination = nullptr);
-  bool read(const size_t recordIndexFromFront, uint8_t *destination = nullptr);
+  bool write(size_t recordIndex = std::numeric_limits<size_t>::max());
+  bool revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
+  bool read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
   void fire();
   void purge();
 
@@ -108,22 +108,22 @@ class storage {
   /// @brief Check if there is a transmission gap before the given record.
   /// @param recordIndex global position of the record
   /// @return true if a gap marker exists immediately before this record
-  bool hasGapBefore(size_t recordIndex) const;
+  [[nodiscard]] bool hasGapBefore(size_t recordIndex) const;
 
   /// @brief Check if the meta index is empty (no records tracked).
   /// @return true if neither storage nor meta index contain any records
-  bool isMetaIndexEmpty() const;
+  [[nodiscard]] bool isMetaIndexEmpty() const;
 
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);
   void releaseOnHold();
-  size_t getRecordsCount();
+  [[nodiscard]] size_t getRecordsCount() const;
   bool descriptorFileExist();
 
   bool isDeclared();
 
-  void setCapacity(const int capacity);
+  void setCapacity(int capacity);
   void cleanPayload(uint8_t *destination = nullptr);
 
   /// @brief Configure sampling interval and nullfill length for gap detection.
@@ -137,7 +137,7 @@ class storage {
   void configureGapDetection(boost::rational<int> rInterval, int nullFillCount = 2);
 
   /// @brief Return the current sampling interval configured in storage.
-  boost::rational<int> getSamplingInterval() const;
+  [[nodiscard]] boost::rational<int> getSamplingInterval() const;
 
   // technical function - for unit tests
   void resetForUnitTest();

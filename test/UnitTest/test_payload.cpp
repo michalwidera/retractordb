@@ -10,6 +10,9 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
 
+// Tests intentionally access optionals and raw buffers directly to validate low-level payload behavior.
+// NOLINTBEGIN(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)
+
 static_assert(std::is_same_v<decltype(std::declval<rdb::payload &>().span()), std::span<uint8_t>>);
 static_assert(std::is_same_v<decltype(std::declval<const rdb::payload &>().span()), std::span<const uint8_t>>);
 
@@ -28,12 +31,13 @@ TEST(payload, position_conversion_case_3_with_payload) {
   payload.setItem(4, 2000);
   payload.setItem(5, std::string("test"));
 
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0).value()) == 145);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1).value()) == 24);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2).value()) == 25);
-  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3).value()) == 26);
-  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4).value()) == 2000);
-  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()).c_str() == std::string("test"));
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(0).value()) == 145);  // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(1).value()) == 24);   // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(2).value()) == 25);   // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<uint8_t>(payload.getItem(3).value()) == 26);   // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<int>(payload.getItem(4).value()) == 2000);     // NOLINT(bugprone-unchecked-optional-access)
+  EXPECT_TRUE(std::any_cast<std::string>(payload.getItem(5).value()) ==
+              std::string("test"));  // NOLINT(bugprone-unchecked-optional-access)
 
   std::stringstream coutstring;
   coutstring << rdb::singleLineFormat << payload;
@@ -287,3 +291,5 @@ TEST(payload, stream_operators_support_rational_fields) {
   out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ ratio:3/4 }");
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)

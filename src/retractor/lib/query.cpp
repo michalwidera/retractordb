@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <stdexcept>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 
@@ -22,23 +23,22 @@ void query::reset() {
   isHold       = false;
   isSubstrat   = false;
   policy       = std::make_pair("DEFAULT", 0);
-  retention    = rdb::retention_t{0, 0};
-  return;
+  retention    = rdb::retention_t{.segments = 0, .capacity = 0};
 }
 
 bool isThere(const std::vector<query> &v, const std::string &query_name) {
-  return std::any_of(v.begin(), v.end(), [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
+  return std::ranges::any_of(v, [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
 }
 
 /** Construktor set */
 
-query::query(boost::rational<int> rInterval, const std::string &id) : rInterval(rInterval), id(id) {}
+query::query(boost::rational<int> rInterval, std::string id) : rInterval(rInterval), id(std::move(id)) {}
 
-query::query() {}
+query::query() = default;
 
 int query::getFieldIndex(const field &f_arg) {
   int idx(0);
-  for (auto f : lSchema) {
+  for (const auto &f : lSchema) {
     if (f.field_.rname == f_arg.field_.rname)  // Todo
       return idx;
     ++idx;
@@ -90,10 +90,10 @@ rdb::Descriptor query::descriptorStorage() {
 
   if (!isDeclaration()) {
     if (!retention.noRetention()) {
-      retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
+      retVal += rdb::Descriptor("", static_cast<int>(retention.segments), static_cast<int>(retention.capacity), rdb::RETENTION);
     }
     if (policy.second != 0) {
-      retVal += rdb::Descriptor("", policy.second, 0, rdb::RETMEMORY);
+      retVal += rdb::Descriptor("", static_cast<int>(policy.second), 0, rdb::RETMEMORY);
       retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
     }
     return retVal;
@@ -101,7 +101,7 @@ rdb::Descriptor query::descriptorStorage() {
   retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);
 
   auto filenameShdw{filename};
-  std::transform(filenameShdw.begin(), filenameShdw.end(), filenameShdw.begin(), ::tolower);
+  std::ranges::transform(filenameShdw, filenameShdw.begin(), ::tolower);
   if (filenameShdw.find(".txt") != std::string::npos)
     retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
   else
@@ -176,7 +176,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
   }
 
   if (!retention.noRetention()) {
-    retVal += rdb::Descriptor("", retention.segments, retention.capacity, rdb::RETENTION);
+    retVal += rdb::Descriptor("", static_cast<int>(retention.segments), static_cast<int>(retention.capacity), rdb::RETENTION);
   }
   return retVal;
 }
@@ -202,10 +202,10 @@ std::ostream &operator<<(std::ostream &os, const query &s) {
   os << "filename:" << s.filename << ",";
   os << "rInterval:" << s.rInterval << ",";
   os << "lSchema:";
-  for (auto &i : s.lSchema)
+  for (const auto &i : s.lSchema)
     os << i << ",";
   os << "lProgram:";
-  for (auto &i : s.lProgram)
+  for (const auto &i : s.lProgram)
     os << i << ",";
   return os;
 }

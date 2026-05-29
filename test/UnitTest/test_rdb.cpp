@@ -12,12 +12,15 @@
 #include "rdb/payload.hpp"
 #include "rdb/storageacc.hpp"
 
+// Tests intentionally use raw arrays and direct optional access to exercise binary storage semantics.
+// NOLINTBEGIN(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)
+
 // ctest -R '^ut-test_rdb' -V
 
 const uint AREA_SIZE = 10;
 
 // Helper: build a single-field Descriptor matching AREA_SIZE bytes
-static rdb::Descriptor makeDesc(size_t size) { return rdb::Descriptor("f", static_cast<int>(size), 1, rdb::BYTE); }
+static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
 template <typename T, typename K>
 bool test_1() {
@@ -37,9 +40,7 @@ bool test_1() {
     if (std::memcmp(yData, "test data", AREA_SIZE) != 0) return false;
   }
   auto statusRemove1 = remove(binary1.name().c_str());
-  if (statusRemove1 != 0) return false;
-
-  return true;
+  return static_cast<bool>(statusRemove1 == 0);
 }
 
 template <typename T, typename K>
@@ -61,9 +62,7 @@ bool test_2() {
     if (std::memcmp(yData, "test data", AREA_SIZE) != 0) return false;
   }
   auto statusRemove1 = remove(dataStore.name().c_str());
-  if (statusRemove1 != 0) return false;
-
-  return true;
+  return static_cast<bool>(statusRemove1 == 0);
 }
 
 template <typename T, typename K>
@@ -99,9 +98,7 @@ bool test_3() {
     if (std::memcmp(yData, "test xxxx", AREA_SIZE) != 0) return false;
   }
   auto statusRemove1 = remove(dataStore.name().c_str());
-  if (statusRemove1 != 0) return false;
-
-  return true;
+  return static_cast<bool>(statusRemove1 == 0);
 }
 
 TEST(xrdb, test_storage) {
@@ -261,14 +258,14 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
 
     pl->setItem(0, std::nullopt);
     ASSERT_TRUE(s.write());
-    ASSERT_EQ(s.getRecordsCount(), 1u);
+    ASSERT_EQ(s.getRecordsCount(), 1U);
 
     s.purge();
-    ASSERT_EQ(s.getRecordsCount(), 0u);
+    ASSERT_EQ(s.getRecordsCount(), 0U);
 
     pl->setItem(0, 1234);
     ASSERT_TRUE(s.write());
-    ASSERT_EQ(s.getRecordsCount(), 1u);
+    ASSERT_EQ(s.getRecordsCount(), 1U);
 
     ASSERT_TRUE(s.read(0));
     ASSERT_TRUE(pl->getItem(0).has_value());
@@ -482,7 +479,7 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
     }
 
     EXPECT_FALSE(s.isMetaIndexEmpty());
-    EXPECT_EQ(s.getRecordsCount(), 3u);
+    EXPECT_EQ(s.getRecordsCount(), 3U);
   }
 
   std::filesystem::remove(dataFile);
@@ -516,7 +513,7 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
       pl->setItem(0, i);
       s.write();
     }
-    EXPECT_EQ(s.getRecordsCount(), 3u);
+    EXPECT_EQ(s.getRecordsCount(), 3U);
     // ~storage → ~posixBinaryFile: renames dataFile → dataFile.old0
   }
 
@@ -570,9 +567,11 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
 
     // Meta still has the original 3 records (not rotated).
     EXPECT_FALSE(s.isMetaIndexEmpty());
-    EXPECT_EQ(s.getRecordsCount(), 3u);
+    EXPECT_EQ(s.getRecordsCount(), 3U);
   }
 
   for (const auto &f : {dataFile2, descFile2, metaFile2})
     std::filesystem::remove(f);
 }
+
+// NOLINTEND(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)

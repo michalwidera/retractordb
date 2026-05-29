@@ -56,7 +56,7 @@ bool GetPosCmd::execute(CommandContext &ctx) {
   else if (value.type() == typeid(int))
     std::cout << std::any_cast<int>(value) << "\n";
   else if (value.type() == typeid(uint8_t))
-    std::cout << std::any_cast<uint8_t>(value) << "\n";
+    std::cout << static_cast<unsigned int>(std::any_cast<uint8_t>(value)) << "\n";
   else if (value.type() == typeid(float))
     std::cout << std::any_cast<float>(value) << "\n";
   else if (value.type() == typeid(double))

@@ -39,7 +39,7 @@ class textSourceRO : public FileInterface {
   bool loopToBeginningIfEOF_ = true;
 
  public:
-  textSourceRO(const std::string_view fileName,    //
+  textSourceRO(std::string_view fileName,          //
                const rdb::Descriptor &descriptor,  //
                bool loopToBeginningIfEOF);
 
@@ -47,7 +47,7 @@ class textSourceRO : public FileInterface {
 
   using FileInterface::read;
   using FileInterface::write;
-  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) override;
+  ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override {
     return EXIT_FAILURE;
   }

@@ -55,7 +55,7 @@ TEST_F(UsageFixture, scenariusz_nagrywanie_rekordow) {
   meta.onRecordAppended(valNull);     // rekord 2: czujnik nie odpowiedział
   meta.onRecordAppended(allPresent);  // rekord 3: powrót do normy
 
-  EXPECT_EQ(meta.totalRecords(), 4u);
+  EXPECT_EQ(meta.totalRecords(), 4U);
 
   // Odczyt wzorca null dla dowolnego rekordu po fakcie:
   EXPECT_EQ(meta.getNullBitset(0), allPresent);
@@ -85,17 +85,17 @@ TEST_F(UsageFixture, scenariusz_kompresja_rle) {
   for (int i = 0; i < 200; ++i)
     meta.onRecordAppended(allNull);
 
-  EXPECT_EQ(meta.totalRecords(), 700u);
+  EXPECT_EQ(meta.totalRecords(), 700U);
 
   // Mimo 700 rekordów — tylko 2 segmenty RLE.
   auto segs = meta.segments();
-  EXPECT_EQ(segs.size(), 2u);
+  EXPECT_EQ(segs.size(), 2U);
 
   EXPECT_EQ(segs[0].nullBitset, allPresent);
-  EXPECT_EQ(segs[0].recordCount, 500u);
+  EXPECT_EQ(segs[0].recordCount, 500U);
 
   EXPECT_EQ(segs[1].nullBitset, allNull);
-  EXPECT_EQ(segs[1].recordCount, 200u);
+  EXPECT_EQ(segs[1].recordCount, 200U);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ TEST_F(UsageFixture, scenariusz_persystencja_po_restarcie) {
     rdb::metaDataStream meta(descriptor, file);
 
     // Wszystkie 5 rekordów jest dostępnych po restarcie.
-    EXPECT_EQ(meta.totalRecords(), 5u);
+    EXPECT_EQ(meta.totalRecords(), 5U);
 
     EXPECT_EQ(meta.getNullBitset(0), allPresent);
     EXPECT_EQ(meta.getNullBitset(2), valNull);
@@ -153,7 +153,7 @@ TEST_F(UsageFixture, scenariusz_przerwa_w_transmisji) {
   meta.onRecordAppended(allPresent);  // rekord 3 — pierwszy po przerwie
   meta.onRecordAppended(allPresent);  // rekord 4
 
-  EXPECT_EQ(meta.totalRecords(), 5u);
+  EXPECT_EQ(meta.totalRecords(), 5U);
 
   // Rekordy 0-2 nie mają przerwy przed sobą.
   EXPECT_FALSE(meta.isGapBefore(0));
@@ -170,7 +170,7 @@ TEST_F(UsageFixture, scenariusz_przerwa_w_transmisji) {
   size_t gapCount = 0;
   for (const auto &s : segs)
     if (s.isGap) ++gapCount;
-  EXPECT_EQ(gapCount, 1u);
+  EXPECT_EQ(gapCount, 1U);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,15 +198,15 @@ TEST_F(UsageFixture, scenariusz_flush_dla_bezpieczenstwa) {
   meta.onRecordAppended(valNull);
   meta.flushCurrentEntry();  // rekord 3 — inny wzorzec, nowy wpis na dysku
 
-  EXPECT_EQ(meta.totalRecords(), 4u);
+  EXPECT_EQ(meta.totalRecords(), 4U);
   EXPECT_EQ(meta.getNullBitset(0), allPresent);
   EXPECT_EQ(meta.getNullBitset(3), valNull);
 
   // Mimo 3 takich samych rekordów — tylko 2 segmenty (kompresja działa).
   auto segs = meta.segments();
-  EXPECT_EQ(segs.size(), 2u);
-  EXPECT_EQ(segs[0].recordCount, 3u);
-  EXPECT_EQ(segs[1].recordCount, 1u);
+  EXPECT_EQ(segs.size(), 2U);
+  EXPECT_EQ(segs[0].recordCount, 3U);
+  EXPECT_EQ(segs[1].recordCount, 1U);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
   // Okazuje się, że rekord 2 jednak miał dane — korekta po fakcie.
   meta.onRecordModified(2, allPresent);
 
-  EXPECT_EQ(meta.totalRecords(), 5u);
+  EXPECT_EQ(meta.totalRecords(), 5U);
 
   // Rekordy 0,1 pozostają allNull.
   EXPECT_EQ(meta.getNullBitset(0), allNull);
@@ -241,10 +241,10 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
 
   // Segment [allNull,5] został rozbity na 3: [allNull,2], [allPresent,1], [allNull,2].
   auto segs = meta.segments();
-  EXPECT_EQ(segs.size(), 3u);
-  EXPECT_EQ(segs[0].recordCount, 2u);
-  EXPECT_EQ(segs[1].recordCount, 1u);
-  EXPECT_EQ(segs[2].recordCount, 2u);
+  EXPECT_EQ(segs.size(), 3U);
+  EXPECT_EQ(segs[0].recordCount, 2U);
+  EXPECT_EQ(segs[1].recordCount, 1U);
+  EXPECT_EQ(segs[2].recordCount, 2U);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,18 +259,18 @@ TEST_F(UsageFixture, scenariusz_reset_strumienia) {
   // Pierwsza seria — 10 rekordów.
   for (int i = 0; i < 10; ++i)
     meta.onRecordAppended(allPresent);
-  EXPECT_EQ(meta.totalRecords(), 10u);
+  EXPECT_EQ(meta.totalRecords(), 10U);
   EXPECT_FALSE(meta.isEmpty());
 
   // Rotacja — strumień zaczyna od nowa.
   meta.reset();
 
   EXPECT_TRUE(meta.isEmpty());
-  EXPECT_EQ(meta.totalRecords(), 0u);
+  EXPECT_EQ(meta.totalRecords(), 0U);
   EXPECT_TRUE(meta.segments().empty());
 
   // Po resecie klasa jest gotowa do ponownego zapisu.
   meta.onRecordAppended(valNull);
-  EXPECT_EQ(meta.totalRecords(), 1u);
+  EXPECT_EQ(meta.totalRecords(), 1U);
   EXPECT_EQ(meta.getNullBitset(0), valNull);
 }

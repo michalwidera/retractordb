@@ -14,10 +14,10 @@ class PersistentCounter {
  public:
   explicit PersistentCounter(std::string initFilename);
   ~PersistentCounter();
-  int getCount() const;
+  [[nodiscard]] int getCount() const;
 
  private:
-  int count_;
+  int count_{0};
   std::string persistentCounterFilename_;
   void load();
   void save();

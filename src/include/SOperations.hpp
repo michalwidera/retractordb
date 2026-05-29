@@ -13,7 +13,8 @@ constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(
 
 constexpr int ceilR(boost::rational<int> const &num) {
   auto inum = static_cast<int>(num.numerator() / num.denominator());
-  return (num == inum) ? inum : ((num.numerator() > 0) ? ++inum : --inum);
+  if (num == inum) return inum;
+  return (num.numerator() > 0) ? ++inum : --inum;
 }
 
 inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {

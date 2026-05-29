@@ -12,19 +12,10 @@
 
 namespace rdb {
 
-typedef std::variant<uint8_t,                      // BYTE
-                     int,                          // INTEGER
-                     unsigned,                     // UINT
-                     boost::rational<int>,         // RATIONAL
-                     float,                        // FLOAT
-                     double,                       // DOUBLE
-                     std::pair<int, int>,          // INTPAIR
-                     std::pair<std::string, int>,  // IDXPAIR
-                     std::string,                  // STRING
-                     std::monostate>               // NULL
-    descFldVT;
+using descFldVT = std::variant<uint8_t, int, unsigned int, boost::rational<int>, float, double, std::pair<int, int>,
+                               std::pair<std::string, int>, std::string, std::monostate>;
 
-enum descFld {
+enum descFld : std::uint8_t {
   BYTE,       //
   INTEGER,    //
   UINT,       //

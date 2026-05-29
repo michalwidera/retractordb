@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <ranges>
+#include <utility>
 #include "fatalError.hpp"
 
 namespace rdb {
@@ -61,7 +63,7 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
     if (descriptorParam != nullptr && *descriptorParam != descriptor) {
       SPDLOG_ERROR("Descriptors do not match.");
       std::cerr << "Error in data descriptor file: " << storageFile_ << ".desc\n";
-      std::cerr << "Provided Descriptor:\n" << *descriptorParam << "\nExisting Descriptor:\n" << descriptor << std::endl;
+      std::cerr << "Provided Descriptor:\n" << *descriptorParam << "\nExisting Descriptor:\n" << descriptor << '\n';
       FatalError("storage: descriptor schema mismatch — remove data files and restart");
     }
 
@@ -114,7 +116,7 @@ void storage::moveRef() {
   // if storage object was created with default storage as ""
   // and there is no specified storage as REF in descriptor - we should
   // stop immediately.
-  if (storageFile_ == "") {
+  if (storageFile_.empty()) {
     FatalError("storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
   }
 }
@@ -147,7 +149,7 @@ void storage::attachStorage() {
 storage::~storage() {
   flushPendingGap();
   if (isDisposable_) {
-    if (storageFile_ != "") auto statusRemove1 = remove(storageFile_.c_str());
+    if (!storageFile_.empty()) (void)remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
     if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) remove(metaIndexFile_.c_str());
   }
@@ -229,7 +231,7 @@ void storage::setDisposable(bool value) { isDisposable_ = value; }
 
 void storage::releaseOnHold() { isHold_ = false; }
 
-size_t storage::getRecordsCount() { return recordsCount_; }
+size_t storage::getRecordsCount() const { return recordsCount_; }
 
 void storage::abortIfStorageNotPrepared() {
   if (descriptor.empty()) {
@@ -247,7 +249,7 @@ void storage::fire() {
   if (circularBuffer_.capacity() == 0) FatalError("storage::fire: circular buffer capacity is zero");
   *storagePayload_ = *chamber_;
   recordsCount_++;
-  circularBuffer_.push_front(*storagePayload_.get());  // only one place when buffer is feed.
+  circularBuffer_.push_front(*storagePayload_);  // only one place when buffer is feed.
 }
 
 void storage::purge() {
@@ -299,8 +301,8 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   }
 
   if (destination == nullptr) FatalError("storage::read: destination pointer is null (payload span is empty)");
-  auto size   = descriptor.getSizeInBytes();
-  auto result = 0;
+  auto size      = descriptor.getSizeInBytes();
+  ssize_t result = 0;
 
   if (recordsCount_ != accessor_->count()) {
     FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
@@ -385,8 +387,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
       SPDLOG_WARN("Read failure from declared source {}. Returning null row.", accessor_->name());
     }
 
-    bufferState              = sourceState::armed;
-    *(storagePayload_.get()) = *chamber_;
+    bufferState        = sourceState::armed;
+    *(storagePayload_) = *chamber_;
     return true;
   }
   // recordIndexFromBack is size_t (unsigned), always >= 0
@@ -420,7 +422,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // Note: the previous if-block handles the case where recordIndexFromBack >= circularBuffer_.size()
   // so here recordIndexFromBack < circularBuffer_.size() is guaranteed
 
-  *(storagePayload_.get()) = circularBuffer_[recordIndexFromBack];
+  *(storagePayload_) = circularBuffer_[recordIndexFromBack];
   return true;
 }
 
@@ -452,8 +454,8 @@ bool storage::write(const size_t recordIndex) {
                storageFile_);
   }
 
-  auto size   = descriptor.getSizeInBytes();
-  auto result = 0;
+  auto size      = descriptor.getSizeInBytes();
+  ssize_t result = 0;
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     if (result != 0) {

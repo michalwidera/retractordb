@@ -15,6 +15,10 @@
 
 extern dataModel *pProc;
 
+namespace {
+constexpr mode_t kDefaultDumpFileMode = 0644;
+}
+
 dumpTask::dumpTask(dumpTask &&other) noexcept
     : taskName(std::move(other.taskName)),
       range(other.range),
@@ -55,7 +59,7 @@ dumpTask::~dumpTask() {
 
 void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   if (pProc == nullptr) FatalError("dumpManager::registerTask: dataModel pointer is null");
-  if (pProc->qSet.find(streamName) == pProc->qSet.end()) {
+  if (!pProc->qSet.contains(streamName)) {
     FatalError("dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
   }
   if (task.range.first > task.range.second) {
@@ -64,8 +68,8 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   }
 
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
-  task.dumpedRecordsToGo                    = abs(task.range.second - task.range.first);
-  retentionSize[streamName + task.taskName] = task.retentionSize;
+  task.dumpedRecordsToGo                    = static_cast<int>(abs(task.range.second - task.range.first));
+  retentionSize[streamName + task.taskName] = static_cast<int>(task.retentionSize);
   if (bookOfTasks[streamName].capacity() == 0) {
     bookOfTasks[streamName].set_capacity(task.retentionSize > 0 ? task.retentionSize : 1);
   }
@@ -78,10 +82,10 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     // if range.first is 0 or positive - no history dump needed
     // CHECK IF WE HAVE ENOUGH HISTORY
     // CHECK SEQUENCE IF THIS IS IN REVERSE ORDER
-    size_t dumpHistoryCount   = abs(task.range.first);
+    int dumpHistoryCount = static_cast<int>(abs(task.range.first));
     for (auto i = 0; i < dumpHistoryCount; ++i) {
-      auto payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
-      auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
+      auto *payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
+      auto resultSeek  = ::lseek(task.fd, 0, SEEK_END);
       if (resultSeek == -1) FatalError("dumpManager::registerTask: lseek failed during history dump");
       ssize_t write_count_result = ::write(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes());
       if (write_count_result <= 0) FatalError("dumpManager::registerTask: write failed during history dump");
@@ -92,7 +96,7 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     }
     task.dumpedRecordsToGo -= dumpHistoryCount;
   } else {
-    task.delayDumpRecordsToGo = task.range.first;
+    task.delayDumpRecordsToGo = static_cast<int>(task.range.first);
   }
 
   bookOfTasks[streamName].push_back(std::move(task));
@@ -102,15 +106,15 @@ void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = s
 
 void dumpManager::processStreamChunk(const std::string &streamName) {
   if (pProc == nullptr) FatalError("dumpManager::processStreamChunk: dataModel pointer is null");
-  if (pProc->qSet.find(streamName) == pProc->qSet.end()) {
+  if (!pProc->qSet.contains(streamName)) {
     FatalError("dumpManager::processStreamChunk: stream '{}' not found in dataModel", streamName);
   }
-  if (bookOfTasks.find(streamName) == bookOfTasks.end()) return;
+  if (!bookOfTasks.contains(streamName)) return;
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
   if (currentStreamCount == 0) return;  // nothing to dump
 
-  auto payLoadPtr = pProc->getPayload(streamName);
+  auto *payLoadPtr = pProc->getPayload(streamName);
 
   if (payLoadPtr->descriptor.getSizeInBytes() == 0)
     FatalError("dumpManager::processStreamChunk: payload descriptor size is zero");
@@ -175,7 +179,7 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
                  key);
     }
   }
-  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, kDefaultDumpFileMode);
   if (fd < 0) {
     FatalError("dumpManager::createDumpFile: failed to open '{}': {}", filename.string(), strerror(errno));
   }

@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <sstream>
@@ -32,7 +33,7 @@ ptree qry::netClient(const std::string &cmd, const std::string &arg) { return tr
 bool qry::adhoc(const std::string &sAdhoc) {
   if (sAdhoc.empty()) {
     SPDLOG_ERROR("qry::adhoc: adhoc query string must not be empty");
-    return system::errc::protocol_error;
+    return true;
   }
   ptree pt = netClient("adhoc", sAdhoc);
 
@@ -43,9 +44,9 @@ bool qry::adhoc(const std::string &sAdhoc) {
 
   if (rcv != "OK") {
     SPDLOG_ERROR("bad rcv: {}", rcv.c_str());
-    return system::errc::protocol_error;
+    return true;
   }
-  return system::errc::success;
+  return false;
 }
 
 bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
@@ -54,7 +55,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
   ptree pt        = netClient("get", "");
 
   const auto stream = pt.get_child("db.stream");
-  const bool found  = std::any_of(stream.begin(), stream.end(), [input, this](const auto &node) {
+  const bool found  = std::ranges::any_of(stream, [input, this](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[input] = netClient("show", input);
@@ -79,9 +80,9 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
   ptree e_value;
   try {
     while (!transport_->done) {
-      if (_kbhit(vm.count("needctrlc"))) break;
+      if (_kbhit(vm.contains("needctrlc"))) break;
       if (timeLimitCntQry == 1) {
-        if (vm.count("kill")) {
+        if (vm.contains("kill")) {
           netClient("kill", "");
           transport_->done = true;
         }
@@ -98,7 +99,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
           if (w == streamN) {
             const int count = std::stoi(e_value.get("count", ""));
             if (outputFormatMode == formatMode::RAW)
-              Formatter::renderRaw(e_value, count, nullmap, vm.count("null"));
+              Formatter::renderRaw(e_value, count, nullmap, vm.contains("null"));
             else if (outputFormatMode == formatMode::GNUPLOT)
               formatter_->renderGnuplot(e_value, count, nullmap, input, schema, gnuplotDim);
             else if (outputFormatMode == formatMode::GRAPHITE)
@@ -158,7 +159,7 @@ std::string qry::dirYaml() {
     retval << "    delta: " << v.second.get<std::string>("duration") << "\n";
     if (size != "-1") retval << "    size: " << size << "\n";
     retval << "    count: " << v.second.get<std::string>("count") << "\n";
-    if (location != "") retval << "    location: " << location << "\n";
+    if (!location.empty()) retval << "    location: " << location << "\n";
   }
 
   return retval.str();
@@ -171,7 +172,7 @@ std::string qry::dir() {
   std::stringstream ss;
   for (auto nName : vcols) {
     auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::max_element(stream.begin(), stream.end(), [&nName](const auto &node1, const auto &node2) {
+    auto maxSizeIt = std::ranges::max_element(stream, [&nName](const auto &node1, const auto &node2) {
       const ptree &v1 = node1.second;
       const ptree &v2 = node2.second;
       return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
@@ -180,12 +181,22 @@ std::string qry::dir() {
   }
   ss << "|\n";
 
-  char buffer[kDirLineBufferSize];
+  std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
   for (const auto &v : pt.get_child("db.stream")) {
-    sprintf(buffer, ss.str().c_str(), v.second.get<std::string>("").c_str(), v.second.get<std::string>("duration").c_str(),
-            v.second.get<std::string>("size").c_str(), v.second.get<std::string>("count").c_str(),
-            v.second.get<std::string>("location").c_str(), v.second.get<std::string>("cap").c_str());
-    retval << buffer;
+    int n = snprintf(buffer.data(), buffer.size(), ss.str().c_str(),
+                     v.second.get<std::string>("").c_str(),
+                     v.second.get<std::string>("duration").c_str(),
+                     v.second.get<std::string>("size").c_str(),
+                     v.second.get<std::string>("count").c_str(),
+                     v.second.get<std::string>("location").c_str(),
+                     v.second.get<std::string>("cap").c_str());
+    if (n < 0) {
+      continue;
+    }
+    if (static_cast<std::size_t>(n) >= buffer.size()) {
+      buffer[buffer.size() - 1] = '\0';
+    }
+    retval << buffer.data();
   }
 
   return retval.str();
@@ -198,7 +209,7 @@ std::string qry::detailShow(const std::string &input) {
   ptree pt = netClient("get", "");
 
   const auto streams = pt.get_child("db.stream");
-  bool found         = std::any_of(streams.begin(), streams.end(), [&input](const auto &node) {
+  bool found         = std::ranges::any_of(streams, [&input](const auto &node) {
     const ptree &v = node.second;
     return input == v.get<std::string>("");
   });

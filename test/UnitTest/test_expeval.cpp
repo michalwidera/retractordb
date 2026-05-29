@@ -16,9 +16,9 @@ TEST(xExpressionEval, add_int_int) {
   ADD
   */
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -35,9 +35,9 @@ TEST(xExpressionEval, add_int_int_new_token) {
   ADD
   */
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -54,9 +54,9 @@ TEST(xExpressionEval, add_double_int) {
   ADD
   */
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.1));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1.1);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -68,9 +68,9 @@ TEST(xExpressionEval, add_double_int) {
 
 TEST(xExpressionEval, add_string_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT("data1")));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT("data1"));
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -82,9 +82,9 @@ TEST(xExpressionEval, add_string_int) {
 
 TEST(xExpressionEval, add_rational_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, boost::rational<int>(1, 2)));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, boost::rational<int>(1, 2));
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -96,9 +96,9 @@ TEST(xExpressionEval, add_rational_int) {
 
 TEST(xExpressionEval, add_rational_string) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT("test")));
-  program.push_back(token(PUSH_VAL, boost::rational<int>(1, 2)));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT("test"));
+  program.emplace_back(PUSH_VAL, boost::rational<int>(1, 2));
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -110,9 +110,9 @@ TEST(xExpressionEval, add_rational_string) {
 
 TEST(xExpressionEval, sub_int_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(SUBTRACT));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -124,9 +124,9 @@ TEST(xExpressionEval, sub_int_int) {
 
 TEST(xExpressionEval, sub_int_dobule) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2.1));
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(SUBTRACT));
+  program.emplace_back(PUSH_VAL, 2.1);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -138,9 +138,9 @@ TEST(xExpressionEval, sub_int_dobule) {
 
 TEST(xExpressionEval, mul_int_dobule) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2.1));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(MULTIPLY));
+  program.emplace_back(PUSH_VAL, 2.1);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -152,9 +152,9 @@ TEST(xExpressionEval, mul_int_dobule) {
 
 TEST(xExpressionEval, div_int_dobule) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 2.5));
-  program.push_back(token(DIVIDE));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 2.5);
+  program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -166,8 +166,8 @@ TEST(xExpressionEval, div_int_dobule) {
 
 TEST(xExpressionEval, neg_dobule) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2.1));
-  program.push_back(token(NEGATE));
+  program.emplace_back(PUSH_VAL, 2.1);
+  program.emplace_back(NEGATE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -178,8 +178,8 @@ TEST(xExpressionEval, neg_dobule) {
 
 TEST(xExpressionEval, neg_byte_as_xor_ff) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, static_cast<uint8_t>(0x0f)));
-  program.push_back(token(NEGATE));
+  program.emplace_back(PUSH_VAL, static_cast<uint8_t>(0x0f));
+  program.emplace_back(NEGATE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -190,8 +190,8 @@ TEST(xExpressionEval, neg_byte_as_xor_ff) {
 
 TEST(xExpressionEval, neg_rational_preserves_type) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, boost::rational<int>(3, 2)));
-  program.push_back(token(NEGATE));
+  program.emplace_back(PUSH_VAL, boost::rational<int>(3, 2));
+  program.emplace_back(NEGATE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -202,8 +202,8 @@ TEST(xExpressionEval, neg_rational_preserves_type) {
 
 TEST(xExpressionEval, call_floor_function_double) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.25));
-  program.push_back(token(CALL, std::string("floor")));
+  program.emplace_back(PUSH_VAL, 1.25);
+  program.emplace_back(CALL, std::string("floor"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -214,8 +214,8 @@ TEST(xExpressionEval, call_floor_function_double) {
 
 TEST(xExpressionEval, call_floor_function_rational) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, boost::rational<int>(3 / 2)));
-  program.push_back(token(CALL, std::string("floor")));
+  program.emplace_back(PUSH_VAL, boost::rational<int>(3 / 2));
+  program.emplace_back(CALL, std::string("floor"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -226,8 +226,8 @@ TEST(xExpressionEval, call_floor_function_rational) {
 
 TEST(xExpressionEval, call_ceil_function_double) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.25));
-  program.push_back(token(CALL, std::string("ceil")));
+  program.emplace_back(PUSH_VAL, 1.25);
+  program.emplace_back(CALL, std::string("ceil"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -238,12 +238,12 @@ TEST(xExpressionEval, call_ceil_function_double) {
 
 TEST(xExpressionEval, long_program) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.25));
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(ADD));
-  program.push_back(token(MULTIPLY));
-  program.push_back(token(CALL, std::string("ceil")));
+  program.emplace_back(PUSH_VAL, 1.25);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
+  program.emplace_back(MULTIPLY);
+  program.emplace_back(CALL, std::string("ceil"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -254,9 +254,9 @@ TEST(xExpressionEval, long_program) {
 
 TEST(xExpressionEval, add_null_int_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -266,9 +266,9 @@ TEST(xExpressionEval, add_null_int_propagates_null) {
 
 TEST(xExpressionEval, and_false_null_is_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(AND));
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(AND);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -279,9 +279,9 @@ TEST(xExpressionEval, and_false_null_is_false) {
 
 TEST(xExpressionEval, or_true_null_is_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(OR));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(OR);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -292,9 +292,9 @@ TEST(xExpressionEval, or_true_null_is_true) {
 
 TEST(xExpressionEval, and_true_null_is_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(AND));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(AND);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -304,8 +304,8 @@ TEST(xExpressionEval, and_true_null_is_null) {
 
 TEST(xExpressionEval, not_true_is_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(NOT));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(NOT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -316,8 +316,8 @@ TEST(xExpressionEval, not_true_is_false) {
 
 TEST(xExpressionEval, not_null_is_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(NOT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(NOT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -327,9 +327,9 @@ TEST(xExpressionEval, not_null_is_null) {
 
 TEST(xExpressionEval, divide_by_zero_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 5));
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(DIVIDE));
+  program.emplace_back(PUSH_VAL, 5);
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::domain_error);
@@ -337,7 +337,7 @@ TEST(xExpressionEval, divide_by_zero_throws) {
 
 TEST(xExpressionEval, malformed_stack_throws) {
   std::list<token> program;
-  program.push_back(token(ADD));
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -345,9 +345,9 @@ TEST(xExpressionEval, malformed_stack_throws) {
 
 TEST(xExpressionEval, cmp_equal_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_EQUAL));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -358,9 +358,9 @@ TEST(xExpressionEval, cmp_equal_true) {
 
 TEST(xExpressionEval, cmp_equal_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 4));
-  program.push_back(token(CMP_EQUAL));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 4);
+  program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -371,9 +371,9 @@ TEST(xExpressionEval, cmp_equal_false) {
 
 TEST(xExpressionEval, cmp_not_equal_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 4));
-  program.push_back(token(CMP_NOT_EQUAL));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 4);
+  program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -384,9 +384,9 @@ TEST(xExpressionEval, cmp_not_equal_true) {
 
 TEST(xExpressionEval, cmp_lt_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_LT));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 2 < 3
@@ -397,9 +397,9 @@ TEST(xExpressionEval, cmp_lt_true) {
 
 TEST(xExpressionEval, cmp_lt_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(CMP_LT));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 < 2
@@ -410,9 +410,9 @@ TEST(xExpressionEval, cmp_lt_false) {
 
 TEST(xExpressionEval, cmp_gt_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(CMP_GT));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 > 2
@@ -423,9 +423,9 @@ TEST(xExpressionEval, cmp_gt_true) {
 
 TEST(xExpressionEval, cmp_gt_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_GT));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 2 > 3
@@ -436,9 +436,9 @@ TEST(xExpressionEval, cmp_gt_false) {
 
 TEST(xExpressionEval, cmp_le_true_less) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 2 <= 3
@@ -449,9 +449,9 @@ TEST(xExpressionEval, cmp_le_true_less) {
 
 TEST(xExpressionEval, cmp_le_true_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 <= 3
@@ -462,9 +462,9 @@ TEST(xExpressionEval, cmp_le_true_equal) {
 
 TEST(xExpressionEval, cmp_le_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 <= 2
@@ -475,9 +475,9 @@ TEST(xExpressionEval, cmp_le_false) {
 
 TEST(xExpressionEval, cmp_ge_true_greater) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 >= 2
@@ -488,9 +488,9 @@ TEST(xExpressionEval, cmp_ge_true_greater) {
 
 TEST(xExpressionEval, cmp_ge_true_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 >= 3
@@ -501,9 +501,9 @@ TEST(xExpressionEval, cmp_ge_true_equal) {
 
 TEST(xExpressionEval, cmp_ge_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 2 >= 3
@@ -516,9 +516,9 @@ TEST(xExpressionEval, cmp_ge_false) {
 
 TEST(xExpressionEval, sub_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 5));
-  program.push_back(token(SUBTRACT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 5);
+  program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -526,9 +526,9 @@ TEST(xExpressionEval, sub_null_propagates_null) {
 
 TEST(xExpressionEval, mul_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 5));
-  program.push_back(token(MULTIPLY));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 5);
+  program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -536,9 +536,9 @@ TEST(xExpressionEval, mul_null_propagates_null) {
 
 TEST(xExpressionEval, div_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 5));
-  program.push_back(token(DIVIDE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 5);
+  program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -548,8 +548,8 @@ TEST(xExpressionEval, div_null_propagates_null) {
 
 TEST(xExpressionEval, neg_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 7));
-  program.push_back(token(NEGATE));
+  program.emplace_back(PUSH_VAL, 7);
+  program.emplace_back(NEGATE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -560,8 +560,8 @@ TEST(xExpressionEval, neg_int) {
 
 TEST(xExpressionEval, neg_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(NEGATE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(NEGATE);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -571,9 +571,9 @@ TEST(xExpressionEval, neg_null_propagates_null) {
 
 TEST(xExpressionEval, cmp_equal_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_EQUAL));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -581,9 +581,9 @@ TEST(xExpressionEval, cmp_equal_null_propagates_null) {
 
 TEST(xExpressionEval, cmp_not_equal_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_NOT_EQUAL));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // 3 != 3
@@ -596,9 +596,9 @@ TEST(xExpressionEval, cmp_not_equal_false) {
 
 TEST(xExpressionEval, or_false_null_is_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(OR));
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(OR);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -606,9 +606,9 @@ TEST(xExpressionEval, or_false_null_is_null) {
 
 TEST(xExpressionEval, or_false_false_is_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(OR));
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(OR);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -619,9 +619,9 @@ TEST(xExpressionEval, or_false_false_is_false) {
 
 TEST(xExpressionEval, and_true_true_is_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(AND));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(AND);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -634,8 +634,8 @@ TEST(xExpressionEval, and_true_true_is_true) {
 
 TEST(xExpressionEval, call_unsupported_function_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.0));
-  program.push_back(token(CALL, std::string("unsupported_fn")));
+  program.emplace_back(PUSH_VAL, 1.0);
+  program.emplace_back(CALL, std::string("unsupported_fn"));
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -650,9 +650,9 @@ TEST(xExpressionEval, empty_program_throws) {
 
 TEST(xExpressionEval, sub_string_string_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("a"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("b"))));
-  program.push_back(token(SUBTRACT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("a")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("b")));
+  program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -660,9 +660,9 @@ TEST(xExpressionEval, sub_string_string_throws) {
 
 TEST(xExpressionEval, mul_string_string_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("a"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("b"))));
-  program.push_back(token(MULTIPLY));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("a")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("b")));
+  program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -670,9 +670,9 @@ TEST(xExpressionEval, mul_string_string_throws) {
 
 TEST(xExpressionEval, div_string_string_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("a"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("b"))));
-  program.push_back(token(DIVIDE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("a")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("b")));
+  program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -682,8 +682,8 @@ TEST(xExpressionEval, div_string_string_throws) {
 
 TEST(xExpressionEval, not_nonempty_string_is_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("hello"))));
-  program.push_back(token(NOT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("hello")));
+  program.emplace_back(NOT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -694,8 +694,8 @@ TEST(xExpressionEval, not_nonempty_string_is_false) {
 
 TEST(xExpressionEval, not_empty_string_is_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string(""))));
-  program.push_back(token(NOT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("")));
+  program.emplace_back(NOT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -706,9 +706,9 @@ TEST(xExpressionEval, not_empty_string_is_true) {
 
 TEST(xExpressionEval, and_string_int_uses_string_truthiness) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("text"))));
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(AND));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("text")));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(AND);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -720,8 +720,8 @@ TEST(xExpressionEval, and_string_int_uses_string_truthiness) {
 
 TEST(xExpressionEval, not_intpair_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::pair<int, int>(1, 2))));
-  program.push_back(token(NOT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<int, int>(1, 2)));
+  program.emplace_back(NOT);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -735,7 +735,7 @@ TEST(xExpressionEval, push_id_reads_value_from_payload) {
   p.setItem(0, 42);
 
   std::list<token> program;
-  program.push_back(token(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0))));
+  program.emplace_back(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0)));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program, &p);
@@ -746,7 +746,7 @@ TEST(xExpressionEval, push_id_reads_value_from_payload) {
 
 TEST(xExpressionEval, push_id_null_payload_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0))));
+  program.emplace_back(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0)));
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program, nullptr), std::runtime_error);
@@ -760,7 +760,7 @@ TEST(xExpressionEval, push_id2_reads_value_from_payload) {
   p.setItem(0, 99);
 
   std::list<token> program;
-  program.push_back(token(PUSH_ID2, rdb::descFldVT(std::string("x[0]"))));
+  program.emplace_back(PUSH_ID2, rdb::descFldVT(std::string("x[0]")));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program, &p);
@@ -771,7 +771,7 @@ TEST(xExpressionEval, push_id2_reads_value_from_payload) {
 
 TEST(xExpressionEval, push_id2_null_payload_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_ID2, rdb::descFldVT(std::string("x[0]"))));
+  program.emplace_back(PUSH_ID2, rdb::descFldVT(std::string("x[0]")));
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program, nullptr), std::runtime_error);
@@ -783,7 +783,7 @@ TEST(xExpressionEval, push_id2_malformed_identifier_throws) {
   p.setItem(0, 1);
 
   std::list<token> program;
-  program.push_back(token(PUSH_ID2, rdb::descFldVT(std::string("fieldname"))));
+  program.emplace_back(PUSH_ID2, rdb::descFldVT(std::string("fieldname")));
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program, &p), std::runtime_error);
@@ -793,7 +793,7 @@ TEST(xExpressionEval, push_id2_malformed_identifier_throws) {
 
 TEST(xExpressionEval, push_idx_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_IDX, 0));
+  program.emplace_back(PUSH_IDX, 0);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -803,8 +803,8 @@ TEST(xExpressionEval, push_idx_throws) {
 
 TEST(xExpressionEval, too_many_values_on_stack_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1));
-  program.push_back(token(PUSH_VAL, 2));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(PUSH_VAL, 2);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -814,8 +814,8 @@ TEST(xExpressionEval, too_many_values_on_stack_throws) {
 
 TEST(xExpressionEval, call_sqrt_function_double) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 4.0));
-  program.push_back(token(CALL, std::string("sqrt")));
+  program.emplace_back(PUSH_VAL, 4.0);
+  program.emplace_back(CALL, std::string("sqrt"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -826,8 +826,8 @@ TEST(xExpressionEval, call_sqrt_function_double) {
 
 TEST(xExpressionEval, call_round_function_double) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.5));
-  program.push_back(token(CALL, std::string("round")));
+  program.emplace_back(PUSH_VAL, 1.5);
+  program.emplace_back(CALL, std::string("round"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -838,8 +838,8 @@ TEST(xExpressionEval, call_round_function_double) {
 
 TEST(xExpressionEval, call_trunc_function_double) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.9));
-  program.push_back(token(CALL, std::string("trunc")));
+  program.emplace_back(PUSH_VAL, 1.9);
+  program.emplace_back(CALL, std::string("trunc"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -850,8 +850,8 @@ TEST(xExpressionEval, call_trunc_function_double) {
 
 TEST(xExpressionEval, call_sin_zero) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 0.0));
-  program.push_back(token(CALL, std::string("sin")));
+  program.emplace_back(PUSH_VAL, 0.0);
+  program.emplace_back(CALL, std::string("sin"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -862,8 +862,8 @@ TEST(xExpressionEval, call_sin_zero) {
 
 TEST(xExpressionEval, call_cos_zero) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 0.0));
-  program.push_back(token(CALL, std::string("cos")));
+  program.emplace_back(PUSH_VAL, 0.0);
+  program.emplace_back(CALL, std::string("cos"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -874,8 +874,8 @@ TEST(xExpressionEval, call_cos_zero) {
 
 TEST(xExpressionEval, call_tan_zero) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 0.0));
-  program.push_back(token(CALL, std::string("tan")));
+  program.emplace_back(PUSH_VAL, 0.0);
+  program.emplace_back(CALL, std::string("tan"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -886,8 +886,8 @@ TEST(xExpressionEval, call_tan_zero) {
 
 TEST(xExpressionEval, call_log_of_one) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.0));
-  program.push_back(token(CALL, std::string("log")));
+  program.emplace_back(PUSH_VAL, 1.0);
+  program.emplace_back(CALL, std::string("log"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -898,8 +898,8 @@ TEST(xExpressionEval, call_log_of_one) {
 
 TEST(xExpressionEval, call_log2_of_one) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.0));
-  program.push_back(token(CALL, std::string("log2")));
+  program.emplace_back(PUSH_VAL, 1.0);
+  program.emplace_back(CALL, std::string("log2"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -910,8 +910,8 @@ TEST(xExpressionEval, call_log2_of_one) {
 
 TEST(xExpressionEval, call_function_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(CALL, std::string("sqrt")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("sqrt"));
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -919,8 +919,8 @@ TEST(xExpressionEval, call_function_null_propagates_null) {
 
 TEST(xExpressionEval, call_function_on_string_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("text"))));
-  program.push_back(token(CALL, std::string("floor")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("text")));
+  program.emplace_back(CALL, std::string("floor"));
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -930,9 +930,9 @@ TEST(xExpressionEval, call_function_on_string_throws) {
 
 TEST(xExpressionEval, cmp_lt_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_LT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -940,9 +940,9 @@ TEST(xExpressionEval, cmp_lt_null_propagates_null) {
 
 TEST(xExpressionEval, cmp_gt_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_GT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -950,9 +950,9 @@ TEST(xExpressionEval, cmp_gt_null_propagates_null) {
 
 TEST(xExpressionEval, cmp_le_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -960,9 +960,9 @@ TEST(xExpressionEval, cmp_le_null_propagates_null) {
 
 TEST(xExpressionEval, cmp_ge_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -970,9 +970,9 @@ TEST(xExpressionEval, cmp_ge_null_propagates_null) {
 
 TEST(xExpressionEval, cmp_not_equal_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, 3));
-  program.push_back(token(CMP_NOT_EQUAL));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -982,8 +982,8 @@ TEST(xExpressionEval, cmp_not_equal_null_propagates_null) {
 
 TEST(xExpressionEval, neg_string_throws) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("hello"))));
-  program.push_back(token(NEGATE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("hello")));
+  program.emplace_back(NEGATE);
 
   expressionEvaluator test;
   EXPECT_THROW(test.eval(program), std::runtime_error);
@@ -993,9 +993,9 @@ TEST(xExpressionEval, neg_string_throws) {
 
 TEST(xExpressionEval, and_null_null_is_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(AND));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(AND);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -1003,9 +1003,9 @@ TEST(xExpressionEval, and_null_null_is_null) {
 
 TEST(xExpressionEval, or_null_null_is_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(OR));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(OR);
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -1015,9 +1015,9 @@ TEST(xExpressionEval, or_null_null_is_null) {
 
 TEST(xExpressionEval, cmp_equal_string_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_EQUAL));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1028,9 +1028,9 @@ TEST(xExpressionEval, cmp_equal_string_equal) {
 
 TEST(xExpressionEval, cmp_equal_string_not_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(CMP_EQUAL));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1043,24 +1043,24 @@ TEST(xExpressionEval, cmp_equal_string_not_equal) {
 
 TEST(xExpressionEval, add_float_float) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.0f));
-  program.push_back(token(PUSH_VAL, 2.0f));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1.0F);
+  program.emplace_back(PUSH_VAL, 2.0F);
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(std::holds_alternative<float>(result));
-  EXPECT_EQ(std::get<float>(result), 3.0f);
+  EXPECT_EQ(std::get<float>(result), 3.0F);
 }
 
 // --- unsigned arithmetic ---
 
 TEST(xExpressionEval, add_uint_uint) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3U));
-  program.push_back(token(PUSH_VAL, 4U));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 3U);
+  program.emplace_back(PUSH_VAL, 4U);
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1071,8 +1071,8 @@ TEST(xExpressionEval, add_uint_uint) {
 
 TEST(xExpressionEval, isnull_returns_1_for_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(CALL, std::string("isnull")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("isnull"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1083,8 +1083,8 @@ TEST(xExpressionEval, isnull_returns_1_for_null) {
 
 TEST(xExpressionEval, isnull_returns_0_for_non_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 42));
-  program.push_back(token(CALL, std::string("isnull")));
+  program.emplace_back(PUSH_VAL, 42);
+  program.emplace_back(CALL, std::string("isnull"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1099,9 +1099,9 @@ TEST(xExpressionEval, isnull_returns_0_for_non_null) {
 
 TEST(xExpressionEval, cmp_not_equal_string_not_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(CMP_NOT_EQUAL));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" != "xyz"
@@ -1112,9 +1112,9 @@ TEST(xExpressionEval, cmp_not_equal_string_not_equal) {
 
 TEST(xExpressionEval, cmp_not_equal_string_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_NOT_EQUAL));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" != "abc"
@@ -1125,9 +1125,9 @@ TEST(xExpressionEval, cmp_not_equal_string_equal) {
 
 TEST(xExpressionEval, cmp_lt_string_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(CMP_LT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" < "xyz"
@@ -1138,9 +1138,9 @@ TEST(xExpressionEval, cmp_lt_string_true) {
 
 TEST(xExpressionEval, cmp_lt_string_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_LT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" < "abc"
@@ -1151,9 +1151,9 @@ TEST(xExpressionEval, cmp_lt_string_false) {
 
 TEST(xExpressionEval, cmp_gt_string_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_GT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" > "abc"
@@ -1164,9 +1164,9 @@ TEST(xExpressionEval, cmp_gt_string_true) {
 
 TEST(xExpressionEval, cmp_gt_string_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(CMP_GT));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" > "xyz"
@@ -1177,9 +1177,9 @@ TEST(xExpressionEval, cmp_gt_string_false) {
 
 TEST(xExpressionEval, cmp_le_string_true_less) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" <= "xyz"
@@ -1190,9 +1190,9 @@ TEST(xExpressionEval, cmp_le_string_true_less) {
 
 TEST(xExpressionEval, cmp_le_string_true_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" <= "abc"
@@ -1203,9 +1203,9 @@ TEST(xExpressionEval, cmp_le_string_true_equal) {
 
 TEST(xExpressionEval, cmp_le_string_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_LE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" <= "abc"
@@ -1216,9 +1216,9 @@ TEST(xExpressionEval, cmp_le_string_false) {
 
 TEST(xExpressionEval, cmp_ge_string_true_greater) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" >= "abc"
@@ -1229,9 +1229,9 @@ TEST(xExpressionEval, cmp_ge_string_true_greater) {
 
 TEST(xExpressionEval, cmp_ge_string_true_equal) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" >= "abc"
@@ -1242,9 +1242,9 @@ TEST(xExpressionEval, cmp_ge_string_true_equal) {
 
 TEST(xExpressionEval, cmp_ge_string_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("abc"))));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("xyz"))));
-  program.push_back(token(CMP_GE));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
+  program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" >= "xyz"
@@ -1258,9 +1258,9 @@ TEST(xExpressionEval, cmp_ge_string_false) {
 
 TEST(xExpressionEval, or_nonempty_string_false_is_true) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("text"))));
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(OR));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("text")));
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(OR);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "text" OR 0 → true, typ string
@@ -1271,9 +1271,9 @@ TEST(xExpressionEval, or_nonempty_string_false_is_true) {
 
 TEST(xExpressionEval, or_empty_string_false_is_false) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string(""))));
-  program.push_back(token(PUSH_VAL, 0));
-  program.push_back(token(OR));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("")));
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(OR);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "" OR 0 → false, typ string
@@ -1289,22 +1289,22 @@ TEST(xExpressionEval, or_empty_string_false_is_false) {
 
 TEST(xExpressionEval, add_string_float_converts_via_to_string) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.0f));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("unit"))));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 1.0F);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("unit")));
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "unit" + std::to_string(1.0f)
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0f) + "unit");
+  EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0F) + "unit");
 }
 
 TEST(xExpressionEval, add_string_double_converts_via_to_string) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 2.0));
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("val"))));
-  program.push_back(token(ADD));
+  program.emplace_back(PUSH_VAL, 2.0);
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("val")));
+  program.emplace_back(ADD);
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "val" + std::to_string(2.0)
@@ -1317,8 +1317,8 @@ TEST(xExpressionEval, add_string_double_converts_via_to_string) {
 
 TEST(xExpressionEval, call_to_integer_from_string) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("42"))));
-  program.push_back(token(CALL, std::string("to_integer")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("42")));
+  program.emplace_back(CALL, std::string("to_integer"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1329,8 +1329,8 @@ TEST(xExpressionEval, call_to_integer_from_string) {
 
 TEST(xExpressionEval, call_to_integer_from_double_truncates) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 3.9));
-  program.push_back(token(CALL, std::string("to_integer")));
+  program.emplace_back(PUSH_VAL, 3.9);
+  program.emplace_back(CALL, std::string("to_integer"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1341,8 +1341,8 @@ TEST(xExpressionEval, call_to_integer_from_double_truncates) {
 
 TEST(xExpressionEval, call_to_integer_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(CALL, std::string("to_integer")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("to_integer"));
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -1352,32 +1352,32 @@ TEST(xExpressionEval, call_to_integer_null_propagates_null) {
 
 TEST(xExpressionEval, call_to_float_from_string) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("2.5"))));
-  program.push_back(token(CALL, std::string("to_float")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("2.5")));
+  program.emplace_back(CALL, std::string("to_float"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(std::holds_alternative<float>(result));
-  EXPECT_EQ(std::get<float>(result), 2.5f);
+  EXPECT_EQ(std::get<float>(result), 2.5F);
 }
 
 TEST(xExpressionEval, call_to_float_from_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 5));
-  program.push_back(token(CALL, std::string("to_float")));
+  program.emplace_back(PUSH_VAL, 5);
+  program.emplace_back(CALL, std::string("to_float"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(std::holds_alternative<float>(result));
-  EXPECT_EQ(std::get<float>(result), 5.0f);
+  EXPECT_EQ(std::get<float>(result), 5.0F);
 }
 
 TEST(xExpressionEval, call_to_float_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(CALL, std::string("to_float")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("to_float"));
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -1387,8 +1387,8 @@ TEST(xExpressionEval, call_to_float_null_propagates_null) {
 
 TEST(xExpressionEval, call_to_double_from_string) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("1.5"))));
-  program.push_back(token(CALL, std::string("to_double")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("1.5")));
+  program.emplace_back(CALL, std::string("to_double"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1399,8 +1399,8 @@ TEST(xExpressionEval, call_to_double_from_string) {
 
 TEST(xExpressionEval, call_to_double_from_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 7));
-  program.push_back(token(CALL, std::string("to_double")));
+  program.emplace_back(PUSH_VAL, 7);
+  program.emplace_back(CALL, std::string("to_double"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1411,8 +1411,8 @@ TEST(xExpressionEval, call_to_double_from_int) {
 
 TEST(xExpressionEval, call_to_double_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(CALL, std::string("to_double")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("to_double"));
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
@@ -1422,8 +1422,8 @@ TEST(xExpressionEval, call_to_double_null_propagates_null) {
 
 TEST(xExpressionEval, call_to_string_from_int) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 42));
-  program.push_back(token(CALL, std::string("to_string")));
+  program.emplace_back(PUSH_VAL, 42);
+  program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1434,20 +1434,20 @@ TEST(xExpressionEval, call_to_string_from_int) {
 
 TEST(xExpressionEval, call_to_string_from_float) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, 1.0f));
-  program.push_back(token(CALL, std::string("to_string")));
+  program.emplace_back(PUSH_VAL, 1.0F);
+  program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0f));
+  EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0F));
 }
 
 TEST(xExpressionEval, call_to_string_identity) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::string("hello"))));
-  program.push_back(token(CALL, std::string("to_string")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("hello")));
+  program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
@@ -1458,8 +1458,8 @@ TEST(xExpressionEval, call_to_string_identity) {
 
 TEST(xExpressionEval, call_to_string_null_propagates_null) {
   std::list<token> program;
-  program.push_back(token(PUSH_VAL, rdb::descFldVT(std::monostate{})));
-  program.push_back(token(CALL, std::string("to_string")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));

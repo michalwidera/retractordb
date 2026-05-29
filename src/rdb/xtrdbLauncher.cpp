@@ -32,12 +32,16 @@
 #include "xtrdbStorageMap.hpp"
 #include "xtrdbTypes.hpp"
 
+namespace {
+constexpr int kHelpColumnWidth = 32;
+}
+
 int main(int argc, char *argv[]) {
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
 
   namespace po = boost::program_options;
   po::options_description desc("Allowed options");
-  std::string mapDatafile{""};
+  std::string mapDatafile;
   // clang-format off
   desc.add_options()
       ("help,h",       "produce help message")
@@ -59,9 +63,9 @@ int main(int argc, char *argv[]) {
   po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data()).options(desc).run(), vm);
   po::notify(vm);
 
-  if (vm.count("noprompt")) cliNoPrompt = true;
+  if (vm.count("noprompt") != 0U) cliNoPrompt = true;
 
-  if (vm.count("help")) {
+  if (vm.count("help") != 0U) {
     std::cout << argv[0] << " - data accessing tool.\n\n"
               << "Usage: " << argv[0] << " [option]\n\n"
               << desc << config_line << "\nLog: " << filelog << "\n"
@@ -70,7 +74,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  if (vm.count("storagemap")) {
+  if (vm.count("storagemap") != 0U) {
     showStorageMap(mapDatafile);
     spdlog::shutdown();
     return 0;
@@ -194,15 +198,15 @@ int main(int argc, char *argv[]) {
                {"#|rem [text]", "comment line"},
                {"help|h", "show this help"},
            })
-        std::cout << std::left << std::setw(32) << c << d << "\n";
+        std::cout << std::left << std::setw(kHelpColumnWidth) << c << d << "\n";
       for (auto &[name, cmdPtr] : commands) {
         auto [cmd, desc] = cmdPtr->usage();
         if (cmd.empty()) continue;
-        std::cout << std::left << std::setw(32) << cmd;
+        std::cout << std::left << std::setw(kHelpColumnWidth) << cmd;
         if (!desc.empty()) std::cout << desc[0];
         std::cout << "\n";
         for (size_t i = 1; i < desc.size(); ++i)
-          std::cout << std::string(32, ' ') << desc[i] << "\n";
+          std::cout << std::string(kHelpColumnWidth, ' ') << desc[i] << "\n";
       }
       std::cout << argv[0] << " - data accessing tool.\n\n"
                 << config_line << "\nLog: " << filelog << "\n"

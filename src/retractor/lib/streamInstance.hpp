@@ -28,21 +28,21 @@ struct streamInstance {
   // This constructor will create data based on query
   explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
 
-  rdb::payload constructAgsePayload(const int length,             //  _@(_,length)
-                                    const int step,               //  _@(step,_)
-                                    const std::string &instance,  //  instance@(_,_)
-                                    const int storedRecordsCountDst);
+  [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
+                                                  int step,                     //  _@(step,_)
+                                                  const std::string &instance,  //  instance@(_,_)
+                                                  int storedRecordCountDst) const;
   /*
    * This function will create aggregate payload based on the command and instance
    */
-  rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance);
+  [[nodiscard]] rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
 
   /*
    * This function will create OutputPayload based on all field from query
    * constructOutputPayload uses only data from inputPayload
    * inputPayload need to be filled first before this constructOutputPayload will be called.
    */
-  void constructOutputPayload(const std::list<field> &fields);
+  void constructOutputPayload(const std::list<field> &fields) const;
 
   /*
    * This function will process all rules from query

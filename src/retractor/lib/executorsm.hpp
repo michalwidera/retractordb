@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <set>
 #include <string>
 
@@ -11,12 +12,12 @@
 #include "CRSMath.hpp"
 #include "lockManager.hpp"
 
-typedef boost::property_tree::ptree ptree;
-typedef boost::program_options::variables_map vm_map;
+using ptree  = boost::property_tree::ptree;
+using vm_map = boost::program_options::variables_map;
 struct executorsm {
   int run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm);
 
-  enum : int { inifitie_loop = 0, stop_now = 1, waitForXqry = -1 };
+  enum : std::int8_t { inifitie_loop = 0, stop_now = 1, waitForXqry = -1 };
 
  private:
   static qTree *coreInstancePtr;
@@ -27,7 +28,7 @@ struct executorsm {
   static std::atomic<bool> ipcReady;
 
   static void commandProcessorLoop();
-  static ptree commandProcessor(ptree ptInval);
+  static ptree commandProcessor(const ptree &ptInval);
   static ptree collectStreamsParameters();
   static ptree getAdHoc(const std::string &adHocQuery);
   static void boradcastOutOfBussiness();

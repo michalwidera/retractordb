@@ -312,13 +312,13 @@ size_t RQLParser::ProgContext::getRuleIndex() const {
 }
 
 void RQLParser::ProgContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterProg(this);
 }
 
 void RQLParser::ProgContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitProg(this);
 }
@@ -431,12 +431,12 @@ tree::TerminalNode* RQLParser::CoptionContext::STRING() {
 RQLParser::CoptionContext::CoptionContext(Compiler_optionContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::CoptionContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterCoption(this);
 }
 void RQLParser::CoptionContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitCoption(this);
 }
@@ -469,9 +469,9 @@ RQLParser::Compiler_optionContext* RQLParser::compiler_option() {
     setState(65);
     antlrcpp::downCast<CoptionContext *>(_localctx)->value = _input->LT(1);
     _la = _input->LA(1);
-    if (!(_la == RQLParser::STRING_PROFILE
+    if (_la != RQLParser::STRING_PROFILE
 
-    || _la == RQLParser::STRING)) {
+    && _la != RQLParser::STRING) {
       antlrcpp::downCast<CoptionContext *>(_localctx)->value = _errHandler->recoverInline(this);
     }
     else {
@@ -557,12 +557,12 @@ tree::TerminalNode* RQLParser::SelectContext::TYPE_PROFILE() {
 RQLParser::SelectContext::SelectContext(Select_statementContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SelectContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSelect(this);
 }
 void RQLParser::SelectContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSelect(this);
 }
@@ -717,12 +717,12 @@ tree::TerminalNode* RQLParser::DeclareContext::HOLD() {
 RQLParser::DeclareContext::DeclareContext(Declare_statementContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::DeclareContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterDeclare(this);
 }
 void RQLParser::DeclareContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitDeclare(this);
 }
@@ -860,12 +860,12 @@ RQLParser::SystempartContext* RQLParser::RulezContext::systempart() {
 RQLParser::RulezContext::RulezContext(Rule_statementContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::RulezContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRulez(this);
 }
 void RQLParser::RulezContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRulez(this);
 }
@@ -966,13 +966,13 @@ size_t RQLParser::DumppartContext::getRuleIndex() const {
 }
 
 void RQLParser::DumppartContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterDumppart(this);
 }
 
 void RQLParser::DumppartContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitDumppart(this);
 }
@@ -1056,13 +1056,13 @@ size_t RQLParser::SystempartContext::getRuleIndex() const {
 }
 
 void RQLParser::SystempartContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSystempart(this);
 }
 
 void RQLParser::SystempartContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSystempart(this);
 }
@@ -1119,12 +1119,12 @@ tree::TerminalNode* RQLParser::RationalAsDecimalContext::DECIMAL() {
 RQLParser::RationalAsDecimalContext::RationalAsDecimalContext(Rational_seContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::RationalAsDecimalContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRationalAsDecimal(this);
 }
 void RQLParser::RationalAsDecimalContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRationalAsDecimal(this);
 }
@@ -1137,12 +1137,12 @@ tree::TerminalNode* RQLParser::RationalAsFloatContext::FLOAT() {
 RQLParser::RationalAsFloatContext::RationalAsFloatContext(Rational_seContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::RationalAsFloatContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRationalAsFloat(this);
 }
 void RQLParser::RationalAsFloatContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRationalAsFloat(this);
 }
@@ -1155,12 +1155,12 @@ RQLParser::Fraction_ruleContext* RQLParser::RationalAsFraction_proformaContext::
 RQLParser::RationalAsFraction_proformaContext::RationalAsFraction_proformaContext(Rational_seContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::RationalAsFraction_proformaContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRationalAsFraction_proforma(this);
 }
 void RQLParser::RationalAsFraction_proformaContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRationalAsFraction_proforma(this);
 }
@@ -1249,12 +1249,12 @@ tree::TerminalNode* RQLParser::RetentionContext::DECIMAL(size_t i) {
 RQLParser::RetentionContext::RetentionContext(Retention_fromContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::RetentionContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterRetention(this);
 }
 void RQLParser::RetentionContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitRetention(this);
 }
@@ -1328,12 +1328,12 @@ tree::TerminalNode* RQLParser::FractionContext::DIVIDE() {
 RQLParser::FractionContext::FractionContext(Fraction_ruleContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::FractionContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFraction(this);
 }
 void RQLParser::FractionContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFraction(this);
 }
@@ -1400,12 +1400,12 @@ tree::TerminalNode* RQLParser::SingleDeclarationContext::DECIMAL() {
 RQLParser::SingleDeclarationContext::SingleDeclarationContext(Field_declarationContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SingleDeclarationContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSingleDeclaration(this);
 }
 void RQLParser::SingleDeclarationContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSingleDeclaration(this);
 }
@@ -1475,12 +1475,12 @@ tree::TerminalNode* RQLParser::TypeUnsignedContext::UNSIGNED_T() {
 RQLParser::TypeUnsignedContext::TypeUnsignedContext(Field_typeContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::TypeUnsignedContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeUnsigned(this);
 }
 void RQLParser::TypeUnsignedContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeUnsigned(this);
 }
@@ -1493,12 +1493,12 @@ tree::TerminalNode* RQLParser::TypeIntContext::INTEGER_T() {
 RQLParser::TypeIntContext::TypeIntContext(Field_typeContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::TypeIntContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeInt(this);
 }
 void RQLParser::TypeIntContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeInt(this);
 }
@@ -1511,12 +1511,12 @@ tree::TerminalNode* RQLParser::TypeFloatContext::FLOAT_T() {
 RQLParser::TypeFloatContext::TypeFloatContext(Field_typeContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::TypeFloatContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeFloat(this);
 }
 void RQLParser::TypeFloatContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeFloat(this);
 }
@@ -1529,12 +1529,12 @@ tree::TerminalNode* RQLParser::TypeStringContext::STRING_T() {
 RQLParser::TypeStringContext::TypeStringContext(Field_typeContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::TypeStringContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeString(this);
 }
 void RQLParser::TypeStringContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeString(this);
 }
@@ -1547,12 +1547,12 @@ tree::TerminalNode* RQLParser::TypeByteContext::BYTE_T() {
 RQLParser::TypeByteContext::TypeByteContext(Field_typeContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::TypeByteContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeByte(this);
 }
 void RQLParser::TypeByteContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeByte(this);
 }
@@ -1565,12 +1565,12 @@ tree::TerminalNode* RQLParser::TypeDoubleContext::DOUBLE_T() {
 RQLParser::TypeDoubleContext::TypeDoubleContext(Field_typeContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::TypeDoubleContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterTypeDouble(this);
 }
 void RQLParser::TypeDoubleContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitTypeDouble(this);
 }
@@ -1687,12 +1687,12 @@ tree::TerminalNode* RQLParser::SelectListContext::COMMA(size_t i) {
 RQLParser::SelectListContext::SelectListContext(Select_listContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SelectListContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSelectList(this);
 }
 void RQLParser::SelectListContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSelectList(this);
 }
@@ -1705,12 +1705,12 @@ RQLParser::AsteriskContext* RQLParser::SelectListFullscanContext::asterisk() {
 RQLParser::SelectListFullscanContext::SelectListFullscanContext(Select_listContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SelectListFullscanContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSelectListFullscan(this);
 }
 void RQLParser::SelectListFullscanContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSelectListFullscan(this);
 }
@@ -1800,12 +1800,12 @@ tree::TerminalNode* RQLParser::FieldIDUnderlineContext::ID() {
 RQLParser::FieldIDUnderlineContext::FieldIDUnderlineContext(Field_idContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::FieldIDUnderlineContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFieldIDUnderline(this);
 }
 void RQLParser::FieldIDUnderlineContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFieldIDUnderline(this);
 }
@@ -1822,12 +1822,12 @@ tree::TerminalNode* RQLParser::FieldIDTableContext::DECIMAL() {
 RQLParser::FieldIDTableContext::FieldIDTableContext(Field_idContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::FieldIDTableContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFieldIDTable(this);
 }
 void RQLParser::FieldIDTableContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFieldIDTable(this);
 }
@@ -1840,12 +1840,12 @@ tree::TerminalNode* RQLParser::FieldIDContext::ID() {
 RQLParser::FieldIDContext::FieldIDContext(Field_idContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::FieldIDContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFieldID(this);
 }
 void RQLParser::FieldIDContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFieldID(this);
 }
@@ -1866,12 +1866,12 @@ tree::TerminalNode* RQLParser::FieldIDColumnNameContext::ID(size_t i) {
 RQLParser::FieldIDColumnNameContext::FieldIDColumnNameContext(Field_idContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::FieldIDColumnNameContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFieldIDColumnName(this);
 }
 void RQLParser::FieldIDColumnNameContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFieldIDColumnName(this);
 }
@@ -1980,13 +1980,13 @@ size_t RQLParser::Unary_op_expressionContext::getRuleIndex() const {
 }
 
 void RQLParser::Unary_op_expressionContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterUnary_op_expression(this);
 }
 
 void RQLParser::Unary_op_expressionContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitUnary_op_expression(this);
 }
@@ -2022,9 +2022,9 @@ RQLParser::Unary_op_expressionContext* RQLParser::unary_op_expression() {
         setState(195);
         antlrcpp::downCast<Unary_op_expressionContext *>(_localctx)->op = _input->LT(1);
         _la = _input->LA(1);
-        if (!(_la == RQLParser::PLUS
+        if (_la != RQLParser::PLUS
 
-        || _la == RQLParser::MINUS)) {
+        && _la != RQLParser::MINUS) {
           antlrcpp::downCast<Unary_op_expressionContext *>(_localctx)->op = _errHandler->recoverInline(this);
         }
         else {
@@ -2074,13 +2074,13 @@ size_t RQLParser::AsteriskContext::getRuleIndex() const {
 }
 
 void RQLParser::AsteriskContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterAsterisk(this);
 }
 
 void RQLParser::AsteriskContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitAsterisk(this);
 }
@@ -2138,13 +2138,13 @@ size_t RQLParser::ExpressionContext::getRuleIndex() const {
 }
 
 void RQLParser::ExpressionContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpression(this);
 }
 
 void RQLParser::ExpressionContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpression(this);
 }
@@ -2199,12 +2199,12 @@ RQLParser::Expression_logicContext* RQLParser::LogicExpressionContext::expressio
 RQLParser::LogicExpressionContext::LogicExpressionContext(LogicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::LogicExpressionContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterLogicExpression(this);
 }
 void RQLParser::LogicExpressionContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitLogicExpression(this);
 }
@@ -2267,12 +2267,12 @@ tree::TerminalNode* RQLParser::ExpOrContext::OR_C() {
 RQLParser::ExpOrContext::ExpOrContext(Expression_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpOrContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpOr(this);
 }
 void RQLParser::ExpOrContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpOr(this);
 }
@@ -2293,12 +2293,12 @@ tree::TerminalNode* RQLParser::ExpAndContext::AND_C() {
 RQLParser::ExpAndContext::ExpAndContext(Expression_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpAndContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpAnd(this);
 }
 void RQLParser::ExpAndContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpAnd(this);
 }
@@ -2311,12 +2311,12 @@ RQLParser::Term_logicContext* RQLParser::ExpTermLogicContext::term_logic() {
 RQLParser::ExpTermLogicContext::ExpTermLogicContext(Expression_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpTermLogicContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpTermLogic(this);
 }
 void RQLParser::ExpTermLogicContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpTermLogic(this);
 }
@@ -2365,7 +2365,7 @@ RQLParser::Expression_logicContext* RQLParser::expression_logic(int precedence) 
         _errHandler->sync(this);
         switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 23, _ctx)) {
         case 1: {
-          auto newContext = _tracker.createInstance<ExpAndContext>(_tracker.createInstance<Expression_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpAndContext>(_tracker.createInstance<Expression_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpression_logic);
           setState(212);
@@ -2379,7 +2379,7 @@ RQLParser::Expression_logicContext* RQLParser::expression_logic(int precedence) 
         }
 
         case 2: {
-          auto newContext = _tracker.createInstance<ExpOrContext>(_tracker.createInstance<Expression_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpOrContext>(_tracker.createInstance<Expression_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpression_logic);
           setState(215);
@@ -2441,12 +2441,12 @@ tree::TerminalNode* RQLParser::ExpLsContext::IS_LS() {
 RQLParser::ExpLsContext::ExpLsContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpLsContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpLs(this);
 }
 void RQLParser::ExpLsContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpLs(this);
 }
@@ -2467,12 +2467,12 @@ tree::TerminalNode* RQLParser::ExpLeContext::IS_LE() {
 RQLParser::ExpLeContext::ExpLeContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpLeContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpLe(this);
 }
 void RQLParser::ExpLeContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpLe(this);
 }
@@ -2493,12 +2493,12 @@ tree::TerminalNode* RQLParser::ExpNqContext::IS_NQ() {
 RQLParser::ExpNqContext::ExpNqContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpNqContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpNq(this);
 }
 void RQLParser::ExpNqContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpNq(this);
 }
@@ -2519,12 +2519,12 @@ tree::TerminalNode* RQLParser::ExpGrContext::IS_GR() {
 RQLParser::ExpGrContext::ExpGrContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpGrContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpGr(this);
 }
 void RQLParser::ExpGrContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpGr(this);
 }
@@ -2537,12 +2537,12 @@ RQLParser::Expression_factorContext* RQLParser::ExpFactorContext::expression_fac
 RQLParser::ExpFactorContext::ExpFactorContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpFactorContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpFactor(this);
 }
 void RQLParser::ExpFactorContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpFactor(this);
 }
@@ -2563,12 +2563,12 @@ tree::TerminalNode* RQLParser::ExpEqContext::IS_EQ() {
 RQLParser::ExpEqContext::ExpEqContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpEqContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpEq(this);
 }
 void RQLParser::ExpEqContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpEq(this);
 }
@@ -2589,12 +2589,12 @@ tree::TerminalNode* RQLParser::ExpGeContext::IS_GE() {
 RQLParser::ExpGeContext::ExpGeContext(Term_logicContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpGeContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpGe(this);
 }
 void RQLParser::ExpGeContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpGe(this);
 }
@@ -2643,7 +2643,7 @@ RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
         _errHandler->sync(this);
         switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 25, _ctx)) {
         case 1: {
-          auto newContext = _tracker.createInstance<ExpEqContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpEqContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm_logic);
           setState(226);
@@ -2657,7 +2657,7 @@ RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
         }
 
         case 2: {
-          auto newContext = _tracker.createInstance<ExpNqContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpNqContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm_logic);
           setState(229);
@@ -2671,7 +2671,7 @@ RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
         }
 
         case 3: {
-          auto newContext = _tracker.createInstance<ExpGrContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpGrContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm_logic);
           setState(232);
@@ -2685,7 +2685,7 @@ RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
         }
 
         case 4: {
-          auto newContext = _tracker.createInstance<ExpLsContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpLsContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm_logic);
           setState(235);
@@ -2699,7 +2699,7 @@ RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
         }
 
         case 5: {
-          auto newContext = _tracker.createInstance<ExpGeContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpGeContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm_logic);
           setState(238);
@@ -2713,7 +2713,7 @@ RQLParser::Term_logicContext* RQLParser::term_logic(int precedence) {
         }
 
         case 6: {
-          auto newContext = _tracker.createInstance<ExpLeContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpLeContext>(_tracker.createInstance<Term_logicContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm_logic);
           setState(241);
@@ -2775,12 +2775,12 @@ tree::TerminalNode* RQLParser::ExpPlusContext::PLUS() {
 RQLParser::ExpPlusContext::ExpPlusContext(Expression_factorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpPlusContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpPlus(this);
 }
 void RQLParser::ExpPlusContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpPlus(this);
 }
@@ -2801,12 +2801,12 @@ tree::TerminalNode* RQLParser::ExpMinusContext::MINUS() {
 RQLParser::ExpMinusContext::ExpMinusContext(Expression_factorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpMinusContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpMinus(this);
 }
 void RQLParser::ExpMinusContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpMinus(this);
 }
@@ -2819,12 +2819,12 @@ RQLParser::TermContext* RQLParser::ExpTermContext::term() {
 RQLParser::ExpTermContext::ExpTermContext(Expression_factorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpTermContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpTerm(this);
 }
 void RQLParser::ExpTermContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpTerm(this);
 }
@@ -2873,7 +2873,7 @@ RQLParser::Expression_factorContext* RQLParser::expression_factor(int precedence
         _errHandler->sync(this);
         switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 27, _ctx)) {
         case 1: {
-          auto newContext = _tracker.createInstance<ExpPlusContext>(_tracker.createInstance<Expression_factorContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpPlusContext>(_tracker.createInstance<Expression_factorContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpression_factor);
           setState(252);
@@ -2887,7 +2887,7 @@ RQLParser::Expression_factorContext* RQLParser::expression_factor(int precedence
         }
 
         case 2: {
-          auto newContext = _tracker.createInstance<ExpMinusContext>(_tracker.createInstance<Expression_factorContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpMinusContext>(_tracker.createInstance<Expression_factorContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleExpression_factor);
           setState(255);
@@ -2941,12 +2941,12 @@ RQLParser::Expression_factorContext* RQLParser::ExpInContext::expression_factor(
 RQLParser::ExpInContext::ExpInContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpInContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpIn(this);
 }
 void RQLParser::ExpInContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpIn(this);
 }
@@ -2963,12 +2963,12 @@ tree::TerminalNode* RQLParser::ExpFloatContext::MINUS() {
 RQLParser::ExpFloatContext::ExpFloatContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpFloatContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpFloat(this);
 }
 void RQLParser::ExpFloatContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpFloat(this);
 }
@@ -2985,12 +2985,12 @@ tree::TerminalNode* RQLParser::ExpDecContext::MINUS() {
 RQLParser::ExpDecContext::ExpDecContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpDecContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpDec(this);
 }
 void RQLParser::ExpDecContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpDec(this);
 }
@@ -3003,12 +3003,12 @@ RQLParser::AgregatorContext* RQLParser::ExpAggContext::agregator() {
 RQLParser::ExpAggContext::ExpAggContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpAggContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpAgg(this);
 }
 void RQLParser::ExpAggContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpAgg(this);
 }
@@ -3021,12 +3021,12 @@ RQLParser::Function_callContext* RQLParser::ExpFnCallContext::function_call() {
 RQLParser::ExpFnCallContext::ExpFnCallContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpFnCallContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpFnCall(this);
 }
 void RQLParser::ExpFnCallContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpFnCall(this);
 }
@@ -3047,12 +3047,12 @@ tree::TerminalNode* RQLParser::ExpDivContext::DIVIDE() {
 RQLParser::ExpDivContext::ExpDivContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpDivContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpDiv(this);
 }
 void RQLParser::ExpDivContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpDiv(this);
 }
@@ -3065,12 +3065,12 @@ RQLParser::Field_idContext* RQLParser::ExpFieldContext::field_id() {
 RQLParser::ExpFieldContext::ExpFieldContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpFieldContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpField(this);
 }
 void RQLParser::ExpFieldContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpField(this);
 }
@@ -3087,12 +3087,12 @@ RQLParser::TermContext* RQLParser::ExpNotContext::term() {
 RQLParser::ExpNotContext::ExpNotContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpNotContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpNot(this);
 }
 void RQLParser::ExpNotContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpNot(this);
 }
@@ -3105,12 +3105,12 @@ tree::TerminalNode* RQLParser::ExpStringContext::STRING() {
 RQLParser::ExpStringContext::ExpStringContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpStringContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpString(this);
 }
 void RQLParser::ExpStringContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpString(this);
 }
@@ -3123,12 +3123,12 @@ RQLParser::Unary_op_expressionContext* RQLParser::ExpUnaryContext::unary_op_expr
 RQLParser::ExpUnaryContext::ExpUnaryContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpUnaryContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpUnary(this);
 }
 void RQLParser::ExpUnaryContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpUnary(this);
 }
@@ -3149,12 +3149,12 @@ tree::TerminalNode* RQLParser::ExpMultContext::STAR() {
 RQLParser::ExpMultContext::ExpMultContext(TermContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::ExpMultContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterExpMult(this);
 }
 void RQLParser::ExpMultContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitExpMult(this);
 }
@@ -3307,7 +3307,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
         _errHandler->sync(this);
         switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 32, _ctx)) {
         case 1: {
-          auto newContext = _tracker.createInstance<ExpMultContext>(_tracker.createInstance<TermContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpMultContext>(_tracker.createInstance<TermContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm);
           setState(285);
@@ -3321,7 +3321,7 @@ RQLParser::TermContext* RQLParser::term(int precedence) {
         }
 
         case 2: {
-          auto newContext = _tracker.createInstance<ExpDivContext>(_tracker.createInstance<TermContext>(parentContext, parentState));
+          auto *newContext = _tracker.createInstance<ExpDivContext>(_tracker.createInstance<TermContext>(parentContext, parentState));
           _localctx = newContext;
           pushNewRecursionContext(newContext, startState, RuleTerm);
           setState(288);
@@ -3383,12 +3383,12 @@ tree::TerminalNode* RQLParser::SExpPlusContext::PLUS() {
 RQLParser::SExpPlusContext::SExpPlusContext(Stream_expressionContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpPlusContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpPlus(this);
 }
 void RQLParser::SExpPlusContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpPlus(this);
 }
@@ -3401,12 +3401,12 @@ RQLParser::Stream_termContext* RQLParser::SExpTermContext::stream_term() {
 RQLParser::SExpTermContext::SExpTermContext(Stream_expressionContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpTermContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpTerm(this);
 }
 void RQLParser::SExpTermContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpTerm(this);
 }
@@ -3427,12 +3427,12 @@ tree::TerminalNode* RQLParser::SExpTimeMoveContext::DECIMAL() {
 RQLParser::SExpTimeMoveContext::SExpTimeMoveContext(Stream_expressionContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpTimeMoveContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpTimeMove(this);
 }
 void RQLParser::SExpTimeMoveContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpTimeMove(this);
 }
@@ -3453,12 +3453,12 @@ RQLParser::Rational_seContext* RQLParser::SExpMinusContext::rational_se() {
 RQLParser::SExpMinusContext::SExpMinusContext(Stream_expressionContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpMinusContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpMinus(this);
 }
 void RQLParser::SExpMinusContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpMinus(this);
 }
@@ -3559,12 +3559,12 @@ RQLParser::Stream_factorContext* RQLParser::SExpFactorContext::stream_factor() {
 RQLParser::SExpFactorContext::SExpFactorContext(Stream_termContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpFactorContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpFactor(this);
 }
 void RQLParser::SExpFactorContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpFactor(this);
 }
@@ -3585,12 +3585,12 @@ tree::TerminalNode* RQLParser::SExpHashContext::SHARP() {
 RQLParser::SExpHashContext::SExpHashContext(Stream_termContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpHashContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpHash(this);
 }
 void RQLParser::SExpHashContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpHash(this);
 }
@@ -3611,12 +3611,12 @@ RQLParser::Rational_seContext* RQLParser::SExpModContext::rational_se() {
 RQLParser::SExpModContext::SExpModContext(Stream_termContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpModContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpMod(this);
 }
 void RQLParser::SExpModContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpMod(this);
 }
@@ -3637,12 +3637,12 @@ RQLParser::AgregatorContext* RQLParser::SExpAgregate_proformaContext::agregator(
 RQLParser::SExpAgregate_proformaContext::SExpAgregate_proformaContext(Stream_termContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpAgregate_proformaContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpAgregate_proforma(this);
 }
 void RQLParser::SExpAgregate_proformaContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpAgregate_proforma(this);
 }
@@ -3675,12 +3675,12 @@ tree::TerminalNode* RQLParser::SExpAgseContext::MINUS() {
 RQLParser::SExpAgseContext::SExpAgseContext(Stream_termContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpAgseContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpAgse(this);
 }
 void RQLParser::SExpAgseContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpAgse(this);
 }
@@ -3701,12 +3701,12 @@ RQLParser::Rational_seContext* RQLParser::SExpAndContext::rational_se() {
 RQLParser::SExpAndContext::SExpAndContext(Stream_termContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::SExpAndContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterSExpAnd(this);
 }
 void RQLParser::SExpAndContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitSExpAnd(this);
 }
@@ -3844,13 +3844,13 @@ size_t RQLParser::Stream_factorContext::getRuleIndex() const {
 }
 
 void RQLParser::Stream_factorContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterStream_factor(this);
 }
 
 void RQLParser::Stream_factorContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStream_factor(this);
 }
@@ -3926,12 +3926,12 @@ tree::TerminalNode* RQLParser::StreamMinContext::MIN() {
 RQLParser::StreamMinContext::StreamMinContext(AgregatorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::StreamMinContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterStreamMin(this);
 }
 void RQLParser::StreamMinContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStreamMin(this);
 }
@@ -3944,12 +3944,12 @@ tree::TerminalNode* RQLParser::StreamAvgContext::AVG() {
 RQLParser::StreamAvgContext::StreamAvgContext(AgregatorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::StreamAvgContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterStreamAvg(this);
 }
 void RQLParser::StreamAvgContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStreamAvg(this);
 }
@@ -3962,12 +3962,12 @@ tree::TerminalNode* RQLParser::StreamMaxContext::MAX() {
 RQLParser::StreamMaxContext::StreamMaxContext(AgregatorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::StreamMaxContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterStreamMax(this);
 }
 void RQLParser::StreamMaxContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStreamMax(this);
 }
@@ -3980,12 +3980,12 @@ tree::TerminalNode* RQLParser::StreamSumContext::SUMC() {
 RQLParser::StreamSumContext::StreamSumContext(AgregatorContext *ctx) { copyFrom(ctx); }
 
 void RQLParser::StreamSumContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterStreamSum(this);
 }
 void RQLParser::StreamSumContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitStreamSum(this);
 }
@@ -4102,13 +4102,13 @@ size_t RQLParser::Function_callContext::getRuleIndex() const {
 }
 
 void RQLParser::Function_callContext::enterRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->enterFunction_call(this);
 }
 
 void RQLParser::Function_callContext::exitRule(tree::ParseTreeListener *listener) {
-  auto parserListener = dynamic_cast<RQLListener *>(listener);
+  auto *parserListener = dynamic_cast<RQLListener *>(listener);
   if (parserListener != nullptr)
     parserListener->exitFunction_call(this);
 }

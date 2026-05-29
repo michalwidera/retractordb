@@ -6,7 +6,7 @@
 
 #include <boost/property_tree/ptree.hpp>
 
-enum class formatMode { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
+enum class formatMode : std::uint8_t { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 
 class Formatter {
   std::vector<std::deque<std::string>> gnuplot_lines_;

@@ -18,7 +18,8 @@ TEST(IpcTransport, done_can_be_set_and_read) {
 }
 
 TEST(IpcTransport, done_is_independently_per_instance) {
-  IpcTransport a, b;
+  IpcTransport a;
+  IpcTransport b;
   a.done = true;
   EXPECT_TRUE(a.done);
   EXPECT_FALSE(b.done);
@@ -41,7 +42,8 @@ TEST(IpcTransport, popQueue_does_not_modify_pt_on_empty) {
 }
 
 TEST(IpcTransport, multiple_instances_have_independent_queues) {
-  IpcTransport a, b;
+  IpcTransport a;
+  IpcTransport b;
   boost::property_tree::ptree pt;
   EXPECT_FALSE(a.popQueue(pt));
   EXPECT_FALSE(b.popQueue(pt));

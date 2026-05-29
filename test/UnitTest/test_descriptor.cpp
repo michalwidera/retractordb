@@ -7,7 +7,10 @@
 
 #include "rdb/descriptor.hpp"
 
-extern std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet);
+// Tests intentionally validate legacy textual/binary layouts with C-style arrays.
+// NOLINTBEGIN(modernize-avoid-c-arrays)
+
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
 
 namespace {
 
@@ -266,6 +269,8 @@ TEST(descriptor, assign_operator) {
   EXPECT_TRUE(data2.fieldSize("Control") == data1.fieldSize("Control"));
   EXPECT_TRUE(data2.fieldIndex("TLen") == data1.fieldIndex("TLen"));
 }
+
+// NOLINTEND(modernize-avoid-c-arrays)
 
 TEST(descriptor, copy_constructor) {
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //

@@ -14,7 +14,7 @@ namespace rdb {
 // https://developers.google.com/protocol-buffers/docs/overview#scalar
 // https://doc.rust-lang.org/book/ch03-02-data-types.html
 
-enum FieldColumn { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
+enum FieldColumn : std::uint8_t { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 //
 // Creates ability to create descriptions of binary frames using types and arrays
 //
@@ -60,13 +60,13 @@ class Descriptor : public std::vector<rField> {
   bool operator==(const Descriptor &rhs) const;
   void composeHashDescriptorFrom(const std::string &fieldNamePrefix, Descriptor lhs, Descriptor rhs);
   void removeConfigurationFields();
-  size_t getSizeInBytes() const;
-  size_t fieldIndex(const std::string_view fieldName);
-  int fieldSize(const std::string_view fieldName);
-  int fieldSize(const rdb::rField &field) const;
-  size_t fieldByteOffset(const std::string_view fieldName);
+  [[nodiscard]] size_t getSizeInBytes() const;
+  size_t fieldIndex(std::string_view fieldName);
+  int fieldSize(std::string_view fieldName);
+  [[nodiscard]] int fieldSize(const rdb::rField &field) const;
+  size_t fieldByteOffset(std::string_view fieldName);
   int byteOffsetAtFlatIndex(int flatIndex);
-  std::string_view fieldTypeName(const std::string_view fieldName);
+  std::string_view fieldTypeName(std::string_view fieldName);
   int flatElementCount();
   std::vector<rField> dataFields();
   rdb::retention_t retention();
@@ -74,8 +74,8 @@ class Descriptor : public std::vector<rField> {
   std::pair<rdb::descFld, int> widestFieldType();
   std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex);
 
-  bool hasField(const std::string_view fieldName) const {
-    return std::any_of(begin(), end(), [fieldName](const auto &f) { return f.rname == fieldName; });
+  [[nodiscard]] bool hasField(const std::string_view fieldName) const {
+    return std::ranges::any_of(*this, [fieldName](const auto &f) { return f.rname == fieldName; });
   }
 
   friend std::ostream &operator<<(std::ostream &os, const Descriptor &rhs);

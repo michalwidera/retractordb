@@ -17,8 +17,12 @@
 
 #include "fatalError.hpp"
 
-int _kbhit(bool ignoreAnyKey) {
-  if (ignoreAnyKey) return 0;
+namespace {
+constexpr char kCarriageReturn = '\r';
+}
+
+bool _kbhit(bool ignoreAnyKey) {
+  if (ignoreAnyKey) return false;
   struct termios oldt = {};
   struct termios newt = {};
   int ch;
@@ -34,14 +38,14 @@ int _kbhit(bool ignoreAnyKey) {
   fcntl(STDIN_FILENO, F_SETFL, oldf);
   if (ch != EOF) {
     ungetc(ch, stdin);
-    return 1;
+    return true;
   }
-  return 0;
+  return false;
 }
 
 int _getch() { return getchar(); }
 
-void fixArgcv(int argc, char *argv[]) {
+void fixArgcv(int argc, char **argv) {
   // Clarification: When gcc has been upgraded to 9.x version some tests fails.
   // Bug appear when data are passing to program via script .sh
   // additional 13 (\r) character was append - this code normalize argv list.
@@ -52,7 +56,7 @@ void fixArgcv(int argc, char *argv[]) {
     for (int i = 0; i < argc; ++i) {
       auto len = strlen(argv[i]);
       if (len > 0)
-        if (argv[i][len - 1] == 13) argv[i][len - 1] = 0;
+        if (argv[i][len - 1] == kCarriageReturn) argv[i][len - 1] = 0;
     }
 }
 

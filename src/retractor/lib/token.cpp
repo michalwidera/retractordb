@@ -7,19 +7,19 @@
 
 #include "rdb/convertTypes.hpp"
 
-static_assert(std::is_copy_constructible_v<rdb::descFldVT> == true);
+static_assert(std::is_copy_constructible_v<rdb::descFldVT>);
 
 command_id token::getCommandID() { return command_; }
 
 std::string token::getStrCommandID() { return std::string(GetStringcommand_id(command_)); }
 
-boost::rational<int> token::getRI() {
+boost::rational<int> token::getRI() const {
   cast<rdb::descFldVT> castRI;
   auto ret = castRI(getVT(), rdb::RATIONAL);
   return std::get<boost::rational<int>>(ret);
 }
 
-std::string token::getStr_() {
+std::string token::getStr_() const {
   return std::visit(
       [](const auto &v) -> std::string {
         using T = std::decay_t<decltype(v)>;

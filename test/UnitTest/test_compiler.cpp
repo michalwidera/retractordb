@@ -11,8 +11,8 @@
 
 // ctest -R '^ut-test_compiler' -V
 
-extern std::string parserRQLFile_4Test(qTree &coreInstance, std::string sInputFile);
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, std::string sInputFile);
+extern std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 qTree coreInstance;
 

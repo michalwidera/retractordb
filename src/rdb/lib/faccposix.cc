@@ -10,11 +10,15 @@
 #include "fatalError.hpp"
 namespace rdb {
 
+namespace {
+constexpr mode_t kDefaultFileMode = 0644;
+}
+
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
                                  const Descriptor &descriptor,     //
                                  int percounter)                   //
     : filename_(std::string(fileName)),
-      recordSize_(descriptor.getSizeInBytes()),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
   if (recordSize_ == 0) FatalError("posixBinaryFile: record size must be > 0");
 
@@ -24,7 +28,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     SPDLOG_WARN("Failed to check if {} exists: {}", filename_, fs_ec.message());
   }
 
-  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
     FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
   }
@@ -94,7 +98,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
     auto result = ::lseek(fd, 0, SEEK_END);
     if (result == -1) return errno;  // Error status
   } else {
-    auto result = ::lseek(fd, position, SEEK_SET);
+    auto result = ::lseek(fd, static_cast<__off_t>(position), SEEK_SET);
     if (result == -1) return errno;  // Error status
   }
   ssize_t sizesh(recordSize_);

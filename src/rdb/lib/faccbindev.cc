@@ -10,6 +10,10 @@
 
 namespace rdb {
 
+namespace {
+constexpr mode_t kDefaultFileMode = 0644;
+}
+
 binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
                                const rdb::Descriptor &descriptor,
                                bool loopToBeginningIfEOF)  //
@@ -18,7 +22,7 @@ binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
       descriptor_(descriptor),
       loopToBeginningIfEOF_(loopToBeginningIfEOF),
       lastNullBitset_(descriptor.size(), false) {
-  fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC, 0644);
+  fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC, kDefaultFileMode);
   if (fd_ < 0) {
     SPDLOG_WARN("Unable to open binary device source: {}", filename_);
   }

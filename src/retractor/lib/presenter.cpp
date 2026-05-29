@@ -1,5 +1,6 @@
 #include "presenter.hpp"
 
+#include <algorithm>
 #include <iostream>  // for operator<<
 
 #include <boost/lexical_cast.hpp>  // for lexical_cast
@@ -19,17 +20,17 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
   //
   // dot call commandline: dot -Tjpg filewithgraph.txt -o file.jpg
   //
-  bool bShowFileds      = (vm.count("fields") != 0);
-  bool bShowStreamProgs = (vm.count("streamprogs") != 0);
-  bool bShowTags        = (vm.count("tags") != 0);
-  bool bShowRules       = (vm.count("rules") != 0);
-  bool bTransparent     = (vm.count("transparent") != 0);
-  bool bShowRuleProgram = !(vm.count("hideruleprog") != 0);
+  bool bShowFileds      = vm.contains("fields");
+  bool bShowStreamProgs = vm.contains("streamprogs");
+  bool bShowTags        = vm.contains("tags");
+  bool bShowRules       = vm.contains("rules");
+  bool bTransparent     = vm.contains("transparent");
+  bool bShowRuleProgram = !vm.contains("hideruleprog");
 
-  xout << "digraph structs {" << std::endl;
-  xout << " node\t[shape=record];" << std::endl;
+  xout << "digraph structs {" << '\n';
+  xout << " node\t[shape=record];" << '\n';
   if (bTransparent) {
-    xout << " bgcolor=\"transparent\";" << std::endl;
+    xout << " bgcolor=\"transparent\";" << '\n';
   }
   xout << "";
   std::set<std::string> planStreamRelationsSet;
@@ -67,7 +68,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       xout << "{";
       int dTag(0);
       bool isFirst(true);
-      for (auto f : q.lSchema) {
+      for (const auto &f : q.lSchema) {
         if (isFirst)
           isFirst = false;
         else
@@ -78,8 +79,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         // dot program is using { as important sign - we need to convert { to <
         //
         std::string name(f.field_.rname);
-        std::replace(name.begin(), name.end(), '{', '/');
-        std::replace(name.begin(), name.end(), '}', '/');
+        std::ranges::replace(name, '{', '/');
+        std::ranges::replace(name, '}', '/');
         xout << name;
         std::cout << "(" << GetStringdescFld(f.field_.rtype) << ")";
       }
@@ -89,7 +90,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     // stream specific
     //
     xout << "\"]";
-    xout << std::endl;
+    xout << '\n';
     if (!q.isDeclaration()) {
       if (bShowStreamProgs) {
         xout << " prg_" << q.id << "\t";
@@ -115,15 +116,15 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
           xout << "\\n";
         }
         xout << "\"]";
-        xout << std::endl;
+        xout << '\n';
         //
         // Relation stream plan to stream
         //
         std::string relation(q.id + " -> " + "prg_" + q.id);
         planStreamRelationsSet.insert(relation);
       }
-      if (bShowRules && q.lRules.size() > 0) {
-        for (auto r : q.lRules) {
+      if (bShowRules && !q.lRules.empty()) {
+        for (const auto &r : q.lRules) {
           xout << " rule_" << r.name << "\t";
           xout << "[shape=record,style=filled,";
           xout << "fillcolor=cyan,color=Black,";
@@ -135,8 +136,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
             if (r.dump_retention != 0) xout << "\\n RETENTION " << r.dump_retention;
           } else if (r.action == rule::SYSTEM) {
             std::string cmd(r.systemCommand);
-            std::replace(cmd.begin(), cmd.end(), '"', '=');
-            std::replace(cmd.begin(), cmd.end(), '\'', '=');
+            std::ranges::replace(cmd, '"', '=');
+            std::ranges::replace(cmd, '\'', '=');
             xout << "DO SYSTEM \\n'" << cmd << "'";
           } else {
             xout << "UNKNOWN_ACTION";
@@ -156,8 +157,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
               if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
                 xout << t;
               else {
-                std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
-                std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
+                std::ranges::replace(sTokenName, '{', '/');
+                std::ranges::replace(sTokenName, '}', '/');
                 xout << sTokenName;
               }
             }
@@ -167,7 +168,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
 
           xout << "\"";  // end label
           xout << "]";   // end shape
-          xout << std::endl;
+          xout << '\n';
 
           std::string relation(q.id + " -> rule_" + r.name + " [color=\"red\" dir=none]");
           planStreamRelationsSet.insert(relation);
@@ -175,8 +176,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       }
     }
   }
-  for (auto s : planStreamRelationsSet)
-    xout << s << std::endl;
+  for (const auto &s : planStreamRelationsSet)
+    xout << s << '\n';
   //
   // Due this variable we eleminate redundant relation on schema
   //
@@ -185,9 +186,9 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
   // Programs that show build of data stream
   //
   if (bShowTags) {
-    for (auto q : coreInstance) {
+    for (const auto &q : coreInstance) {
       int dTag(0);
-      for (auto f : q.lSchema) {
+      for (const auto &f : q.lSchema) {
         if (q.isDeclaration()) continue;
         xout << " ";
         xout << q.id << "_tag" << dTag << "\t";
@@ -197,8 +198,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         else
           xout << "[shape=record,label=\"";
         std::string sFieldName(f.field_.rname);
-        std::replace(sFieldName.begin(), sFieldName.end(), '{', '/');
-        std::replace(sFieldName.begin(), sFieldName.end(), '}', '/');
+        std::ranges::replace(sFieldName, '{', '/');
+        std::ranges::replace(sFieldName, '}', '/');
         xout << sFieldName;
         xout << "|";
         xout << "{";
@@ -216,15 +217,15 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
             if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
               xout << t;
             else {
-              std::replace(sTokenName.begin(), sTokenName.end(), '{', '/');
-              std::replace(sTokenName.begin(), sTokenName.end(), '}', '/');
+              std::ranges::replace(sTokenName, '{', '/');
+              std::ranges::replace(sTokenName, '}', '/');
               xout << sTokenName;
             }
           }
         xout << "}";
         xout << "\"";
         xout << "]";
-        xout << std::endl;
+        xout << '\n';
         // Relation1
         std::string relation(q.id + ":" + "tag" + lexical_cast<std::string>(dTag) + " -> " + q.id + "_tag" +
                              lexical_cast<std::string>(dTag) + " [style=dotted]");
@@ -236,26 +237,26 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
   //
   // Stream realtions
   //
-  for (auto q : coreInstance) {
+  for (const auto &q : coreInstance) {
     for (auto t : q.lProgram) {
       if (t.getStrCommandID() == "PUSH_STREAM") {
         if (q.isDeclaration()) continue;
         std::string relation(q.id + " -> " + t.getStr_());
-        if (bShowStreamProgs) relation = "prg_" + relation;
+        if (bShowStreamProgs) relation.insert(0, "prg_");
         streamRelationsSet.insert(relation);
       }
     }
   }
-  for (auto s : streamRelationsSet)
-    xout << s << std::endl;
-  xout << "}" << std::endl;
+  for (const auto &s : streamRelationsSet)
+    xout << s << '\n';
+  xout << "}" << '\n';
 }  // presenter::graphiz
 
 void presenter::qFieldsProgram() {
-  std::cout << std::endl;
-  std::cout << "fcnt_ref\tid_ref\ttoken\tvalue" << std::endl;
-  for (auto q : coreInstance) {
-    for (auto f : q.lSchema) {
+  std::cout << '\n';
+  std::cout << "fcnt_ref\tid_ref\ttoken\tvalue" << '\n';
+  for (const auto &q : coreInstance) {
+    for (const auto &f : q.lSchema) {
       for (auto t : f.lProgram) {
         std::cout << q.id << "\t";
         std::cout << f.field_.rname << "\t";
@@ -265,47 +266,47 @@ void presenter::qFieldsProgram() {
         else
           std::cout << t.getStrCommandID();
 
-        std::cout << std::endl;
+        std::cout << '\n';
       }
     }
   }
 }
 
 void presenter::qFields() {
-  std::cout << std::endl;
-  std::cout << "fcnt\tid_ref\tfName" << std::endl;
-  for (auto q : coreInstance) {
+  std::cout << '\n';
+  std::cout << "fcnt\tid_ref\tfName" << '\n';
+  for (const auto &q : coreInstance) {
     int loccnt(0);
-    for (auto f : q.lSchema) {
+    for (const auto &f : q.lSchema) {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
       std::cout << f.field_.rname << "\t";
-      std::cout << std::endl;
+      std::cout << '\n';
     }
   }
 }
 
 void presenter::qPrograms() {
-  std::cout << std::endl;
-  std::cout << "qcnt\tid_ref\ttoken\tvalue" << std::endl;
-  for (auto q : coreInstance) {
+  std::cout << '\n';
+  std::cout << "qcnt\tid_ref\ttoken\tvalue" << '\n';
+  for (const auto &q : coreInstance) {
     int loccnt(0);
     for (auto t : q.lProgram) {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
       std::cout << t.getStrCommandID() << "\t";
       std::cout << t.getStr_();
-      std::cout << std::endl;
+      std::cout << '\n';
     }
   }
 }
 
 void presenter::qRules() {
-  std::cout << std::endl;
-  std::cout << "qcnt\tid\tid_ref\taction" << std::endl;
-  for (auto q : coreInstance) {
+  std::cout << '\n';
+  std::cout << "qcnt\tid\tid_ref\taction" << '\n';
+  for (const auto &q : coreInstance) {
     int loccnt(0);
-    for (auto r : q.lRules) {
+    for (const auto &r : q.lRules) {
       std::cout << ++loccnt << "\t";
       std::cout << q.id << "\t";
       std::cout << r.name << "\t";
@@ -317,30 +318,30 @@ void presenter::qRules() {
       } else {
         std::cout << "UNKNOWN_ACTION";
       }
-      std::cout << std::endl;
+      std::cout << '\n';
     }
   }
 }
 
 void presenter::qSet() {
-  std::cout << std::endl;
-  std::cout << "id\tlen prg\tlen sch\tinterval\tfilename" << std::endl;
-  for (auto q : coreInstance) {
+  std::cout << '\n';
+  std::cout << "id\tlen prg\tlen sch\tinterval\tfilename" << '\n';
+  for (const auto &q : coreInstance) {
     std::cout << q.id << "\t";
     std::cout << (int)q.lProgram.size() << "\t";
     std::cout << (int)q.lSchema.size() << "\t";
     std::cout << q.rInterval << "\t";
     std::cout << q.filename << "\t";
-    std::cout << std::endl;
+    std::cout << '\n';
   }
 }
 
 void presenter::onlyCompileShowProgram() {
-  for (auto q : coreInstance) {
+  for (const auto &q : coreInstance) {
     std::cout << q.id;
     if (!q.isCompilerDirective()) std::cout << "(" << q.rInterval << ")";
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
-    std::cout << std::endl;
+    std::cout << '\n';
     for (auto t : q.lProgram)
       if (t.getStrCommandID() == "PUSH_ID" ||          //
           t.getStrCommandID() == "PUSH_STREAM" ||      //
@@ -348,33 +349,29 @@ void presenter::onlyCompileShowProgram() {
           t.getStrCommandID() == "STREAM_SUBTRACT" ||  //
           t.getStrCommandID() == "STREAM_AGSE" ||      //
           t.getStrCommandID() == "STREAM_TIMEMOVE")
-        std::cout << "\t:- " << t << std::endl;
+        std::cout << "\t:- " << t << '\n';
       else
-        std::cout << "\t:- " << t.getStrCommandID() << std::endl;
+        std::cout << "\t:- " << t.getStrCommandID() << '\n';
 
-    for (auto f : q.lSchema) {
+    for (const auto &f : q.lSchema) {
       std::cout << "\t";
       std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
-      std::cout << std::endl;
+      std::cout << '\n';
       for (auto tf : f.lProgram)
-        if (tf.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf << std::endl;
-        } else if ((tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf << std::endl;
-        } else
-          std::cout << "\t\t" << tf.getStrCommandID() << std::endl;
+        if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL"))
+          std::cout << "\t\t" << tf << '\n';
+        else
+          std::cout << "\t\t" << tf.getStrCommandID() << '\n';
     }
 
-    for (auto r : q.lRules) {
-      std::cout << "\tRULE " << r.name << std::endl;
+    for (const auto &r : q.lRules) {
+      std::cout << "\tRULE " << r.name << '\n';
 
       for (auto tf1 : r.condition) {
-        if (tf1.getStrCommandID() == "PUSH_ID") {
-          std::cout << "\t\t" << tf1 << std::endl;
-        } else if ((tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL")) {
-          std::cout << "\t\t" << tf1 << std::endl;
-        } else
-          std::cout << "\t\t" << tf1.getStrCommandID() << std::endl;
+        if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL"))
+          std::cout << "\t\t" << tf1 << '\n';
+        else
+          std::cout << "\t\t" << tf1.getStrCommandID() << '\n';
       }
 
       switch (r.action) {
@@ -390,7 +387,7 @@ void presenter::onlyCompileShowProgram() {
           abort();
       }
 
-      std::cout << std::endl;
+      std::cout << '\n';
     }
   }
 }
@@ -399,30 +396,30 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   const int msInSec = 1000;
   bool isGridOn     = (gridType != 0);
 
-  std::cout << "% Creating diagram output grid is " << (isGridOn ? "on" : "off") << ", cycle count:" << cycleCount << std::endl;
+  std::cout << "% Creating diagram output grid is " << (isGridOn ? "on" : "off") << ", cycle count:" << cycleCount << '\n';
   // https://swirly.dev
 
   auto minInterval = boost::rational<int>(std::numeric_limits<int>::max());
   auto maxInterval = boost::rational<int>(std::numeric_limits<int>::min());
-  for (auto q : coreInstance) {
+  for (const auto &q : coreInstance) {
     if (q.isCompilerDirective()) continue;
     if (q.rInterval < minInterval) minInterval = q.rInterval;
     if (q.rInterval > maxInterval) maxInterval = q.rInterval;
   }
-  std::cout << "% Minimum interval is " << boost::rational_cast<int>(minInterval * msInSec) << "ms" << std::endl;
-  std::cout << "% Maximum interval is " << boost::rational_cast<int>(maxInterval * msInSec) << "ms" << std::endl;
+  std::cout << "% Minimum interval is " << boost::rational_cast<int>(minInterval * msInSec) << "ms" << '\n';
+  std::cout << "% Maximum interval is " << boost::rational_cast<int>(maxInterval * msInSec) << "ms" << '\n';
 
   auto divider = boost::rational_cast<int>(maxInterval / minInterval);
   if (divider > 2) divider--;
 
   auto grid = boost::rational_cast<int>(minInterval * msInSec / divider);
-  std::cout << "% Grid time is " << grid << "ms, divider:" << divider << std::endl;
+  std::cout << "% Grid time is " << grid << "ms, divider:" << divider << '\n';
 
   auto cycleStepInt = boost::rational_cast<int>((maxInterval * msInSec) / grid);
-  std::cout << "% Full cycle step count in grid is " << cycleStepInt << std::endl;
+  std::cout << "% Full cycle step count in grid is " << cycleStepInt << '\n';
 
   if (cycleStepInt <= 0) {
-    std::cerr << "Error: Cycle step is zero or negative." << std::endl;
+    std::cerr << "Error: Cycle step is zero or negative." << '\n';
     return;
   }
   TimeLine tl(coreInstance.getAvailableTimeIntervals());
@@ -446,13 +443,13 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     int period(boost::rational_cast<int>(interval - prev_interval));
     prev_interval = interval;
 
-    proc.push_back(proc_t{procSetVar, period});
+    proc.push_back(proc_t{.procSet = procSetVar, .interval = period});
     stepCounter++;
     if (stepCounter >= stepLimit) break;
     int emptyCount = period / grid;
 
     for (int j = 0; j < emptyCount - 1; j++) {
-      proc.push_back(proc_t{std::set<std::string>{}, grid});
+      proc.push_back(proc_t{.procSet = std::set<std::string>{}, .interval = grid});
       stepCounter++;
       if (stepCounter >= stepLimit) break;
     }
@@ -463,14 +460,14 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
   const char stateChar = '-';
   const char gridChar  = '|';
 
-  for (auto q : coreInstance) {
+  for (const auto &q : coreInstance) {
     int gridCount = 0;
     if (q.isCompilerDirective()) continue;
     if (!q.isDeclaration()) continue;
     std::cout << stateChar;
     if (isGridOn) std::cout << gridChar;
-    for (const auto p : proc) {
-      if (p.procSet.find(q.id) != p.procSet.end())
+    for (const auto &p : proc) {
+      if (p.procSet.contains(q.id))
         std::cout << objChar;
       else
         std::cout << stateChar;
@@ -478,13 +475,13 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
       if (isGridOn && (gridCount % cycleStepInt == 0)) std::cout << gridChar;
     }
     std::cout << stateChar;
-    std::cout << std::endl;
+    std::cout << '\n';
     if (q.rInterval.denominator() == 1)
-      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
+      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << '\n';
     else
-      std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
+      std::cout << "title = " << q.id << "," << q.rInterval << '\n';
     objChar++;
-    std::cout << std::endl;
+    std::cout << '\n';
   }
 
   for (auto q : coreInstance) {
@@ -492,16 +489,16 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     if (q.isCompilerDirective()) continue;
     if (q.isDeclaration()) continue;
 
-    auto it = std::find_if(processedLines.begin(), processedLines.end(),
-                           [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
+    auto it =
+        std::ranges::find_if(processedLines, [&q](const std::pair<std::string, std::string> &p) { return p.first == q.id; });
     if (it != processedLines.end()) {
-      std::cout << "> " << it->second << std::endl;
-      std::cout << std::endl;
+      std::cout << "> " << it->second << '\n';
+      std::cout << '\n';
     }
     std::cout << stateChar;
     if (isGridOn) std::cout << gridChar;
-    for (const auto p : proc) {
-      if (p.procSet.find(q.id) != p.procSet.end())
+    for (const auto &p : proc) {
+      if (p.procSet.contains(q.id))
         std::cout << objChar;
       else
         std::cout << stateChar;
@@ -509,34 +506,32 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
       if (isGridOn && (gridCount % cycleStepInt == 0)) std::cout << gridChar;
     }
     std::cout << stateChar;
-    std::cout << std::endl;
+    std::cout << '\n';
     if (q.rInterval.denominator() == 1)
-      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << std::endl;
+      std::cout << "title = " << q.id << "," << q.rInterval.numerator() << '\n';
     else
-      std::cout << "title = " << q.id << "," << q.rInterval << std::endl;
+      std::cout << "title = " << q.id << "," << q.rInterval << '\n';
     objChar++;
-    std::cout << std::endl;
+    std::cout << '\n';
   }
-
-  return;
 }
 
 int presenter::run(const boost::program_options::variables_map &vm) {
   try {
-    if (vm.count("tags") != 0 && vm.count("fields") == 0) {
-      std::cerr << "Conflicting parameters." << std::endl;
-      std::cerr << "Tags are referencing fields - when you set tags, leave field in dots" << std::endl;
+    if (vm.contains("tags") && !vm.contains("fields")) {
+      std::cerr << "Conflicting parameters." << '\n';
+      std::cerr << "Tags are referencing fields - when you set tags, leave field in dots" << '\n';
       return system::errc::invalid_argument;
     }
-    if (vm.count("dot")) {
+    if (vm.contains("dot")) {
       graphiz(std::cout, vm);
-    } else if (vm.count("csv")) {
+    } else if (vm.contains("csv")) {
       qSet();
       qPrograms();
       qFields();
       qFieldsProgram();
       qRules();
-    } else if (vm.count("diagram")) {
+    } else if (vm.contains("diagram")) {
       std::string sDiagramArgument = vm["diagram"].as<std::string>();
 
       std::string::size_type const secondArgLocation(sDiagramArgument.find_last_of(':'));
@@ -547,12 +542,12 @@ int presenter::run(const boost::program_options::variables_map &vm) {
       }
 
       if (gridArg.empty()) {
-        std::cerr << "Diagram grid type not specified." << std::endl;
+        std::cerr << "Diagram grid type not specified." << '\n';
         return system::errc::invalid_argument;
       }
       int gridType = atoi(gridArg.c_str());
       if (gridType < 0 || gridType > 1) {
-        std::cerr << "Diagram grid type is invalid." << std::endl;
+        std::cerr << "Diagram grid type is invalid." << '\n';
         return system::errc::invalid_argument;
       }
       sequenceDiagram(gridType, cycleCount);
@@ -560,7 +555,7 @@ int presenter::run(const boost::program_options::variables_map &vm) {
       onlyCompileShowProgram();
     }
   } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    std::cerr << e.what() << '\n';
     return system::errc::interrupted;
   }
   return system::errc::success;

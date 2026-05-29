@@ -12,7 +12,7 @@ using namespace boost;
 
 void qTree::dfs(const std::string &v) {
   visited_[v] = true;
-  for (auto u : adj_[v]) {
+  for (const auto &u : adj_[v]) {
     if (!visited_[u]) dfs(u);
   }
   ans_.push_back(v);
@@ -26,23 +26,22 @@ void qTree::topologicalSort() {
   qTree &coreInstance{*this};
 
   ans_.clear();
-  for (auto q : coreInstance)
+  for (const auto &q : coreInstance)
     visited_[q.id] = false;
   for (auto q : coreInstance)
     adj_[q.id] = q.getDepStream();
-  for (auto q : coreInstance)
+  for (const auto &q : coreInstance)
     if (!visited_[q.id]) dfs(q.id);
 
   qTree tempInstance;
   // for (auto qname : ans_) tempInstance.push_back(coreInstance[qname]); -> same:
-  std::for_each(ans_.begin(), ans_.end(),
-                [&tempInstance, &coreInstance](const std::string &qname)  //
-                { tempInstance.push_back(coreInstance[qname]); });
+  std::ranges::for_each(ans_, [&tempInstance, &coreInstance](const std::string &qname)  //
+                        { tempInstance.push_back(coreInstance[qname]); });
   coreInstance = tempInstance;
 }
 
 bool qTree::exists(const std::string &query_name) {
-  return std::any_of(begin(), end(), [&query_name](const auto &q) { return q.id == query_name; });
+  return std::ranges::any_of(*this, [&query_name](const auto &q) { return q.id == query_name; });
 }
 
 boost::rational<int> qTree::getDelta(const std::string &query_name) { return getQuery(query_name).rInterval; }
@@ -52,22 +51,23 @@ void qTree::dumpCore() {
   std::stringstream ss;
   std::stringstream sp;
 
-  for (const auto nName : vcols) {
-    int maxSize = nName.length();
+  for (const auto &nName : vcols) {
+    int maxSize = static_cast<int>(nName.length());
     int size{0};
     for (const auto &it : *this) {
       if (nName == vcols[0])
-        size = std::to_string(getSeqNr(it.id)).length();
+        size = static_cast<int>(std::to_string(getSeqNr(it.id)).length());
       else if (nName == vcols[1])
-        size = (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length();
+        size = static_cast<int>(
+            (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length());
       else if (nName == vcols[2])
-        size = std::to_string(maxCapacity[it.id]).length();
+        size = static_cast<int>(std::to_string(maxCapacity[it.id]).length());
       else if (nName == vcols[3])
-        size = it.id.length();
+        size = static_cast<int>(it.id.length());
       else {
         FatalError("qTree::dumpCore: unknown column name");
       }
-      if (maxSize < size) maxSize = size;
+      maxSize = std::max(maxSize, size);
     }
     ss << "|%";
     ss << maxSize;
@@ -106,7 +106,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 query &qTree::getQuery(const std::string &query_name) {
   if (query_name.empty()) FatalError("qTree::getQuery: query name is empty");
 
-  auto it = std::find_if(begin(), end(), [query_name](const auto &node) { return node.id == query_name; });
+  auto it = std::ranges::find_if(*this, [query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {
     SPDLOG_ERROR("Missing - {}", query_name);
     throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE. (check log)");
@@ -117,10 +117,8 @@ query &qTree::getQuery(const std::string &query_name) {
 int qTree::getSeqNr(const std::string &query_name) {
   int cnt(0);
   for (auto &q : *this) {
-    if (query_name == q.id)
-      return cnt;
-    else
-      ++cnt;
+    if (query_name == q.id) return cnt;
+    ++cnt;
   }
   SPDLOG_ERROR("No such stream in set - {}", query_name);
   throw std::logic_error("No such stream in set.");

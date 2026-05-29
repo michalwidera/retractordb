@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <ranges>
 #include <string_view>
 #include "fatalError.hpp"
 
@@ -15,15 +16,18 @@ namespace rdb {
 
 namespace {
 
+constexpr int kDecimalBase              = 10;
+constexpr size_t kDefaultSegmentReserve = 8;
+
 auto parseSegmentIndex(const std::string &candidate, const std::string &baseName) -> std::optional<size_t> {
   const std::string prefix = baseName + "_segment_";
   if (!candidate.starts_with(prefix)) return std::nullopt;
 
   const std::string suffix = candidate.substr(prefix.size());
   if (suffix.empty()) return std::nullopt;
-  if (!std::all_of(suffix.begin(), suffix.end(), ::isdigit)) return std::nullopt;
+  if (!std::ranges::all_of(suffix, ::isdigit)) return std::nullopt;
 
-  return static_cast<size_t>(std::strtoull(suffix.c_str(), nullptr, 10));
+  return static_cast<size_t>(std::strtoull(suffix.c_str(), nullptr, kDecimalBase));
 }
 
 }  // namespace
@@ -41,7 +45,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
                         int percounter)                   //
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
-      recordSize_(descriptor.getSizeInBytes()),
+      recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       retention_(retention),
       percounter_(percounter) {
   writeCount_      = 0;
@@ -51,7 +55,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
     vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
   } else {
     std::vector<size_t> existingSegments;
-    existingSegments.reserve(retention_.segments == 0 ? 8 : retention_.segments);
+    existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
 
     for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
       const auto filenameEx = entry.path().filename().string();
@@ -65,8 +69,8 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       existingSegments.push_back(0);
     }
 
-    std::sort(existingSegments.begin(), existingSegments.end());
-    existingSegments.erase(std::unique(existingSegments.begin(), existingSegments.end()), existingSegments.end());
+    std::ranges::sort(existingSegments);
+    existingSegments.erase(std::ranges::unique(existingSegments).begin(), existingSegments.end());
 
     // Restore only a contiguous suffix ending at the latest segment. This guarantees
     // global-position mapping remains valid after restart even if older files are missing.
@@ -78,7 +82,8 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       --firstContiguousIdx;
     }
 
-    std::vector<size_t> restoredSegments(existingSegments.begin() + firstContiguousIdx, existingSegments.end());
+    std::vector<size_t> restoredSegments(existingSegments.begin() + static_cast<std::ptrdiff_t>(firstContiguousIdx),
+                                         existingSegments.end());
 
     if (retention_.segments != 0 && restoredSegments.size() > retention_.segments) {
       restoredSegments.erase(restoredSegments.begin(),
@@ -95,7 +100,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
   }
 }
 template <typename T>
-groupFile<T>::~groupFile() {}
+groupFile<T>::~groupFile() = default;
 
 template <typename T>
 auto groupFile<T>::name() -> std::string & {
@@ -198,7 +203,7 @@ size_t groupFile<T>::count() {
   size_t sumCount = 0;
   for (auto &v : vec_)
     sumCount += v->count();
-  return sumCount + removedSegments_ * retention_.capacity;  // compensate for removed segments
+  return sumCount + (removedSegments_ * retention_.capacity);  // compensate for removed segments
 }
 
 }  // namespace rdb

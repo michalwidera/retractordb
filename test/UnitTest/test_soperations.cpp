@@ -53,7 +53,7 @@ TEST(xSOperations, divmod_operations) {
   for (int i = 0; i < 10; i++) {
     auto retPosDiv = Div(deltaA, deltaB, i);
     auto retPosMod = Mod(deltaA, deltaB, i);
-    std::cout << "{" << i << ", " << retPosDiv << ", " << retPosMod << "},  //" << std::endl;
+    std::cout << "{" << i << ", " << retPosDiv << ", " << retPosMod << "},  //" << '\n';
     EXPECT_TRUE(testdata[i][1] == retPosDiv);
     EXPECT_TRUE(testdata[i][2] == retPosMod);
   }

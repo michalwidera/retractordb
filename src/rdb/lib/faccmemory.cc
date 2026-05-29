@@ -5,6 +5,8 @@
 #include <algorithm>  // for std::copy
 #include <limits>
 #include <map>
+#include <ranges>
+#include <utility>
 #include <vector>
 #include "fatalError.hpp"
 
@@ -39,12 +41,12 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
     memoryStorage[filename_].push_back(vec);
     memoryNullStorage[filename_].push_back(nullBitset);
   } else {
-    if (location < removed_count_) {
+    if (std::cmp_less(location, removed_count_)) {
       SPDLOG_ERROR("Write failed: Position out of bounds in memory storage: location {}, removed_count {}", location,
                    removed_count_);
       return EXIT_FAILURE;  // Return an error code if position is out of bounds
     }
-    const size_t adjustedLocation              = location - removed_count_;
+    const size_t adjustedLocation              = location - static_cast<size_t>(removed_count_);
     memoryStorage[filename_][adjustedLocation] = std::move(vec);
     if (adjustedLocation < memoryNullStorage[filename_].size()) {
       memoryNullStorage[filename_][adjustedLocation] = nullBitset;
@@ -56,12 +58,12 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   if (recordSize_ == 0) FatalError("memoryFile::read: recordSize_ is zero");
   auto location = position / recordSize_;
-  if (location < removed_count_) {
+  if (std::cmp_less(location, removed_count_)) {
     SPDLOG_ERROR("Read failed: Position out of bounds in memory storage: location {}, removed_count {}", location,
                  removed_count_);
     return EXIT_FAILURE;  // Return an error code if position is out of bounds
   }
-  auto adjustedLocation = location - removed_count_;
+  auto adjustedLocation = location - static_cast<size_t>(removed_count_);
   if (adjustedLocation >= memoryStorage[filename_].size()) {
     SPDLOG_ERROR("Read failed: Position beyond end of memory storage: location {}, size {}", location,
                  memoryStorage[filename_].size() + removed_count_);
@@ -69,7 +71,7 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
   }
 
   auto &vec = memoryStorage[filename_][adjustedLocation];
-  std::copy(vec.begin(), vec.end(), ptrData);
+  std::ranges::copy(vec, ptrData);
 
   auto &nullVec = memoryNullStorage[filename_];
   if (adjustedLocation < nullVec.size()) {
