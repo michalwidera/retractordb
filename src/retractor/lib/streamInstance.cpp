@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
+#include <utility>
 
 #include "fatalError.hpp"
 
@@ -107,7 +108,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     auto fp = std::div(storedRecordCountDst_ - i, descriptorSrcSize);
     auto readPosition{recordsCountSrc - fp.quot - 1};
     // Guard negative quotient before revRead: out-of-range windows must stay null, not stale 0.
-    if (fp.quot >= 0 && static_cast<size_t>(fp.quot) < recordsCountSrc) {
+    if (fp.quot >= 0 && std::cmp_less(fp.quot, recordsCountSrc)) {
       if (!source->revRead(static_cast<size_t>(readPosition))) fp.rem = -1;
     } else
       fp.rem = -1;  // skip to undefined(-1) as value

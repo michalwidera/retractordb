@@ -29,8 +29,8 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 
   std::vector<uint8_t> vec(ptrData, ptrData + recordSize_);
 
-  if (retentionSize_ != no_retention)                        // If retention size is set, manage the retention
-    if (memoryStorage[filename_].size() > retentionSize_) {  // NOLINT(bugprone-implicit-widening-of-multiplication-result)
+  if (retentionSize_ != no_retention)  // If retention size is set, manage the retention
+    if (memoryStorage[filename_].size() > retentionSize_) {
       // Remove the oldest record if retention size is reached
       memoryStorage[filename_].erase(memoryStorage[filename_].begin());
       removed_count_++;

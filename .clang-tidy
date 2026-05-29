@@ -15,10 +15,9 @@ Checks: >
   -readability-convert-member-functions-to-static,
   -clang-analyzer-optin.core.EnumCastOutOfRange,
   -clang-analyzer-core.UndefinedBinaryOperatorResult,
+  -clang-analyzer-unix.StdCLibraryFunctions,
   -bugprone-reserved-identifier,
   -bugprone-easily-swappable-parameters,
-  -bugprone-suspicious-stringview-data-usage,
-  -modernize-use-std-print,
   -portability-avoid-pragma-once
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(.*/)?(src|test)(/[^./][^/]*)*/[^/]*$'

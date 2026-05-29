@@ -2,9 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdio>
 #include <ctime>
-#include <iostream>
+#include <print>
 #include <sstream>
 #include <utility>
 
@@ -31,36 +30,36 @@ std::string Formatter::displayedValue(const ptree &row, int index, const std::st
 }
 
 void Formatter::initGnuplot(std::tuple<int, int, int> dim) {
-  std::cout << "set term qt noraise\n";
-  std::cout << "set style fill transparent solid 0.5\n";
-  std::cout << "set xrange [0:" << std::get<0>(dim) << "]\n";
-  std::cout << "set yrange [" << std::get<1>(dim) << ":" << std::get<2>(dim) << "]\n";
-  std::cout << "set ticslevel 0\n";
-  std::cout << "set hidden3d\n";
-  std::cout << "set view 60,30\n";
+  std::println("set term qt noraise");
+  std::println("set style fill transparent solid 0.5");
+  std::println("set xrange [0:{}]", std::get<0>(dim));
+  std::println("set yrange [{}:{}]", std::get<1>(dim), std::get<2>(dim));
+  std::println("set ticslevel 0");
+  std::println("set hidden3d");
+  std::println("set view 60,30");
 }
 
 void Formatter::renderRaw(const ptree &row, int count, const std::string &nullmap, bool skipNull) {
   if (skipNull && isAllNull(nullmap, count)) return;
   for (int i = 0; i < count; i++)
-    printf("%s ", displayedValue(row, i, nullmap, formatMode::RAW).c_str());
-  printf("\r\n");
+    std::print("{} ", displayedValue(row, i, nullmap, formatMode::RAW));
+  std::print("\r\n");
 }
 
 void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nullmap, const std::string &input,
                               const ptree &schema, std::tuple<int, int, int> dim) {
   if (std::cmp_less(gnuplot_lines_.size(), count)) gnuplot_lines_.resize(static_cast<std::size_t>(count));
 
-  std::cout << "plot";
+  std::print("plot");
   int colIdx{0};
   for (const auto &v : schema.get_child("db.field")) {
-    if (colIdx != 0) std::cout << ",";
+    if (colIdx != 0) std::print(",");
     auto columnName = v.second.get<std::string>("");
     std::ranges::replace(columnName, '_', '-');
-    std::cout << " '-' u 1:2 t '[" << columnName << "]' w lines lc rgb '" << colors_[colIdx % colors_.size()] << "'";
+    std::print(" '-' u 1:2 t '[{}]' w lines lc rgb '{}'", columnName, colors_[colIdx % colors_.size()]);
     colIdx++;
   }
-  std::cout << "\r\n";
+  std::print("\r\n");
 
   for (int i = 0; i < count; i++) {
     gnuplot_lines_[i].push_front(displayedValue(row, i, nullmap, formatMode::GNUPLOT));
@@ -68,8 +67,8 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
   }
   for (int i = 0; i < count; i++) {
     for (size_t j = 0; j < gnuplot_lines_[i].size(); j++)
-      printf("%zu %s\r\n", j, gnuplot_lines_[i][j].c_str());
-    printf("e\r\n");
+      std::print("{} {}\r\n", j, gnuplot_lines_[i][j]);
+    std::print("e\r\n");
   }
 }
 
@@ -80,8 +79,8 @@ void Formatter::renderGraphite(const ptree &row, const std::string &nullmap, con
       ++i;
       continue;
     }
-    printf("%s.%s %s %llu\n", input.c_str(), v.second.get<std::string>("").c_str(), row.get(std::to_string(i++), "").c_str(),
-           (unsigned long long)time(nullptr));
+    std::println("{}.{} {} {}", input, v.second.get<std::string>(""), row.get(std::to_string(i++), ""),
+                 (unsigned long long)time(nullptr));
   }
 }
 
@@ -105,6 +104,6 @@ void Formatter::renderInfluxDB(const ptree &row, const std::string &nullmap, con
   }
   if (!firstValNoComma) {
     line << " " << duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
-    printf("%s\n", line.str().c_str());
+    std::println("{}", line.str());
   }
 }

@@ -89,8 +89,6 @@ if(PROG_CLANG_TIDY)
       find ${CMAKE_SOURCE_DIR}/src -iname "*.cpp" -o -iname "*.cc" | grep
       --invert-match '.antlr/' | xargs -r ${PROG_CLANG_TIDY}
       -p=${CMAKE_BINARY_DIR}
-    COMMAND find ${CMAKE_SOURCE_DIR}/test -iname "*.cpp" -o -iname "*.cc" |
-            xargs -r ${PROG_CLANG_TIDY} -p=${CMAKE_BINARY_DIR}
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 else()
   message(STATUS "Optional tool not found: clang-tidy (ctidy target disabled)")

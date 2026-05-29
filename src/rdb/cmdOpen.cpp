@@ -1,6 +1,7 @@
 #include "cmdOpen.hpp"
 
 #include <iostream>
+#include <print>
 #include <sstream>
 
 #include "rdb/descriptor.hpp"
@@ -13,7 +14,7 @@ std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
 bool OpenCmd::execute(CommandContext &ctx) {
   std::cin >> ctx.file;
   if (ctx.file.contains('{')) {
-    std::cout << ctx.colors.RED << "unrecognized or missing file:" << ctx.file << "\n" << ctx.colors.RESET;
+    std::print("{}unrecognized or missing file:{}\n{}", ctx.colors.RED, ctx.file, ctx.colors.RESET);
     return false;
   }
   const auto oldPos = ctx.file.find(".old");

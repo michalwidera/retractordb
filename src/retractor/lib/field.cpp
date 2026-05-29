@@ -14,8 +14,7 @@ field::field(rdb::rField field_, const token &lToken)
 }
 
 field::field(rdb::rField field_, std::list<token> lProgram)
-    :                                            //
-      lProgram(std::move(lProgram)),  //
+    : lProgram(std::move(lProgram)),  //
       field_(std::move(field_)) {}
 
 token field::getFirstFieldToken() {

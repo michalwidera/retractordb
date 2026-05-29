@@ -50,6 +50,37 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+find_python3() {
+    local ver py
+    for ver in 3.13 3.12 3.11 3.10 3.9 3.8; do
+        py="python${ver}"
+        if command_exists "$py"; then
+            echo "$py"
+            return 0
+        fi
+    done
+    if command_exists python3; then
+        echo "python3"
+        return 0
+    fi
+    return 1
+}
+
+install_python_venv_support() {
+    local py pyver pkg
+    py=$(find_python3) || { echo "Error: python3 not found"; exit 1; }
+    if ! "$py" -m venv --help >/dev/null 2>&1; then
+        pyver=$(echo "$py" | grep -oE '[0-9]+\.[0-9]+' | head -n1)
+        if [ -n "$pyver" ]; then
+            pkg="python${pyver}-venv"
+        else
+            pkg="python3-venv"
+        fi
+        echo "-- Installing $pkg for venv support..."
+        sudo apt-get -y install "$pkg"
+    fi
+}
+
 tool_installed() {
     local tool="$1"
     case "$tool" in
@@ -60,7 +91,9 @@ tool_installed() {
             command_exists clang-tidy || compgen -G '/usr/bin/clang-tidy-*' >/dev/null
             ;;
         python3-venv)
-            python3 -m venv --help >/dev/null 2>&1
+            local py
+            py=$(find_python3 2>/dev/null) || return 1
+            "$py" -m venv --help >/dev/null 2>&1
             ;;
         build-essential)
             dpkg -s build-essential >/dev/null 2>&1
@@ -90,8 +123,12 @@ append_unique() {
 }
 
 ensure_venv() {
+    local py
+    py=$(find_python3) || { echo "Error: python3 not found"; exit 1; }
+    install_python_venv_support
     if [ ! -d "$HOME/.venv" ]; then
-        python3 -m venv ~/.venv
+        echo "-- Creating venv with $py..."
+        "$py" -m venv ~/.venv
     fi
     export PATH="$HOME/.venv/bin:$PATH"
     # shellcheck source=/dev/null
@@ -130,6 +167,22 @@ install_cmake_format_if_missing() {
 
     pip3 install cmakelang
     command_exists cmake-format
+}
+
+add_venv_to_bashrc() {
+    local bashrc="$HOME/.bashrc"
+    local desired="source ~/.venv/bin/activate"
+    local regex='^(source|\.)[[:space:]]+(.*/)?\.venv/bin/activate$'
+    if grep -qF "$desired" "$bashrc" 2>/dev/null; then
+        echo "-- venv activation already in ~/.bashrc, skipping"
+        return 0
+    fi
+    if grep -qE "$regex" "$bashrc" 2>/dev/null; then
+        echo "-- Updating venv activation line in ~/.bashrc"
+    else
+        echo "-- Adding venv activation to ~/.bashrc"
+    fi
+    ensure_single_bashrc_line "$bashrc" "$desired" "$regex"
 }
 
 ensure_single_bashrc_line() {
@@ -227,7 +280,7 @@ cmd_to_apt_package() {
         git) echo "git" ;;
         gdb) echo "gdb" ;;
         python3) echo "python3" ;;
-        python3-venv) echo "python3-venv" ;;
+        python3-venv) echo "" ;;
         pip3) echo "python3-pip" ;;
         build-essential) echo "build-essential" ;;
         valgrind) echo "valgrind" ;;
@@ -268,6 +321,9 @@ extract_major() {
 install_missing_special_tool() {
     local cmd="$1"
     case "$cmd" in
+        python3-venv)
+            install_python_venv_support
+            ;;
         conan)
             install_conan_if_missing
             ;;
@@ -323,9 +379,9 @@ ensure_tools_for_option() {
             tool_specs=(
                 "sudo:required" "apt-get:required"
                 "git:required" "gcc:required" "g++:required"
-                "cmake:required" "make:required" "conan:required" "ninja:required"
-                "python3:required" "pip3:required" "valgrind:required"
-                "hexdump:required" "graphviz:required"
+                "cmake:required" "make:required" "ninja:required"
+                "python3:required" "python3-venv:required" "pip3:required" "conan:required"
+                "valgrind:required" "hexdump:required" "graphviz:required"
                 "cppcheck:recommended" "mold:recommended" "rg:recommended"
                 "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
@@ -345,10 +401,10 @@ ensure_tools_for_option() {
             tool_specs=(
                 "sudo:required" "apt-get:required"
                 "git:required" "gcc:required" "g++:required"
-                "cmake:required" "make:required" "conan:required"
-                "python3:required" "pip3:required" "valgrind:required"
-                "hexdump:required" "graphviz:required"
-                "cppcheck:required" "gdb:required" "ninja:required" "mold:required" "cmake-format:required" "clang-format:required" "clang-tidy:required" "rg:required"
+                "cmake:required" "make:required" "ninja:required"
+                "python3:required" "python3-venv:required" "pip3:required" "conan:required"
+                "valgrind:required" "hexdump:required" "graphviz:required"
+                "cppcheck:required" "gdb:required" "mold:required" "cmake-format:required" "clang-format:required" "clang-tidy:required" "rg:required"
                 "tmux:required" "feh:required" "gnuplot:required"
             )
             ;;
@@ -684,6 +740,7 @@ run_option() {
             ;;
         "toolchain"|"toolchain_all")
             ensure_venv
+            add_venv_to_bashrc
             if [ ! -f ~/.conan2/profiles/default ]; then conan profile detect; fi
             conan profile show
             echo "-- Verifying C++23 support..."
@@ -700,6 +757,7 @@ run_option() {
             ;;
         "toolchain_required")
             ensure_venv
+            add_venv_to_bashrc
             echo "-- Minimal CI-like toolchain installation complete."
             ;;
         "validate")

@@ -1,13 +1,15 @@
 #include "xtrdbStorageMap.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
-#include <iostream>
+#include <print>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "rdb/descriptor.hpp"
@@ -120,7 +122,7 @@ static std::vector<RotatedFileInfo> readRotatedFiles(const std::string &baseName
     if (oldPos == std::string::npos) continue;
     const std::string suffix = fname.substr(oldPos + oldMarker.size());
     if (suffix.empty()) continue;
-    if (!std::all_of(suffix.begin(), suffix.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
+    if (!std::ranges::all_of(suffix, [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
     RotatedFileInfo info;
     info.counter = std::stoi(suffix);
     info.ext     = fname.substr(stem.size(), oldPos - stem.size());
@@ -158,7 +160,7 @@ static std::vector<DataSegmentInfo> readDataSegments(const std::string &baseName
 
     const std::string suffix = fileName.substr(prefix.size());
     if (suffix.empty()) continue;
-    if (!std::all_of(suffix.begin(), suffix.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
+    if (!std::ranges::all_of(suffix, [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
 
     DataSegmentInfo info;
     info.index                = static_cast<size_t>(std::stoull(suffix));
@@ -301,7 +303,7 @@ static std::vector<Segment> readMetaFile(const std::string &path, size_t fieldCo
   constexpr size_t kHeaderSize = sizeof(int64_t);
   if (fileSize <= kHeaderSize) return {};
 
-  const size_t entrySize   = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + (fieldCount + 7) / 8;
+  const size_t entrySize   = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + ((fieldCount + 7) / 8);
   const size_t payloadSize = fileSize - kHeaderSize;
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
@@ -347,7 +349,7 @@ static std::string makeMetaBar(const std::vector<Segment> &segs, const std::vect
   }
   // give leftover to the largest segment
   if (int leftover = barWidth - used; leftover > 0) {
-    auto it = std::max_element(widths.begin(), widths.end());
+    auto it = std::ranges::max_element(widths);
     *it += leftover;
   }
 
@@ -359,7 +361,7 @@ static std::string makeMetaBar(const std::vector<Segment> &segs, const std::vect
     const std::string label = seg.isGap ? ("gap:" + std::to_string(seg.recordCount)) : std::to_string(seg.recordCount);
 
     bar += '[';
-    if (static_cast<int>(label.size()) >= inner) {
+    if (std::cmp_greater_equal(label.size(), inner)) {
       bar += label.substr(0, inner);
     } else {
       const int padL = (inner - static_cast<int>(label.size())) / 2;
@@ -373,7 +375,7 @@ static std::string makeMetaBar(const std::vector<Segment> &segs, const std::vect
 
 static std::string fit(const std::string &s, int w) {
   if (w <= 0) return "";
-  if (static_cast<int>(s.size()) <= w) return s + std::string(w - static_cast<int>(s.size()), ' ');
+  if (std::cmp_less_equal(s.size(), w)) return s + std::string(w - static_cast<int>(s.size()), ' ');
   if (w <= 3) return s.substr(0, w);
   return s.substr(0, w - 3) + "...";
 }
@@ -393,16 +395,16 @@ class TablePrinter {
   [[nodiscard]] int metaBarWidth() const { return inner_ - 2; }
 
   void hline(std::string_view l, std::string_view m, std::string_view r) const {
-    std::cout << l << repeatGlyph(std::string(m), width_ - 2) << r << "\n";
+    std::println("{}{}{}", l, repeatGlyph(std::string(m), width_ - 2), r);
   }
 
-  void row(const std::string &s) const { std::cout << "│ " << std::left << std::setw(inner_) << s.substr(0, inner_) << " │\n"; }
+  void row(const std::string &s) const { std::println("│ {:<{}} │", s.substr(0, inner_), inner_); }
 
   void valueRow(const std::string &left, const std::string &right) const {
     const int leftMax         = inner_ - static_cast<int>(right.size()) - 1;
     const std::string leftFit = fit(left, std::max(0, leftMax));
     const int gap             = std::max(1, inner_ - static_cast<int>(leftFit.size()) - static_cast<int>(right.size()));
-    std::cout << "│ " << leftFit << std::string(gap, ' ') << right << " │\n";
+    std::println("│ {}{}{} │", leftFit, std::string(gap, ' '), right);
   }
 
   void sizeRow(const std::string &tag, const std::string &name, uintmax_t bytes) const {
@@ -410,11 +412,11 @@ class TablePrinter {
   }
 
   void mapHLine(std::string_view l, std::string_view j1, std::string_view j2, std::string_view r, int c1, int c2, int c3) const {
-    std::cout << l << repeatGlyph("─", c1 + 2) << j1 << repeatGlyph("─", c2 + 2) << j2 << repeatGlyph("─", c3 + 2) << r << "\n";
+    std::println("{}{}{}{}{}{}{}", l, repeatGlyph("─", c1 + 2), j1, repeatGlyph("─", c2 + 2), j2, repeatGlyph("─", c3 + 2), r);
   }
 
   void mapRow(const std::string &s1, const std::string &s2, const std::string &s3, int c1, int c2, int c3) const {
-    std::cout << "│ " << fit(s1, c1) << " │ " << fit(s2, c2) << " │ " << fit(s3, c3) << " │\n";
+    std::println("│ {} │ {} │ {} │", fit(s1, c1), fit(s2, c2), fit(s3, c3));
   }
 
  private:
@@ -441,7 +443,7 @@ void showStorageMap(const std::string &baseName) {
   const auto rotatedFiles      = readRotatedFiles(baseName);
 
   if (!fs::exists(descFile)) {
-    std::cerr << "Descriptor not found: " << descFile << "\n";
+    std::println(stderr, "Descriptor not found: {}", descFile);
     return;
   }
 

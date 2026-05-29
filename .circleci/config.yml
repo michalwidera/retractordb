@@ -134,6 +134,7 @@ commands:
           name: Install build toolchain (minimal, CI only)
           command: |
             scripts/buildrdb.sh toolchain_required conan
+            echo 'source ~/.venv/bin/activate' >> "$BASH_ENV"
       - run:
           name: Validate installed toolchain
           command: |
@@ -156,6 +157,7 @@ commands:
           command: |
             uname -a && cat /proc/version && cat /etc/issue
             scripts/buildrdb.sh toolchain conan
+            echo 'source ~/.venv/bin/activate' >> "$BASH_ENV"
       - run:
           name: Validate installed toolchain
           command: |
@@ -182,7 +184,6 @@ commands:
       - run:
           name: Conan install (project dependencies)
           command: |
-            source ~/.venv/bin/activate
             conan source .
             conan install . -s build_type=<< parameters.build_type >> << parameters.build_param >>
   conan-build:
@@ -200,7 +201,6 @@ commands:
       - run:
           name: "Conan build (<< parameters.build_tool >>)"
           command: |
-            source ~/.venv/bin/activate
             conan build . -s build_type=<<parameters.build_type>> <<parameters.build_param>>
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> install
   run-test:

@@ -1,6 +1,8 @@
 #include <chrono>
 #include <iostream>
+#include <print>
 #include <sstream>
+#include <string>
 #include <thread>
 #include <utility>
 
@@ -32,8 +34,8 @@ static bool waitForServer(int maxSeconds = kDefaultServerWaitSeconds) {
   const int maxAttempts = maxSeconds * 1000 / kServerWaitPollIntervalMs;
   for (int i = 0; i < maxAttempts; ++i) {
     try {
-      IPC::managed_shared_memory seg(IPC::open_only, ipc::kShmemSegment.data());
-      IPC::message_queue mq(IPC::open_only, ipc::kQueryQueue.data());
+      IPC::managed_shared_memory seg(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
+      IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
       return true;
     } catch (...) {
       std::this_thread::sleep_for(std::chrono::milliseconds(kServerWaitPollIntervalMs));
@@ -88,7 +90,7 @@ int main(int argc, char *argv[]) {
     qry obj;
 
     if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
-      std::cout << "Only one output format could be selected." << '\n';
+      std::println("Only one output format could be selected.");
       return system::errc::invalid_argument;
     }
     if (vm.contains("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
@@ -110,20 +112,20 @@ int main(int argc, char *argv[]) {
       } else if (delimetersCnt == 2) {
         ss >> x >> c >> ymin >> c >> ymax;  // expected format is x,ymin,ymax or x:ymin:ymax
       } else {
-        std::cerr << "gnuplot mode need {x,y} or {x,ymin,ymax} parameters.";
+        std::print(std::cerr, "gnuplot mode need {{x,y}} or {{x,ymin,ymax}} parameters.");
         return system::errc::invalid_argument;
       }
 
       if (ss.fail() || !ss.eof()) {
-        std::cerr << "gnuplot mode need {x,y} or {x,ymin,ymax} parameters.";
+        std::print(std::cerr, "gnuplot mode need {{x,y}} or {{x,ymin,ymax}} parameters.");
         return system::errc::invalid_argument;
       }
       if (x <= 0) {
-        std::cout << "gnuplot mode need x > 0.";
+        std::print("gnuplot mode need x > 0.");
         return system::errc::invalid_argument;
       }
       if (ymin >= ymax) {
-        std::cout << "gnuplot mode need ymin < ymax.";
+        std::print("gnuplot mode need ymin < ymax.");
         return system::errc::invalid_argument;
       }
       gnuplotDim = std::make_tuple(x, ymin, ymax);
@@ -135,27 +137,27 @@ int main(int argc, char *argv[]) {
       }
     }
     if (vm.contains("help")) {
-      std::cout << argv[0] << " - data query tool." << '\n' << '\n';
-      std::cout << "Usage: " << argv[0] << " [option]" << '\n' << '\n';
+      std::println("{} - data query tool.\n", argv[0]);
+      std::println("Usage: {} [option]\n", argv[0]);
       std::cout << desc;
-      std::cout << config_line << '\n';
-      std::cout << "Log: " << tempLocation << '\n';
-      std::cout << warranty << '\n';
+      std::println("{}", config_line);
+      std::println("Log: {}", tempLocation);
+      std::println("{}", warranty);
       return system::errc::success;
     }
     if (vm.contains("hello")) return obj.hello();
     if (vm.contains("kill") && timeLimit == 0) {
       obj.netClient("kill", "");
     } else if (vm.contains("dir")) {
-      std::cout << obj.dir();
+      std::print("{}", obj.dir());
     } else if (vm.contains("diryaml")) {
-      std::cout << obj.dirYaml();
+      std::print("{}", obj.dirYaml());
     } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
       if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
       auto ret = obj.detailShow(sDetailStream);
       if (!ret.empty()) {
-        std::cout << ret;
+        std::print("{}", ret);
       } else
         return system::errc::no_such_file_or_directory;
     } else if (vm.contains("select") && sInputStream != "none") {
