@@ -5,9 +5,11 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "rdb/descriptor.hpp"
@@ -120,7 +122,7 @@ static std::vector<RotatedFileInfo> readRotatedFiles(const std::string &baseName
     if (oldPos == std::string::npos) continue;
     const std::string suffix = fname.substr(oldPos + oldMarker.size());
     if (suffix.empty()) continue;
-    if (!std::all_of(suffix.begin(), suffix.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
+    if (!std::ranges::all_of(suffix, [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
     RotatedFileInfo info;
     info.counter = std::stoi(suffix);
     info.ext     = fname.substr(stem.size(), oldPos - stem.size());
@@ -158,7 +160,7 @@ static std::vector<DataSegmentInfo> readDataSegments(const std::string &baseName
 
     const std::string suffix = fileName.substr(prefix.size());
     if (suffix.empty()) continue;
-    if (!std::all_of(suffix.begin(), suffix.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
+    if (!std::ranges::all_of(suffix, [](char ch) { return ch >= '0' && ch <= '9'; })) continue;
 
     DataSegmentInfo info;
     info.index                = static_cast<size_t>(std::stoull(suffix));
@@ -301,7 +303,7 @@ static std::vector<Segment> readMetaFile(const std::string &path, size_t fieldCo
   constexpr size_t kHeaderSize = sizeof(int64_t);
   if (fileSize <= kHeaderSize) return {};
 
-  const size_t entrySize   = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + (fieldCount + 7) / 8;
+  const size_t entrySize   = sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + ((fieldCount + 7) / 8);
   const size_t payloadSize = fileSize - kHeaderSize;
 
   in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
@@ -347,7 +349,7 @@ static std::string makeMetaBar(const std::vector<Segment> &segs, const std::vect
   }
   // give leftover to the largest segment
   if (int leftover = barWidth - used; leftover > 0) {
-    auto it = std::max_element(widths.begin(), widths.end());
+    auto it = std::ranges::max_element(widths);
     *it += leftover;
   }
 
@@ -359,7 +361,7 @@ static std::string makeMetaBar(const std::vector<Segment> &segs, const std::vect
     const std::string label = seg.isGap ? ("gap:" + std::to_string(seg.recordCount)) : std::to_string(seg.recordCount);
 
     bar += '[';
-    if (static_cast<int>(label.size()) >= inner) {
+    if (std::cmp_greater_equal(label.size(), inner)) {
       bar += label.substr(0, inner);
     } else {
       const int padL = (inner - static_cast<int>(label.size())) / 2;
@@ -373,7 +375,7 @@ static std::string makeMetaBar(const std::vector<Segment> &segs, const std::vect
 
 static std::string fit(const std::string &s, int w) {
   if (w <= 0) return "";
-  if (static_cast<int>(s.size()) <= w) return s + std::string(w - static_cast<int>(s.size()), ' ');
+  if (std::cmp_less_equal(s.size(), w)) return s + std::string(w - static_cast<int>(s.size()), ' ');
   if (w <= 3) return s.substr(0, w);
   return s.substr(0, w - 3) + "...";
 }

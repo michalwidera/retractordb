@@ -63,9 +63,9 @@ int main(int argc, char *argv[]) {
   po::store(po::command_line_parser(static_cast<int>(filteredArgs.size()), filteredArgs.data()).options(desc).run(), vm);
   po::notify(vm);
 
-  if (vm.count("noprompt") != 0U) cliNoPrompt = true;
+  if (vm.contains("noprompt")) cliNoPrompt = true;
 
-  if (vm.count("help") != 0U) {
+  if (vm.contains("help")) {
     std::cout << argv[0] << " - data accessing tool.\n\n"
               << "Usage: " << argv[0] << " [option]\n\n"
               << desc << config_line << "\nLog: " << filelog << "\n"
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  if (vm.count("storagemap") != 0U) {
+  if (vm.contains("storagemap")) {
     showStorageMap(mapDatafile);
     spdlog::shutdown();
     return 0;
@@ -117,7 +117,13 @@ int main(int argc, char *argv[]) {
   std::string_view prompt = cliNoPrompt ? "" : ".";
   std::string_view ok     = cliNoPrompt ? "" : "ok\n";
 
-  CommandContext ctx{dacc, payloadStatus, file, storageParam, storagePolicy, colors, rox};
+  CommandContext ctx{.dacc          = dacc,
+                     .payloadStatus = payloadStatus,
+                     .file          = file,
+                     .storageParam  = storageParam,
+                     .storagePolicy = storagePolicy,
+                     .colors        = colors,
+                     .rox           = rox};
 
   std::map<std::string, std::unique_ptr<ICommand>> commands;
   commands["append"]   = std::make_unique<AppendCmd>();

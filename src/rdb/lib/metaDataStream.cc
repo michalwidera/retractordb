@@ -123,7 +123,7 @@ void metaDataStream::overwriteLastEntry(const IndexRecord &entry) {
   f.seekp(0, std::ios::end);
   // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
   const auto fileSize = static_cast<std::streamoff>(f.tellp());
-  if (fileSize < static_cast<std::streamoff>(kHeaderSize + entrySize_)) return;
+  if (std::cmp_less(fileSize, kHeaderSize + entrySize_)) return;
   f.seekp(-static_cast<std::streamoff>(entrySize_), std::ios::end);
   auto buf = entry.serialize();
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
@@ -175,7 +175,7 @@ std::vector<metaDataStream::IndexRecord> metaDataStream::readCommittedEntries() 
   in.seekg(0, std::ios::end);
   // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
   const auto fileSize = static_cast<std::streamoff>(in.tellg());
-  if (fileSize <= 0 || fileSize <= static_cast<std::streamoff>(kHeaderSize)) {
+  if (fileSize <= 0 || std::cmp_less_equal(fileSize, kHeaderSize)) {
     cacheValid_ = true;
     return entriesCache_;
   }
@@ -205,7 +205,7 @@ void metaDataStream::loadIndex() {
   in.seekg(0, std::ios::end);
   // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
   const auto fileSize = static_cast<std::streamoff>(in.tellg());
-  if (fileSize <= 0 || fileSize < static_cast<std::streamoff>(kHeaderSize)) return;
+  if (fileSize <= 0 || std::cmp_less(fileSize, kHeaderSize)) return;
   in.seekg(0, std::ios::beg);
 
   int64_t creationTimeNs = 0;

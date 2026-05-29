@@ -102,10 +102,8 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
 }
 
 void storage::moveRef() {
-  auto it = std::find_if(descriptor.begin(),
-                         descriptor.end(),                                        //
-                         [](const auto &item) { return item.rtype == rdb::REF; }  //
-  );
+  auto it = std::ranges::find_if(descriptor,  //
+                                 [](const auto &item) { return item.rtype == rdb::REF; });
 
   // Descriptor changes storageFile location
   if (it != descriptor.end()) {
@@ -124,10 +122,8 @@ void storage::moveRef() {
 void storage::attachStorage() {
   if (storageFile_.empty()) FatalError("storage: storageFile_ is empty — storage not properly configured");
 
-  auto it1 = std::find_if(descriptor.begin(),
-                          descriptor.end(),                                         //
-                          [](const auto &item) { return item.rtype == rdb::TYPE; }  //
-  );
+  auto it1 = std::ranges::find_if(descriptor,  //
+                                  [](const auto &item) { return item.rtype == rdb::TYPE; });
 
   if (it1 != descriptor.end()) {
     storageType_ = (*it1).rname;
@@ -201,7 +197,7 @@ void storage::resetForUnitTest() {
 
   // Reset meta index if it exists
   if (metaDataStream_) {
-    metaDataStream_->reset();
+    (*metaDataStream_).reset();
   }
 
   if (recordsCount_ != accessor_->count()) {
@@ -263,7 +259,7 @@ void storage::purge() {
 
   // Reset meta index if it exists
   if (metaDataStream_) {
-    metaDataStream_->reset();
+    (*metaDataStream_).reset();
   }
 }
 
@@ -436,10 +432,10 @@ bool storage::write(const size_t recordIndex) {
   abortIfStorageNotPrepared();
 
   if (recordIndex >= recordsCount_ && gapDetectionConfigured_ && metaDataStream_) {
-    const bool isAllNull = !nullInfo.empty() && std::all_of(nullInfo.begin(), nullInfo.end(), [](bool b) { return b; });
+    const bool isAllNull = !nullInfo.empty() && std::ranges::all_of(nullInfo, [](bool b) { return b; });
     if (isAllNull) {
       consecutiveNullCount_++;
-      if (consecutiveNullCount_ > static_cast<size_t>(nullFillCount_)) {
+      if (std::cmp_greater(consecutiveNullCount_, nullFillCount_)) {
         activeGapDuration_++;
         return true;
       }
