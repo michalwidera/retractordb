@@ -18,8 +18,6 @@ Checks: >
   -clang-analyzer-unix.StdCLibraryFunctions,
   -bugprone-reserved-identifier,
   -bugprone-easily-swappable-parameters,
-  -bugprone-suspicious-stringview-data-usage,
-  -modernize-use-std-print,
   -portability-avoid-pragma-once
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(.*/)?(src|test)(/[^./][^/]*)*/[^/]*$'

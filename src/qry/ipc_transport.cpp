@@ -5,7 +5,9 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <print>
 #include <sstream>
+#include <string>
 #include <thread>
 
 #include <spdlog/spdlog.h>
@@ -67,19 +69,19 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
     using ShmemAllocator    = IPC::allocator<ValueType, segment_manager_t>;
     using IPCMap            = boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator>;
 
-    IPC::managed_shared_memory mapSegment(IPC::open_only, ipc::kShmemSegment.data());
+    IPC::managed_shared_memory mapSegment(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_only, ipc::kMapMutex.data());
+    IPC::named_mutex mapMutex(IPC::open_only, std::string(ipc::kMapMutex).c_str());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
     if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
 
-    IPC::message_queue mq(IPC::open_only, ipc::kQueryQueue.data());
+    IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
     mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
 
-    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>(ipc::kMapObject.data());
+    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>(std::string(ipc::kMapObject).c_str());
     IPCMap *mymap                        = ret.first;
     if (mymap == nullptr) {
       SPDLOG_ERROR("ipc_transport: shared memory map '{}' not found", ipc::kMapObject);
@@ -105,7 +107,7 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
       --cntr;
     }
     if (it == mymap->end()) {
-      printf("server not found\n");
+      std::println("server not found");
       SPDLOG_ERROR("server not found");
       done = true;
       pt_response.put("error.response", "server not found");

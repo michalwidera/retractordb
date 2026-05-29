@@ -1,10 +1,10 @@
 #include "xtrdbStorageMap.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
-#include <iostream>
+#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -395,16 +395,16 @@ class TablePrinter {
   [[nodiscard]] int metaBarWidth() const { return inner_ - 2; }
 
   void hline(std::string_view l, std::string_view m, std::string_view r) const {
-    std::cout << l << repeatGlyph(std::string(m), width_ - 2) << r << "\n";
+    std::println("{}{}{}", l, repeatGlyph(std::string(m), width_ - 2), r);
   }
 
-  void row(const std::string &s) const { std::cout << "│ " << std::left << std::setw(inner_) << s.substr(0, inner_) << " │\n"; }
+  void row(const std::string &s) const { std::println("│ {:<{}} │", s.substr(0, inner_), inner_); }
 
   void valueRow(const std::string &left, const std::string &right) const {
     const int leftMax         = inner_ - static_cast<int>(right.size()) - 1;
     const std::string leftFit = fit(left, std::max(0, leftMax));
     const int gap             = std::max(1, inner_ - static_cast<int>(leftFit.size()) - static_cast<int>(right.size()));
-    std::cout << "│ " << leftFit << std::string(gap, ' ') << right << " │\n";
+    std::println("│ {}{}{} │", leftFit, std::string(gap, ' '), right);
   }
 
   void sizeRow(const std::string &tag, const std::string &name, uintmax_t bytes) const {
@@ -412,11 +412,11 @@ class TablePrinter {
   }
 
   void mapHLine(std::string_view l, std::string_view j1, std::string_view j2, std::string_view r, int c1, int c2, int c3) const {
-    std::cout << l << repeatGlyph("─", c1 + 2) << j1 << repeatGlyph("─", c2 + 2) << j2 << repeatGlyph("─", c3 + 2) << r << "\n";
+    std::println("{}{}{}{}{}{}{}", l, repeatGlyph("─", c1 + 2), j1, repeatGlyph("─", c2 + 2), j2, repeatGlyph("─", c3 + 2), r);
   }
 
   void mapRow(const std::string &s1, const std::string &s2, const std::string &s3, int c1, int c2, int c3) const {
-    std::cout << "│ " << fit(s1, c1) << " │ " << fit(s2, c2) << " │ " << fit(s3, c3) << " │\n";
+    std::println("│ {} │ {} │ {} │", fit(s1, c1), fit(s2, c2), fit(s3, c3));
   }
 
  private:
@@ -443,7 +443,7 @@ void showStorageMap(const std::string &baseName) {
   const auto rotatedFiles      = readRotatedFiles(baseName);
 
   if (!fs::exists(descFile)) {
-    std::cerr << "Descriptor not found: " << descFile << "\n";
+    std::println(stderr, "Descriptor not found: {}", descFile);
     return;
   }
 

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
@@ -312,20 +313,20 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
 void executorsm::commandProcessorLoop() {
   if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessorLoop: coreInstancePtr is null");
   try {
-    IPC::message_queue::remove(ipc::kQueryQueue.data());
-    IPC::shared_memory_object::remove(ipc::kShmemSegment.data());
-    IPC::named_mutex::remove(ipc::kMapMutex.data());
+    IPC::message_queue::remove(std::string(ipc::kQueryQueue).c_str());
+    IPC::shared_memory_object::remove(std::string(ipc::kShmemSegment).c_str());
+    IPC::named_mutex::remove(std::string(ipc::kMapMutex).c_str());
     // Segment and allocator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, ipc::kShmemSegment.data(), ipc::kShmemSegmentSize);
+    IPC::managed_shared_memory mapSegment(IPC::open_or_create, std::string(ipc::kShmemSegment).c_str(), ipc::kShmemSegmentSize);
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, ipc::kMapMutex.data());
+    IPC::named_mutex mapMutex(IPC::open_or_create, std::string(ipc::kMapMutex).c_str());
     // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,            // open or crate
-                          ipc::kQueryQueue.data(),        // name
-                          ipc::kQueryQueueMaxMessages,    // max message number
-                          ipc::kQueryQueueMaxMessageSize  // max message size
+    IPC::message_queue mq(IPC::open_or_create,                          // open or crate
+                          std::string(ipc::kQueryQueue).c_str(),        // name
+                          ipc::kQueryQueueMaxMessages,                  // max message number
+                          ipc::kQueryQueueMaxMessageSize                // max message size
     );
-    IPCMap *mymap = mapSegment.construct<IPCMap>(ipc::kMapObject.data())  // object name
+    IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
                     (std::less<>(), allocatorShmemMapInstance);
     ipcReady = true;
     cv.notify_all();
