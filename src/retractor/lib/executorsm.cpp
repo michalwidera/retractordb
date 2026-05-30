@@ -75,9 +75,9 @@ std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
 
-// variable connected with tlimitqry (-m) parameter
-// when it will be set thread will exit by given time (testing purposes)
-std::atomic<int> iTimeLimitCnt{executorsm::inifitie_loop};
+// variable connected with llimitqry (-m) parameter
+// counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
+std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
@@ -86,9 +86,9 @@ std::atomic<bool> executorsm::ipcReady{false};
 static std::thread bt;
 
 void cleanup() {
-  if (iTimeLimitCnt != executorsm::stop_now) {
-    SPDLOG_WARN("Cleanup: Setting iTimeLimitCnt to stop_now.");
-    iTimeLimitCnt = executorsm::stop_now;
+  if (iLoopLimitCnt != executorsm::stop_now) {
+    SPDLOG_WARN("Cleanup: Setting iLoopLimitCnt to stop_now.");
+    iLoopLimitCnt = executorsm::stop_now;
     std::cout << "Cleanup!" << '\n';
   }
   if (bt.joinable()) bt.join();
@@ -293,7 +293,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     // This command stop (kills) server process
     //
     if (command == "kill") {
-      iTimeLimitCnt = executorsm::stop_now;
+      iLoopLimitCnt = executorsm::stop_now;
     }
     //
     // Diagnostic method
@@ -340,9 +340,9 @@ void executorsm::commandProcessorLoop() {
     bool loopRunning = true;
     while (loopRunning) {
       while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
-        if (iTimeLimitCnt == executorsm::waitForXqry) {
+        if (iLoopLimitCnt == executorsm::waitForXqry) {
           // Notify main thread that first query is received
-          iTimeLimitCnt = executorsm::inifitie_loop;
+          iLoopLimitCnt = executorsm::inifitie_loop;
           cv.notify_all();
         }
 
@@ -367,7 +367,7 @@ void executorsm::commandProcessorLoop() {
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
-      if (iTimeLimitCnt == executorsm::stop_now) loopRunning = false;
+      if (iLoopLimitCnt == executorsm::stop_now) loopRunning = false;
     }
   } catch (IPC::interprocess_exception &ex) {
     std::cout << "Exception on server." << '\n' << ex.what() << '\n';
@@ -514,7 +514,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
   if (!guard.acquireLock()) {
     SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
-    iTimeLimitCnt = executorsm::stop_now;
+    iLoopLimitCnt = executorsm::stop_now;
     bt.join();
     return system::errc::no_lock_available;
   }
@@ -525,8 +525,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     if (vm.contains("xqrywait")) {
       if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
       std::unique_lock<std::mutex> scoped_lock(core_mutex);
-      iTimeLimitCnt = executorsm::waitForXqry;
-      cv.wait(scoped_lock, [this] { return iTimeLimitCnt != executorsm::waitForXqry; });
+      iLoopLimitCnt = executorsm::waitForXqry;
+      cv.wait(scoped_lock, [this] { return iLoopLimitCnt != executorsm::waitForXqry; });
       if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
     }
 
@@ -538,7 +538,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     //
     // When this value is 0 - means we are waiting for key - other way watchdog
     //
-    if (iTimeLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
+    if (iLoopLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
 
     // ZERO-step
     std::set<std::string> inSet;
@@ -561,10 +561,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     }
 #endif
 
-    while (!_kbhit(ignoreanykey) && iTimeLimitCnt != executorsm::stop_now) {
-      if (iTimeLimitCnt != executorsm::inifitie_loop) {
-        if (iTimeLimitCnt != executorsm::stop_now)
-          iTimeLimitCnt--;
+    while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
+      if (iLoopLimitCnt != executorsm::inifitie_loop) {
+        if (iLoopLimitCnt != executorsm::stop_now)
+          iLoopLimitCnt--;
         else
           break;
       }
@@ -602,7 +602,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     //
     // End of data processing loop
     //
-    if (iTimeLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
+    if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;
@@ -612,7 +612,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
   }
-  iTimeLimitCnt = executorsm::stop_now;
+  iLoopLimitCnt = executorsm::stop_now;
   boradcastOutOfBussiness();
   bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");

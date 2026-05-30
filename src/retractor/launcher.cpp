@@ -31,7 +31,7 @@ using boost::lexical_cast;
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
-extern std::atomic<int> iTimeLimitCnt;
+extern std::atomic<int> iLoopLimitCnt;
 
 extern std::vector<std::pair<std::string, std::string>> processedLines;
 
@@ -52,7 +52,7 @@ static void handleSignal(int signum) {
   }
 
   // This will cause the main loop to exit
-  iTimeLimitCnt = executorsm::stop_now;
+  iLoopLimitCnt = executorsm::stop_now;
 }
 
 void dropArtifactFile(const std::filesystem::path &artifact_filename) {
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
   const std::string serviceName = std::string(argv[0]) + "_service";
   FlockServiceGuard guard(serviceName);
 
-  int timeLimitVar{executorsm::inifitie_loop};
+  int loopLimitVar{executorsm::inifitie_loop};
   try {
     std::string sInputFile;
     std::string sDiagram;
@@ -115,8 +115,8 @@ int main(int argc, char *argv[]) {
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
-          ("tlimitqry,m", po::value<int>(&timeLimitVar)->default_value(executorsm::inifitie_loop),  //
-           "query limit, 0 - no limit")                                                             //
+          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
+           "loop iteration limit, 0 - no limit")                                                             //
           ;
     }
     po::positional_options_description p;  // Assume that infile is the first option
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
 
     po::notify(vm);
 
-    iTimeLimitCnt = timeLimitVar;  // std::atomic assignment
+    iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 
     if (vm.contains("status")) {
       std::cout << "Checking service status." << '\n';
