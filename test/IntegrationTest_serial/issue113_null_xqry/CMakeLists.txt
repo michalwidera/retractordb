@@ -1,4 +1,8 @@
-# cd build/Debug && make install && ctest -R issue113_null_xqry -V
+# make install && ctest -R issue113_null_xqry -V
+
+# Weryfikuje że wartości null z pliku źródłowego są poprawnie przesyłane przez
+# IPC do xqry i wyświetlane jako "null" w wyjściu (issue #113).
+# Dane: wiersz 1 = "10 NULL", wiersz 2 = "20 30". Asercja: grep na obu wzorcach.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")

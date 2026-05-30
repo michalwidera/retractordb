@@ -1,7 +1,13 @@
 # make install && ctest -R xqry_elem_limit -V
 
-# Weryfikuje że xqry -m N zwraca dokładnie N wierszy, nawet jeśli źródło
-# zawiera więcej rekordów (tutaj: 10 wierszy, limit -m 5).
+# Weryfikuje że parametr -m N (elimitqry) w xqry ogranicza liczbę odebranych
+# elementów do dokładnie N, nawet gdy źródło zawiera więcej rekordów.
+#
+# Scenariusz:
+#   - xretractor wczytuje data.txt (10 wierszy całkowitych) jako strumień ONESHOT
+#   - xqry pobiera strumień dst z limitem -m 5 i zapisuje wynik do out.txt
+#   - po zakończeniu xqry wysyła sygnał kill do xretractor (-k)
+#   - asercja: wc -l out.txt == 5
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")

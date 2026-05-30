@@ -1,3 +1,10 @@
+# make install && ctest -R rotation_test -V
+
+# Weryfikuje mechanizm rotacji plików binarnych strumieni (ROTATION).
+# Uruchamia xretractor dwukrotnie z -m 2; po każdym przebiegu sprawdza czy
+# liczba plików str* (bez .shadow) jest zgodna z oczekiwaną (count.pattern).
+# Pętla oczekiwania na lock file między uruchomieniami chroni przed race condition.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 add_test(
