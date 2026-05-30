@@ -40,12 +40,9 @@ syn match rqlNumber         "\<[0-9]\+[eE][+-]\=[0-9]\+\>"
 syn match rqlNumber         "\<[0-9]\+\.[0-9]\+[eE][+-]\=[0-9]\+\>"
 syn match rqlNumber         "\<[0-9]\+\/[0-9]\+\>"
 
-" Data types (RQL.g4 + DESC.g4)
+" Data types
 syn keyword rqlType         BYTE Byte CHAR Char UINT Uint STRING String
-syn keyword rqlType         FLOAT Float INTEGER Integer DOUBLE Double RATIONAL
-
-" DESC meta-commands
-syn keyword rqlDesc         REF TYPE RETMEMORY INTPAIR IDXPAIR
+syn keyword rqlType         FLOAT Float INTEGER Integer DOUBLE Double
 
 " Aggregate functions
 syn keyword rqlAggregate    MIN min MAX max AVG avg SUMC sumc
@@ -53,7 +50,7 @@ syn keyword rqlAggregate    MIN min MAX max AVG avg SUMC sumc
 " Built-in functions
 syn keyword rqlFunction     Sqrt Ceil Abs Floor Sign Chr Length
 syn keyword rqlFunction     ToNumber ToTimeStamp FloatCast IntCast
-syn keyword rqlFunction     Count Crc Sum IsZero IsNonZero
+syn keyword rqlFunction     Count Crc Sum IsZero IsNonZero isnull
 syn keyword rqlFunction     to_integer to_float to_double to_string
 
 hi def link rqlKey          Keyword
@@ -65,7 +62,6 @@ hi def link rqlString       String
 hi def link rqlStringEscape SpecialChar
 hi def link rqlNumber       Number
 hi def link rqlType         Type
-hi def link rqlDesc         Special
 hi def link rqlAggregate    Function
 hi def link rqlFunction     Function
 
