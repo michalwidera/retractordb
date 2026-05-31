@@ -18,7 +18,7 @@ class Formatter {
   static std::string displayedValue(const boost::property_tree::ptree &row, int index, const std::string &nullmap,
                                     formatMode mode);
 
-  static void initGnuplot(std::tuple<int, int, int> dim);
+  static void initGnuplot(std::tuple<int, int, int> dim, bool rightToLeft);
   static void renderRaw(const boost::property_tree::ptree &row, int count, const std::string &nullmap, bool skipNull);
   void renderGnuplot(const boost::property_tree::ptree &row, int count, const std::string &nullmap, const std::string &input,
                      const boost::property_tree::ptree &schema, std::tuple<int, int, int> dim);

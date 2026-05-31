@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
         ("graphite,g", "graphite output mode")                                                            //
         ("influxdb,f", "influxDB output mode")                                                            //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
+        ("gnuplot-rtl", "gnuplot output: newest samples on the right (right-to-left scroll)")             //
         ("help,h", "produce help message")                                                                //
         ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
         ("wait-server,w", "poll until xretractor server is available before executing command");
@@ -98,6 +99,7 @@ int main(int argc, char *argv[]) {
     if (vm.contains("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
     if (vm.contains("gnuplot")) {
       obj.outputFormatMode = formatMode::GNUPLOT;
+      obj.gnuplotRightToLeft = vm.contains("gnuplot-rtl");
       std::stringstream ss(sGnuplotDim);
 
       auto delimetersCnt = std::count_if(sGnuplotDim.begin(), sGnuplotDim.end(), [](char c) { return c == ',' || c == ':'; });
@@ -130,6 +132,10 @@ int main(int argc, char *argv[]) {
       }
       gnuplotDim = std::make_tuple(x, ymin, ymax);
     }
+    if (vm.contains("gnuplot-rtl") && !vm.contains("gnuplot")) {
+      std::print(std::cerr, "--gnuplot-rtl requires --gnuplot/-p mode.");
+      return system::errc::invalid_argument;
+    }
     if (vm.contains("wait-server") && !vm.contains("help")) {
       if (!waitForServer()) {
         SPDLOG_ERROR("server not available after {} seconds", kDefaultServerWaitSeconds);
@@ -161,7 +167,8 @@ int main(int argc, char *argv[]) {
       } else
         return system::errc::no_such_file_or_directory;
     } else if (vm.contains("select") && sInputStream != "none") {
-      if (!obj.select(vm, elemLimit, sInputStream, gnuplotDim)) return system::errc::no_such_file_or_directory;
+      if (!obj.select(vm, elemLimit, sInputStream, gnuplotDim, obj.gnuplotRightToLeft))
+        return system::errc::no_such_file_or_directory;
     } else {
       SPDLOG_ERROR("no argument.");
       return EPERM;  // ERROR defined in errno-base.h

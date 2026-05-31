@@ -27,6 +27,7 @@ Allowed options:
   -g [ --graphite ]           graphite output mode
   -f [ --influxdb ]           influxDB output mode
   -p [ --gnuplot ] arg        x,y - gnuplot output mode
+      [ --gnuplot-rtl ]        gnuplot scroll right-to-left (new samples on right)
   -h [ --help ]               produce help message
   -c [ --needctrlc ]          force ctl+c for stop this tool
 Branch: issue_31-doc:eb1aba1, Code compiler: GNU Ver. 13.3.0, Build time: 2512170028, Type: Debug

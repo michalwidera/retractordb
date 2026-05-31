@@ -12,6 +12,7 @@ control_c()
 STREAM=${1:-str1}
 QUERY=${2:-query.rql}
 SIZE=${3:-50,200}
+XQRY_EXTRA_FLAGS=${4:-}
 
 if ! xretractor $QUERY -c -r ; then exit 1 ; fi
 
@@ -28,7 +29,7 @@ if [ -z "$DISPLAY" ]
 then
 export DISPLAY=:0
 fi
-{ printf 'bind "Close" "exit gnuplot"\n'; xqry -s $STREAM -p $SIZE; } | gnuplot || true
+{ printf 'bind "Close" "exit gnuplot"\n'; xqry -s "$STREAM" -p "$SIZE" $XQRY_EXTRA_FLAGS; } | gnuplot || true
 # gnuplot closed (window X or Ctrl+C) — cleanup
 xqry -k || true
 if [ -t 0 ]; then stty sane; fi

@@ -40,7 +40,7 @@ add_custom_target(
 add_custom_target(
   ecg
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out rec205-replay.rql
-          720,-2048,2048
+    720,560,1360 --gnuplot-rtl
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(

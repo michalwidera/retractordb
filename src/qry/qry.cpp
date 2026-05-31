@@ -50,7 +50,7 @@ bool qry::adhoc(const std::string &sAdhoc) {
 }
 
 bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
-                 std::tuple<int, int, int> gnuplotDim) {
+                 std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
   elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
   ptree pt        = netClient("get", "");
 
@@ -69,7 +69,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
 
   std::jthread producer_thread([this] { transport_->producer(); });
 
-  if (outputFormatMode == formatMode::GNUPLOT) Formatter::initGnuplot(gnuplotDim);
+  if (outputFormatMode == formatMode::GNUPLOT) Formatter::initGnuplot(gnuplotDim, gnuplotRightToLeft);
 
   ptree schema;
   if (outputFormatMode != formatMode::RAW) schema = netClient("detail", input);

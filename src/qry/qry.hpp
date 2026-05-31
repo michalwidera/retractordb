@@ -18,10 +18,11 @@ class qry {
 
  public:
   formatMode outputFormatMode{formatMode::RAW};
+  bool gnuplotRightToLeft{false};
 
   qry();
   bool select(boost::program_options::variables_map &vm, int /*iElemLimit*/, const std::string & /*input*/,
-              std::tuple<int, int, int> /*gnuplotDim*/);
+              std::tuple<int, int, int> /*gnuplotDim*/, bool /*gnuplotRightToLeft*/ = false);
   bool adhoc(const std::string & /*sAdhoc*/);
   std::string dir();
   std::string dirYaml();
