@@ -110,9 +110,7 @@ Generate all three by running from the project root:
 bash examples/ecg/build.sh
 ```
 
-The `rec` prefix (instead of `205`) is required because the DESC grammar token `FILENAME`
-cannot be distinguished from `DECIMAL` when a name consists only of digits — ANTLR4 matches
-`205` as `DECIMAL` first, causing a parse error in `xtrdb` and `xretractor`.
+The generated files use the `rec` prefix for the retractordb binary and replay script so the example stream/output names remain valid identifiers and are easy to distinguish from the original MIT-BIH `205.*` files.
 
 ### `rec205` — binary data (retractordb, int32 little-endian)
 
