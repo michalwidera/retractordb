@@ -1,0 +1,13 @@
+# Odtwarzanie EKG — rekord 205
+# Kanaly: MLII, V1
+# Czestotliwosc: 360 Hz, interwal 0.002778 s (1/360 s w RQL)
+# Uruchamiac z katalogu zawierajacego pliki danych:
+#   cd /home/michal/github/retractordb/examples/ecg/rec205
+#   xretractor rec205-replay.rql -m <liczba_cykli>
+#
+# Zrodlo danych czyta plik binarny w petli (TYPE DEVICE bez ONESHOT).
+# Kazdy cykl xretractor odpowiada jednej probce EKG (0.002778 s).
+
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
+
+SELECT ecg.MLII, ecg.V1 STREAM s205out FROM ecg VOLATILE

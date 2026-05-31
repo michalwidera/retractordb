@@ -38,6 +38,12 @@ add_custom_target(
     ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_parallel/dsp)
 
 add_custom_target(
+  ecg
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out rec205-replay.rql
+          720,-2048,2048
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
+
+add_custom_target(
   simple-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
