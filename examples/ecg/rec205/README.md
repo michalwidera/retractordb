@@ -154,7 +154,7 @@ SELECT ecg.MLII, ecg.V1 STREAM s205out FROM ecg VOLATILE
 ```
 
 - `STREAM ecg, 1/360` — sampling interval 1/360 s (= 360 Hz), matching the original recording
-- `FILE 'rec205'` — references `rec205.desc` and the `rec205` binary file in the same directory
+- `FILE 'rec205'` — references `rec205.desc` and the `rec205` binary data file
 - `VOLATILE` — output stream is not written to disk
 
 Run from the `rec205/` directory so that relative paths resolve correctly:

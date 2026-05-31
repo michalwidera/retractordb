@@ -9,7 +9,7 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?       # ByteID
                       | FLOAT_T name=ID    ('[' arr=DECIMAL ']')?       # FloatID
                       | DOUBLE_T name=ID   ('[' arr=DECIMAL ']')?       # DoubleID
                       | RATIONAL_T name=ID ('[' arr=DECIMAL ']')?       # RationalID
-                      | REF_T '"' file=FILENAME '"'                     # RefID
+                      | REF_T '"' (file=FILENAME | file=ID | file=DECIMAL) '"' # RefID
                       | TYPE_T type=ID                                  # TypeID
                       | STRING_T name=ID '[' strsize=DECIMAL ']'        # StringID
                       | RETENTION_T capacity=DECIMAL segment=DECIMAL    # RetentionID
