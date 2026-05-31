@@ -29,10 +29,13 @@ std::string Formatter::displayedValue(const ptree &row, int index, const std::st
   return mode == formatMode::GNUPLOT ? "NaN" : "null";
 }
 
-void Formatter::initGnuplot(std::tuple<int, int, int> dim) {
+void Formatter::initGnuplot(std::tuple<int, int, int> dim, bool rightToLeft) {
   std::println("set term qt noraise");
   std::println("set style fill transparent solid 0.5");
-  std::println("set xrange [0:{}]", std::get<0>(dim));
+  if (rightToLeft)
+    std::println("set xrange [{}:0]", std::get<0>(dim));
+  else
+    std::println("set xrange [0:{}]", std::get<0>(dim));
   std::println("set yrange [{}:{}]", std::get<1>(dim), std::get<2>(dim));
   std::println("set ticslevel 0");
   std::println("set hidden3d");

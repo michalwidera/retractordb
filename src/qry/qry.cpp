@@ -49,9 +49,9 @@ bool qry::adhoc(const std::string &sAdhoc) {
   return false;
 }
 
-bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit, const std::string &input,
-                 std::tuple<int, int, int> gnuplotDim) {
-  timeLimitCntQry = (iTimeLimit > 0) ? iTimeLimit + 1 : iTimeLimit;
+bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
+                 std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
+  elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
   ptree pt        = netClient("get", "");
 
   const auto stream = pt.get_child("db.stream");
@@ -69,7 +69,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
 
   std::jthread producer_thread([this] { transport_->producer(); });
 
-  if (outputFormatMode == formatMode::GNUPLOT) Formatter::initGnuplot(gnuplotDim);
+  if (outputFormatMode == formatMode::GNUPLOT) Formatter::initGnuplot(gnuplotDim, gnuplotRightToLeft);
 
   ptree schema;
   if (outputFormatMode != formatMode::RAW) schema = netClient("detail", input);
@@ -81,7 +81,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
   try {
     while (!transport_->done) {
       if (_kbhit(vm.contains("needctrlc"))) break;
-      if (timeLimitCntQry == 1) {
+      if (elemLimitCnt == 1) {
         if (vm.contains("kill")) {
           netClient("kill", "");
           transport_->done = true;
@@ -107,7 +107,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
             else if (outputFormatMode == formatMode::INFLUXDB)
               Formatter::renderInfluxDB(e_value, nullmap, input, schema);
 
-            if (timeLimitCntQry > 1) --timeLimitCntQry;
+            if (elemLimitCnt > 1) --elemLimitCnt;
             noDataCounter = 0;
           }
       }
@@ -121,7 +121,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iTimeLimit
     while (transport_->popQueue(e_value) && !transport_->done)
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
-    if (timeLimitCntQry != 1 && !transport_->done) _getch();
+    if (elemLimitCnt != 1 && !transport_->done) _getch();
 
   } catch (...) {
     SPDLOG_ERROR("General exception catched.");

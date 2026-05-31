@@ -177,6 +177,8 @@ public:
     antlr4::Token *file = nullptr;
     antlr4::tree::TerminalNode *REF_T();
     antlr4::tree::TerminalNode *FILENAME();
+    antlr4::tree::TerminalNode *ID();
+    antlr4::tree::TerminalNode *DECIMAL();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

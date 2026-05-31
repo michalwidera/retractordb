@@ -11,6 +11,6 @@ add_test(
   NAME ${TestID}-vg-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
-    valgrind --error-exitcode=1 --leak-check=full
+    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
     --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
     queryWithSubstrats.rql -c)

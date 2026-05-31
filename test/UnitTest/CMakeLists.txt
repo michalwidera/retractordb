@@ -63,7 +63,7 @@ foreach(item ${V_GLOB})
     NAME ut_${TEST_SHORT}
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
-    COMMAND valgrind --error-exitcode=1 --leak-check=full
+    COMMAND valgrind --vgdb=no --error-exitcode=1 --leak-check=full
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
   set_tests_properties(ut_${TEST_SHORT} PROPERTIES FIXTURES_REQUIRED
                                                    ut_${TEST_SHORT}-fixture)
@@ -75,7 +75,7 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)
 add_test(
   NAME ut_xqry
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
-  COMMAND valgrind --error-exitcode=1 --leak-check=full
+  COMMAND valgrind --vgdb=no --error-exitcode=1 --leak-check=full
           ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)

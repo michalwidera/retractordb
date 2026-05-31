@@ -11,17 +11,18 @@
 class IpcTransport;
 
 class qry {
-  int timeLimitCntQry{0};
+  int elemLimitCnt{0};
   std::map<std::string, boost::property_tree::ptree> streamTable;
   std::unique_ptr<IpcTransport> transport_;
   std::unique_ptr<Formatter> formatter_;
 
  public:
   formatMode outputFormatMode{formatMode::RAW};
+  bool gnuplotRightToLeft{false};
 
   qry();
-  bool select(boost::program_options::variables_map &vm, int /*iTimeLimit*/, const std::string & /*input*/,
-              std::tuple<int, int, int> /*gnuplotDim*/);
+  bool select(boost::program_options::variables_map &vm, int /*iElemLimit*/, const std::string & /*input*/,
+              std::tuple<int, int, int> /*gnuplotDim*/, bool /*gnuplotRightToLeft*/ = false);
   bool adhoc(const std::string & /*sAdhoc*/);
   std::string dir();
   std::string dirYaml();
