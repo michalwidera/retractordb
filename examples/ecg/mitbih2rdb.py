@@ -169,8 +169,9 @@ def main() -> None:
     if fmt != 212:
         sys.exit(f'Błąd: obsługiwany jest tylko format 212 (podano {fmt})')
 
-    # Nazwa pliku binarnego musi zaczynać się od litery — gramatyka DESC FILENAME
-    # nie może rozróżnić cyfr od tokenu DECIMAL gdy cała nazwa to cyfry (np. "205").
+    # Keep generated retractordb artifacts under a `rec` prefix so they are easy to
+    # distinguish from the original MIT-BIH files and remain valid when reused in
+    # generated stream/output identifiers.
     bin_name = ('rec' + record if record[0].isdigit() else record)
     bin_path = os.path.join(base_dir, bin_name)
     rql_path = os.path.join(base_dir, bin_name + '-replay.rql')
