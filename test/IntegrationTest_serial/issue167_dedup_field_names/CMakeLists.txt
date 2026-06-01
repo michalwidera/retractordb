@@ -12,5 +12,10 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     bash -c
-    "set -e \; xretractor -c query.rql > out_compile.txt \; grep -F 'mysum(1/1)' out_compile.txt \; grep -F 'out(1/1)' out_compile.txt \; grep -F ':- PUSH_STREAM(mysum)' out_compile.txt \; if grep -F 'STREAM_ADD_s1_s2(1/1)' out_compile.txt \; then exit 1 \; fi"
+    "set -e \
+\; xretractor -c query.rql > out_compile.txt \
+\; grep -F 'mysum(1/1)' out_compile.txt \
+\; grep -F 'out(1/1)' out_compile.txt \
+\; grep -F ':- PUSH_STREAM(mysum)' out_compile.txt \
+\; if grep -F 'STREAM_ADD_s1_s2(1/1)' out_compile.txt \; then exit 1 \; fi"
 )
