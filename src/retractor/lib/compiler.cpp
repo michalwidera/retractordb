@@ -588,9 +588,9 @@ void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset
   int offset  = 0;
   for (auto &t : srcQuery.lProgram) {
     if (t.getCommandID() == PUSH_STREAM) {
-      const std::string &sub     = t.getStr_();
-      const int globalOffset     = isHash ? baseOffset : (baseOffset + offset);
-      result[sub]                = globalOffset;
+      const std::string &sub = t.getStr_();
+      const int globalOffset = isHash ? baseOffset : (baseOffset + offset);
+      result[sub]            = globalOffset;
       collectTransitiveOffsets(sub, globalOffset, result);
       if (!isHash) offset += coreInstance[sub].descriptorStorage().flatElementCount();
     }
@@ -796,8 +796,7 @@ std::string compiler::deduplicateSubstrats() {
 
         bool schemaMatch =
             std::equal(it->lSchema.begin(), it->lSchema.end(), it2->lSchema.begin(), [](const field &a, const field &b) {
-              return a.field_.rname == b.field_.rname && a.field_.rtype == b.field_.rtype && a.field_.rlen == b.field_.rlen &&
-                     a.field_.rarray == b.field_.rarray;
+              return a.field_.rtype == b.field_.rtype && a.field_.rlen == b.field_.rlen && a.field_.rarray == b.field_.rarray;
             });
         if (!schemaMatch) continue;
 

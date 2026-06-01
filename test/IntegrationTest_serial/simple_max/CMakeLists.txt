@@ -1,9 +1,9 @@
 # make install && ctest -R simple_max -V
 
-# Weryfikuje operator .max na strumieniu: str0 zawiera dane z core0+core1,
-# str1 = str0.max (wartość maksymalna), str2 = str0 + str1 (złączenie).
-# Wynik porównywany z pattern-run.txt via xtrdb.
-# Test -vg-2 uruchamia valgrind z wykrywaniem wycieków pamięci.
+# Weryfikuje operator .max na strumieniu: str0 zawiera dane z core0+core1, str1
+# = str0.max (wartość maksymalna), str2 = str0 + str1 (złączenie). Wynik
+# porównywany z pattern-run.txt via xtrdb. Test -vg-2 uruchamia valgrind z
+# wykrywaniem wycieków pamięci.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")

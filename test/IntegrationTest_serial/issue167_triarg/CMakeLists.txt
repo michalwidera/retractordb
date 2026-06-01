@@ -3,13 +3,12 @@
 # Weryfikuje obsługę wieloargumentowych wyrażeń strumieniowych (issue #167).
 # SUBSTRAT 'memory' powoduje, że dane substratów ADD są w pamięci (brak plików
 # binarnych na dysku); substraty HASH korzystają z pliku dla stabilności przy
-# dłuższych iteracjach (znane ograniczenie storage::read z CRS math).
-# out1: s1+s2+s3 (lewostronnie rekurencyjny ADD, substrat pośredni)
-# out2: (s1#s2)#s3 (dwupoziomowy HASH z nawiasami)
-# out3: s1+(s2#s3) (mieszane ADD + HASH)
-# out4: s1+s2+s3+s4 (czteroargumentowy ADD, dwupoziomowy substrat)
-# out5: s1#s2#s3 (lewostronnie rekurencyjny HASH; substrat wspólny z out2)
-# -m 30: faccmemory implementuje kołowy bufor — brak crashu przy HASH z retPosValue > 0.
+# dłuższych iteracjach (znane ograniczenie storage::read z CRS math). out1:
+# s1+s2+s3 (lewostronnie rekurencyjny ADD, substrat pośredni) out2: (s1#s2)#s3
+# (dwupoziomowy HASH z nawiasami) out3: s1+(s2#s3) (mieszane ADD + HASH) out4:
+# s1+s2+s3+s4 (czteroargumentowy ADD, dwupoziomowy substrat) out5: s1#s2#s3
+# (lewostronnie rekurencyjny HASH; substrat wspólny z out2) -m 30: faccmemory
+# implementuje kołowy bufor — brak crashu przy HASH z retPosValue > 0.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
@@ -29,5 +28,4 @@ add_test(
   while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
   ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out_run.txt ; \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_compile.txt out_compile.txt ; \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_run.txt out_run.txt"
-)
+  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_run.txt out_run.txt")

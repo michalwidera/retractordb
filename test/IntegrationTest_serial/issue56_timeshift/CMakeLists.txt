@@ -1,8 +1,8 @@
 # make install && ctest -R issue56_timeshift -V
 
 # Weryfikuje operator filtra (> 5) na połączonych strumieniach (issue #57).
-# core0 + core1 z filtrem > 5 — tylko rekordy spełniające warunek trafiają
-# do str1. Wynik porównywany z pattern-run.txt via xtrdb.
+# core0 + core1 z filtrem > 5 — tylko rekordy spełniające warunek trafiają do
+# str1. Wynik porównywany z pattern-run.txt via xtrdb.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")

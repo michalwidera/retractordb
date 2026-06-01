@@ -2,8 +2,8 @@
 
 # Weryfikuje operator @(n,m) przy wolniejszym wyjściu niż źródło: źródło rate
 # 0.1, okna @(3,2), @(3,3), @(3,-3) — strumienie serial4, serial5, serial6.
-# Sprawdza poprawność rate-conversion gdy output rate < input rate.
-# Wynik porównywany z pattern.txt via xtrdb.
+# Sprawdza poprawność rate-conversion gdy output rate < input rate. Wynik
+# porównywany z pattern.txt via xtrdb.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
