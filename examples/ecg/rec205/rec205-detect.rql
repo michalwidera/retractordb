@@ -1,0 +1,50 @@
+# Detekcja QRS z nakladka EKG — rekord 205
+# Czestotliwosc: 360 Hz, interwal 1/360 s
+#
+# Potok algorytmu Pan-Tompkins (jak rec205-qrs.rql):
+#  1. Filtr pasmowoprzepustowy 5-15 Hz — FIR 25-tap (okno Hamminga)
+#  2. Rozniczkowanie            — FIR 5-tap: [-1,-2,0,2,1]
+#  3. Kwadrat                   — eliminuje znak, wzmacnia QRS
+#  4. Calkowani w oknie ruchomym 30 probek (~83 ms)
+#  5. Prog adaptacyjny          — 2x srednia ruchoma 180 probek (0.5 s)
+#
+# Wyjscie detect_out (3 sygnaly):
+#  [0] mlii-900   — MLII wycentrowane do zera
+#  [1] v1-900     — V1 wycentrowane do zera
+#  [2] detekcja*5 — sygnal detekcji QRS: wartosc >0 = wykryty QRS
+#
+# Uruchamiac z katalogu zawierajacego pliki danych:
+#   cd examples/ecg/rec205
+#   xretractor rec205-detect.rql -m <liczba_cykli>
+
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
+DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
+DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
+
+# Wyodrebnienie kanalow
+SELECT ecg.MLII STREAM mlii FROM ecg VOLATILE
+SELECT ecg.V1 STREAM v1 FROM ecg VOLATILE
+
+# 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
+SELECT * STREAM mlii_win FROM mlii@(1,25) VOLATILE
+SELECT mlii_win[_]*bpf[_] STREAM bp_acc FROM mlii_win+bpf VOLATILE
+SELECT bp_acc[0]/1000 STREAM bp_out FROM bp_acc.sumc VOLATILE
+
+# 2. Rozniczkowanie — splot FIR 5-tap
+SELECT * STREAM bp_win FROM bp_out@(1,5) VOLATILE
+SELECT bp_win[_]*df[_] STREAM d_acc FROM bp_win+df VOLATILE
+SELECT d_acc[0] STREAM d_out FROM d_acc.sumc VOLATILE
+
+# 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
+SELECT d_out[0]*d_out[0]/1000 STREAM sq_out FROM d_out VOLATILE
+
+# 4. Calkowani w oknie ruchomym 30 probek (~83 ms)
+SELECT * STREAM mwi_win FROM sq_out@(1,30) VOLATILE
+SELECT mwi_win[0] STREAM mwi FROM mwi_win.avg VOLATILE
+
+# 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
+SELECT * STREAM mwi_long FROM mwi@(1,180) VOLATILE
+SELECT mwi_long[0] STREAM mwi_thr FROM mwi_long.avg VOLATILE
+
+# Wyjscie: MLII wycentrowane, V1 wycentrowane, sygnal detekcji x5
+SELECT mlii[0]-900, v1[0]-900, (mwi[0]-mwi_thr[0]*2)*5 STREAM detect_out FROM mlii+v1+mwi+mwi_thr VOLATILE

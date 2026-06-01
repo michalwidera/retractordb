@@ -38,9 +38,48 @@ add_custom_target(
     ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_parallel/dsp)
 
 add_custom_target(
+  ecg-clean
+  COMMAND
+    sh -c "rm -f ecg.desc *.shadow STREAM_ADD* bpf.desc df.desc \
+      s205out s205out.desc s205out.meta \
+      mlii mlii.desc mlii.meta \
+      v1 v1.desc v1.meta \
+      mlii_win mlii_win.desc mlii_win.meta \
+      bp_acc bp_acc.desc bp_acc.meta \
+      bp_out bp_out.desc bp_out.meta \
+      bp_win bp_win.desc bp_win.meta \
+      d_acc d_acc.desc d_acc.meta \
+      d_out d_out.desc d_out.meta \
+      sq_out sq_out.desc sq_out.meta \
+      mwi_win mwi_win.desc mwi_win.meta \
+      mwi mwi.desc mwi.meta \
+      mwi_long mwi_long.desc mwi_long.meta \
+      mwi_thr mwi_thr.desc mwi_thr.meta \
+      mwi_proc mwi_proc.desc mwi_proc.meta \
+      qrs_out qrs_out.desc qrs_out.meta \
+      detect_out detect_out.desc detect_out.meta"
+  COMMAND rm -rf temp
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
+
+add_custom_target(
   ecg
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out rec205-replay.rql
-          720,560,1360 --gnuplot-rtl
+    720,560,1360 --gnuplot-rtl
+  DEPENDS ecg-clean
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
+
+add_custom_target(
+  ecg-qrs
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql
+    1440,-250,350 --gnuplot-rtl
+  DEPENDS ecg-clean
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
+
+add_custom_target(
+  ecg-detect-qrs
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
+    720,-400,400 --gnuplot-rtl
+  DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
