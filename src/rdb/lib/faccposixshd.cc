@@ -72,7 +72,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
   }
 
-  if (fd >= 0 && mainFileExisted) {
+  if (mainFileExisted) {
     const off_t mainSize = ::lseek(fd, 0, SEEK_END);
     if (mainSize < 0) {
       SPDLOG_ERROR("::lseek {} failed during state restore: {}", filename_, strerror(errno));
@@ -88,7 +88,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     }
   }
 
-  if (fd_shadow >= 0 && shadowFileExisted) {
+  if (shadowFileExisted) {
     const ssize_t entrySize = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
     const off_t shadowSize  = ::lseek(fd_shadow, 0, SEEK_END);
     if (shadowSize < 0) {
@@ -163,8 +163,8 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
     while (sizesh > 0) {
       ssize_t write_result = ::write(fd, ptr, sizesh);
       if (write_result < 0) {
-        if (errno == EINTR && ++retries <= maxRetries) continue;
         if (errno == EINTR) {
+          if (++retries <= maxRetries) continue;
           SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
           return errno;
         }
@@ -197,8 +197,8 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd_shadow, ptr, sizesh);
     if (write_result < 0) {
-      if (errno == EINTR && ++retries <= maxRetries) continue;
       if (errno == EINTR) {
+        if (++retries <= maxRetries) continue;
         SPDLOG_ERROR("::write shadow {} failed after {} EINTR retries", shadowName(), maxRetries);
         return errno;
       }

@@ -33,7 +33,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
   }
 
-  if (fd >= 0 && fileExisted) {
+  if (fileExisted) {
     const off_t fileSize = ::lseek(fd, 0, SEEK_END);
     if (fileSize < 0) {
       SPDLOG_ERROR("::lseek {} failed during state restore: {}", filename_, strerror(errno));
@@ -107,8 +107,8 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd, ptrData, sizesh);
     if (write_result < 0) {
-      if (errno == EINTR && ++retries <= maxRetries) continue;  // Retry
       if (errno == EINTR) {
+        if (++retries <= maxRetries) continue;
         SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
         return errno;
       }
