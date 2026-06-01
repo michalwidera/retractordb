@@ -162,18 +162,20 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
     int retries              = 0;
     while (sizesh > 0) {
       ssize_t write_result = ::write(fd, ptr, sizesh);
-      if (write_result < 0) {
-        if (errno == EINTR) {
-          if (++retries <= maxRetries) continue;
-          SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
-          return errno;
-        }
+      if (write_result >= 0) {
+        retries = 0;
+        ptr += write_result;
+        sizesh -= write_result;
+        continue;
+      }
+      if (errno != EINTR) {
         SPDLOG_ERROR("::write {} failed: {}", filename_, strerror(errno));
         return EXIT_FAILURE;
       }
-      retries = 0;
-      ptr += write_result;
-      sizesh -= write_result;
+      if (++retries > maxRetries) {
+        SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
+        return errno;
+      }
     }
     return EXIT_SUCCESS;
   }
@@ -196,18 +198,20 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd_shadow, ptr, sizesh);
-    if (write_result < 0) {
-      if (errno == EINTR) {
-        if (++retries <= maxRetries) continue;
-        SPDLOG_ERROR("::write shadow {} failed after {} EINTR retries", shadowName(), maxRetries);
-        return errno;
-      }
+    if (write_result >= 0) {
+      retries = 0;
+      ptr += write_result;
+      sizesh -= write_result;
+      continue;
+    }
+    if (errno != EINTR) {
       SPDLOG_ERROR("::write shadow {} failed: {}", shadowName(), strerror(errno));
       return EXIT_FAILURE;
     }
-    retries = 0;
-    ptr += write_result;
-    sizesh -= write_result;
+    if (++retries > maxRetries) {
+      SPDLOG_ERROR("::write shadow {} failed after {} EINTR retries", shadowName(), maxRetries);
+      return errno;
+    }
   }
   return EXIT_SUCCESS;
 }

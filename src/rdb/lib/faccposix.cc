@@ -106,17 +106,17 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd, ptrData, sizesh);
-    if (write_result < 0) {
-      if (errno == EINTR) {
-        if (++retries <= maxRetries) continue;
-        SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
-        return errno;
-      }
-      return errno;  // Error status
+    if (write_result >= 0) {
+      retries = 0;
+      ptrData += write_result;
+      sizesh -= write_result;
+      continue;
     }
-    retries = 0;  // Reset on successful write
-    ptrData += write_result;
-    sizesh -= write_result;
+    if (errno != EINTR) return errno;
+    if (++retries > maxRetries) {
+      SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
+      return errno;
+    }
   }
   return EXIT_SUCCESS;
 }
