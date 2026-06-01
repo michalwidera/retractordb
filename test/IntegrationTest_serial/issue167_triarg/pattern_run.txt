@@ -1,16 +1,16 @@
-2 Record(s)
+7 Record(s)
 4 Byte(s) per record.
 {	INTEGER out1_0
 }
 { out1_0:111 }
 { out1_0:222 }
-2 Record(s)
+7 Record(s)
 4 Byte(s) per record.
 {	INTEGER out4_0
 }
 { out4_0:1111 }
 { out4_0:2222 }
-6 Record(s)
+22 Record(s)
 4 Byte(s) per record.
 {	INTEGER out5_0
 }

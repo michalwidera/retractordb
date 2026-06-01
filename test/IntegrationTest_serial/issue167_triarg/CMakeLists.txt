@@ -9,7 +9,7 @@
 # out3: s1+(s2#s3) (mieszane ADD + HASH)
 # out4: s1+s2+s3+s4 (czteroargumentowy ADD, dwupoziomowy substrat)
 # out5: s1#s2#s3 (lewostronnie rekurencyjny HASH; substrat wspólny z out2)
-# -m 9: bezpieczna granica przed przepełnieniem bufora HASH w storage MEMORY.
+# -m 30: faccmemory implementuje kołowy bufor — brak crashu przy HASH z retPosValue > 0.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
@@ -25,7 +25,7 @@ add_test(
         STREAM_HASH_s1_s2.desc STREAM_HASH_s2_s3.desc \
         s1.desc s2.desc s3.desc s4.desc *.meta *.shadow ; \
   xretractor -c query.rql > out_compile.txt ; \
-  xretractor query.rql -m 9 ; \
+  xretractor query.rql -m 30 ; \
   while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
   ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out_run.txt ; \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_compile.txt out_compile.txt ; \
