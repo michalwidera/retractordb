@@ -45,8 +45,5 @@ SELECT mwi_win[0] STREAM mwi FROM mwi_win.avg VOLATILE
 SELECT * STREAM mwi_long FROM mwi@(1,180) VOLATILE
 SELECT mwi_long[0] STREAM mwi_thr FROM mwi_long.avg VOLATILE
 
-# Obwiednia x5 i sygnal detekcji x5 w jednym strumieniu (unika zagniezdzonego join)
-SELECT mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM mwi_proc FROM mwi+mwi_thr VOLATILE
-
 # Wyjscie: MLII wycentrowane, obwiednia x5, sygnal detekcji x5
-SELECT mlii[0]-900, mwi_proc[0], mwi_proc[1] STREAM qrs_out FROM mlii+mwi_proc VOLATILE
+SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+mwi+mwi_thr VOLATILE
