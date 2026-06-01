@@ -12,6 +12,8 @@
 
 static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 static std::map<std::string, std::vector<std::vector<bool>>> memoryNullStorage;
+// Globalny licznik zapisów na strumień — utrzymuje logiczną pozycję niezależnie od instancji.
+static std::map<std::string, size_t> memoryWriteCount;
 
 namespace rdb {
 
@@ -20,68 +22,67 @@ auto memoryFile::name() -> std::string & { return filename_; }
 ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
   if (recordSize_ == 0) FatalError("memoryFile::write: recordSize_ is zero");
   auto location = position / recordSize_;
-  // If ptrData is null, clear the storage and reset removed_count
   if (ptrData == nullptr) {
-    memoryStorage[filename_].clear();  // Clear the storage if ptrData is null
-    removed_count_ = 0;                // Reset removed count
+    memoryStorage[filename_].clear();
+    memoryNullStorage[filename_].clear();
+    memoryWriteCount[filename_] = 0;
     return EXIT_SUCCESS;
   }
 
   std::vector<uint8_t> vec(ptrData, ptrData + recordSize_);
 
-  if (retentionSize_ != no_retention)  // If retention size is set, manage the retention
-    if (memoryStorage[filename_].size() > retentionSize_) {
-      // Remove the oldest record if retention size is reached
-      memoryStorage[filename_].erase(memoryStorage[filename_].begin());
-      removed_count_++;
-    }
-
   if (position == std::numeric_limits<size_t>::max()) {
-    // Append to the end of the file
-    memoryStorage[filename_].push_back(vec);
-    memoryNullStorage[filename_].push_back(nullBitset);
+    if (retentionSize_ != no_retention) {
+      // Kołowy bufor: zapisz do slotu writeCount % retentionSize_
+      const size_t wc   = memoryWriteCount[filename_];
+      const size_t slot = wc % retentionSize_;
+      if (slot < memoryStorage[filename_].size()) {
+        memoryStorage[filename_][slot]     = std::move(vec);
+        memoryNullStorage[filename_][slot] = nullBitset;
+      } else {
+        memoryStorage[filename_].push_back(std::move(vec));
+        memoryNullStorage[filename_].push_back(nullBitset);
+      }
+    } else {
+      memoryStorage[filename_].push_back(std::move(vec));
+      memoryNullStorage[filename_].push_back(nullBitset);
+    }
+    memoryWriteCount[filename_]++;
   } else {
-    if (std::cmp_less(location, removed_count_)) {
-      SPDLOG_ERROR("Write failed: Position out of bounds in memory storage: location {}, removed_count {}", location,
-                   removed_count_);
-      return EXIT_FAILURE;  // Return an error code if position is out of bounds
+    // Nadpisanie rekordu pod wskazaną pozycją
+    const size_t slot = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
+    if (slot >= memoryStorage[filename_].size()) {
+      SPDLOG_ERROR("Write failed: slot {} out of range, storage size {}", slot, memoryStorage[filename_].size());
+      return EXIT_FAILURE;
     }
-    const size_t adjustedLocation              = location - static_cast<size_t>(removed_count_);
-    memoryStorage[filename_][adjustedLocation] = std::move(vec);
-    if (adjustedLocation < memoryNullStorage[filename_].size()) {
-      memoryNullStorage[filename_][adjustedLocation] = nullBitset;
-    }
+    memoryStorage[filename_][slot] = std::move(vec);
+    if (slot < memoryNullStorage[filename_].size()) memoryNullStorage[filename_][slot] = nullBitset;
   }
   return EXIT_SUCCESS;
 }
 
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   if (recordSize_ == 0) FatalError("memoryFile::read: recordSize_ is zero");
-  auto location = position / recordSize_;
-  if (std::cmp_less(location, removed_count_)) {
-    SPDLOG_ERROR("Read failed: Position out of bounds in memory storage: location {}, removed_count {}", location,
-                 removed_count_);
-    return EXIT_FAILURE;  // Return an error code if position is out of bounds
-  }
-  auto adjustedLocation = location - static_cast<size_t>(removed_count_);
-  if (adjustedLocation >= memoryStorage[filename_].size()) {
-    SPDLOG_ERROR("Read failed: Position beyond end of memory storage: location {}, size {}", location,
-                 memoryStorage[filename_].size() + removed_count_);
+  const auto location = position / recordSize_;
+  const size_t slot   = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
+
+  if (slot >= memoryStorage[filename_].size()) {
+    SPDLOG_ERROR("Read failed: slot {} out of range, storage size {}", slot, memoryStorage[filename_].size());
     return EXIT_FAILURE;
   }
 
-  auto &vec = memoryStorage[filename_][adjustedLocation];
+  auto &vec = memoryStorage[filename_][slot];
   std::ranges::copy(vec, ptrData);
 
   auto &nullVec = memoryNullStorage[filename_];
-  if (adjustedLocation < nullVec.size()) {
-    nullBitset = nullVec[adjustedLocation];
+  if (slot < nullVec.size()) {
+    nullBitset = nullVec[slot];
   } else {
     nullBitset.clear();
   }
   return EXIT_SUCCESS;
 }
 
-size_t memoryFile::count() { return memoryStorage[filename_].size() + removed_count_; }
+size_t memoryFile::count() { return memoryWriteCount[filename_]; }
 
 }  // namespace rdb

@@ -958,21 +958,21 @@ public:
    
   };
 
-  class  SExpPlusContext : public Stream_expressionContext {
-  public:
-    SExpPlusContext(Stream_expressionContext *ctx);
-
-    std::vector<Stream_termContext *> stream_term();
-    Stream_termContext* stream_term(size_t i);
-    antlr4::tree::TerminalNode *PLUS();
-    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
-    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
-  };
-
   class  SExpTermContext : public Stream_expressionContext {
   public:
     SExpTermContext(Stream_expressionContext *ctx);
 
+    Stream_termContext *stream_term();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  class  SExpPlusContext : public Stream_expressionContext {
+  public:
+    SExpPlusContext(Stream_expressionContext *ctx);
+
+    Stream_expressionContext *stream_expression();
+    antlr4::tree::TerminalNode *PLUS();
     Stream_termContext *stream_term();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -1001,7 +1001,7 @@ public:
   };
 
   Stream_expressionContext* stream_expression();
-
+  Stream_expressionContext* stream_expression(int precedence);
   class  Stream_termContext : public antlr4::ParserRuleContext {
   public:
     Stream_termContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -1028,9 +1028,9 @@ public:
   public:
     SExpHashContext(Stream_termContext *ctx);
 
-    std::vector<Stream_factorContext *> stream_factor();
-    Stream_factorContext* stream_factor(size_t i);
+    Stream_termContext *stream_term();
     antlr4::tree::TerminalNode *SHARP();
+    Stream_factorContext *stream_factor();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -1085,7 +1085,7 @@ public:
   };
 
   Stream_termContext* stream_term();
-
+  Stream_termContext* stream_term(int precedence);
   class  Stream_factorContext : public antlr4::ParserRuleContext {
   public:
     Stream_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -1180,6 +1180,8 @@ public:
   bool term_logicSempred(Term_logicContext *_localctx, size_t predicateIndex);
   bool expression_factorSempred(Expression_factorContext *_localctx, size_t predicateIndex);
   bool termSempred(TermContext *_localctx, size_t predicateIndex);
+  bool stream_expressionSempred(Stream_expressionContext *_localctx, size_t predicateIndex);
+  bool stream_termSempred(Stream_termContext *_localctx, size_t predicateIndex);
 
   // By default the static state used to implement the parser is lazily initialized during the first
   // call to the constructor. You can call this function if you wish to initialize the static state

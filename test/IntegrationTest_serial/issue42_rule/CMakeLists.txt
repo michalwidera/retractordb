@@ -1,8 +1,8 @@
 # make install && ctest -R issue42_rule -V
 
-# Weryfikuje mechanizm RULE (issue #42): warunkowe akcje wyzwalane na wartościach
-# strumienia. Trzy reguły: DUMP z oknem -5..5 przy wartości < 15, DUMP z
-# retencją 100 przy > 11, wywołanie SYSTEM przy wartości = 13 lub = 11.
+# Weryfikuje mechanizm RULE (issue #42): warunkowe akcje wyzwalane na
+# wartościach strumienia. Trzy reguły: DUMP z oknem -5..5 przy wartości < 15,
+# DUMP z retencją 100 przy > 11, wywołanie SYSTEM przy wartości = 13 lub = 11.
 # Wynik porównywany z pattern-run.txt via xtrdb.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)

@@ -1,9 +1,9 @@
 # make install && ctest -R issue6_adhoc -V
 
-# Weryfikuje tryb zapytania ad-hoc (issue #6): xqry -a 'SELECT ...' definiuje
-# i wykonuje zapytanie w locie bez wcześniej skompilowanego pliku .rql.
-# xlaunch.sh startuje xretractor, wysyła zapytanie ad-hoc przez xqry, następnie
-# zatrzymuje serwer. Asercja: pliki strumieni w temp/ zgodne z pattern-ls.txt.
+# Weryfikuje tryb zapytania ad-hoc (issue #6): xqry -a 'SELECT ...' definiuje i
+# wykonuje zapytanie w locie bez wcześniej skompilowanego pliku .rql. xlaunch.sh
+# startuje xretractor, wysyła zapytanie ad-hoc przez xqry, następnie zatrzymuje
+# serwer. Asercja: pliki strumieni w temp/ zgodne z pattern-ls.txt.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
