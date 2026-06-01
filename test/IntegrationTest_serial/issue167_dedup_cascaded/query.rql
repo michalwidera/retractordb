@@ -1,0 +1,9 @@
+SUBSTRAT 'memory'
+
+DECLARE a INTEGER STREAM s1, 1 FILE 'data1.dat'
+DECLARE b INTEGER STREAM s2, 1 FILE 'data2.dat'
+DECLARE c INTEGER STREAM s3, 1 FILE 'data3.dat'
+
+SELECT * STREAM mysum FROM s1+s2
+SELECT * STREAM shifted FROM (s1+s2)>1
+SELECT * STREAM merged FROM s3+((s1+s2)>1)

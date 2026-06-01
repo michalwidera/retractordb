@@ -805,6 +805,24 @@ std::string compiler::deduplicateSubstrats() {
         for (auto &q : coreInstance)
           for (auto &tok : q.lProgram)
             if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == oldName) tok = token(PUSH_STREAM, newName);
+        for (auto &q : coreInstance)
+          for (auto &f : q.lSchema)
+            for (auto &tok : f.lProgram) {
+              if (tok.getCommandID() == PUSH_ID) {
+                auto [schema, idx] = std::get<std::pair<std::string, int>>(tok.getVT());
+                if (schema == oldName) tok = token(PUSH_ID, std::make_pair(newName, idx));
+              }
+              if (tok.getCommandID() == PUSH_ID2) {
+                const std::string str = tok.getStr_();  // copy before tok may be replaced
+                if (str.starts_with(oldName + "[")) {
+                  const std::string updated = newName + str.substr(oldName.size());
+                  if (std::holds_alternative<std::pair<std::string, int>>(tok.getVT()))
+                    tok = token(PUSH_ID2, std::make_pair(updated, 0));
+                  else
+                    tok = token(PUSH_ID2, updated);
+                }
+              }
+            }
 
         coreInstance.erase(it);
         changed = true;
