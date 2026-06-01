@@ -2,5 +2,9 @@
   "cmake.useCMakePresets": "always",
   "cmake.configurePreset": "conan-debug",
   "cmake.buildPreset": "conan-debug",
-  "cmake.testPreset": "conan-debug"
+  "cmake.testPreset": "conan-debug",
+  "sonarlint.connectedMode.project": {
+    "connectionId": "retractordb",
+    "projectKey": "retractordb_mw"
+  }
 }
