@@ -1,0 +1,7 @@
+SUBSTRAT 'memory'
+
+DECLARE a INTEGER STREAM s1, 1 FILE 'data1.dat'
+DECLARE b INTEGER STREAM s2, 1 FILE 'data2.dat'
+
+SELECT s1[0], s2[0] STREAM mysum FROM s1+s2
+SELECT out[0] STREAM out FROM (s1+s2)>1
