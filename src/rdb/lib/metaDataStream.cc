@@ -3,11 +3,15 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
+#include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <utility>
 
@@ -72,8 +76,9 @@ namespace {
 constexpr size_t kHeaderSize = sizeof(int64_t);
 
 void writeHeader(std::ostream &out, std::chrono::system_clock::time_point t) {
-  int64_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-  out.write(reinterpret_cast<const char *>(&ns), sizeof(ns));
+  int64_t ns        = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+  const auto bytes  = std::as_bytes(std::span{&ns, 1});
+  out.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size_bytes()));
 }
 
 void writeEntry(std::ostream &out, const metaDataStream::IndexRecord &entry) {
@@ -84,9 +89,9 @@ void writeEntry(std::ostream &out, const metaDataStream::IndexRecord &entry) {
 std::vector<metaDataStream::IndexRecord> splitSegment(const metaDataStream::IndexRecord &seg, size_t offset,
                                                       const std::vector<bool> &newBitset) {
   std::vector<metaDataStream::IndexRecord> result;
-  if (offset > 0) result.push_back({seg.nullBitset, offset, false});
-  result.push_back({newBitset, 1, false});
-  if (offset + 1 < seg.recordCount) result.push_back({seg.nullBitset, seg.recordCount - offset - 1, false});
+  if (offset > 0) result.emplace_back(seg.nullBitset, offset, false);
+  result.emplace_back(newBitset, 1, false);
+  if (offset + 1 < seg.recordCount) result.emplace_back(seg.nullBitset, seg.recordCount - offset - 1, false);
   return result;
 }
 
@@ -146,7 +151,7 @@ void metaDataStream::appendEntry(const IndexRecord &entry) {
 
 void metaDataStream::rewriteFile(const std::vector<IndexRecord> &entries) {
   if (metaFilePath_.empty()) return;
-  const std::string tmpPath = metaFilePath_ + ".tmp";
+  const std::string tmpPath = std::format("{}.tmp", metaFilePath_);
   std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
   if (!out.is_open()) return;
   writeHeader(out, creationTime_);
@@ -208,9 +213,11 @@ void metaDataStream::loadIndex() {
   if (fileSize <= 0 || std::cmp_less(fileSize, kHeaderSize)) return;
   in.seekg(0, std::ios::beg);
 
-  int64_t creationTimeNs = 0;
-  in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
+  std::array<std::byte, sizeof(int64_t)> nsBuf{};
+  in.read(reinterpret_cast<char *>(nsBuf.data()), static_cast<std::streamsize>(nsBuf.size()));
   in.close();
+  int64_t creationTimeNs{};
+  std::memcpy(&creationTimeNs, nsBuf.data(), sizeof(creationTimeNs));
 
   creationTime_ = std::chrono::system_clock::time_point(std::chrono::nanoseconds(creationTimeNs));
 
@@ -362,7 +369,7 @@ bool metaDataStream::isEmpty() const { return totalRecords() == 0; }
 void metaDataStream::rotate(int percounter) {
   flushCurrentEntry();
   if (percounter >= 0 && !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_)) {
-    std::string rotatedPath = metaFilePath_ + ".old" + std::to_string(percounter);
+    std::string rotatedPath = std::format("{}.old{}", metaFilePath_, percounter);
     std::error_code ec;
     std::filesystem::rename(metaFilePath_, rotatedPath, ec);
     if (ec) SPDLOG_WARN("metaDataStream::rotate: failed to rename '{}' to '{}': {}", metaFilePath_, rotatedPath, ec.message());
