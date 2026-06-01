@@ -57,7 +57,8 @@ TEST(MemoryTest, test_faccmemory_infinite) {
   GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
 }
 
-// Verify retention evicts oldest records and reading evicted positions returns failure
+// Verify retention ring buffer: after 4 writes with size 2, ring holds last 2 records.
+// Reads at any position succeed via modular mapping; no EXIT_FAILURE for old positions.
 TEST(MemoryTest, test_faccmemory_retention) {
   struct {
     BYTE data;
@@ -80,14 +81,16 @@ TEST(MemoryTest, test_faccmemory_retention) {
 
   GTEST_ASSERT_EQ(mfa->count(), 4);
 
+  // Positions 2 and 3 map to ring slots 0 and 1 — current values 3 and 4
   GTEST_ASSERT_EQ(mfa->read(&record.data, 2), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 3);
 
   GTEST_ASSERT_EQ(mfa->read(&record.data, 3), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 4);
 
-  // Evicted record should fail to read
-  GTEST_ASSERT_EQ(mfa->read(&record.data, 0), EXIT_FAILURE);
+  // Position 0 maps to ring slot 0 — returns the record currently at that slot (value 3)
+  GTEST_ASSERT_EQ(mfa->read(&record.data, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record.data, 3);
 
   mfa->write(nullptr);               // Clear the storage
   GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
@@ -192,8 +195,8 @@ TEST(MemoryTest, test_faccmemory_empty_count) {
   mfa->write(nullptr);
 }
 
-// Verify retention boundary: eviction triggers when internal size exceeds retentionSize.
-// The check is `size > N` (checked before push), so first eviction happens on write N+2.
+// Verify retention ring boundary: ring of size 3 overwrites slot 0 on the 4th write.
+// All reads succeed via modular mapping — no EXIT_FAILURE for wrapped positions.
 TEST(MemoryTest, test_faccmemory_retention_boundary) {
   BYTE record;
 
@@ -203,33 +206,46 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
   auto retention = std::pair<std::string, size_t>("MEMORY", 3);
   auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
-  // Write 4 records - no eviction (size checked before push: 0,1,2,3 are all <= 3)
-  for (BYTE i = 1; i <= 4; i++) {
+  // Write 3 records — ring fills up, no overwrite yet
+  for (BYTE i = 1; i <= 3; i++) {
     record = i;
     mfa->write(&record);
   }
 
-  GTEST_ASSERT_EQ(mfa->count(), 4);
+  GTEST_ASSERT_EQ(mfa->count(), 3);
 
-  // All 4 records should still be readable (no eviction)
+  // Ring slots 0,1,2 hold values 1,2,3
   GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 1);
+  GTEST_ASSERT_EQ(mfa->read(&record, 2), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 3);
 
-  // Write 5th record - size is 4 > 3, triggers first eviction
+  // Write 4th record — wraps to slot 0, overwrites value 1 with value 4
+  record = 4;
+  mfa->write(&record);
+
+  GTEST_ASSERT_EQ(mfa->count(), 4);
+
+  // Position 0 maps to slot 0 — now holds value 4 (overwritten)
+  GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 4);
+
+  // Position 3 also maps to slot 0 — same value
+  GTEST_ASSERT_EQ(mfa->read(&record, 3), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 4);
+
+  // Write 5th record — wraps to slot 1, overwrites value 2 with value 5
   record = 5;
   mfa->write(&record);
 
   GTEST_ASSERT_EQ(mfa->count(), 5);
 
-  // First record evicted (removed_count_ = 1)
-  GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_FAILURE);
-
-  // Second record now readable (location 1 >= removed_count 1)
-  GTEST_ASSERT_EQ(mfa->read(&record, 1), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(record, 2);
-
   GTEST_ASSERT_EQ(mfa->read(&record, 4), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 5);
+
+  // Slot 2 still holds value 3 (not yet overwritten)
+  GTEST_ASSERT_EQ(mfa->read(&record, 2), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 3);
 
   mfa->write(nullptr);
 }

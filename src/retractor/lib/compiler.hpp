@@ -24,6 +24,7 @@ struct compiler {
   std::string expandIndexWildcards();
   std::string resolveFieldReferences();
   std::string localizeFieldOffsets();
+  void collectTransitiveOffsets(const std::string &srcId, int baseOffset, std::map<std::string, int> &result);
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);

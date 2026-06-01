@@ -1,0 +1,16 @@
+open out1
+size
+desc
+list 2
+open out4
+size
+desc
+list 2
+open out5
+size
+desc
+list 3
+dropfile { out1 out1.desc out2 out2.desc out3 out3.desc out4 out4.desc out5 out5.desc }
+dropfile { STREAM_ADD_s1_s2.desc STREAM_ADD_STREAM_ADD_s1_s2_s3.desc }
+dropfile { STREAM_HASH_s1_s2.desc STREAM_HASH_s2_s3.desc }
+quit

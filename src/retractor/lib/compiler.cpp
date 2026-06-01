@@ -581,6 +581,22 @@ std::string compiler::resolveFieldReferences() {
 
 /* This function will convert fields list where stream a from b#c
 clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
+void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset, std::map<std::string, int> &result) {
+  auto &srcQuery = coreInstance.getQuery(srcId);
+  if (!srcQuery.isSubstrat) return;
+  bool isHash = std::ranges::any_of(srcQuery.lProgram, [](token &t) { return t.getCommandID() == STREAM_HASH; });
+  int offset  = 0;
+  for (auto &t : srcQuery.lProgram) {
+    if (t.getCommandID() == PUSH_STREAM) {
+      const std::string &sub     = t.getStr_();
+      const int globalOffset     = isHash ? baseOffset : (baseOffset + offset);
+      result[sub]                = globalOffset;
+      collectTransitiveOffsets(sub, globalOffset, result);
+      if (!isHash) offset += coreInstance[sub].descriptorStorage().flatElementCount();
+    }
+  }
+}
+
 std::string compiler::localizeFieldOffsets() {
   std::map<std::string, std::map<std::string, int>> offsetMap;
 
@@ -601,6 +617,10 @@ std::string compiler::localizeFieldOffsets() {
           i.second = 0;
       }
     }
+    // Extend with transitive sources from system-generated substrats.
+    std::vector<std::pair<std::string, int>> directSources(offsetItem.begin(), offsetItem.end());
+    for (const auto &[srcName, srcBase] : directSources)
+      collectTransitiveOffsets(srcName, srcBase, offsetItem);
     offsetMap[q.id] = offsetItem;
   }
 

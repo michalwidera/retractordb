@@ -125,13 +125,13 @@ term                : term STAR term               # ExpMult
                     | NOT_C term                   # ExpNot
                     ;
 
-stream_expression   : stream_term '>' DECIMAL       # SExpTimeMove
-                    | stream_term MINUS rational_se # SExpMinus
-                    | stream_term PLUS stream_term  # SExpPlus
-                    | stream_term                   # SExpTerm
+stream_expression   : stream_expression PLUS stream_term # SExpPlus
+                    | stream_term '>' DECIMAL             # SExpTimeMove
+                    | stream_term MINUS rational_se       # SExpMinus
+                    | stream_term                         # SExpTerm
                     ;
 
-stream_term         : stream_factor SHARP stream_factor # SExpHash
+stream_term         : stream_term SHARP stream_factor   # SExpHash
                     | stream_factor AND rational_se     # SExpAnd
                     | stream_factor MOD rational_se     # SExpMod
                     | stream_factor AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
