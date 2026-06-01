@@ -52,7 +52,7 @@ bool qry::adhoc(const std::string &sAdhoc) {
 bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
                  std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
   elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
-  ptree pt        = netClient("get", "");
+  ptree pt     = netClient("get", "");
 
   const auto stream = pt.get_child("db.stream");
   const bool found  = std::ranges::any_of(stream, [input, this](const auto &node) {

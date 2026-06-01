@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
           ("noanykey,k", "do not wait for any key to terminate")                  //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
           ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
-           "loop iteration limit, 0 - no limit")                                                             //
+           "loop iteration limit, 0 - no limit")                                                    //
           ;
     }
     po::positional_options_description p;  // Assume that infile is the first option

@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     if (vm.contains("raw")) obj.outputFormatMode = formatMode::RAW;
     if (vm.contains("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
     if (vm.contains("gnuplot")) {
-      obj.outputFormatMode = formatMode::GNUPLOT;
+      obj.outputFormatMode   = formatMode::GNUPLOT;
       obj.gnuplotRightToLeft = vm.contains("gnuplot-rtl");
       std::stringstream ss(sGnuplotDim);
 
