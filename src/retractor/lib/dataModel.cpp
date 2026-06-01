@@ -128,10 +128,6 @@ void dataModel::constructInputPayload(const std::string &instance) {
     FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4",
                qry.lProgram.size(), instance);
   }
-  if (qry.lProgram.empty()) {
-    FatalError("dataModel::constructInputPayload: empty program for query '{}' — declarations should not be processed here",
-               instance);
-  }
 
   std::vector<token> arg;
   std::ranges::copy(qry.lProgram, std::back_inserter(arg));

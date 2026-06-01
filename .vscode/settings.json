@@ -6,5 +6,6 @@
   "sonarlint.connectedMode.project": {
     "connectionId": "retractordb",
     "projectKey": "retractordb_mw"
-  }
+  },
+  "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/Debug/compile_commands.json"
 }
