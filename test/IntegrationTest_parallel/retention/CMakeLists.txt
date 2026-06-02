@@ -1,3 +1,7 @@
+# Weryfikuje operacje xtrdb na pliku z parametrem RETENTION: open z retencją
+# (3 rekordy, 2 pliki historyczne), purge, append, list, write modyfikujący
+# konkretny rekord bez zmiany pozostałych. Wynik porównywany z pattern-run.txt.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 

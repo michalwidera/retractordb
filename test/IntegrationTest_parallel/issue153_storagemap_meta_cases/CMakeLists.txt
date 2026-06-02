@@ -1,3 +1,8 @@
+# Weryfikuje wyświetlanie mapy składowania (xtrdb -s) dla pliku zwykłego i pliku
+# w formacie retractordb (issue #153): znaczniki slotów ([====][----][~~~~][XXXX]),
+# lista segmentów (s0, s1), pliki rotowane (.old0/.old1/.old2), referencje do
+# .meta i .shadow oraz sekcja DATA TOTAL. Sprawdza oba warianty wyjścia.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 

@@ -1,3 +1,7 @@
+# Weryfikuje kompilację operatora okna czasowego @(n,m) w wariantach do przodu
+# @(1,10) i wstecz @(1,-10) na strumieniu BYTE. Dodatkowo uruchamia valgrind
+# z wykrywaniem wycieków pamięci podczas kompilacji.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 add_test(

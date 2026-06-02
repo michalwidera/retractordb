@@ -1,3 +1,7 @@
+# Równoległa wersja simple_max: weryfikuje kompilację zapytania z operatorem
+# .max (wartość maksymalna strumienia) oraz poprawność DOT grafu (-d -f -t -s).
+# Korzysta z danych w IntegrationTest_serial/simple_max. Uruchamia też valgrind.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 set(DATA_DIR ${CMAKE_BINARY_DIR}/test/IntegrationTest_serial/simple_max)

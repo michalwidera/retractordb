@@ -1,5 +1,9 @@
 # cd build/Debug make install ; ctest -R issue113_meta -V
 
+# Weryfikuje zachowanie xtrdb przy append bez modyfikacji pól (issue #113):
+# dwa rekordy wpisane do jednokolumnowej bazy, następnie lista i hexdump pliku
+# binarnego porównywane z oczekiwanym wzorcem pattern.txt.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 

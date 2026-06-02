@@ -1,3 +1,7 @@
+# Weryfikuje operacje xtrdb descc (wyświetlenie deskryptora), rread (odczyt
+# wsteczny) i printt (wydruk sformatowany) na strumieniu TEXTSOURCE: plik
+# tekstowy jako źródło danych. Wynik porównywany z pattern-run.txt.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 

@@ -1,3 +1,8 @@
+# Weryfikuje że wygenerowany substrat współdzielony między strumieniami
+# użytkownika jest poprawnie referencjonowany przez kompilator (issue #96):
+# STREAM_TIMEMOVE_core0 musi być reużyty, a nie powielony. Uruchamia też
+# valgrind z wykrywaniem wycieków pamięci.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 add_test(

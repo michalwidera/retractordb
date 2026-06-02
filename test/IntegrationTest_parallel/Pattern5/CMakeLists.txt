@@ -1,3 +1,7 @@
+# Weryfikuje operacje xtrdb na rekordzie wielotypowym (STRING, INTEGER, BYTE,
+# FLOAT): tworzenie bazy, append, read, printt, list/rlist (przód/tył), input,
+# write. Wynik porównywany z pattern.txt.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 add_test(

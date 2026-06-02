@@ -1,5 +1,10 @@
 # cd build/Debug && make install && ctest -R issue113_meta_xtrdb -V
 
+# Weryfikuje że xretractor generuje poprawny plik sidecar .meta dla str_null
+# (issue #113, ścieżka weryfikacji przez xtrdb): po uruchomieniu xretractor+xqry
+# potwierdza istnienie i rozmiar .meta (>16B), a xtrdb raportuje poprawną ścieżkę
+# "meta: temp/str_null.meta" bez błędu "meta file not found".
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 

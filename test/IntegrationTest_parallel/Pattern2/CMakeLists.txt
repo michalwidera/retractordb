@@ -1,3 +1,7 @@
+# Weryfikuje kompilację zapytań na strumieniach BYTE z /dev/urandom: bezpośredni
+# SELECT, wyrażenie arytmetyczne (+1), łączenie dwóch strumieni z arytmetyką.
+# Wynik kompilatora porównywany z pattern.txt.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 add_test(

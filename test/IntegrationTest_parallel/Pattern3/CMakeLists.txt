@@ -1,3 +1,7 @@
+# Weryfikuje rozwinięcie operatora SELECT * (unfold) na strumieniu z deklaracją
+# pliku wyjściowego i retencją. Sprawdza czy kompilator poprawnie rozwija *
+# na wszystkie zadeklarowane pola. Wynik porównywany z pattern.txt.
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")
 add_test(
