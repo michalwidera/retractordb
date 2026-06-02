@@ -105,6 +105,69 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` — blank
 4. **Clean your orphans** — remove imports/vars/functions YOUR changes made unused; leave pre-existing dead code alone.
 5. **Verify** — for multi-step tasks state a brief plan with success criteria per step; loop until verified.
 
+## Collaboration Rules
+
+### Session start
+
+Every session has a single declared goal in the form:
+> "Cel: X. Gotowe gdy: Y. Pliki dotknięte: Z."
+
+For tasks spanning >2 files: show a plan and wait for approval before writing any code.
+
+### Before coding
+
+```bash
+git status        # must be clean
+ninja cformat     # format first, not after
+ctest -R ...      # relevant tests must pass
+```
+
+Never start a new topic on a dirty working tree.
+
+### During the session
+
+- **Plan before implement** — for multi-file tasks, list the steps and success criteria first.
+- **No scope creep** — do not improve adjacent code even if it looks wrong.
+- **Run ctest before reporting done** — never claim success without executing the relevant tests.
+
+### Session end
+
+Every session ends with a commit or an explicit note why not. No uncommitted progress left behind.
+
+### Model selection
+
+During a session, if the task shows signs of needing deeper reasoning, say so explicitly:
+> "To zadanie może wymagać silniejszego modelu — rozważ przełączenie na Opus 4.8 (`/model`)."
+
+Signals that warrant suggesting Opus 4.8:
+- Multi-file refactor with subtle cross-file interactions
+- Concurrency bugs, race conditions, or undefined behavior in C++
+- Architectural decision with long-range consequences
+- Security or adversarial analysis
+- Repeated self-corrections on the same issue within one session
+
+Sonnet is sufficient for: single-file edits, bugfixes, formatting, test additions, grammar changes with clear spec.
+
+When suggesting a model switch, use this exact phrasing:
+
+> **Sugestia modelu:** To zadanie wymaga głębszego rozumowania (podaj krótki powód).
+>
+> **Opcja A — przełącz na Opus 4.8:** wpisz `/model`, wybierz `claude-opus-4-8`, następnie powtórz ostatnie polecenie.
+>
+> **Opcja B — kontynuuj na Sonnet:** mogę podjąć próbę, ale jakość wyniku może być niższa. Wpisz „kontynuuj" aby kontynuować.
+
+### Context hygiene
+
+Warn the user when the session shows signs of context degradation:
+- more than ~10 back-and-forth exchanges on a single task, or
+- the conversation has drifted across multiple unrelated topics, or
+- you catch yourself re-asking for information already given earlier in the session.
+
+When any of these occur, say explicitly:
+> "Kontekst tej sesji jest długi — rozważ przerwę lub nową sesję od czystego stanu."
+
+Then suggest either: (a) commit current state and end the session, or (b) defer remaining work to a new session with a fresh context.
+
 ## ANTLR4 Grammar — Known Pitfalls
 
 ### COMMA ambiguity in `select_list` vs `function_call`
