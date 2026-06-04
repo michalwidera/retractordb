@@ -139,6 +139,8 @@ void storage::attachStorage() {
   recordsCount_ = accessor_->count();
 
   metaDataStream_ = std::make_unique<rdb::metaDataStream>(descriptor, metaIndexFile_);
+  // Magazyny z plikiem cienia danych (.shadow) kierują aktualizacje do cienia indeksu (.meta.shadow).
+  if (storageType_ == "DEFAULT" || storageType_ == "POSIXSHD") metaDataStream_->setShadowMode(true);
   detectStartupState();
 }
 
@@ -148,6 +150,8 @@ storage::~storage() {
     if (!storageFile_.empty()) (void)remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
     if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) remove(metaIndexFile_.c_str());
+    const std::string metaShadowFile = metaIndexFile_ + ".shadow";
+    if (!metaIndexFile_.empty() && std::filesystem::exists(metaShadowFile)) remove(metaShadowFile.c_str());
   }
 }
 

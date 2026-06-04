@@ -14,6 +14,7 @@ test_db.shadow
 test_db
 test_db.desc
 test_db.meta
+test_db.meta.shadow
 test_db.shadow
  db
 0000000 0001 0000 0002 0000                    

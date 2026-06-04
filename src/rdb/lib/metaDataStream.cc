@@ -76,8 +76,8 @@ namespace {
 constexpr size_t kHeaderSize = sizeof(int64_t);
 
 void writeHeader(std::ostream &out, std::chrono::system_clock::time_point t) {
-  int64_t ns        = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-  const auto bytes  = std::as_bytes(std::span{&ns, 1});
+  int64_t ns       = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+  const auto bytes = std::as_bytes(std::span{&ns, 1});
   out.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size_bytes()));
 }
 
@@ -257,6 +257,7 @@ metaDataStream::metaDataStream(const Descriptor &descriptor, std::string metaFil
       descriptorRef_(std::make_shared<Descriptor>(descriptor)),
       creationTime_(std::chrono::system_clock::now()),
       entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte)) {
+  shadowFilePath_ = metaFilePath_.empty() ? std::string{} : metaFilePath_ + ".shadow";
   createNullBitsetTemplate();
   loadIndex();
   if (!metaFilePath_.empty() && !std::filesystem::exists(metaFilePath_)) saveHeader();
@@ -284,6 +285,14 @@ void metaDataStream::onRecordAppended(const std::vector<bool> &nullBitsetParam) 
 }
 
 void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
+  if (shadowMode_) {
+    appendShadowOverride(recordIndex, nullBitsetParam);
+    return;
+  }
+  applyModificationToMainIndex(recordIndex, nullBitsetParam);
+}
+
+void metaDataStream::applyModificationToMainIndex(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
   auto [segIdx, offset]     = locateRecord(recordIndex);
   const bool inCurrentEntry = !segIdx.has_value();
 
@@ -324,6 +333,10 @@ void metaDataStream::onRecordModified(size_t recordIndex, const std::vector<bool
 // ── Query interface ──────────────────────────────────────────────────
 
 std::vector<bool> metaDataStream::getNullBitset(size_t recordIndex) const {
+  if (shadowMode_)
+    for (auto it = shadowOverrides_.rbegin(); it != shadowOverrides_.rend(); ++it)
+      if (it->recordCount == recordIndex) return it->nullBitset;  // ostatni wpis dla pozycji jest obowiązujący
+
   auto [segIdx, offset] = locateRecord(recordIndex);
   if (!segIdx) return currentEntry_.nullBitset;
   return readCommittedEntries()[*segIdx].nullBitset;
@@ -382,7 +395,66 @@ void metaDataStream::reset() {
   createNullBitsetTemplate();
   committedRecordCount_ = 0;
   tail_.reset();
+  discardShadow();
   saveHeader();
+}
+
+// ── Shadow-index interface (.meta.shadow) ────────────────────────────
+
+void metaDataStream::setShadowMode(bool enabled) {
+  shadowMode_ = enabled;
+  if (enabled) loadShadow();
+}
+
+void metaDataStream::appendShadowOverride(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
+  if (recordIndex >= totalRecords())
+    throw std::out_of_range("recordIndex out of range in metaDataStream::onRecordModified (shadow)");
+
+  IndexRecord ov{nullBitsetParam, recordIndex, false};  // recordCount pełni rolę absolutnego indeksu rekordu
+  shadowOverrides_.push_back(ov);
+
+  if (shadowFilePath_.empty()) return;
+  std::ofstream out(shadowFilePath_, std::ios::binary | std::ios::app);
+  if (out.is_open()) writeEntry(out, ov);
+}
+
+void metaDataStream::loadShadow() {
+  shadowOverrides_.clear();
+  if (shadowFilePath_.empty()) return;
+
+  std::ifstream in(shadowFilePath_, std::ios::binary);
+  if (!in.is_open()) return;
+
+  in.seekg(0, std::ios::end);
+  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  if (fileSize <= 0) return;
+
+  const auto payloadSize = static_cast<size_t>(fileSize);
+  if (payloadSize % entrySize_ != 0)
+    SPDLOG_WARN("metaDataStream: unexpected shadow alignment (size={}, entrySize={})", payloadSize, entrySize_);
+
+  in.seekg(0, std::ios::beg);
+  std::vector<std::byte> fileData(payloadSize);
+  in.read(reinterpret_cast<char *>(fileData.data()), static_cast<std::streamsize>(payloadSize));
+
+  std::span<const std::byte> remaining(fileData);
+  while (remaining.size() >= entrySize_) {
+    shadowOverrides_.push_back(IndexRecord::deserialize(remaining.subspan(0, entrySize_)));
+    remaining = remaining.subspan(entrySize_);
+  }
+}
+
+void metaDataStream::mergeShadow() {
+  for (const auto &ov : shadowOverrides_)
+    applyModificationToMainIndex(ov.recordCount, ov.nullBitset);
+  discardShadow();
+}
+
+void metaDataStream::discardShadow() {
+  shadowOverrides_.clear();
+  if (shadowFilePath_.empty()) return;
+  std::error_code ec;
+  std::filesystem::remove(shadowFilePath_, ec);
 }
 
 }  // namespace rdb

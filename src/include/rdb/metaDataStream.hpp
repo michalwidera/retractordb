@@ -18,6 +18,8 @@ namespace rdb {
 /// Obiekt klasy metaDataStream powinien:
 /// - przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
 /// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
+/// - w przypadku istnienia pliku cienia danych (.shadow), aktualizacja rekordu nie modyfikuje głównego pliku indeksu, lecz dopisuje nadpisanie wzorca null do pliku cienia indeksu (.meta.shadow), zachowując spójność głównego indeksu z głównym plikiem danych,
+/// - plik cienia indeksu (.meta.shadow) podąża za plikiem cienia danych (.shadow): jest aktualizowany przy każdej aktualizacji rekordu oraz scalany/usuwany razem z cieniem danych, aby uniknąć rozbieżności między nimi,
 /// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
 /// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
 /// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić szybkie aktualizacje bez konieczności odczytu całego indeksu z pliku,
@@ -145,6 +147,29 @@ class metaDataStream {
   /// the same file.
   void flushCurrentEntry();
 
+  // ── Shadow-index interface (.meta.shadow) ──────────────────────────
+
+  /// @brief Enable or disable shadow mode for record modifications.
+  ///
+  /// In shadow mode (used when the data store keeps updates in a .shadow
+  /// file), onRecordModified() does not rewrite the main index; instead it
+  /// records the new null pattern as an override in the shadow index file
+  /// (<metaFilePath>.shadow). Enabling loads any existing shadow overrides.
+  /// @param enabled true to route modifications to the shadow index
+  void setShadowMode(bool enabled);
+
+  /// @brief Merge all shadow overrides into the main index and clear the shadow.
+  ///
+  /// Applies each recorded override to the main index (in arrival order, so
+  /// the last override for a record wins) and then discards the shadow index,
+  /// mirroring the data store's merge() of .shadow into the main file.
+  void mergeShadow();
+
+  /// @brief Discard all shadow overrides and remove the shadow index file.
+  ///
+  /// Mirrors deletion of the data .shadow file (purge / reset / rotation).
+  void discardShadow();
+
  private:
   /// @brief State of the lazy-overwrite optimisation for the last on-disk RLE entry.
   ///
@@ -174,6 +199,9 @@ class metaDataStream {
   };
 
   void createNullBitsetTemplate();
+  void applyModificationToMainIndex(size_t recordIndex, const std::vector<bool> &nullBitset);  ///< split/rewrite main index
+  void appendShadowOverride(size_t recordIndex, const std::vector<bool> &nullBitset);  ///< record one .meta.shadow override
+  void loadShadow();                                  ///< load shadow overrides from <metaFilePath>.shadow
   void loadIndex();                                   ///< read header and restore currentEntry_ from file
   void saveHeader();                                  ///< write file header (creation time) without entries
   void appendEntry(const IndexRecord &entry);         ///< append a single entry to end of file
@@ -195,6 +223,10 @@ class metaDataStream {
   IndexRecord currentEntry_;                       ///< accumulator for the pending (not yet committed) RLE run
   mutable std::vector<IndexRecord> entriesCache_;  ///< in-memory copy of committed on-disk entries
   mutable bool cacheValid_{false};                 ///< true when entriesCache_ matches the file; cleared on every write
+
+  bool shadowMode_{false};                    ///< true when modifications go to the shadow index, not the main file
+  std::string shadowFilePath_;                ///< path of the shadow index file (<metaFilePath>.shadow)
+  std::vector<IndexRecord> shadowOverrides_;  ///< in-memory mirror of overrides (recordCount field = absolute record index)
 };  // class metaDataStream
 
 }  // namespace rdb
