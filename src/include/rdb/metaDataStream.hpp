@@ -18,7 +18,7 @@ namespace rdb {
 /// Obiekt klasy metaDataStream powinien:
 /// - przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
 /// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
-/// - w przypadku istnienia pliku cienia danych (.shadow), aktualizacja rekordu nie modyfikuje głównego pliku indeksu, lecz dopisuje nadpisanie wzorca null do pliku cienia indeksu (.meta.shadow), zachowując spójność głównego indeksu z głównym plikiem danych,
+/// - w przypadku magazynu typu DEFAULT lub POSIXSHD (ustawianego przez setShadowMode(true)), aktualizacja rekordu nie modyfikuje głównego pliku indeksu, lecz dopisuje nadpisanie wzorca null do pliku cienia indeksu (.meta.shadow), zachowując spójność głównego indeksu z głównym plikiem danych,
 /// - plik cienia indeksu (.meta.shadow) podąża za plikiem cienia danych (.shadow): jest aktualizowany przy każdej aktualizacji rekordu oraz scalany/usuwany razem z cieniem danych, aby uniknąć rozbieżności między nimi,
 /// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
 /// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
