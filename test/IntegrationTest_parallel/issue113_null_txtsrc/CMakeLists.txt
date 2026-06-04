@@ -1,6 +1,6 @@
 # Weryfikuje operacje xtrdb rread i getpos na strumieniu TEXTSOURCE zawierającym
-# wartość NULL (issue #113): data.txt ma wiersz "10 NULL" — sprawdza czy
-# odczyt wsteczny i pozycjonowanie działają poprawnie przy null w źródle tekstowym.
+# wartość NULL (issue #113): data.txt ma wiersz "10 NULL" — sprawdza czy odczyt
+# wsteczny i pozycjonowanie działają poprawnie przy null w źródle tekstowym.
 # Wynik porównywany z pattern.txt.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)

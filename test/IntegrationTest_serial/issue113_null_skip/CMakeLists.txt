@@ -2,7 +2,8 @@
 
 # Weryfikuje flagę -n (skip-null) w xqry (issue #113): z -n wiersze w całości
 # null są pomijane (brak "null null" w wyjściu), mieszane i niepuste wiersze
-# muszą się pojawić. Bez -n wszystkie wiersze łącznie z all-null muszą być widoczne.
+# muszą się pojawić. Bez -n wszystkie wiersze łącznie z all-null muszą być
+# widoczne.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")

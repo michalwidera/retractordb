@@ -302,8 +302,8 @@ TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix)
 
 TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files) {
   dumpManager manager;
-  manager.storagePath                  = sandBoxFolder.string();
-  manager.retentionSize["streamtask"]  = 3;
+  manager.storagePath                 = sandBoxFolder.string();
+  manager.retentionSize["streamtask"] = 3;
 
   auto [f0, fd0] = manager.createDumpFile("stream", "task");
   ASSERT_GE(fd0, 0);

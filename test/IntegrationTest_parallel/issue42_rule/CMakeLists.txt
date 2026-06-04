@@ -1,6 +1,6 @@
 # Równoległa wersja kompilacyjna issue42_rule: weryfikuje że składnia RULE
-# (warunkowe akcje na wartościach strumienia) kompiluje się poprawnie.
-# Korzysta z danych w IntegrationTest_serial/issue42_rule.
+# (warunkowe akcje na wartościach strumienia) kompiluje się poprawnie. Korzysta
+# z danych w IntegrationTest_serial/issue42_rule.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")

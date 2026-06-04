@@ -10,9 +10,8 @@
 
 class PersistentCounterTest : public ::testing::Test {
  protected:
-  const std::filesystem::path sandBoxFolder =
-      std::filesystem::temp_directory_path() / "test_persistentCounter";
-  const std::string counterFile = "test_counter";
+  const std::filesystem::path sandBoxFolder = std::filesystem::temp_directory_path() / "test_persistentCounter";
+  const std::string counterFile             = "test_counter";
 
   void SetUp() override {
     if (std::filesystem::is_directory(sandBoxFolder)) {
