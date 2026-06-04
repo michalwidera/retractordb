@@ -318,7 +318,12 @@ void metaDataStream::applyModificationToMainIndex(size_t recordIndex, const std:
   }
 
   auto allEntries = readCommittedEntries();
-  auto &seg       = allEntries[*segIdx];
+  // Gdy ostatni wpis na dysku jest przestarzały (został wciągnięty do currentEntry_
+  // mechanizmem lazy overwrite), usuń go przed rewriteFile — w przeciwnym razie
+  // logicznie nadpisany wpis zostałby utrwalony i policzony podwójnie.
+  if (tail_.shouldOverwrite() && !allEntries.empty()) allEntries.pop_back();
+
+  auto &seg = allEntries[*segIdx];
   if (seg.nullBitset == nullBitsetParam) return;
 
   auto replacement = splitSegment(seg, offset, nullBitsetParam);

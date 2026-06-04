@@ -18,8 +18,10 @@ namespace rdb {
 /// Obiekt klasy metaDataStream powinien:
 /// - przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
 /// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
-/// - w przypadku magazynu typu DEFAULT lub POSIXSHD (ustawianego przez setShadowMode(true)), aktualizacja rekordu nie modyfikuje głównego pliku indeksu, lecz dopisuje nadpisanie wzorca null do pliku cienia indeksu (.meta.shadow), zachowując spójność głównego indeksu z głównym plikiem danych,
+/// - w przypadku magazynu posiadającego plik cienia indeksu (.meta.shadow), aktualizacja rekordu nie modyfikuje głównego pliku indeksu, lecz dopisuje nadpisanie wzorca null do pliku cienia indeksu (.meta.shadow), zachowując spójność głównego indeksu z głównym plikiem danych,
 /// - plik cienia indeksu (.meta.shadow) podąża za plikiem cienia danych (.shadow): jest aktualizowany przy każdej aktualizacji rekordu oraz scalany/usuwany razem z cieniem danych, aby uniknąć rozbieżności między nimi,
+/// - jeśli shadow mode jest aktywny (setShadowMode(true)) i istnieją overrides - przy odczycie dla rekordów z wpisem w shadow — shadow wygrywa, pozostałe dane prezentowane są z głównego indeksu
+/// - jeśli istnieje plik cienia indeksu, jego zawartość jest scalana z głównym indeksem przy wywołaniu mergeShadow(), a następnie plik cienia jest usuwany, co odzwierciedla scalanie danych cienia z głównym plikiem danych,
 /// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
 /// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
 /// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić szybkie aktualizacje bez konieczności odczytu całego indeksu z pliku,
@@ -29,10 +31,12 @@ namespace rdb {
 /// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 /// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
-/// - przyjąć od obiektu storage informację o rotacji pliku danych i zresetować indeks do stanu początkowego (bez wpisu gap),
+/// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: skopiować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap),
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
-/// - umożliwić rotację indeksu podobnie jak obiekty klasy storage, tworząc kopię obecnego pliku indeksu z rozszerzeniem .old/percounter i tworząc nowy, czysty plik indeksu.
 /// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
+/// - umożliwiać odrzucenie pliku cienia bez scalania (discardShadow()), odzwierciedlając usunięcie pliku .shadow danych bez merge.
+/// - udostępniać metodę wymuszającą natychmiastowy zapis pending entry na dysk (flushCurrentEntry()), aby null metadata przeżyła awarię lub otwarcie pliku przez drugi obiekt storage.
+/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage — usunięcie wszystkich wpisów przy zachowaniu czasu utworzenia zapisanego w nagłówku pliku.
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
 /// @note Wpisy gap są markerami przerw transmisji danych między rekordami i nie są wliczane do numeracji logicznych rekordów zwracanej przez totalRecords().
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
@@ -89,6 +93,7 @@ class metaDataStream {
   /// @param recordIndex global position of the record in the stream
   /// @return null bit-set (one bit per descriptor field, true = null)
   /// @throws std::out_of_range if recordIndex >= totalRecords()
+  /// @note If shadow mode is active and an override exists for this record, the shadow override is returned instead.
   std::vector<bool> getNullBitset(size_t recordIndex) const;
 
   /// @brief Total number of records tracked by the meta index

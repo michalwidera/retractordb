@@ -431,3 +431,49 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
   EXPECT_EQ(segs[2].recordCount, 2U);
   EXPECT_EQ(segs[2].nullBitset, A);
 }
+
+// ── tailDirty_ + onRecordModified on a committed (on-disk) entry ──────
+//
+// Bug: when tailDirty_=true (last on-disk entry was re-absorbed into
+// currentEntry_ via lazy overwrite) and onRecordModified() targets an
+// EARLIER committed entry, applyModificationToMainIndex() used to rewrite
+// the file from readCommittedEntries(), which still contained the stale
+// tail. The stale entry was then persisted AND counted, while currentEntry_
+// still represented the same records — double counting (totalRecords off
+// by the stale count) and wrong patterns at the logical tail.
+
+TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"f1", 4, 0, rdb::INTEGER}, {"f2", 4, 0, rdb::INTEGER}});
+
+  rdb::metaDataStream meta(descriptor, metaFile);
+  const std::vector<bool> A = {true, false};
+  const std::vector<bool> B = {false, true};
+  const std::vector<bool> C = {true, true};
+
+  meta.onRecordAppended(A);  // rec 0
+  meta.onRecordAppended(A);  // rec 1
+  meta.onRecordAppended(A);  // rec 2
+  meta.flushCurrentEntry();  // disk: [{A,3}]
+  meta.onRecordAppended(B);  // rec 3
+  meta.flushCurrentEntry();  // disk: [{A,3},{B,1}]
+  meta.onRecordAppended(B);  // rec 4 — re-absorb {B,1}: tailDirty_=true, currentEntry_={B,2}
+
+  ASSERT_EQ(meta.totalRecords(), 5U);
+
+  // Modify an earlier committed record (rec 1) while the on-disk tail is stale.
+  meta.onRecordModified(1, C);
+
+  ASSERT_EQ(meta.totalRecords(), 5U);
+  EXPECT_EQ(meta.getNullBitset(0), A);
+  EXPECT_EQ(meta.getNullBitset(1), C);  // modified
+  EXPECT_EQ(meta.getNullBitset(2), A);
+  EXPECT_EQ(meta.getNullBitset(3), B);
+  EXPECT_EQ(meta.getNullBitset(4), B);
+
+  // [{A,1},{C,1},{A,1}] on disk + pending {B,2} = 4 segments, no stale {B,1}.
+  auto segs = meta.segments();
+  ASSERT_EQ(segs.size(), 4U);
+  EXPECT_EQ(segs[3].recordCount, 2U);
+  EXPECT_EQ(segs[3].nullBitset, B);
+}
