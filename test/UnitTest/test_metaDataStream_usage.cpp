@@ -36,7 +36,10 @@ struct UsageFixture : public ::testing::Test {
   void SetUp() override {
     descriptor.append({{"val", 8, 0, rdb::DOUBLE}, {"flag", 4, 0, rdb::INTEGER}, {"temp", 8, 0, rdb::DOUBLE}});
   }
-  void TearDown() override { std::remove(file.c_str()); }
+  void TearDown() override {
+    std::remove(file.c_str());
+    std::remove((file + ".shadow").c_str());
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -273,4 +276,58 @@ TEST_F(UsageFixture, scenariusz_reset_strumienia) {
   meta.onRecordAppended(valNull);
   EXPECT_EQ(meta.totalRecords(), 1U);
   EXPECT_EQ(meta.getNullBitset(0), valNull);
+}
+
+// ---------------------------------------------------------------------------
+// Scenariusz 8: Cień indeksu (.meta.shadow) dla magazynów z plikiem cienia danych
+//
+// Gdy magazyn trzyma aktualizacje rekordów w pliku cienia danych (.shadow),
+// onRecordModified() nie modyfikuje głównego indeksu, lecz dopisuje nadpisanie
+// wzorca null do cienia indeksu (.meta.shadow). Główny indeks pozostaje spójny
+// z głównym plikiem danych; cień indeksu jest spójny z cieniem danych.
+// mergeShadow() scala nadpisania do głównego indeksu (jak merge() pliku cienia).
+// ---------------------------------------------------------------------------
+TEST_F(UsageFixture, scenariusz_cien_indeksu) {
+  const std::string shadow = file + ".shadow";
+
+  {
+    rdb::metaDataStream meta(descriptor, file);
+    meta.setShadowMode(true);
+
+    // 5 rekordów allNull trafia do głównego indeksu (append nie używa cienia).
+    for (int i = 0; i < 5; ++i)
+      meta.onRecordAppended(allNull);
+
+    // Korekta rekordu 2 w trybie cienia → nadpisanie w .meta.shadow.
+    meta.onRecordModified(2, allPresent);
+
+    // Widok logiczny uwzględnia nadpisanie...
+    EXPECT_EQ(meta.getNullBitset(2), allPresent);
+    EXPECT_EQ(meta.getNullBitset(1), allNull);
+
+    // ...ale główny indeks pozostaje nietknięty (1 segment RLE [allNull,5]).
+    auto segs = meta.segments();
+    EXPECT_EQ(segs.size(), 1U);
+    EXPECT_EQ(segs[0].recordCount, 5U);
+
+    // Plik cienia indeksu powstał obok głównego.
+    EXPECT_TRUE(std::filesystem::exists(shadow));
+  }
+
+  // Persystencja cienia po restarcie: nadpisanie nadal widoczne.
+  {
+    rdb::metaDataStream meta(descriptor, file);
+    meta.setShadowMode(true);
+    EXPECT_EQ(meta.getNullBitset(2), allPresent);
+
+    // Scalenie cienia do głównego indeksu — jak merge() pliku cienia danych.
+    meta.mergeShadow();
+
+    // Teraz główny indeks jest rozbity na 3 segmenty, a cień usunięty.
+    auto segs = meta.segments();
+    EXPECT_EQ(segs.size(), 3U);
+    EXPECT_EQ(segs[1].nullBitset, allPresent);
+    EXPECT_FALSE(std::filesystem::exists(shadow));
+    EXPECT_EQ(meta.getNullBitset(2), allPresent);
+  }
 }

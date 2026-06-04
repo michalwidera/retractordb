@@ -64,21 +64,21 @@ add_custom_target(
 add_custom_target(
   ecg
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out rec205-replay.rql
-    720,560,1360 --gnuplot-rtl
+          720,560,1360 --gnuplot-rtl
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
   ecg-qrs
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql
-    1440,-250,350 --gnuplot-rtl
+          1440,-250,350 --gnuplot-rtl
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
   ecg-detect-qrs
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
-    720,-400,400 --gnuplot-rtl
+          720,-400,400 --gnuplot-rtl
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 

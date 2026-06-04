@@ -2,8 +2,8 @@
 
 # Weryfikuje kompilację operatora # (HASH-merge strumieni), selekcji pól z
 # przesunięciem czasowym oraz łączenia strumieni (+). Trzy zapytania:
-# core0#core1 (merge), core1-1/2 (rate-conversion), core1+core0 (concat).
-# Wynik kompilatora porównywany z pattern.txt.
+# core0#core1 (merge), core1-1/2 (rate-conversion), core1+core0 (concat). Wynik
+# kompilatora porównywany z pattern.txt.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")

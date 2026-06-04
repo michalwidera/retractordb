@@ -2,8 +2,8 @@
 # issue31_doc -V
 
 # Weryfikuje że wszystkie przykłady dokumentacyjne (q-31.*.rql) kompilują się
-# bez błędów i generują poprawny DOT na trzech poziomach szczegółowości:
-# -d -p, -d -f -t -s -p, -d -f -t -s -u -p. Generuje pliki SVG przez graphviz.
+# bez błędów i generują poprawny DOT na trzech poziomach szczegółowości: -d -p,
+# -d -f -t -s -p, -d -f -t -s -u -p. Generuje pliki SVG przez graphviz.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "pt_${TestID}")

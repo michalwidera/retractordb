@@ -12,9 +12,7 @@
 
 using rational = boost::rational<int>;
 
-static query makeQuery(const std::string &id, int num = 1, int den = 1) {
-  return query(rational(num, den), id);
-}
+static query makeQuery(const std::string &id, int num = 1, int den = 1) { return query(rational(num, den), id); }
 
 // ============================================================
 // exists()
@@ -88,7 +86,7 @@ TEST(qTree, sort_orders_by_rInterval_ascending) {
   qTree qt;
   qt.push_back(makeQuery("slow", 3, 1));
   qt.push_back(makeQuery("fast", 1, 2));
-  qt.push_back(makeQuery("mid",  1, 1));
+  qt.push_back(makeQuery("mid", 1, 1));
 
   qt.sort();
 
