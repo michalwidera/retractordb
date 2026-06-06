@@ -10,6 +10,8 @@ sleep 0.5
 rm -f core*
 rm -f str*
 
+QUEUES_BEFORE=$(ls /dev/shm/brcdbr* 2>/dev/null | wc -l)
+
 if ! xretractor "$1" -c; then exit 1; fi
 
 xretractor "$1" -m 100 -k -x &
@@ -53,3 +55,10 @@ xqry -k || true
 kill $XRETRACTOR_PID 2>/dev/null
 wait $XRETRACTOR_PID 2>/dev/null
 pkill xretractor 2>/dev/null; true
+
+QUEUES_AFTER=$(ls /dev/shm/brcdbr* 2>/dev/null | wc -l)
+if [ "$QUEUES_AFTER" -gt "$QUEUES_BEFORE" ]; then
+  echo "LEAK: brcdbr queue count increased from $QUEUES_BEFORE to $QUEUES_AFTER"
+  ls /dev/shm/brcdbr* 2>/dev/null
+  exit 1
+fi

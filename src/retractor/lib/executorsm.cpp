@@ -294,6 +294,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     //
     if (command == "kill") {
       iLoopLimitCnt = executorsm::stop_now;
+      cv.notify_all();
     }
     //
     // Diagnostic method
@@ -446,9 +447,8 @@ void executorsm::boradcastOutOfBussiness() {
       write_info(strstream, pt);
       std::string row = strstream.str();
 
-      if (!mq.try_send(row.c_str(), row.length(), 0)) {
-        message_queue::remove(queueName.c_str());
-      }
+      mq.try_send(row.c_str(), row.length(), 0);
+      message_queue::remove(queueName.c_str());
       SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
     } catch (IPC::interprocess_exception &e) {
       SPDLOG_WARN("boradcastOutOfBussiness: queue {} already removed, procId={}: {}", queueName, element.first, e.what());
