@@ -30,6 +30,7 @@ using namespace boost;
 using boost::lexical_cast;
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
+extern std::vector<std::string> readLogicalLines(std::ifstream &file);
 
 extern std::atomic<int> iLoopLimitCnt;
 
@@ -163,13 +164,11 @@ int main(int argc, char *argv[]) {
     }
 
     std::string parseOut = "Empty file.";
-    std::string line;
-    while (std::getline(file, line)) {
-      if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
-      auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, line);
+    for (const auto &stmt : readLogicalLines(file)) {
+      auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
       parseOut                                  = status;
-      if (status != "OK") break;  // Return error if parsing fails
-      processedLines.emplace_back(stream_name, line);
+      if (status != "OK") break;
+      processedLines.emplace_back(stream_name, stmt);
     }
 
     file.close();
