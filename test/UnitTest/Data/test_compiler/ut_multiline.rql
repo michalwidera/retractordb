@@ -1,0 +1,8 @@
+# Test kontynuacji backslashem — wieloliniowe zapytania
+DECLARE a INTEGER, b BYTE \
+        STREAM core0, 1 \
+        FILE '/dev/urandom'
+SELECT core0[0], \
+       core0[1] \
+       STREAM str1 \
+       FROM core0

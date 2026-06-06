@@ -63,3 +63,11 @@ TEST(xparser, check_parserRQLString) {
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }
+
+TEST(xparser, check_multiline_backslash) {
+  qTree instance;
+  auto result = parserRQLFile_4Test(instance, "ut_multiline.rql");
+  EXPECT_EQ(result, "OK");
+  EXPECT_TRUE(instance.exists("core0"));
+  EXPECT_TRUE(instance.exists("str1"));
+}

@@ -480,27 +480,38 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   return {status, firsttoken, streamName};
 }
 
+std::vector<std::string> readLogicalLines(std::ifstream &file) {
+  std::vector<std::string> result;
+  std::string line, accumulated;
+  while (std::getline(file, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    if (line.back() == '\\') {
+      accumulated += line.substr(0, line.size() - 1) + ' ';
+      continue;
+    }
+    accumulated += line;
+    result.push_back(std::move(accumulated));
+    accumulated = {};
+  }
+  return result;
+}
+
 std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile) {
   std::ifstream file(sInputFile);
   if (!file.is_open()) {
     SPDLOG_ERROR("Error: Unable to open file!");
-    return "Unable to open file.";  // Indicate an error
+    return "Unable to open file.";
   }
 
   std::string status = "Empty file.";
-  std::string line;
-  while (std::getline(file, line)) {
-    if (line.empty() || line[0] == '#') continue;  // Skip empty lines and comments
-    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, line);
+  for (const auto &stmt : readLogicalLines(file)) {
+    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
     status                                    = result;
     if (status != "OK") {
-      SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, line);
-      file.close();
-      return status;  // Return error if parsing fails
+      SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, stmt);
+      return status;
     }
   }
 
-  file.close();
-
-  return status;  // Indicate success
+  return status;
 }

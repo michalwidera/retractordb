@@ -44,7 +44,7 @@ docs/
 bin/*
 .venv/
 .codex
-gitbook-rdb/
+dokumentacja-rdb/
 docker/ci/DockerConan.txt
 205.bin
 205.bin.meta
