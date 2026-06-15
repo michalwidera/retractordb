@@ -34,9 +34,8 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// - przed oznaczeniem gap zapisywać początkowe rekordy null jako nullfill, a dopiero dalsze braki danych agregować do znacznika gap w metaDataStream,
 /// - przechowywać długość gap jako liczbę interwałów próbkowania i udostępniać informację, czy gap występuje przed danym rekordem,
 /// - umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap.
-/// - wyznaczyć czas przerwy w transmisji danych wynikającej z nie funkcjonowania systemu na podstawie czasu utworzenia pliku danych i ilości zarejestrowanych rekordów z interwału ich próbkowania, a następnie przekazać informację o przerwie do obiektu indeksu metadanych,
-/// - przy starcie przekazać zidentyfikowaną informację o przerwie w rejestracji danych do obiektu indeksu metadanych w celu zarejestrowania tej przerwy jako wpisu gap w indeksie,
-/// - przy starcie wykrywać wymaganą (jeśli jest wymagana) rotację pliku danych i informować obiekt indeksu o przeprowadzonej rotacji, aby ten zrotował indeks podobnie jak storage (.old + percounter) i przygotował nowy ze stanem początkowym.
+/// - przy starcie wyznaczać przerwę w transmisji danych (wynikającą z niedziałania systemu) jako liczbę interwałów próbkowania, które upłynęły od ostatniego zapisu pliku danych do momentu startu, i przekazywać ją do obiektu indeksu metadanych w celu zarejestrowania jako wpis gap,
+/// - przy starcie wykrywać zaszłą rotację pliku danych (świeży/pusty magazyn przy niepustym indeksie metadanych) i informować obiekt indeksu, aby ten zrotował indeks tak jak storage (.old<percounter> dla percounter >= 0) i przygotował nowy ze stanem początkowym.
 ///
 /// @note Klasa sama nie implementuje fizycznego formatu magazynu; deleguje operacje I/O do accessor_.
 /// @note Semantyka nullfill i gap dotyczy tylko ścieżki zapisu z włączonym mechanizmem gap detection oraz obecnym metaDataStream.
