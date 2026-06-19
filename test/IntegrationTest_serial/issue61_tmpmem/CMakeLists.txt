@@ -21,10 +21,6 @@ ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out-run.txt
 ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out-run.txt
 ")
 
-# TODO(pattern-drift): test do tej pory był no-opem (bug ze średnikiem w
-# add_test), więc rozjazd patternu pozostał niezauważony. Po realnym
-# uruchomieniu wyjście substratu pamięciowego (memory) nie zgadza się z
-# pattern-run.txt (zawijanie bufora kołowego, prawdopodobnie skutek zmiany z
-# issue #167). Wymaga rewizji patternu lub weryfikacji czy to regresja produktu.
-# Do czasu analizy: DISABLED.
-set_tests_properties(${TestID}-run PROPERTIES DISABLED TRUE)
+# pattern-run.txt zregenerowany 2026-06-20 po włączeniu testu (był no-opem przez
+# bug ze średnikiem w add_test). Wyjście substratu memory zmieniło się po #167
+# (bufor kołowy) — pattern odzwierciedla aktualne, deterministyczne zachowanie.

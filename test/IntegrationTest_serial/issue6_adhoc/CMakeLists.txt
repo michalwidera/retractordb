@@ -18,11 +18,5 @@ add_test(
   ls temp | grep --invert-match '\\.shadow$' > out-ls.txt && \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-ls.txt out-ls.txt")
 
-# TODO(lock-path): test zawiesza się lokalnie. Bariera "czekaj na lock"
-# hardkoduje /tmp/xretractor_service.lock, ale serwer tworzy lock w
-# temp_directory_path() (= $TMPDIR jeśli ustawione, zob. lockManager.cpp:18).
-# Gdy TMPDIR != /tmp, pętla "while [ ! -f /tmp/...lock ]" czeka w
-# nieskończoność. Naprawa: przenieść logikę do skryptu .sh i użyć
-# ${TMPDIR:-/tmp}/xretractor_service.lock (składnia $ nie przechodzi przez makro
-# add_test w CMakeLists). Do czasu naprawy: DISABLED.
-set_tests_properties(${TestID}-run PROPERTIES DISABLED TRUE)
+# Startuje serwer przez xlaunch.sh (blokada usługi) -> RUN_SERIAL.
+set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
