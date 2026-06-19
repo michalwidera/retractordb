@@ -31,6 +31,32 @@ This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
 
+## Running as a systemd service
+
+xretractor can run as a Linux systemd service without any wrapper/supervisor process.
+It runs in the foreground (`Type=simple`) and shuts down cleanly on `SIGTERM`.
+
+Relevant options:
+- `-j` / `--service` — service mode: log to **stderr** (captured by journald), no log file in `/tmp`.
+- `-k` / `--noanykey` — do not wait for a key/TTY (required without a terminal).
+- starting **without** a query file boots an **idle** instance that stays alive until `SIGTERM`
+  (no crash-loop before any query is defined); pass a `.rql` file to load queries.
+
+Service logging mode can also be enabled with the `XRETRACTOR_SERVICE` environment variable
+(any value other than empty or `0`), which is convenient in a systemd unit via `Environment=`:
+
+```ini
+[Service]
+Type=simple
+Environment=XRETRACTOR_SERVICE=1
+ExecStart=/usr/local/bin/xretractor --noanykey
+KillSignal=SIGTERM
+TimeoutStopSec=30
+```
+
+A ready-to-use unit file is provided in [`packaging/systemd/xretractor.service`](../../packaging/systemd/xretractor.service).
+Logs are then available via `journalctl -u xretractor`; status via `systemctl status xretractor` or `xretractor --status`.
+
 Please notice that this tool has second face when you call it with "only compile" option. This face is required for _Show Diagram_ or _Show query Plan_ actions.
 
 ```

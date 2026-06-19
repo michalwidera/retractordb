@@ -4,7 +4,12 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}-waterfall
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash -c "xretractor query-lnx.rql -m 10; rm -f core* ; rm -f str*")
+  COMMAND
+    bash -c "
+xretractor query-lnx.rql -m 10
+rm -f core*
+rm -f str*
+")
 
 add_test(
   NAME ${TestID}-workflow

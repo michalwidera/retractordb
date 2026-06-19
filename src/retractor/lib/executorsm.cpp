@@ -519,90 +519,115 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     return system::errc::no_lock_available;
   }
   try {
-    dataModel proc(*coreInstancePtr);
-    pProc = &proc;
-
-    if (vm.contains("xqrywait")) {
-      if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
-      std::unique_lock<std::mutex> scoped_lock(core_mutex);
-      iLoopLimitCnt = executorsm::waitForXqry;
-      cv.wait(scoped_lock, [this] { return iLoopLimitCnt != executorsm::waitForXqry; });
-      if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
-    }
-
-    if (vm.contains("verbose")) coreInstancePtr->dumpCore();
-
-    TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
-    //
-    // Main loop of data processing
-    //
-    // When this value is 0 - means we are waiting for key - other way watchdog
-    //
-    if (iLoopLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
-
-    // ZERO-step
-    std::set<std::string> inSet;
-    for (const auto &it : *coreInstancePtr)
-      if (it.isDeclaration()) inSet.insert(it.id);
-    proc.processZeroStep();
-    boradcast(inSet);
-    // End of ZERO-step
-
-    // Loop of data processing
     bool ignoreanykey = vm.contains("noanykey");
-    boost::rational<int> prev_interval(0);
 
-#ifdef __linux__
-    struct timespec loop_anchor{};
-    clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
-    const bool rt_mode = vm.contains("realtime");
-    if (rt_mode) {
-      if (rtCheckAndPrint()) rtActivate();
-    }
-#endif
-
-    while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
-      if (iLoopLimitCnt != executorsm::inifitie_loop) {
-        if (iLoopLimitCnt != executorsm::stop_now)
-          iLoopLimitCnt--;
-        else
+    if (coreInstancePtr->empty()) {
+      //
+      // Tryb bezczynny (idle): brak zapytań — nie budujemy dataModel ani TimeLine
+      // (uniknięcie FatalError). Czekamy na zatrzymanie (SIGTERM / klawisz / limit iteracji),
+      // utrzymując wątek komunikacyjny i blokadę usługi. pProc pozostaje null —
+      // wątek komunikacyjny obsługuje to (komendy działają tylko gdy pProc != nullptr).
+      //
+      SPDLOG_INFO("Idle mode: no queries to process, waiting for shutdown signal.");
+      while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
+        if (iLoopLimitCnt != executorsm::inifitie_loop) {
+          if (iLoopLimitCnt != executorsm::stop_now)
+            iLoopLimitCnt--;
+          else
+            break;
+        }
+        if (!guard.isLockActive()) {
+          SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
           break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      }
+      if (iLoopLimitCnt != executorsm::stop_now) _getch();
+    } else {
+      dataModel proc(*coreInstancePtr);
+      pProc = &proc;
+
+      if (vm.contains("xqrywait")) {
+        if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
+        std::unique_lock<std::mutex> scoped_lock(core_mutex);
+        iLoopLimitCnt = executorsm::waitForXqry;
+        cv.wait(scoped_lock, [this] { return iLoopLimitCnt != executorsm::waitForXqry; });
+        if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
       }
 
-      // Check if system service lock is still active
-      if (!guard.isLockActive()) {
-        SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
-        break;
-      }
+      if (vm.contains("verbose")) coreInstancePtr->dumpCore();
 
+      TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
       //
-      // Inner time is counted in miliseconds
-      // probably can be increased in faster machines
+      // Main loop of data processing
       //
-      const int msInSec = 1000;
-      boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
-      int period(rational_cast<int>(interval - prev_interval));  // miliseconds
-      prev_interval = interval;
+      // When this value is 0 - means we are waiting for key - other way watchdog
+      //
+      if (iLoopLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
 
-      //
-      // Waiting given miliseconds time that is computed
-      //
-#ifdef __linux__
-      if (rt_mode)
-        rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
-      else
-#endif
-        std::this_thread::sleep_for(std::chrono::milliseconds(period));
-
-      inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-      proc.processRows(inSet);
+      // ZERO-step
+      std::set<std::string> inSet;
+      for (const auto &it : *coreInstancePtr)
+        if (it.isDeclaration()) inSet.insert(it.id);
+      proc.processZeroStep();
       boradcast(inSet);
-      // End of loop while( ! _kbhit(ignoreanykey) )
+      // End of ZERO-step
+
+      // Loop of data processing
+      boost::rational<int> prev_interval(0);
+
+#ifdef __linux__
+      struct timespec loop_anchor{};
+      clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
+      const bool rt_mode = vm.contains("realtime");
+      if (rt_mode) {
+        if (rtCheckAndPrint()) rtActivate();
+      }
+#endif
+
+      while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
+        if (iLoopLimitCnt != executorsm::inifitie_loop) {
+          if (iLoopLimitCnt != executorsm::stop_now)
+            iLoopLimitCnt--;
+          else
+            break;
+        }
+
+        // Check if system service lock is still active
+        if (!guard.isLockActive()) {
+          SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
+          break;
+        }
+
+        //
+        // Inner time is counted in miliseconds
+        // probably can be increased in faster machines
+        //
+        const int msInSec = 1000;
+        boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
+        int period(rational_cast<int>(interval - prev_interval));  // miliseconds
+        prev_interval = interval;
+
+        //
+        // Waiting given miliseconds time that is computed
+        //
+#ifdef __linux__
+        if (rt_mode)
+          rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
+        else
+#endif
+          std::this_thread::sleep_for(std::chrono::milliseconds(period));
+
+        inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
+        proc.processRows(inSet);
+        boradcast(inSet);
+        // End of loop while( ! _kbhit(ignoreanykey) )
+      }
+      //
+      // End of data processing loop
+      //
+      if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
     }
-    //
-    // End of data processing loop
-    //
-    if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;

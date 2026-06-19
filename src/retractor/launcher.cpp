@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <csignal>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -68,6 +69,8 @@
 /// - Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
 /// - Opcjonalnie mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
 ///   aby journald poprawnie klasyfikował wagę komunikatów.
+/// - Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
+///   środowiskową XRETRACTOR_SERVICE — dla wygody konfiguracji jednostki systemd przez Environment=.
 ///
 /// Interfejs komunikacji i funkcjonalność:
 /// - Wymuszać pojedynczą instancję usługi poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
@@ -81,7 +84,6 @@
 /// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
 /// - Opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall, sen do bezwzględnego
 ///   punktu czasu) dla deterministycznych interwałów przetwarzania.
-
 
 using namespace boost;
 
@@ -129,7 +131,18 @@ int main(int argc, char *argv[]) {
   compiler cm(coreInstance);
 
   fixArgcv(argc, argv);
-  const auto tempLocation = setupLoggerMain(std::string(argv[0]));
+
+  // Wczesny skan argumentów: tryb logowania usługowego musi być znany przed konfiguracją logera.
+  // Tryb usługi można włączyć flagą (-j/--service) albo zmienną środowiskową XRETRACTOR_SERVICE
+  // (dowolna wartość poza pustą i "0") — wygodne dla jednostki systemd przez Environment=.
+  bool serviceLog{false};
+  for (int i = 0; i < argc; ++i) {
+    if (strcmp(argv[i], "-j") == 0 || strcmp(argv[i], "--service") == 0) serviceLog = true;
+  }
+  if (const char *env = std::getenv("XRETRACTOR_SERVICE"); env != nullptr && env[0] != '\0' && strcmp(env, "0") != 0)
+    serviceLog = true;
+
+  const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
   namespace po = boost::program_options;
   po::variables_map vm;
@@ -173,6 +186,7 @@ int main(int argc, char *argv[]) {
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
+          ("service,j", "service mode: log to stderr (journald), no log file")    //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
           ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
            "loop iteration limit, 0 - no limit")                                                    //
@@ -206,58 +220,64 @@ int main(int argc, char *argv[]) {
       return system::errc::success;
     }
 
+    // Brak pliku z zapytaniami: w trybie --onlycompile to błąd (nie ma czego kompilować),
+    // w trybie usługowym oznacza start bezczynny (idle) — pomijamy parsowanie i kompilację.
     if (!vm.contains("queryfile")) {
-      std::cout << argv[0] << ": fatal error: no input file" << '\n';
-      return EPERM;  // ERROR defined in errno-base.h
-    }
-    if (!std::filesystem::exists(sInputFile)) {
-      std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
-      return EPERM;  // ERROR defined in errno-base.h
-    }
-
-    std::ifstream file(sInputFile);
-    if (!file.is_open()) {
-      std::cerr << "Error: Unable to open file!" << '\n';
-      return system::errc::protocol_error;
-    }
-
-    std::string parseOut = "Empty file.";
-    for (const auto &stmt : readLogicalLines(file)) {
-      auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
-      parseOut                                  = status;
-      if (status != "OK") break;
-      processedLines.emplace_back(stream_name, stmt);
-    }
-
-    file.close();
-
-    if (parseOut != "OK") {
-      std::cerr << "Input file:" << sInputFile << '\n'  //
-                << "Parse result:" << parseOut << '\n';
-      return system::errc::protocol_error;
-    }
-
-    //
-    // Compile part
-    //
-    if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
-
-    std::string response;
-
-    response = cm.compile();
-
-    if (response != "OK") {
-      std::cerr << "Input file:" << sInputFile << '\n'  //
-                << "Check result:" << response << '\n';
-      return system::errc::protocol_error;
-    }
-
-    if (onlyCompile) {
-      if (!vm.contains("quiet")) {
-        presenter dm(coreInstance);
-        return dm.run(vm);
+      if (onlyCompile) {
+        std::cout << argv[0] << ": fatal error: no input file" << '\n';
+        return EPERM;  // ERROR defined in errno-base.h
       }
-      return system::errc::success;
+      SPDLOG_INFO("No query file provided; starting in idle (service) mode.");
+    } else {
+      if (!std::filesystem::exists(sInputFile)) {
+        std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
+        return EPERM;  // ERROR defined in errno-base.h
+      }
+
+      std::ifstream file(sInputFile);
+      if (!file.is_open()) {
+        std::cerr << "Error: Unable to open file!" << '\n';
+        return system::errc::protocol_error;
+      }
+
+      std::string parseOut = "Empty file.";
+      for (const auto &stmt : readLogicalLines(file)) {
+        auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
+        parseOut                                  = status;
+        if (status != "OK") break;
+        processedLines.emplace_back(stream_name, stmt);
+      }
+
+      file.close();
+
+      if (parseOut != "OK") {
+        std::cerr << "Input file:" << sInputFile << '\n'  //
+                  << "Parse result:" << parseOut << '\n';
+        return system::errc::protocol_error;
+      }
+
+      //
+      // Compile part
+      //
+      if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
+
+      std::string response;
+
+      response = cm.compile();
+
+      if (response != "OK") {
+        std::cerr << "Input file:" << sInputFile << '\n'  //
+                  << "Check result:" << response << '\n';
+        return system::errc::protocol_error;
+      }
+
+      if (onlyCompile) {
+        if (!vm.contains("quiet")) {
+          presenter dm(coreInstance);
+          return dm.run(vm);
+        }
+        return system::errc::success;
+      }
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
