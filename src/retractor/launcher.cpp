@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <csignal>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -24,6 +25,65 @@
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
 #include "uxSysTermTools.hpp"
+
+/// @brief Główny plik uruchamiający program, odpowiedzialny za parsowanie argumentów, obsługę sygnałów i koordynację działania programu.
+///
+/// program xretractor powinien:
+/// - być budowany jako pojedynczy plik wykonywalny, który można uruchomić z linii poleceń.
+/// - Przyjmować jako opcjonalny argument plik z zapytaniami RQL; brak pliku uruchamia tryb bezczynny (idle).
+/// - Parsować ten plik i kompilować zapytania do postaci wewnętrznej reprezentacji (qTree).
+/// - Uruchamiać wykonanie zapytań, zarządzać ich cyklem życia i obsługiwać wyniki.
+/// - Obsługiwać sygnały systemowe (np. SIGINT, SIGTERM), aby umożliwić bezpieczne zatrzymanie programu.
+/// - Zapewniać opcje konfiguracyjne, takie jak tryb tylko kompilacji, ciche działanie, generowanie diagramów itp.
+/// - Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów.
+/// - Być odpornym na błędy, zapewniając odpowiednie komunikaty o błędach i obsługę wyjątków.
+///
+/// Niezależność od programu nadzorującego (supervisor):
+/// - xretractor jest samodzielnym procesem i NIE wymaga do działania żadnego programu nadrzędnego
+///   typu supervisor/orchestrator; musi w pełni funkcjonować uruchomiony bezpośrednio z linii poleceń.
+/// - Nie zakłada obecności kanału sterującego nadzorcy ani jego API (REST/gRPC); własny cykl życia
+///   (start, praca, zatrzymanie) realizuje samodzielnie poprzez argumenty CLI i sygnały systemowe.
+/// - Cała koordynacja stanu odbywa się przez własne mechanizmy procesu: blokadę pojedynczej instancji
+///   (FlockServiceGuard), kanał IPC do klientów (xqry) oraz sygnały — bez zależności od procesu nadzorcy.
+/// - Ewentualny supervisor pełni wyłącznie rolę zewnętrznego zarządcy plików/uruchomień i może zostać
+///   przebudowany lub usunięty bez wpływu na zdolność xretractor do samodzielnej pracy.
+///
+/// Praca jako usługa systemd:
+/// - Działać w trybie pierwszoplanowym (foreground), bez samodzielnej demonizacji — zgodnie z `Type=simple`.
+/// - Umożliwiać start bez pliku .rql (tryb idle), tak aby jednostka systemd mogła wstać przy starcie systemu
+///   i pozostać aktywna, zanim zostaną zdefiniowane jakiekolwiek zapytania (bez pętli restartów/crash-loop).
+/// - Reagować na SIGTERM bezpiecznym, kontrolowanym zatrzymaniem (graceful shutdown) w skończonym czasie,
+///   współpracując z `KillSignal=SIGTERM` i `TimeoutStopSec` menedżera systemd.
+/// - W trybie usługi nie oczekiwać na klawisz/terminal (opcja --noanykey), działając bez TTY.
+/// - Zwracać kody wyjścia zgodne z konwencją POSIX, aby systemd mógł poprawnie ocenić stan i politykę Restart.
+/// - Udostępniać kontrolę stanu działania (opcja --status) na potrzeby zewnętrznego monitoringu/healthcheck.
+///
+/// Logowanie w trybie usługi systemowej:
+/// - W trybie usługi kierować logi na standardowe wyjście procesu (stdout/stderr), tak aby były przechwytywane
+///   przez journald i dostępne przez `journalctl -u`; nie pisać logów do pliku w katalogu tymczasowym (/tmp).
+/// - Nie duplikować znacznika czasu w komunikacie — czas nadaje journald; format usługowy ma być zwięzły
+///   (poziom + treść), bez własnego timestampu.
+/// - Nie emitować kodów ANSI/kolorów, gdy wyjście nie jest terminalem (brak TTY) — log do journala musi być
+///   czystym tekstem.
+/// - Nie wykonywać własnej rotacji ani retencji plików logów — pozostawić to menedżerowi journald.
+/// - Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
+/// - Opcjonalnie mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
+///   aby journald poprawnie klasyfikował wagę komunikatów.
+/// - Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
+///   środowiskową XRETRACTOR_SERVICE — dla wygody konfiguracji jednostki systemd przez Environment=.
+///
+/// Interfejs komunikacji i funkcjonalność:
+/// - Wymuszać pojedynczą instancję usługi poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
+///   jest sygnalizowana błędem braku dostępnej blokady (no_lock_available).
+/// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
+///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
+/// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
+///   nadejścia pierwszego zapytania kanałem IPC) oraz zewnętrzne zatrzymanie instancji.
+/// - Wspierać tryb wsadowej kompilacji bez uruchamiania przetwarzania (--onlycompile) z generowaniem artefaktów
+///   diagnostycznych (dot/csv/diagram) jako odrębną, nieusługową ścieżką użycia.
+/// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
+/// - Opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall, sen do bezwzględnego
+///   punktu czasu) dla deterministycznych interwałów przetwarzania.
 
 using namespace boost;
 
@@ -71,7 +131,18 @@ int main(int argc, char *argv[]) {
   compiler cm(coreInstance);
 
   fixArgcv(argc, argv);
-  const auto tempLocation = setupLoggerMain(std::string(argv[0]));
+
+  // Wczesny skan argumentów: tryb logowania usługowego musi być znany przed konfiguracją logera.
+  // Tryb usługi można włączyć flagą (-j/--service) albo zmienną środowiskową XRETRACTOR_SERVICE
+  // (dowolna wartość poza pustą i "0") — wygodne dla jednostki systemd przez Environment=.
+  bool serviceLog{false};
+  for (int i = 0; i < argc; ++i) {
+    if (strcmp(argv[i], "-j") == 0 || strcmp(argv[i], "--service") == 0) serviceLog = true;
+  }
+  if (const char *env = std::getenv("XRETRACTOR_SERVICE"); env != nullptr && env[0] != '\0' && strcmp(env, "0") != 0)
+    serviceLog = true;
+
+  const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
   namespace po = boost::program_options;
   po::variables_map vm;
@@ -115,6 +186,7 @@ int main(int argc, char *argv[]) {
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
+          ("service,j", "service mode: log to stderr (journald), no log file")    //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
           ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
            "loop iteration limit, 0 - no limit")                                                    //
@@ -148,58 +220,64 @@ int main(int argc, char *argv[]) {
       return system::errc::success;
     }
 
+    // Brak pliku z zapytaniami: w trybie --onlycompile to błąd (nie ma czego kompilować),
+    // w trybie usługowym oznacza start bezczynny (idle) — pomijamy parsowanie i kompilację.
     if (!vm.contains("queryfile")) {
-      std::cout << argv[0] << ": fatal error: no input file" << '\n';
-      return EPERM;  // ERROR defined in errno-base.h
-    }
-    if (!std::filesystem::exists(sInputFile)) {
-      std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
-      return EPERM;  // ERROR defined in errno-base.h
-    }
-
-    std::ifstream file(sInputFile);
-    if (!file.is_open()) {
-      std::cerr << "Error: Unable to open file!" << '\n';
-      return system::errc::protocol_error;
-    }
-
-    std::string parseOut = "Empty file.";
-    for (const auto &stmt : readLogicalLines(file)) {
-      auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
-      parseOut                                  = status;
-      if (status != "OK") break;
-      processedLines.emplace_back(stream_name, stmt);
-    }
-
-    file.close();
-
-    if (parseOut != "OK") {
-      std::cerr << "Input file:" << sInputFile << '\n'  //
-                << "Parse result:" << parseOut << '\n';
-      return system::errc::protocol_error;
-    }
-
-    //
-    // Compile part
-    //
-    if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
-
-    std::string response;
-
-    response = cm.compile();
-
-    if (response != "OK") {
-      std::cerr << "Input file:" << sInputFile << '\n'  //
-                << "Check result:" << response << '\n';
-      return system::errc::protocol_error;
-    }
-
-    if (onlyCompile) {
-      if (!vm.contains("quiet")) {
-        presenter dm(coreInstance);
-        return dm.run(vm);
+      if (onlyCompile) {
+        std::cout << argv[0] << ": fatal error: no input file" << '\n';
+        return EPERM;  // ERROR defined in errno-base.h
       }
-      return system::errc::success;
+      SPDLOG_INFO("No query file provided; starting in idle (service) mode.");
+    } else {
+      if (!std::filesystem::exists(sInputFile)) {
+        std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
+        return EPERM;  // ERROR defined in errno-base.h
+      }
+
+      std::ifstream file(sInputFile);
+      if (!file.is_open()) {
+        std::cerr << "Error: Unable to open file!" << '\n';
+        return system::errc::protocol_error;
+      }
+
+      std::string parseOut = "Empty file.";
+      for (const auto &stmt : readLogicalLines(file)) {
+        auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
+        parseOut                                  = status;
+        if (status != "OK") break;
+        processedLines.emplace_back(stream_name, stmt);
+      }
+
+      file.close();
+
+      if (parseOut != "OK") {
+        std::cerr << "Input file:" << sInputFile << '\n'  //
+                  << "Parse result:" << parseOut << '\n';
+        return system::errc::protocol_error;
+      }
+
+      //
+      // Compile part
+      //
+      if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
+
+      std::string response;
+
+      response = cm.compile();
+
+      if (response != "OK") {
+        std::cerr << "Input file:" << sInputFile << '\n'  //
+                  << "Check result:" << response << '\n';
+        return system::errc::protocol_error;
+      }
+
+      if (onlyCompile) {
+        if (!vm.contains("quiet")) {
+          presenter dm(coreInstance);
+          return dm.run(vm);
+        }
+        return system::errc::success;
+      }
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";

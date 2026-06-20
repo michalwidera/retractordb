@@ -1,0 +1,33 @@
+# Jednostka systemd dla serwera RetractorDB (xretractor).
+# UWAGA: plik generowany z xretractor.service.in przez configure_file() —
+# @RETRACTOR_BIN@ jest podstawiane na ścieżkę instalacji binarium. Nie edytuj
+# wygenerowanej kopii; zmiany nanoś w szablonie .in.
+#
+# Logi:   journalctl -u xretractor -f
+# Status: systemctl status xretractor   (lub: xretractor --status)
+
+[Unit]
+Description=RetractorDB continuous query engine (xretractor)
+Documentation=https://dokumentacja.retractordb.com
+After=network.target
+
+[Service]
+Type=simple
+User=retractor
+Group=retractor
+
+# Tryb usługowy: log na stderr (przechwytywany przez journald), bez TTY.
+# Start bez pliku .rql uruchamia tryb bezczynny (idle); aby wczytać zapytania,
+# dopisz plik jako argument, np. ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey /etc/retractor/startup.rql
+#
+# Tryb usługowy logowania można też włączyć zmienną środowiskową zamiast flagi --service:
+#   Environment=XRETRACTOR_SERVICE=1
+ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey
+
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

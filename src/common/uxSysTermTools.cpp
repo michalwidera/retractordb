@@ -61,11 +61,24 @@ void fixArgcv(int argc, char **argv) {
 }
 
 // https://github.com/gabime/spdlog/wiki/2.-Creating-loggers#creating-loggers-with-multiple-sinks
-std::string setupLoggerMain(const std::string &loggerFile, bool dual) {
+std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool service) {
   namespace fs = std::filesystem;
   fs::path tmp;
 
   const auto loggerFileSole = fs::path(loggerFile).filename();
+
+  // Tryb usługi systemowej: logujemy na stderr (przechwytywany przez journald),
+  // bez pliku w /tmp, bez własnego znacznika czasu i bez kodów ANSI; flush po każdej linii.
+  if (service) {
+    auto journal_sink = std::make_shared<spdlog::sinks::stderr_sink_mt>();
+    journal_sink->set_pattern("[%L] %v");
+    journal_sink->set_level(spdlog::level::trace);
+
+    auto journal_logger = std::make_shared<spdlog::logger>("log", journal_sink);
+    spdlog::set_default_logger(journal_logger);
+    spdlog::flush_on(spdlog::level::trace);
+    return "journald (stderr)";
+  }
 
   // Functional description: system first checks if in current folder
   // there is temp folder - if found we stop looking and temp folder became log folder

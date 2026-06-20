@@ -9,29 +9,18 @@ get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
 # With -n: all-null rows must be skipped; mixed/non-null rows must appear
+
 add_test(
   NAME ${TestID}-skip-enabled
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    bash -c "set -e ; \
-    xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    xqry -s str_null -n -k -m 4 > out_skip.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    grep -F '10 null' out_skip.txt ; \
-    grep -F '20 30' out_skip.txt ; \
-    ! grep -qF 'null null' out_skip.txt")
+  COMMAND bash run.sh skip)
 
-# Without -n: all rows including all-null must appear
 add_test(
   NAME ${TestID}-skip-disabled
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    bash -c "set -e ; \
-    xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    xqry -s str_null -k -m 4 > out_noskip.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    grep -F '10 null' out_noskip.txt ; \
-    grep -F '20 30' out_noskip.txt ; \
-    grep -qF 'null null' out_noskip.txt")
+  COMMAND bash run.sh noskip)
+
+# Startują serwer (blokada usługi) -> RUN_SERIAL jawnie (flagi -k/-m są w
+# run.sh, więc makro add_test ich nie widzi).
+set_tests_properties(${TestID}-skip-enabled ${TestID}-skip-disabled
+                     PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)

@@ -12,7 +12,8 @@ if ! xretractor query-6.rql -c; then exit 1 ; fi
 
 nohup xretractor query-6.rql </dev/null >/dev/null 2>&1 &
 echo $! > xretractor.pid
-while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done
+LOCK="${TMPDIR:-/tmp}/xretractor_service.lock"
+while [ ! -f "$LOCK" ]; do sleep 0.1; done
 xqry -a 'select * stream stradhoc from core0'
 sleep 0.1
 xqry -k
@@ -21,4 +22,4 @@ then
     kill -9 $(cat xretractor.pid)
 fi
 rm -f xretractor.pid
-rm -f /tmp/xretractor_service.lock
+rm -f "$LOCK"

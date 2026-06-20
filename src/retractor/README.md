@@ -31,6 +31,46 @@ This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
 
+## Running as a systemd service
+
+xretractor can run as a Linux systemd service without any wrapper/supervisor process.
+It runs in the foreground (`Type=simple`) and shuts down cleanly on `SIGTERM`.
+
+Relevant options:
+- `-j` / `--service` — service mode: log to **stderr** (captured by journald), no log file in `/tmp`.
+- `-k` / `--noanykey` — do not wait for a key/TTY (required without a terminal).
+- starting **without** a query file boots an **idle** instance that stays alive until `SIGTERM`
+  (no crash-loop before any query is defined); pass a `.rql` file to load queries.
+
+Service logging mode can also be enabled with the `XRETRACTOR_SERVICE` environment variable
+(any value other than empty or `0`), which is convenient in a systemd unit via `Environment=`:
+
+```ini
+[Service]
+Type=simple
+Environment=XRETRACTOR_SERVICE=1
+ExecStart=/usr/bin/xretractor --noanykey
+KillSignal=SIGTERM
+TimeoutStopSec=30
+```
+
+### Packaged unit (DEB)
+
+The `.deb` produced by `make packages` ships the unit and wires it up automatically:
+
+- binaries install to `/usr/bin/` (so `ExecStart=/usr/bin/xretractor`),
+- the unit installs to `/usr/lib/systemd/system/xretractor.service`,
+- the `postinst` maintainer script creates the system user `retractor` and runs
+  `systemctl enable xretractor.service` (the service starts on next boot; it is **not**
+  started immediately — use `systemctl start xretractor` to start it now),
+- `postrm` disables the unit on package removal.
+
+The unit is generated from the template
+[`packaging/systemd/xretractor.service.in`](../../packaging/systemd/xretractor.service.in)
+(`@RETRACTOR_BIN@` is substituted with the install bindir). Edit the template, not the
+generated copy. Logs: `journalctl -u xretractor`; status: `systemctl status xretractor`
+or `xretractor --status`.
+
 Please notice that this tool has second face when you call it with "only compile" option. This face is required for _Show Diagram_ or _Show query Plan_ actions.
 
 ```

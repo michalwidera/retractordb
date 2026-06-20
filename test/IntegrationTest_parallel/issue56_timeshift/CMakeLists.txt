@@ -9,6 +9,6 @@ set(DATA_DIR ${CMAKE_BINARY_DIR}/test/IntegrationTest_serial/issue56_timeshift)
 add_test(
   NAME ${TestID}-compile
   WORKING_DIRECTORY ${DATA_DIR}
-  COMMAND bash -c "set -e ; \
-    xretractor query-51.rql -c > out.txt ; \
+  COMMAND bash -c "set -e && \
+    xretractor query-51.rql -c > out.txt && \
     ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")

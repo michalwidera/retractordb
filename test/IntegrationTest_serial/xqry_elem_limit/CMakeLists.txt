@@ -14,11 +14,8 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    bash -c "set -e ; \
-    mkdir -p temp ; \
-    xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    xqry -s dst -k -m 5 > out.txt ; \
-    while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    [ \$(wc -l < out.txt) -eq 5 ]")
+  COMMAND bash run.sh)
+
+# Startują serwer (blokada usługi) -> RUN_SERIAL jawnie (flagi -k/-m są w
+# run.sh, więc makro add_test ich nie widzi).
+set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
