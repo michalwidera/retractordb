@@ -357,7 +357,7 @@ ensure_tools_for_option() {
     fi
 
     case "$opt" in
-        "release"|"debug")
+        "release"|"debug"|"probe")
             tool_specs=(
                 "gcc:required" "g++:required" "cmake:required"
                 "ninja:required" "conan:required" "make:required"
@@ -733,10 +733,24 @@ run_option() {
             conan build $build_folder -s build_type=Release --build missing
             ;;
         "debug")
-            sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
+            sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Debug --build missing
             conan build $build_folder -s build_type=Debug --build missing
+            ;;
+        "probe")
+            # Budowa Release z WŁĄCZONĄ sondą pomiarową (benchmark E1/E3). Release, bo
+            # sonda służy do pomiarów wydajności — mierzymy kod zoptymalizowany, nie Debug.
+            # UWAGA: sonda jest skompilowana w binarce (xretractor ostrzega w logu i w
+            # 'xretractor -h'). NIE używać produkcyjnie.
+            sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
+            conan source $build_folder
+            conan install $build_folder -s build_type=Release --build missing
+            cd "$build_folder"
+            cmake --preset conan-release -DRDB_BENCH_PROBE=ON
+            cd build/Release
+            ninja
+            echo "-- [warning: probe benchmark build] sonda pomiarowa WŁĄCZONA w tej kompilacji (RDB_BENCH_PROBE=ON)."
             ;;
         "package")
             # Pakowanie binarne (DEB;TGZ wg CPACK_GENERATOR) z auto-sprzątaniem
@@ -876,6 +890,7 @@ run_option() {
             echo "Options:"
             echo "  release    - Build in Release mode (conan source, install, build)"
             echo "  debug      - Build in Debug mode (conan source, install, build)"
+            echo "  probe      - Build Release with benchmark probe ENABLED (RDB_BENCH_PROBE); NOT for production"
             echo "  package    - Build DEB/TGZ packages (cpack) and clean staging artifacts"
             echo "  toolchain  - Install build toolchain (gcc, cmake, ninja, conan, etc.)"
             echo "  toolchain_required - Install minimal CI-like required toolchain from config.yml"
@@ -894,7 +909,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release debug package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage vimsyntax batsyntax help quit"
+              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -906,7 +921,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"

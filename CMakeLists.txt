@@ -36,6 +36,19 @@ option(BUILD_SUPERVISOR "Build Go rsupervisor binary (requires Go)" OFF)
 # konflikty nazw między TU (np. anonimowe namespace, statyczne zmienne) — testuj
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
+# Sonda pomiarowa benchmarku (E1 czas obliczeń, E3 rozmiar planu). Domyślnie
+# WYŁĄCZONA: kod sondy jest wtedy całkowicie wycięty z kompilacji (#ifdef
+# RDB_BENCH_PROBE), zero kosztu. Włączenie tylko do pomiarów wydajności — NIE
+# dla produkcji. Użycie: scripts/buildrdb.sh probe
+option(RDB_BENCH_PROBE
+       "Build with benchmark measurement probe (E1/E3); NOT for production" OFF)
+if(RDB_BENCH_PROBE)
+  add_compile_definitions(RDB_BENCH_PROBE)
+  message(
+    WARNING
+      "RDB_BENCH_PROBE=ON — benchmark probe compiled in; NOT a production build."
+  )
+endif()
 
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
 

@@ -3,6 +3,9 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <cstdio>   // sonda benchmarku E1 (RDB_BENCH_CSV): std::fopen/fprintf/fclose
+#include <cstdlib>  // sonda benchmarku E1: std::getenv
+#include <ctime>    // sonda benchmarku E1: clock_gettime, timespec
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -583,6 +586,22 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       if (rt_mode) {
         if (rtCheckAndPrint()) rtActivate();
       }
+
+#ifdef RDB_BENCH_PROBE
+      //
+      // Sonda pomiarowa E1 (benchmark budżetu czasowego).
+      // Cały kod sondy jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON
+      // (scripts/buildrdb.sh probe); w zwykłej kompilacji znika bez śladu.
+      // Dodatkowo aktywna w runtime tylko, gdy ustawiona jest zmienna środowiskowa
+      // RDB_BENCH_CSV wskazująca plik wyjściowy. W normalnym działaniu (brak zmiennej)
+      // benchFile == nullptr i sonda nie ma żadnego wpływu na przetwarzanie.
+      // Format CSV analizuje examples/ecg/e1_stats.py.
+      //
+      const char *benchPath = std::getenv("RDB_BENCH_CSV");
+      std::FILE *benchFile  = benchPath ? std::fopen(benchPath, "w") : nullptr;
+      if (benchFile) std::fprintf(benchFile, "iter,compute_ns\n");
+      long benchIter = 0;
+#endif
 #endif
 
       while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
@@ -619,10 +638,24 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
         inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-        proc.processRows(inSet);
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+        struct timespec t0{}, t1{};
+        if (benchFile) clock_gettime(CLOCK_MONOTONIC, &t0);
+#endif
+        proc.processRows(inSet);  // mierzony rdzeń obliczeń jednego interwału (E1)
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+        if (benchFile) {
+          clock_gettime(CLOCK_MONOTONIC, &t1);
+          long ns = (t1.tv_sec - t0.tv_sec) * 1'000'000'000L + (t1.tv_nsec - t0.tv_nsec);
+          std::fprintf(benchFile, "%ld,%ld\n", benchIter++, ns);
+        }
+#endif
         boradcast(inSet);
         // End of loop while( ! _kbhit(ignoreanykey) )
       }
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+      if (benchFile) std::fclose(benchFile);  // domknięcie sondy E1
+#endif
       //
       // End of data processing loop
       //

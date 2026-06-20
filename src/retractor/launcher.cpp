@@ -153,6 +153,12 @@ int main(int argc, char *argv[]) {
 
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
+#ifdef RDB_BENCH_PROBE
+  // Kompilacja z włączoną sondą pomiarową (E1/E3). Ostrzeżenie trafia do logu, a w trybie
+  // usługowym (-j) do journald — operator usługi widzi, że to build benchmarkowy, nie produkcyjny.
+  SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
+#endif
+
   namespace po = boost::program_options;
   po::variables_map vm;
   po::options_description desc("Available options");
@@ -219,6 +225,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (vm.contains("help")) {
+#ifdef RDB_BENCH_PROBE
+      std::cout << "[warning: probe benchmark build]" << '\n' << '\n';
+#endif
       std::cout << argv[0] << " - compiler & data processing tool." << '\n' << '\n';
       std::cout << "Usage: " << argv[0];
       if (onlyCompile) std::cout << " -c";
