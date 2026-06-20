@@ -147,15 +147,14 @@ static void validateConfiguredStorageDir(const AppConfig &cfg) {
     throw std::invalid_argument("Configuration error: storage.dir does not exist: " + storageDir.string());
   }
   if (ec) {
-    throw std::invalid_argument("Configuration error: cannot access storage.dir '" + storageDir.string() + "': " +
-                                ec.message());
+    throw std::invalid_argument("Configuration error: cannot access storage.dir '" + storageDir.string() + "': " + ec.message());
   }
   if (!std::filesystem::is_directory(storageDir, ec)) {
     throw std::invalid_argument("Configuration error: storage.dir is not a directory: " + storageDir.string());
   }
   if (ec) {
-    throw std::invalid_argument("Configuration error: cannot inspect storage.dir '" + storageDir.string() + "': " +
-                                ec.message());
+    throw std::invalid_argument("Configuration error: cannot inspect storage.dir '" + storageDir.string() +
+                                "': " + ec.message());
   }
 
   const std::filesystem::path probeFile = storageDir / (".xretractor_write_probe_" + std::to_string(std::rand()) + ".tmp");

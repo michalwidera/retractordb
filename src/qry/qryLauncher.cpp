@@ -1,5 +1,5 @@
-#include <chrono>
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <optional>
 #include <print>
@@ -15,10 +15,10 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "../retractor/lib/appConfig.hpp"
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "qry.hpp"
-#include "../retractor/lib/appConfig.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;

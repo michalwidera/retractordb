@@ -27,8 +27,7 @@
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-IpcTransport::IpcTransport(int clientResponseMaxFails)
-  : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)) {}
+IpcTransport::IpcTransport(int clientResponseMaxFails) : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)) {}
 
 bool IpcTransport::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 

@@ -89,9 +89,12 @@ void writeEntry(std::ostream &out, const metaDataStream::IndexRecord &entry) {
 std::vector<metaDataStream::IndexRecord> splitSegment(const metaDataStream::IndexRecord &seg, size_t offset,
                                                       const std::vector<bool> &newBitset) {
   std::vector<metaDataStream::IndexRecord> result;
-  if (offset > 0) result.emplace_back(seg.nullBitset, offset, false);
-  result.emplace_back(newBitset, 1, false);
-  if (offset + 1 < seg.recordCount) result.emplace_back(seg.nullBitset, seg.recordCount - offset - 1, false);
+  if (offset > 0)
+    result.emplace_back(metaDataStream::IndexRecord{.nullBitset = seg.nullBitset, .recordCount = offset, .isGap = false});
+  result.emplace_back(metaDataStream::IndexRecord{.nullBitset = newBitset, .recordCount = 1, .isGap = false});
+  if (offset + 1 < seg.recordCount)
+    result.emplace_back(
+        metaDataStream::IndexRecord{.nullBitset = seg.nullBitset, .recordCount = seg.recordCount - offset - 1, .isGap = false});
   return result;
 }
 
@@ -234,12 +237,17 @@ void metaDataStream::loadIndex() {
 
 std::pair<std::optional<size_t>, size_t> metaDataStream::locateRecord(size_t recordIndex) const {
   if (recordIndex < committedRecordCount_) {
-    auto entries      = readCommittedEntries();
-    size_t cumulative = 0;
-    for (size_t i = 0; i < entries.size(); ++i) {
-      if (entries[i].isGap) continue;
-      if (recordIndex < cumulative + entries[i].recordCount) return {i, recordIndex - cumulative};
-      cumulative += entries[i].recordCount;
+    auto entries        = readCommittedEntries();
+    size_t cumulative   = 0;
+    size_t segmentIndex = 0;
+    for (const auto &entry : entries) {
+      if (entry.isGap) {
+        ++segmentIndex;
+        continue;
+      }
+      if (recordIndex < cumulative + entry.recordCount) return {segmentIndex, recordIndex - cumulative};
+      cumulative += entry.recordCount;
+      ++segmentIndex;
     }
     throw std::logic_error("metaDataStream: committedRecordCount_ inconsistent with on-disk entries");
   }
@@ -303,13 +311,15 @@ void metaDataStream::applyModificationToMainIndex(size_t recordIndex, const std:
     IndexRecord newCur = parts.back();
     parts.pop_back();
 
-    for (size_t i = 0; i < parts.size(); ++i) {
-      if (i == 0 && tail_.shouldOverwrite()) {
-        overwriteLastEntry(parts[i]);  // replace stale on-disk entry, not append after it
+    bool isFirst = true;
+    for (const auto &part : parts) {
+      if (isFirst && tail_.shouldOverwrite()) {
+        overwriteLastEntry(part);  // replace stale on-disk entry, not append after it
       } else {
-        appendEntry(parts[i]);
+        appendEntry(part);
       }
-      committedRecordCount_ += parts[i].recordCount;
+      committedRecordCount_ += part.recordCount;
+      isFirst = false;
     }
 
     tail_.reset();
@@ -361,10 +371,8 @@ void metaDataStream::onTransmissionGap(size_t gapDuration) {
   flushCurrentEntry();
   tail_.reset();
 
-  IndexRecord gapMarker;
-  gapMarker.nullBitset.resize(descriptorRef_->size(), true);
-  gapMarker.recordCount = gapDuration;
-  gapMarker.isGap       = true;
+  IndexRecord gapMarker{
+      .nullBitset = std::vector<bool>(descriptorRef_->size(), true), .recordCount = gapDuration, .isGap = true};
   appendEntry(gapMarker);
 }
 
@@ -415,7 +423,9 @@ void metaDataStream::appendShadowOverride(size_t recordIndex, const std::vector<
   if (recordIndex >= totalRecords())
     throw std::out_of_range("recordIndex out of range in metaDataStream::onRecordModified (shadow)");
 
-  IndexRecord ov{nullBitsetParam, recordIndex, false};  // recordCount pełni rolę absolutnego indeksu rekordu
+  IndexRecord ov{.nullBitset  = nullBitsetParam,
+                 .recordCount = recordIndex,
+                 .isGap       = false};  // recordCount pełni rolę absolutnego indeksu rekordu
   shadowOverrides_.push_back(ov);
 
   if (shadowFilePath_.empty()) return;

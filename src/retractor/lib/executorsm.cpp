@@ -55,7 +55,7 @@ using namespace CRationalStreamMath;
 
 namespace {
 constexpr std::chrono::milliseconds kIdleLoopSleep{100};
-}  // namespace (empty — wartości przeniesione do cfgQueueBufferSeconds/cfgMinQueueElements)
+}  // namespace
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
@@ -496,8 +496,8 @@ void executorsm::boradcast(const std::set<std::string> &inSet) {
 }
 
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg) {
-  executorsm::coreInstancePtr = &coreInstance;
-  executorsm::cmPtr           = &cm;
+  executorsm::coreInstancePtr       = &coreInstance;
+  executorsm::cmPtr                 = &cm;
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
   executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;

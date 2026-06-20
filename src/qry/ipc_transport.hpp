@@ -7,7 +7,7 @@
 
 // Pojemność wewnętrznej kolejki SPSC między wątkiem producenta (IPC) a wątkiem select().
 // Wartość musi być potęgą 2 i wystarczająco duża by zaabsorbować burstowe dane strumieniowe.
-constexpr int kSpscQueueCapacity = 1024;
+constexpr int kSpscQueueCapacity                         = 1024;
 constexpr int kIpcTransportDefaultClientResponseMaxFails = 10;
 
 class IpcTransport {

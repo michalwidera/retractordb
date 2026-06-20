@@ -24,7 +24,7 @@ class qry {
   formatMode outputFormatMode{formatMode::RAW};
   bool gnuplotRightToLeft{false};
 
-  explicit qry(int serverNoDataTimeoutMs = kDefaultServerNoDataTimeoutMs,
+  explicit qry(int serverNoDataTimeoutMs  = kDefaultServerNoDataTimeoutMs,
                int clientResponseMaxFails = kDefaultClientResponseMaxFails);
   bool select(boost::program_options::variables_map &vm, int /*iElemLimit*/, const std::string & /*input*/,
               std::tuple<int, int, int> /*gnuplotDim*/, bool /*gnuplotRightToLeft*/ = false);

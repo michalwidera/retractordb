@@ -1,5 +1,6 @@
 #include "qTree.hpp"
 
+#include <fmt/core.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -69,9 +70,9 @@ void qTree::dumpCore() {
       }
       maxSize = std::max(maxSize, size);
     }
-    ss << "|%";
+    ss << "|{:>";
     ss << maxSize;
-    ss << "s";
+    ss << "}";
 
     sp << "|";
     for (auto i = 0; i < maxSize; ++i)
@@ -80,15 +81,16 @@ void qTree::dumpCore() {
   ss << "|\n";
   sp << "|\n";
 
-  printf(ss.str().c_str(), vcols[0].c_str(), vcols[1].c_str(), vcols[2].c_str(), vcols[3].c_str());
-  printf("%s", sp.str().c_str());
+  fmt::vprint(ss.str(), fmt::make_format_args(vcols[0], vcols[1], vcols[2], vcols[3]));
+  fmt::print("{}", sp.str());
 
-  for (const auto &it : *this)
-    printf(ss.str().c_str(),                                                                                       //
-           std::to_string(getSeqNr(it.id)).c_str(),                                                                //
-           (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).c_str(),  //
-           std::to_string(maxCapacity[it.id]).c_str(),                                                             //
-           it.id.c_str());                                                                                         //
+  for (const auto &it : *this) {
+    std::string col0        = std::to_string(getSeqNr(it.id));
+    std::string col1        = std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator());
+    std::string col2        = std::to_string(maxCapacity[it.id]);
+    const std::string &col3 = it.id;
+    fmt::vprint(ss.str(), fmt::make_format_args(col0, col1, col2, col3));
+  }
 }
 
 std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
