@@ -9,7 +9,7 @@ import stat
 class Retractor(ConanFile):
     """This class is required for conan file build system."""
     name = "retractordb"
-    version = "0.1.4"
+    version = "0.1.5"
     url = "https://retractordb.com"
     topics = ("time-series", "database", "timeseries", "rdb", "retractordb", "iot", "monitoring", "analytics")
     settings_build = ("os", "compiler", "build_type", "arch")
@@ -27,7 +27,8 @@ class Retractor(ConanFile):
         "antlr4/4.13.1",
         "spdlog/1.17.0",
         "openjdk/21.0.1",
-        "magic_enum/0.9.7"
+        "magic_enum/0.9.7",
+        "libconfig/1.7.3"
     )
     testing = []
     package_type = "application"
