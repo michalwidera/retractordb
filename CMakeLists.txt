@@ -10,12 +10,15 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 # Domyślny prefiks instalacji: katalog użytkownika (~/.local), aby `ninja
 # install` działał bez sudo (domyślny /usr/local wymaga roota → Permission
-# denied). Warunek łapie świeżą konfigurację (INITIALIZED_TO_DEFAULT) oraz
-# istniejący cache z nietkniętym domyślnym /usr/local. Własny prefiks
-# użytkownika (dowolny inny) jest uszanowany. Pakiety CPack używają
-# CPACK_PACKAGING_INSTALL_PREFIX (/usr) — bez zmian.
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR CMAKE_INSTALL_PREFIX STREQUAL
-                                                  "/usr/local")
+# denied). Warunek łapie: świeżą konfigurację (INITIALIZED_TO_DEFAULT),
+# istniejący cache z nietkniętym /usr/local oraz prefiks wskazujący w drzewo
+# źródeł (CMAKE_SOURCE_DIR) — instalacja do korzenia repo zaśmieca bin/ lib/
+# share/ i jest zawsze błędna. Własny sensowny prefiks (dowolny inny) jest
+# uszanowany. Pakiety CPack używają CPACK_PACKAGING_INSTALL_PREFIX (/usr) — bez
+# zmian.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT
+   OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local"
+   OR CMAKE_INSTALL_PREFIX STREQUAL CMAKE_SOURCE_DIR)
   set(CMAKE_INSTALL_PREFIX
       "$ENV{HOME}/.local"
       CACHE PATH "Install prefix (user-local, no sudo)" FORCE)
