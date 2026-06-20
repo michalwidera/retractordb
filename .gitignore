@@ -42,7 +42,7 @@ graph_info.json
 .settings/*
 docs/
 bin/*
-lib/
+/lib/
 .venv/
 .codex
 dokumentacja-rdb/

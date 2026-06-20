@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include <boost/system/error_code.hpp>
 
 #include "config.h"  // Add an automatically generated configuration file
+#include "lib/appConfig.hpp"
 #include "lib/compiler.hpp"
 #include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
@@ -84,6 +86,13 @@
 /// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
 /// - Opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall, sen do bezwzględnego
 ///   punktu czasu) dla deterministycznych interwałów przetwarzania.
+///
+/// Konfiguracja:
+/// - System w trybie usługowym wspiera pliki konfiguracjne podobnie jak inne usługi systemu linux (np. sshd).
+/// - W plikach konfiguracyjnych można zdefiniować katalogi w których będą przechowywane artefakty (storage) a także inne ustawienia.
+/// - Pliki konfiguracyjne są opcjonalne, a ich brak nie powinien uniemożliwiać startu programu; w przypadku braku konfiguracji
+///   program powinien działać z domyślnymi ustawieniami, a brak konfiguracji traktować jako stan poprawny (nie błąd).
+/// - Konfigurację wspiera bibliteka toml++.
 
 using namespace boost;
 
@@ -160,6 +169,7 @@ int main(int argc, char *argv[]) {
   try {
     std::string sInputFile;
     std::string sDiagram;
+    std::string sConfig;
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
@@ -188,6 +198,7 @@ int main(int argc, char *argv[]) {
           ("noanykey,k", "do not wait for any key to terminate")                  //
           ("service,j", "service mode: log to stderr (journald), no log file")    //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")    //
           ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
            "loop iteration limit, 0 - no limit")                                                    //
           ;
@@ -213,6 +224,10 @@ int main(int argc, char *argv[]) {
       if (onlyCompile) std::cout << " -c";
       std::cout << " queryfile [option]" << '\n' << '\n';
       std::cout << desc;
+      if (!onlyCompile)
+        std::cout << "Config search: /etc/retractor/retractor.toml, "
+                     "$XDG_CONFIG_HOME (or ~/.config)/retractor/retractor.toml (optional)"
+                  << '\n';
       std::cout << config_line << '\n';
       std::cout << "Log: " << tempLocation << '\n';
       if (vm.contains("realtime")) rtCheckAndPrint();
@@ -278,6 +293,20 @@ int main(int argc, char *argv[]) {
         }
         return system::errc::success;
       }
+    }
+
+    // Domyślny katalog storage z opcjonalnego pliku konfiguracyjnego (toml++).
+    // Stosowany tylko gdy zestaw RQL nie podał własnej dyrektywy :STORAGE (RQL ma
+    // pierwszeństwo) i gdy istnieją realne zapytania — w trybie idle coreInstance jest
+    // pusty, dataModel nie powstaje, więc domyślny storage nie ma tam zastosowania.
+    const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    if (!appCfg.storageDir.empty() && !coreInstance.empty() &&
+        std::ranges::none_of(coreInstance, [](const auto &it) { return it.id == ":STORAGE"; })) {
+      query storageDirective;
+      storageDirective.id       = ":STORAGE";
+      storageDirective.filename = appCfg.storageDir;
+      coreInstance.push_back(storageDirective);
+      SPDLOG_INFO("Default storage directory from config: {}", appCfg.storageDir);
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";

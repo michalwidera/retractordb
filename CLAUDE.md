@@ -8,9 +8,10 @@ Conan 2 + CMake + Ninja. Setup via `scripts/buildrdb.sh` (run from repo root, `s
 scripts/buildrdb.sh toolchain   # apt packages + Python venv + Conan
 scripts/buildrdb.sh conan       # detect profile, set C++23
 scripts/buildrdb.sh ninja       # add Ninja generator to profile
-scripts/buildrdb.sh bashrc      # add retractordb/bin to PATH
+scripts/buildrdb.sh bashrc      # add ~/.local/bin to PATH (matches install prefix)
 scripts/buildrdb.sh debug       # conan install + build (Debug)
 scripts/buildrdb.sh release     # conan install + build (Release)
+scripts/buildrdb.sh package     # cpack DEB/TGZ + auto-clean staging (_CPack_Packages, install_manifest.txt)
 scripts/buildrdb.sh coverage    # build with coverage + gcovr report → coverage/coverage.html
 ```
 
@@ -19,7 +20,7 @@ Options chain: `scripts/buildrdb.sh conan ninja debug`
 **Incremental (from `build/Debug`):**
 ```bash
 ninja               # build
-ninja install       # install to ~/.local/bin
+ninja install       # install to ~/.local/bin (prefix auto-defaults to ~/.local — no sudo)
 ninja test          # all tests (unit + integration, via valgrind)
 ninja cformat       # format C++/CMake sources
 ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
@@ -59,6 +60,7 @@ CI: CircleCI, branches `master` or `issue_*`.
 - `streamInstance` — per stream: `outputPayload` (stored) + `inputPayload` (computed from FROM).
 - `executorsm` — dual-threaded: processing loop + comms thread (shared memory / boost IPC).
 - `CRSMath` — rational stream math for aligned time intervals.
+- `appConfig` — optional TOML service config (toml++). Layered search: `/etc/retractor/retractor.toml` → `$XDG_CONFIG_HOME`/`~/.config/retractor/retractor.toml` → `--config <file>`. Missing config = valid (defaults). Currently exposes `[storage] dir` — default storage dir used only when RQL has no `:STORAGE` directive (RQL wins).
 
 **Grammars:**
 - `src/rdb/lib/DESC.g4` → `.antlr/` (regenerate: `ninja descgrammar`)

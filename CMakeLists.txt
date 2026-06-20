@@ -8,6 +8,19 @@ project(
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
+# Domyślny prefiks instalacji: katalog użytkownika (~/.local), aby `ninja
+# install` działał bez sudo (domyślny /usr/local wymaga roota → Permission
+# denied). Warunek łapie świeżą konfigurację (INITIALIZED_TO_DEFAULT) oraz
+# istniejący cache z nietkniętym domyślnym /usr/local. Własny prefiks
+# użytkownika (dowolny inny) jest uszanowany. Pakiety CPack używają
+# CPACK_PACKAGING_INSTALL_PREFIX (/usr) — bez zmian.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR CMAKE_INSTALL_PREFIX STREQUAL
+                                                  "/usr/local")
+  set(CMAKE_INSTALL_PREFIX
+      "$ENV{HOME}/.local"
+      CACHE PATH "Install prefix (user-local, no sudo)" FORCE)
+endif()
+
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
@@ -88,9 +101,13 @@ include_directories(
   ${spdlog_INCLUDE_DIR}
   ${fmt_INCLUDE_DIR}
   ${magic_enum_INCLUDE_DIR}
-  ${tomlplusplus_INCLUDE_DIR}
   ${antlr4-runtime_INCLUDE_DIR}
   src/include)
+
+# toml++ jako include SYSTEMOWY (-isystem) — wycisza ostrzeżenia z jego
+# nagłówków (np. -Wdeprecated-literal-operator pod C++23). To kod zewnętrzny,
+# header-only, nie chcemy go diagnozować jak własnego (-I).
+include_directories(SYSTEM ${tomlplusplus_INCLUDE_DIR})
 
 link_directories(${Boost_LIBRARY_DIRS})
 
@@ -128,6 +145,15 @@ configure_file(
   ${CMAKE_BINARY_DIR}/xretractor.service @ONLY)
 install(FILES ${CMAKE_BINARY_DIR}/xretractor.service
         DESTINATION lib/systemd/system)
+
+# Przykładowa konfiguracja: instalowana jako .example, NIGDY jako żywy plik —
+# nie nadpisuje konfiguracji administratora. DESTINATION jest WZGLĘDNY (pod
+# prefiks /usr → /usr/share/retractordb), bo bezwzględny /etc łamie staging
+# cpack (próba zapisu do realnego /etc). Na Debianie postinst kopiuje przykład
+# do /etc/retractor.
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/retractor.toml.example
+  DESTINATION share/retractordb)
 
 # Skrypty maintainer DEB: tworzą usera 'retractor' i włączają jednostkę (enable,
 # bez natychmiastowego startu).

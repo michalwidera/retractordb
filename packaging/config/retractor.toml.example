@@ -1,0 +1,17 @@
+# Przykładowa konfiguracja usługi xretractor (RetractorDB).
+#
+# Pliki konfiguracyjne są OPCJONALNE — bez nich xretractor startuje z domyślnymi
+# ustawieniami. Aby aktywować, skopiuj ten plik jako żywą konfigurację:
+#
+#   sudo cp /etc/retractor/retractor.toml.example /etc/retractor/retractor.toml
+#
+# Wyszukiwanie warstwowe (kolejna warstwa nadpisuje klucze poprzedniej):
+#   1. /etc/retractor/retractor.toml                       (systemowa)
+#   2. $XDG_CONFIG_HOME (lub ~/.config)/retractor/retractor.toml  (użytkownika)
+# Jawny plik: xretractor --config /ścieżka/do/pliku.toml (wyłącza wyszukiwanie).
+
+[storage]
+# Domyślny katalog na artefakty (pliki danych strumieni, .desc, .meta).
+# Stosowany wyłącznie gdy zestaw RQL nie zdefiniował własnej dyrektywy :STORAGE
+# (dyrektywa w .rql ma pierwszeństwo). Końcowy '/' jest opcjonalny.
+dir = "/var/lib/retractor"
