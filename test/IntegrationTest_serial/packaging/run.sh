@@ -50,7 +50,7 @@ if [ -f "$SRCCFG" ]; then
   test -n "$SRC"
   SRC_LIST=$(tar tzf "$SRC")
   for bad in '/build/' '/coverage/' '/Testing/' '/dokumentacja-rdb/' '/[.]claude/' \
-             '/[.]git/' '/[.]github/' '/docker/' '/uiRdbApp/' '/[.]venv/' '/bin/' \
+             '/[.]git/' '/[.]github/' '/docker/' '/[.]venv/' '/bin/' \
              '/CMakeCache' '[.]deb$'; do
     if printf '%s\n' "$SRC_LIST" | grep -qE "$bad"; then
       echo "BŁĄD: pakiet źródłowy zawiera zbędny artefakt pasujący do: $bad"

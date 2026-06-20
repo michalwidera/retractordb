@@ -208,7 +208,6 @@ set(CPACK_SOURCE_IGNORE_FILES
     /src/UML/
     /src/retractor/UML/
     /src/rdb/UML/
-    /src/uiRdbApp/
     /.vscode/
     /scripts/.vim/
     /scripts/dev-test/
