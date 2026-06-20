@@ -54,6 +54,7 @@ using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemA
 using namespace CRationalStreamMath;
 
 namespace {
+constexpr std::chrono::milliseconds kIdleLoopSleep{100};
 }  // namespace (empty — wartości przeniesione do cfgQueueBufferSeconds/cfgMinQueueElements)
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
@@ -83,9 +84,9 @@ std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 std::atomic<bool> executorsm::ipcReady{false};
-int executorsm::cfgQueueBufferSeconds = 10;
-int executorsm::cfgMinQueueElements   = 100;
-int executorsm::cfgRtPriority         = 50;
+int executorsm::cfgQueueBufferSeconds = appcfg::kDefaultIpcQueueBufferSeconds;
+int executorsm::cfgMinQueueElements   = appcfg::kDefaultIpcMinQueueElements;
+int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 
 static std::thread bt;
 
@@ -547,7 +548,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
           break;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(kIdleLoopSleep);
       }
       if (iLoopLimitCnt != executorsm::stop_now) _getch();
     } else {

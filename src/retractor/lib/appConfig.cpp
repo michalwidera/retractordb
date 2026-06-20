@@ -12,6 +12,14 @@
 
 namespace {
 
+constexpr int kWarnHighIpcQueueBufferSeconds{3600};
+constexpr int kWarnHighIpcMinQueueElements{1'000'000};
+constexpr int kWarnHighIpcClientResponseMaxFails{1000};
+constexpr int kWarnHighTimingServerStartupWaitSeconds{3600};
+constexpr int kWarnHighTimingServerStartupPollIntervalMs{10'000};
+constexpr int kWarnHighTimingQueryNoDataTimeoutMs{600'000};
+constexpr int kWarnHighSchedulingRtPriority{80};
+
 // Normalizuje katalog storage: niepusty bez końcowego '/' dostaje '/'
 // — spójnie z konwencją dyrektywy :STORAGE w RQLParser.
 std::string normalizeStorageDir(std::string dir) {
@@ -26,7 +34,7 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("Invalid config ipc.queue_buffer_seconds={} (must be > 0). Using default {}.",
                 cfg.ipcQueueBufferSeconds, defaults.ipcQueueBufferSeconds);
     cfg.ipcQueueBufferSeconds = defaults.ipcQueueBufferSeconds;
-  } else if (cfg.ipcQueueBufferSeconds > 3600) {
+  } else if (cfg.ipcQueueBufferSeconds > kWarnHighIpcQueueBufferSeconds) {
     SPDLOG_WARN("Suspiciously high ipc.queue_buffer_seconds={} (1h+ queue headroom).", cfg.ipcQueueBufferSeconds);
   }
 
@@ -34,7 +42,7 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("Invalid config ipc.min_queue_elements={} (must be > 0). Using default {}.", cfg.ipcMinQueueElements,
                 defaults.ipcMinQueueElements);
     cfg.ipcMinQueueElements = defaults.ipcMinQueueElements;
-  } else if (cfg.ipcMinQueueElements > 1'000'000) {
+  } else if (cfg.ipcMinQueueElements > kWarnHighIpcMinQueueElements) {
     SPDLOG_WARN("Suspiciously high ipc.min_queue_elements={} (may consume significant memory).",
                 cfg.ipcMinQueueElements);
   }
@@ -43,7 +51,7 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("Invalid config ipc.client_response_max_fails={} (must be > 0). Using default {}.",
                 cfg.ipcClientResponseMaxFails, defaults.ipcClientResponseMaxFails);
     cfg.ipcClientResponseMaxFails = defaults.ipcClientResponseMaxFails;
-  } else if (cfg.ipcClientResponseMaxFails > 1000) {
+  } else if (cfg.ipcClientResponseMaxFails > kWarnHighIpcClientResponseMaxFails) {
     SPDLOG_WARN("Suspiciously high ipc.client_response_max_fails={} (long request wait).",
                 cfg.ipcClientResponseMaxFails);
   }
@@ -52,7 +60,7 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("Invalid config timing.server_startup_wait_s={} (must be > 0). Using default {}.",
                 cfg.timingServerStartupWaitSeconds, defaults.timingServerStartupWaitSeconds);
     cfg.timingServerStartupWaitSeconds = defaults.timingServerStartupWaitSeconds;
-  } else if (cfg.timingServerStartupWaitSeconds > 3600) {
+  } else if (cfg.timingServerStartupWaitSeconds > kWarnHighTimingServerStartupWaitSeconds) {
     SPDLOG_WARN("Suspiciously high timing.server_startup_wait_s={} (1h+ startup wait).",
                 cfg.timingServerStartupWaitSeconds);
   }
@@ -61,7 +69,7 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("Invalid config timing.server_startup_poll_ms={} (must be > 0). Using default {}.",
                 cfg.timingServerStartupPollIntervalMs, defaults.timingServerStartupPollIntervalMs);
     cfg.timingServerStartupPollIntervalMs = defaults.timingServerStartupPollIntervalMs;
-  } else if (cfg.timingServerStartupPollIntervalMs > 10'000) {
+  } else if (cfg.timingServerStartupPollIntervalMs > kWarnHighTimingServerStartupPollIntervalMs) {
     SPDLOG_WARN("Suspiciously high timing.server_startup_poll_ms={} (slow startup detection).",
                 cfg.timingServerStartupPollIntervalMs);
   }
@@ -70,16 +78,16 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("Invalid config timing.query_no_data_timeout_ms={} (must be > 0). Using default {}.",
                 cfg.timingQueryNoDataTimeoutMs, defaults.timingQueryNoDataTimeoutMs);
     cfg.timingQueryNoDataTimeoutMs = defaults.timingQueryNoDataTimeoutMs;
-  } else if (cfg.timingQueryNoDataTimeoutMs > 600'000) {
+  } else if (cfg.timingQueryNoDataTimeoutMs > kWarnHighTimingQueryNoDataTimeoutMs) {
     SPDLOG_WARN("Suspiciously high timing.query_no_data_timeout_ms={} (10m+ no-data timeout).",
                 cfg.timingQueryNoDataTimeoutMs);
   }
 
-  if (cfg.schedulingRtPriority < 1 || cfg.schedulingRtPriority > 99) {
+  if (cfg.schedulingRtPriority < appcfg::kRtPriorityMin || cfg.schedulingRtPriority > appcfg::kRtPriorityMax) {
     SPDLOG_WARN("Invalid config scheduling.rt_priority={} (allowed range 1..99). Using default {}.",
                 cfg.schedulingRtPriority, defaults.schedulingRtPriority);
     cfg.schedulingRtPriority = defaults.schedulingRtPriority;
-  } else if (cfg.schedulingRtPriority > 80) {
+  } else if (cfg.schedulingRtPriority > kWarnHighSchedulingRtPriority) {
     SPDLOG_WARN("High scheduling.rt_priority={} (may starve lower-priority tasks).", cfg.schedulingRtPriority);
   }
 
