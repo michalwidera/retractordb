@@ -18,7 +18,7 @@ workflows:
             branches:
               only:
                 - master
-                - /issue_.*/
+                - /[Ii]ssue_.*/
                 - /[0-9]+[-].*/
 
   nightly-full:
@@ -31,7 +31,7 @@ workflows:
             branches:
               only:
                 - master
-                - /issue_.*/
+                - /[Ii]ssue_.*/
     jobs:
       - build-release
       - build-release-ninja-mydocker
@@ -75,7 +75,7 @@ workflows:
           filters:
             branches:
               only:
-                - /issue_.*/
+                - /[Ii]ssue_.*/
     jobs:
       - build-release-ninja-mydocker
       - build-debug-ninja-mydocker
@@ -83,7 +83,7 @@ workflows:
           filters:
             branches:
               only:
-                - /issue_.*/
+                - /[Ii]ssue_.*/
 
 
 executors:
