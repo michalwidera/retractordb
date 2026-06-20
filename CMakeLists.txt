@@ -40,6 +40,7 @@ find_package(antlr4-runtime CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(antlr4 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
+find_package(tomlplusplus CONFIG REQUIRED)
 
 # Oznacz wszystkie importowane targety (Conan) jako systemowe — clang-tidy z
 # SystemHeaders:false pomija ich nagłówki (brak ostrzeżeń i notatek z .conan2/).
@@ -87,6 +88,7 @@ include_directories(
   ${spdlog_INCLUDE_DIR}
   ${fmt_INCLUDE_DIR}
   ${magic_enum_INCLUDE_DIR}
+  ${tomlplusplus_INCLUDE_DIR}
   ${antlr4-runtime_INCLUDE_DIR}
   src/include)
 

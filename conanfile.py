@@ -20,6 +20,27 @@ class Retractor(ConanFile):
     author = "Michal Widera"
     description = "RetractorDB - time series database and data processing engine"
     homepage = "https://retractordb.com"
+    # Siatka zgodności licencyjnej (projekt: MIT). Wszystkie zależności są zgodne z MIT.
+    #
+    # | Komponent                  | Licencja                              | Zgodna z MIT | Uwagi                                |
+    # |----------------------------|---------------------------------------|--------------|--------------------------------------|
+    # | boost/1.91.0               | BSL-1.0                               | Tak          | permisywna                           |
+    # | gtest/1.17.0               | BSD-3-Clause                          | Tak          | tylko testy                          |
+    # | antlr4-cppruntime/4.13.2   | BSD-3-Clause                          | Tak          | runtime parsera                      |
+    # | antlr4/4.13.1              | BSD-3-Clause                          | Tak          | generator (build-time)               |
+    # | spdlog/1.17.0              | MIT                                   | Tak          | header-only                          |
+    # | openjdk/21.0.1             | GPL-2.0 WITH Classpath-exception-2.0  | Tak (*)      | build-time, nielinkowany do binariów |
+    # | magic_enum/0.9.7           | MIT                                   | Tak          | header-only                          |
+    # | tomlplusplus/3.4.0         | MIT                                   | Tak          | header-only                          |
+    # | fmt/12.1.0                 | MIT                                   | Tak          | tranzytywna (z spdlog)               |
+    # | libbacktrace/cci.20210118  | BSD-3-Clause                          | Tak          | tranzytywna (z boost)                |
+    # | b2/5.4.2                   | BSL-1.0                               | Tak          | narzędzie build-only                 |
+    # | cmake/4.3.2                | BSD-3-Clause                          | Tak          | narzędzie build-only                 |
+    #
+    # (*) GPL-2.0 nie infekuje produktu: openjdk uruchamia jedynie ANTLR przy buildzie,
+    #     nie jest linkowany do binariów, a Classpath-exception i tak na to zezwala.
+    #     Permisywne licencje (MIT/BSD-3-Clause/BSL-1.0) wymagają tylko zachowania
+    #     not o prawach autorskich w dystrybucji.
     requires = (
         "boost/1.91.0",
         "gtest/1.17.0",
@@ -27,7 +48,8 @@ class Retractor(ConanFile):
         "antlr4/4.13.1",
         "spdlog/1.17.0",
         "openjdk/21.0.1",
-        "magic_enum/0.9.7"
+        "magic_enum/0.9.7",
+        "tomlplusplus/3.4.0"
     )
     testing = []
     package_type = "application"
