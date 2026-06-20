@@ -767,12 +767,6 @@ run_option() {
             check_cxx23 || { echo "Error: C++23 not supported by g++ $(g++ -dumpversion 2>/dev/null). Run 'toolchain' first."; exit 1; }
             conan profile detect -f
             sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
-            # libconfig/1.7.3 deklaruje cmake_minimum_required(VERSION 3.1); CMake 4.x odmawia konfiguracji
-            # poniżej 3.5. Zmienna środowiskowa CMAKE_POLICY_VERSION_MINIMUM jest czytana przed linią 1
-            # (toolchain ładowany jest za późno), więc ustawiamy ją w [buildenv] profilu dla budów zależności.
-            conan_profile="$HOME/.conan2/profiles/default"
-            ensure_single_profile_line "$conan_profile" '[buildenv]' '^[[]buildenv[]]$'
-            ensure_single_profile_line "$conan_profile" 'CMAKE_POLICY_VERSION_MINIMUM=3.5' '^CMAKE_POLICY_VERSION_MINIMUM='
             ;;
         "ninja")
             conan_profile="$HOME/.conan2/profiles/default"

@@ -101,8 +101,6 @@ RUN python3 -m venv .venv \
     && pip install cmakelang conan \
     && conan profile detect \
     && sed -i -e "s/gnu17/gnu23/g" ~/.conan2/profiles/default \
-    && echo '[buildenv]' >> ~/.conan2/profiles/default \
-    && echo 'CMAKE_POLICY_VERSION_MINIMUM=3.5' >> ~/.conan2/profiles/default \
     && echo '[conf]' >> ~/.conan2/profiles/default \
     && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default \
     && conan install DockerConan.txt -s build_type=Release --build missing \
