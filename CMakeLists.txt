@@ -109,11 +109,25 @@ include(InstallRequiredSystemLibraries)
 set(CPACK_GENERATOR "DEB;TGZ")
 set(CPACK_SOURCE_GENERATOR "DEB;TGZ")
 
-if(CPACK_GENERATOR MATCHES "DEB")
-  set(CPACK_PACKAGING_INSTALL_PREFIX "/opt")
-elseif(CPACK_GENERATOR MATCHES "TGZ")
-  set(CPACK_PACKAGING_INSTALL_PREFIX "")
-endif()
+# Jeden prefiks /usr dla obu generatorów (DEB i TGZ): binaria -> /usr/bin,
+# jednostka systemd -> /usr/lib/systemd/system (ścieżka rozpoznawana przez
+# systemd). TGZ rozpakowany w / daje te same ścieżki.
+set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+
+# Jednostka systemd dla xretractor: ExecStart wskazuje realną ścieżkę binarium w
+# pakiecie (prefiks + bindir). Generowana z szablonu .in.
+set(RETRACTOR_BIN "${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/packaging/systemd/xretractor.service.in
+  ${CMAKE_BINARY_DIR}/xretractor.service @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/xretractor.service
+        DESTINATION lib/systemd/system)
+
+# Skrypty maintainer DEB: tworzą usera 'retractor' i włączają jednostkę (enable,
+# bez natychmiastowego startu).
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
+)
 
 set(CPACK_PACKAGE_NAME "retractordb")
 set(CPACK_PACKAGE_VERSION

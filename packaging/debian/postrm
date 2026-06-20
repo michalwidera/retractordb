@@ -1,0 +1,15 @@
+#!/bin/sh
+# postrm dla pakietu retractordb: przy usunięciu/purge wyłącza jednostkę systemd.
+# Użytkownika 'retractor' celowo nie usuwamy (mógł zostać właścicielem danych).
+set -e
+
+case "$1" in
+  remove|purge)
+    if [ -d /run/systemd/system ]; then
+      systemctl disable xretractor.service || true
+      systemctl daemon-reload || true
+    fi
+    ;;
+esac
+
+exit 0
