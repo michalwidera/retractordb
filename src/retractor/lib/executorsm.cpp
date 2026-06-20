@@ -54,9 +54,7 @@ using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemA
 using namespace CRationalStreamMath;
 
 namespace {
-constexpr int kQueueBufferSeconds   = 10;
-constexpr int kMinimumQueueElements = 100;
-}  // namespace
+}  // namespace (empty — wartości przeniesione do cfgQueueBufferSeconds/cfgMinQueueElements)
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
@@ -85,6 +83,9 @@ std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 std::atomic<bool> executorsm::ipcReady{false};
+int executorsm::cfgQueueBufferSeconds = 10;
+int executorsm::cfgMinQueueElements   = 100;
+int executorsm::cfgRtPriority         = 50;
 
 static std::thread bt;
 
@@ -283,8 +284,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
-      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * kQueueBufferSeconds;
-      maxElements     = std::max(maxElements, kMinimumQueueElements);
+      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * cfgQueueBufferSeconds;
+      maxElements     = std::max(maxElements, cfgMinQueueElements);
       IPC::message_queue mq(IPC::open_or_create,               // open or crate
                             queueName.c_str(),                 // name
                             maxElements,                       // max message number
@@ -493,9 +494,12 @@ void executorsm::boradcast(const std::set<std::string> &inSet) {
   }
 }
 
-int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm) {
+int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg) {
   executorsm::coreInstancePtr = &coreInstance;
   executorsm::cmPtr           = &cm;
+  executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
+  executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
+  executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
 
   std::atexit(cleanup);
 
@@ -584,7 +588,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
       const bool rt_mode = vm.contains("realtime");
       if (rt_mode) {
-        if (rtCheckAndPrint()) rtActivate();
+        if (rtCheckAndPrint()) rtActivate(cfgRtPriority);
       }
 
 #ifdef RDB_BENCH_PROBE

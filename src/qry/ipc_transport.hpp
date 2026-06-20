@@ -11,9 +11,12 @@ constexpr int kSpscQueueCapacity = 1024;
 
 class IpcTransport {
   boost::lockfree::spsc_queue<boost::property_tree::ptree, boost::lockfree::capacity<kSpscQueueCapacity>> spsc_queue_;
+  int clientResponseMaxFails_{10};
 
  public:
   std::atomic<bool> done{false};
+
+  explicit IpcTransport(int clientResponseMaxFails = 10);
 
   boost::property_tree::ptree netClient(const std::string &netCommand, const std::string &netArgument);
   void producer();

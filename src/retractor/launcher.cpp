@@ -92,6 +92,8 @@
 /// - W plikach konfiguracyjnych można zdefiniować katalogi w których będą przechowywane artefakty (storage) a także inne ustawienia.
 /// - Pliki konfiguracyjne są opcjonalne, a ich brak nie powinien uniemożliwiać startu programu; w przypadku braku konfiguracji
 ///   program powinien działać z domyślnymi ustawieniami, a brak konfiguracji traktować jako stan poprawny (nie błąd).
+/// - Jeśli ustawiono storage.dir, katalog musi istnieć i mieć uprawnienia zapisu; w przeciwnym razie start programu
+///   jest przerywany z błędem konfiguracji.
 /// - Konfigurację wspiera bibliteka toml++.
 
 using namespace boost;
@@ -135,6 +137,38 @@ void dropArtifactFile(const std::filesystem::path &artifact_filename) {
   }
 }
 
+static void validateConfiguredStorageDir(const AppConfig &cfg) {
+  if (cfg.storageDir.empty()) return;
+
+  const std::filesystem::path storageDir(cfg.storageDir);
+  std::error_code ec;
+
+  if (!std::filesystem::exists(storageDir, ec)) {
+    throw std::invalid_argument("Configuration error: storage.dir does not exist: " + storageDir.string());
+  }
+  if (ec) {
+    throw std::invalid_argument("Configuration error: cannot access storage.dir '" + storageDir.string() + "': " +
+                                ec.message());
+  }
+  if (!std::filesystem::is_directory(storageDir, ec)) {
+    throw std::invalid_argument("Configuration error: storage.dir is not a directory: " + storageDir.string());
+  }
+  if (ec) {
+    throw std::invalid_argument("Configuration error: cannot inspect storage.dir '" + storageDir.string() + "': " +
+                                ec.message());
+  }
+
+  const std::filesystem::path probeFile = storageDir / (".xretractor_write_probe_" + std::to_string(std::rand()) + ".tmp");
+  {
+    std::ofstream out(probeFile, std::ios::out | std::ios::trunc);
+    if (!out.is_open()) {
+      throw std::invalid_argument("Configuration error: storage.dir is not writable: " + storageDir.string());
+    }
+    out << "probe";
+  }
+  std::filesystem::remove(probeFile, ec);
+}
+
 int main(int argc, char *argv[]) {
   qTree coreInstance;
   compiler cm(coreInstance);
@@ -159,6 +193,23 @@ int main(int argc, char *argv[]) {
   SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
 #endif
 
+  // Wczesny skan argumentów: ścieżka --config musi być znana przed konstruowaniem FlockServiceGuard,
+  // aby lock dir z config trafił do guard przed acquireLock().
+  std::optional<std::string> earlyConfigPath;
+  for (int i = 0; i < argc - 1; ++i) {
+    if (strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--config") == 0) {
+      earlyConfigPath = argv[i + 1];
+      break;
+    }
+  }
+  const AppConfig earlyAppCfg = [&]() -> AppConfig {
+    try {
+      return loadAppConfig(earlyConfigPath);
+    } catch (...) {
+      return {};  // błąd zostanie powtórzony i zgłoszony niżej z właściwym komunikatem
+    }
+  }();
+
   namespace po = boost::program_options;
   po::variables_map vm;
   po::options_description desc("Available options");
@@ -170,8 +221,10 @@ int main(int argc, char *argv[]) {
 
   const std::string serviceName = std::string(argv[0]) + "_service";
   FlockServiceGuard guard(serviceName);
+  guard.setLockDir(earlyAppCfg.lockDir);
 
   int loopLimitVar{executorsm::inifitie_loop};
+  AppConfig appCfg = earlyAppCfg;
   try {
     std::string sInputFile;
     std::string sDiagram;
@@ -214,6 +267,9 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    validateConfiguredStorageDir(appCfg);
 
     iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 
@@ -308,7 +364,6 @@ int main(int argc, char *argv[]) {
     // Stosowany tylko gdy zestaw RQL nie podał własnej dyrektywy :STORAGE (RQL ma
     // pierwszeństwo) i gdy istnieją realne zapytania — w trybie idle coreInstance jest
     // pusty, dataModel nie powstaje, więc domyślny storage nie ma tam zastosowania.
-    const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
     if (!appCfg.storageDir.empty() && !coreInstance.empty() &&
         std::ranges::none_of(coreInstance, [](const auto &it) { return it.id == ":STORAGE"; })) {
       query storageDirective;
@@ -347,5 +402,5 @@ int main(int argc, char *argv[]) {
   }
 
   executorsm exec;
-  return exec.run(coreInstance, guard, cm, vm);
+  return exec.run(coreInstance, guard, cm, vm, appCfg);
 }

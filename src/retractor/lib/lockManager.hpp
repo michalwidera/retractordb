@@ -13,6 +13,7 @@ class FlockServiceGuard {
   ~FlockServiceGuard();
 
   bool acquireLock();
+  void setLockDir(const std::string &dir);
   [[nodiscard]] bool isLockActive() const;
   void releaseLock();
   [[nodiscard]] bool isAnotherInstanceRunning() const;

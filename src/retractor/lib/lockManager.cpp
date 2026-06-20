@@ -20,6 +20,12 @@ FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
 
 FlockServiceGuard::~FlockServiceGuard() { releaseLock(); }
 
+void FlockServiceGuard::setLockDir(const std::string &dir) {
+  if (dir.empty()) return;
+  const std::filesystem::path lockName = std::filesystem::path(lockFilePath).filename();
+  lockFilePath                         = (std::filesystem::path(dir) / lockName).string();
+}
+
 bool FlockServiceGuard::acquireLock() {
   // Open or create the lock file
   lockFileDescriptor = open(lockFilePath.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
