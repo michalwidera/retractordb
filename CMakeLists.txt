@@ -109,10 +109,14 @@ include(InstallRequiredSystemLibraries)
 set(CPACK_GENERATOR "DEB;TGZ")
 set(CPACK_SOURCE_GENERATOR "DEB;TGZ")
 
-# Jeden prefiks /usr dla obu generatorów (DEB i TGZ): binaria -> /usr/bin,
+# Prefiks /usr dla pakietów BINARNYCH (DEB i TGZ): binaria -> /usr/bin,
 # jednostka systemd -> /usr/lib/systemd/system (ścieżka rozpoznawana przez
-# systemd). TGZ rozpakowany w / daje te same ścieżki.
+# systemd). TGZ rozpakowany w / daje te same ścieżki. Dla pakietu ŹRÓDŁOWEGO
+# prefiks jest zerowany w project-config.cmake (drzewo źródeł w korzeniu
+# archiwum).
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+set(CPACK_PROJECT_CONFIG_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/cpack/project-config.cmake")
 
 # Jednostka systemd dla xretractor: ExecStart wskazuje realną ścieżkę binarium w
 # pakiecie (prefiks + bindir). Generowana z szablonu .in.
@@ -149,14 +153,24 @@ set(CPACK_SOURCE_IGNORE_FILES
     /CMakeFiles/
     /CMakeCache.txt
     /bin/
+    /lib/
+    # Wygenerowane / lokalne artefakty — nie należą do pakietu źródłowego.
+    /coverage/
+    /Testing/
+    /dokumentacja-rdb/
+    /.claude/
+    /.venv/
+    /.cache/
     /src/UML/
     /src/retractor/UML/
     /src/rdb/UML/
+    /src/uiRdbApp/
     /.vscode/
     /scripts/.vim/
     /scripts/dev-test/
     /scripts/sublime/
     /.circleci/
+    /.github/
     /.gitignore
     /.gitattributes
     /CMakeUserPresets.json
@@ -167,8 +181,15 @@ set(CPACK_SOURCE_IGNORE_FILES
     README.md
     CONTRIBUTING.md
     CODE_OF_CONDUCT.md
+    /docker/
     Dockerfile
     DockerConan.txt
+    sonar-project.properties
+    CLAUDE.md
+    .clang-format
+    .clang-tidy
+    .claudeignore
+    .dockerignore
     ~$
     ${CPACK_SOURCE_IGNORE_FILES})
 
