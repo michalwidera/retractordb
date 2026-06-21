@@ -38,7 +38,7 @@
 /// - Uruchamiać wykonanie zapytań, zarządzać ich cyklem życia i obsługiwać wyniki.
 /// - Obsługiwać sygnały systemowe (np. SIGINT, SIGTERM), aby umożliwić bezpieczne zatrzymanie programu.
 /// - Zapewniać opcje konfiguracyjne, takie jak tryb tylko kompilacji, ciche działanie, generowanie diagramów itp.
-/// - Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów.
+/// - Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów (poza trybem usługowym)
 /// - Być odpornym na błędy, zapewniając odpowiednie komunikaty o błędach i obsługę wyjątków.
 ///
 /// Niezależność od programu nadzorującego (supervisor):
@@ -66,12 +66,12 @@
 ///   przez journald i dostępne przez `journalctl -u`; nie pisać logów do pliku w katalogu tymczasowym (/tmp).
 /// - Nie duplikować znacznika czasu w komunikacie — czas nadaje journald; format usługowy ma być zwięzły
 ///   (poziom + treść), bez własnego timestampu.
-/// - Nie emitować kodów ANSI/kolorów, gdy wyjście nie jest terminalem (brak TTY) — log do journala musi być
+/// - Nie emitować kodów ANSI/kolorów w trybie usługowym, gdy wyjście nie jest terminalem (brak TTY) — log do journala musi być
 ///   czystym tekstem.
 /// - Nie wykonywać własnej rotacji ani retencji plików logów — pozostawić to menedżerowi journald.
 /// - Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
-/// - Opcjonalnie mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
-///   aby journald poprawnie klasyfikował wagę komunikatów.
+/// - Mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
+///   aby journald poprawnie klasyfikował wagę komunikatów w trybie usługowym.
 /// - Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
 ///   środowiskową XRETRACTOR_SERVICE — dla wygody konfiguracji jednostki systemd przez Environment=.
 ///

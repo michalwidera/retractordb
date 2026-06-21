@@ -14,6 +14,9 @@
 
 namespace {
 
+// Kod wyjścia dziecka, gdy execvp() się nie powiedzie — konwencja powłoki "command not found".
+constexpr int kExecFailedExitCode{127};
+
 // Domyślny wykonawca: fork + execvp("systemctl", argv). Bez shella (brak ryzyka interpretacji argv).
 // Zwraca kod wyjścia systemctl albo -1 przy błędzie fork/wait.
 int execSystemctl(const std::vector<std::string> &argv) {
@@ -29,7 +32,7 @@ int execSystemctl(const std::vector<std::string> &argv) {
       cargv.push_back(const_cast<char *>(a.c_str()));
     cargv.push_back(nullptr);
     execvp(cargv[0], cargv.data());
-    _exit(127);  // exec się nie powiódł (np. brak systemctl w PATH)
+    _exit(kExecFailedExitCode);  // exec się nie powiódł (np. brak systemctl w PATH)
   }
   int status = 0;
   if (waitpid(pid, &status, 0) < 0) return -1;

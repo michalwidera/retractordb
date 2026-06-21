@@ -6,10 +6,13 @@
 
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <iostream>  //remove it with std::
+#include <memory>
 #include <string>
 
+#include <spdlog/pattern_formatter.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/sinks/daily_file_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
@@ -19,7 +22,39 @@
 
 namespace {
 constexpr char kCarriageReturn = '\r';
-}
+
+// Flaga patternu '%*' dla trybu usługowego: prefiks priorytetu sd-daemon "<N>" na początku linii.
+// journald odczytuje ten prefiks i klasyfikuje wagę komunikatu (man sd-daemon). Mapowanie poziomu
+// spdlog -> priorytet syslog: critical=2, err=3, warn=4, info=6, debug/trace=7.
+class SdPriorityFlag : public spdlog::custom_flag_formatter {
+ public:
+  void format(const spdlog::details::log_msg &msg, const std::tm &, spdlog::memory_buf_t &dest) override {
+    int prio = 6;  // domyślnie LOG_INFO
+    switch (msg.level) {
+      case spdlog::level::critical:
+        prio = 2;  // LOG_CRIT
+        break;
+      case spdlog::level::err:
+        prio = 3;  // LOG_ERR
+        break;
+      case spdlog::level::warn:
+        prio = 4;  // LOG_WARNING
+        break;
+      case spdlog::level::debug:
+      case spdlog::level::trace:
+        prio = 7;  // LOG_DEBUG
+        break;
+      default:
+        prio = 6;  // LOG_INFO
+        break;
+    }
+    const char c = static_cast<char>('0' + prio);
+    dest.push_back(c);
+  }
+
+  [[nodiscard]] std::unique_ptr<custom_flag_formatter> clone() const override { return std::make_unique<SdPriorityFlag>(); }
+};
+}  // namespace
 
 bool _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return false;
@@ -71,7 +106,11 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
   // bez pliku w /tmp, bez własnego znacznika czasu i bez kodów ANSI; flush po każdej linii.
   if (service) {
     auto journal_sink = std::make_shared<spdlog::sinks::stderr_sink_mt>();
-    journal_sink->set_pattern("[%L] %v");
+    // Pattern z prefiksem priorytetu sd-daemon "<N>" (flaga '%*') na początku linii — journald
+    // klasyfikuje wagę. Dalej zwięźle: poziom + treść, bez własnego znacznika czasu i bez ANSI.
+    auto journal_formatter = std::make_unique<spdlog::pattern_formatter>();
+    journal_formatter->add_flag<SdPriorityFlag>('*').set_pattern("<%*>[%L] %v");
+    journal_sink->set_formatter(std::move(journal_formatter));
     journal_sink->set_level(spdlog::level::trace);
 
     auto journal_logger = std::make_shared<spdlog::logger>("log", journal_sink);

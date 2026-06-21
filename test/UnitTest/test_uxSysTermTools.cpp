@@ -1,9 +1,14 @@
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <array>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
 
 #include "uxSysTermTools.hpp"
@@ -92,4 +97,40 @@ TEST_F(SetupLoggerMainTest, dual_mode_returns_valid_path) {
   EXPECT_NE(result.find("test_unit_dual"), std::string::npos);
   spdlog::default_logger()->flush();
   std::filesystem::remove(result);
+}
+
+// Tryb usługowy: log na stderr z prefiksem priorytetu sd-daemon "<N>". Przechwytujemy stderr
+// (dup2 na plik), logujemy INFO i ERROR, po czym sprawdzamy prefiksy: INFO=>6, ERROR=>3.
+TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
+  namespace fs               = std::filesystem;
+  const fs::path captureFile = fs::temp_directory_path() / "xretractor_service_log_capture.txt";
+
+  std::fflush(stderr);
+  const int savedStderr = dup(STDERR_FILENO);
+  ASSERT_NE(savedStderr, -1);
+  const int captureFd = open(captureFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  ASSERT_NE(captureFd, -1);
+  ASSERT_NE(dup2(captureFd, STDERR_FILENO), -1);
+
+  const auto result = setupLoggerMain("test_unit_service", false /* dual */, true /* service */);
+  spdlog::info("idle marker");
+  spdlog::error("error marker");
+  spdlog::default_logger()->flush();
+
+  std::fflush(stderr);
+  dup2(savedStderr, STDERR_FILENO);
+  close(savedStderr);
+  close(captureFd);
+
+  EXPECT_EQ(result, "journald (stderr)");
+
+  std::ifstream in(captureFile);
+  std::stringstream ss;
+  ss << in.rdbuf();
+  const std::string out = ss.str();
+
+  EXPECT_NE(out.find("<6>[I] idle marker"), std::string::npos);
+  EXPECT_NE(out.find("<3>[E] error marker"), std::string::npos);
+
+  fs::remove(captureFile);
 }
