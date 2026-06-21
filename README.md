@@ -35,7 +35,176 @@ RetractorDB consists of three main programs:
 
 ## Installation
 
-Check [cluade.md](CLAUDE.md)
+RetractorDB targets Linux (x64 and ARM64). You can either build it from source or
+install a prebuilt package from the GitHub Releases page.
+
+### Option A — install from a release package
+
+Prebuilt packages are published on the
+[GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
+Each release ships a Debian package and a portable tarball, named after the
+project version and the target system, for example (version `0.1.4`):
+
+- `retractordb-0.1.4-Linux.deb`
+- `retractordb-0.1.4-Linux.tar.gz`
+
+**Debian / Ubuntu (`.deb`)** — installs binaries into `/usr/bin` and wires up the
+systemd service automatically:
+
+```bash
+# Download the .deb from the Releases page, then:
+sudo apt install ./retractordb-0.1.4-Linux.deb
+```
+
+The package `postinst` creates the system user `retractor` and runs
+`systemctl enable xretractor.service`. The service is enabled (starts on next
+boot) but **not** started immediately — start it now with:
+
+```bash
+sudo systemctl start xretractor
+systemctl status xretractor        # or: xretractor --status
+journalctl -u xretractor           # logs
+```
+
+See [src/retractor/README.md](src/retractor/README.md#running-as-a-systemd-service)
+for the packaged systemd unit details.
+
+**Portable tarball (`.tar.gz`)** — no service integration, just the binaries:
+
+```bash
+tar xzf retractordb-0.1.4-Linux.tar.gz
+sudo cp retractordb-0.1.4-Linux/bin/* /usr/local/bin/   # or anywhere on $PATH
+```
+
+After install, verify the three binaries are reachable:
+
+```bash
+xretractor -h
+xqry -h
+xtrdb -h
+```
+
+### Option B — build from source
+
+The build uses **Conan 2 + CMake + Ninja** and requires **GCC 13+** (C++23).
+A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the
+toolchain and drives the build. Run it from the repo root, `scripts/`, or
+`build/Debug/`.
+
+```bash
+git clone https://github.com/michalwidera/retractordb.git
+cd retractordb
+
+# 1. Install build dependencies (apt packages + Python venv + Conan)
+scripts/buildrdb.sh toolchain
+
+# 2. Configure the Conan profile (C++23) and add the Ninja generator
+scripts/buildrdb.sh conan ninja
+
+# 3. Add ~/.local/bin to PATH (the default install prefix)
+scripts/buildrdb.sh bashrc        # then restart the shell or: source ~/.bashrc
+
+# 4. Build (Debug); use 'release' for an optimized build
+scripts/buildrdb.sh debug
+```
+
+Install the binaries (no sudo — prefix defaults to `~/.local`) and run the test
+suite from the build directory:
+
+```bash
+cd build/Debug
+ninja install     # installs xretractor, xqry, xtrdb to ~/.local/bin
+ninja test        # optional: unit + integration tests
+```
+
+To produce your own `.deb` / `.tar.gz` packages locally:
+
+```bash
+scripts/buildrdb.sh release package
+```
+
+## Initial configuration
+
+RetractorDB runs with sensible defaults and **needs no configuration file** to
+start — a missing config is a valid state. Configuration is optional TOML, loaded
+in layers (later layers override earlier ones):
+
+1. system: `/etc/retractor/retractor.toml`
+2. user: `$XDG_CONFIG_HOME/retractor/retractor.toml` (or `~/.config/retractor/retractor.toml`)
+3. explicit: `xretractor --config <file>` — when given, **only** that file is loaded
+
+Both `xretractor` and `xqry` use the same search. Logs go to `/tmp/xretractor.log`
+and `/tmp/xqry.log` (in `--service` mode `xretractor` logs to stderr/journald
+instead).
+
+**Storage.** Where stream data and `.desc` / `.meta` artifacts are written is
+controlled by the `:STORAGE` directive inside the RQL file. The `[storage] dir`
+config key only provides a *default* used when the RQL has no `:STORAGE`
+directive — **RQL always wins**. If `storage.dir` is set, the directory must
+already exist and be writable by the xretractor process, otherwise startup fails
+with a configuration error.
+
+A minimal config that sets a default storage directory:
+
+```toml
+[storage]
+dir = "/var/lib/retractor/data"
+```
+
+For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`),
+validation rules, and the systemd service setup, see
+[src/retractor/README.md](src/retractor/README.md#configuration-toml).
+
+## Running your first query
+
+A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s.
+The example below needs no input data files — it reads bytes from `/dev/urandom`.
+Save it as `first.rql`:
+
+```sql
+# declaration of input time series
+DECLARE a BYTE , b BYTE STREAM core0, 1 FILE '/dev/urandom'
+DECLARE c BYTE STREAM core1, 0.5 FILE '/dev/urandom'
+
+SELECT core0[0],b STREAM str1 FROM core0#core1
+SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0
+```
+
+(More ready-made examples live under [examples/](examples/), e.g.
+[examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
+
+**1. Sanity-check (compile only)** — no data processing, just validate the query
+set:
+
+```bash
+xretractor -c first.rql
+```
+
+**2. Start the engine.** `xretractor` compiles the queries and then runs them
+continuously until terminated. Start it (here in the foreground; press a key to
+stop, or use `-k` to disable that):
+
+```bash
+xretractor first.rql
+```
+
+If you installed via the `.deb`, the engine usually runs as a service instead;
+load a query set per your deployment and use `systemctl`/`journalctl` to manage
+it.
+
+**3. Query the running engine** with the `xqry` client (in a second terminal).
+`xretractor` must be running — `xqry` reads results from shared memory:
+
+```bash
+xqry -d              # list active streams/queries
+xqry -s str1         # stream out results of stream 'str1'
+xqry -s str2
+```
+
+`xqry` also offers other output modes (`--graphite`, `--influxdb`, `--gnuplot`)
+and an ad-hoc query mode (`--adhoc`); see
+[src/qry/README.md](src/qry/README.md) and `xqry -h`. To stop the engine you can
+also run `xqry --kill`.
 
 ## Documentation
 
