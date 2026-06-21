@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstring>
@@ -25,6 +26,8 @@
 
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
+
+IpcTransport::IpcTransport(int clientResponseMaxFails) : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)) {}
 
 bool IpcTransport::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
@@ -97,9 +100,7 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
       it = mymap->find(processId);
     }
 
-    // When server works under valgrind - must be 10 probes x 10ms
-    constexpr int maxAcceptableFails = 10;
-    int cntr(maxAcceptableFails);
+    int cntr(clientResponseMaxFails_);
     while (it == mymap->end() && cntr != 0) {
       std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
       IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);

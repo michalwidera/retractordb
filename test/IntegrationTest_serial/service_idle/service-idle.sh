@@ -19,5 +19,6 @@ else
   grep -q 'Idle mode: no queries to process' stderr.txt
 fi
 
-# Format logu usługowego: 'poziom + treść' na stderr, bez znacznika czasu.
-grep -qE '^\[I\] ' stderr.txt
+# Format logu usługowego: prefiks priorytetu sd-daemon '<N>' + 'poziom + treść' na stderr,
+# bez znacznika czasu. Linia INFO ma priorytet 6 (LOG_INFO) => '<6>[I] '.
+grep -qE '^<6>\[I\] ' stderr.txt

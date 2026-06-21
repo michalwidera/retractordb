@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>   // instrumentacja E3 (RDB_BENCH_PLAN): std::fprintf
+#include <cstdlib>  // instrumentacja E3: std::getenv
 #include <limits>
 #include <sstream>
+#include <utility>  // instrumentacja E3: std::pair
 
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
@@ -837,6 +840,42 @@ std::string compiler::deduplicateSubstrats() {
 std::string compiler::compile() {
   std::string result;
 
+#ifdef RDB_BENCH_PROBE
+  //
+  // Instrumentacja efektu optymalizacji planu (eksperyment E3).
+  // Cały kod jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON (scripts/buildrdb.sh probe);
+  // w zwykłej kompilacji znika bez śladu.
+  // Aktywna w runtime wyłącznie, gdy ustawiona jest zmienna środowiskowa RDB_BENCH_PLAN.
+  // Bez niej benchPlan == false i funkcja zachowuje się dokładnie jak wcześniej
+  // (zero kosztu i efektów ubocznych). Kod jest przenośny (tylko getenv/fprintf),
+  // więc — w odróżnieniu od sondy E1 — nie wymaga #ifdef __linux__.
+  //
+  // planSize() liczy łączną liczbę strumieni i tokenów (operatorów) w programach
+  // zapytań (query::lProgram), z pominięciem dyrektyw kompilatora. Migawki bierzemy
+  // na czterech etapach:
+  //   * wejście            — surowy plan po parsowaniu,
+  //   * przed deduplikacją — po kanonizacji do postaci pośredniej (dekompozycja),
+  //   * po deduplikacji    — po eliminacji zdublowanych substratów (wspólne
+  //                          podwyrażenia) — to właściwa redukcja planu,
+  //   * wyjście            — końcowy, zoptymalizowany plan.
+  // Spadek liczby tokenów/strumieni (zwłaszcza na etapie deduplikacji) to
+  // mierzalny efekt optymalizacji z sekcji E3. Wynik trafia na stderr i zasila
+  // tabelę E3 manuskryptu.
+  //
+  const bool benchPlan = std::getenv("RDB_BENCH_PLAN") != nullptr;
+  auto planSize        = [this]() {
+    std::pair<size_t, size_t> acc{0, 0};  // {strumienie, tokeny}
+    for (const auto &q : coreInstance) {
+      if (q.isCompilerDirective()) continue;
+      ++acc.first;
+      acc.second += q.lProgram.size();
+    }
+    return acc;
+  };
+  const std::pair<size_t, size_t> empty{0, 0};
+  const auto atEntry = benchPlan ? planSize() : empty;
+#endif
+
   result = extractIntermediateStreams();
   if (result != "OK") return result;
 
@@ -846,8 +885,14 @@ std::string compiler::compile() {
   result = resolveStreamIntervals();
   if (result != "OK") return result;
 
+#ifdef RDB_BENCH_PROBE
+  const auto preDedup = benchPlan ? planSize() : empty;  // przed eliminacją (E3)
+#endif
   result = deduplicateSubstrats();
   if (result != "OK") return result;
+#ifdef RDB_BENCH_PROBE
+  const auto postDedup = benchPlan ? planSize() : empty;  // po eliminacji (E3)
+#endif
 
   result = resolveFieldReferences();
   if (result != "OK") return result;
@@ -865,6 +910,18 @@ std::string compiler::compile() {
 
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
   if (result != "OK") return result;
+
+#ifdef RDB_BENCH_PROBE
+  // Raport instrumentacji E3 (tylko gdy RDB_BENCH_PLAN). Format: strumienie/tokeny.
+  if (benchPlan) {
+    const auto atExit = planSize();
+    std::fprintf(stderr,
+                 "PLAN bench (strumienie/tokeny): wejscie=%zu/%zu  przed-dedup=%zu/%zu  "
+                 "po-dedup=%zu/%zu  wyjscie=%zu/%zu\n",
+                 atEntry.first, atEntry.second, preDedup.first, preDedup.second, postDedup.first, postDedup.second, atExit.first,
+                 atExit.second);
+  }
+#endif
 
   return {"OK"};
 }

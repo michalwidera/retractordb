@@ -8,6 +8,22 @@ project(
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
+# Domyślny prefiks instalacji: katalog użytkownika (~/.local), aby `ninja
+# install` działał bez sudo (domyślny /usr/local wymaga roota → Permission
+# denied). Warunek łapie: świeżą konfigurację (INITIALIZED_TO_DEFAULT),
+# istniejący cache z nietkniętym /usr/local oraz prefiks wskazujący w drzewo
+# źródeł (CMAKE_SOURCE_DIR) — instalacja do korzenia repo zaśmieca bin/ lib/
+# share/ i jest zawsze błędna. Własny sensowny prefiks (dowolny inny) jest
+# uszanowany. Pakiety CPack używają CPACK_PACKAGING_INSTALL_PREFIX (/usr) — bez
+# zmian.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT
+   OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local"
+   OR CMAKE_INSTALL_PREFIX STREQUAL CMAKE_SOURCE_DIR)
+  set(CMAKE_INSTALL_PREFIX
+      "$ENV{HOME}/.local"
+      CACHE PATH "Install prefix (user-local, no sudo)" FORCE)
+endif()
+
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 add_definitions(-Wno-deprecated-declarations)
@@ -20,6 +36,19 @@ option(BUILD_SUPERVISOR "Build Go rsupervisor binary (requires Go)" OFF)
 # konflikty nazw między TU (np. anonimowe namespace, statyczne zmienne) — testuj
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
+# Sonda pomiarowa benchmarku (E1 czas obliczeń, E3 rozmiar planu). Domyślnie
+# WYŁĄCZONA: kod sondy jest wtedy całkowicie wycięty z kompilacji (#ifdef
+# RDB_BENCH_PROBE), zero kosztu. Włączenie tylko do pomiarów wydajności — NIE
+# dla produkcji. Użycie: scripts/buildrdb.sh probe
+option(RDB_BENCH_PROBE
+       "Build with benchmark measurement probe (E1/E3); NOT for production" OFF)
+if(RDB_BENCH_PROBE)
+  add_compile_definitions(RDB_BENCH_PROBE)
+  message(
+    WARNING
+      "RDB_BENCH_PROBE=ON — benchmark probe compiled in; NOT a production build."
+  )
+endif()
 
 set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
 
@@ -40,6 +69,7 @@ find_package(antlr4-runtime CONFIG REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 find_package(antlr4 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
+find_package(tomlplusplus CONFIG REQUIRED)
 
 # Oznacz wszystkie importowane targety (Conan) jako systemowe — clang-tidy z
 # SystemHeaders:false pomija ich nagłówki (brak ostrzeżeń i notatek z .conan2/).
@@ -90,11 +120,28 @@ include_directories(
   ${antlr4-runtime_INCLUDE_DIR}
   src/include)
 
+# toml++ jako include SYSTEMOWY (-isystem) — wycisza ostrzeżenia z jego
+# nagłówków (np. -Wdeprecated-literal-operator pod C++23). To kod zewnętrzny,
+# header-only, nie chcemy go diagnozować jak własnego (-I).
+include_directories(SYSTEM ${tomlplusplus_INCLUDE_DIR})
+
 link_directories(${Boost_LIBRARY_DIRS})
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compileCommands req. from
                                       # .vsccode/c_cpp_properties.json
+
+# Jedno źródło prawdy dla kanonicznego pliku zapytań serwisu. Podstawiane
+# (configure_file) do: jednostki systemd (ExecStart), nagłówka serviceDefaults.h
+# (domyślna wartość AppConfig) oraz postinst (utworzenie pliku). Dystrybutor
+# może nadpisać -D...
+set(RETRACTOR_QUERY_FILE
+    "/etc/retractor/startup.rql"
+    CACHE
+      PATH
+      "Kanoniczny plik zapytań serwisu xretractor (ExecStart / fallback AppConfig)"
+)
+
 add_subdirectory(src)
 add_subdirectory(scripts)
 add_subdirectory(test)
@@ -127,10 +174,24 @@ configure_file(
 install(FILES ${CMAKE_BINARY_DIR}/xretractor.service
         DESTINATION lib/systemd/system)
 
+# Przykładowa konfiguracja: instalowana jako .example, NIGDY jako żywy plik —
+# nie nadpisuje konfiguracji administratora. DESTINATION jest WZGLĘDNY (pod
+# prefiks /usr → /usr/share/retractordb), bo bezwzględny /etc łamie staging
+# cpack (próba zapisu do realnego /etc). Na Debianie postinst kopiuje przykład
+# do /etc/retractor.
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/retractor.toml.example
+        ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/service.env.example
+  DESTINATION share/retractordb)
+
 # Skrypty maintainer DEB: tworzą usera 'retractor' i włączają jednostkę (enable,
-# bez natychmiastowego startu).
+# bez natychmiastowego startu). postinst generowany z .in (podstawienie
+# @RETRACTOR_QUERY_FILE@), by ścieżka pliku zapytań pochodziła z tego samego
+# źródła co ExecStart jednostki.
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst.in
+               ${CMAKE_BINARY_DIR}/debian/postinst @ONLY)
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
+    "${CMAKE_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
 )
 
 set(CPACK_PACKAGE_NAME "retractordb")
@@ -164,7 +225,6 @@ set(CPACK_SOURCE_IGNORE_FILES
     /src/UML/
     /src/retractor/UML/
     /src/rdb/UML/
-    /src/uiRdbApp/
     /.vscode/
     /scripts/.vim/
     /scripts/dev-test/

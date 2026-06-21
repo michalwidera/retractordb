@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include <boost/system/error_code.hpp>
 
 #include "config.h"  // Add an automatically generated configuration file
+#include "lib/appConfig.hpp"
 #include "lib/compiler.hpp"
 #include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
@@ -24,6 +26,7 @@
 #include "lib/persistentCounter.hpp"
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
+#include "lib/serviceControl.hpp"
 #include "uxSysTermTools.hpp"
 
 /// @brief Główny plik uruchamiający program, odpowiedzialny za parsowanie argumentów, obsługę sygnałów i koordynację działania programu.
@@ -35,7 +38,7 @@
 /// - Uruchamiać wykonanie zapytań, zarządzać ich cyklem życia i obsługiwać wyniki.
 /// - Obsługiwać sygnały systemowe (np. SIGINT, SIGTERM), aby umożliwić bezpieczne zatrzymanie programu.
 /// - Zapewniać opcje konfiguracyjne, takie jak tryb tylko kompilacji, ciche działanie, generowanie diagramów itp.
-/// - Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów.
+/// - Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów (poza trybem usługowym)
 /// - Być odpornym na błędy, zapewniając odpowiednie komunikaty o błędach i obsługę wyjątków.
 ///
 /// Niezależność od programu nadzorującego (supervisor):
@@ -63,18 +66,21 @@
 ///   przez journald i dostępne przez `journalctl -u`; nie pisać logów do pliku w katalogu tymczasowym (/tmp).
 /// - Nie duplikować znacznika czasu w komunikacie — czas nadaje journald; format usługowy ma być zwięzły
 ///   (poziom + treść), bez własnego timestampu.
-/// - Nie emitować kodów ANSI/kolorów, gdy wyjście nie jest terminalem (brak TTY) — log do journala musi być
+/// - Nie emitować kodów ANSI/kolorów w trybie usługowym, gdy wyjście nie jest terminalem (brak TTY) — log do journala musi być
 ///   czystym tekstem.
 /// - Nie wykonywać własnej rotacji ani retencji plików logów — pozostawić to menedżerowi journald.
 /// - Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
-/// - Opcjonalnie mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
-///   aby journald poprawnie klasyfikował wagę komunikatów.
+/// - Mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
+///   aby journald poprawnie klasyfikował wagę komunikatów w trybie usługowym.
 /// - Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
 ///   środowiskową XRETRACTOR_SERVICE — dla wygody konfiguracji jednostki systemd przez Environment=.
 ///
 /// Interfejs komunikacji i funkcjonalność:
-/// - Wymuszać pojedynczą instancję usługi poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
+/// - Wymuszać pojedynczą instancję programu w systemie poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
 ///   jest sygnalizowana błędem braku dostępnej blokady (no_lock_available).
+/// - W przypadku rozpoznania funkcjonowania innej instancji programu, należy rozpoznać czy ta instancja działa jako serwis,
+///   czy jako osobny proces, jeśli działa jako serwis zaraportować informację o tym fakcie i
+///   przekompilować zapytania (sprawdzić poprawność) i przekazać zapytanie do tej instancji poprzez restart serwisu z zapytaniem (zachowując konfigurację serwisu).
 /// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
 ///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
 /// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
@@ -84,6 +90,15 @@
 /// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
 /// - Opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall, sen do bezwzględnego
 ///   punktu czasu) dla deterministycznych interwałów przetwarzania.
+///
+/// Konfiguracja:
+/// - System w trybie usługowym wspiera pliki konfiguracjne podobnie jak inne usługi systemu linux (np. sshd).
+/// - W plikach konfiguracyjnych można zdefiniować katalogi w których będą przechowywane artefakty (storage) a także inne ustawienia.
+/// - Pliki konfiguracyjne są opcjonalne, a ich brak nie powinien uniemożliwiać startu programu; w przypadku braku konfiguracji
+///   program powinien działać z domyślnymi ustawieniami, a brak konfiguracji traktować jako stan poprawny (nie błąd).
+/// - Jeśli ustawiono storage.dir, katalog musi istnieć i mieć uprawnienia zapisu; w przeciwnym razie start programu
+///   jest przerywany z błędem konfiguracji.
+/// - Konfigurację wspiera bibliteka toml++.
 
 using namespace boost;
 
@@ -126,6 +141,37 @@ void dropArtifactFile(const std::filesystem::path &artifact_filename) {
   }
 }
 
+static void validateConfiguredStorageDir(const AppConfig &cfg) {
+  if (cfg.storageDir.empty()) return;
+
+  const std::filesystem::path storageDir(cfg.storageDir);
+  std::error_code ec;
+
+  if (!std::filesystem::exists(storageDir, ec)) {
+    throw std::invalid_argument("Configuration error: storage.dir does not exist: " + storageDir.string());
+  }
+  if (ec) {
+    throw std::invalid_argument("Configuration error: cannot access storage.dir '" + storageDir.string() + "': " + ec.message());
+  }
+  if (!std::filesystem::is_directory(storageDir, ec)) {
+    throw std::invalid_argument("Configuration error: storage.dir is not a directory: " + storageDir.string());
+  }
+  if (ec) {
+    throw std::invalid_argument("Configuration error: cannot inspect storage.dir '" + storageDir.string() +
+                                "': " + ec.message());
+  }
+
+  const std::filesystem::path probeFile = storageDir / (".xretractor_write_probe_" + std::to_string(std::rand()) + ".tmp");
+  {
+    std::ofstream out(probeFile, std::ios::out | std::ios::trunc);
+    if (!out.is_open()) {
+      throw std::invalid_argument("Configuration error: storage.dir is not writable: " + storageDir.string());
+    }
+    out << "probe";
+  }
+  std::filesystem::remove(probeFile, ec);
+}
+
 int main(int argc, char *argv[]) {
   qTree coreInstance;
   compiler cm(coreInstance);
@@ -144,6 +190,29 @@ int main(int argc, char *argv[]) {
 
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
+#ifdef RDB_BENCH_PROBE
+  // Kompilacja z włączoną sondą pomiarową (E1/E3). Ostrzeżenie trafia do logu, a w trybie
+  // usługowym (-j) do journald — operator usługi widzi, że to build benchmarkowy, nie produkcyjny.
+  SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
+#endif
+
+  // Wczesny skan argumentów: ścieżka --config musi być znana przed konstruowaniem FlockServiceGuard,
+  // aby lock dir z config trafił do guard przed acquireLock().
+  std::optional<std::string> earlyConfigPath;
+  for (int i = 0; i < argc - 1; ++i) {
+    if (strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--config") == 0) {
+      earlyConfigPath = argv[i + 1];
+      break;
+    }
+  }
+  const AppConfig earlyAppCfg = [&]() -> AppConfig {
+    try {
+      return loadAppConfig(earlyConfigPath);
+    } catch (...) {
+      return {};  // błąd zostanie powtórzony i zgłoszony niżej z właściwym komunikatem
+    }
+  }();
+
   namespace po = boost::program_options;
   po::variables_map vm;
   po::options_description desc("Available options");
@@ -155,11 +224,14 @@ int main(int argc, char *argv[]) {
 
   const std::string serviceName = std::string(argv[0]) + "_service";
   FlockServiceGuard guard(serviceName);
+  guard.setLockDir(earlyAppCfg.lockDir);
 
   int loopLimitVar{executorsm::inifitie_loop};
+  AppConfig appCfg = earlyAppCfg;
   try {
     std::string sInputFile;
     std::string sDiagram;
+    std::string sConfig;
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
@@ -188,6 +260,7 @@ int main(int argc, char *argv[]) {
           ("noanykey,k", "do not wait for any key to terminate")                  //
           ("service,j", "service mode: log to stderr (journald), no log file")    //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")    //
           ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
            "loop iteration limit, 0 - no limit")                                                    //
           ;
@@ -197,6 +270,9 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    validateConfiguredStorageDir(appCfg);
 
     iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 
@@ -208,11 +284,18 @@ int main(int argc, char *argv[]) {
     }
 
     if (vm.contains("help")) {
+#ifdef RDB_BENCH_PROBE
+      std::cout << "[warning: probe benchmark build]" << '\n' << '\n';
+#endif
       std::cout << argv[0] << " - compiler & data processing tool." << '\n' << '\n';
       std::cout << "Usage: " << argv[0];
       if (onlyCompile) std::cout << " -c";
       std::cout << " queryfile [option]" << '\n' << '\n';
       std::cout << desc;
+      if (!onlyCompile)
+        std::cout << "Config search: /etc/retractor/retractor.toml, "
+                     "$XDG_CONFIG_HOME (or ~/.config)/retractor/retractor.toml (optional)"
+                  << '\n';
       std::cout << config_line << '\n';
       std::cout << "Log: " << tempLocation << '\n';
       if (vm.contains("realtime")) rtCheckAndPrint();
@@ -233,6 +316,10 @@ int main(int argc, char *argv[]) {
         std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
         return EPERM;  // ERROR defined in errno-base.h
       }
+
+      // Zapamiętaj plik zapytań w blokadzie: jeśli ta instancja zostanie serwisem, inna instancja
+      // odczyta QUERYFILE i będzie wiedziała, który plik nadpisać przed restartem serwisu (E3).
+      guard.setServiceQueryFile(std::filesystem::absolute(sInputFile).string());
 
       std::ifstream file(sInputFile);
       if (!file.is_open()) {
@@ -278,6 +365,47 @@ int main(int argc, char *argv[]) {
         }
         return system::errc::success;
       }
+
+      // E3: jeśli działa już inna instancja będąca serwisem systemd, nie startujemy drugiej —
+      // dostarczamy zwalidowany (skompilowany powyżej) zestaw zapytań, nadpisując plik zapytań
+      // serwisu i zlecając restart. Serwis załaduje nowy zestaw, zachowując konfigurację jednostki.
+      // Podwójna kompilacja (tu lokalnie + w serwisie po restarcie) jest zamierzona.
+      if (guard.isAnotherInstanceRunning()) {
+        const FlockServiceGuard::PeerInfo peer = guard.readPeerInfo();
+        if (peer.kind == FlockServiceGuard::PeerInfo::Kind::Service && !peer.unit.empty()) {
+          const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
+          SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
+          if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
+            std::cerr << "Failed to write query file to service: " << target << '\n';
+            return system::errc::io_error;
+          }
+          const bool userScope = peer.scope == FlockServiceGuard::PeerInfo::Scope::User;
+          const int rc         = servicecontrol::restartService(userScope, peer.unit);
+          if (rc != 0) {
+            std::cerr << "Failed to restart service unit '" << peer.unit << "' (systemctl rc=" << rc << ").";
+            if (!userScope) std::cerr << " A system unit restart requires privileges (run with sudo).";
+            std::cerr << '\n';
+            return system::errc::operation_not_permitted;
+          }
+          std::cout << "Query compiled OK and sent to running service '" << peer.unit << "' (restart requested)." << '\n';
+          return system::errc::success;
+        }
+        // Inna instancja to zwykły proces (lub nierozpoznana) — dalsza ścieżka (exec.run) zgłosi
+        // brak dostępnej blokady (no_lock_available); nie próbujemy restartu.
+      }
+    }
+
+    // Domyślny katalog storage z opcjonalnego pliku konfiguracyjnego (toml++).
+    // Stosowany tylko gdy zestaw RQL nie podał własnej dyrektywy :STORAGE (RQL ma
+    // pierwszeństwo) i gdy istnieją realne zapytania — w trybie idle coreInstance jest
+    // pusty, dataModel nie powstaje, więc domyślny storage nie ma tam zastosowania.
+    if (!appCfg.storageDir.empty() && !coreInstance.empty() &&
+        std::ranges::none_of(coreInstance, [](const auto &it) { return it.id == ":STORAGE"; })) {
+      query storageDirective;
+      storageDirective.id       = ":STORAGE";
+      storageDirective.filename = appCfg.storageDir;
+      coreInstance.push_back(storageDirective);
+      SPDLOG_INFO("Default storage directory from config: {}", appCfg.storageDir);
     }
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
@@ -309,5 +437,5 @@ int main(int argc, char *argv[]) {
   }
 
   executorsm exec;
-  return exec.run(coreInstance, guard, cm, vm);
+  return exec.run(coreInstance, guard, cm, vm, appCfg);
 }

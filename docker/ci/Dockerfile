@@ -1,9 +1,9 @@
 # https://hub.docker.com/_/debian
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.0.6"
+LABEL com.retractordb.version="0.0.7"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-05-25"
+LABEL com.retractordb.release-date="2026-06-20"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -90,8 +90,8 @@ USER developer
 
 # Generuj DockerConan.txt wewnątrz kontenera na podstawie conanfile.py.
 # docker build wywołuj z katalogu głównego repo: docker build -f docker/ci/Dockerfile .
-COPY conanfile.py /tmp/conanfile.py
-COPY docker/ci/gen_dockerconan.sh /tmp/gen_dockerconan.sh
+COPY --chown=developer:developer conanfile.py /tmp/conanfile.py
+COPY --chown=developer:developer docker/ci/gen_dockerconan.sh /tmp/gen_dockerconan.sh
 RUN bash /tmp/gen_dockerconan.sh /tmp/conanfile.py /home/developer/workspace/DockerConan.txt \
     && rm /tmp/conanfile.py /tmp/gen_dockerconan.sh
 
@@ -122,8 +122,9 @@ CMD ["/bin/bash"]
 # docker image ls
 # dive <IMAGE ID>
 
-# How to deploy to DockerHub (run from docker/ci/)
-# docker build -t buildenv-retractordb .
+# How to deploy to DockerHub (run from repo root)
+# FIRST: cd github/retractordb ($PROJECT_ROOT)
+# docker build -f docker/ci/Dockerfile -t buildenv-retractordb .
 # docker run -it buildenv-retractordb
 # docker login
 # docker tag buildenv-retractordb micwide/buildenv-retractordb:latest

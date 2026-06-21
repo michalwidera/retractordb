@@ -1,9 +1,9 @@
 # make install && ctest -R it_service_idle -V
 
 # Weryfikuje tryb usługowy xretractor (systemd): start bezczynny (idle) bez
-# pliku .rql oraz logowanie usługowe na stderr (format '[L] treść', bez
-# znacznika czasu). -run : tryb włączony flagą --service. -env : ten sam efekt
-# włączony zmienną środowiskową XRETRACTOR_SERVICE=1.
+# pliku .rql oraz logowanie usługowe na stderr (format '<N>[L] treść' z prefiksem
+# priorytetu sd-daemon, bez znacznika czasu). -run : tryb włączony flagą --service.
+# -env : ten sam efekt włączony zmienną środowiskową XRETRACTOR_SERVICE=1.
 #
 # Logika scenariusza jest w service-idle.sh (kopiowanym do katalogu build przy
 # konfiguracji), a NIE w 'bash -c "...; ...; ..."', bo średnik w add_test() jest

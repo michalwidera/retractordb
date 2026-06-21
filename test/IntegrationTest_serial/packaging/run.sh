@@ -21,7 +21,9 @@ EXPECTED=$(printf '%s\n' \
   usr/bin/xqry \
   usr/bin/xretractor \
   usr/bin/xtrdb \
-  usr/lib/systemd/system/xretractor.service | sort)
+  usr/lib/systemd/system/xretractor.service \
+  usr/share/retractordb/retractor.toml.example \
+  usr/share/retractordb/service.env.example | sort)
 
 assert_exact() { # $1 = opis pakietu, $2 = lista plików (po jednym na linię)
   got=$(printf '%s\n' "$2" | sort)
@@ -49,7 +51,7 @@ if [ -f "$SRCCFG" ]; then
   test -n "$SRC"
   SRC_LIST=$(tar tzf "$SRC")
   for bad in '/build/' '/coverage/' '/Testing/' '/dokumentacja-rdb/' '/[.]claude/' \
-             '/[.]git/' '/[.]github/' '/docker/' '/uiRdbApp/' '/[.]venv/' '/bin/' \
+             '/[.]git/' '/[.]github/' '/docker/' '/[.]venv/' '/bin/' \
              '/CMakeCache' '[.]deb$'; do
     if printf '%s\n' "$SRC_LIST" | grep -qE "$bad"; then
       echo "BŁĄD: pakiet źródłowy zawiera zbędny artefakt pasujący do: $bad"

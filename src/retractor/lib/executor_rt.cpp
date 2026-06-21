@@ -102,14 +102,14 @@ bool rtCheckAndPrint() {
   return critical;
 }
 
-bool rtActivate() {
+bool rtActivate(int priority) {
   bool ok = true;
   if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
     SPDLOG_WARN("mlockall failed: {}", strerror(errno));
     ok = false;
   }
   struct sched_param sp{};
-  sp.sched_priority = kRtSchedulerPriority;
+  sp.sched_priority = priority;
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(errno));
     ok = false;

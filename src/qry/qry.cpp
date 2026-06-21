@@ -25,7 +25,10 @@ using boost::property_tree::ptree;
 // Musi pomieścić jedną sformatowaną linię z nazwami wszystkich kolumn strumienia.
 constexpr int kDirLineBufferSize = 1024;
 
-qry::qry() : transport_(std::make_unique<IpcTransport>()), formatter_(std::make_unique<Formatter>()) {}
+qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails)
+    : serverNoDataTimeoutMs_(std::max(1, serverNoDataTimeoutMs)),
+      transport_(std::make_unique<IpcTransport>(clientResponseMaxFails)),
+      formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 
 ptree qry::netClient(const std::string &cmd, const std::string &arg) { return transport_->netClient(cmd, arg); }
@@ -74,8 +77,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
   ptree schema;
   if (outputFormatMode != formatMode::RAW) schema = netClient("detail", input);
 
-  constexpr int serverTimeoutMs = 10000;
-  int noDataCounter             = 0;
+  int noDataCounter = 0;
 
   ptree e_value;
   try {
@@ -112,8 +114,8 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
           }
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
-      if (++noDataCounter > serverTimeoutMs) {
-        SPDLOG_WARN("No data received for {} ms, assuming server is dead.", serverTimeoutMs);
+      if (++noDataCounter > serverNoDataTimeoutMs_) {
+        SPDLOG_WARN("No data received for {} ms, assuming server is dead.", serverNoDataTimeoutMs_);
         transport_->done = true;
         break;
       }

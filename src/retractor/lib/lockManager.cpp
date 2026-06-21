@@ -8,9 +8,61 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <optional>
+#include <sstream>
+#include <string_view>
 
 #include <spdlog/spdlog.h>
+
+namespace {
+
+struct SystemdIdentity {
+  std::optional<std::string> unit;  // nazwa jednostki, gdy proces jest jednostką systemd
+  bool userScope{false};            // true => user.slice (systemctl --user), false => system
+};
+
+// Ustala własną tożsamość systemd na podstawie /proc/self/cgroup. systemd umieszcza jednostkę
+// w ścieżce cgroup typu ".../system.slice/xretractor.service" lub (dla --user)
+// ".../user.slice/user@1000.service/.../xretractor.service". Zwraca nazwę unitu, gdy proces jest
+// jednostką systemd; unit == nullopt gdy to zwykły proces.
+SystemdIdentity detectSystemdIdentity() {
+  SystemdIdentity id;
+
+  std::ifstream cgroup("/proc/self/cgroup");
+  if (!cgroup.is_open()) return id;
+
+  std::string line;
+  while (std::getline(cgroup, line)) {
+    // Format: "hierarchy:controllers:path" (v2: "0::/...path"). Interesuje nas ostatnie pole.
+    const auto lastColon = line.rfind(':');
+    if (lastColon == std::string::npos) continue;
+    std::string_view path(line);
+    path.remove_prefix(lastColon + 1);
+
+    // Zakres user, gdy ścieżka cgroup biegnie przez user.slice / user@<uid>.service.
+    const bool userScope = path.find("/user.slice") != std::string_view::npos || path.find("/user@") != std::string_view::npos;
+
+    // Ostatni (najgłębszy) segment ścieżki kończący się na ".service" jest nazwą naszego unitu;
+    // pomijamy user@<uid>.service, który jest menedżerem sesji, nie naszą jednostką.
+    std::string_view scan = path;
+    while (!scan.empty()) {
+      const auto slash     = scan.rfind('/');
+      std::string_view seg = (slash == std::string_view::npos) ? scan : scan.substr(slash + 1);
+      if (seg.ends_with(".service") && !seg.starts_with("user@")) {
+        id.unit      = std::string(seg);
+        id.userScope = userScope;
+        return id;
+      }
+      if (slash == std::string_view::npos) break;
+      scan = scan.substr(0, slash);
+    }
+  }
+  return id;
+}
+
+}  // namespace
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
 
@@ -19,6 +71,14 @@ FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
 }
 
 FlockServiceGuard::~FlockServiceGuard() { releaseLock(); }
+
+void FlockServiceGuard::setLockDir(const std::string &dir) {
+  if (dir.empty()) return;
+  const std::filesystem::path lockName = std::filesystem::path(lockFilePath).filename();
+  lockFilePath                         = (std::filesystem::path(dir) / lockName).string();
+}
+
+void FlockServiceGuard::setServiceQueryFile(const std::string &queryFile) { serviceQueryFile = queryFile; }
 
 bool FlockServiceGuard::acquireLock() {
   // Open or create the lock file
@@ -86,6 +146,40 @@ bool FlockServiceGuard::isAnotherInstanceRunning() const {
   return isRunning;
 }
 
+FlockServiceGuard::PeerInfo FlockServiceGuard::readPeerInfo() const {
+  PeerInfo info;
+
+  std::ifstream lockFile(lockFilePath);
+  if (!lockFile.is_open()) return info;  // brak pliku => Unknown
+
+  std::string line;
+  while (std::getline(lockFile, line)) {
+    std::istringstream ls(line);
+    std::string key;
+    ls >> key;
+    if (key == "MODE:") {
+      std::string value;
+      ls >> value;
+      if (value == "service")
+        info.kind = PeerInfo::Kind::Service;
+      else if (value == "process")
+        info.kind = PeerInfo::Kind::Process;
+    } else if (key == "UNIT:") {
+      ls >> info.unit;
+    } else if (key == "SCOPE:") {
+      std::string value;
+      ls >> value;
+      if (value == "system")
+        info.scope = PeerInfo::Scope::System;
+      else if (value == "user")
+        info.scope = PeerInfo::Scope::User;
+    } else if (key == "QUERYFILE:") {
+      ls >> info.queryFile;
+    }
+  }
+  return info;
+}
+
 bool FlockServiceGuard::writeLockInfo() const {
   if (lockFileDescriptor == -1) {
     return false;
@@ -104,6 +198,18 @@ bool FlockServiceGuard::writeLockInfo() const {
   // Process information
   std::string processInfo = "PID: " + std::to_string(getpid()) + "\n";
   processInfo += "PPID: " + std::to_string(getppid()) + "\n";
+
+  // Tryb działania: serwis (jednostka systemd) vs zwykły proces. Tożsamość systemd ustalamy
+  // z własnego /proc/self/cgroup — pewniej niż z flagi logowania (-j), która nie oznacza,
+  // że proces jest restartowalną jednostką. UNIT/SCOPE są potrzebne do systemctl [--user] restart,
+  // a QUERYFILE wskazuje plik zapytań do nadpisania przez inną instancję przed restartem.
+  const SystemdIdentity id = detectSystemdIdentity();
+  processInfo += "MODE: " + std::string(id.unit ? "service" : "process") + "\n";
+  if (id.unit) {
+    processInfo += "UNIT: " + *id.unit + "\n";
+    processInfo += "SCOPE: " + std::string(id.userScope ? "user" : "system") + "\n";
+  }
+  if (!serviceQueryFile.empty()) processInfo += "QUERYFILE: " + serviceQueryFile + "\n";
 
   // Write to the file
   ssize_t written = write(lockFileDescriptor, processInfo.c_str(), processInfo.length());

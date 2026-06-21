@@ -191,3 +191,5 @@ else()
   set(GIT_PREV_COMMIT none)
 endif()
 configure_file(config.h.in ${PROJECT_SOURCE_DIR}/src/include/config.h @ONLY)
+configure_file(serviceDefaults.h.in
+               ${PROJECT_SOURCE_DIR}/src/include/serviceDefaults.h @ONLY)

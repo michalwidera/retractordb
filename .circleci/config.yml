@@ -18,7 +18,7 @@ workflows:
             branches:
               only:
                 - master
-                - /issue_.*/
+                - /[Ii]ssue_.*/
                 - /[0-9]+[-].*/
 
   nightly-full:
@@ -31,11 +31,12 @@ workflows:
             branches:
               only:
                 - master
-                - /issue_.*/
+                - /[Ii]ssue_.*/
     jobs:
       - build-release
       - build-release-ninja-mydocker
-      - build-debug-ninja-mydocker
+      - build-debug-ninja-mydocker:
+          check_skipci: false
       - build-debug:
           requires:
             - build-release
@@ -55,7 +56,8 @@ workflows:
     jobs:
       - build-release
       - build-release-ninja-mydocker
-      - build-debug-ninja-mydocker
+      - build-debug-ninja-mydocker:
+          check_skipci: false
       - build-debug:
           requires:
             - build-release
@@ -75,15 +77,16 @@ workflows:
           filters:
             branches:
               only:
-                - /issue_.*/
+                - /[Ii]ssue_.*/
     jobs:
       - build-release-ninja-mydocker
-      - build-debug-ninja-mydocker
+      - build-debug-ninja-mydocker:
+          check_skipci: false
       - build-ARM:
           filters:
             branches:
               only:
-                - /issue_.*/
+                - /[Ii]ssue_.*/
 
 
 executors:
@@ -115,14 +118,27 @@ executors:
 
 commands:
   check-skipci:
+    parameters:
+      enabled:
+        type: boolean
+        default: true
     steps:
-      - run:
-          name: Check for [skipci] in commit message
-          command: |
-            if git log -1 --pretty=%B | grep -qF '[skipci]'; then
-              echo "Commit message contains [skipci] — skipping CI."
-              circleci step halt
-            fi
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Check for [skipci] in commit message
+                command: |
+                  if git log -1 --pretty=%B | grep -qF '[skipci]'; then
+                    echo "Commit message contains [skipci] — skipping CI."
+                    circleci step halt
+                  fi
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: "[skipci] check disabled (scheduled/manual workflow)"
+                command: echo "Ignoring [skipci] — this is not a commit-triggered workflow."
 
   prep-env-ci:
     parameters:
@@ -215,7 +231,7 @@ commands:
       - run:
           name: Smoke test
           command: |
-            export PATH="$HOME/retractordb/bin:$PATH"
+            export PATH="$HOME/.local/bin:$PATH"
             cd build/<< parameters.build_type >> && << parameters.build_tool >> showelf
             xretractor -h
             xqry -h
@@ -223,7 +239,7 @@ commands:
       - run:
           name: Integration & Unit test
           command: |
-            export PATH="$HOME/retractordb/bin:$PATH"
+            export PATH="$HOME/.local/bin:$PATH"
             cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
       - store_test_results:
           path: build/<< parameters.build_type >>/test
@@ -264,7 +280,8 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - check-skipci
+      - check-skipci:
+          enabled: false
       - prep-env:
           use_ninja: true
       - conan-install:
@@ -277,12 +294,17 @@ jobs:
           build_tool: ninja
 
   build-debug-ninja-mydocker:
+    parameters:
+      check_skipci:
+        type: boolean
+        default: true
     working_directory: ~/retractordb
     executor: debian-mydocker
     steps:
       - checkout:
           method: blobless
-      - check-skipci
+      - check-skipci:
+          enabled: << parameters.check_skipci >>
       - prep-env:
           use_ninja: true
       - conan-install:
@@ -303,7 +325,8 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - check-skipci
+      - check-skipci:
+          enabled: false
       - prep-env-ci
       - conan-install:
           build_param: --build missing
@@ -318,7 +341,8 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - check-skipci
+      - check-skipci:
+          enabled: false
       - prep-env-ci
       - conan-install:
           build_type: Debug
@@ -335,7 +359,8 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - check-skipci
+      - check-skipci:
+          enabled: false
       - prep-env-ci:
           use_ninja: true
       - conan-install:
@@ -363,7 +388,8 @@ jobs:
     steps:
       - checkout:
           method: blobless
-      - check-skipci
+      - check-skipci:
+          enabled: false
       - prep-env-ci
       - conan-install:
           build_type: << parameters.build_type >>

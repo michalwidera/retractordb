@@ -357,7 +357,7 @@ ensure_tools_for_option() {
     fi
 
     case "$opt" in
-        "release"|"debug")
+        "release"|"debug"|"probe")
             tool_specs=(
                 "gcc:required" "g++:required" "cmake:required"
                 "ninja:required" "conan:required" "make:required"
@@ -733,10 +733,40 @@ run_option() {
             conan build $build_folder -s build_type=Release --build missing
             ;;
         "debug")
-            sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default 
+            sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Debug --build missing
             conan build $build_folder -s build_type=Debug --build missing
+            ;;
+        "probe")
+            # Budowa Release z WŁĄCZONĄ sondą pomiarową (benchmark E1/E3). Release, bo
+            # sonda służy do pomiarów wydajności — mierzymy kod zoptymalizowany, nie Debug.
+            # UWAGA: sonda jest skompilowana w binarce (xretractor ostrzega w logu i w
+            # 'xretractor -h'). NIE używać produkcyjnie.
+            sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
+            conan source $build_folder
+            conan install $build_folder -s build_type=Release --build missing
+            cd "$build_folder"
+            cmake --preset conan-release -DRDB_BENCH_PROBE=ON
+            cd build/Release
+            ninja
+            echo "-- [warning: probe benchmark build] sonda pomiarowa WŁĄCZONA w tej kompilacji (RDB_BENCH_PROBE=ON)."
+            ;;
+        "package")
+            # Pakowanie binarne (DEB;TGZ wg CPACK_GENERATOR) z auto-sprzątaniem
+            # śmieci stagingu. Wybiera istniejący katalog buildu (Release > Debug).
+            cd "$build_folder" || exit 1
+            if   [ -d build/Release ]; then pkg_dir="build/Release"
+            elif [ -d build/Debug ];   then pkg_dir="build/Debug"
+            else echo "Error: no build dir found. Run 'debug' or 'release' first."; exit 1
+            fi
+            cd "$pkg_dir" || exit 1
+            cpack || echo "-- cpack zgłosił błędy (np. brak dpkg-deb dla DEB) — sprawdzam wynik."
+            # Śmieci po packagingu: katalog stagingu i manifest instalacji. Finalne
+            # archiwa (.deb/.tar.gz) zostają.
+            rm -rf _CPack_Packages install_manifest.txt
+            echo "-- Packaging artifacts in $pkg_dir:"
+            ls -1 *.deb *.tar.gz 2>/dev/null || echo "   (none produced)"
             ;;
         "toolchain"|"toolchain_all")
             ensure_venv
@@ -778,9 +808,16 @@ run_option() {
             cd $build_folder
             if [ "${PWD##*/}" != "retractordb" ] ; then echo "Error: Current folder is not retractordb" ; exit ; fi 
             bashrc_file="$HOME/.bashrc"
-            desired_path_line="export PATH=\"${PWD}/bin:\$PATH\""
+            # Binaria instalują się do ~/.local/bin (prefiks ustawiany w CMakeLists).
+            # Tworzymy katalog, by wpis PATH był poprawny nawet przed pierwszym 'ninja
+            # install'. Regex '.*/bin' przy podmianie usuwa też stare wpisy <repo>/bin.
+            mkdir -p "$HOME/.local/bin"
+            desired_path_line="export PATH=\"\$HOME/.local/bin:\$PATH\""
             desired_venv_line="source ~/.venv/bin/activate"
-            ensure_single_bashrc_line "$bashrc_file" "$desired_path_line" '^export PATH=".*\/bin:\$PATH"$'
+            # Uwaga awk: literalny '$' w dynamicznym regexie wymaga '\\$' (pojedyncze
+            # '\$' awk -v zamienia na kotwicę końca linii → dawny wzorzec nigdy nie
+            # pasował i wpisy PATH się duplikowały). Teraz podmienia stare <repo>/bin.
+            ensure_single_bashrc_line "$bashrc_file" "$desired_path_line" '^export PATH=".*/bin:\\$PATH"$'
             ensure_single_bashrc_line "$bashrc_file" "$desired_venv_line" '^(source|\.)[[:space:]]+(.*/)?\.venv/bin/activate$'
             echo "-- Last two lines of ~/.bashrc are:"
             tail -n 2 ~/.bashrc
@@ -853,13 +890,15 @@ run_option() {
             echo "Options:"
             echo "  release    - Build in Release mode (conan source, install, build)"
             echo "  debug      - Build in Debug mode (conan source, install, build)"
+            echo "  probe      - Build Release with benchmark probe ENABLED (RDB_BENCH_PROBE); NOT for production"
+            echo "  package    - Build DEB/TGZ packages (cpack) and clean staging artifacts"
             echo "  toolchain  - Install build toolchain (gcc, cmake, ninja, conan, etc.)"
             echo "  toolchain_required - Install minimal CI-like required toolchain from config.yml"
             echo "  toolchain_all - Install full toolchain: required + recommended + optional"
             echo "  validate   - Show required/recommended/optional tool status and install state"
             echo "  conan      - Detect conan profile and set C++23 standard"
             echo "  ninja      - Add Ninja generator to conan profile"
-            echo "  bashrc     - Add retractordb/bin to PATH in ~/.bashrc"
+            echo "  bashrc     - Add ~/.local/bin to PATH in ~/.bashrc (and create it)"
             echo "  coverage   - Build tests with code coverage enabled"
             echo "  vimsyntax  - Install RetractorQL syntax highlighting for vim"
             echo "  batsyntax  - Install RetractorQL syntax highlighting for bat/batcat"
@@ -870,7 +909,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release debug conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage vimsyntax batsyntax help quit"
+              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -882,7 +921,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"

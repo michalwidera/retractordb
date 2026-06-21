@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <optional>
 #include <print>
 #include <sstream>
 #include <string>
@@ -13,6 +15,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "../retractor/lib/appConfig.hpp"
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "qry.hpp"
@@ -23,22 +26,17 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
-// Domyślny czas oczekiwania na gotowość serwera xretractor przed wykonaniem komendy.
-constexpr int kDefaultServerWaitSeconds = 30;
-
-// Interwał odpytywania IPC podczas czekania na serwer — kompromis między
-// latencją startu a obciążeniem CPU przy czekaniu.
-constexpr int kServerWaitPollIntervalMs = 100;
-
-static bool waitForServer(int maxSeconds = kDefaultServerWaitSeconds) {
-  const int maxAttempts = maxSeconds * 1000 / kServerWaitPollIntervalMs;
+static bool waitForServer(int maxSeconds, int pollIntervalMs) {
+  const int safeSeconds      = std::max(1, maxSeconds);
+  const int safePollInterval = std::max(1, pollIntervalMs);
+  const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
   for (int i = 0; i < maxAttempts; ++i) {
     try {
       IPC::managed_shared_memory seg(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
       IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
       return true;
     } catch (...) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(kServerWaitPollIntervalMs));
+      std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
     }
   }
   return false;
@@ -62,6 +60,7 @@ int main(int argc, char *argv[]) {
     std::string sDetailStream;
     std::string sAdHoc;
     std::string sGnuplotDim;
+    std::string sConfig;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
@@ -78,6 +77,7 @@ int main(int argc, char *argv[]) {
         ("influxdb,f", "influxDB output mode")                                                            //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
         ("gnuplot-rtl", "gnuplot output: newest samples on the right (right-to-left scroll)")             //
+        ("config", po::value<std::string>(&sConfig), "config file (TOML); overrides search")              //
         ("help,h", "produce help message")                                                                //
         ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
         ("wait-server,w", "poll until xretractor server is available before executing command");
@@ -88,7 +88,9 @@ int main(int argc, char *argv[]) {
     po::notify(vm);
     (void)setvbuf(stdout, nullptr, _IONBF, 0);
 
-    qry obj;
+    const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+
+    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails);
 
     if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
       std::println("Only one output format could be selected.");
@@ -137,8 +139,8 @@ int main(int argc, char *argv[]) {
       return system::errc::invalid_argument;
     }
     if (vm.contains("wait-server") && !vm.contains("help")) {
-      if (!waitForServer()) {
-        SPDLOG_ERROR("server not available after {} seconds", kDefaultServerWaitSeconds);
+      if (!waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs)) {
+        SPDLOG_ERROR("server not available after {} seconds", appCfg.timingServerStartupWaitSeconds);
         return system::errc::no_child_process;
       }
     }

@@ -3,6 +3,9 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <cstdio>   // sonda benchmarku E1 (RDB_BENCH_CSV): std::fopen/fprintf/fclose
+#include <cstdlib>  // sonda benchmarku E1: std::getenv
+#include <ctime>    // sonda benchmarku E1: clock_gettime, timespec
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -51,8 +54,7 @@ using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemA
 using namespace CRationalStreamMath;
 
 namespace {
-constexpr int kQueueBufferSeconds   = 10;
-constexpr int kMinimumQueueElements = 100;
+constexpr std::chrono::milliseconds kIdleLoopSleep{100};
 }  // namespace
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
@@ -82,6 +84,9 @@ std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 std::atomic<bool> executorsm::ipcReady{false};
+int executorsm::cfgQueueBufferSeconds = appcfg::kDefaultIpcQueueBufferSeconds;
+int executorsm::cfgMinQueueElements   = appcfg::kDefaultIpcMinQueueElements;
+int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 
 static std::thread bt;
 
@@ -280,8 +285,8 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
-      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * kQueueBufferSeconds;
-      maxElements     = std::max(maxElements, kMinimumQueueElements);
+      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * cfgQueueBufferSeconds;
+      maxElements     = std::max(maxElements, cfgMinQueueElements);
       IPC::message_queue mq(IPC::open_or_create,               // open or crate
                             queueName.c_str(),                 // name
                             maxElements,                       // max message number
@@ -490,9 +495,12 @@ void executorsm::boradcast(const std::set<std::string> &inSet) {
   }
 }
 
-int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm) {
-  executorsm::coreInstancePtr = &coreInstance;
-  executorsm::cmPtr           = &cm;
+int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg) {
+  executorsm::coreInstancePtr       = &coreInstance;
+  executorsm::cmPtr                 = &cm;
+  executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
+  executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
+  executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
 
   std::atexit(cleanup);
 
@@ -540,7 +548,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
           break;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(kIdleLoopSleep);
       }
       if (iLoopLimitCnt != executorsm::stop_now) _getch();
     } else {
@@ -581,8 +589,24 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
       const bool rt_mode = vm.contains("realtime");
       if (rt_mode) {
-        if (rtCheckAndPrint()) rtActivate();
+        if (rtCheckAndPrint()) rtActivate(cfgRtPriority);
       }
+
+#ifdef RDB_BENCH_PROBE
+      //
+      // Sonda pomiarowa E1 (benchmark budżetu czasowego).
+      // Cały kod sondy jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON
+      // (scripts/buildrdb.sh probe); w zwykłej kompilacji znika bez śladu.
+      // Dodatkowo aktywna w runtime tylko, gdy ustawiona jest zmienna środowiskowa
+      // RDB_BENCH_CSV wskazująca plik wyjściowy. W normalnym działaniu (brak zmiennej)
+      // benchFile == nullptr i sonda nie ma żadnego wpływu na przetwarzanie.
+      // Format CSV analizuje examples/ecg/e1_stats.py.
+      //
+      const char *benchPath = std::getenv("RDB_BENCH_CSV");
+      std::FILE *benchFile  = benchPath ? std::fopen(benchPath, "w") : nullptr;
+      if (benchFile) std::fprintf(benchFile, "iter,compute_ns\n");
+      long benchIter = 0;
+#endif
 #endif
 
       while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
@@ -619,10 +643,24 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
         inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-        proc.processRows(inSet);
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+        struct timespec t0{}, t1{};
+        if (benchFile) clock_gettime(CLOCK_MONOTONIC, &t0);
+#endif
+        proc.processRows(inSet);  // mierzony rdzeń obliczeń jednego interwału (E1)
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+        if (benchFile) {
+          clock_gettime(CLOCK_MONOTONIC, &t1);
+          long ns = (t1.tv_sec - t0.tv_sec) * 1'000'000'000L + (t1.tv_nsec - t0.tv_nsec);
+          std::fprintf(benchFile, "%ld,%ld\n", benchIter++, ns);
+        }
+#endif
         boradcast(inSet);
         // End of loop while( ! _kbhit(ignoreanykey) )
       }
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+      if (benchFile) std::fclose(benchFile);  // domknięcie sondy E1
+#endif
       //
       // End of data processing loop
       //
