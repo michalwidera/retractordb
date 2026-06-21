@@ -108,6 +108,8 @@ void applyTable(const toml::table &tbl, AppConfig &cfg) {
   if (auto v = tbl.at_path("scheduling.rt_priority").value<int>(); v) cfg.schedulingRtPriority = *v;
 
   if (auto v = tbl.at_path("paths.lock_dir").value<std::string>(); v) cfg.lockDir = *v;
+
+  if (auto v = tbl.at_path("service.query_file").value<std::string>(); v) cfg.serviceQueryFile = *v;
 }
 
 // Ścieżka pliku konfiguracyjnego użytkownika wg XDG ($XDG_CONFIG_HOME lub ~/.config).

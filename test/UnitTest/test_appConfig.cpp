@@ -86,6 +86,19 @@ TEST_F(AppConfigTest, malformed_toml_in_layer_falls_back_to_defaults) {
   EXPECT_TRUE(cfg.storageDir.empty());
 }
 
+TEST_F(AppConfigTest, service_query_file_defaults_to_canonical_path) {
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_EQ(cfg.serviceQueryFile, appcfg::kDefaultServiceQueryFile);
+}
+
+TEST_F(AppConfigTest, user_layer_overrides_service_query_file) {
+  writeFile(userConfigFile(), "[service]\nquery_file = \"/srv/retractor/queries.rql\"\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  EXPECT_EQ(cfg.serviceQueryFile, "/srv/retractor/queries.rql");
+}
+
 TEST_F(AppConfigTest, explicit_config_path_is_read) {
   const fs::path explicitFile = tmpDir / "custom.toml";
   writeFile(explicitFile, "[storage]\ndir = \"/srv/rdb\"\n");

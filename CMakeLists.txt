@@ -130,6 +130,18 @@ link_directories(${Boost_LIBRARY_DIRS})
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # compileCommands req. from
                                       # .vsccode/c_cpp_properties.json
+
+# Jedno źródło prawdy dla kanonicznego pliku zapytań serwisu. Podstawiane
+# (configure_file) do: jednostki systemd (ExecStart), nagłówka serviceDefaults.h
+# (domyślna wartość AppConfig) oraz postinst (utworzenie pliku). Dystrybutor
+# może nadpisać -D...
+set(RETRACTOR_QUERY_FILE
+    "/etc/retractor/startup.rql"
+    CACHE
+      PATH
+      "Kanoniczny plik zapytań serwisu xretractor (ExecStart / fallback AppConfig)"
+)
+
 add_subdirectory(src)
 add_subdirectory(scripts)
 add_subdirectory(test)
@@ -169,12 +181,17 @@ install(FILES ${CMAKE_BINARY_DIR}/xretractor.service
 # do /etc/retractor.
 install(
   FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/retractor.toml.example
+        ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/service.env.example
   DESTINATION share/retractordb)
 
 # Skrypty maintainer DEB: tworzą usera 'retractor' i włączają jednostkę (enable,
-# bez natychmiastowego startu).
+# bez natychmiastowego startu). postinst generowany z .in (podstawienie
+# @RETRACTOR_QUERY_FILE@), by ścieżka pliku zapytań pochodziła z tego samego
+# źródła co ExecStart jednostki.
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst.in
+               ${CMAKE_BINARY_DIR}/debian/postinst @ONLY)
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
+    "${CMAKE_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
 )
 
 set(CPACK_PACKAGE_NAME "retractordb")

@@ -22,7 +22,8 @@ EXPECTED=$(printf '%s\n' \
   usr/bin/xretractor \
   usr/bin/xtrdb \
   usr/lib/systemd/system/xretractor.service \
-  usr/share/retractordb/retractor.toml.example | sort)
+  usr/share/retractordb/retractor.toml.example \
+  usr/share/retractordb/service.env.example | sort)
 
 assert_exact() { # $1 = opis pakietu, $2 = lista plików (po jednym na linię)
   got=$(printf '%s\n' "$2" | sort)

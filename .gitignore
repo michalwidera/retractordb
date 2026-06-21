@@ -5,6 +5,7 @@ CTestTestfile.cmake
 CMakeLists.txt.user
 cmake_install.cmake
 src/include/config.h
+src/include/serviceDefaults.h
 examples/generator/CMakeFiles
 examples/generator/xgenerator
 examples/temp/

@@ -57,12 +57,45 @@ KillSignal=SIGTERM
 TimeoutStopSec=30
 ```
 
+### Delivering a query set to a running service
+
+When `xretractor` is started with a query file while another instance is **already
+running as a systemd service**, it does not fail with a lock error. Instead it:
+
+1. detects that the running instance is a systemd unit (and whether it is a
+   `system` or `--user` unit),
+2. compiles the new query set locally to validate it (a parse/compile error stops
+   here — nothing is delivered),
+3. overwrites the service's query file with the validated set (atomically), and
+4. restarts the unit (`systemctl restart` / `systemctl --user restart`), so the
+   service reloads the new queries while keeping its unit configuration.
+
+On success it prints `Query ... sent to running service '<unit>'` and exits `0`.
+
+```bash
+# xretractor.service is already running
+xretractor my-new-queries.rql      # validated, delivered, service restarted
+```
+
+Notes:
+- This is the path for a **full, persistent** query set (rules, `:STORAGE`,
+  `:SUBSTRAT`, rotation) — unlike the lightweight, transient ad-hoc injection over
+  IPC (`xqry --adhoc`), which only accepts `SELECT` / `DECLARE`.
+- Restarting a **system** unit needs privileges — run with `sudo` if `systemctl
+  restart` is denied; a `--user` unit restarts without root.
+- Which file is overwritten: the service reports its own query file in the lock
+  file; if that is unavailable, the `[service] query_file` config default is used.
+- If the running instance is a plain process (not a systemd unit), startup fails
+  with the usual single-instance lock error (`no_lock_available`).
+
 ### Packaged unit (DEB)
 
 The `.deb` produced by `make packages` ships the unit and wires it up automatically:
 
 - binaries install to `/usr/bin/` (so `ExecStart=/usr/bin/xretractor`),
 - the unit installs to `/usr/lib/systemd/system/xretractor.service`,
+- its `ExecStart` loads the canonical query file `/etc/retractor/startup.rql`
+  (an **empty** file = idle); `postinst` creates it empty if absent,
 - the `postinst` maintainer script creates the system user `retractor` and runs
   `systemctl enable xretractor.service` (the service starts on next boot; it is **not**
   started immediately — use `systemctl start xretractor` to start it now),
@@ -70,9 +103,12 @@ The `.deb` produced by `make packages` ships the unit and wires it up automatica
 
 The unit is generated from the template
 [`packaging/systemd/xretractor.service.in`](../../packaging/systemd/xretractor.service.in)
-(`@RETRACTOR_BIN@` is substituted with the install bindir). Edit the template, not the
-generated copy. Logs: `journalctl -u xretractor`; status: `systemctl status xretractor`
-or `xretractor --status`.
+(`@RETRACTOR_BIN@` and `@RETRACTOR_QUERY_FILE@` are substituted at build time). Edit the
+template, not the generated copy. The query-file path has a single build-time source
+(CMake `RETRACTOR_QUERY_FILE`); an administrator can override it at runtime **without
+editing the unit** by setting `RETRACTOR_QUERY_FILE=...` in `/etc/retractor/service.env`
+(shipped as `service.env.example`, read via the unit's `EnvironmentFile`). Logs:
+`journalctl -u xretractor`; status: `systemctl status xretractor` or `xretractor --status`.
 
 ## Configuration (TOML)
 
@@ -145,6 +181,14 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Empty means system temp directory.
   - Recommended for service deployments: `/var/run/retractor` or `$XDG_RUNTIME_DIR`.
 
+#### [service]
+
+- `service.query_file` (string, default: `/etc/retractor/startup.rql`)
+  - Query file overwritten when delivering a set to a running service
+    (see "Delivering a query set to a running service").
+  - Fallback only: normally the running service reports its own query file in the lock.
+  - Must match the unit's `ExecStart` argument — this key does **not** change `ExecStart`.
+
 ### Example configuration
 
 ```toml
@@ -166,6 +210,9 @@ rt_priority = 50
 
 [paths]
 lock_dir = "/var/run/retractor"
+
+[service]
+query_file = "/etc/retractor/startup.rql"
 ```
 
 Please notice that this tool has second face when you call it with "only compile" option. This face is required for _Show Diagram_ or _Show query Plan_ actions.

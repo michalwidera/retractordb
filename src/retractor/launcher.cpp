@@ -26,6 +26,7 @@
 #include "lib/persistentCounter.hpp"
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
+#include "lib/serviceControl.hpp"
 #include "uxSysTermTools.hpp"
 
 /// @brief Główny plik uruchamiający program, odpowiedzialny za parsowanie argumentów, obsługę sygnałów i koordynację działania programu.
@@ -75,8 +76,11 @@
 ///   środowiskową XRETRACTOR_SERVICE — dla wygody konfiguracji jednostki systemd przez Environment=.
 ///
 /// Interfejs komunikacji i funkcjonalność:
-/// - Wymuszać pojedynczą instancję usługi poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
+/// - Wymuszać pojedynczą instancję programu w systemie poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
 ///   jest sygnalizowana błędem braku dostępnej blokady (no_lock_available).
+/// - W przypadku rozpoznania funkcjonowania innej instancji programu, należy rozpoznać czy ta instancja działa jako serwis,
+///   czy jako osobny proces, jeśli działa jako serwis zaraportować informację o tym fakcie i
+///   przekompilować zapytania (sprawdzić poprawność) i przekazać zapytanie do tej instancji poprzez restart serwisu z zapytaniem (zachowując konfigurację serwisu).
 /// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
 ///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
 /// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
@@ -313,6 +317,10 @@ int main(int argc, char *argv[]) {
         return EPERM;  // ERROR defined in errno-base.h
       }
 
+      // Zapamiętaj plik zapytań w blokadzie: jeśli ta instancja zostanie serwisem, inna instancja
+      // odczyta QUERYFILE i będzie wiedziała, który plik nadpisać przed restartem serwisu (E3).
+      guard.setServiceQueryFile(std::filesystem::absolute(sInputFile).string());
+
       std::ifstream file(sInputFile);
       if (!file.is_open()) {
         std::cerr << "Error: Unable to open file!" << '\n';
@@ -356,6 +364,34 @@ int main(int argc, char *argv[]) {
           return dm.run(vm);
         }
         return system::errc::success;
+      }
+
+      // E3: jeśli działa już inna instancja będąca serwisem systemd, nie startujemy drugiej —
+      // dostarczamy zwalidowany (skompilowany powyżej) zestaw zapytań, nadpisując plik zapytań
+      // serwisu i zlecając restart. Serwis załaduje nowy zestaw, zachowując konfigurację jednostki.
+      // Podwójna kompilacja (tu lokalnie + w serwisie po restarcie) jest zamierzona.
+      if (guard.isAnotherInstanceRunning()) {
+        const FlockServiceGuard::PeerInfo peer = guard.readPeerInfo();
+        if (peer.kind == FlockServiceGuard::PeerInfo::Kind::Service && !peer.unit.empty()) {
+          const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
+          SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
+          if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
+            std::cerr << "Failed to write query file to service: " << target << '\n';
+            return system::errc::io_error;
+          }
+          const bool userScope = peer.scope == FlockServiceGuard::PeerInfo::Scope::User;
+          const int rc         = servicecontrol::restartService(userScope, peer.unit);
+          if (rc != 0) {
+            std::cerr << "Failed to restart service unit '" << peer.unit << "' (systemctl rc=" << rc << ").";
+            if (!userScope) std::cerr << " A system unit restart requires privileges (run with sudo).";
+            std::cerr << '\n';
+            return system::errc::operation_not_permitted;
+          }
+          std::cout << "Query compiled OK and sent to running service '" << peer.unit << "' (restart requested)." << '\n';
+          return system::errc::success;
+        }
+        // Inna instancja to zwykły proces (lub nierozpoznana) — dalsza ścieżka (exec.run) zgłosi
+        // brak dostępnej blokady (no_lock_available); nie próbujemy restartu.
       }
     }
 

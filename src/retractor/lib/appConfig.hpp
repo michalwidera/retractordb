@@ -3,6 +3,8 @@
 #include <optional>
 #include <string>
 
+#include "serviceDefaults.h"  // kBuildDefaultServiceQueryFile (generowane z CMake)
+
 namespace appcfg {
 inline constexpr int kDefaultIpcQueueBufferSeconds{10};
 inline constexpr int kDefaultIpcMinQueueElements{100};
@@ -14,6 +16,11 @@ inline constexpr int kDefaultSchedulingRtPriority{50};
 
 inline constexpr int kRtPriorityMin{1};
 inline constexpr int kRtPriorityMax{99};
+
+// Kanoniczny plik zapytań serwisu — fallback, gdy działający serwis nie zaraportował
+// własnego QUERYFILE w pliku blokady. Jedno źródło prawdy: CMake RETRACTOR_QUERY_FILE
+// (to samo zasila ExecStart jednostki i postinst), spójność gwarantowana w build-time.
+inline constexpr const char *kDefaultServiceQueryFile{kBuildDefaultServiceQueryFile};
 }  // namespace appcfg
 
 /// Konfiguracja usługi xretractor wczytywana z opcjonalnego pliku TOML (toml++).
@@ -66,6 +73,13 @@ struct AppConfig {
   /// Katalog na plik blokady singleton (lock). Pusty = system temp dir.
   /// Dla usług systemd zalecane /var/run/retractor lub $XDG_RUNTIME_DIR.
   std::string lockDir;
+
+  // === [service] ===
+
+  /// Plik zapytań nadpisywany przy przekazaniu zestawu działającemu serwisowi (restart).
+  /// Używany tylko jako fallback, gdy serwis nie zaraportował własnego QUERYFILE w blokadzie.
+  /// Musi być zgodny z argumentem ExecStart jednostki systemd (config nie zmienia ExecStart).
+  std::string serviceQueryFile{appcfg::kDefaultServiceQueryFile};
 };
 
 /// Wczytuje konfigurację.

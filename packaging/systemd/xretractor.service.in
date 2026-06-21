@@ -17,12 +17,22 @@ User=retractor
 Group=retractor
 
 # Tryb usługowy: log na stderr (przechwytywany przez journald), bez TTY.
-# Start bez pliku .rql uruchamia tryb bezczynny (idle); aby wczytać zapytania,
-# dopisz plik jako argument, np. ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey /etc/retractor/startup.rql
+#
+# Plik zapytań wskazuje zmienna RETRACTOR_QUERY_FILE. Domyślnie @RETRACTOR_QUERY_FILE@
+# (jedno źródło: CMake RETRACTOR_QUERY_FILE). Administrator może nadpisać ścieżkę BEZ edycji
+# tej jednostki — wpisując RETRACTOR_QUERY_FILE=/ścieżka w /etc/retractor/service.env
+# (EnvironmentFile poniżej; '-' = plik opcjonalny). Plik env jest czytany PO Environment=,
+# więc nadpisuje domyślną wartość. Wskazany plik musi istnieć (pusty = tryb idle).
+#
+# Pusty plik = tryb bezczynny (idle); serwis wstaje i czeka. Nową instancję xretractor
+# uruchomioną z innym plikiem zapytań wykryje działający serwis, nadpisze ten plik zwalidowanym
+# zestawem i zleci restart jednostki (przekazanie zapytania, zachowanie konfiguracji).
 #
 # Tryb usługowy logowania można też włączyć zmienną środowiskową zamiast flagi --service:
 #   Environment=XRETRACTOR_SERVICE=1
-ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey
+Environment=RETRACTOR_QUERY_FILE=@RETRACTOR_QUERY_FILE@
+EnvironmentFile=-/etc/retractor/service.env
+ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey ${RETRACTOR_QUERY_FILE}
 
 KillSignal=SIGTERM
 TimeoutStopSec=30

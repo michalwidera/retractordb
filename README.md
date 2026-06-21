@@ -151,8 +151,8 @@ A minimal config that sets a default storage directory:
 dir = "/var/lib/retractor/data"
 ```
 
-For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`),
-validation rules, and the systemd service setup, see
+For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`,
+`[service]`), validation rules, and the systemd service setup, see
 [src/retractor/README.md](src/retractor/README.md#configuration-toml).
 
 ## Running your first query
@@ -188,9 +188,21 @@ stop, or use `-k` to disable that):
 xretractor first.rql
 ```
 
-If you installed via the `.deb`, the engine usually runs as a service instead;
-load a query set per your deployment and use `systemctl`/`journalctl` to manage
-it.
+If you installed via the `.deb`, the engine usually runs as a systemd service
+instead. To load a query set into an **already running** service, just start
+`xretractor` with your `.rql` file — it detects the running service, validates
+(compiles) the queries, overwrites the service's query file and restarts the unit
+to apply them, keeping the unit configuration:
+
+```bash
+xretractor my-new-queries.rql      # delivered to the running service via restart
+```
+
+This is the path for a full, persistent query set (rules, `:STORAGE`, rotation),
+as opposed to the transient ad-hoc injection over IPC (`xqry --adhoc`). Use
+`systemctl`/`journalctl` to manage and inspect the service. See
+[src/retractor/README.md](src/retractor/README.md#delivering-a-query-set-to-a-running-service)
+for details.
 
 **3. Query the running engine** with the `xqry` client (in a second terminal).
 `xretractor` must be running — `xqry` reads results from shared memory:
