@@ -35,7 +35,7 @@ RUN mkdir /home/developer/libs && \
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.1.5"
+LABEL com.retractordb.version="0.1.7"
 LABEL vendor1="Michal Widera"
 LABEL com.retractordb.release-date="2026-06-21"
 LABEL com.retractordb.description="RetractorDB production runtime"
