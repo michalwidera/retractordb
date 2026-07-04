@@ -594,18 +594,29 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
 #ifdef RDB_BENCH_PROBE
       //
-      // Sonda pomiarowa E1 (benchmark budżetu czasowego).
+      // Sonda pomiarowa E1 + E2E (benchmark budżetu czasowego i latencji end-to-end).
       // Cały kod sondy jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON
       // (scripts/buildrdb.sh probe); w zwykłej kompilacji znika bez śladu.
       // Dodatkowo aktywna w runtime tylko, gdy ustawiona jest zmienna środowiskowa
       // RDB_BENCH_CSV wskazująca plik wyjściowy. W normalnym działaniu (brak zmiennej)
       // benchFile == nullptr i sonda nie ma żadnego wpływu na przetwarzanie.
-      // Format CSV analizuje examples/ecg/e1_stats.py.
+      // Format CSV analizuje examples/ecg/e1_stats.py. Kolumny:
+      //   compute_ns  — czas processRows() (E1, czysty rdzeń obliczeń),
+      //   wake_lag_ns — spóźnienie pobudki względem deadline'u interwału
+      //                 (loop_anchor + interval; ten sam cel, do którego dąży
+      //                 rtAbsoluteSleep) — jitter planisty,
+      //   e2e_ns      — od deadline'u (nominalny moment pojawienia się krotki
+      //                 wejściowej w modelu czasowym) do końca boradcast()
+      //                 (emisja wyniku do kolejek IPC klientów).
+      // Uwaga: bez -t (realtime) pętla śpi względnie, więc dryf kumuluje się
+      // w wake_lag/e2e — do CDF E2E miarodajny jest przebieg z -t.
       //
       const char *benchPath = std::getenv("RDB_BENCH_CSV");
       std::FILE *benchFile  = benchPath ? std::fopen(benchPath, "w") : nullptr;
-      if (benchFile) std::fprintf(benchFile, "iter,compute_ns\n");
-      long benchIter = 0;
+      if (benchFile) std::fprintf(benchFile, "iter,compute_ns,wake_lag_ns,e2e_ns\n");
+      long benchIter             = 0;
+      const long loop_anchor_ns  = loop_anchor.tv_sec * 1'000'000'000L + loop_anchor.tv_nsec;
+      constexpr auto benchTimeNs = [](const struct timespec &ts) { return ts.tv_sec * 1'000'000'000L + ts.tv_nsec; };
 #endif
 #endif
 
@@ -642,24 +653,35 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 #endif
           std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+        struct timespec t0{}, t1{}, tWake{};
+        long deadline_ns = 0;
+        if (benchFile) {
+          clock_gettime(CLOCK_MONOTONIC, &tWake);
+          deadline_ns = loop_anchor_ns + rational_cast<long>(interval) * 1'000'000L;  // ms -> ns
+        }
+#endif
         inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
 #if defined(__linux__) && defined(RDB_BENCH_PROBE)
-        struct timespec t0{}, t1{};
         if (benchFile) clock_gettime(CLOCK_MONOTONIC, &t0);
 #endif
         proc.processRows(inSet);  // mierzony rdzeń obliczeń jednego interwału (E1)
 #if defined(__linux__) && defined(RDB_BENCH_PROBE)
-        if (benchFile) {
-          clock_gettime(CLOCK_MONOTONIC, &t1);
-          long ns = (t1.tv_sec - t0.tv_sec) * 1'000'000'000L + (t1.tv_nsec - t0.tv_nsec);
-          std::fprintf(benchFile, "%ld,%ld\n", benchIter++, ns);
-        }
+        if (benchFile) clock_gettime(CLOCK_MONOTONIC, &t1);
 #endif
         boradcast(inSet);
+#if defined(__linux__) && defined(RDB_BENCH_PROBE)
+        if (benchFile) {
+          struct timespec tEmit{};
+          clock_gettime(CLOCK_MONOTONIC, &tEmit);  // koniec emisji wyniku (E2E)
+          std::fprintf(benchFile, "%ld,%ld,%ld,%ld\n", benchIter++, benchTimeNs(t1) - benchTimeNs(t0),
+                       benchTimeNs(tWake) - deadline_ns, benchTimeNs(tEmit) - deadline_ns);
+        }
+#endif
         // End of loop while( ! _kbhit(ignoreanykey) )
       }
 #if defined(__linux__) && defined(RDB_BENCH_PROBE)
-      if (benchFile) std::fclose(benchFile);  // domknięcie sondy E1
+      if (benchFile) std::fclose(benchFile);  // domknięcie sondy E1/E2E
 #endif
       //
       // End of data processing loop
