@@ -11,6 +11,8 @@ namespace rdb {
 ///
 /// Obiekt posixBinaryFileWithShadow powinien:
 /// - realizować append do głównego pliku danych oraz update do osobnego pliku cienia,
+/// - dzięki plikowi cienia zachowywać oryginalną, zarejestrowaną zawartość danych: aktualizacje nie nadpisują
+///   rekordów w pliku głównym aż do jawnego wywołania merge(),
 /// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) opisujące zmiany istniejących rekordów,
 /// - podczas odczytu zwracać najnowszą wartość rekordu, preferując dane z pliku cienia przed danymi z pliku głównego,
 /// - przy wielokrotnych aktualizacjach tej samej pozycji traktować ostatni wpis w pliku cienia jako obowiązujący stan rekordu,
@@ -19,6 +21,7 @@ namespace rdb {
 /// - udostępniać operację merge(), która scala zmiany z pliku cienia do pliku głównego i zeruje plik cienia,
 /// - w operacji purge wywołanej przez write(nullptr, ..., 0) usuwać zarówno plik główny, jak i plik cienia,
 /// - zwracać przez count() liczbę rekordów wynikającą wyłącznie z rozmiaru pliku głównego,
+/// - raportować przez hasShadow() posiadanie pliku cienia danych, aby storage dobrał wariant indeksu metadanych,
 /// - przy tworzeniu obiektu odtwarzać stan z istniejącego pliku głównego i istniejącego pliku cienia, przycinając niepełne końcówki wpisów,
 /// - zwalniać deskryptory plików przy niszczeniu obiektu i podejmować próbę utrwalenia zapisanych danych przez fsync.
 ///
@@ -54,6 +57,7 @@ class posixBinaryFileWithShadow : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] bool hasShadow() const override { return true; }
 
   /// @brief Scala plik cienia z głównym plikiem i usuwa plik cienia
   ssize_t merge();

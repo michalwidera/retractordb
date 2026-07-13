@@ -12,7 +12,7 @@
 #include "config.h"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
-#include "rdb/storageacc.hpp"
+#include "rdb/storage.hpp"
 #include "retractor/lib/dataModel.hpp"
 #include "retractor/lib/qTree.hpp"  // coreInstance
 
@@ -338,7 +338,7 @@ std::unique_ptr<dataModel> dataArea_null;
 class xschema_all_null : public ::testing::Test {
  protected:
   xschema_all_null() {
-    // Destroy first so its metaDataStream flushes before files are removed
+    // Destroy first so its metaData flushes before files are removed
     dataArea_null.reset();
     for (const auto *f : {"core0.desc", "core1.desc", "str1", "str1.meta", "str1.desc", "str2", "str2.desc"})
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
@@ -356,7 +356,7 @@ class xschema_all_null : public ::testing::Test {
 };
 
 // Logika trójwartościowa: agregacja na samych NULL-ach → wynik NULL
-// Null bity są w currentEntry_ metaDataStream tej samej instancji storage,
+// Null bity są w currentEntry_ metaData tej samej instancji storage,
 // więc revRead(0) odczyta je poprawnie bez potrzeby flushu na dysk.
 TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_sum) {
   auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_SUM, "str1");

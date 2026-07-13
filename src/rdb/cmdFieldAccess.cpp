@@ -2,6 +2,7 @@
 
 #include <any>
 #include <iostream>
+#include <print>
 
 std::pair<std::string, std::vector<std::string>> SetPosCmd::usage() const {
   return {"setpos [position][number value]", {"set payload field number value"}};
@@ -45,21 +46,22 @@ bool GetPosCmd::execute(CommandContext &ctx) {
   const auto fieldName = ctx.dacc->descriptor[position].rname;
   const auto valueOpt  = ctx.dacc->getPayload()->getItem(position);
   if (!valueOpt.has_value()) {
-    std::cout << fieldName << ": null\n";
+    std::print("{}: null\n", fieldName);
     return false;
   }
   const std::any &value = *valueOpt;
   if (value.type() == typeid(std::monostate))
-    std::cout << "null\n";
+    std::print("null\n");
   else if (value.type() == typeid(std::string))
-    std::cout << std::any_cast<std::string>(value) << "\n";
+    std::print("{}\n", std::any_cast<std::string>(value));
   else if (value.type() == typeid(int))
-    std::cout << std::any_cast<int>(value) << "\n";
+    std::print("{}\n", std::any_cast<int>(value));
   else if (value.type() == typeid(uint8_t))
-    std::cout << static_cast<unsigned int>(std::any_cast<uint8_t>(value)) << "\n";
+    std::print("{}\n", static_cast<unsigned int>(std::any_cast<uint8_t>(value)));
   else if (value.type() == typeid(float))
-    std::cout << std::any_cast<float>(value) << "\n";
+    std::cout << std::any_cast<float>(value)
+              << "\n";  // std::cout: domyślny format (6 cyfr znaczących) — std::print dałby inny zapis
   else if (value.type() == typeid(double))
-    std::cout << std::any_cast<double>(value) << "\n";
+    std::cout << std::any_cast<double>(value) << "\n";  // jw. — zachowanie zgodne z dotychczasowym wyjściem
   return true;
 }

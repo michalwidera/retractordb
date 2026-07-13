@@ -6,9 +6,11 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <print>
 #include <sstream>
 #include <vector>
 
+#include <fmt/ranges.h>                    // fmt::join — łączenie listy ścieżek konfiguracyjnych
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <boost/algorithm/string.hpp>
@@ -272,34 +274,34 @@ int main(int argc, char *argv[]) {
     po::notify(vm);
 
     appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    if (appCfg.loadedFrom.empty())
+      SPDLOG_INFO("No configuration file found; using built-in defaults.");
+    else
+      SPDLOG_INFO("Configuration loaded from: {}", fmt::join(appCfg.loadedFrom, ", "));
     validateConfiguredStorageDir(appCfg);
 
     iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 
     if (vm.contains("status")) {
-      std::cout << "Checking service status." << '\n';
+      std::println("Checking service status.");
       bool isRunning = guard.isAnotherInstanceRunning();
-      std::cout << serviceName << ": " << (isRunning ? "Running" : "Stopped") << '\n';
+      std::println("{}: {}", serviceName, isRunning ? "Running" : "Stopped");
       return isRunning ? system::errc::no_lock_available : system::errc::success;
     }
 
     if (vm.contains("help")) {
 #ifdef RDB_BENCH_PROBE
-      std::cout << "[warning: probe benchmark build]" << '\n' << '\n';
+      std::println("[warning: probe benchmark build]\n");
 #endif
-      std::cout << argv[0] << " - compiler & data processing tool." << '\n' << '\n';
-      std::cout << "Usage: " << argv[0];
-      if (onlyCompile) std::cout << " -c";
-      std::cout << " queryfile [option]" << '\n' << '\n';
+      std::println("{} - compiler & data processing tool.\n", argv[0]);
+      std::print("Usage: {}", argv[0]);
+      if (onlyCompile) std::print(" -c");
+      std::println(" queryfile [option]\n");
       std::cout << desc;
-      if (!onlyCompile)
-        std::cout << "Config search: /etc/retractor/retractor.toml, "
-                     "$XDG_CONFIG_HOME (or ~/.config)/retractor/retractor.toml (optional)"
-                  << '\n';
-      std::cout << config_line << '\n';
-      std::cout << "Log: " << tempLocation << '\n';
+      std::println("{}", config_line);
+      std::println("Log: {}", tempLocation);
       if (vm.contains("realtime")) rtCheckAndPrint();
-      std::cout << warranty << '\n';
+      std::println("{}", warranty);
       return system::errc::success;
     }
 
@@ -307,13 +309,13 @@ int main(int argc, char *argv[]) {
     // w trybie usługowym oznacza start bezczynny (idle) — pomijamy parsowanie i kompilację.
     if (!vm.contains("queryfile")) {
       if (onlyCompile) {
-        std::cout << argv[0] << ": fatal error: no input file" << '\n';
+        std::println("{}: fatal error: no input file", argv[0]);
         return EPERM;  // ERROR defined in errno-base.h
       }
       SPDLOG_INFO("No query file provided; starting in idle (service) mode.");
     } else {
       if (!std::filesystem::exists(sInputFile)) {
-        std::cout << argv[0] << ": fatal error: file " << sInputFile << " does not exist." << '\n';
+        std::println("{}: fatal error: file {} does not exist.", argv[0], sInputFile);
         return EPERM;  // ERROR defined in errno-base.h
       }
 
@@ -387,7 +389,7 @@ int main(int argc, char *argv[]) {
             std::cerr << '\n';
             return system::errc::operation_not_permitted;
           }
-          std::cout << "Query compiled OK and sent to running service '" << peer.unit << "' (restart requested)." << '\n';
+          std::println("Query compiled OK and sent to running service '{}' (restart requested).", peer.unit);
           return system::errc::success;
         }
         // Inna instancja to zwykły proces (lub nierozpoznana) — dalsza ścieżka (exec.run) zgłosi

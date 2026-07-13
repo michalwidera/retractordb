@@ -10,7 +10,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
-#include "rdb/storageacc.hpp"
+#include "rdb/storage.hpp"
 
 // Tests intentionally use raw arrays and direct optional access to exercise binary storage semantics.
 // NOLINTBEGIN(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)

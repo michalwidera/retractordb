@@ -50,7 +50,7 @@ CI: CircleCI, branches `master` or `issue_*`.
 - `payload` — typed view over raw buffer per `Descriptor`. Null-per-field via `nullBitset`.
 - `FileInterface` — abstract I/O (`read`, `write`, `count`). Impls: `faccbindev`, `faccfs`, `faccmemory`, `faccposix`/`faccposixshd`, `facctxtsrc`, `fagrp`.
 - `storage` — coordinates `Descriptor` + `payload` + `FileInterface`. Manages `.desc`, binary data, `.meta` sidecars. Gap detection + null-fill.
-- `metaDataStream` — per-record null/gap metadata sidecar.
+- `metaData` — per-record null/gap metadata sidecar.
 
 **`retractor` library** (`src/retractor/lib/`):
 - `qTree` — topologically sorted `std::vector<query>`. Central structure for compile + execution.
@@ -148,7 +148,7 @@ Signals that warrant suggesting Opus 4.8:
 - Security or adversarial analysis
 - Repeated self-corrections on the same issue within one session
 
-Sonnet is sufficient for: single-file edits, bugfixes, formatting, test additions, grammar changes with clear spec.
+Sonnet 5 is sufficient for: single-file edits, bugfixes, formatting, test additions, grammar changes with clear spec.
 
 When suggesting a model switch, use this exact phrasing:
 
@@ -156,7 +156,7 @@ When suggesting a model switch, use this exact phrasing:
 >
 > **Opcja A — przełącz na Opus 4.8:** wpisz `/model`, wybierz `claude-opus-4-8`, następnie powtórz ostatnie polecenie.
 >
-> **Opcja B — kontynuuj na Sonnet:** mogę podjąć próbę, ale jakość wyniku może być niższa. Wpisz „kontynuuj" aby kontynuować.
+> **Opcja B — kontynuuj na Sonnet 5:** mogę podjąć próbę, ale jakość wyniku może być niższa. Wpisz „kontynuuj" aby kontynuować.
 
 ### Context hygiene
 

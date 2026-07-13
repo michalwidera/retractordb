@@ -1,5 +1,0 @@
-STORAGE 'temp'
-
-DECLARE a BYTE STREAM core0, 0.1 FILE '/dev/urandom'
-
-SELECT str[0], str[0] / 2 STREAM str1 FROM core0

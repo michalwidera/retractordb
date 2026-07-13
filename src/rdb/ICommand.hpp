@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "rdb/storageacc.hpp"
+#include "rdb/storage.hpp"
 #include "xtrdbTypes.hpp"
 
 struct CommandContext {

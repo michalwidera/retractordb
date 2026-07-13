@@ -1,6 +1,7 @@
 """Module required for conan build system."""
 from conan import ConanFile, tools
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.files import load
 
 # These modules are required for +x on generated script
 import os
@@ -9,8 +10,13 @@ import stat
 class Retractor(ConanFile):
     """This class is required for conan file build system."""
     name = "retractordb"
-    version = "0.1.7"
     url = "https://retractordb.com"
+
+    def set_version(self):
+        # Jedyne źródło prawdy o wersji: plik VERSION w korzeniu repo (wspólny z
+        # CMakeLists.txt i Dockerfile). NIE wpisywać wersji na sztywno.
+        self.version = load(self, os.path.join(self.recipe_folder, "VERSION")).strip()
+
     topics = ("time-series", "database", "timeseries", "rdb", "retractordb", "iot", "monitoring", "analytics")
     settings_build = ("os", "compiler", "build_type", "arch")
 
