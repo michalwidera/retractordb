@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -10,6 +9,7 @@
 
 #include "descriptor.hpp"
 #include "indexRecord.hpp"
+#include "metaIndexStore.hpp"
 
 namespace rdb {
 
@@ -227,28 +227,17 @@ class metaData {
   };
 
   void createNullBitsetTemplate();
-  void loadIndex();                                   ///< read header and restore currentEntry_ from file
-  void saveHeader();                                  ///< write file header (creation time) without entries
-  void appendEntry(const IndexRecord &entry);         ///< append a single entry to end of file
-  void overwriteLastEntry(const IndexRecord &entry);  ///< overwrite the last committed entry in-place (for lazy RLE retract)
-  void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
-  std::vector<IndexRecord> readCommittedEntries() const;      ///< read all committed entries from file
+  void loadIndex();  ///< restore currentEntry_ from store_'s committed entries
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
   /// @return {segment index in committed entries (nullopt = currentEntry_), offset within segment}
   std::pair<std::optional<size_t>, size_t> locateRecord(size_t recordIndex) const;
 
-  std::string metaFilePath_;                            ///< file path for saving/loading the meta index
-  std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
-  std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
-  /// serialized size of one IndexRecord on disk; depends on descriptor field count, computed once at construction.
-  /// NOLINT: wartość liczona z parametru konstruktora (descriptor.size()), nie da się jako default member init.
-  const size_t entrySize_;                         // NOLINT(modernize-use-default-member-init)
-  size_t committedRecordCount_{0};                 ///< cached total records in committed entries on disk
-  DiskTailState tail_{};                           ///< lazy-overwrite state for the last on-disk entry
-  IndexRecord currentEntry_;                       ///< accumulator for the pending (not yet committed) RLE run
-  mutable std::vector<IndexRecord> entriesCache_;  ///< in-memory copy of committed on-disk entries
-  mutable bool cacheValid_{false};                 ///< true when entriesCache_ matches the file; cleared on every write
+  MetaIndexStore store_;                       ///< raw .meta file I/O (header + committed entries)
+  std::shared_ptr<Descriptor> descriptorRef_;  ///< descriptor of the indexed data stream
+  size_t committedRecordCount_{0};             ///< cached total records in committed entries on disk
+  DiskTailState tail_{};                       ///< lazy-overwrite state for the last on-disk entry
+  IndexRecord currentEntry_;                   ///< accumulator for the pending (not yet committed) RLE run
 
   int nullFillCount_{2};                ///< number of nullfill records written before a gap is marked (R17)
   size_t consecutiveNullCount_{0};      ///< consecutive all-null records fed into absorbAppend()
