@@ -1,9 +1,3 @@
-# Pre-built binary — gobuilder stage must compile from Go source
-docker/supervisor/rsupervisor
-
-# Runtime-generated storage data — not part of build
-docker/supervisor/temp/
-
 # Build artifacts and tooling
 build/
 .venv/

@@ -114,3 +114,28 @@ TEST_F(AppConfigTest, explicit_missing_config_path_throws) {
 
   EXPECT_THROW(loadAppConfig(missing.string()), toml::parse_error);
 }
+
+TEST_F(AppConfigTest, loaded_from_empty_when_no_file_found) {
+  // Brak pliku → loadedFrom puste (sygnał, że użyto wartości domyślnych).
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_TRUE(cfg.loadedFrom.empty());
+}
+
+TEST_F(AppConfigTest, loaded_from_records_user_layer_path) {
+  writeFile(userConfigFile(), "[storage]\ndir = \"/var/lib/retractor\"\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  ASSERT_EQ(cfg.loadedFrom.size(), 1u);
+  EXPECT_EQ(cfg.loadedFrom.front(), userConfigFile().string());
+}
+
+TEST_F(AppConfigTest, loaded_from_records_explicit_path) {
+  const fs::path explicitFile = tmpDir / "custom.toml";
+  writeFile(explicitFile, "[storage]\ndir = \"/srv/rdb\"\n");
+
+  const AppConfig cfg = loadAppConfig(explicitFile.string());
+
+  ASSERT_EQ(cfg.loadedFrom.size(), 1u);
+  EXPECT_EQ(cfg.loadedFrom.front(), explicitFile.string());
+}

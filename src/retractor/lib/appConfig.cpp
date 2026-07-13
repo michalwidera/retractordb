@@ -131,6 +131,7 @@ AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
     // (toml::parse_file rzuca toml::parse_error). Wywołujący raportuje go użytkownikowi.
     const toml::table tbl = toml::parse_file(*cliPath);
     applyTable(tbl, cfg);
+    cfg.loadedFrom.push_back(*cliPath);
     sanitizeConfig(cfg);
     cfg.storageDir = normalizeStorageDir(cfg.storageDir);
     return cfg;
@@ -146,6 +147,7 @@ AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
     try {
       const toml::table tbl = toml::parse_file(path.string());
       applyTable(tbl, cfg);
+      cfg.loadedFrom.push_back(path.string());
     } catch (const toml::parse_error &e) {
       SPDLOG_WARN("Config parse error in {}: {} — skipping this layer", path.string(), e.what());
     }

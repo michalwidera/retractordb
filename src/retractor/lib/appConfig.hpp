@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "serviceDefaults.h"  // kBuildDefaultServiceQueryFile (generowane z CMake)
 
@@ -80,6 +81,12 @@ struct AppConfig {
   /// Używany tylko jako fallback, gdy serwis nie zaraportował własnego QUERYFILE w blokadzie.
   /// Musi być zgodny z argumentem ExecStart jednostki systemd (config nie zmienia ExecStart).
   std::string serviceQueryFile{appcfg::kDefaultServiceQueryFile};
+
+  // === diagnostyka ===
+
+  /// Ścieżki plików konfiguracyjnych faktycznie wczytanych (w kolejności nakładania warstw).
+  /// Pusty wektor = żaden plik nie został znaleziony, użyto wartości domyślnych.
+  std::vector<std::string> loadedFrom;
 };
 
 /// Wczytuje konfigurację.

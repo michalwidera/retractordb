@@ -72,10 +72,10 @@ class payload {
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
 
-  /// @brief Expose null metadata for external persistence (metaDataStream)
+  /// @brief Expose null metadata for external persistence (metaData)
   [[nodiscard]] const std::vector<bool> &getNullBitset() const;
 
-  /// @brief Restore null metadata read from metaDataStream/text source
+  /// @brief Restore null metadata read from metaData/text source
   void setNullBitset(const std::vector<bool> &nullBitset);
 
   friend std::istream &operator>>(std::istream &is, payload &rhs);

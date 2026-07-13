@@ -28,7 +28,6 @@ Available options:
                               absolute wakeup)
   -g [ --config ] arg         config file (TOML); overrides search
   -m [ --llimitqry ] arg (=0) loop iteration limit, 0 - no limit
-Config search: /etc/retractor/retractor.toml, $XDG_CONFIG_HOME (or ~/.config)/retractor/retractor.toml (optional)
 Log: /tmp/xretractor.log
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.

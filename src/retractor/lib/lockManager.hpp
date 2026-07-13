@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 class FlockServiceGuard {
@@ -9,8 +10,8 @@ class FlockServiceGuard {
   // Process => zwykły proces uruchomiony z linii poleceń.
   // Unknown => starszy/niepełny plik blokady albo brak danych.
   struct PeerInfo {
-    enum class Kind { Unknown, Process, Service };
-    enum class Scope { Unknown, System, User };  // systemctl restart vs systemctl --user restart
+    enum class Kind : std::uint8_t { Unknown, Process, Service };
+    enum class Scope : std::uint8_t { Unknown, System, User };  // systemctl restart vs systemctl --user restart
     Kind kind{Kind::Unknown};
     Scope scope{Scope::Unknown};
     std::string unit;       // nazwa jednostki systemd, gdy kind == Service

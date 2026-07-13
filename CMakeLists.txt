@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
+# Jedyne źródło prawdy o wersji: plik VERSION w korzeniu repo. Czytany też przez
+# conanfile.py (set_version) i Dockerfile (--build-arg). NIE wpisywać wersji
+# tutaj na sztywno — zmieniać wyłącznie plik VERSION.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" RDB_VERSION)
+
 project(
   retractordb
-  VERSION 0.1.7
+  VERSION ${RDB_VERSION}
   LANGUAGES CXX)
 
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
@@ -30,7 +35,6 @@ add_definitions(-Wno-deprecated-declarations)
 add_definitions(-DHAS_BOOST)
 
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
-option(BUILD_SUPERVISOR "Build Go rsupervisor binary (requires Go)" OFF)
 # Unity Build łączy wiele .cpp w jedną jednostkę kompilacji, zmniejszając liczbę
 # uruchomień kompilatora i wielokrotne parsowanie nagłówków. Może ujawnić
 # konflikty nazw między TU (np. anonimowe namespace, statyczne zmienne) — testuj
@@ -179,10 +183,17 @@ install(FILES ${CMAKE_BINARY_DIR}/xretractor.service
 # prefiks /usr → /usr/share/retractordb), bo bezwzględny /etc łamie staging
 # cpack (próba zapisu do realnego /etc). Na Debianie postinst kopiuje przykład
 # do /etc/retractor.
+#
+# COMPONENT service + EXCLUDE_FROM_ALL: pliki .example trafiają WYŁĄCZNIE do
+# pakietu (cpack), a deweloperski `ninja install`/`cmake --install` do ~/.local
+# je pomija. Komponent 'service' jest jawnie wymieniony w CPACK_COMPONENTS_ALL
+# poniżej, więc cpack i tak go dołącza.
 install(
   FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/retractor.toml.example
         ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/service.env.example
-  DESTINATION share/retractordb)
+  DESTINATION share/retractordb
+  COMPONENT service
+  EXCLUDE_FROM_ALL)
 
 # Skrypty maintainer DEB: tworzą usera 'retractor' i włączają jednostkę (enable,
 # bez natychmiastowego startu). postinst generowany z .in (podstawienie
@@ -193,6 +204,18 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst.in
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
     "${CMAKE_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
 )
+
+# Komponenty pakietu: 'Unspecified' to domyślny komponent binarek (install bez
+# COMPONENT), 'service' to pliki .example oznaczone EXCLUDE_FROM_ALL. Pliki
+# EXCLUDE_FROM_ALL trafiają do pakietu TYLKO przy włączonym component-install
+# (DEB/ARCHIVE) i jawnym wymienieniu komponentu w CPACK_COMPONENTS_ALL — w
+# trybie monolitycznym cpack je pomija. GROUPING=ALL_COMPONENTS_IN_ONE scala oba
+# komponenty z powrotem w jeden .deb/.tar.gz (nie rozbija na pakiety
+# per-komponent).
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
+set(CPACK_COMPONENTS_ALL Unspecified service)
 
 set(CPACK_PACKAGE_NAME "retractordb")
 set(CPACK_PACKAGE_VERSION

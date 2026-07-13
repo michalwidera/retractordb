@@ -727,10 +727,18 @@ run_option() {
     fi
     case "$opt" in
         "release")
+            # RDB_BENCH_PROBE wymuszone OFF: sonda dołącza się WYŁĄCZNIE przez target
+            # 'probe'. Bez tego lepki wpis cache po wcześniejszym 'probe' (ten sam katalog
+            # build/Release) przeniknąłby do produkcyjnej binarki/pakietu — option() nie
+            # nadpisuje istniejącej wartości cache. Konfiguracja jawna (jak w 'probe'),
+            # bo 'conan build' nie pozwala wstrzyknąć -D.
             sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Release --build missing
-            conan build $build_folder -s build_type=Release --build missing
+            cd "$build_folder"
+            cmake --preset conan-release -DRDB_BENCH_PROBE=OFF
+            cd build/Release
+            ninja
             ;;
         "debug")
             sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default

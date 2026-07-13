@@ -1,41 +1,14 @@
 # https://hub.docker.com/_/debian
-# Multi-stage: builder uses CI image (conan cache pre-populated), runtime is minimal.
+# Runtime instaluje xretractor/xqry z opublikowanego pakietu .deb i uruchamia
+# usługę xretractor przez systemd (PID 1) — tak jak na realnym systemie.
 
-# ── Stage 0: build rsupervisor ───────────────────────────────────────────────
-FROM golang:1.24-bookworm AS gobuilder
-
-COPY docker/supervisor/ /src/
-WORKDIR /src
-RUN CGO_ENABLED=0 go build -o /rsupervisor .
-
-# ── Stage 1: build ───────────────────────────────────────────────────────────
-FROM micwide/buildenv-retractordb:latest AS builder
-
-# Copy project source on top of existing workspace (preserves .venv from CI image)
-COPY --chown=developer:developer . /home/developer/workspace/
-
-WORKDIR /home/developer/workspace
-
-RUN . .venv/bin/activate \
-    && conan install . -s build_type=Release --build missing \
-    && conan build . -s build_type=Release
-
-# Collect non-system shared library dependencies of all three binaries
-RUN mkdir /home/developer/libs && \
-    for bin in \
-        build/Release/src/retractor/xretractor \
-        build/Release/src/qry/xqry; \
-    do \
-        ldd "$bin" \
-            | awk '/=> \// { print $3 }' \
-            | grep -v '^/lib\|^/usr/lib/x86_64-linux-gnu/libc\|libstdc++\|libm\|libgcc\|libpthread\|libdl\|librt' \
-            | xargs -I{} cp -n "{}" /home/developer/libs/ 2>/dev/null || true; \
-    done
-
-# ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.1.7"
+# Wersja bez wartości domyślnej — jedyne źródło prawdy to plik VERSION w korzeniu
+# repo. Przekazywana przy buildzie: --build-arg RDB_VERSION="$(cat ../../VERSION)".
+ARG RDB_VERSION
+
+LABEL com.retractordb.version="${RDB_VERSION}"
 LABEL vendor1="Michal Widera"
 LABEL com.retractordb.release-date="2026-06-21"
 LABEL com.retractordb.description="RetractorDB production runtime"
@@ -44,48 +17,82 @@ LABEL com.retractordb.url="https://retractordb.com"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libstdc++6 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
+# Użytkownik usługi tworzony przed instalacją pakietu: postinst .deb wykrywa
+# istniejącego 'retractor' i pomija własne useradd (zachowujemy home /home/retractor,
+# potrzebny jako WorkingDirectory usługi dla STORAGE 'temp').
 RUN useradd -m -s /bin/bash retractor
 
-# Binaries
-COPY --from=builder \
-    /home/developer/workspace/build/Release/src/retractor/xretractor \
-    /home/developer/workspace/build/Release/src/qry/xqry \
-    /usr/local/bin/
+# Pakiet retractordb (.deb) z GitHub Releases. apt-get install rozwiązuje zależności;
+# binaria lądują w /usr/bin (prefiks /usr pakietu), jednostka w /usr/lib/systemd/system.
+# systemd + systemd-sysv: init kontenera (PID 1). libstdc++6 to jedyna zależność
+# runtime binariów (antlr linkowany statycznie). ca-certificates do pobrania .deb.
+ADD https://github.com/michalwidera/retractordb/releases/download/v${RDB_VERSION}/retractordb-${RDB_VERSION}-Linux.deb /tmp/retractordb.deb
 
-COPY --from=gobuilder /rsupervisor /usr/local/bin/rsupervisor
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libstdc++6 \
+    systemd \
+    systemd-sysv \
+    /tmp/retractordb.deb \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/retractordb.deb
 
-# Extra shared libs not in trixie-slim (antlr4-cppruntime etc.)
-COPY --from=builder /home/developer/libs/ /usr/local/lib/retractordb/
+# Instalacja usługi: włącz jednostkę (symlink w multi-user.target.wants — wykonywane
+# offline, bez działającego systemd). Na boocie kontenera systemd ją wystartuje.
+RUN systemctl enable xretractor.service
 
-RUN ldconfig /usr/local/lib/retractordb
+# Drop-in: usługa pisze magazyn 'temp' względem cwd; bez WorkingDirectory systemd
+# uruchamia ExecStart z '/', gdzie retractor nie ma prawa zapisu → crash-loop.
+RUN mkdir -p /etc/systemd/system/xretractor.service.d
+RUN <<'EOF' cat > /etc/systemd/system/xretractor.service.d/override.conf
+[Service]
+WorkingDirectory=/home/retractor
+EOF
 
+# Magazyn danych usługi (STORAGE 'temp' z pliku zapytań).
 RUN mkdir -p /home/retractor/temp && chown retractor:retractor /home/retractor/temp
 
-WORKDIR /home/retractor
-USER retractor
+# Plik zapytań usługi: ExecStart czyta /etc/retractor/startup.rql (postinst tworzy go
+# pustym = tryb idle). Podmieniamy na przykładowy workload kontenera.
+COPY --chown=retractor:retractor docker/supervisor/startup.rql /etc/retractor/startup.rql
 
-COPY --chown=retractor:retractor docker/supervisor/startup.rql /home/retractor/startup.rql
+# Konfiguracja usługi (czytana automatycznie z /etc/retractor/retractor.toml).
+# lock_dir: serwis liczy ścieżkę lock-a z argv[0] → '/usr/bin/xretractor_service.lock',
+# gdzie User=retractor nie ma prawa zapisu (crash-loop). Przenosimy lock do home usługi.
+COPY <<'EOF' /etc/retractor/retractor.toml
+[paths]
+lock_dir = "/home/retractor"
+EOF
 
-ENV RDB_XRETRACTOR=/usr/local/bin/xretractor
-ENV RDB_XQRY=/usr/local/bin/xqry
+ENV RDB_XRETRACTOR=/usr/bin/xretractor
+ENV RDB_XQRY=/usr/bin/xqry
 
-EXPOSE 8080 50051 9090
+# Czysty shutdown systemd na 'docker stop'.
+STOPSIGNAL SIGRTMIN+3
 
-CMD ["/usr/local/bin/rsupervisor"]
+CMD ["/sbin/init"]
 
 # How to build and push (run from docker/prod/):
-#   docker build -f Dockerfile -t retractordb:latest ../..
+#   docker build --build-arg RDB_VERSION="$(cat ../../VERSION)" -f Dockerfile -t retractordb:latest ../..
 #   docker tag retractordb:latest micwide/retractordb:latest
 #   docker push micwide/retractordb:latest
 
-# How to run with a local directory mounted (queries + data):
-#   docker run -d \
-#     -v /path/to/local/data:/home/retractor/data \
-#     -e RDB_QUERY_FILE=/home/retractor/data/queries.rql \
-#     -p 8080:8080 -p 50051:50051 -p 9090:9090 \
+# How to run (systemd jako PID 1 wymaga dostępu do cgroup):
+#   docker run -d --name retractordb \
+#     --tmpfs /run --tmpfs /tmp \
+#     -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+#     --cgroupns=host \
 #     retractordb:latest
+#
+# Logowanie do kontenera (shell):
+#   docker exec -it retractordb bash              # jako root
+#   docker exec -it -u retractor retractordb bash # jako użytkownik usługi
+#
+# Status / logi usługi w kontenerze:
+#   docker exec retractordb systemctl status xretractor
+#   docker exec retractordb journalctl -u xretractor -f
+#
+# Własny plik zapytań (zamiast przykładowego workloadu):
+#   docker run -d \
+#     -v /path/to/queries.rql:/etc/retractor/startup.rql:ro \
+#     ... retractordb:latest

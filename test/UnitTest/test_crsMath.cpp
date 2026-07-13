@@ -8,7 +8,7 @@
 #include "config.h"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
-#include "rdb/storageacc.hpp"
+#include "rdb/storage.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/CRSMath.hpp"
 #include "retractor/lib/dataModel.hpp"

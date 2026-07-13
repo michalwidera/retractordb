@@ -482,7 +482,8 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 
 std::vector<std::string> readLogicalLines(std::ifstream &file) {
   std::vector<std::string> result;
-  std::string line, accumulated;
+  std::string line;
+  std::string accumulated;
   while (std::getline(file, line)) {
     if (line.empty() || line[0] == '#') continue;
     if (line.back() == '\\') {

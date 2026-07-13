@@ -5,7 +5,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
-#include "rdb/storageacc.hpp"
+#include "rdb/storage.hpp"
 
 bool ReadCmd::execute(CommandContext &ctx) {
   int record;

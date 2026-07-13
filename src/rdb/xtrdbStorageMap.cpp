@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "rdb/descriptor.hpp"
-#include "rdb/metaDataStream.hpp"
+#include "rdb/metaData.hpp"
 
 // Prezentacja mapy pliku (przykład)
 //
@@ -60,7 +60,7 @@
 
 namespace fs = std::filesystem;
 
-using Segment = rdb::metaDataStream::IndexRecord;
+using Segment = rdb::metaData::IndexRecord;
 
 struct DataSegmentInfo {
   size_t index{};

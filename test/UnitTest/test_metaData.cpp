@@ -1,38 +1,38 @@
 #include <gtest/gtest.h>
 
 #include "rdb/descriptor.hpp"
-#include "rdb/metaDataStream.hpp"
+#include "rdb/metaData.hpp"
 
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
 
 struct MetaTestFixture : public ::testing::Test {
-  const std::string metaFile = "test_metaDataStream.meta";
+  const std::string metaFile = "test_metaData.meta";
   void TearDown() override { std::remove(metaFile.c_str()); }
 };
 
 // ── Low-level serialization ──────────────────────────────────────────
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
-  rdb::metaDataStream::IndexRecord original;
+  rdb::metaData::IndexRecord original;
   original.recordCount = 42;
   original.nullBitset  = {true, false, true, true, false};
 
-  std::vector<std::byte> serialized             = original.serialize();
-  rdb::metaDataStream::IndexRecord deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
+  std::vector<std::byte> serialized       = original.serialize();
+  rdb::metaData::IndexRecord deserialized = rdb::metaData::IndexRecord::deserialize(serialized);
   EXPECT_EQ(deserialized.recordCount, original.recordCount);
   EXPECT_EQ(deserialized.nullBitset, original.nullBitset);
 }
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
-  rdb::metaDataStream::IndexRecord gap;
+  rdb::metaData::IndexRecord gap;
   gap.isGap       = true;
   gap.recordCount = 5;
   gap.nullBitset  = {true, true};
 
   auto serialized   = gap.serialize();
-  auto deserialized = rdb::metaDataStream::IndexRecord::deserialize(serialized);
+  auto deserialized = rdb::metaData::IndexRecord::deserialize(serialized);
   EXPECT_TRUE(deserialized.isGap);
   EXPECT_EQ(deserialized.recordCount, 5U);
   EXPECT_EQ(deserialized.nullBitset, gap.nullBitset);
@@ -48,7 +48,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   std::vector<bool> null_   = {true};
   std::vector<bool> noNull_ = {false};
 
@@ -79,7 +79,7 @@ TEST_F(MetaTestFixture, test_large_data_volume) {
 
   constexpr size_t N = 100'000;
   {
-    rdb::metaDataStream meta(descriptor, metaFile);
+    rdb::metaData meta(descriptor, metaFile);
     std::vector<bool> patA = {true, false};
     std::vector<bool> patB = {false, true};
 
@@ -94,7 +94,7 @@ TEST_F(MetaTestFixture, test_large_data_volume) {
     EXPECT_EQ(meta.getNullBitset(N - 1), (((N - 1) % 100 < 50) ? patA : patB));
   }
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   EXPECT_EQ(meta.totalRecords(), N);
   std::vector<bool> patA = {true, false};
   EXPECT_EQ(meta.getNullBitset(0), patA);
@@ -111,7 +111,7 @@ TEST_F(MetaTestFixture, test_reset_clears_all_data) {
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
   {
-    rdb::metaDataStream meta(descriptor, metaFile);
+    rdb::metaData meta(descriptor, metaFile);
     std::vector<bool> pat = {true};
     for (int i = 0; i < 10; ++i)
       meta.onRecordAppended(pat);
@@ -121,7 +121,7 @@ TEST_F(MetaTestFixture, test_reset_clears_all_data) {
     EXPECT_TRUE(meta.isEmpty());
   }
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   EXPECT_TRUE(meta.isEmpty());
   EXPECT_EQ(meta.totalRecords(), 0U);
 }
@@ -132,7 +132,7 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   std::vector<bool> normal = {false};
   std::vector<bool> error  = {true};
 
@@ -173,7 +173,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
   descriptor.append({{"v", 4, 0, rdb::INTEGER}});
 
   {
-    rdb::metaDataStream meta(descriptor, metaFile);
+    rdb::metaData meta(descriptor, metaFile);
     std::vector<bool> pat = {false};
     meta.onRecordAppended(pat);
     meta.onTransmissionGap();
@@ -184,7 +184,7 @@ TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
     EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2U);
   }
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   auto e = meta.segments();
   EXPECT_EQ(std::count_if(e.begin(), e.end(), [](const auto &x) { return x.isGap; }), 2U);
 }
@@ -200,7 +200,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_file_size_stable) {
   // kHeaderSize = sizeof(int64_t) = 8
   constexpr std::uintmax_t kExpectedSize = 8U + 18U;
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   std::vector<bool> patA = {true};
 
   meta.onRecordAppended(patA);
@@ -225,7 +225,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_persistence) {
   std::vector<bool> patA = {false};
 
   {
-    rdb::metaDataStream meta(descriptor, metaFile);
+    rdb::metaData meta(descriptor, metaFile);
     meta.onRecordAppended(patA);  // rec 0
     meta.onRecordAppended(patA);  // rec 1
     meta.flushCurrentEntry();     // disk: [A,2]
@@ -234,7 +234,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_persistence) {
     // destructor: overwrite disk → [A,4]
   }
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   EXPECT_EQ(meta.totalRecords(), 4U);
   for (int i = 0; i < 4; ++i)
     EXPECT_EQ(meta.getNullBitset(i), patA) << "rec " << i;
@@ -246,7 +246,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
   rdb::Descriptor descriptor;
   descriptor.append({{"v", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   std::vector<bool> patA = {false};
 
   meta.onRecordAppended(patA);  // rec 0
@@ -265,7 +265,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
   EXPECT_EQ(meta.totalRecords(), 4U);
 }
 
-// ── metaDataStream::rotate() ────────────────────────────────────────────────
+// ── metaData::rotate() ────────────────────────────────────────────────
 
 struct RotateFixture : public ::testing::Test {
   const std::string meta     = "rotate_test.meta";
@@ -283,13 +283,13 @@ struct RotateFixture : public ::testing::Test {
 // rotate() renames current file to .old<N> and clears all in-memory state.
 TEST_F(RotateFixture, rotate_renames_file_and_clears_state) {
   {
-    rdb::metaDataStream m(descriptor, meta);
+    rdb::metaData m(descriptor, meta);
     m.onRecordAppended({false});
     m.onRecordAppended({false});
     m.onRecordAppended({true});
   }
 
-  rdb::metaDataStream m(descriptor, meta);
+  rdb::metaData m(descriptor, meta);
   ASSERT_EQ(m.totalRecords(), 3U);
 
   m.rotate(0);
@@ -303,12 +303,12 @@ TEST_F(RotateFixture, rotate_renames_file_and_clears_state) {
 // rotate(-1) resets state without renaming the file.
 TEST_F(RotateFixture, rotate_negative_percounter_resets_without_rename) {
   {
-    rdb::metaDataStream m(descriptor, meta);
+    rdb::metaData m(descriptor, meta);
     m.onRecordAppended({false});
     m.onRecordAppended({true});
   }
 
-  rdb::metaDataStream m(descriptor, meta);
+  rdb::metaData m(descriptor, meta);
   ASSERT_EQ(m.totalRecords(), 2U);
 
   m.rotate(-1);
@@ -320,17 +320,17 @@ TEST_F(RotateFixture, rotate_negative_percounter_resets_without_rename) {
 // Renamed .old file contains the original records.
 TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
   {
-    rdb::metaDataStream m(descriptor, meta);
+    rdb::metaData m(descriptor, meta);
     m.onRecordAppended({false});
     m.onRecordAppended({true});
   }
 
   {
-    rdb::metaDataStream m(descriptor, meta);
+    rdb::metaData m(descriptor, meta);
     m.rotate(1);
   }
 
-  rdb::metaDataStream old(descriptor, metaOld1);
+  rdb::metaData old(descriptor, metaOld1);
   EXPECT_EQ(old.totalRecords(), 2U);
   EXPECT_EQ(old.getNullBitset(0), (std::vector<bool>{false}));
   EXPECT_EQ(old.getNullBitset(1), (std::vector<bool>{true}));
@@ -339,12 +339,12 @@ TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
 // After rotation, new records can be appended and queried correctly.
 TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
   {
-    rdb::metaDataStream m(descriptor, meta);
+    rdb::metaData m(descriptor, meta);
     for (int i = 0; i < 5; ++i)
       m.onRecordAppended({false});
   }
 
-  rdb::metaDataStream m(descriptor, meta);
+  rdb::metaData m(descriptor, meta);
   m.rotate(0);
 
   m.onRecordAppended({false});
@@ -359,7 +359,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
   rdb::Descriptor descriptor;
   descriptor.append({{"z", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   std::vector<bool> patA = {false};
   std::vector<bool> patB = {true};
 
@@ -396,7 +396,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   const std::vector<bool> A = {false};
   const std::vector<bool> B = {true};
 
@@ -436,7 +436,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
 //
 // Bug: when tailDirty_=true (last on-disk entry was re-absorbed into
 // currentEntry_ via lazy overwrite) and onRecordModified() targets an
-// EARLIER committed entry, applyModificationToMainIndex() used to rewrite
+// EARLIER committed entry, onRecordModified() used to rewrite
 // the file from readCommittedEntries(), which still contained the stale
 // tail. The stale entry was then persisted AND counted, while currentEntry_
 // still represented the same records — double counting (totalRecords off
@@ -446,7 +446,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
   rdb::Descriptor descriptor;
   descriptor.append({{"f1", 4, 0, rdb::INTEGER}, {"f2", 4, 0, rdb::INTEGER}});
 
-  rdb::metaDataStream meta(descriptor, metaFile);
+  rdb::metaData meta(descriptor, metaFile);
   const std::vector<bool> A = {true, false};
   const std::vector<bool> B = {false, true};
   const std::vector<bool> C = {true, true};

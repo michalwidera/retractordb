@@ -5,10 +5,10 @@
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
-#include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <print>
 #include <span>
 #include <string>
 #include <string_view>
@@ -27,7 +27,7 @@
 #include "cmdStorage.hpp"
 #include "config.h"
 #include "ICommand.hpp"
-#include "rdb/storageacc.hpp"
+#include "rdb/storage.hpp"
 #include "uxSysTermTools.hpp"
 #include "xtrdbStorageMap.hpp"
 #include "xtrdbTypes.hpp"
@@ -36,6 +36,9 @@ namespace {
 constexpr int kHelpColumnWidth = 32;
 }
 
+// Jedyna ścieżka wyjątku to std::format_error z std::print w nagłówkach systemowych <print>/<format>;
+// łańcuchy formatujące są stałymi compile-time i nie rzucają.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 int main(int argc, char *argv[]) {
   const auto filelog = setupLoggerMain(std::string(argv[0]), false);
 
@@ -66,10 +69,9 @@ int main(int argc, char *argv[]) {
   if (vm.contains("noprompt")) cliNoPrompt = true;
 
   if (vm.contains("help")) {
-    std::cout << argv[0] << " - data accessing tool.\n\n"
-              << "Usage: " << argv[0] << " [option]\n\n"
-              << desc << config_line << "\nLog: " << filelog << "\n"
-              << warranty << "\n";
+    std::print("{} - data accessing tool.\n\nUsage: {} [option]\n\n", argv[0], argv[0]);
+    std::cout << desc;  // boost::program_options::options_description — brak std::formatter
+    std::print("{}\nLog: {}\n{}\n", config_line, filelog, warranty);
     spdlog::shutdown();
     return 0;
   }
@@ -155,7 +157,7 @@ int main(int argc, char *argv[]) {
 
   std::string cmd;
   while (true) {
-    if (cmd != "#") std::cout << prompt;
+    if (cmd != "#") std::cout << prompt;  // std::cout (powiązany z std::cin) gwarantuje flush przed odczytem — std::print nie
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {
@@ -163,7 +165,7 @@ int main(int argc, char *argv[]) {
       // rem behaves like a normal command (prints ok). Both consume the rest of the line.
       std::string rest;
       std::getline(std::cin, rest);
-      if (cmd == "rem") std::cout << ok;
+      if (cmd == "rem") std::print("{}", ok);
       continue;
     }
     if (cmd == "quitdrop" || cmd == "qd") {
@@ -173,7 +175,7 @@ int main(int argc, char *argv[]) {
     if (cmd == "echo") {
       std::string rest;
       std::getline(std::cin, rest);
-      std::cout << colors.BLINK << rest << "\n" << colors.RESET;
+      std::print("{}{}\n{}", colors.BLINK, rest, colors.RESET);
       continue;
     }
     if (cmd == "storage") {
@@ -188,12 +190,12 @@ int main(int argc, char *argv[]) {
 
     if (auto it = commands.find(cmd); it != commands.end()) {
       if (it->second->requiresConnection() && !dacc) {
-        std::cout << colors.RED << "unconnected\n" << colors.RESET;
+        std::print("{}unconnected\n{}", colors.RED, colors.RESET);
         continue;
       }
       if (!it->second->execute(ctx)) continue;
     } else if (cmd == "help" || cmd == "h") {
-      std::cout << colors.GREEN;
+      std::print("{}", colors.GREEN);
       for (auto [c, d] : std::initializer_list<std::pair<std::string_view, std::string_view>>{
                {"exit|quit|q", "exit"},
                {"quitdrop|qd", "exit & drop artifacts (data, .desc, .meta)"},
@@ -204,33 +206,30 @@ int main(int argc, char *argv[]) {
                {"#|rem [text]", "comment line"},
                {"help|h", "show this help"},
            })
-        std::cout << std::left << std::setw(kHelpColumnWidth) << c << d << "\n";
+        std::print("{:<{}}{}\n", c, kHelpColumnWidth, d);
       for (auto &[name, cmdPtr] : commands) {
         auto [cmd, desc] = cmdPtr->usage();
         if (cmd.empty()) continue;
-        std::cout << std::left << std::setw(kHelpColumnWidth) << cmd;
-        if (!desc.empty()) std::cout << desc[0];
-        std::cout << "\n";
+        std::print("{:<{}}", cmd, kHelpColumnWidth);
+        if (!desc.empty()) std::print("{}", desc[0]);
+        std::print("\n");
         for (size_t i = 1; i < desc.size(); ++i)
-          std::cout << std::string(kHelpColumnWidth, ' ') << desc[i] << "\n";
+          std::print("{}{}\n", std::string(kHelpColumnWidth, ' '), desc[i]);
       }
-      std::cout << argv[0] << " - data accessing tool.\n\n"
-                << config_line << "\nLog: " << filelog << "\n"
-                << warranty << "\n"
-                << colors.RESET;
+      std::print("{} - data accessing tool.\n\n{}\nLog: {}\n{}\n{}", argv[0], config_line, filelog, warranty, colors.RESET);
     } else if (!dacc) {
-      std::cout << colors.RED << "unconnected\n" << colors.RESET;
+      std::print("{}unconnected\n{}", colors.RED, colors.RESET);
       continue;
     } else if (cmd == "system") {
       std::string systemCommand;
       std::getline(std::cin, systemCommand);
       if (const int rc = std::system(systemCommand.c_str()); rc != 0)
-        std::cout << colors.RED << "system command error: " << rc << "\n" << colors.RESET;
+        std::print("{}system command error: {}\n{}", colors.RED, rc, colors.RESET);
     } else {
-      std::cout << colors.RED << "?\n" << colors.RESET;
+      std::print("{}?\n{}", colors.RED, colors.RESET);
       continue;
     }
-    std::cout << ok;
+    std::print("{}", ok);
   }
   dacc.reset();
   spdlog::shutdown();

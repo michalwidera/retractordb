@@ -20,6 +20,7 @@
 /// - obsługiwać dopisywanie rekordów oraz aktualizację istniejącego rekordu w odpowiednim segmencie,
 /// - zwracać przez count() logiczną liczbę rekordów uwzględniającą także rekordy znajdujące się wcześniej w usuniętych segmentach,
 /// - zwracać przez name() nazwę bieżącego segmentu, gdy retencja jest aktywna, albo nazwę bazową pliku w trybie bez retencji,
+/// - raportować przez hasShadow() mechanizm cienia swoich segmentów T (grupa nie dodaje własnego pliku cienia),
 /// - obsługiwać purge wywołane przez write(nullptr, ..., 0), resetując stan obiektu i odtwarzając pusty segment gotowy do dalszego zapisu,
 /// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając spójny końcowy fragment sekwencji i rekonstruując removedSegments_.
 ///
@@ -58,6 +59,7 @@ class groupFile : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] bool hasShadow() const override { return !vec_.empty() && vec_.front()->hasShadow(); }
 };
 
 template class groupFile<posixBinaryFileWithShadow>;

@@ -17,7 +17,10 @@ namespace rdb {
 /// - umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
 /// - interpretować pozostałe wartości position zgodnie z kontraktem danej implementacji; dla większości magazynów losowego dostępu oznacza to pozycję w bajtach,
 /// - móc ograniczać dopuszczalne wartości position w przypadku źródeł sekwencyjnych, które nie wspierają losowego dostępu,
-/// - zwracać przez count() liczbę rekordów lub inną implementacyjnie zdefiniowaną miarę postępu zgodną z semantyką danej klasy pochodnej.
+/// - zwracać przez count() liczbę rekordów lub inną implementacyjnie zdefiniowaną miarę postępu zgodną z semantyką danej klasy pochodnej,
+/// - raportować przez hasShadow(), czy magazyn utrzymuje plik cienia danych (.shadow) dla operacji update;
+///   na tej podstawie storage dobiera wariant indeksu metadanych null (storageShadow zamiast metaData),
+///   niezależnie od tego, czy magazyn w ogóle posiada indeks metadanych.
 ///
 /// Podstawowe operacje objęte kontraktem polimorficznym:
 /// 1. `read(data, nullBitset, position)` odczytuje rekord z magazynu i wypełnia `nullBitset`, jeśli implementacja wspiera metadane null.
@@ -65,6 +68,10 @@ struct FileInterface {
   /// @brief data count in storage
   /// @return number of records in storage
   virtual size_t count() = 0;
+
+  /// @brief Whether this storage keeps a data shadow file (.shadow) for update operations.
+  /// @return true when updates go to a shadow file (see posixBinaryFileWithShadow)
+  [[nodiscard]] virtual bool hasShadow() const { return false; }
 
   virtual ~FileInterface() = default;
 };

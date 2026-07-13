@@ -23,29 +23,36 @@
 namespace {
 constexpr char kCarriageReturn = '\r';
 
+// Priorytety syslog (man sd-daemon / RFC 5424) używane w prefiksie sd-daemon "<N>".
+constexpr int kPrioCrit    = 2;  // LOG_CRIT
+constexpr int kPrioErr     = 3;  // LOG_ERR
+constexpr int kPrioWarning = 4;  // LOG_WARNING
+constexpr int kPrioInfo    = 6;  // LOG_INFO
+constexpr int kPrioDebug   = 7;  // LOG_DEBUG
+
 // Flaga patternu '%*' dla trybu usługowego: prefiks priorytetu sd-daemon "<N>" na początku linii.
 // journald odczytuje ten prefiks i klasyfikuje wagę komunikatu (man sd-daemon). Mapowanie poziomu
 // spdlog -> priorytet syslog: critical=2, err=3, warn=4, info=6, debug/trace=7.
 class SdPriorityFlag : public spdlog::custom_flag_formatter {
  public:
-  void format(const spdlog::details::log_msg &msg, const std::tm &, spdlog::memory_buf_t &dest) override {
-    int prio = 6;  // domyślnie LOG_INFO
+  void format(const spdlog::details::log_msg &msg, const std::tm & /*tm_time*/, spdlog::memory_buf_t &dest) override {
+    int prio = kPrioInfo;  // domyślnie LOG_INFO
     switch (msg.level) {
       case spdlog::level::critical:
-        prio = 2;  // LOG_CRIT
+        prio = kPrioCrit;
         break;
       case spdlog::level::err:
-        prio = 3;  // LOG_ERR
+        prio = kPrioErr;
         break;
       case spdlog::level::warn:
-        prio = 4;  // LOG_WARNING
+        prio = kPrioWarning;
         break;
       case spdlog::level::debug:
       case spdlog::level::trace:
-        prio = 7;  // LOG_DEBUG
+        prio = kPrioDebug;
         break;
       default:
-        prio = 6;  // LOG_INFO
+        prio = kPrioInfo;
         break;
     }
     const char c = static_cast<char>('0' + prio);

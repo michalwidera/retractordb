@@ -4,8 +4,8 @@
 #include <string>
 
 #include "dumpManager.hpp"
-#include "qTree.hpp"           // qTree
-#include "rdb/storageacc.hpp"  // rdb::storage (transitively includes descriptor.hpp, payload.hpp)
+#include "qTree.hpp"        // qTree
+#include "rdb/storage.hpp"  // rdb::storage (transitively includes descriptor.hpp, payload.hpp)
 
 /// @brief Klasa streamInstance umożliwia tworzenie zawartości poszczególnych rekordów
 ///
