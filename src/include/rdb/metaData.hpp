@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "descriptor.hpp"
+#include "gapDetector.hpp"
 #include "indexRecord.hpp"
 #include "metaIndexStore.hpp"
 
@@ -145,7 +146,7 @@ class metaData {
   void configureGapDetection(int nullFillCount = 2);
 
   /// @brief Whether configureGapDetection() was called.
-  [[nodiscard]] bool gapDetectionEnabled() const { return gapDetectionConfigured_; }
+  [[nodiscard]] bool gapDetectionEnabled() const { return gapDetector_.enabled(); }
 
   /// @brief Feed an appended record's null bit-set into the gap-detection machine.
   ///
@@ -238,11 +239,7 @@ class metaData {
   size_t committedRecordCount_{0};             ///< cached total records in committed entries on disk
   DiskTailState tail_{};                       ///< lazy-overwrite state for the last on-disk entry
   IndexRecord currentEntry_;                   ///< accumulator for the pending (not yet committed) RLE run
-
-  int nullFillCount_{2};                ///< number of nullfill records written before a gap is marked (R17)
-  size_t consecutiveNullCount_{0};      ///< consecutive all-null records fed into absorbAppend()
-  size_t activeGapDuration_{0};         ///< accumulated gap duration not yet flushed as a gap entry
-  bool gapDetectionConfigured_{false};  ///< true only when configureGapDetection() was explicitly called
+  GapDetector gapDetector_;                    ///< nullfill/absorb state machine (przejęte od storage)
 };  // class metaData
 
 }  // namespace rdb

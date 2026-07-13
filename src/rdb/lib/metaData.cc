@@ -236,39 +236,25 @@ void metaData::reset() {
   createNullBitsetTemplate();
   committedRecordCount_ = 0;
   tail_.reset();
-  consecutiveNullCount_ = 0;
-  activeGapDuration_    = 0;
+  gapDetector_.resetCounters();
   store_.saveHeader();
 }
 
 // ── Gap-detection state machine (przejęte od storage) ────────────────
 
-void metaData::configureGapDetection(int nullFillCount) {
-  nullFillCount_          = nullFillCount;
-  gapDetectionConfigured_ = true;
-}
+void metaData::configureGapDetection(int nullFillCount) { gapDetector_.configure(nullFillCount); }
 
 bool metaData::absorbAppend(const std::vector<bool> &nullBitset) {
-  if (!gapDetectionConfigured_) return false;
+  if (!gapDetector_.enabled()) return false;
 
   const bool isAllNull = !nullBitset.empty() && std::ranges::all_of(nullBitset, [](bool b) { return b; });
-  if (isAllNull) {
-    consecutiveNullCount_++;
-    if (std::cmp_greater(consecutiveNullCount_, nullFillCount_)) {
-      activeGapDuration_++;
-      return true;
-    }
-  } else {
-    flushPendingGap();
-    consecutiveNullCount_ = 0;
-  }
-  return false;
+  const bool absorbed  = gapDetector_.absorb(isAllNull);
+  if (!absorbed && !isAllNull) flushPendingGap();
+  return absorbed;
 }
 
 void metaData::flushPendingGap() {
-  if (activeGapDuration_ == 0) return;
-  onTransmissionGap(activeGapDuration_);
-  activeGapDuration_ = 0;
+  if (auto gap = gapDetector_.takePendingGap(); gap > 0) onTransmissionGap(gap);
 }
 
 }  // namespace rdb
