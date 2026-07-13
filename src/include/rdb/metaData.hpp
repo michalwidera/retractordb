@@ -5,11 +5,11 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <span>
 #include <string>
 #include <vector>
 
 #include "descriptor.hpp"
+#include "indexRecord.hpp"
 
 namespace rdb {
 
@@ -56,15 +56,8 @@ class metaData {
  public:
   // ── Nested types ───────────────────────────────────────────────────
 
-  /// @brief Single entry in the meta index – a null bit-set pattern and count
-  ///        of consecutive records sharing that pattern.
-  struct IndexRecord {
-    std::vector<bool> nullBitset;                                     ///< one bit per descriptor field (true = null)
-    size_t recordCount{0};                                            ///< number of consecutive records with this pattern
-    bool isGap{false};                                                ///< true if this entry represents a transmission gap
-    [[nodiscard]] std::vector<std::byte> serialize() const;           ///< serialize the entry to a vector of bytes
-    static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
-  };
+  /// @brief Alias kept for source compatibility — the type now lives standalone (indexRecord.hpp).
+  using IndexRecord = rdb::IndexRecord;
 
   // ── Construction / destruction ──────────────────────────────────────
 
