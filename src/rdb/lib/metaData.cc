@@ -12,31 +12,11 @@
 #include <stdexcept>
 #include <utility>
 
+#include "rdb/rleSegment.hpp"
+
 namespace rdb {
 
 constexpr size_t kBitsPerByte = 8;  ///< used below to size store_'s entrySize (must match indexRecord.cc's packing)
-
-// ── RLE segment helpers ──────────────────────────────────────────────
-
-namespace {
-
-std::vector<metaData::IndexRecord> splitSegment(const metaData::IndexRecord &seg, size_t offset,
-                                                const std::vector<bool> &newBitset) {
-  std::vector<metaData::IndexRecord> result;
-  if (offset > 0)
-    result.emplace_back(metaData::IndexRecord{.nullBitset = seg.nullBitset, .recordCount = offset, .isGap = false});
-  result.emplace_back(metaData::IndexRecord{.nullBitset = newBitset, .recordCount = 1, .isGap = false});
-  if (offset + 1 < seg.recordCount)
-    result.emplace_back(
-        metaData::IndexRecord{.nullBitset = seg.nullBitset, .recordCount = seg.recordCount - offset - 1, .isGap = false});
-  return result;
-}
-
-size_t sumNonGapRecords(const std::vector<metaData::IndexRecord> &entries) {
-  return std::ranges::fold_left(entries, 0UZ, [](size_t acc, const auto &e) { return acc + (e.isGap ? 0UZ : e.recordCount); });
-}
-
-}  // namespace
 
 // ── Private helpers ──────────────────────────────────────────────────
 
