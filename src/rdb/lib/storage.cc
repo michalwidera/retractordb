@@ -156,6 +156,9 @@ storage::~storage() {
   // Pending gap musi trafić na dysk PRZED ewentualnym kasowaniem plików disposable.
   if (metaData_) metaData_->flushPendingGap();
   if (isDisposable_) {
+    // Odłączenie od pliku PRZED usunięciem: bez tego destruktor metaData_ (wywołany automatycznie
+    // po zakończeniu tego ciała) odtworzyłby właśnie skasowany plik .meta przez flushCurrentEntry().
+    if (metaData_) metaData_->abandonFile();
     if (!storageFile_.empty()) (void)remove(storageFile_.c_str());
     if (descriptorFileExist()) remove(descriptorFile_.c_str());
     if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) remove(metaIndexFile_.c_str());

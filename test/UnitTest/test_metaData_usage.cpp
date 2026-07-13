@@ -319,3 +319,49 @@ TEST_F(UsageFixture, scenariusz_maszyna_gap) {
   ASSERT_NE(gapSeg, segs.end());
   EXPECT_EQ(gapSeg->recordCount, 2U);
 }
+
+// ---------------------------------------------------------------------------
+// Scenariusz 9: Bez abandonFile() destruktor odtwarza właśnie skasowany plik
+//
+// Dopóki w currentEntry_ czeka niezapisany wpis (recordCount > 0),
+// ~metaData() -> flushCurrentEntry() zapisze go na dysk — a appendEntry()
+// otwiera plik trybem ios::app, który TWORZY plik, jeśli nie istnieje.
+// To odtwarza plik nawet jeśli ktoś skasował go, póki obiekt jeszcze żyje
+// (dokładnie sytuacja storage::~storage() dla magazynu dysponowalnego,
+// zanim wprowadzono abandonFile()).
+// ---------------------------------------------------------------------------
+TEST_F(UsageFixture, scenariusz_bez_abandonFile_odtwarza_usuniety_plik) {
+  {
+    rdb::metaData meta(descriptor, file);
+    meta.onRecordAppended(allPresent);  // pending wpis w currentEntry_, jeszcze niezapisany
+
+    std::remove(file.c_str());  // np. storage kasuje plik dysponowalnego magazynu
+    ASSERT_FALSE(std::filesystem::exists(file));
+
+    // Obiekt nie wie o usunięciu — nadal trzyma pending wpis i ścieżkę pliku.
+  }
+  // ~metaData() odtworzył właśnie skasowany plik.
+  EXPECT_TRUE(std::filesystem::exists(file));
+}
+
+// ---------------------------------------------------------------------------
+// Scenariusz 10: abandonFile() zapobiega odtworzeniu pliku po usunięciu
+//
+// storage::~storage() woła metaData_->abandonFile() tuż PRZED skasowaniem
+// plików magazynu dysponowalnego. Odłączenie czyści metaFilePath_, więc
+// każda kolejna próba zapisu — łącznie z tą z destruktora — staje się
+// no-opem (ten sam wariant inertny, co dla źródeł deklarowanych).
+// ---------------------------------------------------------------------------
+TEST_F(UsageFixture, scenariusz_abandonFile_zapobiega_odtworzeniu) {
+  {
+    rdb::metaData meta(descriptor, file);
+    meta.onRecordAppended(allPresent);  // ten sam pending wpis co w scenariuszu 9
+
+    std::remove(file.c_str());
+    ASSERT_FALSE(std::filesystem::exists(file));
+
+    meta.abandonFile();  // odłączenie PRZED usunięciem — jak w storage::~storage()
+  }
+  // Destruktor nie mógł nic zapisać: metaFilePath_ jest puste.
+  EXPECT_FALSE(std::filesystem::exists(file));
+}

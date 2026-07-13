@@ -273,6 +273,8 @@ metaData::metaData(const Descriptor &descriptor, std::string metaFilePath)
 
 metaData::~metaData() { flushCurrentEntry(); }
 
+void metaData::abandonFile() { metaFilePath_.clear(); }
+
 // ── Core update interface ────────────────────────────────────────────
 
 void metaData::onRecordAppended(const std::vector<bool> &nullBitsetParam) {

@@ -160,6 +160,36 @@ TEST(xrdb, test_storage) {
   EXPECT_EQ(std::any_cast<uint8_t>(pl->getItem(1).value()), 0x33);
 }
 
+// ---------------------------------------------------------------------------
+// Dysponowalny storage (setDisposable(true)) nie zostawia po sobie żadnych
+// plików po destrukcji — ani danych, ani deskryptora, ani indeksu metadanych
+// (.meta). Bez odłączenia metaData_ od pliku przed usunięciem
+// (storage::~storage() woła metaData_->abandonFile()), automatyczny
+// destruktor metaData_ (flushCurrentEntry()) odtworzyłby właśnie skasowany
+// plik .meta, bo appendEntry() otwiera plik trybem ios::app.
+// ---------------------------------------------------------------------------
+TEST(xrdb, test_storage_disposal_removes_all_files) {
+  const std::string qryId = "disposal-fstream";
+  auto desc               = makeDesc(AREA_SIZE);
+
+  {
+    rdb::storage s(qryId, qryId, "");
+    s.attachDescriptor(&desc);
+    s.setDisposable(true);
+
+    auto *pl = s.getPayload();
+    uint8_t xData[AREA_SIZE];
+    std::memcpy(xData, "test data", AREA_SIZE);
+    std::memcpy(pl->span().data(), xData, AREA_SIZE);
+
+    ASSERT_TRUE(s.write());
+  }  // ~storage(): isDisposable_ => usuwa plik danych, .desc i .meta
+
+  EXPECT_FALSE(std::filesystem::exists(qryId));
+  EXPECT_FALSE(std::filesystem::exists(qryId + ".desc"));
+  EXPECT_FALSE(std::filesystem::exists(qryId + ".meta"));
+}
+
 TEST(crdb, genericBinaryFile_byte) {
   auto result1 = test_1<uint8_t, rdb::genericBinaryFile>();
   EXPECT_TRUE(result1);

@@ -198,6 +198,13 @@ class metaData {
   /// the same file.
   void flushCurrentEntry();
 
+  /// @brief Detach the index from its backing file so no further disk I/O occurs.
+  ///
+  /// Call before removing a disposable storage's meta file: without this, the destructor's
+  /// implicit flushCurrentEntry() would recreate the just-deleted file (appendEntry() opens
+  /// with ios::app, which creates a missing file).
+  void abandonFile();
+
  private:
   /// @brief State of the lazy-overwrite optimisation for the last on-disk RLE entry.
   ///
