@@ -1,6 +1,6 @@
 #include "rdb/rleSegment.hpp"
 
-#include <ranges>
+#include <algorithm>
 
 namespace rdb {
 
