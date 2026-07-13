@@ -2,17 +2,16 @@
 
 #include <cstdint>
 #include <cstring>
+#include <span>
 #include <stdexcept>
+
+#include "rdb/bitsetCodec.hpp"
 
 namespace rdb {
 
-namespace {
-constexpr size_t kBitsPerByte = 8;
-}  // namespace
-
 std::vector<std::byte> IndexRecord::serialize() const {
   const size_t bitsetSize = nullBitset.size();
-  const size_t byteCount  = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
+  const size_t byteCount  = packedByteCount(bitsetSize);
   std::vector<std::byte> buf(sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + byteCount, std::byte{0});
   std::byte *ptr = buf.data();
 
@@ -24,8 +23,7 @@ std::vector<std::byte> IndexRecord::serialize() const {
   write(static_cast<uint8_t>(isGap ? 1 : 0));
   write(recordCount);
   write(bitsetSize);
-  for (size_t i = 0; i < bitsetSize; ++i)
-    if (nullBitset[i]) ptr[i / kBitsPerByte] |= static_cast<std::byte>(1U << (i % kBitsPerByte));
+  packBits(nullBitset, std::span<std::byte>(ptr, byteCount));
 
   return buf;
 }
@@ -48,12 +46,10 @@ IndexRecord IndexRecord::deserialize(std::span<const std::byte> data) {
 
   size_t bitsetSize = 0;
   read(bitsetSize);
-  const size_t byteCount = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
+  const size_t byteCount = packedByteCount(bitsetSize);
   if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in bitset data");
 
-  rec.nullBitset.resize(bitsetSize);
-  for (size_t i = 0; i < bitsetSize; ++i)
-    rec.nullBitset[i] = ((std::to_integer<uint8_t>(ptr[i / kBitsPerByte]) >> (i % kBitsPerByte)) & 1U) != 0;
+  rec.nullBitset = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
 
   return rec;
 }

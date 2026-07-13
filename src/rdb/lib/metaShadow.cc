@@ -7,17 +7,18 @@
 #include <filesystem>
 #include <fstream>
 #include <ranges>
+#include <span>
 #include <stdexcept>
 
-namespace rdb {
+#include "rdb/bitsetCodec.hpp"
 
-constexpr size_t kBitsPerByte = 8;
+namespace rdb {
 
 // ── ShadowOverride serialization ─────────────────────────────────────
 
 std::vector<std::byte> metaShadow::ShadowOverride::serialize() const {
   const size_t bitsetSize = nullBitset.size();
-  const size_t byteCount  = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
+  const size_t byteCount  = packedByteCount(bitsetSize);
   std::vector<std::byte> buf(sizeof(uint8_t) + sizeof(size_t) + sizeof(size_t) + byteCount, std::byte{0});
   std::byte *ptr = buf.data();
 
@@ -29,8 +30,7 @@ std::vector<std::byte> metaShadow::ShadowOverride::serialize() const {
   write(static_cast<uint8_t>(0));  // flag byte reserved, unused for overrides
   write(recordIndex);
   write(bitsetSize);
-  for (size_t i = 0; i < bitsetSize; ++i)
-    if (nullBitset[i]) ptr[i / kBitsPerByte] |= static_cast<std::byte>(1U << (i % kBitsPerByte));
+  packBits(nullBitset, std::span<std::byte>(ptr, byteCount));
 
   return buf;
 }
@@ -52,12 +52,10 @@ metaShadow::ShadowOverride metaShadow::ShadowOverride::deserialize(std::span<con
 
   size_t bitsetSize = 0;
   read(bitsetSize);
-  const size_t byteCount = (bitsetSize + (kBitsPerByte - 1)) / kBitsPerByte;
+  const size_t byteCount = packedByteCount(bitsetSize);
   if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in ShadowOverride bitset data");
 
-  ov.nullBitset.resize(bitsetSize);
-  for (size_t i = 0; i < bitsetSize; ++i)
-    ov.nullBitset[i] = ((std::to_integer<uint8_t>(ptr[i / kBitsPerByte]) >> (i % kBitsPerByte)) & 1U) != 0;
+  ov.nullBitset = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
 
   return ov;
 }
@@ -70,7 +68,7 @@ std::string metaShadow::shadowFilePathFor(std::string_view metaFilePath) {
 
 metaShadow::metaShadow(const Descriptor &descriptor, std::string metaFilePath)
     : shadowFilePath_(shadowFilePathFor(metaFilePath)),
-      entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte)) {}
+      entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + packedByteCount(descriptor.size())) {}
 
 // ── Persistence ───────────────────────────────────────────────────────
 

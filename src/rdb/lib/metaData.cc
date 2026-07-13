@@ -12,11 +12,10 @@
 #include <stdexcept>
 #include <utility>
 
+#include "rdb/bitsetCodec.hpp"
 #include "rdb/rleSegment.hpp"
 
 namespace rdb {
-
-constexpr size_t kBitsPerByte = 8;  ///< used below to size store_'s entrySize (must match indexRecord.cc's packing)
 
 // ── Private helpers ──────────────────────────────────────────────────
 
@@ -76,8 +75,7 @@ std::pair<std::optional<size_t>, size_t> metaData::locateRecord(size_t recordInd
 // ── Construction / destruction ───────────────────────────────────────
 
 metaData::metaData(const Descriptor &descriptor, std::string metaFilePath)
-    : store_(std::move(metaFilePath),
-             sizeof(uint8_t) + (2 * sizeof(size_t)) + ((descriptor.size() + (kBitsPerByte - 1)) / kBitsPerByte)),
+    : store_(std::move(metaFilePath), sizeof(uint8_t) + (2 * sizeof(size_t)) + packedByteCount(descriptor.size())),
       descriptorRef_(std::make_shared<Descriptor>(descriptor)) {
   createNullBitsetTemplate();
   loadIndex();
