@@ -391,12 +391,23 @@ jobs:
       - check-skipci:
           enabled: false
       - prep-env-ci
+      - run:
+          name: Toolchain diagnostics (ARM)
+          command: |
+            uname -a
+            gcc --version
+            g++ --version
+            g++ -dumpfullversion
+            cmake --version
+            ls /usr/include/c++/
+            echo "--- conan profile default ---"
+            cat ~/.conan2/profiles/default
       - conan-install:
           build_type: << parameters.build_type >>
           build_param: --build missing
       - conan-build:
           build_type: << parameters.build_type >>
-          build_param: --build missing
+          build_param: --build missing -c tools.build:verbosity=verbose
           build_tool: << parameters.build_tool >>
       - run-test:
           build_type: << parameters.build_type >>
