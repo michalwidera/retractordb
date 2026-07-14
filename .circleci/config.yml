@@ -24,9 +24,9 @@ workflows:
   nightly-full:
     triggers:
       - schedule:
-          # https://crontab.guru/#0_4_5,15_*_*
-          # At 04:00 on day-of-month 5 and 15.
-          cron: "0 4 5,15 * *"
+          # https://crontab.guru/#0_4_5,15,25_*_*
+          # At 04:00 on day-of-month 5, 15, and 25.
+          cron: "0 4 5,15,25 * *"
           filters:
             branches:
               only:

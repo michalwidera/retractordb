@@ -1,7 +1,11 @@
 # https://hub.docker.com/_/debian
 FROM debian:trixie-slim
 
-LABEL com.retractordb.version="0.0.7"
+# Wersja bez wartości domyślnej — jedyne źródło prawdy to plik VERSION w korzeniu
+# repo. Przekazywana przy buildzie: --build-arg RDB_VERSION="$(cat VERSION)".
+ARG RDB_VERSION
+
+LABEL com.retractordb.version="${RDB_VERSION}"
 LABEL vendor1="Michal Widera"
 LABEL com.retractordb.release-date="2026-06-20"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
@@ -122,13 +126,12 @@ CMD ["/bin/bash"]
 # docker image ls
 # dive <IMAGE ID>
 
-# How to deploy to DockerHub (run from repo root)
-# FIRST: cd github/retractordb ($PROJECT_ROOT)
-# docker build -f docker/ci/Dockerfile -t buildenv-retractordb .
-# docker run -it buildenv-retractordb
-# docker login
-# docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
-# docker push micwide/buildenv-retractordb:latest
+# How to build and push (run from repo root):
+#   docker build --build-arg RDB_VERSION="$(cat VERSION)" -f docker/ci/Dockerfile -t buildenv-retractordb .
+#   docker run -it buildenv-retractordb
+#   docker login
+#   docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
+#   docker push micwide/buildenv-retractordb:latest
 
 # clean up all dangling images
 # https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images

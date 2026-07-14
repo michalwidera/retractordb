@@ -1,4 +1,7 @@
-# Build artifacts and tooling
-build/
-.venv/
-coverage/
+# Kontekst budowania ograniczony do białej listy: do obrazów trafiają wyłącznie
+# pliki jawnie kopiowane w docker/*/Dockerfile (conanfile.py, docker/...).
+# Wyklucza to m.in. .git (58 MB), bin/ (322 MB), build/, źródła i pliki
+# dokumentacyjne (CITATION.cff, LICENSE, *.md), przyspieszając docker build.
+*
+!conanfile.py
+!docker
