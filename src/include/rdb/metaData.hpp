@@ -1,15 +1,16 @@
 #pragma once
 
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <span>
 #include <string>
 #include <vector>
 
 #include "descriptor.hpp"
+#include "gapDetector.hpp"
+#include "indexRecord.hpp"
+#include "metaIndexStore.hpp"
 
 namespace rdb {
 
@@ -25,14 +26,17 @@ namespace rdb {
 /// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
 /// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
 /// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić szybkie aktualizacje bez konieczności odczytu całego indeksu z pliku,
-/// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu,
+/// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu; surowe
+///   I/O pliku .meta (nagłówek, wpisy, cache) deleguje do obiektu MetaIndexStore (metaIndexStore.hpp),
 /// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie; dla rekordów spoza
 ///   indeksu (nullBitsetFor()) zwracać domyślny wzorzec all-false, aby wywołujący nie musiał sprawdzać zakresu,
 /// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
 /// - realizować maszynę detekcji przerw transmisji przejętą od storage: po skonfigurowaniu (configureGapDetection())
 ///   pierwsze nullFillCount kolejnych rekordów all-null przepuszczać do fizycznego zapisu (faza nullfill), a dalsze
 ///   rekordy all-null pochłaniać (absorbAppend() zwraca true) akumulując długość oczekującej przerwy; pierwszy rekord
-///   nie-null opróżnia oczekującą przerwę jako wpis gap i zeruje licznik fazy nullfill,
+///   nie-null opróżnia oczekującą przerwę jako wpis gap i zeruje licznik fazy nullfill; sam stan maszyny
+///   (liczniki nullfill/absorpcji, oczekująca przerwa) deleguje do obiektu GapDetector (gapDetector.hpp),
+///   pozostawiając sobie zapis wpisu gap do indeksu,
 /// - udostępniać flushPendingGap() zapisujące zaakumulowaną przerwę jako wpis gap (wywoływane przez storage także przy
 ///   zamykaniu magazynu),
 /// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
@@ -42,7 +46,10 @@ namespace rdb {
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
 /// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
 /// - udostępniać metodę wymuszającą natychmiastowy zapis pending entry na dysk (flushCurrentEntry()), aby null metadata przeżyła awarię lub otwarcie pliku przez drugi obiekt storage.
-/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage — usunięcie wszystkich wpisów (wraz z licznikami maszyny gap) przy zachowaniu czasu utworzenia zapisanego w nagłówku pliku.
+/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage — usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu czasu utworzenia zapisanego w nagłówku pliku.
+/// - udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) — wywoływane
+///   przez storage dla magazynów dysponowalnych PRZED skasowaniem pliku .meta, aby destruktor (niejawny
+///   flushCurrentEntry()) nie odtworzył właśnie usuniętego pliku.
 /// - stanowić polimorficzną bazę dla wariantów zachowania wstrzykiwanych do storage: metody onRecordModified(),
 ///   getNullBitset() i reset() są wirtualne, aby wariant magazynu z plikiem cienia danych (storageShadow,
 ///   storageShadow.hpp) mógł kierować aktualizacje do cienia indeksu bez rozgałęzień w kodzie storage.
@@ -51,20 +58,17 @@ namespace rdb {
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
 /// @note Instancja z pustą ścieżką pliku jest wariantem inertnym (bez persystencji) — storage wstrzykuje ją dla
 ///       źródeł deklarowanych (DEVICE/TEXTSOURCE), które nie utrzymują indeksu null.
+/// @note Klasa pełni rolę koordynatora spinającego wydzielone jednostki: format wpisu definiuje IndexRecord
+///       (indexRecord.hpp), persystencję pliku .meta realizuje MetaIndexStore (metaIndexStore.hpp), stan detekcji
+///       przerw GapDetector (gapDetector.hpp), a operacje na segmentach RLE — splitSegment()/sumNonGapRecords()
+///       (rleSegment.hpp); przy metaData pozostaje polityka RLE (lazy overwrite, DiskTailState) i numeracja rekordów.
 
 class metaData {
  public:
   // ── Nested types ───────────────────────────────────────────────────
 
-  /// @brief Single entry in the meta index – a null bit-set pattern and count
-  ///        of consecutive records sharing that pattern.
-  struct IndexRecord {
-    std::vector<bool> nullBitset;                                     ///< one bit per descriptor field (true = null)
-    size_t recordCount{0};                                            ///< number of consecutive records with this pattern
-    bool isGap{false};                                                ///< true if this entry represents a transmission gap
-    [[nodiscard]] std::vector<std::byte> serialize() const;           ///< serialize the entry to a vector of bytes
-    static IndexRecord deserialize(std::span<const std::byte> data);  ///< deserialize an entry from a vector of bytes
-  };
+  /// @brief Alias kept for source compatibility — the type now lives standalone (indexRecord.hpp).
+  using IndexRecord = rdb::IndexRecord;
 
   // ── Construction / destruction ──────────────────────────────────────
 
@@ -152,7 +156,7 @@ class metaData {
   void configureGapDetection(int nullFillCount = 2);
 
   /// @brief Whether configureGapDetection() was called.
-  [[nodiscard]] bool gapDetectionEnabled() const { return gapDetectionConfigured_; }
+  [[nodiscard]] bool gapDetectionEnabled() const { return gapDetector_.enabled(); }
 
   /// @brief Feed an appended record's null bit-set into the gap-detection machine.
   ///
@@ -198,6 +202,13 @@ class metaData {
   /// the same file.
   void flushCurrentEntry();
 
+  /// @brief Detach the index from its backing file so no further disk I/O occurs.
+  ///
+  /// Call before removing a disposable storage's meta file: without this, the destructor's
+  /// implicit flushCurrentEntry() would recreate the just-deleted file (appendEntry() opens
+  /// with ios::app, which creates a missing file).
+  void abandonFile();
+
  private:
   /// @brief State of the lazy-overwrite optimisation for the last on-disk RLE entry.
   ///
@@ -227,33 +238,18 @@ class metaData {
   };
 
   void createNullBitsetTemplate();
-  void loadIndex();                                   ///< read header and restore currentEntry_ from file
-  void saveHeader();                                  ///< write file header (creation time) without entries
-  void appendEntry(const IndexRecord &entry);         ///< append a single entry to end of file
-  void overwriteLastEntry(const IndexRecord &entry);  ///< overwrite the last committed entry in-place (for lazy RLE retract)
-  void rewriteFile(const std::vector<IndexRecord> &entries);  ///< rewrite full file (header + entries)
-  std::vector<IndexRecord> readCommittedEntries() const;      ///< read all committed entries from file
+  void loadIndex();  ///< restore currentEntry_ from store_'s committed entries
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
   /// @return {segment index in committed entries (nullopt = currentEntry_), offset within segment}
   std::pair<std::optional<size_t>, size_t> locateRecord(size_t recordIndex) const;
 
-  std::string metaFilePath_;                            ///< file path for saving/loading the meta index
-  std::shared_ptr<Descriptor> descriptorRef_;           ///< descriptor of the indexed data stream
-  std::chrono::system_clock::time_point creationTime_;  ///< index creation timestamp
-  /// serialized size of one IndexRecord on disk; depends on descriptor field count, computed once at construction.
-  /// NOLINT: wartość liczona z parametru konstruktora (descriptor.size()), nie da się jako default member init.
-  const size_t entrySize_;                         // NOLINT(modernize-use-default-member-init)
-  size_t committedRecordCount_{0};                 ///< cached total records in committed entries on disk
-  DiskTailState tail_{};                           ///< lazy-overwrite state for the last on-disk entry
-  IndexRecord currentEntry_;                       ///< accumulator for the pending (not yet committed) RLE run
-  mutable std::vector<IndexRecord> entriesCache_;  ///< in-memory copy of committed on-disk entries
-  mutable bool cacheValid_{false};                 ///< true when entriesCache_ matches the file; cleared on every write
-
-  int nullFillCount_{2};                ///< number of nullfill records written before a gap is marked (R17)
-  size_t consecutiveNullCount_{0};      ///< consecutive all-null records fed into absorbAppend()
-  size_t activeGapDuration_{0};         ///< accumulated gap duration not yet flushed as a gap entry
-  bool gapDetectionConfigured_{false};  ///< true only when configureGapDetection() was explicitly called
+  MetaIndexStore store_;                       ///< raw .meta file I/O (header + committed entries)
+  std::shared_ptr<Descriptor> descriptorRef_;  ///< descriptor of the indexed data stream
+  size_t committedRecordCount_{0};             ///< cached total records in committed entries on disk
+  DiskTailState tail_{};                       ///< lazy-overwrite state for the last on-disk entry
+  IndexRecord currentEntry_;                   ///< accumulator for the pending (not yet committed) RLE run
+  GapDetector gapDetector_;                    ///< nullfill/absorb state machine (przejęte od storage)
 };  // class metaData
 
 }  // namespace rdb
