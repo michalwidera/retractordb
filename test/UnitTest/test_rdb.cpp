@@ -8,6 +8,8 @@
 #include <thread>
 
 #include "rdb/descriptor.hpp"
+#include "rdb/faccfs.hpp"
+#include "rdb/faccposix.hpp"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"

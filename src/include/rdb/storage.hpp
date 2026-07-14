@@ -3,29 +3,29 @@
 #include <memory>  // std::unique_ptr
 #include <string>
 
-#include <boost/circular_buffer.hpp>
 #include <boost/rational.hpp>
 
 #include "descriptor.hpp"
-#include "faccbindev.hpp"
-#include "faccfs.hpp"
-#include "faccmemory.hpp"
-#include "faccposix.hpp"
-#include "faccposixshd.hpp"
-#include "facctxtsrc.hpp"
-#include "fagrp.hpp"
+#include "fainterface.hpp"
 #include "metaData.hpp"
 #include "payload.hpp"
+#include "sourceBuffer.hpp"
+#include "storagePaths.hpp"
 
 namespace rdb {
-enum class sourceState : std::uint8_t { empty, flux, armed };
 
 /// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
 /// Obiekt klasy storage powinien:
 /// - utrzymywać Descriptor oraz powiązane obiekty payload używane do odczytu, zapisu i buforowania danych,
+/// - delegować wyliczanie i spójność ścieżek plików magazynu (deskryptor .desc, plik danych, indeks .meta)
+///   do obiektu StoragePaths (storagePaths.hpp), łącznie z relokacją wg pola REF deskryptora
+///   oraz kasowaniem kompletu plików magazynów dysponowalnych,
 /// - tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
-/// - zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych,
+///   delegując samo odwzorowanie typu magazynu na konkretną klasę akcesora oraz dobór wariantu indeksu metadanych
+///   do fabryki (accessorFactory.hpp) — storage zna wyłącznie abstrakcyjny FileInterface,
+/// - zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych; odczyt, zapis
+///   i weryfikację zgodności pliku .desc delegować do funkcji descriptorIO (descriptorIO.hpp),
 /// - udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
 /// - delegować całość metadanych null i gap do wstrzykniętego obiektu metaData, którego wariant jest wybierany
 ///   przy attachStorage(): storageShadow gdy accessor utrzymuje plik cienia danych (FileInterface::hasShadow()),
@@ -34,7 +34,9 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// - traktować posiadanie pliku cienia danych i posiadanie metaindeksu jako niezależne własności magazynu:
 ///   plik cienia zachowuje oryginalną, zarejestrowaną zawartość danych (aktualizacje trafiają do cienia aż do
 ///   merge), a metaindeks pozwala uwzględnić wartości null oraz przerwy w transmisji,
-/// - dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii w circularBuffer_,
+/// - dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii,
+///   delegując komorę bieżącego rekordu, fizyczny odczyt ze źródła i bufor historii do obiektu SourceBuffer
+///   (sourceBuffer.hpp); storage zachowuje decyzje o wartościach zastępczych i stan bufferState,
 /// - wspierać czyszczenie magazynu i odpowiadającego mu indeksu metadanych przez purge() lub reset(),
 /// - umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap;
 ///   samą maszynę detekcji gap (nullfill/absorpcja/flush) realizuje metaData,
@@ -47,25 +49,20 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 class storage {
   std::unique_ptr<FileInterface> accessor_;
   std::unique_ptr<rdb::payload> storagePayload_;
-  std::unique_ptr<rdb::payload> chamber_;
+  SourceBuffer buffer_;  ///< komora bieżącego rekordu i historia dla źródeł deklarowanych
 
   bool isDisposable_   = false;  // if true - storage and descriptor will be deleted after use
   bool isOneShot_      = false;  // if false - storage will be looped when end is reached
   bool isHold_         = false;  // if true - no processing until first query appear
   size_t recordsCount_ = 0;
-  std::string descriptorFile_;
-  std::string storageFile_;
-  std::string metaIndexFile_;  // file path for saving/loading the meta index
+  StoragePaths paths_;
   std::string storageType_;
   int percounter_ = -1;
 
   boost::rational<int> rInterval_{1};  ///< sampling interval for time calculations
 
   void detectStartupState();  ///< detect rotation or startup gap after meta index is ready
-  void moveRef();
   void attachStorage();
-
-  boost::circular_buffer<rdb::payload> circularBuffer_{0};
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
