@@ -86,7 +86,8 @@ xtrdb -h
 
 ### Option B — build from source
 
-The build uses **Conan 2 + CMake + Ninja** and requires **GCC 13+** (C++23).
+The build uses **Conan 2 + CMake + Ninja** and requires **GCC 14+** (C++23,
+including `std::println`/`<print>`, absent from libstdc++ 13).
 A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the
 toolchain and drives the build. Run it from the repo root, `scripts/`, or
 `build/Debug/`.

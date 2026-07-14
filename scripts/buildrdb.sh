@@ -23,24 +23,27 @@ esac
 echo "-- Note: Current folder is [ $foldername ] and will start build in [ $build_folder ]"
 
 # Compile and run a small C++23 probe.
-# Tests std::ranges::fold_left and the uz size_t literal — both C++23 and used in the codebase.
-# Requires GCC 13+.  Returns 0 on success.
+# Tests std::ranges::fold_left, the uz size_t literal and std::println (<print>)
+# — all C++23 and used in the codebase.
+# Requires GCC 14+ (libstdc++ 13 has no <print> at all).  Returns 0 on success.
 check_cxx23() {
     local tmpdir rc
     tmpdir=$(mktemp -d)
     cat > "$tmpdir/cxx23check.cpp" << 'EOF'
 #include <algorithm>
 #include <cstddef>
+#include <print>
 #include <vector>
 int main() {
   std::vector<int> v{1, 2, 3};
   std::size_t s = std::ranges::fold_left(v, 0uz,
       [](std::size_t a, int x){ return a + std::size_t(x); });
+  std::println("{}", s);
   return s == 6 ? 0 : 1;
 }
 EOF
     g++ -std=c++23 -o "$tmpdir/cxx23check" "$tmpdir/cxx23check.cpp" 2>/dev/null \
-        && "$tmpdir/cxx23check"
+        && "$tmpdir/cxx23check" >/dev/null 2>&1
     rc=$?
     rm -rf "$tmpdir"
     return $rc
@@ -506,17 +509,17 @@ ensure_tools_for_option() {
         gcc_ver=""
         if command_exists gcc; then
             gcc_ver=$(gcc -dumpfullversion -dumpversion 2>/dev/null | head -n1)
-            if [ -n "$gcc_ver" ] && version_ge "$gcc_ver" "13"; then
+            if [ -n "$gcc_ver" ] && version_ge "$gcc_ver" "14"; then
                 compat_status="ok"
             else
                 compat_status="fail"
                 compat_failures=$((compat_failures + 1))
             fi
-            printf "%-28s | %-14s | %-8s | %-18s\n" "gcc version" "${gcc_ver:-unknown}" "$compat_status" ">= 13"
+            printf "%-28s | %-14s | %-8s | %-18s\n" "gcc version" "${gcc_ver:-unknown}" "$compat_status" ">= 14"
         else
             compat_status="fail"
             compat_failures=$((compat_failures + 1))
-            printf "%-28s | %-14s | %-8s | %-18s\n" "gcc version" "missing" "$compat_status" ">= 13"
+            printf "%-28s | %-14s | %-8s | %-18s\n" "gcc version" "missing" "$compat_status" ">= 14"
         fi
 
         cmake_ver=""
@@ -686,7 +689,7 @@ ensure_tools_for_option() {
 # switch system alternatives to it, and verify C++23 support.
 install_best_gcc_for_cxx23() {
     local ver priority
-    for ver in 20 19 18 17 16 15 14 13; do
+    for ver in 20 19 18 17 16 15 14; do
         if ! apt-cache show "gcc-$ver" >/dev/null 2>&1 || ! apt-cache show "g++-$ver" >/dev/null 2>&1; then
             continue
         fi
@@ -718,6 +721,20 @@ install_best_gcc_for_cxx23() {
     done
 
     return 1
+}
+
+# Verify C++23 support (probe) and, if missing, install the best available GCC
+# via the ladder above.  Exits the script on failure.
+ensure_cxx23_gcc() {
+    local gcc_ver
+    echo "-- Verifying C++23 support..."
+    if ! check_cxx23; then
+        gcc_ver=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
+        echo "-- C++23 not supported (GCC ${gcc_ver:-unknown}). Minimum required: GCC 14."
+        echo "-- Attempting GCC ladder install (highest available first)..."
+        install_best_gcc_for_cxx23 || { echo "Error: Could not install a C++23-capable GCC (tried versions 20..14). Please install one manually."; exit 1; }
+    fi
+    echo "-- C++23 OK — g++ $(g++ -dumpversion)"
 }
 
 run_option() {
@@ -781,14 +798,7 @@ run_option() {
             add_venv_to_bashrc
             if [ ! -f ~/.conan2/profiles/default ]; then conan profile detect; fi
             conan profile show
-            echo "-- Verifying C++23 support..."
-            if ! check_cxx23; then
-                gcc_ver=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
-                echo "-- C++23 not supported (GCC ${gcc_ver:-unknown}). Minimum required: GCC 13."
-                echo "-- Attempting GCC ladder install (highest available first)..."
-                install_best_gcc_for_cxx23 || { echo "Error: Could not install a C++23-capable GCC (tried versions 20..13). Please install one manually."; exit 1; }
-            fi
-            echo "-- C++23 OK — g++ $(g++ -dumpversion)"
+            ensure_cxx23_gcc
             if [ "$opt" = "toolchain_all" ]; then
                 echo "-- Full toolchain installation complete (required + recommended + optional)."
             fi
@@ -796,6 +806,7 @@ run_option() {
         "toolchain_required")
             ensure_venv
             add_venv_to_bashrc
+            ensure_cxx23_gcc
             echo "-- Minimal CI-like toolchain installation complete."
             ;;
         "validate")
