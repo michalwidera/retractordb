@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use RetractorDB, please cite the paper below."
+title: "RetractorDB"
+type: software
+authors:
+  - family-names: Widera
+    given-names: Michal
+    orcid: "https://orcid.org/0000-0002-3578-3792"
+    email: michal@widera.com.pl
+repository-code: "https://github.com/michalwidera/retractordb"
+license: MIT
+doi: 10.5281/zenodo.21195766
+preferred-citation:
+  type: article
+  title: "RetractorDB: A Deterministic Edge Signal Processing Engine Based on Rational Beatty Sequences and Fraenkel's Partition"
+  authors:
+    - family-names: Widera
+      given-names: Michal
+      orcid: "https://orcid.org/0000-0002-3578-3792"
+  year: 2026
+  month: 7
+  identifiers:
+    - type: other
+      value: "arXiv:2607.07730"
+      description: "arXiv preprint"
+  url: "https://arxiv.org/abs/2607.07730"
+  doi: 10.48550/arXiv.2607.07730
