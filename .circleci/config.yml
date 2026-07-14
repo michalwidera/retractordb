@@ -394,20 +394,20 @@ jobs:
       - run:
           name: Toolchain diagnostics (ARM)
           command: |
-            uname -a
-            gcc --version
-            g++ --version
-            g++ -dumpfullversion
-            cmake --version
-            ls /usr/include/c++/
+            uname -a || true
+            gcc --version || true
+            g++ --version || true
+            g++ -dumpfullversion || true
+            cmake --version || true
+            ls /usr/include/c++/ || true
             echo "--- conan profile default ---"
-            cat ~/.conan2/profiles/default
+            cat ~/.conan2/profiles/default || true
       - conan-install:
           build_type: << parameters.build_type >>
           build_param: --build missing
       - conan-build:
           build_type: << parameters.build_type >>
-          build_param: --build missing -c tools.build:verbosity=verbose
+          build_param: --build missing
           build_tool: << parameters.build_tool >>
       - run-test:
           build_type: << parameters.build_type >>
