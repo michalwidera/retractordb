@@ -823,6 +823,14 @@ run_option() {
             ensure_single_profile_line "$conan_profile" 'tools.cmake.cmaketoolchain:generator=Ninja' '^tools[.]cmake[.]cmaketoolchain:generator='
             cat ~/.conan2/profiles/default
             ;;
+        "mold")
+            export RDB_USE_MOLD=ON
+            echo "-- mold linker ENABLED for subsequent build options in this invocation."
+            ;;
+        "nomold")
+            export RDB_USE_MOLD=OFF
+            echo "-- mold linker DISABLED for subsequent build options in this invocation (falls back to default linker)."
+            ;;
         "bashrc")
             cd $build_folder
             if [ "${PWD##*/}" != "retractordb" ] ; then echo "Error: Current folder is not retractordb" ; exit ; fi 
@@ -919,6 +927,8 @@ run_option() {
             echo "  ninja      - Add Ninja generator to conan profile"
             echo "  bashrc     - Add ~/.local/bin to PATH in ~/.bashrc (and create it)"
             echo "  coverage   - Build tests with code coverage enabled"
+            echo "  mold       - Enable mold linker for subsequent options (default; e.g. buildrdb.sh mold debug)"
+            echo "  nomold     - Disable mold linker for subsequent options (e.g. RPi: buildrdb.sh nomold debug)"
             echo "  vimsyntax  - Install RetractorQL syntax highlighting for vim"
             echo "  batsyntax  - Install RetractorQL syntax highlighting for bat/batcat"
             echo "  help       - Show this help message"
@@ -928,7 +938,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage vimsyntax batsyntax help quit"
+              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -940,7 +950,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"

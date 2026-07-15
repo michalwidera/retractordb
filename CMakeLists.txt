@@ -54,7 +54,23 @@ if(RDB_BENCH_PROBE)
   )
 endif()
 
-set(CMAKE_CXX_FLAGS "-fuse-ld=mold -std=c++23")
+# mold jest domyślnym linkerem (szybszy niż ld/lld), ale na platformach z
+# ograniczoną pamięcią (np. RPi) potrafi zgłaszać błędy alokacji przy
+# linkowaniu. RDB_USE_MOLD=OFF w env wymusza (FORCE) wyłączenie przy każdej
+# konfiguracji — działa też przez 'conan build', które nie pozwala wstrzyknąć -D
+# (patrz scripts/buildrdb.sh: opcje 'mold'/'nomold').
+if(DEFINED ENV{RDB_USE_MOLD})
+  set(RDB_USE_MOLD
+      $ENV{RDB_USE_MOLD}
+      CACHE BOOL "Use mold linker" FORCE)
+else()
+  option(RDB_USE_MOLD "Use mold linker" ON)
+endif()
+
+set(CMAKE_CXX_FLAGS "-std=c++23")
+if(RDB_USE_MOLD)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=mold")
+endif()
 
 if(ENABLE_COVERAGE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
