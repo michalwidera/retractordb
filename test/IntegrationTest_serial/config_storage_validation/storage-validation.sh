@@ -1,7 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-case "${1:-}" in
+# stdout/stderr per tryb (nie wspólne stdout.txt/stderr.txt): oba warianty dzielą ten sam
+# WORKING_DIRECTORY i pod ctest -j mogą wykonywać się równolegle -- wspólna nazwa pliku
+# powodowała nadpisanie stderr.txt przez drugi wariant przed jego własnym grepem.
+mode="${1:-}"
+stdout="stdout-${mode}.txt"
+stderr="stderr-${mode}.txt"
+
+case "$mode" in
   nonexistent)
     cfg="bad-storage-nonexistent.toml"
     cat > "$cfg" <<'EOF'
@@ -10,7 +17,7 @@ dir = "./_missing_storage_dir"
 EOF
 
     set +e
-    xretractor --config "$cfg" --help >stdout.txt 2>stderr.txt
+    xretractor --config "$cfg" --help >"$stdout" 2>"$stderr"
     rc=$?
     set -e
 
@@ -18,7 +25,7 @@ EOF
       echo "expected non-zero exit code for nonexistent storage.dir"
       exit 1
     fi
-    grep -q "Configuration error: storage.dir does not exist" stderr.txt
+    grep -q "Configuration error: storage.dir does not exist" "$stderr"
     ;;
 
   unwritable)
@@ -32,7 +39,7 @@ dir = "./_storage_unwritable"
 EOF
 
     set +e
-    xretractor --config "$cfg" --help >stdout.txt 2>stderr.txt
+    xretractor --config "$cfg" --help >"$stdout" 2>"$stderr"
     rc=$?
     set -e
 
@@ -43,7 +50,7 @@ EOF
       echo "expected non-zero exit code for unwritable storage.dir"
       exit 1
     fi
-    grep -q "Configuration error: storage.dir is not writable" stderr.txt
+    grep -q "Configuration error: storage.dir is not writable" "$stderr"
     ;;
 
   *)
