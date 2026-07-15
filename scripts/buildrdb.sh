@@ -72,7 +72,7 @@ find_python3() {
 install_python_venv_support() {
     local py pyver pkg
     py=$(find_python3) || { echo "Error: python3 not found"; exit 1; }
-    if ! "$py" -m venv --help >/dev/null 2>&1; then
+    if ! "$py" -m venv --help >/dev/null 2>&1 || ! "$py" -c 'import ensurepip' >/dev/null 2>&1; then
         pyver=$(echo "$py" | grep -oE '[0-9]+\.[0-9]+' | head -n1)
         if [ -n "$pyver" ]; then
             pkg="python${pyver}-venv"
@@ -96,7 +96,7 @@ tool_installed() {
         python3-venv)
             local py
             py=$(find_python3 2>/dev/null) || return 1
-            "$py" -m venv --help >/dev/null 2>&1
+            "$py" -m venv --help >/dev/null 2>&1 && "$py" -c 'import ensurepip' >/dev/null 2>&1
             ;;
         build-essential)
             dpkg -s build-essential >/dev/null 2>&1
