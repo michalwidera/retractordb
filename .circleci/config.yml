@@ -33,10 +33,14 @@ workflows:
                 - master
                 - /[Ii]ssue_.*/
     jobs:
-      - build-release
       - build-release-ninja-mydocker
+      - build-release:
+          requires:
+            - build-release-ninja-mydocker
       - build-debug-ninja-mydocker:
           check_skipci: false
+          requires:
+            - build-release-ninja-mydocker
       - build-debug:
           requires:
             - build-release
@@ -54,10 +58,14 @@ workflows:
   manual-nightly-full:
     when: << pipeline.parameters.run_manual_nightly_full >>
     jobs:
-      - build-release
       - build-release-ninja-mydocker
+      - build-release:
+          requires:
+            - build-release-ninja-mydocker
       - build-debug-ninja-mydocker:
           check_skipci: false
+          requires:
+            - build-release-ninja-mydocker
       - build-debug:
           requires:
             - build-release
