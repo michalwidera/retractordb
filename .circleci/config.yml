@@ -248,7 +248,7 @@ commands:
           name: Integration & Unit test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
-            cd build/<< parameters.build_type >>/test && ctest -V --output-junit test_results.xml
+            cd build/<< parameters.build_type >>/test && ctest -j "$(nproc)" -V --output-junit test_results.xml
       - store_test_results:
           path: build/<< parameters.build_type >>/test
       - store_artifacts:

@@ -72,6 +72,30 @@ if(RDB_USE_MOLD)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=mold")
 endif()
 
+# ccache buforuje wyniki kompilacji, przyspieszając powtórne budowanie (np.
+# iteracja dev/test, przełączanie branchy) -- szczególnie odczuwalne na
+# maszynach z ograniczoną mocą/RAM (np. RPi), gdzie pełna rekompilacja
+# Boost+antlr4+GTest jest kosztowna. Wykrywane automatycznie: brak ccache w
+# systemie nie blokuje budowy, po prostu nic nie przyspiesza. Wyłączenie:
+# RDB_USE_CCACHE=OFF w env (patrz scripts/buildrdb.sh, analogicznie do
+# RDB_USE_MOLD/mold/nomold).
+if(DEFINED ENV{RDB_USE_CCACHE})
+  set(RDB_USE_CCACHE
+      $ENV{RDB_USE_CCACHE}
+      CACHE BOOL "Use ccache compiler launcher" FORCE)
+else()
+  option(RDB_USE_CCACHE "Use ccache compiler launcher if available" ON)
+endif()
+if(RDB_USE_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "ccache found, enabling as compiler launcher: ${CCACHE_PROGRAM}")
+  else()
+    message(STATUS "ccache not found, skipping (install: scripts/buildrdb.sh toolchain, or apt install ccache)")
+  endif()
+endif()
+
 if(ENABLE_COVERAGE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")

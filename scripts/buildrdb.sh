@@ -289,6 +289,7 @@ cmd_to_apt_package() {
         valgrind) echo "valgrind" ;;
         cppcheck) echo "cppcheck" ;;
         mold) echo "mold" ;;
+        ccache) echo "ccache" ;;
         graphviz) echo "graphviz" ;;
         feh) echo "feh" ;;
         tmux) echo "tmux" ;;
@@ -309,6 +310,42 @@ version_ge() {
     local have="$1"
     local want="$2"
     [ "$(printf '%s\n' "$want" "$have" | sort -V | head -n1)" = "$want" ]
+}
+
+# Dobiera bezpieczną liczbę równoległych zadań kompilacji na podstawie
+# dostępnej pamięci RAM. Powód: pojedyncza jednostka kompilacji tego projektu
+# (Boost + antlr4-runtime + GTest, C++23, -O3) potrafi zająć nawet ~800MB RSS
+# mimo PCH -- zmierzone na wygenerowanych parserach ANTLR (RQLParser.cpp,
+# DESCParser.cpp) oraz compiler.cpp/executorsm.cpp/expressionEvaluator.cpp.
+# Domyślne '-j = liczba rdzeni' na maszynach z małą ilością RAM (np. RPi 400:
+# 4 rdzenie / 3.7GB) doprowadziło w testach do peaku 3.1GB/3.7GB zużytej
+# pamięci (poniżej 700MB wolnego) -- blisko swapowania/OOM. Formuła zakłada
+# ~850MB na zadanie i zostawia ~500MB marginesu na system/bufory; na maszynach
+# z dużą ilością RAM nie ogranicza niczego (wynik i tak ograniczony do liczby
+# rdzeni). Nadpisanie ręczne: RDB_BUILD_JOBS=N w env, lub opcje
+# 'lowmem'/'nolowmem' (patrz niżej, analogicznie do 'mold'/'nomold').
+compute_build_jobs() {
+    if [ -n "${RDB_BUILD_JOBS:-}" ]; then
+        echo "$RDB_BUILD_JOBS"
+        return 0
+    fi
+    local nproc_count mem_kb mem_mb jobs_by_mem
+    nproc_count=$(nproc 2>/dev/null || echo 1)
+    mem_kb=$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null)
+    if [ -z "$mem_kb" ]; then
+        echo "$nproc_count"
+        return 0
+    fi
+    mem_mb=$((mem_kb / 1024))
+    jobs_by_mem=$(( (mem_mb - 500) / 850 ))
+    if [ "$jobs_by_mem" -lt 1 ]; then
+        jobs_by_mem=1
+    fi
+    if [ "$jobs_by_mem" -lt "$nproc_count" ]; then
+        echo "$jobs_by_mem"
+    else
+        echo "$nproc_count"
+    fi
 }
 
 extract_first_version() {
@@ -385,7 +422,7 @@ ensure_tools_for_option() {
                 "cmake:required" "make:required" "ninja:required"
                 "python3:required" "python3-venv:required" "pip3:required" "conan:required"
                 "valgrind:required" "hexdump:required" "graphviz:required"
-                "cppcheck:recommended" "mold:recommended" "rg:recommended"
+                "cppcheck:recommended" "mold:recommended" "ccache:recommended" "rg:recommended"
                 "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
             ;;
@@ -397,7 +434,7 @@ ensure_tools_for_option() {
                 "python3:required" "python3-venv:required" "pip3:required"
                 "mold:required" "valgrind:required"
                 "graphviz:required" "hexdump:required" "conan:required"
-                "clang-format:optional"
+                "ccache:optional" "clang-format:optional"
             )
             ;;
         "toolchain_all")
@@ -407,7 +444,7 @@ ensure_tools_for_option() {
                 "cmake:required" "make:required" "ninja:required"
                 "python3:required" "python3-venv:required" "pip3:required" "conan:required"
                 "valgrind:required" "hexdump:required" "graphviz:required"
-                "cppcheck:required" "gdb:required" "mold:required" "cmake-format:required" "clang-format:required" "clang-tidy:required" "rg:required"
+                "cppcheck:required" "gdb:required" "mold:required" "ccache:required" "cmake-format:required" "clang-format:required" "clang-tidy:required" "rg:required"
                 "tmux:required" "feh:required" "gnuplot:required"
             )
             ;;
@@ -417,7 +454,7 @@ ensure_tools_for_option() {
                 "cmake:required" "make:required" "conan:required" "ninja:required"
                 "python3:required" "pip3:required" "valgrind:required"
                 "hexdump:required" "graphviz:required"
-                "cppcheck:recommended" "mold:recommended" "rg:recommended"
+                "cppcheck:recommended" "mold:recommended" "ccache:recommended" "rg:recommended"
                 "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
             validate_only=1
@@ -755,12 +792,17 @@ run_option() {
             cd "$build_folder"
             cmake --preset conan-release -DRDB_BENCH_PROBE=OFF
             cd build/Release
-            ninja
+            build_jobs=$(compute_build_jobs)
+            echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
+            ninja -j "$build_jobs"
             ;;
         "debug")
             sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             conan source $build_folder
             conan install $build_folder -s build_type=Debug --build missing
+            build_jobs=$(compute_build_jobs)
+            echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
+            export CMAKE_BUILD_PARALLEL_LEVEL="$build_jobs"
             conan build $build_folder -s build_type=Debug --build missing
             ;;
         "probe")
@@ -774,7 +816,9 @@ run_option() {
             cd "$build_folder"
             cmake --preset conan-release -DRDB_BENCH_PROBE=ON
             cd build/Release
-            ninja
+            build_jobs=$(compute_build_jobs)
+            echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
+            ninja -j "$build_jobs"
             echo "-- [warning: probe benchmark build] sonda pomiarowa WŁĄCZONA w tej kompilacji (RDB_BENCH_PROBE=ON)."
             ;;
         "package")
@@ -831,6 +875,14 @@ run_option() {
             export RDB_USE_MOLD=OFF
             echo "-- mold linker DISABLED for subsequent build options in this invocation (falls back to default linker)."
             ;;
+        "lowmem")
+            export RDB_BUILD_JOBS=2
+            echo "-- Manual override ENABLED: build parallelism fixed at 2 jobs, overriding the automatic RAM-aware default, for subsequent options in this invocation (e.g. RPi: buildrdb.sh lowmem release)."
+            ;;
+        "nolowmem")
+            unset RDB_BUILD_JOBS
+            echo "-- Manual override CLEARED: build parallelism reverts to the automatic RAM-aware default (always applied unless RDB_BUILD_JOBS is set) for subsequent options in this invocation."
+            ;;
         "bashrc")
             cd $build_folder
             if [ "${PWD##*/}" != "retractordb" ] ; then echo "Error: Current folder is not retractordb" ; exit ; fi 
@@ -878,7 +930,9 @@ run_option() {
             cmake --preset conan-debug -DENABLE_COVERAGE=ON
             cd build/Debug
             find . -name '*.gcda' -delete -o -name '*.gcno' -delete
-            ninja clean && ninja
+            build_jobs=$(compute_build_jobs)
+            echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
+            ninja clean && ninja -j "$build_jobs"
             export PATH="$(pwd)/src/retractor:$(pwd)/src/rdb:$(pwd)/src/qry:$PATH"
             ctest || true
             cd ../..
@@ -929,6 +983,8 @@ run_option() {
             echo "  coverage   - Build tests with code coverage enabled"
             echo "  mold       - Enable mold linker for subsequent options (default; e.g. buildrdb.sh mold debug)"
             echo "  nomold     - Disable mold linker for subsequent options (e.g. RPi: buildrdb.sh nomold debug)"
+            echo "  lowmem     - Force build parallelism to a fixed 2 jobs, overriding the automatic RAM-aware default (e.g. RPi: buildrdb.sh lowmem release)"
+            echo "  nolowmem   - Clear that override; parallelism reverts to the automatic RAM-aware default (always applied) for subsequent options"
             echo "  vimsyntax  - Install RetractorQL syntax highlighting for vim"
             echo "  batsyntax  - Install RetractorQL syntax highlighting for bat/batcat"
             echo "  help       - Show this help message"
@@ -938,7 +994,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold vimsyntax batsyntax help quit"
+              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -950,7 +1006,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"
