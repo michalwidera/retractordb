@@ -7,6 +7,86 @@ jądro 6.8.0-raspi-realtime (PREEMPT_RT), system i repo na karcie SD.
 
 ---
 
+## 2026-07-15 — dzień 0: dobór systemu operacyjnego workera pod RT
+## (wpis retrospektywny, dopisany 2026-07-17)
+
+Droga dojścia do Ubuntu 24.04 z jądrem realtime — z dwiema ślepymi
+uliczkami, które uzasadniają wybór.
+
+### Punkt wyjścia: Debian 13 (trixie) na Pi 400
+
+`xretractor --help -t` (wbudowany check RT) zgłaszał: [FAIL]
+CAP_SYS_NICE i CAP_IPC_LOCK, [WARN] RT throttling, RLIMIT_MEMLOCK
+i brak jądra PREEMPT_RT. Trzy pierwsze naprawione na miejscu
+(`setcap cap_sys_nice,cap_ipc_lock+ep` na binarce — do powtórki po
+każdym `ninja install`; `kernel.sched_rt_runtime_us` przez sysctl;
+memlock w `/etc/security/limits.conf`). Został jeden WARN: jądro bez
+PREEMPT_RT (`6.18.34+rpt-rpi-v8`, fork RPi).
+
+### Ślepa uliczka 1: ręczne patchowanie PREEMPT_RT na forku RPi
+
+- Oficjalne repo `raspberrypi/linux` utrzymuje gałęzie `-rt` tylko dla
+  archiwalnych jąder (rpi-4.14.y-rt, rpi-4.19.y-rt) — nic w pobliżu 6.18.
+- Upstream patch RT (kernel.org) istniał dla vanilla 6.18.37-rt6,
+  a fork RPi to 6.18.34 z własnymi zmianami w schedulerze/IRQ/timerach —
+  nałożenie patcha gwarantuje konflikty (`.rej`) w tych samych miejscach,
+  ich ręczne rozwiązywanie to praca na dni bez gwarancji bootowalnego
+  obrazu (stack kamer/display/USB specyficzny dla RPi).
+
+Werdykt: odrzucone. Utrzymywanie własnego forka jądra jest nie do
+obrony metodycznie (niepowtarzalne środowisko badawcze).
+
+### Decyzja: migracja na Ubuntu (Server, nie Desktop)
+
+Canonical dostarcza oficjalnie utrzymywane jądro realtime w wariancie
+`raspi` (BCM2711 = rodzina RPi4, Pi 400 się kwalifikuje) przez Ubuntu
+Pro (darmowy do 5 maszyn): `pro enable realtime-kernel --variant=raspi`.
+Przewaga nad ręcznym patchem: integrację RT z gałęzią raspi robi i
+testuje Canonical. Wybór wariantu **Server**: Desktop dokłada
+kompozytor/GUI/tło sesji konkurujące o CPU z wątkiem RT (wprost
+sprzeczne z celem migracji — niskim jitterem); worker i tak jest
+headless po SSH, a narzędzia (`xretractor`/`xqry`/`xtrdb`) to CLI.
+
+### Ślepa uliczka 2: Ubuntu 26.04 (najnowszy LTS)
+
+Pierwszy flash: Ubuntu Server 26.04 (jądro `7.0.0-1009-raspi`,
+PREEMPT_DYNAMIC). Dwie lekcje:
+
+1. **WiFi nie wstało** — bug sterownika `brcmfmac` przy negocjacji
+   SAE/WPA3 (pętla `CTRL-EVENT-ASSOC-REJECT status_code=16`); fix:
+   wymuszenie czystego WPA2-PSK w netplanie
+   (`auth: key-management: psk`).
+2. **Wariant `raspi` jądra realtime okazał się dostępny wyłącznie dla
+   24.04** — `pro enable realtime-kernel --variant=raspi` failował;
+   `pro help realtime-kernel` opisuje wariant jako "24.04 Real-time
+   kernel optimised for Raspberry Pi", wbrew zapowiedziom dokumentacji
+   o wsparciu 26.04. Wariant `generic` na RPi jest wprost odradzany
+   ("make your system unusable").
+
+### Stan końcowy: Ubuntu Server 24.04 LTS + realtime kernel
+
+Ponowny flash (Ubuntu Server 24.04, jądro bazowe `6.8.0-1047-raspi`,
+WiFi wstało bez obejścia), następnie `pro attach` + `pro enable
+realtime-kernel --variant=raspi`:
+
+```
+Linux pi400 6.8.0-2049-raspi-realtime #50-Ubuntu SMP PREEMPT_RT
+/sys/kernel/realtime = 1
+```
+
+Po migracji powtórzony tuning RT z Debiana (setcap, throttling,
+memlock) — od tego stanu startuje dzień 1.
+
+**Uzasadnienie wyboru (podsumowanie):** Ubuntu 24.04 LTS Server to
+jedyna kombinacja dająca na Pi 400 oficjalnie utrzymywane, testowane
+jądro PREEMPT_RT bez własnego forka — powtarzalne środowisko badawcze
+(wersja jądra przypięta pakietem), przy minimalnym szumie systemowym
+(headless Server). Debian/RPi OS odpadł brakiem jakiejkolwiek ścieżki
+do PREEMPT_RT poza nieutrzymywalnym patchowaniem; 26.04 odpadł brakiem
+wariantu `raspi` jądra realtime (stan na 2026-07-15).
+
+---
+
 ## 2026-07-16 — dzień 1: od wymagań do dwóch poprawek rdzenia silnika
 
 ### Rano — analiza wymagań i budowa infrastruktury
@@ -33,7 +113,13 @@ jądro 6.8.0-raspi-realtime (PREEMPT_RT), system i repo na karcie SD.
    niezależny od nominalnej częstotliwości. Przy okazji: brak tożsamości git
    na workerze (commit padał) — skonfigurowano.
 
-### Baseline (wyniki w `results/rate/rotated/01/`)
+### Baseline (wyniki w `results_20260716/rate/rotated/01/`)
+
+> **_NOTE:_** Artefakty: [results_20260716/rate/rotated/01/](results_20260716/rate/rotated/01/).
+> Konwencja stała dla wszystkich kampanii rate: `study_01/02/03` =
+> 360/720/1080 Hz; każde badanie zawiera `results.md` (opracowanie),
+> `e1_probe.csv` (surowa sonda), `metrics.csv` (sampler temp/CPU/RAM)
+> oraz migawki stanu `state_before.md` / `state_after.md`.
 
 Algorytm: Pan-Tompkins QRS (`rec205-detect.rql`), 20 000 próbek, 1 klient xqry.
 
@@ -64,7 +150,9 @@ Trzy hipotezy: (H1) rekonstrukcja Descriptora okna w `constructAgsePayload`
 per interwał; (H2) `boost::rational` w agregacjach INTEGER; (H3) interpreter
 wyrażeń per pole z alokacją stosu.
 
-### Fix #1 — `constructAgsePayload` (H1), wyniki w `results/rate/` (przebieg 2)
+### Fix #1 — `constructAgsePayload` (H1), wyniki w `results_20260716/rate/` (przebieg 2)
+
+> **_NOTE:_** Wyniki po rotacji w [results_20260716/rate/rotated/02/](results_20260716/rate/rotated/02/).
 
 Cache deskryptora okna per `lengthAbs` + eliminacja pośredniej alokacji.
 
@@ -110,8 +198,12 @@ Kampania weryfikacyjna fixu #2 na workerze (rebuild + rotacja do
 `rotated/02` + 3 badania). Oczekiwanie: jeśli -64% instrukcji przełoży się
 choć w połowie na czas, mediana E1@360Hz spadnie w okolice budżetu 2,78 ms.
 
-### Weryfikacja sprzętowa fixu #2 (kampania 3, wyniki w `results/rate/`,
+### Weryfikacja sprzętowa fixu #2 (kampania 3, wyniki w `results_20260716/rate/`,
 ### poprzednie przebiegi zrotowane do `rotated/01` i `rotated/02`)
+
+> **_NOTE:_** Wyniki kampanii 3 po rotacji w [rotated/03](results_20260716/rate/rotated/03/);
+> poprzednie przebiegi w [rotated/01](results_20260716/rate/rotated/01/)
+> i [rotated/02](results_20260716/rate/rotated/02/).
 
 | Częstość | Baseline | Fix #1 | Fix #2 | Δ łącznie |
 |---|---|---|---|---|
@@ -155,7 +247,9 @@ Przy okazji: przywrócono parzystość master↔experiment (cherry-pick
 naruszenie pkt 6 wymagań).
 
 ### Kampania 4: weryfikacja pakietu kontroli środowiska (wyniki w
-### `results/rate/`, poprzedni przebieg zrotowany do `rotated/03`)
+### `results_20260716/rate/`, poprzedni przebieg zrotowany do `rotated/03`)
+
+> **_NOTE:_** Wyniki kampanii 4 po rotacji w [rotated/04](results_20260716/rate/rotated/04/).
 
 Migawki potwierdzają kontrolę: wszystkie 4 rdzenie `performance` @ 1800000
 kHz, `throttled=0x0`. Wyniki (mediany E1):
@@ -211,8 +305,10 @@ usługowego). Naprawa: ponowna instalacja z Debug → 152/152. Wniosek
 operacyjny: na maszynie nadzorcy `ninja install` wykonywać z build/Debug;
 build Release+probe jest właściwy wyłącznie na workerze.
 
-### Kampania 5: weryfikacja sprzętowa fixu #3 (wyniki w `results/rate/`,
+### Kampania 5: weryfikacja sprzętowa fixu #3 (wyniki w `results_20260716/rate/`,
 ### poprzedni przebieg zrotowany do `rotated/04`)
+
+> **_NOTE:_** Wyniki kampanii 5 po rotacji w [rotated/05](results_20260716/rate/rotated/05/).
 
 **Cel pośredni osiągnięty — silnik po raz pierwszy dotrzymuje budżetu
 natywnego tempa 360 Hz** (mediana ORAZ p99 poniżej 2777,8 µs):
@@ -272,7 +368,9 @@ Wdrożono w `run_study.sh`: idempotentny `setcap` (capabilities znikają
 po każdym rebuildzie) + flaga `-t`.
 
 ### Kampania 6: pierwsze pełne dane z SCHED_FIFO (-t), wyniki w
-### `results/rate/`, poprzedni przebieg zrotowany do `rotated/05`
+### `results_20260716/rate/`, poprzedni przebieg zrotowany do `rotated/05`
+
+> **_NOTE:_** Wyniki kampanii 6 po rotacji w [rotated/06](results_20260716/rate/rotated/06/).
 
 E1 pod SCHED_FIFO (mediana / p99, µs):
 
@@ -339,6 +437,9 @@ rdzenia 3 wątki przerwań (sieć/mmc) były wywłaszczane na tyle długo,
 że system wszedł w degradację. Wątek skryptu na workerze dokończył
 badanie mimo zerwanej sesji (dane ocalone commitem 42cb4c8).
 
+> **_NOTE:_** Artefakty jedynego ukończonego badania:
+> [rotated/07/study_01](results_20260716/rate/rotated/07/study_01/).
+
 Obserwacja z ocalonych danych: **pik E1 zmalał 43 → 25 ms** — hipoteza
 "piki = wątki IRQ blokujące xretractor" potwierdzona kierunkowo; ale
 E2E z tego przebiegu jest skażone degradacją systemu (dryf 24 s) i nie
@@ -348,6 +449,8 @@ właściwy adres pików to izolacja rdzenia (isolcpus / IRQ affinity),
 przy priorytecie 50. `run_study.sh` wraca jawnie do rt_priority=50.
 
 ### Kampania 7bis (priorytet 50 + fix #4) i diagnoza anomalii 3,2 ms
+
+> **_NOTE:_** Wyniki po rotacji w [rotated/08](results_20260716/rate/rotated/08/).
 
 Wyniki (E1 mediana / max, µs): 360 Hz: 1947 / **2655 — PIERWSZY RAZ
 CAŁY rozkład E1 z maksimum w budżecie (95,6%)**; 720 Hz: 1736 / 42148;
@@ -384,7 +487,10 @@ xqry→kolejka end-to-end). Oczekiwanie: narzut slotu z klientem
 ~3,2 ms → rzędu dziesiątek µs + koszt formatowania jednego strumienia.
 
 ### Kampania 8: fix #5 zweryfikowany — OŚ CZASU 360 Hz UTRZYMANA
-### END-TO-END (wyniki w `results/rate/`, poprzedni przebieg w `rotated/08`)
+### END-TO-END (wyniki w `results_20260716/rate/`, poprzedni przebieg w `rotated/08`)
+
+> **_NOTE:_** Wyniki kampanii 8 po rotacji w [rotated/09](results_20260716/rate/rotated/09/);
+> badanie 1: [rotated/09/study_01](results_20260716/rate/rotated/09/study_01/results.md).
 
 Badanie 1 (360 Hz, 20 000 próbek, 1 klient xqry, SCHED_FIFO 50,
 governor performance, taskset):
@@ -413,6 +519,9 @@ na sprzęcie → dziennik.
 
 ### Kampania 9: izolacja rdzenia (isolcpus=3 nohz_full=3 rcu_nocbs=3)
 ### — 2 przebiegi (decyzja prowadzącego: dla testów izolacji wystarczą 2)
+
+> **_NOTE:_** Wyniki po rotacji w [rotated/10](results_20260716/rate/rotated/10/)
+> (study_01 = 360 Hz, study_02 = 720 Hz).
 
 Wdrożono w cmdline.txt workera (backup .bak-20260716), migawki stanu
 rozszerzone o /proc/cmdline. Wyniki @360Hz vs K8 (bez izolacji):
@@ -458,11 +567,15 @@ zgodnie z metodyką eksperymentu i dyspozycjami prowadzącego:
    kolejne stopnie NIE są testowane (dyspozycja prowadzącego).
 
 Implementacja: `worker/run_fir_contrast.sh`; wyniki do
-`results/fir-contrast/` (results.md + surowe probe_*.csv), commit
+`results_20260716/fir-contrast/` (results.md + surowe probe_*.csv), commit
 konwencją eksperymentu (amend + force-with-lease na wspólnym commicie).
 
 ### Kampania clients: H-izolacja POTWIERDZONA w rdzeniu,
-### ogon E2E skaluje się z N (wyniki w `results/clients/`)
+### ogon E2E skaluje się z N (wyniki w `results_20260716/clients/`)
+
+> **_NOTE:_** Artefakty: [study_01](results_20260716/clients/study_01/results.md) /
+> [study_02](results_20260716/clients/study_02/results.md) /
+> [study_03](results_20260716/clients/study_03/results.md) = 1/2/3 klientów.
 
 360 Hz, izolowany rdzeń 3, klienci na 0-2:
 
@@ -489,7 +602,13 @@ Dodatkowo (dyspozycja): zapytanie testu FIR zapisane jako wersjonowany
 plik `config/dsp-simple-fir.rql` (runner podmienia tempo sedem, jak
 rec205-detect.rql w kampaniach QRS).
 
-### Test dsp-simple-fir wykonany (wyniki w `results/fir-contrast/`)
+### Test dsp-simple-fir wykonany (wyniki w `results_20260716/fir-contrast/`)
+
+> **_NOTE:_** Opracowanie: [results.md](results_20260716/fir-contrast/results.md);
+> surowe przebiegi sondy:
+> [probe_1000hz.csv](results_20260716/fir-contrast/probe_1000hz.csv),
+> [probe_2000hz.csv](results_20260716/fir-contrast/probe_2000hz.csv),
+> [probe_3000hz.csv](results_20260716/fir-contrast/probe_3000hz.csv).
 
 | Stopień | budżet | E1 mediana | werdykt |
 |---|---|---|---|
@@ -546,5 +665,48 @@ przepustowość unpaced ×3,9, FIR-kontrast 2 kHz. Wyniki negatywne
 isolcpus vs ogon ~40 ms (przetrwał). Zagadki rozwiązane: pływający
 governor, /tmp≠tmpfs na Pi, logind RemoveIPC czyszczący /dev/shm,
 mechanizm dryfu K6/K7bis (kolejki IPC otwierane per slot).
-Wszystkie dane: `results/{rate,clients,fir-contrast}/` + `rotated/01-08`
+Wszystkie dane: `results_20260716/{rate,clients,fir-contrast}/` + `rotated/01-08`
 na branchu experiment/20260716; infrastruktura i dziennik na master.
+
+> **_NOTE:_** Stan na moment zamknięcia dnia 1; po rotacji z 2026-07-17
+> komplet przebiegów rate to [rotated/01-10](results_20260716/rate/rotated/) —
+> patrz wpis niżej.
+
+---
+
+## 2026-07-17 — dzień 2
+
+### Rano — rotacja wyników K8/K9 i uzupełnienie referencji w dzienniku
+
+- Rotacja ręczna (prowadzący): wyniki kampanii 8 trafiły do
+  [rotated/09](results_20260716/rate/rotated/09/), wyniki kampanii 9 (`study_01`,
+  `study_02` + README kampanii) do [rotated/10](results_20260716/rate/rotated/10/);
+  katalog roboczy `results_20260716/rate/` opróżniony przed kolejnymi przebiegami.
+- Dziennik uzupełniony o względne odnośniki do artefaktów w miejscach,
+  gdzie wpisy opisują konkretne badania. Mapowanie kampania → katalog
+  zweryfikowane danymi (mediany E1 study_01 zgodne z tabelami wpisów
+  dnia 1, daty README kampanii zgodne z chronologią dziennika):
+
+| Wpis dziennika (dzień 1) | Artefakty |
+|---|---|
+| Baseline | [rotated/01](results_20260716/rate/rotated/01/) |
+| Fix #1 — AGSE cache | [rotated/02](results_20260716/rate/rotated/02/) |
+| K3 — fix #2 (ondemand) | [rotated/03](results_20260716/rate/rotated/03/) |
+| K4 — kontrola środowiska | [rotated/04](results_20260716/rate/rotated/04/) |
+| K5 — fix #3 (metaData) | [rotated/05](results_20260716/rate/rotated/05/) |
+| K6 — SCHED_FIFO (-t) | [rotated/06](results_20260716/rate/rotated/06/) |
+| K7 — FIFO 80 (wynik negatywny, 1 badanie) | [rotated/07](results_20260716/rate/rotated/07/) |
+| K7bis — priorytet 50 + fix #4 | [rotated/08](results_20260716/rate/rotated/08/) |
+| K8 — fix #5, oś czasu utrzymana | [rotated/09](results_20260716/rate/rotated/09/) |
+| K9 — isolcpus, 2 przebiegi | [rotated/10](results_20260716/rate/rotated/10/) |
+| clients — H-izolacja | [results_20260716/clients/](results_20260716/clients/) (study_01/02/03 = 1/2/3 klientów) |
+| FIR-kontrast | [results_20260716/fir-contrast/](results_20260716/fir-contrast/) |
+
+Konwencja w kampaniach rate: `study_01/02/03` = 360/720/1080 Hz
+(wyjątki: `rotated/07` — tylko `study_01`, kampania przerwana;
+`rotated/10` — `study_01/02` = 360/720 Hz, decyzja o 2 przebiegach).
+Zawartość każdego badania: `results.md` (opracowanie i werdykt),
+`e1_probe.csv` (surowa sonda E1/E2E/wake_lag), `metrics.csv`
+(temp/CPU/RAM), `state_before.md` / `state_after.md` (migawki stanu
+workera — od kampanii 4 z governorem i częstotliwościami per rdzeń,
+od kampanii 9 z /proc/cmdline).

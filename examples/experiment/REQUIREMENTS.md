@@ -31,3 +31,4 @@ Eksperyment powinien:
 @note Oba branche wskazują na ten sam korzeń w drzewie repozytorium.
 @note Przed rozpoczęciem eksperymenu na branchu nie ma żadnych zmian i zawiera on to co znajduje się w głęzi master. Identyfikatorem tej gałęzi (master) - jest podpisywany eksperyment
 @note Pkt 17 zakłada, że `/tmp` jest w pamięci - na sprzęcie workera to nieprawda: zweryfikowano (Pi 400), że `/tmp` to zwykły ext4 na karcie SD (`/dev/mmcblk0p2`), nie tmpfs. Katalogiem faktycznie gwarantującym RAM jest `/dev/shm` - tego (nie `/tmp`) używają skrypty.
+@note po zakończeniu eksperymentów z algorytmem adetekcji qrs i profilowaniem systemu - zrób krótki test określający jak szybki napływ danych jest w stanie przetworzyć prosty filtr FIR (dla kontrastu badawczego) - użyj testu retractordb/test/IntegrationTest_parallel/dsp do zbudowania przykładu.
