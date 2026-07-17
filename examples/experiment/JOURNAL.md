@@ -710,3 +710,56 @@ Zawartość każdego badania: `results.md` (opracowanie i werdykt),
 (temp/CPU/RAM), `state_before.md` / `state_after.md` (migawki stanu
 workera — od kampanii 4 z governorem i częstotliwościami per rdzeń,
 od kampanii 9 z /proc/cmdline).
+
+### Sekcja Performance Evaluation artykułu wypełniona wynikami
+
+Rozdział 7 main-debs.tex (i tłumaczenie main-debs-pl.tex) wypełniony
+danymi kampanii: Setup (platforma + dyscyplina pomiarowa), Throughput
+and Latency (tabele z rotated/10 dla 360/720 Hz i rotated/09 dla
+1080 Hz), Latency Isolation (kampania clients), Effect of Query-Plan
+Depth (fir-contrast). Podsekcje Baselines i Exactness pozostają jako
+TODO — brak danych. Oba dokumenty kompilują się czysto (12 stron).
+
+### Decyzja: plan badawczy kampanii baseline (REQUIREMENTS.md)
+
+Do REQUIREMENTS.md dopisany plan dwóch kampanii domykających sekcje
+7.5/7.6 artykułu (szczegóły i uzasadnienia w REQUIREMENTS.md, sekcja
+„Plan badawczy — kampanie baseline"):
+
+1. **baseline-numpy (priorytet 1)**: potok Pan–Tompkinsa w float64
+   (NumPy/SciPy na workerze), dwa tryby raportowane osobno — per-slot
+   (odpowiednik E1, z narzutem interpretera) i batch (lfilter);
+   dyscyplina środowiska identyczna z kampaniami QRS. Hipoteza: koszt
+   semantyki wymiernej pomijalny (callgrind: boost::rational <0,4%),
+   różnice zdominuje model wykonania. Ten sam baseline zasila 7.6
+   (round-trip interleave/de-interleave vs scipy resample + bitowa
+   równość artefaktów między przebiegami).
+2. **baseline-flink (priorytet 2, expected fail)**: próba MiniCluster
+   na Pi 400 z czterema zastrzeżeniami (4 GB RAM vs JVM, jitter GC/JIT
+   przy 360 Hz, brak semantyki slotowej → ryzyko strawmana, nietypowa
+   konfiguracja przy izolacji rdzenia); kryterium stopu: 1 dzień
+   roboczy, porażka dokumentowana jako wynik negatywny. Opcja
+   zapasowa: wariant silnika „engine-double" (przełącznik kompilacji
+   double zamiast arytmetyki wymiernej).
+
+### Infrastruktura kampanii baseline-numpy zbudowana i przetestowana dymnie
+
+- `config/pan_tompkins_numpy.py` — wersjonowana implementacja potoku
+  (etapy identyczne z rec205-detect.rql, float64; orientacja okna
+  przejęta z examples/ecg/ref_float.py, ta sama uwaga o konieczności
+  potwierdzenia semantyki AGSE przed publikacją liczb). Tryb `slot`
+  emituje CSV zgodny z RDB_BENCH_CSV (analiza tym samym e1_stats.py);
+  tryb `batch` — wektoryzowany, R powtórzeń. SCHED_FIFO: własna próba
+  sched_setscheduler + okno settle na `chrt -f 50 -p` z runnera
+  (własność plików bez zmian — analogia do ścieżki setcap).
+- `worker/run_numpy_baseline.sh` — runner wg metodyki kampanii
+  (migawki stanu, governor performance z trapem, taskset -c 3 /
+  sampler na 0-2, /dev/shm, wersje python/numpy przypięte w
+  results.md, commit amend + force-with-lease).
+- Smoke test lokalny (x86): tryb slot 3000 próbek @2000 Hz — sonda
+  czytelna dla e1_stats.py (E1 mediana 24,4 µs — rząd narzutu
+  interpretera widoczny już na x86); batch 650k × 3 — 89 ns/próbkę.
+  Zgodność numeryczna slot↔batch: max |Δ| = 8,5e-14 (względnie
+  4,9e-16), 0/5000 rozbieżnych decyzji QRS.
+- Do wykonania na workerze: pełna kampania (20k @360 Hz slot + batch)
+  po decyzji prowadzącego.

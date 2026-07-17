@@ -32,3 +32,78 @@ Eksperyment powinien:
 @note Przed rozpoczęciem eksperymenu na branchu nie ma żadnych zmian i zawiera on to co znajduje się w głęzi master. Identyfikatorem tej gałęzi (master) - jest podpisywany eksperyment
 @note Pkt 17 zakłada, że `/tmp` jest w pamięci - na sprzęcie workera to nieprawda: zweryfikowano (Pi 400), że `/tmp` to zwykły ext4 na karcie SD (`/dev/mmcblk0p2`), nie tmpfs. Katalogiem faktycznie gwarantującym RAM jest `/dev/shm` - tego (nie `/tmp`) używają skrypty.
 @note po zakończeniu eksperymentów z algorytmem adetekcji qrs i profilowaniem systemu - zrób krótki test określający jak szybki napływ danych jest w stanie przetworzyć prosty filtr FIR (dla kontrastu badawczego) - użyj testu retractordb/test/IntegrationTest_parallel/dsp do zbudowania przykładu.
+
+---
+
+## Plan badawczy — kampanie baseline (rozszerzenie dla celów publikacji)
+
+Dopisane 2026-07-17, po ukończeniu kampanii rate/clients/fir-contrast
+(JOURNAL.md, dni 0–2). Cel: dostarczyć dane do dwóch pozostałych
+podsekcji Performance Evaluation w main-debs.tex — 7.5 Baselines
+(sec:eval-baselines) i 7.6 Exactness and Replay Stability
+(sec:eval-exact). Obowiązuje pełna metodyka z pkt 1–27 (migawki stanu,
+dziennik, rotacja, wspólny branch eksperymentu).
+
+### Kampania baseline-numpy (priorytet 1)
+
+- Cel: zmiennoprzecinkowy punkt odniesienia dla 7.5(i) — koszt dokładnej
+  semantyki wymiernej — oraz dane wejściowe dla 7.6 (błąd resamplingu
+  float zestawiony z tożsamością okrężną przeplotu/rozplotu).
+- Implementacja: potok Pan–Tompkinsa o etapach identycznych z
+  rec205-detect.rql, w float64, NumPy/SciPy w venv na workerze
+  (koła aarch64 dostępne dla Ubuntu 24.04; wersje pakietów przypięte
+  i zapisane w results.md).
+- Dwa tryby pomiaru, raportowane OSOBNO (nie wolno ich uśredniać ani
+  porównywać wprost — mierzą co innego):
+  1. per-slot: pętla próbka-po-próbce (okna na collections.deque),
+     pomiar na zegarze monotonicznym per interwał — odpowiednik metryki
+     E1; zawiera narzut interpretera CPython (odnotować przy
+     interpretacji);
+  2. batch: wektoryzowany scipy.signal.lfilter na całym nagraniu —
+     przepustowość batch, bez semantyki slotowej.
+- Dyscyplina środowiska identyczna z kampaniami QRS: governor
+  performance, taskset -c 3 (rdzeń izolowany), SCHED_FIFO 50 przez
+  os.sched_setscheduler, 20 000 próbek, dane w /dev/shm, sampler
+  metrics.csv; wyniki do results_YYYYMMDD/baseline-numpy/ wg konwencji
+  kampanii (results.md + surowe CSV + migawki stanu).
+- Hipoteza do weryfikacji: koszt semantyki wymiernej jest pomijalny
+  (profil callgrind z dnia 1: boost::rational <0,4% instrukcji);
+  ewentualne różnice zdominuje model wykonania (interpreter vs
+  skompilowany silnik), nie arytmetyka.
+- Część dla 7.6: (a) dwukrotny przebieg silnika na identycznym wejściu
+  → równość artefaktów co do bitu; (b) round-trip
+  interleave/de-interleave w silniku (tożsamość, wniosek cor:exact)
+  vs scipy.signal.resample/resample_poly (skumulowany błąd float,
+  raportowany jako norma błędu w funkcji długości nagrania).
+
+### Kampania baseline-flink (priorytet 2, expected fail)
+
+- Cel: próba punktu odniesienia DSMS głównego nurtu dla 7.5(ii).
+  UWAGA: sama próba instalacji i uruchomienia jest wynikiem badawczym —
+  także negatywnym — i podlega regule dziennika (pkt 27); porażkę
+  dokumentujemy z przyczynami, nie ukrywamy.
+- Plan próby: OpenJDK 17/21 aarch64 z repozytorium Ubuntu; Flink w
+  trybie local/MiniCluster (jeden JVM), heap ≤2 GB, checkpointing
+  wyłączony; równoważny dataflow Pan–Tompkinsa; pomiar per rekord.
+- Zastrzeżenia (dlaczego spodziewamy się niepowodzenia lub wyniku
+  nieporównywalnego):
+  1. RAM: Pi 400 ma 4 GB; JobManager + TaskManager + heap + metaspace
+     obok systemu i klientów grozi OOM lub swapowaniem na kartę SD
+     (co samo w sobie unieważnia pomiar);
+  2. jitter JVM: GC i kompilacja JIT zaburzają rozkłady per slot przy
+     360 Hz — brak odpowiednika sondy E1/E2E, ogony nieporównywalne;
+  3. model wykonania: Flink nie ma semantyki slotowej 1/Δ — bufory
+     sieciowe i event-time wnoszą opóźnienia rzędu ms niezależne od
+     obliczeń; porównanie łatwo zakwestionować jako strawman;
+  4. izolacja rdzenia: pozostawienie całego JVM na 3 rdzeniach to
+     konfiguracja nietypowa dla Flinka (wynik nie będzie reprezentować
+     „Flinka w warunkach zalecanych").
+- Kryterium stopu: jeśli instalacja, uruchomienie lub stabilny przebieg
+  20 000 próbek nie powiedzie się w budżecie 1 dnia roboczego —
+  zamykamy próbę wpisem w dzienniku (wynik negatywny + przyczyny),
+  a w 7.5(ii) artykułu opisujemy powód braku porównania.
+- Opcja zapasowa (jeśli Flink odpadnie): baseline „engine-double" —
+  wariant silnika z double zamiast arytmetyki wymiernej (przełącznik
+  kompilacji), izolujący koszt semantyki przy wszystkich pozostałych
+  czynnikach stałych; tańszy pomiarowo i trudniejszy do zakwestionowania
+  niż porównanie międzysystemowe.
