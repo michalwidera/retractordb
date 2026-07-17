@@ -1,0 +1,4 @@
+study_id,rate_hz,clients,samples
+1,360,1,20000
+2,720,1,20000
+3,1080,1,20000

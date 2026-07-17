@@ -61,11 +61,14 @@ void MetaIndexStore::loadHeaderTimestamp() {
 void MetaIndexStore::saveHeader() {
   if (metaFilePath_.empty()) return;
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::trunc);
-  if (out.is_open()) writeHeader(out, creationTime_);
-  cacheValid_ = false;
+  if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
+  writeHeader(out, creationTime_);
+  // write-through: po truncate plik zawiera tylko naglowek -> zero wpisow
+  entriesCache_.clear();
+  cacheValid_ = true;
 }
 
-std::vector<IndexRecord> MetaIndexStore::readAll() const {
+const std::vector<IndexRecord> &MetaIndexStore::readAll() const {
   if (cacheValid_) return entriesCache_;
 
   entriesCache_.clear();
@@ -109,8 +112,9 @@ std::vector<IndexRecord> MetaIndexStore::readAll() const {
 void MetaIndexStore::appendEntry(const IndexRecord &entry) {
   if (metaFilePath_.empty()) return;
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::app);
-  if (out.is_open()) writeEntry(out, entry);
-  cacheValid_ = false;
+  if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
+  writeEntry(out, entry);
+  if (cacheValid_) entriesCache_.push_back(entry);  // write-through
 }
 
 void MetaIndexStore::overwriteLast(const IndexRecord &entry) {
@@ -124,20 +128,26 @@ void MetaIndexStore::overwriteLast(const IndexRecord &entry) {
   f.seekp(-static_cast<std::streamoff>(entrySize_), std::ios::end);
   auto buf = entry.serialize();
   f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
-  cacheValid_ = false;
+  if (cacheValid_ && !entriesCache_.empty())
+    entriesCache_.back() = entry;  // write-through
+  else
+    cacheValid_ = false;  // cache nie odzwierciedla ostatniego wpisu -- odbuduj przy odczycie
 }
 
 void MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
   if (metaFilePath_.empty()) return;
   const std::string tmpPath = std::format("{}.tmp", metaFilePath_);
   std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
-  if (!out.is_open()) return;
+  if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
   writeHeader(out, creationTime_);
   for (const auto &rec : entries)
     writeEntry(out, rec);
   out.close();
   std::filesystem::rename(tmpPath, metaFilePath_);
-  cacheValid_ = false;
+  // write-through; guard na wypadek, gdyby caller podal sam cache (self-assign jest
+  // bezpieczny dla std::vector, ale jawny warunek dokumentuje intencje)
+  if (&entries != &entriesCache_) entriesCache_ = entries;
+  cacheValid_ = true;
 }
 
 }  // namespace rdb

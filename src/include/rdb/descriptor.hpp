@@ -36,11 +36,15 @@ enum FieldColumn : std::uint8_t { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 /// @note Operator== nie oznacza ścisłej równości wszystkich właściwości deskryptora; sprawdza zgodność pól danych z pominięciem pól konfiguracyjnych.
 
 class Descriptor : public std::vector<rField> {
-  std::vector<std::pair<int, int>> flatToDescriptorIndexMap_;
-  std::vector<int> fieldByteOffsets_;
-  int flattenedFieldCount_ = 0;
-  bool fieldMappingsDirty_{true};
-  void rebuildFieldMappings();
+  // Cache mapowan pol jest mutable: metody odczytu (getItem w payload dziala na
+  // const Descriptorze) musza moc leniwie przebudowac mapowania bez kopiowania
+  // calego deskryptora. Przebudowa jest idempotentna; obiekt jest logicznie const.
+  mutable std::vector<std::pair<int, int>> flatToDescriptorIndexMap_;
+  mutable std::vector<int> fieldByteOffsets_;
+  mutable int flattenedFieldCount_ = 0;
+  mutable size_t dataSizeBytes_    = 0;
+  mutable bool fieldMappingsDirty_{true};
+  void rebuildFieldMappings() const;
 
   static bool singleLineOutput_;
 
@@ -65,14 +69,14 @@ class Descriptor : public std::vector<rField> {
   int fieldSize(std::string_view fieldName);
   [[nodiscard]] int fieldSize(const rdb::rField &field) const;
   size_t fieldByteOffset(std::string_view fieldName);
-  int byteOffsetAtFlatIndex(int flatIndex);
+  [[nodiscard]] int byteOffsetAtFlatIndex(int flatIndex) const;
   std::string_view fieldTypeName(std::string_view fieldName);
-  int flatElementCount();
+  [[nodiscard]] int flatElementCount() const;
   std::vector<rField> dataFields();
   rdb::retention_t retention();
   std::pair<std::string, size_t> storagePolicy();
   std::pair<rdb::descFld, int> widestFieldType();
-  std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex);
+  [[nodiscard]] std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex) const;
 
   [[nodiscard]] bool hasField(const std::string_view fieldName) const {
     return std::ranges::any_of(*this, [fieldName](const auto &f) { return f.rname == fieldName; });

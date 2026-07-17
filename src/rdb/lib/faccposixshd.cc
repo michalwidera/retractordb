@@ -5,8 +5,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
+
 #include "fatalError.hpp"
 
 namespace rdb {
@@ -241,13 +243,10 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nul
 }
 
 size_t posixBinaryFileWithShadow::count() {
-  if (!std::filesystem::exists(filename_)) {
-    return 0;
-  }
+  // Wolane na goracej sciezce odczytu — pojedynczy stat(), ENOENT to zwykly brak pliku.
   struct stat stat_buf;
-  int rc = stat(filename_.c_str(), &stat_buf);
-  if (rc != 0) {
-    SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
+  if (stat(filename_.c_str(), &stat_buf) != 0) {
+    if (errno != ENOENT) SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
     return 0;
   }
   return stat_buf.st_size / recordSize_;

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
+#include <optional>
 #include <utility>
 
 #include "fatalError.hpp"
@@ -71,24 +72,35 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // temporary alias for variable - for better understand what is happening here.
   const auto &source = outputPayload;
 
-  // 1. Descriptor construction process
-  rdb::Descriptor descriptor;
   bool flip      = (length < 0);
   auto lengthAbs = abs(length);
 
   auto recordsCountSrc   = source->getRecordsCount();
   auto descriptorSrcSize = source->descriptor.flatElementCount();
-  auto [maxType, maxLen] = source->descriptor.widestFieldType();
-  for (auto i = 0; i < lengthAbs; ++i) {
-    rdb::rField x(instance + "_" + std::to_string(i),  //
-                  maxLen,                              //
-                  1,                                   //
-                  maxType);
-    descriptor += rdb::Descriptor{x};
-  }
 
-  // 2. Construct payload
-  std::unique_ptr<rdb::payload> result = std::make_unique<rdb::payload>(descriptor);
+  // 1. Descriptor construction process -- shape depends only on (this stream,
+  //    lengthAbs) and is invariant across intervals, so build it once per
+  //    distinct lengthAbs and reuse afterwards (see agseDescriptorCache_).
+  auto cacheIt = agseDescriptorCache_.find(lengthAbs);
+  if (cacheIt == agseDescriptorCache_.end()) {
+    rdb::Descriptor descriptor;
+    auto [maxType, maxLen] = source->descriptor.widestFieldType();
+    for (auto i = 0; i < lengthAbs; ++i) {
+      rdb::rField x(instance + "_" + std::to_string(i),  //
+                    maxLen,                              //
+                    1,                                   //
+                    maxType);
+      descriptor += rdb::Descriptor{x};
+    }
+    cacheIt = agseDescriptorCache_.emplace(lengthAbs, std::move(descriptor)).first;
+  }
+  const rdb::Descriptor &descriptor = cacheIt->second;
+
+  // 2. Construct payload (values are per-interval, so this stays; only the
+  //    intermediate heap allocation is gone -- payload(const Descriptor&)
+  //    already copies the shape into its own member, and NRVO avoids a copy
+  //    on return).
+  rdb::payload result(descriptor);
 
   auto deltaDst = boost::rational<int>(step) / descriptorSrcSize;
 
@@ -104,28 +116,36 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   storedRecordCountDst_ /= deltaDst.denominator();
   storedRecordCountDst_ -= 1;
 
+  // Przy descriptorSrcSize > 1 kolejne i trafiaja w ten sam rekord zrodlowy (rozni sie
+  // tylko fp.rem) — rekord siedzi juz w storagePayload_, wiec nie czytamy go ponownie.
+  std::optional<size_t> lastReadPosition;
   for (auto i = 0; i < lengthAbs; ++i) {
     auto fp = std::div(storedRecordCountDst_ - i, descriptorSrcSize);
     auto readPosition{recordsCountSrc - fp.quot - 1};
     // Guard negative quotient before revRead: out-of-range windows must stay null, not stale 0.
     if (fp.quot >= 0 && std::cmp_less(fp.quot, recordsCountSrc)) {
-      if (!source->revRead(static_cast<size_t>(readPosition))) fp.rem = -1;
+      if (lastReadPosition != static_cast<size_t>(readPosition)) {
+        if (source->revRead(static_cast<size_t>(readPosition)))
+          lastReadPosition = static_cast<size_t>(readPosition);
+        else
+          fp.rem = -1;
+      }
     } else
       fp.rem = -1;  // skip to undefined(-1) as value
 
     auto locSrc = fp.rem;
     if (locSrc >= 0) {
       auto valueOpt = source->getPayload()->getItem(locSrc);
-      result->setItem(flip ? lengthAbs - i - 1 : i, valueOpt);
+      result.setItem(flip ? lengthAbs - i - 1 : i, valueOpt);
     } else
-      result->setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
+      result.setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
   }
 
   // 3. Cleanup source after processing
   source->revRead(0);  // Reset source
 
   // 4. Return constructed object.
-  return *(result);
+  return result;
 }
 
 enum opType : std::uint8_t { maxop, minop, sumop, avgop };
@@ -404,6 +424,12 @@ bool boolCast(const rdb::descFldVT &inVar) {
 }
 
 void streamInstance::constructRulesAndUpdate(const query &qry) {
+  // Kopia payloadu jest potrzebna tylko do ewaluacji warunkow regul — bez regul nie placimy za nia co interwal.
+  if (qry.lRules.empty()) {
+    dumpMgr.processStreamChunk(qry.id);
+    return;
+  }
+
   rdb::payload payload(*outputPayload->getPayload());
 
   for (const auto &r : qry.lRules) {

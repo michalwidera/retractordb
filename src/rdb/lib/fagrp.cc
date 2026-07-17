@@ -125,7 +125,7 @@ ssize_t groupFile<T>::purge() {
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
   vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
 
-  spdlog::info("Purged all segments and reset group state.");
+  SPDLOG_DEBUG("Purged all segments and reset group state.");
   if (vec_.size() != 1) FatalError("fagrp::purge: expected exactly one segment after purge");
   if (vec_[0]->count() != 0) FatalError("fagrp::purge: segment is not empty after purge");
 
@@ -148,12 +148,12 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
     if (writeCount_ >= retention_.capacity) {
       currentSegment_++;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-      spdlog::info("Rotating segments: currentSegment={}", currentSegment_);
+      SPDLOG_DEBUG("Rotating segments: currentSegment={}", currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
       writeCount_ = 0;
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
         auto segmentToRemove = vec_.front()->name();
-        spdlog::info("Removing oldest segment: {}", segmentToRemove);
+        SPDLOG_DEBUG("Removing oldest segment: {}", segmentToRemove);
         std::filesystem::remove(segmentToRemove);
         if (std::filesystem::exists(segmentToRemove + ".shadow")) std::filesystem::remove(segmentToRemove + ".shadow");
         vec_.erase(vec_.begin());

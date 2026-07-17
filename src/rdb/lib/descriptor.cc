@@ -39,16 +39,18 @@ Descriptor::Descriptor(const std::string &fieldName, int length, int elementCoun
   emplace_back(fieldName, length, elementCount, type);                                                   //
 }
 
-void Descriptor::rebuildFieldMappings() {
+void Descriptor::rebuildFieldMappings() const {
   if (!fieldMappingsDirty_) return;
 
   flatToDescriptorIndexMap_.clear();
   fieldByteOffsets_.clear();
 
   flattenedFieldCount_ = 0;
+  dataSizeBytes_       = 0;
   int offset{0};
   for (size_t descriptorFieldIdx = 0; descriptorFieldIdx < size(); ++descriptorFieldIdx) {
     const auto &field = (*this)[descriptorFieldIdx];
+    dataSizeBytes_ += fieldSize(field);  // semantyka identyczna z dawnym getSizeInBytes (pola konfiguracyjne i NULLTYPE = 0)
     if (isConfigurationField(field.rtype)) continue;
 
     const int flatCount = (field.rtype == rdb::STRING) ? 1 : field.rarray;
@@ -62,13 +64,13 @@ void Descriptor::rebuildFieldMappings() {
   fieldMappingsDirty_ = false;
 }
 
-std::optional<std::pair<int, int>> Descriptor::flatIndexToDescriptorPosition(int flatIndex) {
+std::optional<std::pair<int, int>> Descriptor::flatIndexToDescriptorPosition(const int flatIndex) const {
   rebuildFieldMappings();
   if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) return {};
   return flatToDescriptorIndexMap_[flatIndex];
 }
 
-int Descriptor::flatElementCount() {
+int Descriptor::flatElementCount() const {
   rebuildFieldMappings();
   return flattenedFieldCount_;
 };
@@ -175,10 +177,10 @@ int Descriptor::fieldSize(const rdb::rField &field) const {
 }
 
 size_t Descriptor::getSizeInBytes() const {
-  auto size{0};
-  for (auto const &i : *this)
-    size += fieldSize(i);
-  return size;
+  // Wolane przez payload::span() przy kazdym dostepie do pola -- suma jest
+  // cache'owana w rebuildFieldMappings zamiast liczona za kazdym razem.
+  rebuildFieldMappings();
+  return dataSizeBytes_;
 }
 
 rdb::retention_t Descriptor::retention() {
@@ -234,7 +236,7 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
   return 0;  // ProForma Error
 }
 
-int Descriptor::byteOffsetAtFlatIndex(const int flatIndex) {
+int Descriptor::byteOffsetAtFlatIndex(const int flatIndex) const {
   rebuildFieldMappings();
   if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) {
     FatalError("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);

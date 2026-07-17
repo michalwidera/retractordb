@@ -122,6 +122,8 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
 
     auto journal_logger = std::make_shared<spdlog::logger>("log", journal_sink);
     spdlog::set_default_logger(journal_logger);
+    // Poziom runtime = poziom kompilacji (Release: tylko błędy, Debug: pełna diagnostyka).
+    spdlog::set_level(static_cast<spdlog::level::level_enum>(SPDLOG_ACTIVE_LEVEL));
     spdlog::flush_on(spdlog::level::trace);
     return "journald (stderr)";
   }
@@ -174,5 +176,8 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
     spdlog::set_pattern(common_log_pattern);
     spdlog::flush_on(spdlog::level::trace);
   }
+  // Poziom runtime = poziom kompilacji (Release: tylko błędy trafiają do pliku logu na
+  // urządzeniu pomiarowym, gdzie /tmp leży na karcie SD; Debug: pełna diagnostyka).
+  spdlog::set_level(static_cast<spdlog::level::level_enum>(SPDLOG_ACTIVE_LEVEL));
   return tmp.string() + ".log";
 }

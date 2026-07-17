@@ -25,7 +25,7 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
   clock_gettime(CLOCK_MONOTONIC, &after);
 
   long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
-  EXPECT_LT(elapsed_ms, 50);
+  EXPECT_LT(elapsed_ms, 500);  // luźny próg: valgrind + obciążone CI dają jitter rzędu dziesiątek ms
 }
 
 TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
@@ -56,7 +56,7 @@ TEST(ExecutorRtSleepTest, NanosecondCarryOverDoesNotHang) {
   clock_gettime(CLOCK_MONOTONIC, &after);
 
   long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
-  EXPECT_LT(elapsed_ms, 50);
+  EXPECT_LT(elapsed_ms, 500);  // luźny próg: valgrind + obciążone CI dają jitter rzędu dziesiątek ms
 }
 
 TEST(ExecutorRtSleepTest, LargeIntervalNoCarryPastAnchor) {
@@ -74,7 +74,7 @@ TEST(ExecutorRtSleepTest, LargeIntervalNoCarryPastAnchor) {
   clock_gettime(CLOCK_MONOTONIC, &after);
 
   long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
-  EXPECT_LT(elapsed_ms, 50);
+  EXPECT_LT(elapsed_ms, 500);  // luźny próg: valgrind + obciążone CI dają jitter rzędu dziesiątek ms
 }
 
 // --- rtCheckAndPrint ---

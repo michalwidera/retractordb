@@ -69,6 +69,15 @@ std::unique_ptr<PersistentCounter> pCounterPtr;
 // Map stores relations processId -> sended stream
 static std::map<const int, std::string> id2StreamName_Relation;
 
+// Cache otwartych kolejek IPC per klient. Konstrukcja message_queue(open_only)
+// to shm_open+mmap -- wykonywana w kazdym slocie kosztowala ~3,2 ms/slot na
+// Pi 400 (zmierzone, JOURNAL.md kampania 7bis) i lamala os czasu 360 Hz.
+// Uchwyt jest wazny dopoki kolejka istnieje: otwieramy przy pierwszej emisji,
+// usuwamy z cache przy usunieciu kolejki (przepelnienie) i re-rejestracji
+// klienta. Wzorzec wspoldzielenia miedzy watkami identyczny jak
+// id2StreamName_Relation powyzej.
+static std::map<const int, std::unique_ptr<IPC::message_queue>> id2Queue_Cache;
+
 extern std::mutex core_mutex;
 
 std::condition_variable cv;  // multithreading condition variable
@@ -281,6 +290,9 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       // Here we set that for process of given id we send appropriate data stream
       int streamId                     = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       id2StreamName_Relation[streamId] = streamName;
+      // Re-rejestracja klienta moze odtworzyc kolejke pod ta sama nazwa --
+      // stary uchwyt w cache wskazywalby odlinkowany obiekt; wymus ponowne otwarcie.
+      id2Queue_Cache.erase(streamId);
       // Create a message_queue
       std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
       // 10-second buffer to prevent overflow on loaded systems
@@ -460,26 +472,41 @@ void executorsm::boradcastOutOfBussiness() {
     }
   }
   id2StreamName_Relation.clear();
+  id2Queue_Cache.clear();
 }
 
 void executorsm::boradcast(const std::set<std::string> &inSet) {
   if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcast: coreInstancePtr is null");
   for (const auto &queryName : inSet) {
-    std::string row = printRowValue(queryName);
+    // Formatowanie wiersza (printRowValue: ptree + serializacja wszystkich pol)
+    // jest kosztowne i potrzebne wylacznie subskrybentom -- wykonuj leniwie,
+    // dopiero przy pierwszym kliencie danego strumienia. Bez subskrybentow
+    // wiersz i tak byl wyrzucany (petla ponizej nie robila nic).
+    std::string row;
+    bool rowFormatted = false;
     std::list<int> eraseList;
     for (const auto &element : id2StreamName_Relation) {
       if (element.second == queryName) {
         using namespace boost::interprocess;
+        if (!rowFormatted) {
+          row          = printRowValue(queryName);
+          rowFormatted = true;
+        }
         //
         // Query discovery. queues are created by show command
         //
         std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-        IPC::message_queue mq(IPC::open_only, queueName.c_str());
+        // Uchwyt kolejki z cache -- otwarcie (shm_open+mmap) tylko przy pierwszej
+        // emisji do danego klienta, nie w kazdym slocie (patrz komentarz przy
+        // id2Queue_Cache).
+        auto &mqPtr = id2Queue_Cache[element.first];
+        if (!mqPtr) mqPtr = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
         //
         // If send queue is full - means no one is listening and queue is
         // going to remove
         //
-        if (!mq.try_send(row.c_str(), row.length(), 0)) {
+        if (!mqPtr->try_send(row.c_str(), row.length(), 0)) {
+          mqPtr.reset();  // zamknij mapowanie przed unlink
           message_queue::remove(queueName.c_str());
           eraseList.push_back(element.first);
         }
@@ -490,6 +517,7 @@ void executorsm::boradcast(const std::set<std::string> &inSet) {
     //
     for (const auto &element : eraseList) {
       id2StreamName_Relation.erase(element);
+      id2Queue_Cache.erase(element);
       SPDLOG_WARN("queue erased on timeout, procId={}", element);
     }
   }

@@ -2,6 +2,7 @@
 
 #include <memory>  // unique_ptr
 #include <string>
+#include <unordered_map>
 
 #include "dumpManager.hpp"
 #include "qTree.hpp"        // qTree
@@ -53,4 +54,12 @@ struct streamInstance {
 
  private:
   dumpManager dumpMgr;
+
+  // Ksztalt deskryptora okna @(step,N) zalezy tylko od (ten strumien, |N|) i jest
+  // niezmienny w trakcie dzialania (source->descriptor sie nie zmienia po
+  // konstrukcji) -- cache unika odtwarzania go (string + alokacja na kazde pole
+  // okna) przy kazdym wywolaniu constructAgsePayload. Wywolywane wylacznie z
+  // watku przetwarzania (dataModel::processRows), nie z watku komunikacji IPC,
+  // wiec bez potrzeby synchronizacji.
+  mutable std::unordered_map<int, rdb::Descriptor> agseDescriptorCache_;
 };

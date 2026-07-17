@@ -1,0 +1,18 @@
+# Test kontrastowy dsp-simple-fir (REQUIREMENTS.md, @note koncowy; JOURNAL.md).
+# Prosty potok FIR (4 etapy) dla kontrastu z pelnym potokiem QRS (~14 etapow).
+# Baza: test/IntegrationTest_parallel/dsp, zmodyfikowana pod metodyke eksperymentu:
+#  - wszystkie SELECT VOLATILE, bez STORAGE -> zero artefaktow (przepustowosc
+#    karty SD wylaczona z pomiaru); uruchamiac z katalogu w /dev/shm,
+#  - zrodlo BYTE z /dev/urandom (pamiec, nie SD),
+#  - odbior: 1 klient xqry na outputAll -> /dev/null (rdzenie 0-2).
+# Tempo bazowe 1/1000 s -- run_fir_contrast.sh podmienia je sedem na tempo
+# biezacego stopnia eskalacji (analogicznie do rec205-detect.rql w kampaniach QRS).
+# Wspolczynniki: test/IntegrationTest_parallel/dsp/filterremez.txt (FIR 25-tap).
+
+DECLARE coef INTEGER[25] STREAM filter, 1 FILE 'filterremez.txt'
+DECLARE data BYTE STREAM source, 1/1000 FILE '/dev/urandom'
+
+SELECT * STREAM signalRow FROM source@(1,25) VOLATILE
+SELECT signalRow[_] * filter[_] STREAM accRow FROM signalRow+filter VOLATILE
+SELECT accRow[0] STREAM output FROM accRow.sumc VOLATILE
+SELECT output[0]/25/1000, source[0] STREAM outputAll FROM output+source VOLATILE

@@ -207,9 +207,6 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
 }
 
 bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
-  if (recordsCount_ != accessor_->count())
-    SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", paths_.storageFile(), recordsCount_, accessor_->count());
-
   if (isHold_) {
     destination = (destination == nullptr)              //
                       ? storagePayload_->span().data()  //
@@ -223,13 +220,14 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   }
 
   if (!isDeclared()) {
-    if (recordsCount_ != accessor_->count()) {
-      FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
-                 paths_.storageFile());
-    }
+    // Spójność recordsCount_ vs accessor_->count() weryfikuje read() — dla magazynów
+    // plikowych count() to syscall (stat), więc nie powtarzamy tego sprawdzenia tutaj.
     const auto recordPositionFromBack = recordsCount_ - recordIndexFromBack - 1;
     return read(recordPositionFromBack, destination);
   }
+
+  if (recordsCount_ != accessor_->count())
+    SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", paths_.storageFile(), recordsCount_, accessor_->count());
 
   // For all _DECLARED_ data sources buffer capacity at least _MUST_ be 1
   // In order to maintain the consistency of declared data sources,

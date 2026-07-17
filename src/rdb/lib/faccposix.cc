@@ -5,9 +5,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
+
 #include "fatalError.hpp"
+
 namespace rdb {
 
 namespace {
@@ -74,12 +77,10 @@ posixBinaryFile::~posixBinaryFile() {
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
 size_t posixBinaryFile::count() {
-  if (!std::filesystem::exists(filename_)) {
-    return 0;
-  }
+  // Wolane na goracej sciezce odczytu — pojedynczy stat(), ENOENT to zwykly brak pliku.
   struct stat stat_buf;
-  int rc = stat(filename_.c_str(), &stat_buf);
-  if (rc != 0) {
+  if (stat(filename_.c_str(), &stat_buf) != 0) {
+    if (errno == ENOENT) return 0;
     SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
     return -1;
   }

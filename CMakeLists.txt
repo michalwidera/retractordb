@@ -31,6 +31,14 @@ endif()
 
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
+# Polityka logowania per konfiguracja: na urządzeniu pomiarowym (rpi400) /tmp
+# leży na karcie SD, a logger flushuje każdą linię — w Release do logu mogą
+# trafiać wyłącznie błędy (makra poniżej ERROR są wycinane w kompilacji). W
+# Debug pełna diagnostyka łącznie z SPDLOG_DEBUG (m.in. rotacja segmentów).
+# Poziom runtime dopasowuje setupLoggerMain() na podstawie SPDLOG_ACTIVE_LEVEL.
+add_compile_definitions(
+  $<IF:$<CONFIG:Release>,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_ERROR,SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
+)
 add_definitions(-Wno-deprecated-declarations)
 add_definitions(-DHAS_BOOST)
 
@@ -90,9 +98,13 @@ if(RDB_USE_CCACHE)
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
     set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-    message(STATUS "ccache found, enabling as compiler launcher: ${CCACHE_PROGRAM}")
+    message(
+      STATUS "ccache found, enabling as compiler launcher: ${CCACHE_PROGRAM}")
   else()
-    message(STATUS "ccache not found, skipping (install: scripts/buildrdb.sh toolchain, or apt install ccache)")
+    message(
+      STATUS
+        "ccache not found, skipping (install: scripts/buildrdb.sh toolchain, or apt install ccache)"
+    )
   endif()
 endif()
 

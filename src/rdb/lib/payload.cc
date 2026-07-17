@@ -25,7 +25,7 @@ namespace {
 constexpr int kHexByteWidth = 2;
 constexpr int kHexWordWidth = 8;
 
-int resolveFieldIndexOrAbort(Descriptor &descriptor, const int positionFlat, const char *context) {
+int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFlat, const char *context) {
   const auto flatCount = descriptor.flatElementCount();
   if (positionFlat < 0 || positionFlat > flatCount - 1) {
     SPDLOG_ERROR("{} out of descriptor req:{} available len: {}", context, positionFlat, flatCount);
@@ -285,19 +285,20 @@ T getVal(std::span<const uint8_t> s, int offset) {
 }
 
 std::optional<std::any> payload::getItem(const int positionFlat) const {
-  Descriptor descriptorCopy(descriptor);
-  auto position = resolveFieldIndexOrAbort(descriptorCopy, positionFlat, "Read");
+  // Goraca sciezka: zadnej kopii deskryptora -- metody mapowan sa const
+  // (leniwy cache w Descriptor jest mutable), wiec czytamy wprost z pola.
+  auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Read");
 
   if (nullBitset_[position]) return std::nullopt;
 
-  const auto requestedType = descriptorCopy[position].rtype;
-  const auto offsetFlat    = descriptorCopy.byteOffsetAtFlatIndex(positionFlat);
+  const auto requestedType = descriptor[position].rtype;
+  const auto offsetFlat    = descriptor.byteOffsetAtFlatIndex(positionFlat);
   auto memory              = span();
 
   auto readStringField = [&]() -> std::string {
-    auto len       = descriptorCopy[position].rlen * descriptorCopy[position].rarray;
+    auto len       = descriptor[position].rlen * descriptor[position].rarray;
     auto fieldSpan = memory.subspan(offsetFlat, len);
-    auto descLen   = descriptorCopy.getSizeInBytes();
+    auto descLen   = descriptor.getSizeInBytes();
     if (offsetFlat + static_cast<size_t>(len) > descLen) {
       FatalError("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
     }

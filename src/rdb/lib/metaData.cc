@@ -50,7 +50,7 @@ void metaData::loadIndex() {
 
 std::pair<std::optional<size_t>, size_t> metaData::locateRecord(size_t recordIndex) const {
   if (recordIndex < committedRecordCount_) {
-    auto entries        = store_.readAll();
+    const auto &entries = store_.readAll();  // goraca sciezka -- bez kopii indeksu
     size_t cumulative   = 0;
     size_t segmentIndex = 0;
     for (const auto &entry : entries) {

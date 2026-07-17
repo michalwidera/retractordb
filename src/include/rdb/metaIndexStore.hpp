@@ -14,7 +14,9 @@ namespace rdb {
 ///
 /// Obiekt klasy MetaIndexStore powinien:
 /// - utrzymywać ścieżkę pliku indeksu oraz rozmiar pojedynczego zserializowanego wpisu,
-/// - cache'ować odczytane wpisy (readAll()) aż do kolejnej mutacji pliku,
+/// - cache'ować odczytane wpisy (readAll()) i utrzymywać cache przyrostowo przy mutacjach
+///   (write-through: append/overwrite/rewrite aktualizują cache zamiast go unieważniać;
+///   plik jest ponownie czytany i deserializowany wyłącznie przy pierwszym dostępie),
 /// - działać jako wariant inertny (bez żadnego I/O), gdy ścieżka pliku jest pusta — tak samo
 ///   jak dotychczasowy wariant metaData dla źródeł deklarowanych,
 /// - przy konstrukcji wczytać czas utworzenia z nagłówka istniejącego pliku, jeśli plik istnieje,
@@ -35,7 +37,10 @@ class MetaIndexStore {
   void saveHeader();
 
   /// @brief All committed entries, in file order. Empty if empty() or file absent/too short.
-  [[nodiscard]] std::vector<IndexRecord> readAll() const;
+  /// Zwraca referencję do wewnętrznego cache (gorąca ścieżka: odczyt nullBitset per rekord)
+  /// — ważną do następnej operacji mutującej; kto potrzebuje własnej kopii, przypisuje do
+  /// zmiennej przez auto (kopia) zamiast const auto&.
+  [[nodiscard]] const std::vector<IndexRecord> &readAll() const;
 
   /// @brief Append one entry to the end of the file. No-op if empty().
   void appendEntry(const IndexRecord &entry);
