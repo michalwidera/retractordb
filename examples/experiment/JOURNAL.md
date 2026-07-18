@@ -1757,3 +1757,14 @@ z "nierozwiązany" na "zdiagnozowany i wyeliminowany (fix #7)";
 twierdzenie RT wzmacnia się z "budżet do p99" na "budżet do p99,9
 włącznie" @360 Hz. Branch experiment/20260718_40ms squashowany do
 mastera i usunięty; worker wraca na master.
+
+Artykuł zaktualizowany (paper-arXiv, commit a4554a6): tabele
+tab:eval-360 / tab:eval-rate / tab:eval-clients i wiersz RetractorDB
+w tab:eval-baselines podmienione na wyniki powtórki; akapity o ogonie
+w 7.2/7.3/7.5 przepisane (przyczyna zdiagnozowana i wyeliminowana,
+opis metody śledztwa i poprawki); abstract, Limitations, Timing
+guarantees i Conclusion wzmocnione z "budżet w medianie i p99" na
+"budżet do p99,9" (z uczciwym zastrzeżeniem: max slotu 117–126%
+budżetu, przy 2–3 klientach p99,9 w granicach 4% budżetu). Obie
+wersje (EN 13 s. / PL 14 s.) kompilują się czysto. Pełny łańcuch
+zamknięty: śledztwo → fix → walidacja → powtórka kampanii → artykuł.
