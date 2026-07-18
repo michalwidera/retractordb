@@ -1,0 +1,8 @@
+# Badanie 7.6(b), faza 1 — zapis kanalow EKG jako artefakty (a, b @ 1/360).
+# Artefakty sa nastepnie deklarowane w fazie 2 (exactness-roundtrip-read.rql)
+# zgodnie z transmisyjnoscia artefaktow: rozplot dziala na zrodle DEKLAROWANYM.
+
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
+
+SELECT ecg.MLII STREAM a FROM ecg
+SELECT ecg.V1 STREAM b FROM ecg

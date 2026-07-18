@@ -1,0 +1,31 @@
+# Badanie 7.6(a) — determinizm artefaktow (replay stability).
+# Wariant rec205-detect.rql z usunietym VOLATILE: WSZYSTKIE strumienie
+# zapisywane jako artefakty; dwa identyczne przebiegi porownywane co do bitu.
+# Oczekiwanie (test dymny 2026-07-17): dane + .desc identyczne; .meta
+# identyczne po odcieciu 8-bajtowego znacznika czasu utworzenia w naglowku
+# (metaIndexStore zapisuje tam system_clock::now()).
+
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
+DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
+DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
+
+SELECT ecg.MLII STREAM mlii FROM ecg
+SELECT ecg.V1 STREAM v1 FROM ecg
+
+SELECT * STREAM mlii_win FROM mlii@(1,25)
+SELECT mlii_win[_]*bpf[_] STREAM bp_acc FROM mlii_win+bpf
+SELECT bp_acc[0]/1000 STREAM bp_out FROM bp_acc.sumc
+
+SELECT * STREAM bp_win FROM bp_out@(1,5)
+SELECT bp_win[_]*df[_] STREAM d_acc FROM bp_win+df
+SELECT d_acc[0] STREAM d_out FROM d_acc.sumc
+
+SELECT d_out[0]*d_out[0]/1000 STREAM sq_out FROM d_out
+
+SELECT * STREAM mwi_win FROM sq_out@(1,30)
+SELECT mwi_win[0] STREAM mwi FROM mwi_win.avg
+
+SELECT * STREAM mwi_long FROM mwi@(1,180)
+SELECT mwi_long[0] STREAM mwi_thr FROM mwi_long.avg
+
+SELECT mlii[0]-900, v1[0]-900, (mwi[0]-mwi_thr[0]*2)*5 STREAM detect_out FROM mlii+v1+mwi+mwi_thr

@@ -1,0 +1,14 @@
+# Badanie 7.6(b), faza 2 — tozsamosc okrezna przeplotu/rozplotu (cor:exact).
+# a, b (rowne delty 1/360, DECLARE z artefaktow fazy 1) -> c = a#b (1/720,
+# wzorzec b0,a0,b1,a1,... wg definicji przeplotu, z = 1/2) ->
+# a2 = c&1/360 (Theta, opozniona o jeden slot: rekord 0 all-null),
+# b2 = c%1/360 (~Theta, dokladna od rekordu 0).
+# Oczekiwanie: a2[1:] == a i b2 == b co do bitu.
+
+DECLARE v INTEGER STREAM a, 1/360 FILE 'a_data'
+DECLARE v INTEGER STREAM b, 1/360 FILE 'b_data'
+
+SELECT c[0] STREAM c FROM a#b
+
+SELECT * STREAM a2 FROM c&1/360
+SELECT * STREAM b2 FROM c%1/360
