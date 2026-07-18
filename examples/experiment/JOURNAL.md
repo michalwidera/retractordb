@@ -1665,3 +1665,47 @@ przechodziły w ramach badań.
   poprawionym silniku, żeby tabele artykułu odzwierciedlały nowe
   binarki — pomiary sprzed poprawki pozostają w results/ jako
   dokumentacja drogi.
+
+## 2026-07-18 — Powtórka kampanii rate i clients na poprawionym silniku
+## (branch experiment/20260718_40ms)
+
+Decyzja prowadzącego: przeprowadzić pkt 1 następstw śledztwa ~40 ms —
+powtórkę kampanii rate (360/720/1080 Hz, 1 klient, 20 000 próbek) oraz
+clients (1–3 klientów @360 Hz, 20 000 próbek) na silniku z fix #7, aby
+tabele artykułu (7.2/7.3) odzwierciedlały wydanie z poprawką, a nie
+pomiary sprzed niej. Po zakończeniu kampanii branch będzie squashowany
+do mastera i usunięty; następnie sekcje 7.2/7.3/7.5 artykułu zostaną
+przepisane na nową narrację.
+
+Ustalenia metodyczne:
+
+- Branch: `experiment/20260718_40ms` (wyjątek pkt 23 rozszerzony przez
+  prowadzącego o ten branch; worker buduje binarki z brancha
+  eksperymentu). W praktyce branch startuje z mastera zawierającego już
+  fix #7, więc "zmiany funkcjonalne" sprowadzają się do tożsamości
+  z masterem — wyjątek dotyczy głównie źródła builda.
+- Infrastruktura bez zmian: `start_supervisor.sh rate` +
+  `start_supervisor.sh clients --rate-hz 360 --skip-build`, konfiguracje
+  `campaign_rate.csv` / `campaign_clients.csv` identyczne jak w
+  kampaniach z 2026-07-16 — jedyną zmienną jest wersja silnika
+  (one-variable-at-a-time: różnica wyników = efekt fix #7).
+- Worker buduje pełny łańcuch `scripts/buildrdb.sh conan ninja probe`
+  z brancha (bez --skip-build w kampanii rate): wyniki do publikacji
+  muszą pochodzić z udokumentowanego builda, mimo że zainstalowana
+  binarka jest treściowo identyczna (ostatnie commity mastera to
+  wyłącznie dziennik/wymagania).
+- Wyniki trafiają do `examples/experiment/results/{rate,clients}/`
+  na branchu (katalogi po squashu 40 ms nie zawierają tych kampanii,
+  więc rotacja nie zajdzie — stare wyniki żyją w `results_20260716/`).
+
+Hipotezy przed startem (do weryfikacji, nie do potwierdzenia):
+
+- H-R1: mediany E1/compute bez zmian względem 2026-07-16 (fix nie
+  dotyka ścieżki stanu ustalonego).
+- H-R2: p99,9 wake_lag @360 Hz spada z ~38 ms do <1 ms (przeniesienie
+  wyniku walidacji fix2 na pełną metodykę kampanii z restartami).
+- H-R3: w kampanii clients ogon przestaje zależeć od liczby klientów
+  (przed poprawką każdy attach wnosił zdarzenie ~40 ms).
+- Otwarte: zachowanie @720/1080 Hz — budżet slotu 1,39/0,93 ms jest
+  ciaśniejszy niż koszt ~0,5 ms zdarzeń resztkowych; tu poprawka może
+  zmienić liczbę przekroczeń budżetu, nie tylko ogon bezwzględny.
