@@ -78,6 +78,13 @@ static std::map<const int, std::string> id2StreamName_Relation;
 // id2StreamName_Relation powyzej.
 static std::map<const int, std::unique_ptr<IPC::message_queue>> id2Queue_Cache;
 
+// Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
+// mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/
+// czyszczone przez watek przetwarzajacy (boradcast). Muteks trzymany wylacznie
+// na operacjach na mapach -- NIGDY podczas konstrukcji kolejki (mmap ~MB), aby
+// nie wnosic inwersji priorytetow do watku RT.
+static std::mutex clientMapsMutex;
+
 extern std::mutex core_mutex;
 
 std::condition_variable cv;  // multithreading condition variable
@@ -288,22 +295,31 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
         return ptRetval;
       }
       // Here we set that for process of given id we send appropriate data stream
-      int streamId                     = boost::lexical_cast<int>(ptInval.get("db.id", ""));
-      id2StreamName_Relation[streamId] = streamName;
-      // Re-rejestracja klienta moze odtworzyc kolejke pod ta sama nazwa --
-      // stary uchwyt w cache wskazywalby odlinkowany obiekt; wymus ponowne otwarcie.
-      id2Queue_Cache.erase(streamId);
-      // Create a message_queue
+      int streamId          = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
       int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * cfgQueueBufferSeconds;
       maxElements     = std::max(maxElements, cfgMinQueueElements);
-      IPC::message_queue mq(IPC::open_or_create,               // open or crate
-                            queueName.c_str(),                 // name
-                            maxElements,                       // max message number
-                            ipc::kResponseQueueMaxMessageSize  // max message size
+      // Pre-otwarcie kolejki TUTAJ, w watku komunikacyjnym (sledztwo ~40 ms,
+      // JOURNAL.md 2026-07-18, Faza 3): tworzenie + mmap segmentu (~MB) nie moze
+      // zostac w torze emisji watku RT -- lazy open_only w boradcast() kosztowal
+      // 42 ms przy pierwszej emisji do nowego klienta (populacja stron mapowania
+      // pod mlockall). Rejestracja w id2StreamName_Relation dopiero PO zbudowaniu
+      // kolejki i razem z uchwytem pod muteksem, wiec watek RT nigdy nie widzi
+      // klienta bez gotowego uchwytu (przy okazji znika dotychczasowy wyscig
+      // rejestracja-przed-utworzeniem-kolejki). Nadpisanie uchwytu przy
+      // re-rejestracji zamyka stare mapowanie w tym watku.
+      auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,               // open or create
+                                                              queueName.c_str(),                 // name
+                                                              maxElements,                       // max message number
+                                                              ipc::kResponseQueueMaxMessageSize  // max message size
       );
+      {
+        std::scoped_lock lock(clientMapsMutex);
+        id2StreamName_Relation[streamId] = streamName;
+        id2Queue_Cache[streamId]         = std::move(queueHandle);
+      }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
     //
@@ -446,6 +462,7 @@ std::string executorsm::printRowValue(const std::string &query_name) {
 
 void executorsm::boradcastOutOfBussiness() {
   if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcastOutOfBussiness: coreInstancePtr is null");
+  std::scoped_lock lock(clientMapsMutex);
   for (const auto &element : id2StreamName_Relation) {
     using namespace boost::interprocess;
     //
@@ -477,6 +494,10 @@ void executorsm::boradcastOutOfBussiness() {
 
 void executorsm::boradcast(const std::set<std::string> &inSet) {
   if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcast: coreInstancePtr is null");
+  // Muteks na caly przebieg emisji: kontencja tylko z krotkim wstawieniem do map
+  // przy rejestracji klienta (watek komunikacyjny trzyma go nanosekundy), a koszt
+  // niekontendowanego lock/unlock raz na slot jest pomijalny wobec ~ms compute.
+  std::scoped_lock lock(clientMapsMutex);
   for (const auto &queryName : inSet) {
     // Formatowanie wiersza (printRowValue: ptree + serializacja wszystkich pol)
     // jest kosztowne i potrzebne wylacznie subskrybentom -- wykonuj leniwie,
@@ -614,7 +635,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
 #ifdef __linux__
       struct timespec loop_anchor{};
-      clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
       const bool rt_mode = vm.contains("realtime");
       if (rt_mode) {
         if (rtCheckAndPrint()) rtActivate(cfgRtPriority);
@@ -643,8 +663,15 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       std::FILE *benchFile  = benchPath ? std::fopen(benchPath, "w") : nullptr;
       if (benchFile) std::fprintf(benchFile, "iter,compute_ns,wake_lag_ns,e2e_ns\n");
       long benchIter             = 0;
-      const long loop_anchor_ns  = loop_anchor.tv_sec * 1'000'000'000L + loop_anchor.tv_nsec;
       constexpr auto benchTimeNs = [](const struct timespec &ts) { return ts.tv_sec * 1'000'000'000L + ts.tv_nsec; };
+#endif
+      // Kotwica osi czasu ustawiana PO rtActivate (mlockall/SCHED_FIFO) i po
+      // otwarciu pliku sondy: koszty inicjalizacji nie obciazaja budzetu
+      // pierwszych slotow (transjent startowy ~20-47 ms w wake_lag --
+      // sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3).
+      clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
+#ifdef RDB_BENCH_PROBE
+      const long loop_anchor_ns = loop_anchor.tv_sec * 1'000'000'000L + loop_anchor.tv_nsec;
 #endif
 #endif
 

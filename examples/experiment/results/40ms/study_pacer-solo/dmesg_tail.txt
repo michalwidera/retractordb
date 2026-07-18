@@ -1,0 +1,300 @@
+[Sat Jul 18 11:38:11 2026] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2019): c0746fd6c5da3ae827864651ad66ae47fe24b3e8'
+[Sat Jul 18 11:38:11 2026] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2021 v1): a8d54bbb3825cfb94fa13c9f8a594a195c107b8d'
+[Sat Jul 18 11:38:11 2026] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2021 v2): 4cf046892d6fd3c9a5b03f98d845f90851dc6a8c'
+[Sat Jul 18 11:38:11 2026] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (2021 v3): 100437bb6de6e469b581e61cd66bce3ef4ed53af'
+[Sat Jul 18 11:38:11 2026] Loaded X.509 cert 'Canonical Ltd. Secure Boot Signing (Ubuntu Core 2019): c1d57b8f6b743f23ee41f4f7ee292f06eecadfb9'
+[Sat Jul 18 11:38:11 2026] Key type .fscrypt registered
+[Sat Jul 18 11:38:11 2026] Key type fscrypt-provisioning registered
+[Sat Jul 18 11:38:12 2026] Key type encrypted registered
+[Sat Jul 18 11:38:12 2026] AppArmor: AppArmor sha256 policy hashing enabled
+[Sat Jul 18 11:38:12 2026] ima: No TPM chip found, activating TPM-bypass!
+[Sat Jul 18 11:38:12 2026] ima: Allocated hash algorithm: sha1
+[Sat Jul 18 11:38:12 2026] ima: No architecture policies found
+[Sat Jul 18 11:38:12 2026] evm: Initialising EVM extended attributes:
+[Sat Jul 18 11:38:12 2026] evm: security.selinux
+[Sat Jul 18 11:38:12 2026] evm: security.SMACK64
+[Sat Jul 18 11:38:12 2026] evm: security.SMACK64EXEC
+[Sat Jul 18 11:38:12 2026] evm: security.SMACK64TRANSMUTE
+[Sat Jul 18 11:38:12 2026] evm: security.SMACK64MMAP
+[Sat Jul 18 11:38:12 2026] evm: security.apparmor
+[Sat Jul 18 11:38:12 2026] evm: security.ima
+[Sat Jul 18 11:38:12 2026] evm: security.capability
+[Sat Jul 18 11:38:12 2026] evm: HMAC attrs: 0x1
+[Sat Jul 18 11:38:12 2026] uart-pl011 fe201000.serial: there is not valid maps for state default
+[Sat Jul 18 11:38:12 2026] uart-pl011 fe201000.serial: cts_event_workaround enabled
+[Sat Jul 18 11:38:12 2026] fe201000.serial: ttyAMA1 at MMIO 0xfe201000 (irq = 37, base_baud = 0) is a PL011 rev3
+[Sat Jul 18 11:38:12 2026] serial serial0: tty port ttyAMA1 registered
+[Sat Jul 18 11:38:12 2026] of_cfs_init
+[Sat Jul 18 11:38:12 2026] of_cfs_init: OK
+[Sat Jul 18 11:38:12 2026] clk: Disabling unused clocks
+[Sat Jul 18 11:38:12 2026] mmc0: SDHCI controller on fe340000.mmc [fe340000.mmc] using ADMA
+[Sat Jul 18 11:38:12 2026] Freeing unused kernel memory: 6464K
+[Sat Jul 18 11:38:12 2026] Checked W+X mappings: passed, no W+X pages found
+[Sat Jul 18 11:38:12 2026] Run /init as init process
+[Sat Jul 18 11:38:12 2026]   with arguments:
+[Sat Jul 18 11:38:12 2026]     /init
+[Sat Jul 18 11:38:12 2026]     fixrtc
+[Sat Jul 18 11:38:12 2026]   with environment:
+[Sat Jul 18 11:38:12 2026]     HOME=/
+[Sat Jul 18 11:38:12 2026]     TERM=linux
+[Sat Jul 18 11:38:12 2026]     multipath=off
+[Sat Jul 18 11:38:12 2026]     ds=nocloud;i=rpi-imager-1784124660514
+[Sat Jul 18 11:38:12 2026] mmc0: new ultra high speed DDR50 SDXC card at address 59b4
+[Sat Jul 18 11:38:12 2026] mmcblk0: mmc0:59b4 EC1S5 59.7 GiB
+[Sat Jul 18 11:38:12 2026]  mmcblk0: p1 p2
+[Sat Jul 18 11:38:12 2026] mmcblk0: mmc0:59b4 EC1S5 59.7 GiB
+[Sat Jul 18 11:38:13 2026] brcmstb-i2c fef04500.i2c:  @97500hz registered in polling mode
+[Sat Jul 18 11:38:13 2026] brcmstb-i2c fef09500.i2c:  @97500hz registered in polling mode
+[Sat Jul 18 11:38:13 2026] xhci_hcd 0000:01:00.0: xHCI Host Controller
+[Sat Jul 18 11:38:13 2026] xhci_hcd 0000:01:00.0: new USB bus registered, assigned bus number 1
+[Sat Jul 18 11:38:13 2026] dwc2 fe980000.usb: supply vusb_d not found, using dummy regulator
+[Sat Jul 18 11:38:13 2026] dwc2 fe980000.usb: supply vusb_a not found, using dummy regulator
+[Sat Jul 18 11:38:13 2026] xhci_hcd 0000:01:00.0: hcc params 0x002841eb hci version 0x100 quirks 0x0300240000000890
+[Sat Jul 18 11:38:13 2026] xhci_hcd 0000:01:00.0: xHCI Host Controller
+[Sat Jul 18 11:38:13 2026] xhci_hcd 0000:01:00.0: new USB bus registered, assigned bus number 2
+[Sat Jul 18 11:38:13 2026] xhci_hcd 0000:01:00.0: Host supports USB 3.0 SuperSpeed
+[Sat Jul 18 11:38:13 2026] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.08
+[Sat Jul 18 11:38:13 2026] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[Sat Jul 18 11:38:13 2026] usb usb1: Product: xHCI Host Controller
+[Sat Jul 18 11:38:13 2026] usb usb1: Manufacturer: Linux 6.8.0-2049-raspi-realtime xhci-hcd
+[Sat Jul 18 11:38:13 2026] usb usb1: SerialNumber: 0000:01:00.0
+[Sat Jul 18 11:38:13 2026] hub 1-0:1.0: USB hub found
+[Sat Jul 18 11:38:13 2026] hub 1-0:1.0: 1 port detected
+[Sat Jul 18 11:38:13 2026] usb usb2: New USB device found, idVendor=1d6b, idProduct=0003, bcdDevice= 6.08
+[Sat Jul 18 11:38:13 2026] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[Sat Jul 18 11:38:13 2026] usb usb2: Product: xHCI Host Controller
+[Sat Jul 18 11:38:13 2026] usb usb2: Manufacturer: Linux 6.8.0-2049-raspi-realtime xhci-hcd
+[Sat Jul 18 11:38:13 2026] usb usb2: SerialNumber: 0000:01:00.0
+[Sat Jul 18 11:38:13 2026] hub 2-0:1.0: USB hub found
+[Sat Jul 18 11:38:13 2026] hub 2-0:1.0: 4 ports detected
+[Sat Jul 18 11:38:13 2026] dwc2 fe980000.usb: EPs: 8, dedicated fifos, 4080 entries in SPRAM
+[Sat Jul 18 11:38:13 2026] dwc2 fe980000.usb: DWC OTG Controller
+[Sat Jul 18 11:38:13 2026] dwc2 fe980000.usb: new USB bus registered, assigned bus number 3
+[Sat Jul 18 11:38:13 2026] dwc2 fe980000.usb: irq 44, io mem 0xfe980000
+[Sat Jul 18 11:38:13 2026] usb usb3: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.08
+[Sat Jul 18 11:38:13 2026] usb usb3: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[Sat Jul 18 11:38:13 2026] usb usb3: Product: DWC OTG Controller
+[Sat Jul 18 11:38:13 2026] usb usb3: Manufacturer: Linux 6.8.0-2049-raspi-realtime dwc2_hsotg
+[Sat Jul 18 11:38:13 2026] usb usb3: SerialNumber: fe980000.usb
+[Sat Jul 18 11:38:13 2026] hub 3-0:1.0: USB hub found
+[Sat Jul 18 11:38:13 2026] hub 3-0:1.0: 1 port detected
+[Sat Jul 18 11:38:13 2026] usb 1-1: new high-speed USB device number 2 using xhci_hcd
+[Sat Jul 18 11:38:13 2026] usb 1-1: New USB device found, idVendor=2109, idProduct=3431, bcdDevice= 4.21
+[Sat Jul 18 11:38:13 2026] usb 1-1: New USB device strings: Mfr=0, Product=1, SerialNumber=0
+[Sat Jul 18 11:38:13 2026] usb 1-1: Product: USB2.0 Hub
+[Sat Jul 18 11:38:13 2026] hub 1-1:1.0: USB hub found
+[Sat Jul 18 11:38:13 2026] hub 1-1:1.0: 4 ports detected
+[Sat Jul 18 11:38:14 2026] usb 1-1.4: new low-speed USB device number 3 using xhci_hcd
+[Sat Jul 18 11:38:14 2026] usb 1-1.4: New USB device found, idVendor=04d9, idProduct=0007, bcdDevice= 1.61
+[Sat Jul 18 11:38:14 2026] usb 1-1.4: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+[Sat Jul 18 11:38:14 2026] usb 1-1.4: Product: Raspberry Pi Internal Keyboard
+[Sat Jul 18 11:38:14 2026] usb 1-1.4: Manufacturer:  
+[Sat Jul 18 11:38:14 2026] usbcore: registered new interface driver usbhid
+[Sat Jul 18 11:38:14 2026] usbhid: USB HID core driver
+[Sat Jul 18 11:38:14 2026] input:   Raspberry Pi Internal Keyboard as /devices/platform/scb/fd500000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/usb1/1-1/1-1.4/1-1.4:1.0/0003:04D9:0007.0001/input/input0
+[Sat Jul 18 11:38:14 2026] hid-generic 0003:04D9:0007.0001: input,hidraw0: USB HID v1.11 Keyboard [  Raspberry Pi Internal Keyboard] on usb-0000:01:00.0-1.4/input0
+[Sat Jul 18 11:38:14 2026] input:   Raspberry Pi Internal Keyboard as /devices/platform/scb/fd500000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/usb1/1-1/1-1.4/1-1.4:1.1/0003:04D9:0007.0002/input/input1
+[Sat Jul 18 11:38:14 2026] hid-generic 0003:04D9:0007.0002: input,hidraw1: USB HID v1.11 Device [  Raspberry Pi Internal Keyboard] on usb-0000:01:00.0-1.4/input1
+[Sat Jul 18 11:38:15 2026] raid6: neonx8   gen()  5014 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: neonx4   gen()  5261 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: neonx2   gen()  4253 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: neonx1   gen()  3080 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: int64x8  gen()  3016 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: int64x4  gen()  2973 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: int64x2  gen()  2695 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: int64x1  gen()  2175 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: using algorithm neonx4 gen() 5261 MB/s
+[Sat Jul 18 11:38:15 2026] raid6: .... xor() 4121 MB/s, rmw enabled
+[Sat Jul 18 11:38:15 2026] raid6: using neon recovery algorithm
+[Sat Jul 18 11:38:15 2026] xor: measuring software checksum speed
+[Sat Jul 18 11:38:15 2026]    8regs           :  6063 MB/sec
+[Sat Jul 18 11:38:15 2026]    32regs          :  6765 MB/sec
+[Sat Jul 18 11:38:15 2026]    arm64_neon      :  5239 MB/sec
+[Sat Jul 18 11:38:15 2026] xor: using function: 32regs (6765 MB/sec)
+[Sat Jul 18 11:38:15 2026] async_tx: api initialized (async)
+[Sat Jul 18 11:38:15 2026] Btrfs loaded, zoned=yes, fsverity=no
+[Sat Jul 18 11:38:15 2026] EXT4-fs (mmcblk0p2): mounted filesystem c5da9c27-d622-4e80-89db-6af2e32618b4 ro with ordered data mode. Quota mode: none.
+[Sat Jul 18 11:38:16 2026] systemd[1]: Inserted module 'autofs4'
+[Sat Jul 18 11:38:16 2026] systemd[1]: systemd 255.4-1ubuntu8.16 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -BPF_FRAMEWORK -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified)
+[Sat Jul 18 11:38:16 2026] systemd[1]: Detected architecture arm64.
+[Sat Jul 18 11:38:16 2026] systemd[1]: Hostname set to <pi400>.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Queued start job for default target graphical.target.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Created slice system-modprobe.slice - Slice /system/modprobe.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Created slice system-serial\x2dgetty.slice - Slice /system/serial-getty.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Created slice system-systemd\x2dfsck.slice - Slice /system/systemd-fsck.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Created slice user.slice - User and Session Slice.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Started systemd-ask-password-wall.path - Forward Password Requests to Wall Directory Watch.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Set up automount proc-sys-fs-binfmt_misc.automount - Arbitrary Executable File Formats File System Automount Point.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Expecting device dev-disk-by\x2dlabel-system\x2dboot.device - /dev/disk/by-label/system-boot...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Expecting device dev-ttyS0.device - /dev/ttyS0...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Expecting device sys-subsystem-net-devices-wlan0.device - /sys/subsystem/net/devices/wlan0...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Reached target integritysetup.target - Local Integrity Protected Volumes.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Reached target slices.target - Slice Units.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Reached target snapd.mounts-pre.target - Mounting snaps.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Reached target swap.target - Swaps.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Reached target veritysetup.target - Local Verity Protected Volumes.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on dm-event.socket - Device-mapper event daemon FIFOs.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on lvm2-lvmpolld.socket - LVM2 poll daemon socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: multipathd.socket - multipathd control socket was skipped because of an unmet condition check (ConditionKernelCommandLine=!multipath=off).
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on syslog.socket - Syslog Socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-fsckd.socket - fsck to fsckd communication Socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-initctl.socket - initctl Compatibility Named Pipe.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-journald-dev-log.socket - Journal Socket (/dev/log).
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-journald.socket - Journal Socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-networkd.socket - Network Service Netlink Socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: systemd-pcrextend.socket - TPM2 PCR Extension (Varlink) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-udevd-control.socket - udev Control Socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Listening on systemd-udevd-kernel.socket - udev Kernel Socket.
+[Sat Jul 18 11:38:17 2026] systemd[1]: Mounting dev-hugepages.mount - Huge Pages File System...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Mounting dev-mqueue.mount - POSIX Message Queue File System...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Mounting sys-kernel-debug.mount - Kernel Debug File System...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Mounting sys-kernel-tracing.mount - Kernel Trace File System...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Starting systemd-journald.service - Journal Service...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Starting keyboard-setup.service - Set the console keyboard layout...
+[Sat Jul 18 11:38:17 2026] systemd[1]: Starting kmod-static-nodes.service - Create List of Static Device Nodes...
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting lvm2-monitor.service - Monitoring of LVM2 mirrors, snapshots etc. using dmeventd or progress polling...
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting modprobe@configfs.service - Load Kernel Module configfs...
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting modprobe@dm_mod.service - Load Kernel Module dm_mod...
+[Sat Jul 18 11:38:18 2026] systemd-journald[372]: Collecting audit messages is disabled.
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting modprobe@drm.service - Load Kernel Module drm...
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting modprobe@efi_pstore.service - Load Kernel Module efi_pstore...
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting modprobe@fuse.service - Load Kernel Module fuse...
+[Sat Jul 18 11:38:18 2026] device-mapper: core: CONFIG_IMA_DISABLE_HTABLE is disabled. Duplicate IMA measurements will not be recorded in the IMA log.
+[Sat Jul 18 11:38:18 2026] device-mapper: uevent: version 1.0.3
+[Sat Jul 18 11:38:18 2026] device-mapper: ioctl: 4.48.0-ioctl (2023-03-01) initialised: dm-devel@redhat.com
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting modprobe@loop.service - Load Kernel Module loop...
+[Sat Jul 18 11:38:18 2026] systemd[1]: netplan-ovs-cleanup.service - OpenVSwitch configuration for cleanup was skipped because of an unmet condition check (ConditionFileIsExecutable=/usr/bin/ovs-vsctl).
+[Sat Jul 18 11:38:18 2026] systemd[1]: systemd-fsck-root.service - File System Check on Root Device was skipped because of an unmet condition check (ConditionPathExists=!/run/initramfs/fsck-root).
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting systemd-modules-load.service - Load Kernel Modules...
+[Sat Jul 18 11:38:18 2026] systemd[1]: systemd-pcrmachine.service - TPM2 PCR Machine ID Measurement was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting systemd-remount-fs.service - Remount Root and Kernel File Systems...
+[Sat Jul 18 11:38:18 2026] systemd[1]: systemd-tpm2-setup-early.service - TPM2 SRK Setup (Early) was skipped because of an unmet condition check (ConditionSecurity=measured-uki).
+[Sat Jul 18 11:38:18 2026] fuse: init (API version 7.39)
+[Sat Jul 18 11:38:18 2026] systemd[1]: Starting systemd-udev-trigger.service - Coldplug All udev Devices...
+[Sat Jul 18 11:38:18 2026] systemd[1]: Started systemd-journald.service - Journal Service.
+[Sat Jul 18 11:38:18 2026] EXT4-fs (mmcblk0p2): re-mounted c5da9c27-d622-4e80-89db-6af2e32618b4 r/w.
+[Sat Jul 18 11:38:18 2026] systemd-journald[372]: Received client request to flush runtime journal.
+[Sat Jul 18 11:38:18 2026] systemd-journald[372]: /var/log/journal/dbad289d77054f8bb02280af68887467/system.journal: Realtime clock jumped backwards relative to last journal entry, rotating.
+[Sat Jul 18 11:38:18 2026] systemd-journald[372]: Rotating system journal.
+[Sat Jul 18 11:38:18 2026] loop0: detected capacity change from 0 to 85200
+[Sat Jul 18 11:38:20 2026] mc: Linux media interface: v0.10
+[Sat Jul 18 11:38:20 2026] rpi-gpiomem fe200000.gpiomem: window base 0xfe200000 size 0x00001000
+[Sat Jul 18 11:38:20 2026] rpi-gpiomem fe200000.gpiomem: initialised 1 regions as /dev/gpiomem
+[Sat Jul 18 11:38:20 2026] videodev: Linux video capture interface: v2.00
+[Sat Jul 18 11:38:20 2026] snd_bcm2835: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] snd_bcm2835: module verification failed: signature and/or required key missing - tainting kernel
+[Sat Jul 18 11:38:20 2026] vc_sm_cma: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] bcm2835_vc_sm_cma_probe: Videocore shared memory driver
+[Sat Jul 18 11:38:20 2026] [vc_sm_connected_init]: start
+[Sat Jul 18 11:38:20 2026] [vc_sm_connected_init]: installed successfully
+[Sat Jul 18 11:38:20 2026] bcm2835_mmal_vchiq: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] rpivid_hevc: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] rpivid feb10000.codec: Device registered as /dev/video19
+[Sat Jul 18 11:38:20 2026] bcm2835_isp: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] bcm2835_codec: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node output[0] registered as /dev/video13
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Device registered as /dev/video10
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Loaded V4L2 decode
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node capture[0] registered as /dev/video14
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node capture[1] registered as /dev/video15
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node stats[2] registered as /dev/video16
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register output node 0 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register capture node 1 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register capture node 2 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register capture node 3 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node output[0] registered as /dev/video20
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node capture[0] registered as /dev/video21
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node capture[1] registered as /dev/video22
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Device registered as /dev/video11
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Loaded V4L2 encode
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Device node stats[2] registered as /dev/video23
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Device registered as /dev/video12
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Loaded V4L2 isp
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register output node 0 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register capture node 1 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register capture node 2 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Register capture node 3 with media controller
+[Sat Jul 18 11:38:20 2026] bcm2835_v4l2: module is from the staging directory, the quality is unknown, you have been warned.
+[Sat Jul 18 11:38:20 2026] bcm2835-isp bcm2835-isp: Loaded V4L2 bcm2835-isp
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Device registered as /dev/video18
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Loaded V4L2 image_fx
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Device registered as /dev/video31
+[Sat Jul 18 11:38:20 2026] bcm2835-codec bcm2835-codec: Loaded V4L2 encode_image
+[Sat Jul 18 11:38:21 2026] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[Sat Jul 18 11:38:21 2026] Loaded X.509 cert 'benh@debian.org: 577e021cb980e0e820821ba7b54b4961b8b4fadf'
+[Sat Jul 18 11:38:21 2026] Loaded X.509 cert 'romain.perier@gmail.com: 3abbc6ec146e09d1b6016ab9d6cf71dd233f0328'
+[Sat Jul 18 11:38:21 2026] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[Sat Jul 18 11:38:21 2026] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fe400000.hvs (ops vc4_hvs_ops [vc4])
+[Sat Jul 18 11:38:21 2026] Bluetooth: Core ver 2.22
+[Sat Jul 18 11:38:21 2026] NET: Registered PF_BLUETOOTH protocol family
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI device and connection manager initialized
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI socket layer initialized
+[Sat Jul 18 11:38:21 2026] Bluetooth: L2CAP socket layer initialized
+[Sat Jul 18 11:38:21 2026] Bluetooth: SCO socket layer initialized
+[Sat Jul 18 11:38:21 2026] Registered IR keymap rc-cec
+[Sat Jul 18 11:38:21 2026] rc rc0: vc4-hdmi-0 as /devices/platform/soc/fef00700.hdmi/rc/rc0
+[Sat Jul 18 11:38:21 2026] input: vc4-hdmi-0 as /devices/platform/soc/fef00700.hdmi/rc/rc0/input2
+[Sat Jul 18 11:38:21 2026] brcmfmac: F1 signature read @0x18000000=0x15294345
+[Sat Jul 18 11:38:21 2026] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43456-sdio for chip BCM4345/9
+[Sat Jul 18 11:38:21 2026] usbcore: registered new interface driver brcmfmac
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART driver ver 2.3
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol H4 registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol BCSP registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol LL registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol ATH3K registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol Three-wire (H5) registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol Intel registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol Broadcom registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol QCA registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol AG6XX registered
+[Sat Jul 18 11:38:21 2026] Bluetooth: HCI UART protocol Marvell registered
+[Sat Jul 18 11:38:21 2026] input: vc4-hdmi-0 HDMI Jack as /devices/platform/soc/fef00700.hdmi/sound/card0/input3
+[Sat Jul 18 11:38:21 2026] hci_uart_bcm serial0-0: supply vbat not found, using dummy regulator
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fef00700.hdmi (ops vc4_hdmi_ops [vc4])
+[Sat Jul 18 11:38:21 2026] hci_uart_bcm serial0-0: supply vddio not found, using dummy regulator
+[Sat Jul 18 11:38:21 2026] Registered IR keymap rc-cec
+[Sat Jul 18 11:38:21 2026] rc rc1: vc4-hdmi-1 as /devices/platform/soc/fef05700.hdmi/rc/rc1
+[Sat Jul 18 11:38:21 2026] input: vc4-hdmi-1 as /devices/platform/soc/fef05700.hdmi/rc/rc1/input4
+[Sat Jul 18 11:38:21 2026] [drm] Initialized v3d 1.0.0 20180419 for fec00000.v3d on minor 1
+[Sat Jul 18 11:38:21 2026] input: vc4-hdmi-1 HDMI Jack as /devices/platform/soc/fef05700.hdmi/sound/card1/input5
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fef05700.hdmi (ops vc4_hdmi_ops [vc4])
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fe004000.txp (ops vc4_txp_ops [vc4])
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fe206000.pixelvalve (ops vc4_crtc_ops [vc4])
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fe207000.pixelvalve (ops vc4_crtc_ops [vc4])
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fe20a000.pixelvalve (ops vc4_crtc_ops [vc4])
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fe216000.pixelvalve (ops vc4_crtc_ops [vc4])
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: bound fec12000.pixelvalve (ops vc4_crtc_ops [vc4])
+[Sat Jul 18 11:38:21 2026] [drm] Initialized vc4 0.0.0 20140616 for gpu on minor 0
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: [drm] Cannot find any crtc or sizes
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: [drm] Cannot find any crtc or sizes
+[Sat Jul 18 11:38:21 2026] vc4-drm gpu: [drm] Cannot find any crtc or sizes
+[Sat Jul 18 11:38:21 2026] brcmfmac: brcmf_c_process_txcap_blob: no txcap_blob available (err=-2)
+[Sat Jul 18 11:38:21 2026] brcmfmac: brcmf_c_preinit_dcmds: Firmware: BCM4345/9 wl0: May 14 2020 17:26:08 version 7.84.17.1 (r871554) FWID 01-3d9e1d87
+[Sat Jul 18 11:38:21 2026] Bluetooth: hci0: BCM: chip id 130
+[Sat Jul 18 11:38:21 2026] Bluetooth: hci0: BCM: features 0x0f
+[Sat Jul 18 11:38:21 2026] Bluetooth: hci0: BCM4345C5
+[Sat Jul 18 11:38:21 2026] Bluetooth: hci0: BCM4345C5 (003.006.006) build 0000
+[Sat Jul 18 11:38:21 2026] Bluetooth: hci0: BCM4345C5 'brcm/BCM4345C5.raspberrypi,400.hcd' Patch
+[Sat Jul 18 11:38:22 2026] brcmfmac: brcmf_cfg80211_set_power_mgmt: power save enabled
+[Sat Jul 18 11:38:22 2026] Bluetooth: hci0: BCM: features 0x0f
+[Sat Jul 18 11:38:22 2026] Bluetooth: hci0: BCM43456 37.4MHz Raspberry Pi BT5.0 [Version: 1052.1108]
+[Sat Jul 18 11:38:22 2026] Bluetooth: hci0: BCM4345C5 (003.006.006) build 1108
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.793:2): apparmor="STATUS" operation="profile_load" profile="unconfined" name="1password" pid=595 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.793:3): apparmor="STATUS" operation="profile_load" profile="unconfined" name="Discord" pid=596 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.794:4): apparmor="STATUS" operation="profile_load" profile="unconfined" name="QtWebEngineProcess" pid=598 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.795:5): apparmor="STATUS" operation="profile_load" profile="unconfined" name=4D6F6E676F444220436F6D70617373 pid=597 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.811:6): apparmor="STATUS" operation="profile_load" profile="unconfined" name="brave" pid=600 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.812:7): apparmor="STATUS" operation="profile_load" profile="unconfined" name="buildah" pid=601 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.814:8): apparmor="STATUS" operation="profile_load" profile="unconfined" name="balena-etcher" pid=599 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.817:9): apparmor="STATUS" operation="profile_load" profile="unconfined" name="busybox" pid=602 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.831:10): apparmor="STATUS" operation="profile_load" profile="unconfined" name="chrome" pid=607 comm="apparmor_parser"
+[Sat Jul 18 11:38:22 2026] audit: type=1400 audit(1780673852.831:11): apparmor="STATUS" operation="profile_load" profile="unconfined" name="ch-run" pid=606 comm="apparmor_parser"
+[Sat Jul 18 11:38:26 2026] bcmgenet fd580000.ethernet: configuring instance for external RGMII (RX delay)
+[Sat Jul 18 11:38:26 2026] bcmgenet fd580000.ethernet eth0: Link is Down
+[Sat Jul 18 11:38:28 2026] kauditd_printk_skb: 111 callbacks suppressed
+[Sat Jul 18 11:38:28 2026] audit: type=1400 audit(1784355239.937:123): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="rsyslogd" pid=792 comm="apparmor_parser"
+[Sat Jul 18 11:38:30 2026] NET: Registered PF_QIPCRTR protocol family
+[Sat Jul 18 11:38:31 2026] loop1: detected capacity change from 0 to 8
+[Sat Jul 18 11:38:32 2026] audit: type=1400 audit(1784355243.298:124): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/snapd/snap-confine" pid=962 comm="apparmor_parser"
+[Sat Jul 18 11:38:32 2026] audit: type=1400 audit(1784355243.307:125): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/snapd/snap-confine//mount-namespace-capture-helper" pid=962 comm="apparmor_parser"

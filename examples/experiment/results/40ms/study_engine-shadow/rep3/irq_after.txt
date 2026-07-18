@@ -1,0 +1,61 @@
+=== /proc/interrupts ===
+           CPU0       CPU1       CPU2       CPU3       
+ 11:    1318848     188363      97887      13655     GICv2  30 Level     arch_timer
+ 14:       4816          0          0          0     GICv2  65 Level     fe00b880.mailbox
+ 15:          0          0          0          0     GICv2 114 Level     DMA IRQ
+ 16:          0          0          0          0     GICv2 116 Level     DMA IRQ
+ 21:          0          0          0          0     GICv2 122 Level     DMA IRQ
+ 22:          0          0          0          0     GICv2 123 Level     DMA IRQ
+ 27:          0          0          0          0     GICv2 175 Level     PCIe PME, aerdrv
+ 28:         10          0          0          0     GICv2 125 Level     ttyS0
+ 29:       5287          0          0          0     GICv2 189 Level     eth0
+ 30:          0          0          0          0     GICv2 190 Level     eth0
+ 31:      40071          0          0          0     GICv2 158 Level     mmc1, mmc0
+ 32:         72          0          0          0     GICv2  66 Level     VCHIQ doorbell
+ 33:          0          0          0          0     GICv2  48 Level     arm-pmu
+ 34:          0          0          0          0     GICv2  49 Level     arm-pmu
+ 35:          0          0          0          0     GICv2  50 Level     arm-pmu
+ 36:          0          0          0          0     GICv2  51 Level     arm-pmu
+ 37:       3466          0          0          0     GICv2 153 Level     uart-pl011
+ 38:          0          0          0          0     GICv2 150 Level     fe204000.spi
+ 39:          0          0          0          0     GICv2 149 Level     fe804000.i2c
+ 40:         69          0          0          0  BRCM STB PCIe MSI 524288 Edge      xhci_hcd
+ 44:          1          0          0          0     GICv2 105 Level     fe980000.usb, fe980000.usb, dwc2_hsotg:usb3
+ 45:          0          0          0          0     GICv2 130 Level     feb10000.codec
+ 46:          0          0          0          0     GICv2 129 Level     vc4 hvs
+ 47:          0          0          0          0  interrupt-controller@7ef00100   4 Level     vc4 hdmi hpd connected
+ 48:          0          0          0          0  interrupt-controller@7ef00100   5 Level     vc4 hdmi hpd disconnected
+ 49:          0          0          0          0  interrupt-controller@7ef00100   1 Level     vc4 hdmi cec rx
+ 50:          0          0          0          0  interrupt-controller@7ef00100   0 Level     vc4 hdmi cec tx
+ 51:          0          0          0          0  interrupt-controller@7ef00100  10 Level     vc4 hdmi hpd connected
+ 52:          0          0          0          0  interrupt-controller@7ef00100  11 Level     vc4 hdmi hpd disconnected
+ 53:          0          0          0          0  interrupt-controller@7ef00100   7 Level     vc4 hdmi cec rx
+ 54:          0          0          0          0  interrupt-controller@7ef00100   8 Level     vc4 hdmi cec tx
+ 55:          0          0          0          0     GICv2 107 Level     fe004000.txp
+ 56:          0          0          0          0     GICv2 141 Level     vc4 crtc
+ 57:          0          0          0          0     GICv2 142 Level     vc4 crtc, vc4 crtc
+ 58:          0          0          0          0     GICv2 133 Level     vc4 crtc
+ 59:          0          0          0          0     GICv2 138 Level     vc4 crtc
+ 60:          0          0          0          0     GICv2 106 Level     v3d
+IPI0:    147799     153504      17044      48650       Rescheduling interrupts
+IPI1:       908      25348      18377        920       Function call interrupts
+IPI2:         0          0          0          0       CPU stop interrupts
+IPI3:         0          0          0          0       CPU stop NMIs
+IPI4:         0          0          0          0       Timer broadcast interrupts
+IPI5:     55552       2267       2651        122       IRQ work interrupts
+IPI6:         0          0          0          0       CPU backtrace interrupts
+IPI7:         0          0          0          0       KGDB roundup interrupts
+Err:          0
+
+=== /proc/softirqs ===
+                    CPU0       CPU1       CPU2       CPU3       
+          HI:          0          1          3          0
+       TIMER:      10178       4501       8833          1
+      NET_TX:          0          0          1          0
+      NET_RX:         39        207        244          0
+       BLOCK:          6         33         56          0
+    IRQ_POLL:          0          0          0          0
+     TASKLET:         34         23         66          0
+       SCHED:     122535      39426      23230          0
+     HRTIMER:     194777     147451       4203         62
+         RCU:          0          0          0          0

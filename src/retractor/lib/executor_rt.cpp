@@ -8,10 +8,12 @@
 #include <unistd.h>
 
 #include <cinttypes>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 #include <spdlog/spdlog.h>
 
@@ -104,10 +106,31 @@ bool rtCheckAndPrint() {
 
 bool rtActivate(int priority) {
   bool ok = true;
-  if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+  // Polityka mlockall (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Fazy 2/3):
+  // synchroniczna populacja stron NOWYCH mapowan pod MCL_FUTURE kosztowala ~25 ms
+  // przy mmapie segmentu kolejki IPC w watku FIFO (badanie mlock-variant), a pelne
+  // MCL_ONFAULT przenosilo koszt zimnego page cache binarki w srodek biegu
+  // (badanie engine-shadow-fix, rep1: seria ~20 ms przy pierwszym uruchomieniu po
+  // instalacji). Tryb domyslny rozdziela wiec polityki dwoma wywolaniami:
+  // ISTNIEJACE mapowania (binarka, sterta) populowane i blokowane od razu -- ten
+  // koszt siedzi przed kotwica osi czasu, wiec nie obciaza slotow -- a NOWE
+  // mapowania (segmenty kolejek klientow) blokowane leniwie przy dotknieciu.
+  // RDB_MLOCKALL pozostaje jako przelacznik diagnostyczny:
+  //   onfault (domyslnie) -- mlockall(MCL_CURRENT) + mlockall(MCL_FUTURE|MCL_ONFAULT)
+  //   populate            -- dawne MCL_CURRENT|MCL_FUTURE (do pomiarow porownawczych)
+  //   off                 -- bez mlockall (WYLACZNIE diagnostycznie; nie-RT-safe)
+  const char *mlockEnv = std::getenv("RDB_MLOCKALL");
+  std::string_view mlockMode(mlockEnv != nullptr ? mlockEnv : "onfault");
+  if (mlockMode == "onfault") {
+    if (mlockall(MCL_CURRENT) != 0 || mlockall(MCL_FUTURE | MCL_ONFAULT) != 0) {
+      SPDLOG_WARN("mlockall failed: {}", strerror(errno));
+      ok = false;
+    }
+  } else if (mlockMode != "off" && mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
     SPDLOG_WARN("mlockall failed: {}", strerror(errno));
     ok = false;
   }
+  if (mlockMode != "onfault") SPDLOG_WARN("RDB_MLOCKALL={} (tryb diagnostyczny)", mlockMode);
   struct sched_param sp{};
   sp.sched_priority = priority;
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
