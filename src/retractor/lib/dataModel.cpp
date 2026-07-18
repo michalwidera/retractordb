@@ -75,6 +75,33 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   return qSet[instance]->outputPayload->getPayload();
 }
 
+rdb::payload dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
+  auto &out = *(qSet[instance]->outputPayload);
+  out.releaseOnHold();
+
+  // Konwersja indeksu postępującego na offset wsteczny względem bieżącej
+  // liczby rekordów źródła — uniezależnia odczyt od kadencji prefetch
+  // źródeł deklarowanych i od siatki slotów.
+  const auto count = static_cast<int>(out.getRecordsCount());
+  const int rev    = count - 1 - forwardIndex;
+
+  const bool outOfRange = forwardIndex < 0 || rev < 0 ||  //
+                          (out.isDeclared() && rev >= static_cast<int>(out.historySize()));
+  if (outOfRange) {
+    // Rekord niedostępny (przyszłość na osi czasu źródła albo poza historią
+    // bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
+    SPDLOG_WARN("fetchForward {}: record {} not available (count={})", instance, forwardIndex, count);
+    rdb::payload nullRecord(out.descriptor);
+    nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
+    return nullRecord;
+  }
+
+  if (out.isDeclared()) return out.history(static_cast<size_t>(rev));
+
+  out.revRead(static_cast<size_t>(rev));
+  return *out.getPayload();
+}
+
 void dataModel::processZeroStep() {
   std::scoped_lock scoped_lock(core_mutex);
   for (auto q : coreInstance_) {
@@ -167,19 +194,27 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
 
       if (rationalArgument <= 0) {
         FatalError("dataModel::constructInputPayload: DEHASH rational argument must be positive");
       }
 
-      int timeOffset = -1;
-      if (cmd == STREAM_DEHASH_DIV) timeOffset = Div(qry.rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
-      if (cmd == STREAM_DEHASH_MOD) timeOffset = Mod(rationalArgument, qry.rInterval, static_cast<int>(lengthOfSrc));
-      if (timeOffset < 0) {
-        FatalError("dataModel::constructInputPayload: DEHASH timeOffset must be non-negative, got {}", timeOffset);
+      // n — 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
+      // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
+      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+
+      int fwdPos = -1;
+      if (cmd == STREAM_DEHASH_DIV) {
+        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} — element c o tym indeksie powstaje
+        // dopiero PO slocie n strumienia wynikowego (definicja jest o jeden
+        // slot nieprzyczynowa). Realizacja przyczynowa: opóźnienie o jeden
+        // slot — rekord n zawiera a_{n-1}, rekord 0 jest all-null.
+        fwdPos = (n == 0) ? -1 : Div(qry.rInterval, rationalArgument, n - 1);
+      } else {
+        // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} — dostępny w swoim slocie.
+        fwdPos = Mod(rationalArgument, qry.rInterval, n);
       }
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = fetchForward(nameSrc, fwdPos);
     } break;
     case STREAM_SUM:
     case STREAM_AVG:
@@ -244,11 +279,13 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      const auto recordOffset = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount()) + 1;
+      // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji
+      // przeplotu); Hash zwraca indeks POSTĘPUJĄCY elementu składowej.
+      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
 
-      int retPosValue                 = 0;
-      bool direction                  = !Hash(intervalSrc1, intervalSrc2, recordOffset, retPosValue);
-      *(qSet[instance]->inputPayload) = *getPayload(direction ? nameSrc1 : nameSrc2, retPosValue);
+      int fwdPos                      = 0;
+      const bool takeSecond           = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
+      *(qSet[instance]->inputPayload) = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
 
     } break;
     default:

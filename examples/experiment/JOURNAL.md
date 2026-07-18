@@ -763,3 +763,399 @@ Do REQUIREMENTS.md dopisany plan dwóch kampanii domykających sekcje
   4,9e-16), 0/5000 rozbieżnych decyzji QRS.
 - Do wykonania na workerze: pełna kampania (20k @360 Hz slot + batch)
   po decyzji prowadzącego.
+
+### Kampania baseline-numpy wykonana na workerze (branch experiment/20260717)
+
+> **_NOTE:_** Artefakty: [results/baseline-numpy/](results/baseline-numpy/)
+> (results.md, probe_slot.csv, metrics.csv, state_before/after.md,
+> logi obu trybów).
+
+Przygotowanie: worker zastany na branchu 20260716 z **wyzerowanym**
+JOURNAL.md w working tree (0 bajtów, niezacommitowane; przyczyna
+nieustalona) — przywrócony `git checkout --`, drzewo czyste przed
+badaniem.
+
+Droga do poprawnego SCHED_FIFO — dwie usterki runnera, obie wykryte
+dzięki polu `scheduler` w META (drukowanym po fazie settle, więc
+rozstrzygającym):
+
+1. **Składnia chrt** (commit 716d5b5): `chrt -f 50 -p PID` każe chrt
+   *wykonać* „-p" jako polecenie (exit 127) — poprawnie
+   `chrt -f -p 50 PID`. Przebieg 1 pobiegł na SCHED_OTHER (zachowany
+   w historii brancha, commit 5dd27bb).
+2. **Zły pid** (commit bc2dbda): `$!` po `timeout taskset python3 &`
+   wskazuje proces `timeout`, nie interpretera; FIFO nadane rodzicowi
+   nie przenosi się na już istniejące dziecko — runner raportował
+   sukces chrt, a META dalej OTHER (przebieg 3). Dlatego pipeline
+   drukuje `PID <n>` przed settle — runner czyta go teraz z logu.
+
+Porównanie OTHER↔FIFO (przebiegi 1 i 4, identyczne parametry):
+mediany praktycznie bez zmian (E1 77,9 → 77,0 µs), różnica wyłącznie
+w ogonach — E1 max 754,6 → 328,0 µs, wake_lag max 441,2 → 56,1 µs.
+Na rdzeniu izolowanym (isolcpus=3) SCHED_FIFO działa jak domknięcie
+ogona, nie akcelerator — spójne z obserwacją K6.
+
+**Wyniki (FIFO 50, taskset -c 3, governor performance, isolcpus=3,
+20 000 próbek @360 Hz, python 3.12.3 / numpy 1.26.4):**
+
+| Metryka | mediana | p99 | max | budżet 2777,8 µs |
+|---|---|---|---|---|
+| E1 (slot) | 77,0 µs | 215,8 | 328,0 | max = 11,8% ✓ |
+| E2E (slot) | 112,8 µs | 293,7 | 368,6 | max = 13,3% ✓ |
+| wake_lag | 23,2 µs | 42,1 | 56,1 | — |
+
+Batch (650k próbek × 5, bez semantyki slotowej): 709 ns/próbkę,
+~1,41 mln próbek/s. Sampler: load1 ≈ 0,48, temp ≈ 36,8°C.
+
+Wnioski dla 7.5(i):
+
+- Per-slot float64 (NumPy) mediana E1 = 77 µs wobec 1891 µs silnika
+  (kampania clients, study_01, identyczne warunki) — **czynnik ~24,5×**.
+  Zgodnie z hipotezą planu badawczego różnicy NIE wyjaśnia arytmetyka
+  wymierna (callgrind: boost::rational <0,4%) — to model wykonania:
+  wektoryzowane jądra C/BLAS na oknach kontra interpretowany
+  14-etapowy plan zapytań z warstwą storage/metaData/IPC per slot.
+  Do uczciwego opisu w artykule: NumPy per slot NIE świadczy usług
+  silnika (trwałość, wielu klientów, retrakcja, RQL) — mierzy dolną
+  granicę kosztu samych obliczeń w float64.
+- wake_lag mediana 23,2 µs — praktycznie identyczny z silnikiem
+  (22-23 µs w K8/K9/clients): dyscyplina pomiarowa obu badań jest
+  porównywalna (ten sam rdzeń, governor, polityka RT); różnice E1/E2E
+  są więc atrybutowalne do warstwy obliczeń, nie do środowiska.
+- Batch 709 ns/próbkę to ~×109 wobec trybu slot per próbka — skala
+  narzutu interpretera CPython + semantyki slotowej; raportowane
+  osobno, nieporównywalne wprost (zgodnie z planem badawczym).
+
+### Kampania baseline-flink, krok 1: instalacja + smoke test —
+### wynik pozytywny (branch experiment/20260717, commit 5bd7c27)
+
+> **_NOTE:_** Artefakty: [results/baseline-flink/](results/baseline-flink/)
+> (results.md, smoke_stdout.log, ram_sample.csv, state_before/after.md);
+> skrypt: `worker/run_flink_baseline.sh` (commit 3689650).
+
+Plan badawczy (REQUIREMENTS.md, "kampania baseline-flink, priorytet 2")
+spisał cztery zastrzeżenia co do wykonalności na Pi 400, z RAM (4 GB
+wobec JobManager+TaskManager+heap+metaspace) jako pierwszym. Krok 1 to
+sama instalacja + trywialny smoke test, przed napisaniem równoważnego
+dataflow Pan–Tompkinsa — sprawdzenie, czy w ogóle jest co dalej robić,
+zanim zainwestuje się czas w port DataStream API.
+
+Wykonano: `apt-get install openjdk-17-jdk-headless` (aarch64, kandydat
+17.0.19+10); pobranie `flink-2.3.0-bin-scala_2.12.tgz` (604 MB, ~750
+KB/s po WiFi — jedno przerwanie transferu na 120 s timeout, dokończone
+`curl -C -`), weryfikacja sha512, rozpakowanie. Struktura pakietu
+sprawdzona na sprzęcie, nie z pamięci: `conf/config.yaml` (nie
+`flink-conf.yaml` — nazewnictwo od Flink 2.x), checkpointing wyłączony
+domyślnie (`execution.checkpointing.interval` nieustawiony, wystarczy
+nie dotykać).
+
+**Tryb local/MiniCluster w sensie planu ("jeden JVM")**: nie
+`bin/start-cluster.sh` (to uruchamia JobManager i TaskManager jako
+odrębne procesy demonów — dwa JVM), ale `bin/flink run -t local` —
+CLI embeduje MiniCluster we własnym procesie na czas joba i kończy go
+po zakończeniu. To dosłownie realizuje "local, jeden JVM" z planu.
+
+Smoke test: wbudowany przykład `examples/streaming/WordCount.jar`,
+pamięć ograniczona przez `-D`: `jobmanager.memory.process.size=768m`,
+`taskmanager.memory.process.size=1024m` (razem ~1,75 GB wobec 3,7 GiB
+RAM, 0 swap).
+
+| Metryka | wartość |
+|---|---|
+| exit_code | 0 |
+| Job Runtime (Flink) | 2936 ms |
+| czas całkowity (JVM start + job) | 18,7 s |
+| peak RAM systemowy w trakcie | 568-589 MB (dwa przebiegi) |
+
+**Wniosek kroku 1**: instalacja i wykonanie trywialnego joba w trybie
+MiniCluster na Pi 400 są wykonywalne w budżecie pamięci znacznie
+niższym niż zastrzeżenie planu sugerowało — dla joba tej skali RAM nie
+jest blokerem. To NIE anuluje pozostałych trzech zastrzeżeń planu
+(jitter GC/JIT przy 360 Hz per-rekord, brak semantyki slotowej,
+nietypowa izolacja rdzenia dla całego JVM na rdzeniu 3) — smoke test
+nie mierzył per-rekord, tylko wykonywalność. Kryterium stopu kampanii
+(budżet 1 dnia roboczego) nie zostało wyczerpane; krok 1 zajął ~10 min
+łącznie z pobraniem.
+
+**Decyzja (do potwierdzenia przez prowadzącego)**: krok 2 — port
+równoważnego dataflow Pan–Tompkinsa na DataStream API i pomiar
+per-rekord — jest zasadny do podjęcia, bo krok 1 nie sfalsyfikował
+wykonalności. Pozostałe trzy zastrzeżenia planu (GC/JIT, semantyka
+slotowa, izolacja rdzenia) będą rozstrzygane dopiero na tym etapie.
+
+### Kampania baseline-flink, krok 2: równoważny dataflow Pan–Tompkinsa —
+### zastrzeżenie #2 planu (jitter JVM) POTWIERDZONE pomiarem (branch
+### experiment/20260717, commit finalny 49669ab)
+
+> **_NOTE:_** Artefakty: [results/baseline-flink/](results/baseline-flink/)
+> (`results_pantompkins.md`, `probe_flink.csv`, `PanTompkinsFlinkJob.java`,
+> `metrics.csv`, migawki stanu); skrypty: `worker/run_flink_pantompkins.sh`
+> (commit 4dd891d), poprawka bufora `a6a601c`.
+
+**Implementacja** (`config/PanTompkinsFlinkJob.java`): DataStream API,
+łańcuch operatorów BandPass→Derivative→SquareMwi→Threshold→ProbeSink
+(Tuple8, te same okna 25/5/30/180 i formuła co
+`pan_tompkins_numpy.py --mode slot`), źródło z paced `RichSourceFunction`
+(absolutne terminy slotów, identyczny wzorzec co numpy/silnik `-t`).
+Klasy legacy (`SourceFunction`/`RichSinkFunction` w pakiecie `.legacy`,
+`open(OpenContext)`) zweryfikowane na miejscu przez `javap` na
+`flink-dist-2.3.0.jar` przed napisaniem kodu — Flink 2.x przeniósł te
+API, ale ich nie usunął. Sonda w formacie `RDB_BENCH_CSV` — analiza tym
+samym `e1_stats.py`, bez zmian w narzędziu.
+
+**Odkrycie metodyczne po drodze**: `/dev/shm` czyści się między
+zamknięciami sesji SSH (znana zagadka `RemoveIPC=yes` z dnia 1,
+[K7bis](#kampania-7bis-priorytet-50--fix-4-i-diagnoza-anomalii-32-ms))
+— dwa nieudane manualne smoke testy (pliki zniknęły między poleceniami
+`ssh`), naprawione przez łączenie przygotowania danych + przebiegu +
+odczytu wyników w JEDNEJ sesji. Potwierdza regułę z K7bis: diagnostyka
+na tym sprzęcie musi być jednosesyjna.
+
+**Bug #1 znaleziony i naprawiony — `execution.buffer-timeout`**:
+domyślna wartość Flinka (100 ms, potwierdzona przez `javap` —
+`StreamExecutionEnvironment.setBufferTimeout` istnieje) opóźnia flush
+kanału między operatorami do wypełnienia bufora lub upływu timeoutu;
+przy 360 Hz (1 rekord / 2,8 ms) bufor nigdy się nie wypełnia, więc
+KAŻDY rekord czekał do 100 ms na flush — to nie własność Flinka pod
+testem, to przeoczony parametr tuningu. Fix: `env.setBufferTimeout(0)`
+(flush natychmiastowy, rekomendacja Flinka dla low-latency). Efekt
+(przebiegi diagnostyczne 20k próbek, taskset -c 3, przed/po fixie):
+p99,9 wake_lag 80,1 ms → 19,3 ms (**-76%**); mediana wake_lag bez zmian
+(~600 µs) — fix usunął jeden składnik ogona, nie floor mediany.
+
+**Diagnoza #2 — pauzy GC (log `-Xlog:gc*`, taskset -c 3, przed fixem
+buffera)**: 54 pauzy na 20 000 rekordów / 60 s przebiegu; najdłuższe:
+Full GC (Allocation Failure / Metadata GC Threshold) do **93,4 ms**,
+Young GC do **57,2 ms**. Bezpośredni dowód przyczyny ogona — nie
+hipoteza, zmierzone.
+
+**Diagnoza #3 — samo-rywalizacja `taskset` z wątkami JVM**: `taskset -c 3`
+(dyscyplina identyczna z numpy/silnikiem) zamyka na JEDNYM rdzeniu
+zarówno wątek pomiarowy, JAK I własne wątki JVM (GC, kompilator JIT) —
+inaczej niż w numpy/silniku (jeden wątek, `taskset` daje wyłączność).
+Porównanie diagnostyczne (20k próbek, bez fixu buffera): z `taskset`
+max wake_lag = 132,8 ms; bez `taskset` (JVM ma 4 rdzenie, wątki GC/JIT
+nie rywalizują z wątkiem pomiarowym) max wake_lag = **18,8 ms**
+(**-86%**) — ale mediana wake_lag praktycznie identyczna (659 µs vs
+649 µs) w obu wariantach. Wniosek: `taskset` na wielowątkowym runtime
+pogarsza NAJGORSZY przypadek (rywalizacja o rdzeń podczas GC), nie
+dotyka mediany. Decyzja: kampania oficjalna (committed) zachowuje
+`taskset -c 3` dla spójności środowiskowej z resztą eksperymentu —
+efekt ten jest udokumentowany jako ograniczenie interpretacyjne, nie
+naprawiony (naprawa wymagałaby złamania konwencji izolacji rdzenia
+wspólnej dla całego eksperymentu).
+
+**Wynik finalny (kampania oficjalna, po fixie buffera, 20 000 próbek
+@360 Hz, governor performance, taskset -c 3, BRAK SCHED_FIFO na JVM —
+patrz odstępstwo w skrypcie):**
+
+| Metryka | mediana | p99 | p99,9 | max | budżet 2777,8 µs |
+|---|---|---|---|---|---|
+| E1 (compute) | 4,7 µs | 49,1 | — | 54 714,8 | max = **1969,7%** |
+| E2E | 607,7 µs | 1231,3 | 25 470,6 | 55 745,3 | max = **2006,8%** |
+| wake_lag | 593,8 µs | 1105,2 | 24 457,2 | 52 981,6 | — |
+
+**Porównanie z numpy/silnikiem (mediany, ten sam sprzęt, @360 Hz):**
+
+| System | E1/compute mediana | wake_lag mediana | ogon max |
+|---|---|---|---|
+| Flink (krok 2) | 4,7 µs | 593,8 µs | 52 981,6 µs |
+| numpy (float64, interpretowany) | 77,0 µs | 23,2 µs | 56,1 µs |
+| silnik RetractorDB (K8/clients) | ~1865 µs (E1) | 22-23 µs | ~40 000 µs |
+
+**Wnioski dla 7.5(ii):**
+
+1. **Zastrzeżenie #1 planu (RAM) — obalone** (krok 1): instalacja i
+   wykonanie w budżecie pamięci nie stanowią problemu dla tej skali
+   joba.
+2. **Koszt czystych obliczeń (E1) — Flink WYGRYWA**: po rozgrzewce JIT
+   (20k iteracji) 4,7 µs mediana — szybciej niż numpy interpretowany
+   (77 µs) i tego samego rzędu co silnik natywny. Kompilacja JIT
+   *pomaga* w typowym przypadku, wbrew a priori intuicji planu.
+3. **Zastrzeżenie #2 planu (jitter GC/JIT) — POTWIERDZONE pomiarem,
+   liczbowo**: mediana wake_lag (594-659 µs, niezależnie od
+   `taskset`/bufora) jest **7-28× wyższa** niż numpy (23,2 µs) i
+   silnik (22-23 µs) na IDENTYCZNYM sprzęku — floor nieusuwalny naszą
+   dyscypliną środowiska, przypisywalny do samego runtime'u JVM
+   (ziarnistość `Thread.sleep`/bezpieczniki JIT), nie do GC (obecny
+   też w przebiegu z niemal zerowym wpływem pełnych GC). Ogon (max
+   53-135 ms wg wariantu) to bezpośredni, zmierzony efekt pauz GC
+   (log `-Xlog:gc`) — 9-49× budżet 2,78 ms.
+4. **Zastrzeżenie #3 planu (brak semantyki slotowej) — częściowo
+   zaadresowane implementacją** (paced source z absolutnymi terminami
+   jak numpy/silnik), ale ujawniło pochodny problem infrastrukturalny
+   (buffer-timeout) niewidoczny bez tej implementacji — sama próba
+   odtworzenia semantyki slotowej w Flinku była pouczająca.
+5. **Werdykt całościowy**: Flink na Pi 400 jest zdolny do przetwarzania
+   z medianą lepszą niż baseline numpy, ale kategorycznie NIE spełnia
+   rygoru czasu rzeczywistego przy 360 Hz — ogon p99,9/max (24,5-55,7 ms,
+   9-20× budżet) wynika ze WŁAŚCIWOŚCI RUNTIME'U (GC, ziarnistość
+   planisty JVM), nie z modelu dataflow czy naszej dyscypliny
+   środowiskowej, która zresztą w jednym wymiarze (`taskset` na
+   wielowątkowym procesie) pogarsza sytuację. To dokładnie zastrzeżenia
+   #2/#3 z planu badawczego — teraz z liczbami, nie a priori.
+
+**Kryterium stopu**: budżet 1 dnia roboczego NIE wyczerpany (kroki 1+2
+łącznie: kilka przebiegów ~60 s + diagnostyka, rząd wielkości godzin,
+nie dnia).
+
+**Decyzja prowadzącego (zamknięcie kampanii)**: kampania baseline-flink
+uznana za zamkniętą — materiał dla 7.5(ii) wystarczający, opcje
+dalszej optymalizacji (ZGC/Shenandoah, „engine-double") pozostają
+niewykorzystane, poza zakresem. Komentarz prowadzącego, wart
+odnotowania jako podsumowanie kampanii: **zaskoczenie** — dało się w
+ogóle zainstalować i uruchomić na Pi 400 w budżecie pamięci (zastrzeżenie
+#1 planu, RAM, było główną a priori obawą); **brak zaskoczenia** — Java/JVM
+nie nadaje się do rygoru czasu rzeczywistego (zastrzeżenia #2/#3 planu,
+teraz potwierdzone pomiarem, nie a priori). Worker po zamknięciu:
+brak procesów java/flink, governor przywrócony do `ondemand`.
+
+### Sekcja 7.5 (Baselines) artykułu wypełniona wynikami obu kampanii
+
+Na polecenie prowadzącego wyniki baseline-numpy i baseline-flink
+(z [results/baseline-numpy/](results/baseline-numpy/) i
+[results/baseline-flink/](results/baseline-flink/); katalog `results/`
+zostanie na koniec dnia przeniesiony do `results_20260717/`) wpisane do
+main-debs.tex i main-debs-pl.tex:
+
+- **7.5 Baselines**: nowa tabela `tab:eval-baselines` (RetractorDB /
+  NumPy per-slot / Flink @360 Hz: mediany compute, wake-lag, E2E oraz
+  max E2E) + trzy akapity: (i) numpy — czynnik ~25× przypisany modelowi
+  wykonania, nie arytmetyce wymiernej (boost::rational <0,4%
+  instrukcji), identyczny wake_lag 23 µs jako dowód porównywalności
+  środowisk, batch 709 ns/próbkę raportowany osobno; (ii) Flink —
+  mediana compute 4,7 µs najniższa z trzech (z uczciwą uwagą o jednym
+  przejściu kolejki źródło→operator w sondzie), ale floor wake_lag
+  594 µs (~26×) i ogon 25,5/55,7 ms (9–20× budżetu) przypisany logami
+  GC; odnotowane oba dostosowania (buffer-timeout=0, brak SCHED_FIFO
+  dla JVM) i efekt taskset na wielowątkowym runtime; (iii) werdykt —
+  utrzymanie osi slotów wymaga procesu podatnego na dyscyplinę RT,
+  którą oba procesy natywne spełniają, a JVM nie.
+- Zaktualizowane miejsca „baseline w toku": abstrakt (nowe zdanie
+  zamykające z werdyktem baseline'ów), wstęp, otwarcie sekcji 7
+  (jedyną zaległą częścią pozostaje 7.6 exactness/replay), akapit
+  „Performance evaluation" w Discussion (twierdzenia porównawcze
+  ograniczone do modeli wykonania na tej płytce). Komentarze TODO-EVAL
+  zawężone do części exactness.
+- Kompilacja czysta: EN 12 stron, PL 13 stron, zero ostrzeżeń LaTeX.
+- Otwarte: sekcja 7.6 (Exactness and Replay Stability) — nadal TODO,
+  czeka na kampanię exactness/replay.
+
+### Przygotowanie kampanii 7.6 — testy dymne lokalne (x86, Debug):
+### determinizm artefaktów POTWIERDZONY, round-trip rozplotu ZABLOKOWANY
+### błędem silnika
+
+Dwa testy dymne przed budową infrastruktury kampanii (scratchpad,
+poza repo; binarki z master:305506f).
+
+**7.6(a) — determinizm artefaktów: wynik pozytywny z jednym
+udokumentowanym wyjątkiem.** Wariant rec205-detect.rql z usuniętym
+VOLATILE (17 strumieni zapisywanych), 2 przebiegi × 2000 cykli,
+porównanie sha256 wszystkich artefaktów: **wszystkie pliki danych
+i `.desc` identyczne co do bitu**; różnią się wyłącznie `.meta` —
+i to dokładnie w 8 bajtach nagłówka: `metaIndexStore` zapisuje tam
+czas utworzenia (`system_clock::now()`, metaIndexStore.cc:36,
+nanosekundy epoki). Po odcięciu 8-bajtowego znacznika wszystkie
+`.meta` również identyczne. Definicja porównania dla kampanii:
+równość bitowa modulo znacznik czasu utworzenia w nagłówku `.meta`
+(do jawnego opisania w artykule).
+
+**7.6(b) — tożsamość okrężna: dwa defekty silnika znalezione przed
+kampanią.** Ustalenia po drodze: (1) odwołanie do pola przeplotu
+wymaga self-referencji (`SELECT c[0] STREAM c FROM a#b`, jak w teście
+it_operations); (2) argument `&`/`%` to Δ strumienia usuwanego —
+Δ_out = (Δ_c·x)/|Δ_c−x| (compiler.cpp, STREAM_DEHASH_*); (3) rozplot
+działa tylko na źródle DEKLAROWANYM (bufor cykliczny) — naturalny
+schemat dwufazowy: program 1 zapisuje przeplot jako artefakt,
+program 2 DECLARE z pliku artefaktu i rozplata (zgodne z
+„transmisyjnością artefaktów" z artykułu).
+
+Test kontrolowany (sa=1..N @1/16, sb=1001.. @1/8, c=sa#sb @1/24,
+wzorzec AAB): **przeplot przy różnych Δ dokładny** (c = 1,2,1001,
+3,4,1002,… — bez strat, duplikatów, przestawień). Defekty:
+
+1. **Rozplot szybszej składowej: błąd fazy o 1 pozycję.** Argument
+   1/16 odzyskuje sb DOKŁADNIE (1001,1002,…,1011 — cor:exact
+   potwierdzone dla wolniejszej składowej). Argument 1/8 zamiast
+   sa=(1,2,3,4,…) daje (2,1001,4,1002,6,1003,…) — podciąg o dobrej
+   gęstości 2/3, ale przesunięty o 1 (indeksy 1,2,4,5,… zamiast
+   0,1,3,4,…): wynik zawiera krotki OBU strumieni — wprost narusza
+   cor:exact. Podejrzenie: rozjazd floor/ceil w formułach
+   Div/Mod (SOperations.hpp: Div = i+ceil((i+1)·dA/dB); poprawne
+   pozycje szybszej składowej to i+floor(i·dA/dB)).
+2. **`&` i `%` dają identyczne wyjścia** przy tym samym argumencie
+   (testowane 4 kombinacje × 2 argumenty) — a realizują formalnie
+   różne operatory (Θ vs ~Θ).
+3. **Przeplot równych Δ (1/360 # 1/360): składowa B w całości
+   nullowa** (c = a0,0,a1,0,… zamiast a0,b0,a1,b1,…) — degeneracja
+   w torze STREAM_HASH przy Δa=Δb (przypadek „perfect shuffle",
+   formalnie objęty def:interleave).
+
+**Wniosek: kampania 7.6(b) na workerze jest zablokowana do czasu
+naprawy rozplotu w silniku** (kandydat: fix #6, SOperations.hpp /
+tor STREAM_DEHASH). 7.6(a) jest gotowe do wykonania. Decyzja o
+naprawie rdzenia — do prowadzącego.
+
+### Fix #6 — przeplot/rozplot zgodny z definicjami formalnymi
+### (decyzja prowadzącego: naprawić i pokryć testem; wskazówka
+### prowadzącego: stary test soperations mógł być błędny — potwierdzona)
+
+Diagnoza pełna (trzy współdziałające defekty toru `#`/`&`/`%`):
+
+1. **`Hash` (SOperations.hpp) używał Δ_c zamiast z** = Δb/(Δa+Δb)
+   w formułach retPos — maskowane w starym teście jednostkowym przez
+   Δa=1 (wtedy Δ_c == z liczbowo). Wskazówka prowadzącego trafna:
+   tabela oczekiwań `divmod_operations` była drukowana z implementacji
+   (`std::cout` w pętli testu), choć akurat Div/Mod zgadzały się
+   z definicjami Θ/~Θ — błędne były miejsca WYWOŁAŃ.
+2. **dataModel wołał Hash 1-bazowo** (`count+1`) i traktował wynik
+   (indeks postępujący składowej) jak offset WSTECZNY (`revRead`),
+   który dla źródeł deklarowanych był w dodatku ignorowany
+   (`getPayload` pomija `revRead` dla declared) — stąd „działające"
+   przeplatanie deklaracji (przypadkowa poprawność przez kadencję
+   prefetch) i zerowe wyniki dla źródeł pochodnych.
+3. **DEHASH dostawał `lengthOfSrc`** (licznik rekordów ŹRÓDŁA) zamiast
+   0-bazowego indeksu rekordu WYJŚCIOWEGO, przez co offsety zawsze
+   wypadały poza zakres → całe wyjście null.
+
+Naprawa (6 plików): `Hash` na z (wzór z def:interleave); nowy
+`dataModel::fetchForward` — konwersja indeksu postępującego na offset
+wsteczny względem bieżącego licznika źródła (odporna na kadencję
+prefetch), historia deklaracji czytana z bufora cyklicznego **bez
+mutacji** bieżącego payloadu (nowe akcesory `storage::history/
+historySize`), rekord all-null przy niedostępności; wywołania HASH
+i DEHASH 0-bazowo; pojemność historii źródeł `#`/`&`/`%` podnoszona
+w kompilatorze do stałej `kJunctionHistory=4` (offset wsteczny jest
+stały w rekordach niezależnie od proporcji Δ — inaczej niż w AGSE,
+gdzie lookback rośnie z oknem; pytanie prowadzącego o wyliczanie
+zamiast stałej rozstrzygnięte wyprowadzeniem w komentarzu).
+
+**Ustalenie semantyczne**: Θ (`&`) jest w silniku z natury
+nieprzyczynowa — a_n = c_{n+⌈(n+1)Δa/Δb⌉} powstaje PO slocie n —
+realizacja przyczynowa opóźnia Θ o jeden slot (rekord 0 = all-null,
+poprawnie oznaczony w `.meta`; potem dokładnie a_0, a_1, …). ~Θ (`%`)
+jest dokładna od rekordu 0.
+
+Weryfikacja (wzorce liczone z definicji, nie z implementacji):
+- jednostkowo: `hash_operations_nonunit_delta` (wyłapuje stary błąd
+  z↔Δ_c), `hash_operations_equal_delta` (perfect shuffle),
+  `divmod_inverts_hash` (własność cor:exact: Div/Mod trafiają
+  w gałąź A/B Hash z tym samym indeksem; 4 pary delt × 200 pozycji);
+- integracyjnie: nowy `it_deinterleave_roundtrip` (1/16#1/8 → `&`/`%`,
+  porównanie bitowe c/a2/b2 z wzorcami z definicji);
+- scenariusze ręczne: dwufazowy round-trip EKG (równe Δ, DECLARE
+  z artefaktów): c = b0,a0,b1,a1,…; **a2[1:] == a i b2 == b co do
+  bitu**; jednoprogramowy nierówny (deklaracje): dokładny.
+- testy: **153/153** (152 stare + nowy; zmiana fazy przeplotu na
+  zgodną z definicją nie psuje żadnego istniejącego testu).
+
+**Znane ograniczenie (poza zakresem fixu #6, kandydat na fix #7):**
+przeplot źródeł POCHODNYCH (SELECT→`#`) emituje null tam, gdzie
+element składowej nie istnieje jeszcze w chwili slotu c — planista
+daje c sloty zanim producenci wykonają swoje (kolejność wykonania
+sortowana po rInterval rosnąco + nadmiarowe wczesne sloty c);
+kampania 7.6 nie jest tym dotknięta (schemat dwufazowy przez
+artefakty — zgodny z „transmisyjnością artefaktów" z artykułu).
+Odnotowano też pokrewny trop: `STREAM_TIMEMOVE` (operator `>`)
+na źródle deklarowanym ignoruje offset (ta sama ścieżka getPayload)
+— do osobnego zbadania.

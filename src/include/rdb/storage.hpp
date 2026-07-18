@@ -116,6 +116,12 @@ class storage {
   [[nodiscard]] size_t getRecordsCount() const;
   bool descriptorFileExist();
 
+  /// @brief Rekord historii źródła deklarowanego (0 = najnowszy) bez mutacji bieżącego payloadu.
+  [[nodiscard]] const payload &history(size_t recordIndexFromBack) const { return buffer_.history(recordIndexFromBack); }
+
+  /// @brief Liczba rekordów dostępnych w historii bufora źródła deklarowanego.
+  [[nodiscard]] size_t historySize() const { return buffer_.size(); }
+
   [[nodiscard]] bool isDeclared() const;
 
   void setCapacity(int capacity);

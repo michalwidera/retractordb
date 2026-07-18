@@ -692,6 +692,10 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
 }
 
 std::map<std::string, int> compiler::computeRequiredCapacities() {
+  // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) — stała
+  // w jednostkach rekordów, patrz komentarz przy STREAM_HASH poniżej.
+  constexpr int kJunctionHistory = 4;
+
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
   for (auto &q : coreInstance) {       // for each declaration
@@ -747,8 +751,22 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
       } break;
       case STREAM_HASH:
+        // Przeplot/rozplot czytają elementy składowych po indeksie
+        // postępującym (fetchForward), konsumując je w tempie produkcji
+        // źródła — offset wsteczny nie zależy od proporcji delt (inaczej niż
+        // w AGSE, gdzie lookback rośnie z długością okna): najstarszy
+        // potrzebny rekord to bieżący element składowej, cofnięty najwyżej
+        // o jeden okres źródła (<=1) + prefetch źródła deklarowanego (+1);
+        // kJunctionHistory = bound 2 + margines 2.
+        capMap[arg1] = std::max(capMap[arg1], kJunctionHistory);
+        capMap[arg2] = std::max(capMap[arg2], kJunctionHistory);
+        break;
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
+        // Rozplot: jak wyżej, historia tylko dla strumienia rozplatanego
+        // (arg2 to argument wymierny, nie strumień).
+        capMap[arg1] = std::max(capMap[arg1], kJunctionHistory);
+        break;
       case STREAM_ADD:
       case STREAM_SUBTRACT:
       case STREAM_AVG:
