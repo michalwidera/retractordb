@@ -1523,6 +1523,79 @@ już zlokalizowany): (1) ftrace/osnoise wokół okna attach; (2) przegląd
 (3) kandydat poprawki i powtórka S2 z oczekiwanym zniknięciem drugiej
 serii; (4) osobno: przesunięcie kotwicy pętli za rtActivate (usuwa
 transjent startowy z metryk). Wtedy decyzja o squash do mastera
-(REQUIREMENTS pkt 23, wyjątek). Artykuł: rozdział 7 kompletny;
+(REQUIREMENTS pkt 23, wyjątek).
+
+## 2026-07-18 — Faza 2: mechanizm POTWIERDZONY ilościowo (badanie S3
+## mlock-variant); ftrace zbędny — rozstrzygnęły dane sondy
+
+### Ustalenie wstępne bez tracingu
+
+Ponowna analiza danych S2 (sloty wokół początku drugiej serii)
+rozstrzygnęła mechanizm szybciej niż planowany ftrace: w każdym
+powtórzeniu slot POPRZEDZAJĄCY serię ma **czyste wake (0,03 ms) i
+czysty compute (~2 ms), ale e2e = 41,9–42,2 ms**. Stall siedzi więc
+wewnątrz `boradcast()` wątku przetwarzającego — między końcem
+processRows() a końcem emisji: to pierwsza emisja do świeżo
+zarejestrowanego klienta, czyli `message_queue(open_only)`
+(executorsm.cpp:503) — shm_open+mmap segmentu kolejki. Rozmiar
+segmentu potwierdzony na workerze: **3,77 MB** (3600 komunikatów
+× 1 KB + indeks; bufor 10 s × 360 Hz). Kolejne sloty serii to czyste
+doganianie (wake dziedziczy spóźnienie, maleje o budżet−compute).
+
+### Badanie S3 (mlock-variant): warianty RDB_MLOCKALL, 3×3 przebiegi
+
+Na branchu dodano przełącznik `RDB_MLOCKALL` w rtActivate
+(populate = status quo / onfault = MCL_ONFAULT / off = bez mlockall;
+zmiana funkcjonalna za zgodą poluzowanego pkt 23). Silnik @360 Hz,
+5000 próbek, klient po 2 s; wyniki
+[results/40ms/study_mlock-variant/](results/40ms/study_mlock-variant/)
+na branchu:
+
+| wariant | max e2e przy attach | zdarzeń wake≥5 ms | szczyt serii |
+|---|---|---|---|
+| populate (3 przebiegi) | 42,0–42,5 ms | 44–47 | 39,1–40,2 ms |
+| onfault (3 przebiegi) | 17,3–17,4 ms | 14–16 | 14,3–14,5 ms |
+| off (3 przebiegi) | 17,3 ms | 14 | 14,4 ms |
+
+Polityki wątków (ps -eLo w trakcie biegu): wątek przetwarzający
+**FF/50**, wątek komunikacyjny **TS**, oba na rdzeniu 3 — zgodnie z
+hipotezą z Fazy 0 (sched_setscheduler(0,…) obejmuje tylko wątek
+wywołujący).
+
+### Werdykt Fazy 2
+
+1. **Populacja stron pod MCL_FUTURE potwierdzona jako składnik
+   dominujący**: ~25 ms z 42 ms (60%) znika po MCL_ONFAULT;
+   identyczność wariantów onfault i off (17,3 ms co do dziesiątych!)
+   dowodzi, że reszta nie ma związku z mlockall.
+2. **Rezydualne ~17,3 ms** to koszt samego otwarcia/konstrukcji
+   kolejki w torze emisji wątku FIFO (shm_open+mmap 3,77 MB +
+   pierwszy try_send; kandydat na wyjaśnienie: inicjalizacja indeksu
+   segmentu przez wątek komunikacyjny pod muteksem kolejki w shm —
+   boost::interprocess bez dziedziczenia priorytetów — do
+   potwierdzenia ftrace, jeśli będzie potrzebne).
+3. Wniosek do poprawki docelowej (Faza 3): **MCL_ONFAULT jest
+   konieczny, ale niewystarczający** — 17,3 ms nadal łamie budżet
+   2,78 ms. Pełna poprawka = wyprowadzenie otwarcia/tworzenia kolejki
+   poza tor emisji wątku RT (pre-otwarcie w wątku komunikacyjnym przy
+   rejestracji `show` + przekazanie uchwytu do id2Queue_Cache, z
+   synchronizacją dostępu) + MCL_ONFAULT; osobno przesunięcie kotwicy
+   pętli za rtActivate (transjent startowy).
+
+### Incydenty metodyczne (odnotowane zgodnie z regułą)
+
+- **Fałszywy FAIL guardu binarki (2×)**: `strings | grep -q` pod
+  `set -o pipefail` — grep -q zamyka potok po trafieniu, strings
+  dostaje SIGPIPE (kod 141), pipefail uznaje potok za nieudany.
+  Poprawka: grep bezpośrednio na pliku binarnym (commit 4eda822).
+- **Samoaktualizacja skryptu w trakcie wykonania**: run_40ms_phase2.sh
+  robi `git reset --hard` będąc uruchomionym ze zresetowanego pliku —
+  bash kontynuował STARĄ wersję (stary inode), więc poprawka guardu
+  nie weszła przy drugim podejściu. Obejście: aktualizacja brancha na
+  workerze PRZED wywołaniem skryptu (tak robi start_supervisor.sh —
+  wzorzec do zachowania).
+
+Faza 2 zamknięta. Decyzja do podjęcia: implementacja poprawki
+docelowej (Faza 3) i po jej walidacji squash brancha do mastera. Artykuł: rozdział 7 kompletny;
 poza zakresem procesu pozostają TODO-ANON/TODO-CCS/TODO-TITLE
 (kwestie redakcyjne submisji, nie pomiarów).
