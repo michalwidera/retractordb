@@ -1709,3 +1709,51 @@ Hipotezy przed startem (do weryfikacji, nie do potwierdzenia):
 - Otwarte: zachowanie @720/1080 Hz — budżet slotu 1,39/0,93 ms jest
   ciaśniejszy niż koszt ~0,5 ms zdarzeń resztkowych; tu poprawka może
   zmienić liczbę przekroczeń budżetu, nie tylko ogon bezwzględny.
+
+### Werdykt powtórki kampanii (2026-07-18, wieczór)
+
+Obie kampanie przebiegły bez incydentów (rate ~18 min z buildem
+z brancha, clients ~25 min; restart workera między badaniami oraz
+dodatkowy ręczny restart między kampaniami — nadzorca nie restartuje
+po ostatnim badaniu kampanii). Wyniki na masterze
+w results/{rate,clients} (squash f461529).
+
+Weryfikacja hipotez:
+
+- **H-R1 POTWIERDZONA** — stan ustalony nietknięty: compute mediana
+  @360 Hz 1880–1962 µs (poprzednio 1888–1949), wake_lag mediana
+  22,4–24,0 µs (poprzednio 22,4–23,6). Różnice w szumie między biegami.
+- **H-R2 POTWIERDZONA** — @360 Hz (1 klient): E2E p99,9
+  38 061 → **2692 µs** (w budżecie slotu 2777,8 µs!), max
+  49 169 → **3251 µs** (117% budżetu); wake_lag p99,9
+  35 641 → **471 µs**, max 47 235 → **939 µs**. W surowych danych
+  ZERO slotów z wake_lag lub E2E ≥ 5 ms w całych przebiegach
+  (4×19 999 slotów @360 Hz łącznie z kampanią clients).
+- **H-R3 POTWIERDZONA** — clients 1/2/3: E2E p99,9 =
+  2789/2845/2877 µs (poprzednio 37,5/65,9/105,5 ms). Ogon przestał
+  skalować się z liczbą klientów — zależność ×N zniknęła wraz
+  z przyczyną (attach nie wnosi już zdarzenia). Mediany rosną
+  śladowo (E2E +4% przy 3 klientach), jak poprzednio.
+- **Kwestia otwarta @720/1080 Hz rozstrzygnięta trywialnie**: compute
+  mediana 1838/1845 µs > budżet 1389/926 µs — nasycenie i liniowa
+  dywergencja osi czasu jak w 2026-07-16; fix #7 niczego tu nie
+  zmienia (i nie miał zmienić). Przepustowość unpaced 518–527
+  próbek/s (poprzednio 508–548).
+
+Obserwacja poboczna (poza zakresem, do ewentualnego osobnego
+śledztwa): w reżimie NASYCONYM (720/1080 Hz) występują periodyczne
+sloty compute ~43–45 ms co ~477–500 slotów (~1 s czasu ściennego).
+Zjawisko widoczne identycznie w danych starej kampanii
+(results_20260716/rate/rotated/10/study_02: 29 takich slotów, max
+43,9 ms) — istniało przed fix #7 i nie dotyczy reżimu RT (nasycenie
+jest poza kontraktem czasu rzeczywistego; artykuł raportuje dla
+skalowanych częstości tylko medianę/p99 compute). Odnotowane, nie
+badane.
+
+Konsekwencja dla artykułu: tabele 7.2 (tab:eval-360, tab:eval-rate),
+7.3 (tab:eval-clients) i wiersz RetractorDB w 7.5
+(tab:eval-baselines) do podmiany na nowe wartości; narracja o ogonie
+z "nierozwiązany" na "zdiagnozowany i wyeliminowany (fix #7)";
+twierdzenie RT wzmacnia się z "budżet do p99" na "budżet do p99,9
+włącznie" @360 Hz. Branch experiment/20260718_40ms squashowany do
+mastera i usunięty; worker wraca na master.
