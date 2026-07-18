@@ -1159,3 +1159,120 @@ artefakty — zgodny z „transmisyjnością artefaktów" z artykułu).
 Odnotowano też pokrewny trop: `STREAM_TIMEMOVE` (operator `>`)
 na źródle deklarowanym ignoruje offset (ta sama ścieżka getPayload)
 — do osobnego zbadania.
+
+Fix #6 przeniesiony na master cherry-pickiem (e87b9ab; konflikt tylko
+w JOURNAL.md — master nie miał wpisów dnia 2 — rozwiązany wersją
+z brancha eksperymentu); pełny zestaw testów na masterze: 153/153.
+
+---
+
+## 2026-07-18 — dzień 3: kampania exactness (7.6)
+
+### Rano — domknięcie dnia 2 i przygotowanie kampanii
+
+- Rotacja wyników dnia 2 (zapowiedziana przez prowadzącego):
+  `results/baseline-{numpy,flink}` → [results_20260717/](results_20260717/)
+  (commit ec9c62d na branchu experiment/20260717).
+- Dzień 2 scalony do master squashem (fd221d6) — wzorzec z dnia 1;
+  master zawiera fix #6, wyniki baseline w results_20260717/ i dziennik.
+- Infrastruktura kampanii exactness na master (27880d2), zgodnie
+  z planem badawczym „Część dla 7.6" (REQUIREMENTS.md): trzy badania —
+  A replay (2× potok QRS z zapisem WSZYSTKICH 17 strumieni, porównanie
+  bitowe artefaktów; `.meta` po odcięciu 8-bajtowego znacznika czasu
+  utworzenia), B round-trip przeplotu/rozplotu na kanałach EKG
+  (cor:exact, schemat dwufazowy przez artefakty — rozplot wymaga
+  źródła deklarowanego), C referencja float
+  ([config/resample_roundtrip.py](config/resample_roundtrip.py):
+  scipy `resample_poly` i `resample`, round-trip 360→720→360 Hz,
+  normy błędu pełna/wnętrze w funkcji N z siatki 1250…650000).
+- Decyzja metodyczna: przebiegi unpaced (bez `-t`) — mierzoną
+  własnością jest równość bitowa, nie czas; dyscyplina środowiska
+  (governor performance, taskset -c 3, /dev/shm) utrzymana dla
+  spójności z kampaniami dni 1–2.
+- Branch experiment/20260718 utworzony z master (zgodnie z pkt 23:
+  master zsynchronizowany z origin na obu maszynach); worker
+  zsynchronizowany, kampania uruchomiona przez
+  [worker/run_exactness.sh](worker/run_exactness.sh) (rebuild
+  Release+probe z fixem #6 + 3 badania + commit konwencją amend).
+- Smoke test referencji float lokalnie (x86): `resample_poly` ma błąd
+  strukturalny (wnętrze max ~0,5, RMS ~0,11 jednostki ADC; brzegi do
+  ~184), `resample` (FFT) schodzi do błędu zaokrągleń float64
+  (~1e-13), który rośnie z N — obie metody NIEZEROWE wobec dokładnego
+  zera silnika. Liczby do artykułu wyłącznie z workera (przypięte
+  wersje: python 3.12.3, numpy 1.26.4, scipy 1.11.4).
+- Dodatkowo przygotowany przebieg lokalny x86 (te same parametry:
+  rec205, 20 000 próbek, exactness-replay.rql) — hashe artefaktów do
+  testu równości MIĘDZYPLATFORMOWEJ (x86-64 vs aarch64) po zakończeniu
+  kampanii na workerze.
+
+### Przebieg 1 kampanii: A=OK, B=fałszywy FAIL (błąd weryfikatora,
+### nie silnika) — incydent metodyczny odnotowany zgodnie z regułą
+
+Badanie A (replay) na workerze: **OK** — wszystkie pliki danych,
+`.desc` i `.shadow` obu przebiegów identyczne; `.meta` identyczne po
+odcięciu 8-bajtowego znacznika czasu utworzenia (klasyfikacja
+IDENT-PO-TIMESTAMP w replay_compare.txt).
+
+Badanie B zgłosiło FAIL, ale sprawdzenia merytoryczne PRZESZŁY
+(a2[1:]==a i b2==b co do bitu na danych workera); pękło pomocnicze
+sprawdzenie wzorca c po stronie nieparzystej. Diagnoza reprodukcją
+lokalną w tej samej skali: **zero niezgodności w danych** — błąd był
+w mojej formule weryfikatora (w 39995 rekordach c pozycji
+nieparzystych jest 19997, porównanie brało `len(c)-n`=19998 elementów;
+`np.array_equal` na różnych długościach zwraca False). Poprawka
+runnera (porównania na wspólnych prefiksach, commit ddfbd34 na master,
+cherry-pick 526d510 na branch), kampania powtórzona w całości.
+
+### Równość międzyplatformowa artefaktów (x86-64 ↔ aarch64) — BONUS
+
+Porównanie hashów badania A z workera (aarch64, Release+probe,
+GCC Ubuntu 24.04) z przebiegiem lokalnym x86-64 (Debug, GCC 15.2),
+identyczne parametry: **51/51 artefaktów identycznych co do bitu**
+(17 strumieni: dane + .desc + .shadow oraz .desc deklaracji).
+Uwaga prowadzącego (zasadna a priori): różnice mogłyby wynikać
+z odmiennego wyrównania niepakowanych struktur x86 vs ARM — nie
+manifestują się, bo artefakty nie są zrzutami struktur C++: layout
+rekordu definiuje Descriptor (jawne rozmiary pól, getSizeInBytes),
+a obie platformy są little-endian LP64. Ustalenie wzmacnia tezę
+o transmisyjności artefaktów między maszynami (sekcja System
+artykułu) i jest warte zdania w 7.6.
+
+### Przebieg 2 kampanii: A=OK, B=OK — kampania exactness ZAMKNIĘTA
+
+> **_NOTE:_** Artefakty: [results/exactness/](results/exactness/)
+> (results.md, replay_hashes_run1/2.txt, replay_compare.txt,
+> roundtrip_compare.txt, float_roundtrip.csv, metrics.csv, migawki
+> stanu); commit 4f312ef na branchu experiment/20260718.
+
+Wyniki (worker: aarch64 Release GCC 14.2.0, binarka 526d510;
+python 3.12.3, numpy 1.26.4, scipy 1.11.4 — wersje przypięte):
+
+**A — stabilność odtwarzania**: dwa przebiegi potoku QRS (20 000
+próbek, 17 strumieni zapisywanych) → 67 artefaktów: 51 (dane, .desc,
+.shadow) **identycznych co do bitu**, 16 `.meta` identycznych po
+odcięciu 8-bajtowego znacznika czasu utworzenia w nagłówku — jedyne
+niedeterministyczne bajty, jakie silnik zapisuje. Plus równość
+międzyplatformowa (wpis wyżej): te same artefakty na x86-64 i aarch64.
+
+**B — tożsamość okrężna (cor:exact)**: c = a#b (39 995 rekordów
+@720 Hz) odtwarza wzorzec definicji przeplotu dokładnie po obu
+stronach (parzyste==b: 19 998, nieparzyste==a: 19 997); rozplot:
+**a2[1:] == a i b2 == b co do bitu** (Θ z jednoslotowym opóźnieniem,
+rekord 0 all-null oznaczony w .meta; ~Θ dokładna od rekordu 0).
+
+**C — kontrast float** (round-trip 360→720→360 Hz, MLII, float64):
+- `resample_poly` (FIR polifazowy): błąd WNĘTRZA strukturalny
+  i niezależny od długości (RMS ≈ 0,111 jedn. ADC, max 0,39–0,64);
+  brzegi do 184,4 jedn. (pełny max stały, pełny RMS maleje z N tylko
+  przez rozcieńczenie efektu brzegowego: 6,21 → 0,30).
+- `resample` (FFT): błąd na poziomie zaokrągleń float64, ale NIEZEROWY
+  i ROSNĄCY z długością nagrania: max |err| 5,68e-13 (N=1250) →
+  1,36e-12 (N=650 000); RMS ~2e-13 ≈ względnie ~2e-16.
+- Silnik: błąd ≡ 0 potwierdzony jako równość BITOWA, nie jako małe
+  residuum numeryczne.
+
+Bilans kampanii: wszystkie trzy badania rozstrzygnięte za pierwszym
+kompletnym przebiegiem (drugi przebieg = powtórka po fałszywym FAIL
+weryfikatora); dodatkowy wynik ponadplanowy — równość
+międzyplatformowa artefaktów. Sekcja 7.6 artykułu może zostać
+wypełniona; po niej w Performance Evaluation nie zostaje żaden TODO.
