@@ -32,7 +32,7 @@
 #
 # SCHED_FIFO: proces sam próbuje os.sched_setscheduler(FIFO,50); bez uprawnień
 # degraduje się miękko (jak xretractor bez setcap), a runner może nadać
-# politykę z zewnątrz przez `sudo -n chrt -f 50 -p <pid>` w czasie fazy
+# politykę z zewnątrz przez `sudo -n chrt -f -p 50 <pid>` w czasie fazy
 # --settle (dlatego pętla pomiarowa startuje z opóźnieniem).
 #
 # Stan początkowy okien: zera (jak ref_float.py). Silnik emituje na brzegu
@@ -100,7 +100,7 @@ def run_slot(mlii, v1, bp, d, rate_hz, samples, probe_path, sink_path, settle_s)
     sink = open(sink_path, "w", encoding="utf-8")
     probe = np.empty((samples, 4), dtype=np.int64)
 
-    # Faza settle: okno czasowe dla runnera na `sudo -n chrt -f 50 -p <pid>`.
+    # Faza settle: okno czasowe dla runnera na `sudo -n chrt -f -p 50 <pid>`.
     print(f"PID {os.getpid()}", flush=True)
     time.sleep(settle_s)
     report_env(rate_hz, samples)

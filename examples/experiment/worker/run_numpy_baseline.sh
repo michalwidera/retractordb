@@ -13,7 +13,7 @@
 # Dyscyplina srodowiska identyczna z kampaniami QRS: dane wylacznie w /dev/shm
 # (pkt 17/18), governor performance (przywracany trapem), taskset -c 3 dla
 # procesu mierzonego, sampler metryk na 0-2, SCHED_FIFO 50 nadawane przez
-# `sudo -n chrt -f 50 -p <pid>` w fazie settle procesu Pythona (odpowiednik
+# `sudo -n chrt -f -p 50 <pid>` w fazie settle procesu Pythona (odpowiednik
 # sciezki setcap dla xretractor: proces biegnie jako zwykly uzytkownik,
 # wlasnosc plikow bez zmian; brak sudo = miekka degradacja, odnotowana
 # w META w results.md).
@@ -162,9 +162,16 @@ timeout "${RUN_TIMEOUT}s" $PIN_XR python3 "$PIPELINE" \
 PYPID=$!
 
 # Nadanie SCHED_FIFO 50 z zewnatrz w fazie settle (wlasnosc plikow bez zmian).
-sleep 1
-if sudo -n chrt -f 50 -p "$PYPID" 2>/dev/null; then
-  log "SCHED_FIFO 50 nadane procesowi slot (pid $PYPID)"
+# $PYPID to pid timeout/taskset, nie interpretera — wlasciwy pid Python drukuje
+# jako "PID <n>" przed settle; chrt na zly pid nie dziedziczy sie na dziecko.
+PY_REAL_PID=""
+for _ in $(seq 1 20); do
+  PY_REAL_PID=$(awk '/^PID /{print $2; exit}' "$WORKDIR/slot_stdout.log" 2>/dev/null)
+  [ -n "$PY_REAL_PID" ] && break
+  sleep 0.2
+done
+if [ -n "$PY_REAL_PID" ] && sudo -n chrt -f -p 50 "$PY_REAL_PID" 2>/dev/null; then
+  log "SCHED_FIFO 50 nadane procesowi slot (pid $PY_REAL_PID)"
 else
   log "UWAGA: chrt nieudane -- tryb slot pobiegnie na SCHED_OTHER (odnotowane w META)"
 fi
