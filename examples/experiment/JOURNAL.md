@@ -1319,6 +1319,42 @@ fix #7 (przeplot źródeł pochodnych — planista), STREAM_TIMEMOVE na
 źródle deklarowanym, śledztwo zdarzenia platformowego ~40 ms,
 eksperyment na SSD (pkt 18).
 
+### Korekta interpretacji ogona ~40 ms w artykule (po zamknięciu pomiarów)
+
+Przegląd rzetelnościowy main-debs.tex wykazał, że artykuł przypisywał
+ogon p99,9 (~40 ms) platformie (firmware/SoC) zbyt stanowczo: śledztwo
+jest formalnie otwarte (patrz wyżej), a baseline float64 — taktowany
+identycznie na tym samym izolowanym rdzeniu — nie zaobserwował ani
+jednego takiego zdarzenia w 20 000 slotów (max E2E 368,6 µs), czego
+nie da się pogodzić z czysto platformową atrybucją bez dodatkowych
+badań. Symetrycznie: zdanie abstraktu o Flinku ("misses the slot
+regime by an order of magnitude in its latency tail") było podatne na
+kontrę własną Tabelą 5 (ogon silnika 38/49 ms jest tego samego rzędu
+co 25,5/55,7 ms Flinka; p99 Flinka mieści się w budżecie).
+
+Poprawki (main-debs.tex + main-debs-pl.tex, EN 13 str. / PL 14 str.,
+bibliografia EN nadal od s. 12, kompilacja czysta):
+
+- abstrakt: różnicą wobec Flinka jest teraz próg pobudki ~26× i ogon
+  GC pochodzący z samego środowiska uruchomieniowego, nie "rząd
+  wielkości w ogonie";
+- 7.2: atrybucja ogona przeformułowana na hipotezę (kandydat:
+  platforma; kontrargument: czysty przebieg float64; nie można
+  wykluczyć interakcji z torem emisji) — przyczyna jawnie
+  "nierozstrzygnięta";
+- 7.3: "zdarzenie platformowe" → "zdarzenie ogonowe z 7.2";
+  ograniczenie "na poziomie platformy" → "badanej konfiguracji, do
+  czasu rozstrzygnięcia przyczyny";
+- 7.5 (Flink): dopisane uczciwe zdanie, że ogony obu systemów są tego
+  samego rzędu, a różnica leży w pochodzeniu (GC potwierdzone logami
+  vs zdarzenia o nieustalonej przyczynie) i w progu pobudki;
+- Limitations: "platform events" → zdarzenia o nierozstrzygniętej
+  przyczynie z odsyłaczem do 7.2.
+
+Wniosek metodyczny: fix #7-adjacent — śledztwo zdarzenia ~40 ms (pkt
+"otwarte kandydatury" wyżej) zyskuje na priorytecie, bo od jego wyniku
+zależy siła argumentacji porównawczej artykułu.
+
 Stan maszyn na zamknięciu: worker (pi400) — governor przywrócony,
 brak procesów pomiarowych, repo do przełączenia na master; nadzorca —
 master zsynchronizowany z origin. Artykuł: rozdział 7 kompletny;
