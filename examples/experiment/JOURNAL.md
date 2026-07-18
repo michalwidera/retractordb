@@ -1357,6 +1357,88 @@ zależy siła argumentacji porównawczej artykułu.
 
 Stan maszyn na zamknięciu: worker (pi400) — governor przywrócony,
 brak procesów pomiarowych, repo do przełączenia na master; nadzorca —
-master zsynchronizowany z origin. Artykuł: rozdział 7 kompletny;
+master zsynchronizowany z origin.
+
+---
+
+## 2026-07-18 — Śledztwo zdarzeń ~40 ms: plan i start Fazy 0
+
+Otwarcie odrębnego procesu badawczego (poza zamkniętym eksperymentem
+wydajnościowym): ustalenie pierwotnej przyczyny rzadkich zdarzeń
+30–50 ms w wake_lag (ogon p99,9 silnika; wpisy z dni 1–2 oraz korekta
+interpretacji w artykule wyżej). Od wyniku zależy siła argumentacji
+porównawczej artykułu (7.2/7.5).
+
+### Co już wiemy (przesłanki wyjściowe)
+
+- zdarzenia trafiają w fazę uśpienia (wake_lag), maksimum compute czyste;
+- przetrwały isolcpus/nohz_full/rcu_nocbs — to nie zwykły szum planisty;
+- baseline NumPy (identyczne taktowanie, ten sam rdzeń, sampler metryk
+  aktywny) — ZERO zdarzeń w 20 000 slotów (max E2E 368,6 µs);
+- p99,9 skaluje się ~liniowo z liczbą klientów (tor emisji);
+- odstępy między zdarzeniami 0,9–2,6 s (dzień 1).
+
+Hipotezy: H1 platforma system-wide (firmware/SoC/mmc/magistrala);
+H2 aktywność własna silnika (IPC boost::interprocess → mmap/IPI TLB
+shootdown, zapisy tmpfs → kworker per-cpu, logi); H3 interakcja
+(np. sampler/WiFi × silnik). Przesłanka NumPy mocno osłabia czyste H1.
+
+### Plan (fazy)
+
+- **Faza 0 — dyskryminacja bez zmian w silniku (ten wpis):**
+  S1 pacer-solo — proces-cień (taktowana pętla bez pracy, FIFO 50) SAM
+  na rdzeniu 3, 200 000 slotów (~9 min): czy platforma bez silnika
+  generuje zdarzenia ≥ 5 ms? S2 engine-shadow — silnik (konfiguracja
+  kampanii rate, 1 klient) na rdzeniu 3 + cień na rdzeniu 2, 5×20 000
+  próbek: czy zdarzenia silnika widzi równocześnie niezależny proces na
+  sąsiednim rdzeniu? Wokół przebiegów: snapshoty /proc/interrupts i
+  /proc/softirqs (delta IPI/CAL = ślad TLB shootdown), dmesg.
+  Kryteria werdyktu: cień widzi zdarzenia ≈ jak silnik → H1; cień
+  czysty przy zdarzeniach silnika → H2 (z zastrzeżeniem stalli
+  per-rdzeń — rozstrzyga Faza 2). Koincydencja czasowa w Fazie 0 tylko
+  zgrubna (kotwica silnika znana z widełek launch/exit — sonda nie
+  zapisuje czasu bezwzględnego, a silnika nie zmieniamy).
+- **Faza 1 — ablacja silnika (jedna zmienna na raz):** 0 klientów →
+  wszystkie strumienie VOLATILE → logi/CSV poza SD → WiFi off (SSH po
+  eth) → bez samplera. Zniknięcie zdarzeń po przełączniku = trigger.
+- **Faza 2 — instrumentacja jądra:** tracer osnoise/hwlat; trace-cmd
+  z wyzwalanym snapshotem (sonda przy wake_lag > 5 ms → trace_marker);
+  liczniki IPI/CAL; audyt mlockall/majflt; wtedy też dokładna
+  koincydencja czasowa.
+- **Faza 3 — domknięcie:** poprawka silnika (jeśli H2; oczekiwany
+  spadek p99,9 o ~2 rzędy) albo udokumentowana atrybucja platformowa
+  (jeśli H1) → aktualizacja main-debs.tex 7.2/7.5 z dowodem zamiast
+  hipotezy.
+
+### Decyzje procesowe (odstępstwo od reguł eksperymentu wydajnościowego)
+
+- Branch **experiment/40ms** ZAWIERA skrypty badawcze (potencjalnie
+  ślepa uliczka — dlatego nie na masterze, w odróżnieniu od
+  poprzednich eksperymentów, gdzie branch niósł wyłącznie wyniki).
+  REQUIREMENTS.md pkt 23 poluzowany datowanym wyjątkiem; worker buduje
+  binarki Z BRANCHA eksperymentu, nie z mastera.
+- Jeśli przyczyna zostanie jednoznacznie ustalona — branch będzie
+  squashowany i dołączony do mastera; jeśli śledztwo utknie — zostaje
+  niezmergowany jako udokumentowana ślepa uliczka.
+
+### Infrastruktura Fazy 0 (dodana na branchu)
+
+- `config/shadow_pacer.py` — proces-cień: absolutne deadline'y na
+  CLOCK_MONOTONIC, mechanizm taktowania identyczny z
+  pan_tompkins_numpy.py (porównywalność z opublikowanym baselinem),
+  protokół "PID + settle + sudo chrt -f -p 50" jak w
+  run_numpy_baseline.sh, SIGTERM = partial dump.
+- `config/analyze_40ms.py` — percentyle, zdarzenia ≥ progu, odstępy,
+  zgrubna koincydencja (z jawnie raportowaną tolerancją), werdykt.
+- `worker/run_40ms_phase0.sh` — badania S1/S2 w konwencji
+  run_study.sh (governor, snapshoty, /dev/shm, commit amend + push);
+  dodatkowo snapshoty IRQ i dmesg.
+- `start_40ms_phase0.sh` — nadzorca: checkout brancha na workerze,
+  build z brancha (−DRDB_BENCH_PROBE=ON), S1 → reboot → S2.
+
+Start Fazy 0: uruchomiono `start_40ms_phase0.sh` (S1 200k slotów,
+S2 5×20k, build z brancha). Wyniki trafią do
+`results/40ms/study_{pacer-solo,engine-shadow}/` na branchu; analiza
+i werdykt — kolejny wpis. Artykuł: rozdział 7 kompletny;
 poza zakresem procesu pozostają TODO-ANON/TODO-CCS/TODO-TITLE
 (kwestie redakcyjne submisji, nie pomiarów).
