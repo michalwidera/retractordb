@@ -1357,7 +1357,9 @@ zależy siła argumentacji porównawczej artykułu.
 
 Stan maszyn na zamknięciu: worker (pi400) — governor przywrócony,
 brak procesów pomiarowych, repo do przełączenia na master; nadzorca —
-master zsynchronizowany z origin.
+master zsynchronizowany z origin. Artykuł: rozdział 7 kompletny;
+poza zakresem procesu pozostają TODO-ANON/TODO-CCS/TODO-TITLE
+(kwestie redakcyjne submisji, nie pomiarów).
 
 ---
 
@@ -1596,6 +1598,70 @@ wywołujący).
   wzorzec do zachowania).
 
 Faza 2 zamknięta. Decyzja do podjęcia: implementacja poprawki
-docelowej (Faza 3) i po jej walidacji squash brancha do mastera. Artykuł: rozdział 7 kompletny;
-poza zakresem procesu pozostają TODO-ANON/TODO-CCS/TODO-TITLE
-(kwestie redakcyjne submisji, nie pomiarów).
+docelowej (Faza 3) i po jej walidacji squash brancha do mastera.
+
+## 2026-07-18 — Faza 3: fix #7 zaimplementowany i ZWALIDOWANY;
+## śledztwo ~40 ms ZAMKNIĘTE, branch squashowany do mastera
+
+### Implementacja (decyzja prowadzącego: „naprawiamy")
+
+Trzy zmiany (commit fix #7 na branchu, po squashu w masterze):
+
+1. **Pre-otwarcie kolejki klienta w wątku komunikacyjnym** — kolejka
+   tworzona i otwierana przy rejestracji `show`; uchwyt trafia do
+   id2Queue_Cache pod nowym muteksem map klienckich (trzymanym tylko
+   na operacjach na mapach, nigdy przy konstrukcji kolejki);
+   rejestracja w id2StreamName_Relation dopiero z gotowym uchwytem —
+   przy okazji usunięty istniejący wyścig rejestracja-przed-kolejką.
+   Lazy open_only w boradcast zostaje jako tani fallback.
+2. **Rozdzielone polityki mlockall** — `mlockall(MCL_CURRENT)`
+   (populacja istniejących stron na starcie, przed kotwicą) +
+   `mlockall(MCL_FUTURE|MCL_ONFAULT)` (nowe mapowania leniwie).
+   RDB_MLOCKALL=populate/off zostaje diagnostycznie.
+3. **Kotwica osi czasu za rtActivate i otwarciem sondy** — koszty
+   inicjalizacji nie obciążają slotów.
+
+### Iteracja walidacji — wartość dziennika w praktyce
+
+Pierwsza walidacja (study_engine-shadow-fix): attach i start CZYSTE
+(sloty 600–800: max 0,50 ms; powt. 2–5 bez zdarzeń w całości), ale
+powt. 1 — pierwszy bieg po świeżej instalacji — pokazał NOWĄ serię
+~20 ms przy t=50 s: pełne MCL_ONFAULT przeniosło koszt zimnego page
+cache binarki w środek biegu (fault z karty SD przy pierwszym
+dotknięciu rzadkiej ścieżki kodu). Stąd rozdzielenie polityk (zmiana
+2 wyżej). Druga walidacja (study_engine-shadow-fix2) objęła ten sam
+scenariusz naturalnie: rebuild+install przed badaniem → powt. 1 znów
+było pierwszym biegiem po instalacji.
+
+### Wynik końcowy (study_engine-shadow-fix2, 5×19 999 slotów @360 Hz,
+### silnik+klient, cień na rdzeniu 2)
+
+| metryka | przed (S2) | po (fix2) |
+|---|---|---|
+| zdarzenia ≥ 5 ms / przebieg | 57–83 | **0** (wszystkie 5 powt.) |
+| max wake_lag | 39,1–47,5 ms | **0,52–0,61 ms** |
+| p99,9 wake_lag | 25–34 ms | **~0,5 ms** |
+| mediana wake_lag | 22,5–23,1 µs | 22,4–23,0 µs (bez zmian) |
+
+Redukcja p99,9 o ~50–70×; zdarzenia łączeniowe zniknęły z osi czasu
+w całości, łącznie z pierwszym biegiem po instalacji. Mediana
+nietknięta — poprawka nie kosztuje nic w stanie ustalonym.
+ctest: 153/153 (x86 Debug, valgrind), integracyjne na aarch64
+przechodziły w ramach badań.
+
+### Zamknięcie procesu
+
+- Branch experiment/40ms squashowany do mastera (przyczyna ustalona
+  jednoznacznie — warunek prowadzącego spełniony) i usunięty;
+  wyjątek pkt 23 REQUIREMENTS.md skonsumowany.
+- Wyniki wszystkich badań (S1/S2/S3/S4) w
+  examples/experiment/results/40ms/ na masterze.
+- **Konsekwencje dla artykułu (do osobnej sesji):** sekcje 7.2/7.3/7.5
+  main-debs.tex do przepisania na mocniejszą narrację: ogon p99,9 był
+  deterministycznym kosztem zdarzeń łączeniowych (start + attach), po
+  fix #7 wyeliminowanym — stan ustalony i pełny przebieg trzymają
+  <0,7 ms; znika też zastrzeżenie o skalowaniu ogona ×N klientów.
+  Wymaga to powtórki kampanii clients (1–3 klientów) i rate na
+  poprawionym silniku, żeby tabele artykułu odzwierciedlały nowe
+  binarki — pomiary sprzed poprawki pozostają w results/ jako
+  dokumentacja drogi.
