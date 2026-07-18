@@ -45,10 +45,10 @@ install a prebuilt package from the GitHub Releases page.
 Prebuilt packages are published on the
 [GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
 Each release ships a Debian package and a portable tarball, named after the
-project version and the target system, for example (version `0.1.7`):
+project version and the target system, for example (version `0.1.8`):
 
-- `retractordb-0.1.7-Linux.deb`
-- `retractordb-0.1.7-Linux.tar.gz`
+- `retractordb-0.1.8-Linux.deb`
+- `retractordb-0.1.8-Linux.tar.gz`
 
 **Debian / Ubuntu (`.deb`)** — installs binaries into `/usr/bin` and wires up the
 systemd service automatically:
