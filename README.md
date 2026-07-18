@@ -22,16 +22,18 @@ RetractorDB provides a unique approach to time series data management through co
 
 ### Project Links
 - **Official website**: [retractordb.com](https://retractordb.com)
-- **Documentation**: [gitbook-rdb](https://retractordb.gitbook.io/retractordb-docs/) (Comprehensive documentation in Polish)
+- **Documentation**: [documentation.retractordb.com](https://documentation.retractordb.com/) (comprehensive documentation in Polish)
 - **Repository**: [github.com/michalwidera/retractordb](https://github.com/michalwidera/retractordb)
 
 ## Core Components
 
 RetractorDB consists of three main programs:
 
-- xretractor
-- xqry
-- xtrdb
+| Program | Role |
+|---------|------|
+| [`xretractor`](src/retractor/README.md) | Engine: compiles `.rql` query sets and executes continuous query plans (optionally as a systemd service, with real-time scheduling via `-t/--realtime`) |
+| [`xqry`](src/qry/README.md) | Client: reads results from the running engine via shared memory |
+| [`xtrdb`](src/rdb/README.md) | Inspection tool: reads binary storage artifacts and metadata |
 
 ## Installation
 
@@ -43,17 +45,17 @@ install a prebuilt package from the GitHub Releases page.
 Prebuilt packages are published on the
 [GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
 Each release ships a Debian package and a portable tarball, named after the
-project version and the target system, for example (version `0.1.5`):
+project version and the target system, for example (version `0.1.7`):
 
-- `retractordb-0.1.5-Linux.deb`
-- `retractordb-0.1.5-Linux.tar.gz`
+- `retractordb-0.1.7-Linux.deb`
+- `retractordb-0.1.7-Linux.tar.gz`
 
 **Debian / Ubuntu (`.deb`)** — installs binaries into `/usr/bin` and wires up the
 systemd service automatically:
 
 ```bash
 # Download the .deb from the Releases page, then:
-sudo apt install ./retractordb-0.1.5-Linux.deb
+sudo apt install ./retractordb-0.1.7-Linux.deb
 ```
 
 The package `postinst` creates the system user `retractor` and runs
@@ -72,8 +74,8 @@ for the packaged systemd unit details.
 **Portable tarball (`.tar.gz`)** — no service integration, just the binaries:
 
 ```bash
-tar xzf retractordb-0.1.5-Linux.tar.gz
-sudo cp retractordb-0.1.5-Linux/bin/* /usr/local/bin/   # or anywhere on $PATH
+tar xzf retractordb-0.1.8-Linux.tar.gz
+sudo cp retractordb-0.1.8-Linux/bin/* /usr/local/bin/   # or anywhere on $PATH
 ```
 
 After install, verify the three binaries are reachable:
@@ -165,11 +167,14 @@ Save it as `first.rql`:
 ```sql
 # declaration of input time series
 DECLARE a BYTE , b BYTE STREAM core0, 1 FILE '/dev/urandom'
-DECLARE c BYTE STREAM core1, 0.5 FILE '/dev/urandom'
+DECLARE c BYTE , d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
 
 SELECT core0[0],b STREAM str1 FROM core0#core1
 SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0
 ```
+
+Note: the interlace operator `#` requires both input streams to have the same
+number of fields.
 
 (More ready-made examples live under [examples/](examples/), e.g.
 [examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
@@ -218,17 +223,6 @@ xqry -s str2
 and an ad-hoc query mode (`--adhoc`); see
 [src/qry/README.md](src/qry/README.md) and `xqry -h`. To stop the engine you can
 also run `xqry --kill`.
-
-## Documentation
-
-For comprehensive documentation (in Polish), see:
-- [GitBook Documentation](https://retractordb.gitbook.io/retractordb-docs/)
-- [Official Website](https://retractordb.com)
-
-### Additional Resources
-- [Presentation Slides (PL)](https://retractordb.com/assets/presentation/Prezentacja_RetractorDB_PL.pdf)
-- [Interlace Example (Online)](https://retractordb.com/assets/interlace.html)
-- [Sum Example (Online)](https://retractordb.com/assets/sum.html)
 
 ## Contributing
 
