@@ -185,11 +185,15 @@ a2 = np.fromfile("a2",     dtype="<i4")
 b2 = np.fromfile("b2",     dtype="<i4")
 
 ok = True
-n = len(c) // 2
-w_b = bool(np.array_equal(c[0::2][:n], b[:n]))          # c[2i]   == b_i
-w_a = bool(np.array_equal(c[1::2][:len(c) - n], a[:len(c) - n]))  # c[2i+1] == a_i
-ok &= w_a and w_b
-print(f"c: n={len(c)} przeplot b0,a0,b1,a1,...: parzyste==b:{w_b} nieparzyste==a:{w_a}")
+# Liczba pozycji parzystych/nieparzystych w c rozni sie o 1 przy nieparzystym
+# len(c) — porownania wylacznie na wspolnych prefiksach (min dlugosci).
+even, odd = c[0::2], c[1::2]
+ne = min(len(even), len(b))
+no = min(len(odd), len(a))
+w_b = bool(np.array_equal(even[:ne], b[:ne]))  # c[2i]   == b_i
+w_a = bool(np.array_equal(odd[:no], a[:no]))   # c[2i+1] == a_i
+ok &= w_a and w_b and ne >= 19000 and no >= 19000
+print(f"c: n={len(c)} przeplot b0,a0,b1,a1,...: parzyste==b:{w_b} (n={ne}) nieparzyste==a:{w_a} (n={no})")
 
 r0 = bool(a2[0] == 0)
 wa2 = bool(np.array_equal(a2[1:], a[:len(a2) - 1]))
