@@ -1439,6 +1439,90 @@ shootdown, zapisy tmpfs → kworker per-cpu, logi); H3 interakcja
 Start Fazy 0: uruchomiono `start_40ms_phase0.sh` (S1 200k slotów,
 S2 5×20k, build z brancha). Wyniki trafią do
 `results/40ms/study_{pacer-solo,engine-shadow}/` na branchu; analiza
-i werdykt — kolejny wpis. Artykuł: rozdział 7 kompletny;
+i werdykt — kolejny wpis.
+
+### Wyniki Fazy 0 — werdykt: TO NIE PLATFORMA; zdarzenia są
+### deterministyczne (start + podpięcie klienta), stan ustalony CZYSTY
+
+> **_NOTE:_** Artefakty: branch `experiment/40ms`,
+> `results/40ms/study_pacer-solo/` i `study_engine-shadow/`
+> (results.md, e1_probe.csv per powtórzenie, shadow.csv.gz,
+> irq_before/after, dmesg_tail). Kampania: build z brancha,
+> S1 → reboot → S2 5×20k, zakończona 12:28.
+
+**S1 pacer-solo** (cień SAM na rdzeniu 3, FIFO 50, 200 000 slotów
+≈ 9,3 min): mediana wake_lag 22,5 µs (identyczna jak u silnika!),
+**max 57 µs, ZERO zdarzeń ≥ 5 ms**. Platforma z izolowanym rdzeniem
+nie generuje sama z siebie niczego — replikacja czystego NumPy na
+10× dłuższym przebiegu. H1 (czysta platforma) obalona w praktyce.
+
+**S2 engine-shadow** (silnik rdzeń 3 + cień rdzeń 2, 5×19 999
+slotów): silnik 57–83 „zdarzeń" ≥ 5 ms na przebieg (max 39,1–47,5 ms
+— znajoma sygnatura ~40 ms odtworzona), **cień równocześnie: ZERO
+zdarzeń, max 0,088–0,125 ms** we wszystkich pięciu powtórzeniach.
+Zdarzenia NIE są system-wide.
+
+**Analiza klastrowa (przełom):** zdarzenia nie są rozproszone — w
+każdym powtórzeniu układają się w DOKŁADNIE dwie serie kolejnych
+slotów o liniowo malejącym opóźnieniu (sygnatura pojedynczego stalla
+i doganiania osi czasu przez absolutne deadline'y):
+
+| powt. | seria startowa | seria druga | szczyt drugiej |
+|---|---|---|---|
+| 1 (po reboocie) | sloty 0–36, szczyt 47,5 ms | sloty 679–724, t=1,89 s | 39,9 ms |
+| 2–5 | sloty 0–11, szczyt 19,5 ms | sloty ~709–754, t=1,97 s | 39,1–39,5 ms |
+
+Druga seria występuje ZAWSZE w t≈2,0 s od startu pętli — dokładnie w
+momencie `sleep 2` skryptu, po którym podpina się klient xqry.
+Długość serii ≈ szczyt/(budżet − compute) ≈ 40/(2,78−1,9)… zgadza się
+z obserwowanymi 45–47 slotami. Po slocie 800 (stan ustalony) max
+wake_lag w CAŁYM przebiegu to **0,50–0,69 ms** — żadnych zdarzeń
+przez pozostałe ~53 s, w pięciu powtórzeniach.
+
+**Werdykt:** pierwotna przyczyna to nie „firmware/SoC housekeeping".
+Zdarzenia ~40 ms są deterministycznie związane z (a) inicjalizacją
+pętli (kotwica czasu ustawiana PRZED rtActivate/mlockall/otwarciem
+sondy — executorsm.cpp:617 vs 620–643; transjent startowy, po
+reboocie większy: zimny cache) oraz (b) **podpięciem klienta xqry**
+(tor komunikacyjny silnika). To wyjaśnia jednym mechanizmem:
+przetrwanie isolcpus (zdarzenie wewnątrzprocesowe), trafianie w fazę
+snu przy czystym compute, skalowanie p99,9 ≈ N×40 ms z liczbą
+klientów (N podpięć), czystość NumPy/cienia (brak IPC) oraz p99,9
+kampanii (serie 45+ slotów > 0,1% z 20k slotów → percentyl ląduje w
+serii).
+
+**Hipoteza mechanizmu (do potwierdzenia w Fazie 2):** rtActivate robi
+`sched_setscheduler(0,…)` = FIFO 50 TYLKO dla wątku przetwarzającego;
+wątek komunikacyjny (bt, executorsm.cpp:544) zostaje na SCHED_OTHER i
+dzieli rdzeń 3 (taskset przypina cały proces). Przy podpięciu klienta
+wykonuje on tworzenie/mapowanie segmentu boost::interprocess, a
+`mlockall(MCL_CURRENT|MCL_FUTURE)` wymusza natychmiastową populację
+stron nowego mapowania — kandydat na ~40 ms blokady (mmap_lock /
+inwersja na blokadzie procesu), której budzący się wątek FIFO nie
+może ominąć. Ftrace/osnoise w Fazie 2 ma pokazać, co dokładnie
+wykonuje rdzeń 3 w oknie stalla.
+
+**Korekta wcześniejszej interpretacji (dzień 1):** piki „co 0,9–2,6 s"
+sprzed izolacji to była INNA populacja (housekeeping, usunięty przez
+isolcpus). To, co „przetrwało izolację", to serie start+attach —
+pomylone wtedy z tamtą populacją, bo patrzyliśmy na percentyle, nie
+na rozkład zdarzeń w czasie.
+
+**Konsekwencje dla artykułu (po Fazie 2):** narracja 7.2/7.3 do
+wzmocnienia: ogon p99,9 nie jest losowym szumem platformy, lecz
+deterministycznym kosztem zdarzeń łączeniowych (start, attach);
+stan ustalony trzyma <0,7 ms przez 5×53 s. To lepsza i mocniejsza
+teza niż obecna hipoteza platformowa — ale wymaga potwierdzenia
+mechanizmu i najlepiej poprawki (fix #7-adjacent: FIFO/affinity dla
+wątku komunikacyjnego albo prealokacja segmentów IPC + przesunięcie
+kotwicy za inicjalizację).
+
+**Następne kroki:** Faza 2 skrócona (ablacja Fazy 1 zbędna — trigger
+już zlokalizowany): (1) ftrace/osnoise wokół okna attach; (2) przegląd
+ścieżki attach w komunikacji IPC (rozmiar segmentu, moment mmap);
+(3) kandydat poprawki i powtórka S2 z oczekiwanym zniknięciem drugiej
+serii; (4) osobno: przesunięcie kotwicy pętli za rtActivate (usuwa
+transjent startowy z metryk). Wtedy decyzja o squash do mastera
+(REQUIREMENTS pkt 23, wyjątek). Artykuł: rozdział 7 kompletny;
 poza zakresem procesu pozostają TODO-ANON/TODO-CCS/TODO-TITLE
 (kwestie redakcyjne submisji, nie pomiarów).
