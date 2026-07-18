@@ -766,7 +766,7 @@ Do REQUIREMENTS.md dopisany plan dwóch kampanii domykających sekcje
 
 ### Kampania baseline-numpy wykonana na workerze (branch experiment/20260717)
 
-> **_NOTE:_** Artefakty: [results/baseline-numpy/](results/baseline-numpy/)
+> **_NOTE:_** Artefakty: [results_20260717/baseline-numpy/](results_20260717/baseline-numpy/)
 > (results.md, probe_slot.csv, metrics.csv, state_before/after.md,
 > logi obu trybów).
 
@@ -829,7 +829,7 @@ Wnioski dla 7.5(i):
 ### Kampania baseline-flink, krok 1: instalacja + smoke test —
 ### wynik pozytywny (branch experiment/20260717, commit 5bd7c27)
 
-> **_NOTE:_** Artefakty: [results/baseline-flink/](results/baseline-flink/)
+> **_NOTE:_** Artefakty: [results_20260717/baseline-flink/](results_20260717/baseline-flink/)
 > (results.md, smoke_stdout.log, ram_sample.csv, state_before/after.md);
 > skrypt: `worker/run_flink_baseline.sh` (commit 3689650).
 
@@ -887,7 +887,7 @@ slotowa, izolacja rdzenia) będą rozstrzygane dopiero na tym etapie.
 ### zastrzeżenie #2 planu (jitter JVM) POTWIERDZONE pomiarem (branch
 ### experiment/20260717, commit finalny 49669ab)
 
-> **_NOTE:_** Artefakty: [results/baseline-flink/](results/baseline-flink/)
+> **_NOTE:_** Artefakty: [results_20260717/baseline-flink/](results_20260717/baseline-flink/)
 > (`results_pantompkins.md`, `probe_flink.csv`, `PanTompkinsFlinkJob.java`,
 > `metrics.csv`, migawki stanu); skrypty: `worker/run_flink_pantompkins.sh`
 > (commit 4dd891d), poprawka bufora `a6a601c`.
@@ -1013,8 +1013,8 @@ brak procesów java/flink, governor przywrócony do `ondemand`.
 ### Sekcja 7.5 (Baselines) artykułu wypełniona wynikami obu kampanii
 
 Na polecenie prowadzącego wyniki baseline-numpy i baseline-flink
-(z [results/baseline-numpy/](results/baseline-numpy/) i
-[results/baseline-flink/](results/baseline-flink/); katalog `results/`
+(z [results_20260717/baseline-numpy/](results_20260717/baseline-numpy/) i
+[results_20260717/baseline-flink/](results_20260717/baseline-flink/); katalog `results/`
 zostanie na koniec dnia przeniesiony do `results_20260717/`) wpisane do
 main-debs.tex i main-debs-pl.tex:
 
@@ -1239,7 +1239,7 @@ artykułu) i jest warte zdania w 7.6.
 
 ### Przebieg 2 kampanii: A=OK, B=OK — kampania exactness ZAMKNIĘTA
 
-> **_NOTE:_** Artefakty: [results/exactness/](results/exactness/)
+> **_NOTE:_** Artefakty: [results_20260718/exactness/](results_20260718/exactness/)
 > (results.md, replay_hashes_run1/2.txt, replay_compare.txt,
 > roundtrip_compare.txt, float_roundtrip.csv, metrics.csv, migawki
 > stanu); commit 4f312ef na branchu experiment/20260718.
@@ -1276,3 +1276,51 @@ kompletnym przebiegiem (drugi przebieg = powtórka po fałszywym FAIL
 weryfikatora); dodatkowy wynik ponadplanowy — równość
 międzyplatformowa artefaktów. Sekcja 7.6 artykułu może zostać
 wypełniona; po niej w Performance Evaluation nie zostaje żaden TODO.
+
+### Sekcja 7.6 artykułu wypełniona — Performance Evaluation kompletna
+
+Rozdział 7 main-debs.tex (i main-debs-pl.tex) domknięty wynikami
+kampanii exactness: 7.6 opisuje replay bit-for-bit (modulo 8-bajtowy
+znacznik czasu `.meta`) wraz z równością międzyplatformową
+x86-64↔aarch64, tożsamość okrężną cor:exact potwierdzoną bitowo
+(z uczciwą notą o jednoslotowym opóźnieniu Θ i zdaniem o dokładności
+jako wyroczni testowej — złapany fix #6), oraz kontrast float
+(resample_poly: strukturalne ~0,11 RMS; resample FFT: błąd rosnący
+z N). Zaktualizowane abstrakt, wstęp, otwarcie sekcji 7 i Limitations;
+usunięte wszystkie komentarze TODO-EVAL. Kompilacja czysta:
+EN 13 stron, PL 14 stron. Commit 9148864 w repo paper-arXiv.
+
+---
+
+## 2026-07-18 — ZAMKNIĘCIE PROCESU EKSPERYMENTÓW (decyzja prowadzącego)
+
+Trzydniowy proces eksperymentów zakończony. Wszystkie kampanie
+zaplanowane w REQUIREMENTS.md wykonane, sekcja Performance Evaluation
+artykułu kompletna (7.1–7.6, zero TODO). Wyniki zrotowane do katalogów
+dziennych, branche eksperymentów squashowane do master i usunięte.
+
+### Skorowidz pomiarów (stan końcowy na master)
+
+| Dzień | Kampanie | Artefakty |
+|---|---|---|
+| 1 (2026-07-16) | rate K1–K9 (baseline → fix #1–#5 → isolcpus) | [results_20260716/rate/rotated/01–10](results_20260716/rate/rotated/) |
+| 1 | clients (H-izolacja, 1/2/3 klientów) | [results_20260716/clients/](results_20260716/clients/) |
+| 1 | fir-contrast (głębokość planu, 1–3 kHz) | [results_20260716/fir-contrast/](results_20260716/fir-contrast/) |
+| 2 (2026-07-17) | baseline-numpy (7.5 i) | [results_20260717/baseline-numpy/](results_20260717/baseline-numpy/) |
+| 2 | baseline-flink (7.5 ii, kroki 1+2) | [results_20260717/baseline-flink/](results_20260717/baseline-flink/) |
+| 3 (2026-07-18) | exactness (7.6: replay + round-trip + float) | [results_20260718/exactness/](results_20260718/exactness/) |
+
+Poprawki silnika wyniesione z procesu (wszystkie na master, każda
+z drogą profil→hipoteza→pomiar→dziennik): #1 AGSE cache, #2 Descriptor
+const-cache, #3 metaData write-through, #4 leniwe formatowanie,
+#5 cache kolejek IPC, #6 przeplot/rozplot zgodny z definicjami
+formalnymi (153/153 testów). Otwarte kandydatury na przyszłość:
+fix #7 (przeplot źródeł pochodnych — planista), STREAM_TIMEMOVE na
+źródle deklarowanym, śledztwo zdarzenia platformowego ~40 ms,
+eksperyment na SSD (pkt 18).
+
+Stan maszyn na zamknięciu: worker (pi400) — governor przywrócony,
+brak procesów pomiarowych, repo do przełączenia na master; nadzorca —
+master zsynchronizowany z origin. Artykuł: rozdział 7 kompletny;
+poza zakresem procesu pozostają TODO-ANON/TODO-CCS/TODO-TITLE
+(kwestie redakcyjne submisji, nie pomiarów).
