@@ -57,10 +57,15 @@ Do master trafia **wyłącznie zmiana C1+C2 w `dataModel.cpp`** (2 linie,
 Rusztowanie inwestygacji (licznik `RDB_COPY_COUNTER`, harness, wyniki) zostaje
 na branchu.
 
+## Sprawdzone i odrzucone
+
+- **C3** — `small_vector` zamiast `std::vector<token> arg`: brak mierzalnego
+  zysku (p50 282.1 vs 281.7 µs, w szumie). Cofnięte. Szczegóły:
+  `results/C3-smallvec-REJECTED.md`. Wniosek: narzut kopii był w kopiach całego
+  `query` (C1+C2), nie w mikro-alokacjach.
+
 ## Dalszy kierunek (nie wdrożono)
 
-- `constructInputPayload`: `std::vector<token> arg` kopiowany co wywołanie
-  (≤3 tokeny) — mały narzut, ale możliwy do usunięcia (indeksowanie po liście
-  bez kopii). Osobny kandydat.
 - Kopie payloadów `*(inputPayload) = *getPayload(...)` — konieczne (kopiują
   dane), ale warto sprawdzić czy nie ma zbędnych pośrednich alokacji.
+- Ścieżka `constructOutputPayload` / `write` — większe struktury niż mikro-alokacje.
