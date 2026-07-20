@@ -62,6 +62,22 @@ if(RDB_BENCH_PROBE)
   )
 endif()
 
+# Licznik kopii obiektu query (diagnostyka inwestygacji speed_improvement:
+# kwantyfikuje kopie query/interwał w gorącej ścieżce processRows). Domyślnie
+# WYŁĄCZONY: pod #ifdef RDB_COPY_COUNTER, zero kosztu w produkcji. Włączenie
+# tylko do pomiaru mechanizmu (nie perturbuje E1 istotnie — inkrement relaxed).
+option(
+  RDB_COPY_COUNTER
+  "Count query-object copies (speed_improvement diagnostic); NOT for production"
+  OFF)
+if(RDB_COPY_COUNTER)
+  add_compile_definitions(RDB_COPY_COUNTER)
+  message(
+    WARNING
+      "RDB_COPY_COUNTER=ON — query copy counter compiled in; NOT a production build."
+  )
+endif()
+
 # mold jest domyślnym linkerem (szybszy niż ld/lld), ale na platformach z
 # ograniczoną pamięcią (np. RPi) potrafi zgłaszać błędy alokacji przy
 # linkowaniu. RDB_USE_MOLD=OFF w env wymusza (FORCE) wyłączenie przy każdej

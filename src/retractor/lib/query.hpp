@@ -18,6 +18,28 @@ class qTree;
 
 inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
 
+#ifdef RDB_COPY_COUNTER
+// Diagnostyka inwestygacji speed_improvement: zliczanie kopii obiektu query.
+// Sonda jest składnikiem query; jej KOPIUJĄCY ctor inkrementuje licznik, a
+// PRZENOSZĄCY nie — dzięki temu niejawne składowe specjalne query pozostają
+// niejawne (kopia query kopiuje sondę → zlicza; move query przenosi → nie).
+// Cały blok znika bez śladu bez -DRDB_COPY_COUNTER=ON.
+#include <atomic>
+namespace qcopy {
+extern std::atomic<long> queryCopyCount;
+struct CopyProbe {
+  CopyProbe() = default;
+  CopyProbe(const CopyProbe &) { queryCopyCount.fetch_add(1, std::memory_order_relaxed); }
+  CopyProbe &operator=(const CopyProbe &) {
+    queryCopyCount.fetch_add(1, std::memory_order_relaxed);
+    return *this;
+  }
+  CopyProbe(CopyProbe &&) noexcept            = default;
+  CopyProbe &operator=(CopyProbe &&) noexcept = default;
+};
+}  // namespace qcopy
+#endif
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -43,6 +65,10 @@ class query {
   rdb::retention_t retention            = rdb::retention_t{.segments = 0, .capacity = 0};  // Retention segments and capacity
   std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFile::no_retention);
   std::string storage_policy            = "DEFAULT";
+
+#ifdef RDB_COPY_COUNTER
+  [[no_unique_address]] qcopy::CopyProbe copyProbe_;  // diagnostyka: liczy kopie query (speed_improvement)
+#endif
 
   [[nodiscard]] bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();

@@ -10,6 +10,19 @@
 #include "fatalError.hpp"
 #include "qTree.hpp"
 
+#ifdef RDB_COPY_COUNTER
+#include <cstdio>  // diagnostyka: raport licznika kopii query
+namespace qcopy {
+std::atomic<long> queryCopyCount{0};
+namespace {
+// Raport przy zakończeniu procesu (destruktor obiektu statycznego).
+struct Reporter {
+  ~Reporter() { std::fprintf(stderr, "[RDB_COPY_COUNTER] query copies total: %ld\n", queryCopyCount.load()); }
+} reporter_;
+}  // namespace
+}  // namespace qcopy
+#endif
+
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
 void query::reset() {
