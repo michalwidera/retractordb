@@ -134,7 +134,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   }
 
   // Then - process all declarations to unlock them for next step
-  for (auto q : coreInstance_) {
+  for (const auto &q : coreInstance_) {
     if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
     if (!q.isDeclaration()) continue;     // first declarations need to be processed
 
@@ -149,7 +149,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {
-  auto qry = coreInstance_[instance];
+  const query &qry = coreInstance_[instance];
 
   if (qry.lProgram.size() >= 4) {
     FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4",
