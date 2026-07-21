@@ -13,9 +13,10 @@
 #   examples/experiment/start_supervisor.sh rate_dense [--branch NAME] [--sink null|nc]
 #   examples/experiment/start_supervisor.sh clients --rate-hz N [--branch NAME] [--sink null|nc]
 #
-# 'rate_dense' to ta sama kampania co 'rate' (ten sam uklad kolumn CSV, ten sam cel),
-# ale z gestsza drabinka temp -- wlasny plik konfiguracji i wlasny katalog wynikow,
-# zeby siatka rzadka i gesta nie mieszaly sie w jednym zestawie.
+# Kazde 'rate_<wariant>' to ta sama kampania co 'rate' (ten sam uklad kolumn CSV, ten sam
+# cel), ale z inna drabinka temp -- wlasny plik konfiguracji config/campaign_rate_<wariant>.csv
+# i wlasny katalog wynikow, zeby siatki nie mieszaly sie w jednym zestawie. Dodanie kolejnej
+# drabinki nie wymaga zmiany kodu, tylko nowego pliku CSV.
 #
 # Opcje:
 #   --worker HOST        alias/host SSH workera (domyslnie: worker)
@@ -35,9 +36,9 @@ CAMPAIGN="$1"; shift
 # CAMPAIGN_KIND rozstrzyga uklad kolumn CSV i tresc celu kampanii; CAMPAIGN zostaje
 # nazwa wlasna (katalog wynikow, plik konfiguracji).
 case "$CAMPAIGN" in
-  rate|rate_dense) CAMPAIGN_KIND="rate" ;;
+  rate|rate_*)     CAMPAIGN_KIND="rate" ;;
   clients)         CAMPAIGN_KIND="clients" ;;
-  *) die "campaign musi byc 'rate', 'rate_dense' albo 'clients'" ;;
+  *) die "campaign musi byc 'rate', 'rate_<wariant>' albo 'clients'" ;;
 esac
 
 WORKER_HOST="worker"
