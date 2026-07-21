@@ -7,7 +7,12 @@ add_subdirectory(lib)
 find_package(antlr4-runtime REQUIRED)
 find_package(antlr4 REQUIRED)
 
-set(SOURCES_RETRACTOR launcher.cpp ${BUILDSRCS_CPP} ${BUILDCOMMON_CPP})
+# allocCounter.cpp jawnie w źródłach binarki (NIE w bibliotece): zamiana
+# globalnego operator new/delete musi trafić wprost do obrazu wykonywalnego, bo
+# z archiwum statycznego linker mógłby jej nie wciągnąć. Pusty obiekt bez
+# -DRDB_ALLOC_COUNTER=ON (cała treść pod #ifdef).
+set(SOURCES_RETRACTOR launcher.cpp allocCounter.cpp ${BUILDSRCS_CPP}
+                      ${BUILDCOMMON_CPP})
 
 add_executable(${PROJECT_NAME} ${SOURCES_RETRACTOR})
 

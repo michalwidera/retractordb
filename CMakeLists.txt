@@ -78,6 +78,23 @@ if(RDB_COPY_COUNTER)
   )
 endif()
 
+# Licznik alokacji sterty (diagnostyka inwestygacji speed_improvement:
+# kwantyfikuje alokacje new/delete i sumę bajtów na interwał metodą różnicy).
+# Domyślnie WYŁĄCZONY: cały allocCounter.cpp jest pod #ifdef RDB_ALLOC_COUNTER,
+# zero kosztu w produkcji. Włączenie tylko do pomiaru (atomic per alloc perturbuje
+# czas — mierz alokacje osobno od E1). Użycie: scripts/buildrdb.sh probe, potem
+# reconfigure z -DRDB_ALLOC_COUNTER=ON (patrz run_alloc.sh).
+option(
+  RDB_ALLOC_COUNTER
+  "Count heap allocations (speed_improvement diagnostic); NOT for production" OFF)
+if(RDB_ALLOC_COUNTER)
+  add_compile_definitions(RDB_ALLOC_COUNTER)
+  message(
+    WARNING
+      "RDB_ALLOC_COUNTER=ON — heap allocation counter compiled in; NOT a production build."
+  )
+endif()
+
 # mold jest domyślnym linkerem (szybszy niż ld/lld), ale na platformach z
 # ograniczoną pamięcią (np. RPi) potrafi zgłaszać błędy alokacji przy
 # linkowaniu. RDB_USE_MOLD=OFF w env wymusza (FORCE) wyłączenie przy każdej

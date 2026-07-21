@@ -14,13 +14,37 @@ C3 (small_vector — mikro-alokacje nie są wąskim gardłem). Baseline po C1+C2
 - Wniosek z C1/C2/C3: **celuj w kopie/alokacje DUŻYCH struktur, nie w
   pojedyncze małe alokacje** (glibc obsługuje małe bloki tanio).
 
-## Rekomendowany następny krok metodyczny: LICZNIK ALOKACJI
+## LICZNIK ALOKACJI — ZROBIONE (2026-07-21)
 
-Analogicznie do `RDB_COPY_COUNTER` dodać `RDB_ALLOC_COUNTER` — globalny
-`operator new`/`delete` zliczający alokacje sterty (i sumę bajtów) na interwał
-(różnica m=N2 − m=N1 / Δ, jak przy kopiach). Deterministyczny, niezależny od
-WSL2. Da twardą listę: ile alokacji/interwał i który wariant je usuwa. To
-najszybsza droga do znalezienia realnego wąskiego gardła bez zgadywania.
+Dodany `RDB_ALLOC_COUNTER` (opcja CMake, `src/retractor/allocCounter.cpp` — wprost
+w binarce, nie w libie, żeby zamiana globalnego `operator new` na pewno się
+dolinkowała). Raport na stderr przy wyjściu: `allocs/bytes/frees total`. Harness:
+`run_alloc.sh <label> [N1] [N2]` — metoda różnicy (domyślnie N1=1000, N2=6000).
+
+**BASELINE (deterministyczny, HEAD investigation/speed_improvement):**
+- **alokacje / interwał = 1137.01** (różnica dokładnie stała między przebiegami —
+  szum startowy ±kilkanaście kasuje się w różnicy; potwierdzone 2×)
+- **bajty / interwał = 319.5 KiB**
+- **zwolnienia / interwał = 1137.01** = allocs → stan ustalony (brak akumulacji),
+  a spójność frees==allocs potwierdza, że niewyrównana rodzina new/delete łapie
+  obie strony (typy nadwyrównane nie występują na gorącej ścieżce).
+
+~1137 alloc/interwał ÷ ~15 strumieni ≈ 76 alloc/strumień — to twardy cel. Teraz
+JEDEN kandydat naraz: `run_alloc.sh k1-...` przed/po → różnica alokacji = dowód.
+
+### Build wariantu z licznikiem
+```bash
+scripts/buildrdb.sh probe
+( cd build/Release && cmake -DRDB_ALLOC_COUNTER=ON . && ninja xretractor )
+```
+UWAGA: atomic per alloc perturbuje czas → E1 (czas) mierz na czystym `probe`
+(bez ALLOC_COUNTER), alokacje mierz na build z ALLOC_COUNTER. Dwa osobne buildy.
+
+### Następny krok: zlokalizować 1137 alokacji do call-site
+Zanim ruszysz K1/K2 — potwierdź który to największy udział (nie zgaduj). Opcje:
+snapshot `ralloc::allocCount` wokół faz `processRows` (constructOutputPayload vs
+reduceFieldsToPayload vs constructAgsePayload/okna FIR), dumpowane per-bucket przy
+wyjściu. Wtedy atak na największy bucket.
 
 ## Konkretni kandydaci (od najbardziej obiecujących)
 
