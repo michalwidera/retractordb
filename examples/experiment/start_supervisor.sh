@@ -190,7 +190,10 @@ for row in "${ROWS[@]}"; do
 
   if [ "$IDX" -lt "$TOTAL" ]; then
     log "Restart maszyny workera (pkt 4)..."
-    ssh_worker "$WORKER_HOST" "sudo -n reboot" || true
+    # 'sync' przed reboot: worker trzyma system i repozytorium na karcie SD,
+    # a wyniki badania sa zapisywane tuz przed restartem -- wymuszamy zrzut
+    # cache stron na nosnik, zeby restart nie zostawil ich niezapisanych.
+    ssh_worker "$WORKER_HOST" "sync; sudo -n reboot" || true
     wait_for_worker "$WORKER_HOST" "$REBOOT_TIMEOUT"
   fi
 done
