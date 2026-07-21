@@ -2137,3 +2137,99 @@ wynosi ~2,5 %, więc bez punktu wspólnego nie dałoby się odróżnić przesuni
 sufitu od dryfu maszyny.
 
 Kryterium oceny — zgodnie z decyzją z wpisu wyżej — „każdy slot E2E w budżecie".
+
+## 2026-07-22 — eksperyment thick_mesh: sufit utrzymywanego tempa ZLOKALIZOWANY
+## (480 Hz), dwie kampanie: rate_dense i rate_fine
+
+Zamknięcie punktu 1 z listy otwartych eksperymentu core_speed_1. Dwie kampanie na
+wspólnej gałęzi `experiment/thick_mesh`, silnik bez zmian (master `f458c0f` + wyłącznie
+infrastruktura eksperymentu).
+
+> **_NOTE:_** Artefakty: [results_20260722_thick_mesh/](results_20260722_thick_mesh/) —
+> [rate_dense/](results_20260722_thick_mesh/rate_dense/) (360/540/600/660/700 Hz)
+> i [rate_fine/](results_20260722_thick_mesh/rate_fine/) (360/420/450/480/510 Hz).
+
+### Wynik
+
+| Hz | budżet | E1 max | E1max% | E2E max | E2Emax% | wake_lag p99 | kryterium |
+|---|---|---|---|---|---|---|---|
+| 360 | 2777,8 | 1698,0 | 61,1 % | 1780,4 | 64,1 % | 25,7 | **przechodzi** |
+| 420 | 2381,0 | 1851,0 | 77,7 % | 1984,3 | 83,3 % | 28,7 | **przechodzi** |
+| 450 | 2222,2 | 1845,6 | 83,1 % | 1992,5 | 89,7 % | 29,4 | **przechodzi** |
+| 480 | 2083,3 | 1824,9 | 87,6 % | 1928,8 | 92,6 % | 28,7 | **przechodzi** |
+| 510 | 1960,8 | 1845,6 | 94,1 % | 2424,4 | 123,6 % | 443,9 | nie |
+| 540 | 1851,9 | 1772,2 | 95,7 % | 2630,0 | 142,0 % | 486,3 | nie |
+| 600 | 1666,7 | 1770,0 | 106,2 % | 6056,8 | 363,4 % | 655,2 | nie |
+| 660 | 1515,2 | 1761,9 | 116,3 % | 8014,8 | 529,0 % | 2598,5 | nie |
+| 700 | 1428,6 | 1766,5 | 123,7 % | 9569,8 | 669,9 % | 4157,3 | nie |
+
+**Sufit utrzymywanego tempa: 480 Hz**, próg w przedziale (480, 510]. Dotychczasowe
+twierdzenie artykułu („siatka lokuje sufit między 360 a 720 Hz, nie lokalizując go
+dokładniej") można zastąpić liczbą.
+
+**Przejście jest progiem, nie degradacją.** `wake_lag` p99 skacze z 28,7 na 443,9 µs
+w jednym kroku 30 Hz (15×), przy czym cztery stopnie poniżej trzymają się w paśmie
+25,7–29,4 µs — zaległości nie ma wcale.
+
+**Mechanizm progu.** W reżimie bez ślizgu maksimum E2E jest stałe (~1930–1990 µs).
+Ślizg zaczyna się tam, gdzie to maksimum zrównuje się z budżetem: slot przekraczający
+budżet opóźnia następny i zasiewa zaległość, która się kumuluje. Czyli próg ślizgu
+i kryterium „każdy slot E2E w budżecie" pokrywają się **nie z definicji, tylko
+z mechanizmu** — to jest argument za tym kryterium mocniejszy niż ten, którym je
+przyjmowano. Kryterium medianowe byłoby ślepe: mediana E2E przy 510 Hz to 1386 µs
+(71 % budżetu) i wyglądałaby zdrowo jeszcze przy 700 Hz.
+
+**Maksimum E1 płaskie w całym zakresie: 1698–1851 µs przy tempach różniących się
+dwukrotnie** (mediana 1278–1354). Koszt slotu nie zależy od tempa ani w medianie, ani
+w ogonie — twierdzenie mocniejsze niż to, które artykuł stawia dziś na samej medianie.
+Stąd sufit obliczeniowy daje się policzyć: budżet zrównuje się z ~1850 µs przy ~540 Hz,
+co zgadza się z pomiarem (540 → 95,7 %, 600 → 106,2 %). Sufit dostarczania (480 Hz)
+leży niżej niż obliczeniowy (~540–565 Hz), a cała różnica to sprzężenie zwrotne
+zaległości.
+
+### Błąd doboru pierwszej siatki
+
+Kampania `rate_dense` (360/540/600/660/700) **nie zlokalizowała sufitu** — 360 przechodzi,
+540 już nie, przejście w pominiętym przedziale. Stopnie 420–510 odrzucono argumentem,
+że „niemal na pewno przejdą", opartym na pojemności **obliczeniowej** (~750 próbek/s,
+360 Hz z ~52 % zapasu), podczas gdy przy przyjętym kryterium wiąże **maksimum E2E wobec
+budżetu**. Rozumowanie z niewłaściwej metryki wycięło dokładnie ten przedział, w którym
+leżała odpowiedź. Pierwotna propozycja użytkownika (360/480/540/600) była bliższa trafnej.
+
+Wniosek na przyszłość: drabinkę dobierać z wielkości, którą testuje kryterium stopu,
+a nie z wielkości pokrewnej. Tu wystarczyło zestawić zmierzone maksimum E2E przy 360 Hz
+(1788 µs) z budżetem 1/f — to od razu wskazuje przedział 480–560 Hz.
+
+### Kontrola porównywalności
+
+Kotwica 360 Hz w obu kampaniach: E1 mediana 1310,8 vs 1307,6 µs (0,2 %), E2E max
+1788,2 vs 1780,4 µs (0,4 %). Kampanie szły jedna po drugiej na tej samej binarce
+(`--skip-build`), więc dziewięć stopni złożono w jedną drabinkę bez korekty na dryf.
+Dla porównania: zmienność między kampaniami rozdzielonymi przebudową wynosiła ~3 %.
+
+### Infrastruktura
+
+**Poprawka `wait_for_worker` zwalidowana:** dziewięć restartów, zero zawieszeń. Przed
+poprawką zawieszenie występowało na czterech restartach z czterech.
+
+**Nowa usterka, znaleziona przed startem `rate_fine`:** nadzorca czyta plik konfiguracji
+kampanii (`mapfile`, linia 185) **po** przełączeniu na gałąź eksperymentu (linia 96).
+Gałąź `experiment/thick_mesh` stała na starszym masterze i nie zawierała
+`campaign_rate_fine.csv`, więc plik zniknąłby z drzewa roboczego, lista badań byłaby
+pusta, a kampania zakończyłaby się **kodem 0 z pustym katalogiem wyników** — cicha
+porażka wyglądająca jak sukces. Obejście: przebazowanie gałęzi eksperymentu na aktualny
+master (co i tak jest wymagane przez pkt 26). Do poprawki: asercja przerywająca, gdy
+`${#ROWS[@]}` wynosi zero, oraz przeniesienie odczytu CSV przed `git checkout` gałęzi.
+
+To już trzecia usterka tej samej rodziny w tym harnessie (zawieszenie bez timeoutu,
+timeout nieosiągalny, pusta lista badań bez błędu): **wszystkie objawiają się jako cisza
+albo fałszywy sukces**. Warto przejrzeć nadzorcę pod tym kątem systematycznie.
+
+### Otwarte
+
+1. Zdarzenia ~43 ms przy głębokim nasyceniu — przyczyna nadal nieustalona (z core_speed_1).
+2. Sufit 480 Hz jest wielkością zależną od ogona jittera, więc powtarzalną tylko
+   w przybliżeniu: przy 510 Hz maksimum bez ślizgu (1929–1993 µs) ociera się o budżet
+   1960,8 µs, więc pojedynczy przebieg mógłby wypaść po drugiej stronie. Do rozstrzygnięcia
+   powtórzeniem stopni 480/510 kilka razy, jeśli liczba ma trafić do artykułu jako ostra.
+3. Asercja pustej listy badań w nadzorcy (wyżej).
