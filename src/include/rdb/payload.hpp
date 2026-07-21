@@ -68,6 +68,15 @@ class payload {
   /// descriptor
   [[nodiscard]] std::optional<std::any> getItem(int position) const;
 
+  /// @brief Wariantowy setter (P1, speed_improvement): pisze descFldVT wprost do
+  /// bajtow, bez posrednika std::any (eliminuje konwersje any<->wariant na
+  /// goracej sciezce). Semantyka identyczna z setItem (nullopt => null).
+  void setItemVT(int position, std::optional<descFldVT> valueParam);
+
+  /// @brief Wariantowy getter (P1): czyta bajty do descFldVT bez std::any.
+  /// Semantyka identyczna z getItem (nullopt => null).
+  [[nodiscard]] std::optional<descFldVT> getItemVT(int position) const;
+
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
