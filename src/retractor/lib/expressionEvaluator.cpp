@@ -484,8 +484,11 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
     return v;
   };
 
-  for (auto tk : program) {
-    auto tkStr = tk.getStr_();
+  // S1: token przez referencje (byl przez wartosc -> kopia tokena per iteracja, a token
+  // trzyma descFldVT, ktory moze zawierac std::string). getStr_() liczone LENIWIE — tylko
+  // CALL/CALL2/PUSH_ID2 go potrzebuja, a wczesniej budowal sie string dla kazdego tokena
+  // (arytmetyka, PUSH_VAL, PUSH_ID) tylko po to, by go wyrzucic.
+  for (const auto &tk : program) {
     switch (tk.getCommandID()) {
       case ADD:
       case SUBTRACT:
@@ -555,7 +558,8 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       case AND:
         rStack.push(is_logic_and(b, a));
         break;
-      case CALL:
+      case CALL: {
+        const auto tkStr = tk.getStr_();
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
         if (tkStr == "floor")
           rStack.push(callFun(b, floor));
@@ -589,13 +593,14 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
           throw std::runtime_error(std::string("Unsupported function call: ") + tkStr);
-        break;
-      case CALL2:
+      } break;
+      case CALL2: {
+        const auto tkStr = tk.getStr_();
         if (tkStr == "to_string")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
           throw std::runtime_error(std::string("Unsupported 2-arg function call: ") + tkStr);
-        break;
+      } break;
       case PUSH_ID: {
         if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
@@ -614,6 +619,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         break;
       case PUSH_ID2: {
         if (payload == nullptr) throw std::runtime_error("PUSH_ID2: payload is null");
+        const auto tkStr = tk.getStr_();
         std::regex r(R"((\w*)\[(\d*)\])");
         std::smatch what;
         std::regex_search(tkStr, what, r);  // something[1]

@@ -9,7 +9,7 @@
 
 static_assert(std::is_copy_constructible_v<rdb::descFldVT>);
 
-command_id token::getCommandID() { return command_; }
+command_id token::getCommandID() const { return command_; }
 
 std::string token::getStrCommandID() { return std::string(GetStringcommand_id(command_)); }
 
