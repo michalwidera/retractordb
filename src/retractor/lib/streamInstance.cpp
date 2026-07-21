@@ -381,23 +381,24 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
     rdb::descFldVT retVal = expression.eval(program.lProgram, inputPayload.get());
 
     if (std::holds_alternative<std::monostate>(retVal)) {
-      outputPayload->getPayload()->setItem(i, std::nullopt);
+      outputPayload->getPayload()->setItemVT(i, std::nullopt);
       i++;
       continue;
     }
 
-    std::any result = std::visit([](auto &&arg) -> std::any { return arg; }, retVal);  // God forgive me ... i did it.
-
-    if (!result.has_value()) FatalError("streamInstance::constructOutputPayload: expression result has no value");
-
+    // P1-E2: zapis wprost z wariantu (cast<descFldVT> + setItemVT) — bez owijania
+    // wyniku eval w std::any i bez cast<std::any>. Ewaluator zwraca descFldVT,
+    // payload przyjmuje descFldVT: znika cala konwersja any<->wariant na tej
+    // (najciezszej) sciezce. Parytet z wariantem any-owym potwierdzony round-trip
+    // (test_payload) + integracja bit-identyczna (ctest).
     if (program.field_.rtype != (outputPayload->descriptor[i]).rtype) {
       FatalError("streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i);
     }
 
-    cast<std::any> castAny;
-    std::any value = castAny(result, (outputPayload->descriptor[i]).rtype);
+    cast<rdb::descFldVT> castVT;
+    rdb::descFldVT value = castVT(retVal, (outputPayload->descriptor[i]).rtype);
 
-    outputPayload->getPayload()->setItem(i, value);
+    outputPayload->getPayload()->setItemVT(i, value);
 
     i++;
   }
