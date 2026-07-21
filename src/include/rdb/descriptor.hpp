@@ -45,6 +45,9 @@ class Descriptor : public std::vector<rField> {
   mutable size_t dataSizeBytes_    = 0;
   mutable bool fieldMappingsDirty_{true};
   void rebuildFieldMappings() const;
+  // Zimna sciezka byteOffsetAtFlatIndex (poza TU, uzywa FatalError -> nie wciaga
+  // fmt do tego szeroko-includowanego naglowka). Hot-path jest inline nizej.
+  [[noreturn]] void flatIndexOutOfRange(int flatIndex) const;
 
   static bool singleLineOutput_;
 
@@ -69,14 +72,28 @@ class Descriptor : public std::vector<rField> {
   int fieldSize(std::string_view fieldName);
   [[nodiscard]] int fieldSize(const rdb::rField &field) const;
   size_t fieldByteOffset(std::string_view fieldName);
-  [[nodiscard]] int byteOffsetAtFlatIndex(int flatIndex) const;
+  // Hot-path (P2, speed_improvement): dirty-check inline, zero wywolan cross-TU
+  // gdy cache aktualny (getItem/setItem wolaja to per dostep, ~11% instrukcji
+  // processRows przed inline). Ciezka przebudowa i zimny blad pozostaja poza TU.
+  [[nodiscard]] int byteOffsetAtFlatIndex(int flatIndex) const {
+    if (fieldMappingsDirty_) rebuildFieldMappings();
+    if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) flatIndexOutOfRange(flatIndex);
+    return fieldByteOffsets_[flatIndex];
+  }
   std::string_view fieldTypeName(std::string_view fieldName);
-  [[nodiscard]] int flatElementCount() const;
+  [[nodiscard]] int flatElementCount() const {
+    if (fieldMappingsDirty_) rebuildFieldMappings();
+    return flattenedFieldCount_;
+  }
   std::vector<rField> dataFields();
   rdb::retention_t retention();
   std::pair<std::string, size_t> storagePolicy();
   std::pair<rdb::descFld, int> widestFieldType();
-  [[nodiscard]] std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex) const;
+  [[nodiscard]] std::optional<std::pair<int, int>> flatIndexToDescriptorPosition(int flatIndex) const {
+    if (fieldMappingsDirty_) rebuildFieldMappings();
+    if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) return {};
+    return flatToDescriptorIndexMap_[flatIndex];
+  }
 
   [[nodiscard]] bool hasField(const std::string_view fieldName) const {
     return std::ranges::any_of(*this, [fieldName](const auto &f) { return f.rname == fieldName; });
