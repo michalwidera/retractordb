@@ -1447,7 +1447,8 @@ i werdykt — kolejny wpis.
 ### deterministyczne (start + podpięcie klienta), stan ustalony CZYSTY
 
 > **_NOTE:_** Artefakty: branch `experiment/40ms`,
-> `results/40ms/study_pacer-solo/` i `study_engine-shadow/`
+> [results_20260719/40ms/study_pacer-solo/](results_20260719/40ms/study_pacer-solo/)
+> i [study_engine-shadow/](results_20260719/40ms/study_engine-shadow/)
 > (results.md, e1_probe.csv per powtórzenie, shadow.csv.gz,
 > irq_before/after, dmesg_tail). Kampania: build z brancha,
 > S1 → reboot → S2 5×20k, zakończona 12:28.
@@ -1550,7 +1551,7 @@ Na branchu dodano przełącznik `RDB_MLOCKALL` w rtActivate
 (populate = status quo / onfault = MCL_ONFAULT / off = bez mlockall;
 zmiana funkcjonalna za zgodą poluzowanego pkt 23). Silnik @360 Hz,
 5000 próbek, klient po 2 s; wyniki
-[results/40ms/study_mlock-variant/](results/40ms/study_mlock-variant/)
+[results_20260719/40ms/study_mlock-variant/](results_20260719/40ms/study_mlock-variant/)
 na branchu:
 
 | wariant | max e2e przy attach | zdarzeń wake≥5 ms | szczyt serii |
@@ -1655,7 +1656,8 @@ przechodziły w ramach badań.
   jednoznacznie — warunek prowadzącego spełniony) i usunięty;
   wyjątek pkt 23 REQUIREMENTS.md skonsumowany.
 - Wyniki wszystkich badań (S1/S2/S3/S4) w
-  examples/experiment/results/40ms/ na masterze.
+  [results_20260719/40ms/](results_20260719/40ms/) (w chwili wpisu:
+  `results/40ms/` na masterze; zrotowane 2026-07-21).
 - **Konsekwencje dla artykułu (do osobnej sesji):** sekcje 7.2/7.3/7.5
   main-debs.tex do przepisania na mocniejszą narrację: ogon p99,9 był
   deterministycznym kosztem zdarzeń łączeniowych (start + attach), po
@@ -1718,6 +1720,13 @@ dodatkowy ręczny restart między kampaniami — nadzorca nie restartuje
 po ostatnim badaniu kampanii). Wyniki na masterze
 w results/{rate,clients} (squash f461529).
 
+> **_NOTE:_** Artefakty: [results_20260719/rate/](results_20260719/rate/)
+> i [results_20260719/clients/](results_20260719/clients/)
+> (`study_01/02/03` = 360/720/1080 Hz oraz 1/2/3 klientów; każde
+> badanie zawiera results.md, e1_probe.csv, metrics.csv, migawki
+> stanu). Zrotowane z `results/` 2026-07-21 przed eksperymentem
+> core_speed_1 — wpisy powyżej opisują je jeszcze pod starą ścieżką.
+
 Weryfikacja hipotez:
 
 - **H-R1 POTWIERDZONA** — stan ustalony nietknięty: compute mediana
@@ -1768,3 +1777,166 @@ guarantees i Conclusion wzmocnione z "budżet w medianie i p99" na
 budżetu, przy 2–3 klientach p99,9 w granicach 4% budżetu). Obie
 wersje (EN 13 s. / PL 14 s.) kompilują się czysto. Pełny łańcuch
 zamknięty: śledztwo → fix → walidacja → powtórka kampanii → artykuł.
+
+## 2026-07-21 — eksperyment core_speed_1: pomiar silnika po scaleniu
+## zmian wydajnościowych #190/#191/#193 (branch experiment/core_speed_1)
+
+Powód uruchomienia: na masterze wylądowały trzy zmiany dotykające
+gorącej ścieżki `processRows` — f3044a5 (#190, eliminacja kopii obiektu
+`query`), 5b1cee3 (#191, perf/processrows-hotpath) i 2b8b590 (#193,
+investigation/result 1). Poprzednie kampanie (results_20260719, dawne
+`results/`) mierzyły silnik sprzed tych zmian, więc tabele artykułu
+są nieaktualne.
+
+Zakres i metodyka bez zmian względem powtórki z 2026-07-18: worker
+pi400 (kernel 6.8.0-2049-raspi-realtime), governor performance,
+`taskset -c 3`, SCHED_FIFO 50, dane w /dev/shm, 20 000 próbek na
+badanie, sonda `RDB_BENCH_CSV`, restart maszyny między badaniami.
+Baza brancha: master 1750f3a. Poprzednie wyniki zrotowane w całości
+do `results_20260719/` (154 pliki), `results/` wystartował pusty.
+
+> **_NOTE:_** Artefakty całego eksperymentu:
+> [results_20260721/](results_20260721/) — trzy kampanie
+> ([rate/](results_20260721/rate/), [clients/](results_20260721/clients/),
+> [fir-contrast/](results_20260721/fir-contrast/)), 37 plików.
+> Zebrane do `results/` i zrotowane do `results_20260721/` po
+> zamknięciu eksperymentu, żeby kolejny startował z pustego katalogu
+> (pkt o rotacji przy dostarczeniu nowego kodu). Poprzedni eksperyment
+> leży w [results_20260719/](results_20260719/).
+
+Decyzja zakresowa: mierzymy **wyłącznie master**. Gałąź
+`investigation/speed_improvement` ma dalsze, niescalone commity
+wydajnościowe (f80e0a9 E3a, 1814030 E3b, c65c782 S1, 9bd9686 S2) —
+świadomie poza tym pomiarem, żeby branch eksperymentu pozostał bez
+zmian funkcjonalnych (pkt 6). Zweryfikowane po fakcie:
+`git diff 1750f3a origin/experiment/core_speed_1` poza `results/`
+jest pusty.
+
+### Kampania rate (360/720/1080 Hz, 1 klient)
+
+> **_NOTE:_** Artefakty: [study_01](results_20260721/rate/study_01/results.md) /
+> [study_02](results_20260721/rate/study_02/results.md) /
+> [study_03](results_20260721/rate/study_03/results.md) = 360/720/1080 Hz.
+
+| f [Hz] | E1 mediana | E1 p99 | przepustowość | E2E mediana | E2E p99,9 |
+|---|---|---|---|---|---|
+| 360 | 1333,7 µs | 1614,2 µs | 742 próbek/s | 1398,3 µs | 1880,5 µs |
+| 720 | 1308,0 µs | 1556,2 µs | 735 próbek/s | 363,1 ms | 733,1 ms |
+| 1080 | 1281,3 µs | 1525,9 µs | 754 próbek/s | 4680,5 ms | 9394,6 ms |
+
+Wobec 2026-07-18 @360 Hz: E1 mediana 1880,0 → **1333,7 µs** (−29,1 %),
+przepustowość 527 → **742 próbek/s** (+40,8 %), E2E p99,9
+2692,1 → **1880,5 µs**, a E2E max spadł ze **117 % budżetu
+(przekroczony)** do **78,3 % (mieści się)**. To jakościowa zmiana
+twierdzenia RT @360 Hz: budżet slotu jest dotrzymany również
+w maksimum, nie tylko do p99,9.
+
+`wake_lag` p99,9 spadł 471,2 → 33,4 µs. Wstępnie zapisałem to jako
+podejrzanie duży skok wymagający wyjaśnienia stanem maszyny —
+**hipoteza obalona przez własne dane kampanii**: przy 360 Hz
+wykorzystanie budżetu spadło z ~68 % do ~48 %, więc zaległość slotowa
+przestaje się kumulować. Potwierdzenie w badaniach 720/1080 Hz, gdzie
+`wake_lag` rośnie monotonicznie do setek ms — to nasycenie kolejki,
+nie jitter pobudki.
+
+Ustalenie główne: pojemność silnika jest **płaska i wynosi
+~735–754 próbek/s** niezależnie od zadanej częstości (E1 mediana
+~1,3 ms w każdym z trzech badań). 720 i 1080 Hz to czyste nasycenie.
+
+Kwestia otwarta: siatka 360/720/1080 nie lokalizuje nowego sufitu —
+leży on teraz między 360 a 720 Hz, a żaden stopień go nie próbkuje.
+Do rozstrzygnięcia w kolejnym przebiegu dogęszczoną drabinką
+(np. 480/540/600/660 Hz).
+
+### Kampania clients (1/2/3 klientów @360 Hz)
+
+> **_NOTE:_** Artefakty: [study_01](results_20260721/clients/study_01/results.md) /
+> [study_02](results_20260721/clients/study_02/results.md) /
+> [study_03](results_20260721/clients/study_03/results.md) = 1/2/3 klientów.
+
+| klienci | E1 mediana | E2E p99,9 | wake_lag p99,9 |
+|---|---|---|---|
+| 1 | 1300,7 µs | 1834,8 µs | 31,3 µs |
+| 2 | 1330,0 µs | 1872,7 µs | 33,9 µs |
+| 3 | 1361,3 µs | 1912,9 µs | 32,3 µs |
+
+Przyrost 1→3 klientów: E1 mediana +4,7 %, E2E p99,9 +4,3 %,
+`wake_lag` bez trendu. Wniosek H-R3 z 2026-07-18 (ogon nie skaluje się
+z liczbą klientów) utrzymany, teraz z większym zapasem budżetu.
+Badanie 1 tej kampanii odtwarza rate@360 Hz z dokładnością ~2 %, co
+potwierdza powtarzalność punktu odniesienia między kampaniami.
+
+### Test kontrastowy FIR (dsp-simple-fir)
+
+> **_NOTE:_** Artefakty:
+> [results_20260721/fir-contrast/](results_20260721/fir-contrast/)
+> ([results.md](results_20260721/fir-contrast/results.md) + `probe_{1000,2000,3000,4000}hz.csv`).
+> Bez migawek stanu i metrics.csv — `run_fir_contrast.sh` ich nie
+> zbiera, w odróżnieniu od `run_study.sh`.
+
+Drabinka rozszerzona z 1000/2000/3000 na 1000–5000 Hz, bo przy
+poprzednim sufizie ~2522 próbek/s i spodziewanym +40 % wszystkie trzy
+stare stopnie musiały przejść, zostawiając sufit niewyznaczony.
+
+| f [Hz] | budżet | E1 mediana | przepustowość | E2E mediana |
+|---|---|---|---|---|
+| 1000 | 1000,0 µs | 259,7 µs | 3800 próbek/s | 310,2 µs |
+| 2000 | 500,0 µs | 255,1 µs | 3909 próbek/s | 559,0 µs |
+| 3000 | 333,3 µs | 254,0 µs | 3935 próbek/s | 609,7 µs |
+| 4000 | 250,0 µs | 251,3 µs | 3946 próbek/s | 434,4 ms |
+
+Reguła stopu zadziałała na 4000 Hz i to na włos: 251,3 µs vs 250,0 µs,
+przekroczenie o 1,3 µs (0,5 %). Sufit FIR to ~3950 próbek/s wobec
+~2522 poprzednio (**+56 %**); poprzednio eskalacja urywała się już na
+3000 Hz (384,3 µs > 333,3 µs).
+
+**Zastrzeżenie do reguły stopu — do rozstrzygnięcia.** Reguła patrzy
+wyłącznie na E1, a E2E przekracza budżet slotu wcześniej: już przy
+2000 Hz E2E mediana 559,0 µs > 500,0 µs budżetu (przy E1 na poziomie
+51 % budżetu), przy 3000 Hz 609,7 µs > 333,3 µs. Jeśli kryterium
+czasu rzeczywistego ma być dostarczenie wyniku w slocie, a nie samo
+obliczenie, sufit FIR wynosi między 1000 a 2000 Hz, nie ~3950
+próbek/s. Obie liczby mierzą co innego i nie wolno ich mieszać
+w artykule — wymaga decyzji, którą raportujemy jako „przepustowość
+FIR".
+
+### Uwagi infrastrukturalne
+
+- Restarty workera trwały 5–15 min, co wyglądało na wolny rozruch.
+  Logi rozstrzygnęły inaczej: `systemd-analyze` = 6,571 s (kernel) +
+  17,183 s (userspace) = **23,755 s**, brak jednostek failed,
+  `uptime -s` pokazuje start ~22 s po wydaniu `reboot`. Czas zjada
+  wywołanie `ssh_worker "sudo -n reboot"` w nadzorcy, które nie
+  kończy się po zerwaniu połączenia — dopiero po jego powrocie
+  startuje `wait_for_worker` (stąd mylące „odpowiada po 10s").
+  Wpływu na wyniki brak: `journalctl --list-boots` potwierdza pięć
+  osobnych rozruchów, po jednym na badanie (pkt 4 spełniony).
+  Do poprawy: timeout na tym wywołaniu.
+- Dodane `sync` przed `sudo -n reboot` (master d643b6e) — worker
+  trzyma system i repozytorium na karcie SD, a wyniki są commitowane
+  tuż przed restartem.
+- `state_before.md` nie zapisuje `uptime -s` ani czasu startu systemu,
+  więc artefakty nie dowodzą wprost restartu z pkt 4 (tym razem
+  dowiodły go logi zbierane ręcznie po fakcie). Do dopisania
+  w migawce stanu.
+- Nadzorca przerwał start kampanii `clients` na `git push` odbitym
+  przez remote: commity powstają na workerze (`--amend`), więc
+  lokalny branch na hoście zostaje w tyle po każdej kampanii.
+  Obejście doraźne: `git reset --hard origin/<branch>` na hoście
+  przed kolejną kampanią. Do poprawy w skrypcie.
+
+Wynik eksperymentu: jeden commit na `experiment/core_speed_1` zgodnie
+z pkt 5 — rotacja poprzednich wyników do `results_20260719/`, trzy
+kampanie, rotacja własnych wyników do `results_20260721/` i ten wpis.
+
+Przy okazji rotacji wyszła usterka dokumentacyjna: rotacja z
+2026-07-21 przeniosła dane do `results_20260719/`, ale **nie
+zaktualizowała odwołań w dzienniku** — cztery wskaźniki
+(`NOTE` Fazy 0 śledztwa 40 ms, link do `study_mlock-variant`,
+lokalizacja wyników S1–S4 oraz wyników powtórki kampanii) prowadziły
+do `results/`, czyli po rotacji do danych *innego* eksperymentu.
+Poprawione w tym samym commicie; proza opisująca stan z dnia wpisu
+została nietknięta (pkt 27), a aktualną lokalizację wskazują dopisane
+bloki `NOTE`. Wniosek na przyszłość: rotacja katalogu wyników musi
+obejmować przegląd odwołań w JOURNAL.md — inaczej linki cicho
+zmieniają znaczenie zamiast się psuć.
