@@ -1,5 +1,6 @@
 #include "expressionEvaluator.hpp"
 
+#include <boost/container/small_vector.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cmath>       // sqrt
@@ -464,7 +465,13 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)
 }
 
 rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload) {
-  std::stack<rdb::descFldVT> rStack;
+  // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.
+  // std::deque alokuje mapę + blok już przy konstrukcji pustego stosu (~2 alok.),
+  // a eval() jest wołane raz na pole/regułę co interwał (gorąca ścieżka K1 —
+  // 52.8% alokacji processRows). Inline 16 pokrywa typowe głębokości wyrażeń RPN
+  // bez sterty; głębsze spilują na stertę (bezpieczny fallback). API std::stack
+  // bez zmian — ciało eval() nietknięte. Patrz speed_improvement (run_alloc.sh).
+  std::stack<rdb::descFldVT, boost::container::small_vector<rdb::descFldVT, 16>> rStack;
   rdb::descFldVT a;
   rdb::descFldVT b;
 

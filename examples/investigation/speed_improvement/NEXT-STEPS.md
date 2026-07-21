@@ -4,6 +4,27 @@ Stan: zaakceptowano C1+C2 (kopie query 35→0/interwał, E1 p50 −11.3%), odrzu
 C3 (small_vector — mikro-alokacje nie są wąskim gardłem). Baseline po C1+C2:
 **p50 ≈ 282 µs** (to jest nowy punkt odniesienia dla kolejnych kandydatów).
 
+## K1 — ZROBIONE (2026-07-21): small_vector w eval() zamiast deque
+
+`std::stack<descFldVT>` (kontener domyślny = `std::deque`, alokuje mapę+blok już
+przy pustej konstrukcji, ~2 alok./eval) → `std::stack<…, small_vector<…,16>>`
+(inline, 0 alok. dla płytkich wyrażeń). API std::stack bez zmian, ciało eval()
+nietknięte. `expressionEvaluator.cpp`.
+
+**Dowód deterministyczny (mocny):** alokacje/interwał 1137→567 (**−50.1%**),
+kubełek constructOutputPayload 590→20 (**−96.6%**), bajty 319.5→168.1 KiB.
+ctest 153/153 (output bit-identyczny). E1 p50 282.1→278.3 µs (**−1.35%**, rozkłady
+rozdzielone), p99 płaskie (w szumie).
+
+**KLUCZOWY WNIOSEK: −50% alokacji dało tylko −1.35% czasu.** Reconfirm lekcji
+C1/C2/C3 — małe bloki glibc są tanie; **liczba alokacji NIE jest wąskim gardłem
+E1** na tym workloadzie. K1 to darmowy, czysty zysk (mniej ruchu pamięci, zero
+downside) — AKCEPTUJ do merge. Ale: **dalsze polowanie na alokacje (K4/K2/K3) nie
+ma sensu** — zysk czasowy byłby proporcjonalnie znikomy. Następny kierunek: profiluj
+co realnie dominuje ~278 µs (arytmetyka variant/visit, getItem std::any→variant,
+payload read/write), nie alokacje. Licznik alokacji zrobił swoje: wykluczył całą
+klasę hipotez.
+
 ## Metodyka (potwierdzona)
 
 - Na WSL2 czas jest zaszumiony → **głównym dowodem rób licznik deterministyczny**,
