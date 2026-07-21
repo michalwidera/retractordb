@@ -37,15 +37,33 @@ std::atomic<long> allocBytes{0};
 std::atomic<long> freeCount{0};
 
 namespace {
+// Rejestr kubełków lokalizacyjnych (RDB_ALLOC_SCOPE). Strona instrumentowana
+// rejestruje kubełki przy static init; Reporter wypisuje je przy wyjściu. Stała
+// pojemność — brak alokacji w registerBucket (a i tak byłaby startowa, kasuje się
+// w metodzie różnicy). const char* to literały nazw faz — nie alokują.
+constexpr int kMaxBuckets = 32;
+struct BucketEntry {
+  const char *name;
+  std::atomic<long> *counter;
+};
+BucketEntry g_buckets[kMaxBuckets];
+int g_bucketCount = 0;
+
 // Raport na stderr przy zakończeniu procesu (destruktor obiektu statycznego),
 // tak jak Reporter w query.cpp. fprintf do (niebuforowanego) stderr nie alokuje.
 struct Reporter {
   ~Reporter() {
     std::fprintf(stderr, "[RDB_ALLOC_COUNTER] heap allocs total: %ld  bytes total: %ld  frees total: %ld\n", allocCount.load(),
                  allocBytes.load(), freeCount.load());
+    for (int i = 0; i < g_bucketCount; ++i)
+      std::fprintf(stderr, "[RDB_ALLOC_COUNTER] bucket %s: %ld\n", g_buckets[i].name, g_buckets[i].counter->load());
   }
 } reporter_;
 }  // namespace
+
+void registerBucket(const char *name, std::atomic<long> *counter) {
+  if (g_bucketCount < kMaxBuckets) g_buckets[g_bucketCount++] = {name, counter};
+}
 
 inline void *tracked_alloc(std::size_t size) {
   allocCount.fetch_add(1, std::memory_order_relaxed);

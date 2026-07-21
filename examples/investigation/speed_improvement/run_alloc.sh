@@ -44,16 +44,14 @@ mkdir -p "$OUTDIR"
 PIN=""
 if command -v taskset >/dev/null 2>&1; then PIN="taskset -c 3"; fi
 
-# Sprawdzenie, ze licznik jest wkompilowany (inaczej brak raportu -> falszywe zera).
-probe_err="$(mktemp)"; trap 'rm -f "$probe_err"' EXIT
 cd "$RQLDIR"   # RQL czyta pliki danych z CWD
 
-run_alloc() {  # $1 = liczba interwalow; echo "allocs bytes frees"
-  local n="$1" err
-  err="$(mktemp)"
+WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+
+run_alloc() {  # $1 = liczba interwalow -> zapis pelnego stderr do $WORK/n$1.err; echo "allocs bytes frees"
+  local n="$1" err="$WORK/n$1.err"
   RDB_BENCH_CSV=/dev/null $PIN "$BIN" "$RQL" -k -m "$n" >/dev/null 2>"$err" || true
-  local line; line="$(grep 'RDB_ALLOC_COUNTER' "$err" || true)"
-  rm -f "$err"
+  local line; line="$(grep 'heap allocs total' "$err" || true)"
   [ -n "$line" ] || { echo "BRAK raportu RDB_ALLOC_COUNTER — binarka bez -DRDB_ALLOC_COUNTER=ON" >&2; exit 1; }
   local a b f
   a="$(echo "$line" | grep -o 'allocs total: [0-9]*' | grep -o '[0-9]*')"
@@ -71,6 +69,18 @@ BYTES_PER=$(awk "BEGIN{printf \"%.1f\", ($B2-$B1)/$DELTA}")
 FREES_PER=$(awk "BEGIN{printf \"%.2f\", ($F2-$F1)/$DELTA}")
 KB_PER=$(awk "BEGIN{printf \"%.1f\", ($B2-$B1)/$DELTA/1024}")
 
+# Rozbicie na kubelki lokalizacyjne (RDB_ALLOC_SCOPE): dla kazdej nazwy kubelka
+# z raportu N2 policz per-interwal metoda roznicy. Pusto jesli binarka bez
+# instrumentacji faz (sam licznik globalny) — tabela sie po prostu nie pojawi.
+bucket_rows=""
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  v1="$(grep -F "bucket $name: " "$WORK/n$N1.err" | grep -o '[0-9]*$')"
+  v2="$(grep -F "bucket $name: " "$WORK/n$N2.err" | grep -o '[0-9]*$')"
+  per="$(awk "BEGIN{printf \"%.2f\", ($v2-$v1)/$DELTA}")"
+  bucket_rows+="| \`$name\` | $per |"$'\n'
+done < <(grep -o 'bucket [^:]*:' "$WORK/n$N2.err" | sed 's/^bucket //; s/:$//')
+
 {
   echo "# alloc wynik: $LABEL"
   echo
@@ -83,6 +93,14 @@ KB_PER=$(awk "BEGIN{printf \"%.1f\", ($B2-$B1)/$DELTA/1024}")
   echo "| **alokacje / interwal** | **$ALLOC_PER** |"
   echo "| bajty / interwal | $BYTES_PER (${KB_PER} KiB) |"
   echo "| zwolnienia / interwal | $FREES_PER |"
+  if [ -n "$bucket_rows" ]; then
+    echo
+    echo "## Rozbicie na fazy processRows (alokacje/interwal)"
+    echo
+    echo "| kubelek | alloc/interwal |"
+    echo "|---|---|"
+    printf '%s' "$bucket_rows"
+  fi
   echo
   echo "surowe totale: N1 allocs=$A1 bytes=$B1 frees=$F1 ; N2 allocs=$A2 bytes=$B2 frees=$F2"
 } | tee "$OUTDIR/$LABEL-alloc.md"

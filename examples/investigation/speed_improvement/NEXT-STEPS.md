@@ -40,11 +40,28 @@ scripts/buildrdb.sh probe
 UWAGA: atomic per alloc perturbuje czas → E1 (czas) mierz na czystym `probe`
 (bez ALLOC_COUNTER), alokacje mierz na build z ALLOC_COUNTER. Dwa osobne buildy.
 
-### Następny krok: zlokalizować 1137 alokacji do call-site
-Zanim ruszysz K1/K2 — potwierdź który to największy udział (nie zgaduj). Opcje:
-snapshot `ralloc::allocCount` wokół faz `processRows` (constructOutputPayload vs
-reduceFieldsToPayload vs constructAgsePayload/okna FIR), dumpowane per-bucket przy
-wyjściu. Wtedy atak na największy bucket.
+### LOKALIZACJA — ZROBIONE (2026-07-21)
+Dodane kubełki `RDB_ALLOC_SCOPE` (`allocCounter.hpp` + rejestr w `allocCounter.cpp`;
+instrumentacja faz `processRows` w `dataModel.cpp`, cała pod `#ifdef` → produkcja
+neutralna, ut_dataModel/payload OK). `run_alloc.sh` wypisuje teraz tabelę kubełków.
+Wyniki **idealnie deterministyczne** (każda delta dzieli się bez reszty przez Δ):
+
+| faza processRows | alloc/interwał | udział processRows |
+|---|---|---|
+| **K1 `constructOutputPayload`** | **590** | **52.8%** ← cel #1 |
+| `constructInputPayload` (całość) | 465 | 41.6% |
+| — **K4 `constructAgsePayload`** | **264** | 23.6% ← cel #2 |
+| — K2 `reduceFieldsToPayload` | 60 | 5.4% |
+| — inne (getPayload/operator+/DEHASH) | 141 | 12.6% |
+| `outputPayload.write` | 62 | 5.5% |
+| `declarations` | 1 | 0.1% |
+| `constructRulesAndUpdate` | 0 | 0% |
+
+Suma faz = 1118/1137 (~19/interwał poza `processRows`: getAwaitedStreamsSet/boradcast).
+**Wniosek: K1 (590) + K4 (264) = 854 = 75% wszystkich alokacji.** K1 to
+jednoznaczny cel #1, K4 drugi. K2 (60) i K3 (inne=141) mają mały udział — niski
+priorytet. Atakuj K1, mierz `run_alloc.sh k1-... ` przed/po (różnica kubełka
+constructOutputPayload = dowód) + E1 czas na osobnym buildzie probe.
 
 ## Konkretni kandydaci (od najbardziej obiecujących)
 
@@ -58,7 +75,7 @@ Hipoteza: przejście z `std::any` na `rdb::descFldVT` (wariant, bez alokacji) na
 tej ścieżce zetnie alokacje. Ryzyko: dotyka `cast<>` i `setItem` — sprawdź
 kontrakt typów. Zmierz licznikiem alokacji przed/po.
 
-### K2 — `reduceFieldsToPayload` (SUM/AVG/MIN/MAX)  ★
+### K2 — `reduceFieldsToPayload` (SUM/AVG/MIN/MAX)  — NISKI PRIORYTET (60/interwał, 5.4%)
 [streamInstance.cpp:179]. Per wywołanie: `std::make_unique<rdb::payload>` (alloc),
 `std::any valueRet` + `castAny` per element, `fnOp<T>` na `std::any`. Używane
 przez mwi (.avg), mwi_thr (.avg), bp_out (.sumc) → co interwał.
@@ -66,15 +83,15 @@ Hipoteza: usunąć `std::any` z pętli redukcji (trzymać `descFldVT`/konkretny 
 zwracać payload bez `make_unique` (przez wartość, NRVO — jak w constructAgsePayload
 po jego optymalizacji). Zmierz alokacje.
 
-### K3 — kopie payloadów wejściowych
+### K3 — kopie payloadów wejściowych  — NISKI PRIORYTET (~141/interwał w "inne", 12.6%)
 [dataModel.cpp constructInputPayload]: `*(inputPayload) = *getPayload(a)` oraz
 `*getPayload(a) + *getPayload(b)` (STREAM_ADD, l. ~254). Kopiują dane (konieczne),
 ale sprawdź `payload::operator+` i `operator=` pod kątem ZBĘDNYCH pośrednich
 alokacji/kopii (np. tymczasowy payload w operator+). Cel: eliminacja tymczasowych,
 nie samych danych.
 
-### K4 — `constructAgsePayload` / `fetchForward` zwracają payload przez wartość
-Już mają cache deskryptora. Sprawdź czy `getItem`/`setItem` w pętli po elementach
+### K4 — `constructAgsePayload` (okna FIR)  ★ CEL #2 (264/interwał, 23.6%)
+Już ma cache deskryptora. Sprawdź czy `getItem`/`setItem` w pętli po elementach
 nie robią alokacji per element (np. `std::any` w getItem). Splot FIR (mlii_win@(1,25),
 bp_win@(1,5), mwi_win@(1,30), mwi_long@(1,180)) → duże okna, dużo elementów/interwał.
 mwi_long ma okno 180 — to potencjalnie najcięższy pojedynczy strumień.

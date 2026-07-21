@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
+#include "allocCounter.hpp"
 #include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "SOperations.hpp"
@@ -15,6 +16,26 @@
 // ctest -R '^ut-dataModel' -V
 
 std::mutex core_mutex;
+
+#ifdef RDB_ALLOC_COUNTER
+// Kubełki lokalizacyjne alokacji w processRows (diagnostyka speed_improvement).
+// Rozbijają baseline 1137 alok./interwał na fazy → wskazują cel dla K1/K2/K4.
+// b_reduce (K2) i b_agse (K4) to PODZBIÓR b_input (mierzone wewnątrz).
+namespace {
+std::atomic<long> b_input{0}, b_output{0}, b_write{0}, b_rules{0}, b_decl{0}, b_reduce{0}, b_agse{0};
+struct RegisterBuckets {
+  RegisterBuckets() {
+    ralloc::registerBucket("constructInputPayload", &b_input);
+    ralloc::registerBucket("constructOutputPayload(K1)", &b_output);
+    ralloc::registerBucket("outputPayload.write", &b_write);
+    ralloc::registerBucket("constructRulesAndUpdate", &b_rules);
+    ralloc::registerBucket("declarations", &b_decl);
+    ralloc::registerBucket("reduceFieldsToPayload(K2,subset-input)", &b_reduce);
+    ralloc::registerBucket("constructAgsePayload(K4,subset-input)", &b_agse);
+  }
+} registerBuckets_;
+}  // namespace
+#endif
 
 dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   //
@@ -127,10 +148,22 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;      // Declarations already processed
 
-    constructInputPayload(q.id);                    // That will create 'from' clause data set
-    qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
-    qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
-    qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
+    {
+      RDB_ALLOC_SCOPE(b_input);
+      constructInputPayload(q.id);
+    }  // 'from' clause data set
+    {
+      RDB_ALLOC_SCOPE(b_output);
+      qSet[q.id]->constructOutputPayload(q.lSchema);
+    }  // 'select' fields (K1)
+    {
+      RDB_ALLOC_SCOPE(b_write);
+      qSet[q.id]->outputPayload->write();
+    }  // store 'select' data
+    {
+      RDB_ALLOC_SCOPE(b_rules);
+      qSet[q.id]->constructRulesAndUpdate(q);
+    }  // rules for this query
   }
 
   // Then - process all declarations to unlock them for next step
@@ -139,6 +172,7 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     if (!q.isDeclaration()) continue;     // first declarations need to be processed
 
     if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
+    RDB_ALLOC_SCOPE(b_decl);
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
@@ -222,6 +256,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
     case STREAM_MAX: {
       const auto nameSrc = arg[0].getStr_();
 
+      RDB_ALLOC_SCOPE(b_reduce);  // K2 (podzbiór constructInputPayload)
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->reduceFieldsToPayload(cmd, instance + "_0");
     } break;
     case STREAM_SUBTRACT: {
@@ -265,6 +300,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
         FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
       }
       const int storedRecordsInOutput = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+      RDB_ALLOC_SCOPE(b_agse);  // K4 (podzbiór constructInputPayload)
       *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
     } break;
     case STREAM_HASH: {
