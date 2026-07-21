@@ -2106,3 +2106,34 @@ i przeniesienie inkrementacji `waited` tak, żeby timeout faktycznie działał.
 4. Resztkowa nadwyżka graniczna ~43–59 µs: `std::string` per token
    w `readTokenFromFstream` i `payload::setItem` na `std::any`. To drugie
    pokrywa się z planowanym P1 E4 na `investigation/speed_improvement`.
+
+## 2026-07-21 — poprawka harnessu i zagęszczona siatka temp (przygotowanie
+## eksperymentu thick_mesh)
+
+Zamknięcie punktu 1 z listy otwartych powyżej wymagało wcześniej dwóch zmian
+infrastruktury, obie na masterze (branch eksperymentu nie może zawierać zmian
+funkcjonalnych, pkt 6).
+
+**`wait_for_worker` (`lib/common.sh`).** Sonda opakowana w `timeout 15`, dołożone
+`ServerAliveInterval/CountMax` jak w `ssh_worker`, a odmierzanie czasu przeniesione
+z sumowania `sleep` na zegar (`date +%s` i termin). Sumowanie było błędne
+niezależnie od zawieszania: nieudana iteracja trwa tyle, ile sonda plus `sleep`,
+więc licznik przyrostowy zawyżał faktyczny timeout. Zweryfikowane: host osiągalny —
+powrót po 3 s; host nieosiągalny z `timeout_s=5` — `die` po 5 s zamiast wiszenia.
+
+**Siatka.** Nowa kampania `rate_dense` (`config/campaign_rate_dense.csv`):
+360 / 540 / 600 / 660 / 700 Hz, 1 klient, 20 000 próbek. Kampania ma własną nazwę,
+własny plik konfiguracji i własny katalog wyników — siatka rzadka i gęsta nie
+mieszają się w jednym zestawie. W `start_supervisor.sh` wprowadzone `CAMPAIGN_KIND`
+(układ kolumn CSV i treść celu) obok `CAMPAIGN` (nazwa własna), więc `rate_dense`
+dziedziczy zachowanie `rate` bez powielania kodu.
+
+Dobór stopni: pojemność wynosi ~750 próbek/s (mediana), a 360 Hz jest trzymane
+z ~52 % zapasu, więc 480 i 540 Hz niemal na pewno przejdą — punkty poniżej 540
+kupowałyby restart workera za potwierdzenie rzeczy już wiadomej. Przedział
+faktycznie próbkujący przejście to 600–720 Hz (stosunek żądania do pojemności
+0,80–0,96). 360 Hz zostaje jako kotwica kalibracyjna: zmienność między kampaniami
+wynosi ~2,5 %, więc bez punktu wspólnego nie dałoby się odróżnić przesunięcia
+sufitu od dryfu maszyny.
+
+Kryterium oceny — zgodnie z decyzją z wpisu wyżej — „każdy slot E2E w budżecie".
