@@ -198,7 +198,10 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // same as core[instance].descriptorFrom()
 
   // Second construct payload
-  std::unique_ptr<rdb::payload> localPayload = std::make_unique<rdb::payload>(descriptor);
+  // S2: obiekt lokalny zamiast make_unique — wczesniej payload powstawal na stercie,
+  // a 'return *(localPayload)' KOPIOWAL go w calosci do wyniku. Lokalna zmienna +
+  // NRVO usuwa i alokacje, i kopie (ten sam wzorzec co w constructAgsePayload).
+  rdb::payload localPayload(descriptor);
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
     FatalError("streamInstance: aggregation not supported for this field type");
@@ -307,8 +310,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
 
   if (validItemCount == 0) {
     auto postion{0};
-    localPayload->setItemVT(postion, std::nullopt);
-    return *(localPayload);
+    localPayload.setItemVT(postion, std::nullopt);
+    return localPayload;
   }
 
   if (cmd == STREAM_AVG) {
@@ -377,9 +380,9 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       FatalError("streamInstance: unsupported type in aggregation finalization");
   }
   auto postion{0};
-  localPayload->setItemVT(postion, valueRet);
+  localPayload.setItemVT(postion, valueRet);
 
-  return *(localPayload);
+  return localPayload;
 }
 
 void streamInstance::constructOutputPayload(const std::list<field> &fields) const {
