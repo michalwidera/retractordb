@@ -2233,3 +2233,30 @@ albo fałszywy sukces**. Warto przejrzeć nadzorcę pod tym kątem systematyczni
    1960,8 µs, więc pojedynczy przebieg mógłby wypaść po drugiej stronie. Do rozstrzygnięcia
    powtórzeniem stopni 480/510 kilka razy, jeśli liczba ma trafić do artykułu jako ostra.
 3. Asercja pustej listy badań w nadzorcy (wyżej).
+
+## 2026-07-22 — nadzorca: konfiguracja badań wczytywana przed checkoutem gałęzi
+
+Zamknięcie punktu 3 z listy wyżej. Poprawka jest dwuczęściowa, bo sama asercja
+leczyłaby objaw, a nie przyczynę.
+
+Przyczyna: `mapfile` czytał plik konfiguracji tuż przed pętlą badań, czyli **po**
+przełączeniu drzewa roboczego na gałąź eksperymentu. Gdy gałąź stała na starszym
+masterze i nie zawierała jeszcze danego `campaign_*.csv`, plik znikał z drzewa
+i lista badań wychodziła pusta — kampania kończyła się kodem 0 z pustym katalogiem
+wyników.
+
+Poprawka: odczyt przeniesiony w górę, tuż za weryfikację `master == origin/master`,
+gdzie plik jest gwarantowany. Lista trafia do pamięci (`ROWS`, `TOTAL`) i nie jest
+już czytana ponownie, więc dalsze przełączenia drzewa nie mogą jej zmienić. Do tego
+asercja `TOTAL > 0` i log potwierdzający liczbę wczytanych badań — nadzorca ma teraz
+mówić, ile zamierza wykonać, zanim zacznie.
+
+Zweryfikowane: plik z samym nagłówkiem → `die`, `campaign_rate_fine.csv` → 5 badań.
+Kolejność w skrypcie: `git checkout master` (77), odczyt konfiguracji (89–93),
+`git checkout $BRANCH` (108).
+
+To domyka trzy usterki tej samej rodziny znalezione w tym harnessie — zawieszenie
+bez timeoutu, timeout nieosiągalny z konstrukcji pętli, pusta lista badań bez
+błędu. Wspólny wzorzec: **stan zewnętrzny zmienia się pod skryptem, a skrypt nie
+sprawdza, czy to, na czym pracuje, nadal istnieje**. Warto przy okazji kolejnej
+zmiany przejrzeć nadzorcę pod tym kątem, zamiast czekać na czwarty przypadek.
