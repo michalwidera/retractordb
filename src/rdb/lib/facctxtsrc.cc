@@ -1,13 +1,17 @@
 #include "rdb/facctxtsrc.hpp"
 
+#include <sys/stat.h>  // stat, S_ISREG — rozpoznanie pliku zwykłego przy doborze buforowania
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cstring>  // memcpy
-#include <memory>   // make_unique
+#include <charconv>  // from_chars
+#include <cstring>   // memcpy
+#include <memory>    // make_unique
 #include <optional>
 #include <ranges>
 #include <sstream>
+#include <type_traits>  // is_integral_v
 #include "fatalError.hpp"
 
 namespace rdb {
@@ -33,6 +37,18 @@ bool isNullToken(const std::string &token) { return token == "NULL" || token == 
 template <typename T>
 T parseAs(const std::string &token) {
   T var{0};
+  // std::from_chars nie alokuje i nie buduje obiektu strumienia, więc zdejmuje stały koszt konstrukcji
+  // std::istringstream ponoszony na każdy token. Składnie, których from_chars nie przyjmuje (wiodący '+',
+  // wartość ujemna dla typu bez znaku), obsługuje niezmieniona ścieżka strumieniowa poniżej — zbiór
+  // akceptowanych tokenów i wynik parsowania pozostają takie same jak dotąd.
+  //
+  // Tylko typy całkowite: dla zmiennoprzecinkowych from_chars przyjmuje "inf"/"nan", na których ścieżka
+  // strumieniowa daje 0 — to byłaby cicha zmiana zawartości strumienia, więc FLOAT/DOUBLE zostają na
+  // std::istringstream.
+  if constexpr (std::is_integral_v<T>) {
+    if (std::from_chars(token.data(), token.data() + token.size(), var).ec == std::errc{}) return var;
+  }
+
   std::istringstream(token) >> var;
   return var;
 }
@@ -67,7 +83,14 @@ textSourceRO::textSourceRO(const std::string_view fileName,    //
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
 
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
-  myFile_.rdbuf()->pubsetbuf(nullptr, 0);
+  // Buforowanie wyłączamy wyłącznie dla źródeł nieregularnych (urządzenia, FIFO): tam bufor czytałby w przód
+  // poza bieżącą krotkę i konsumowałby bajty należące do kolejnych odczytów. Dla pliku zwykłego jesteśmy
+  // jedynym czytelnikiem deskryptora, więc bufor jest bezpieczny i zdejmuje koszt I/O ponoszony przez
+  // operator>> na każdy znak. Nierozpoznany stat traktujemy jak źródło nieregularne (wariant zachowawczy).
+  struct stat sourceStat{};
+  if (::stat(filename_.c_str(), &sourceStat) != 0 || !S_ISREG(sourceStat.st_mode)) {
+    myFile_.rdbuf()->pubsetbuf(nullptr, 0);
+  }
   myFile_.open(filename_, std::ios::in);
   if ((myFile_.rdstate() & std::ifstream::failbit) != 0) {
     SPDLOG_WARN("Unable to open text source file: {}", filename_);
