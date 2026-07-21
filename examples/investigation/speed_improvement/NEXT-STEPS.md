@@ -25,6 +25,39 @@ co realnie dominuje ~278 µs (arytmetyka variant/visit, getItem std::any→varia
 payload read/write), nie alokacje. Licznik alokacji zrobił swoje: wykluczył całą
 klasę hipotez.
 
+## PROFIL DETERMINISTYCZNY (2026-07-21, po K1) — gdzie NAPRAWDĘ jest czas
+
+Callgrind (`--toggle-collect='*processRows*'`, -m 200) — instrukcje deterministyczne,
+odporne na szum WSL2. Pełne tabele: `results/profile-k1-callgrind.md`. Wnioski:
+
+**Inclusive (% instrukcji processRows):** constructInputPayload 50.4% [constructAgse
+31.5%, reduceFields 11%], constructOutputPayload 40.6% [eval 21.6%], **setItem 22.2%
+(największy liść, cross-cut)**, **cast<std::any> 15.9%**, storage read (revRead/read/
+memoryFile) ~19/19/8.6%, visit_descFld<int,std::any> 8.5%, **resolveFieldIndexOrAbort
+8.5%**. Self-top: **std::any::_Manager_internal::_S_manage 6.9%**, memcmp 6.5%,
+resolveFieldIndexOrAbort 5.6%, setItem 4.5%, strcmp 3.1%.
+
+**GŁÓWNY WNIOSEK: wąskim gardłem E1 jest type-erasure `std::any` na interfejsie
+payload (~30% łącznie: cast<any> 15.9% + visit_descFld→any 8.5% + _S_manage 6.9% +
+any_caster/any::operator= …).** Payload mówi w `std::any`, evaluator w `descFldVT`
+(wariant) — każde getItem/setItem konwertuje tam i z powrotem. To czysty narzut CPU
+(NIE alokacja — potwierdzone przez K1). Do tego string-keyed mapy (memcmp+strcmp+
+map<string>[] ~13%) i przeliczanie indeksu pola per dostęp.
+
+### Kandydaci wg profilu (nowa numeracja P*, zastępuje K*-alokacyjne)
+- **P1 — `std::any` → `descFldVT` w interfejsie `payload::getItem/setItem`  ★★ największy lewar**
+  (~30% processRows). Evaluator już używa `descFldVT`; usunięcie konwersji any↔wariant
+  eliminuje cast<std::any>, visit_descFld<_,std::any>, _Manager_internal, any_caster.
+  INWAZYJNE: sygnatury getItem/setItem używane szeroko (payload.cc, streamInstance,
+  testy). Duży, ale to jest realne miejsce czasu. Rozważyć etapami / silniejszy model.
+- **P2 — cache indeksu pola (`resolveFieldIndexOrAbort`)  ★ tani szybki zysk** (~8.5%).
+  [payload.cc:28] woła `flatIndexToDescriptorPosition` + `flatElementCount` przy KAŻDYM
+  getItem/setItem, mimo że deskryptor jest statyczny w obrębie strumienia. Memoizacja
+  flatIndex→position (np. wektor lookup w Descriptor budowany raz) zetnie 5.6% self.
+- **P3 — string-keyed lookupy** (~13%): `qSet[id]`, `getPayload(name)`, wewnętrzne
+  `map<string,vector<vector<uint8>>>` w storage, `token::getStr_` zwraca string przez
+  wartość (kopia). Cache wskaźników strumieni / referencje zamiast kopii stringów.
+
 ## Metodyka (potwierdzona)
 
 - Na WSL2 czas jest zaszumiony → **głównym dowodem rób licznik deterministyczny**,
