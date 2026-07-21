@@ -129,7 +129,14 @@ TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
   ss << in.rdbuf();
   const std::string out = ss.str();
 
+  // Test podaza za decyzja projektowa: ciche raportowanie w Release
+  // (SPDLOG_ACTIVE_LEVEL=ERROR — zwiazane z efektywnoscia) odfiltrowuje INFO na
+  // poziomie runtime (setupLoggerMain ustawia poziom = SPDLOG_ACTIVE_LEVEL), wiec
+  // marker INFO w Release LEGALNIE nie powstaje. Prefiks INFO=><6> sprawdzamy tylko
+  // gdy build przepuszcza INFO (Debug); prefiks ERROR=><3> obowiazuje zawsze.
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_INFO
   EXPECT_NE(out.find("<6>[I] idle marker"), std::string::npos);
+#endif
   EXPECT_NE(out.find("<3>[E] error marker"), std::string::npos);
 
   fs::remove(captureFile);

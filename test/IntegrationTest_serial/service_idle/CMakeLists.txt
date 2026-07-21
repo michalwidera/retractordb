@@ -23,8 +23,20 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash service-idle.sh env)
 
+# Logi INFO sa wkompilowane tylko poza Release (SPDLOG_ACTIVE_LEVEL, glowny
+# CMakeLists.txt). W Release tryb uslugowy nie emituje markerow INFO — skrypt
+# pomija wtedy asercje INFO (podaza za cichym, efektywnym Release). Przekazujemy
+# efektywny stan INFO przez zmienna srodowiskowa testu.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(_rdbInfoActive 0)
+else()
+  set(_rdbInfoActive 1)
+endif()
+
 # Testy startują serwer (blokada /tmp/xretractor_service.lock), więc muszą biec
 # szeregowo. Makro add_test wykrywa to po -m/-k w argv, ale tu flagi są w
 # skrypcie, dlatego ustawiamy RUN_SERIAL jawnie.
-set_tests_properties(${TestID}-run ${TestID}-env PROPERTIES RUN_SERIAL TRUE
-                                                            TIMEOUT 60)
+set_tests_properties(
+  ${TestID}-run ${TestID}-env
+  PROPERTIES RUN_SERIAL TRUE TIMEOUT 60 ENVIRONMENT
+             "RDB_INFO_ACTIVE=${_rdbInfoActive}")
