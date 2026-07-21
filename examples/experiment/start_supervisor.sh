@@ -9,8 +9,13 @@
 #   michal ALL=(root) NOPASSWD: /usr/sbin/reboot
 #
 # Usage:
-#   examples/experiment/start_supervisor.sh rate   [--branch NAME] [--sink null|nc]
+#   examples/experiment/start_supervisor.sh rate       [--branch NAME] [--sink null|nc]
+#   examples/experiment/start_supervisor.sh rate_dense [--branch NAME] [--sink null|nc]
 #   examples/experiment/start_supervisor.sh clients --rate-hz N [--branch NAME] [--sink null|nc]
+#
+# 'rate_dense' to ta sama kampania co 'rate' (ten sam uklad kolumn CSV, ten sam cel),
+# ale z gestsza drabinka temp -- wlasny plik konfiguracji i wlasny katalog wynikow,
+# zeby siatka rzadka i gesta nie mieszaly sie w jednym zestawie.
 #
 # Opcje:
 #   --worker HOST        alias/host SSH workera (domyslnie: worker)
@@ -25,9 +30,15 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && cd .. && pwd)"
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
 
-[ $# -ge 1 ] || die "Usage: $0 <rate|clients> [opcje]"
+[ $# -ge 1 ] || die "Usage: $0 <rate|rate_dense|clients> [opcje]"
 CAMPAIGN="$1"; shift
-[ "$CAMPAIGN" = "rate" ] || [ "$CAMPAIGN" = "clients" ] || die "campaign musi byc 'rate' albo 'clients'"
+# CAMPAIGN_KIND rozstrzyga uklad kolumn CSV i tresc celu kampanii; CAMPAIGN zostaje
+# nazwa wlasna (katalog wynikow, plik konfiguracji).
+case "$CAMPAIGN" in
+  rate|rate_dense) CAMPAIGN_KIND="rate" ;;
+  clients)         CAMPAIGN_KIND="clients" ;;
+  *) die "campaign musi byc 'rate', 'rate_dense' albo 'clients'" ;;
+esac
 
 WORKER_HOST="worker"
 WORKER_REPO="/home/michal/retractordb"
@@ -51,7 +62,7 @@ while [ $# -gt 0 ]; do
     *) die "Nieznana opcja: $1" ;;
   esac
 done
-[ "$CAMPAIGN" = "clients" ] && [ "$RATE_HZ" = "360" ] && \
+[ "$CAMPAIGN_KIND" = "clients" ] && [ "$RATE_HZ" = "360" ] && \
   log "UWAGA: kampania 'clients' uzywa rate-hz=360 (domyslnie). Jesli kampania 'rate' wskazala inna stabilna czestosc, podaj ja przez --rate-hz."
 
 CONFIG_CSV="$SCRIPT_DIR/config/campaign_${CAMPAIGN}.csv"
@@ -139,7 +150,7 @@ ssh_worker "$WORKER_HOST" "
 # --- README.md kampanii: generowany PRZED pierwszym badaniem, nie dopisywany
 # po fakcie (REQUIREMENTS.md, pkt "kazdy katalog kampanii ma dolaczony...") ---
 log "Generuje $CAMPAIGN_RESULTS_DIR/README.md na workerze..."
-if [ "$CAMPAIGN" = "rate" ]; then
+if [ "$CAMPAIGN_KIND" = "rate" ]; then
   CAMPAIGN_GOAL="Ustalenie maksymalnej czestosci naplywu danych (Hz), przy ktorej algorytm detekcji QRS (Pan-Tompkins, examples/ecg/rec205/rec205-detect.rql) na tym sprzecie workera dotrzymuje budzetu czasu rzeczywistego -- REQUIREMENTS.md pkt 12-15. Celem NIE jest poprawnosc detekcji, tylko przepustowosc (pkt 13)."
 else
   CAMPAIGN_GOAL="Ustalenie wplywu liczby dolaczonych klientow xqry (1..10) na proces xretractor i system, przy ustalonej czestosci naplywu -- REQUIREMENTS.md pkt 16."
@@ -176,7 +187,7 @@ IDX=0
 for row in "${ROWS[@]}"; do
   IDX=$((IDX + 1))
   IFS=',' read -r study_id col2 col3 col4 <<< "$row"
-  if [ "$CAMPAIGN" = "rate" ]; then
+  if [ "$CAMPAIGN_KIND" = "rate" ]; then
     rate_hz="$col2"; clients="$col3"; samples="$col4"
   else
     rate_hz="$RATE_HZ"; clients="$col2"; samples="$col3"
