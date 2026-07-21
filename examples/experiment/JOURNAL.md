@@ -1940,3 +1940,169 @@ została nietknięta (pkt 27), a aktualną lokalizację wskazują dopisane
 bloki `NOTE`. Wniosek na przyszłość: rotacja katalogu wyników musi
 obejmować przegląd odwołań w JOURNAL.md — inaczej linki cicho
 zmieniają znaczenie zamiast się psuć.
+
+## 2026-07-21 — eksperyment core_speed_1 (powtórka): pomiar po fixie
+## buforowania textSourceRO (#195)
+
+Powód uruchomienia: w rozkładzie E1 od dawna siedziały odstające sloty
+~1,2 ms. Artykuł raportował je uczciwie, ale ich nie tłumaczył, co było
+słabym punktem wobec śledztwa ~40 ms, gdzie przyczynę wskazano.
+Przyczynę ustalono i usunięto (#195, `f458c0f`), więc tabele artykułu
+opisywały silnik, którego już nie ma.
+
+**Przyczyna odstających slotów.** `textSourceRO` wyłączał buforowanie
+`fstream` (`pubsetbuf(nullptr, 0)`) dla każdego źródła. libstdc++ schodzi
+wtedy do bufora 1-znakowego, więc `myFile_ >> token` kosztuje ruch I/O na
+znak. Strumienie deklarowane ze współczynnikami mają okres `1` (1 s), więc
+raz na `rate` slotów silnik przepisywał cały plik tekstowy znak po znaku
+wewnątrz `processRows`. Odcisk palca w danych `results_20260721/`: sloty
+odstające leżą **dokładnie** na indeksach `k·P − 1`, gdzie `P` = tempo
+źródła w Hz — zero wyjątków w 80 000 slotów; amplituda niezależna od
+tempa, ale liniowa w BAJTACH pliku współczynników (FIR 208 B → ~960 µs;
+QRS 69 B + 12 B → ~470 µs). Potwierdzenie eksperymentalne na workerze
+(trzy ramiona, te same 26 wartości, różne dopełnienie białymi znakami):
+208 B → 959,7 µs, 416 B → 1829,8 µs, 832 B → 3585,1 µs, regresja
+**4,209 µs/bajt**. Fix: bufor włączony tylko dla plików zwykłych
+(`stat` + `S_ISREG`); źródła nieregularne (urządzenia, FIFO) zostają
+nieburowane, bo tam bufor czytałby w przód poza bieżącą krotkę.
+Drugi krok: `std::from_chars` zamiast `std::istringstream` w `parseAs`,
+tylko dla typów całkowitych — dla zmiennoprzecinkowych `from_chars`
+przyjmuje `"inf"/"nan"`, gdzie strumień daje 0 (cicha zmiana danych,
+złapana testem różnicowym, nie przez ctest).
+
+Metodyka bez zmian. Baza brancha: master `f458c0f`. Rotacja: wyniki tego
+eksperymentu trafiły do `results_20260721_bufferfix/`, **nie** do
+`results_20260721/` — poprzedni eksperyment zamknął się tego samego dnia
+kalendarzowego i konwencja „po dacie" wskazałaby ten sam katalog, mieszając
+dwa eksperymenty o identycznej strukturze wewnętrznej. Konwencja nazewnicza
+jest wadliwa z założenia i wymaga poprawki.
+
+> **_NOTE:_** Artefakty: [results_20260721_bufferfix/](results_20260721_bufferfix/)
+> — trzy kampanie ([rate/](results_20260721_bufferfix/rate/),
+> [clients/](results_20260721_bufferfix/clients/),
+> [fir-contrast/](results_20260721_bufferfix/fir-contrast/)).
+> Punkt odniesienia (silnik sprzed fixa): [results_20260721/](results_20260721/).
+
+### Wynik główny: tryb graniczny usunięty, składowa jitterowa nietknięta
+
+Nadwyżka slotu granicznego wobec mediany, stary → nowy silnik:
+
+| badanie | stary | nowy |
+|---|---|---|
+| rate 360 Hz | 473,0 µs | **59,3 µs** |
+| rate 720 Hz | 480,5 µs | **58,0 µs** |
+| rate 1080 Hz | 473,8 µs | **77,4 µs** |
+| clients 1/2/3 | 466,3 / 469,8 / 470,7 µs | **59,0 / 58,5 / 59,5 µs** |
+| FIR 1000–4000 Hz | 962,8 / 968,5 / 971,3 / 974,3 µs | **42,6 / 44,6 / 45,0 / 43,4 µs** |
+
+Kontrola rozstrzygająca w danych FIR: **maksimum slotu poza granicą nie
+drgnęło** (431,0–433,6 µs przed, 426,1–431,8 µs po). Zmienił się wyłącznie
+tryb strukturalny; składowa jitterowa jest ta sama. Bez rozbicia rozkładu
+na tryby ta kontrola nie była możliwa.
+
+Skutek: globalne maksimum przestało być slotem granicznym. FIR @1000 Hz —
+max E1 ze **123,5 % budżetu do 43,2 %**, max E2E ze 128,1 % do 46,5 %.
+
+### Wynik uboczny: outliery wake_lag były skutkiem trybu granicznego
+
+Hipoteza postawiona po zobaczeniu spadku wake_lag max 219–317 → 37–44 µs,
+zweryfikowana pozycyjnie: w starym przebiegu trzy największe wartości
+`wake_lag` (317, 279, 262 µs) leżą **wszystkie** na `iter % 360 == 0`,
+czyli w slocie bezpośrednio po granicznym; w nowym pięć największych
+(44, 41, 39, 39, 38 µs) leży na pozycjach bez struktury. Mechanizm:
+przekroczenie budżetu o 470 µs sporadycznie przesuwało pobudkę następnego
+slotu. W medianie niewidoczne (22,6 vs 21,4 µs), w maksimum tak.
+Twierdzenie „wake-up lag nie przekracza 0,32 ms" przez cztery przebiegi
+360 Hz staje się **„nie przekracza 0,05 ms"** (47,1 / 38,9 / 36,5 / 44,2 µs).
+
+### Wynik negatywny: zdarzenia ~43 ms NIE zniknęły
+
+| badanie | zdarzenia >5 ms stary → nowy | E2E mediana (głębokość nasycenia) |
+|---|---|---|
+| 360 Hz | 0 → 0 | brak nasycenia |
+| 720 Hz | 19 → **0** | 363 ms → 93 ms |
+| 1080 Hz | 16 → **14** | 4680 ms → 5198 ms |
+
+Przy 1080 Hz zostały, w tej samej skali (max E1 43628,6 → 43692,6 µs).
+Nie mają związku z fixem i wiążą się z **głębokim nasyceniem**: przy
+360 Hz nie ma ich nigdy, przy 720 Hz zniknęły razem ze spadkiem zaległości,
+przy 1080 Hz trzymają się mocno. Konsekwencja dla artykułu: twierdzenie
+`sec:eval-latency`, że ogon ~40 ms został „eliminated", jest prawdziwe
+wyłącznie dla konfiguracji nieprzesyconej i wymaga zawężenia zakresu —
+inaczej recenzent znajdzie 14 zdarzeń po 43 ms w artefakcie z 1080 Hz.
+Te zdarzenia były już w kampanii z 2026-07-21; utonęły, bo nikt nie
+rozbił rozkładu nasyconego przebiegu na tryby.
+
+### Ustalenie metodyczne: „przepustowość" jako 1/średnia jest zanieczyszczona
+
+Raportowana przepustowość liczona jest jako 1/średnia, a średnia łapie
+rzadkie zdarzenia skrajne: przy 720 Hz 19 zdarzeń po ~43 ms dokłada ~41 µs
+do średniej na slot i samo to daje różnicę 735 → 774 próbek/s, mylnie
+wyglądającą na efekt fixa. Na medianie różnica schodzi do ~2 %
+(1/mediana: 750/765/780 stary, 751/780/747 nowy). **Twierdzenie o płaskiej
+pojemności opierać na medianie, nie na średniej.**
+
+### Decyzja: kryterium sufitu
+
+Nowe dane FIR dają cztery różne sufity zależnie od definicji: mediana E1
+w budżecie → ~3930 próbek/s; każdy slot E1 → między 2000 a 3000 Hz;
+mediana E2E → 2000 Hz (489,0 < 500); **każdy slot E2E → 1000 Hz**
+(przy 2000 Hz max 758,8 > 500). Przyjęto **„każdy slot E2E w budżecie"**,
+a wartość ~3930 próbek/s raportowana osobno jako przepustowość, nie sufit
+czasu rzeczywistego. Uzasadnienie: twierdzenie RT dotyczy dostarczenia
+wyniku w slocie, a kryterium „w każdym slocie" jest jedyne odporne na
+pytanie „a co z p99,9". Przy tym kryterium: **QRS trzyma 360 Hz**
+(E2E max 1860–1935 µs = 67–70 % budżetu w czterech przebiegach),
+**FIR trzyma 1000 Hz** (46,5 %).
+
+Uwaga: mediana E2E FIR @2000 Hz zeszła z 559,0 do 489,0 µs, czyli weszła
+do budżetu. Przy kryterium medianowym sufit FIR przesunąłby się z „poniżej
+2000" na „2000" — kolejny powód, żeby kryterium ustalić raz i trzymać.
+
+### Zastrzeżenie do odczytu median
+
+Mediany E1 w kampanii `clients` wyszły o 1–4 % wyżej niż w starej
+(1300,7 → 1350,5 przy jednym kliencie). To **nie jest regresja**: kontrola
+wewnątrz danych — ta sama konfiguracja (360 Hz, 1 klient) zmierzona dwa razy
+*starym* silnikiem dała 1333,7 (kampania rate) i 1300,7 (kampania clients),
+czyli rozrzut 2,5 % między kampaniami. Skutek dla tekstu: przyrost mediany
+od 1 do 3 klientów spada z +4,7 % do +2,6 % i przestaje być monotoniczny —
+teza o izolacji robi się mocniejsza (wpływ liczby klientów jest mniejszy
+niż szum między przebiegami).
+
+### Usterka infrastruktury: wait_for_worker wiesza się deterministycznie
+
+Cztery restarty na cztery zakończyły się zawieszeniem sondy dostępności
+w `lib/common.sh`. `ssh -o ConnectTimeout=5 ... true` łączy się w oknie
+wczesnego rozruchu i sesja nigdy nie wraca — `ConnectTimeout` bounduje
+tylko zestawienie TCP. Gorzej: skoro `ssh` nie wraca, **ciało pętli się nie
+wykonuje**, więc licznik `waited` zostaje na zerze i zadeklarowany timeout
+600 s nigdy nie wystrzeliwuje. Zawieszenie jest trwałe i ciche.
+
+Dlaczego nie ujawniło się wcześniej: poprzednio wywołanie `sudo -n reboot`
+samo nie wracało przez kilka minut (usterka odnotowana we wpisie
+z 2026-07-21) i mimowolnie przepuszczało workera przez rozruch, zanim ruszyło
+`wait_for_worker`. Po dodaniu `sync` przed `reboot` (`d643b6e`) wywołanie
+zaczęło wracać po ~2 s i sonda trafia prosto w rozruch. **Dwie usterki
+maskowały się nawzajem; naprawa jednej odsłoniła drugą.**
+
+Obejście doraźne: watchdog po stronie nadzorcy ubijający sondę starszą niż
+60 s. Kampanie dokończono bez utraty danych. Do poprawki na masterze przed
+kolejnym eksperymentem: `timeout 15 ssh …` wokół sondy plus
+`-o ServerAliveInterval=5 -o ServerAliveCountMax=3` (jak w `ssh_worker`)
+i przeniesienie inkrementacji `waited` tak, żeby timeout faktycznie działał.
+
+### Otwarte
+
+1. Siatka 360/720/1080 nadal nie lokalizuje sufitu — leży między 360 a 720 Hz.
+   Dogęszczenie (540/600/660/700) jako osobna kampania, po wejściu poprawki
+   `wait_for_worker` i nowej siatki na mastera. Świadomie NIE łączone z tą
+   powtórką, żeby nie zmieniać dwóch rzeczy naraz i nie stracić pary
+   porównawczej ze starym silnikiem.
+2. Zdarzenia ~43 ms przy nasyceniu — przyczyna nieustalona; czy to ta sama
+   ścieżka co ogon ~40 ms, czy zjawisko wtórne do zaległości kolejkowej.
+3. Konwencja nazewnicza rotacji („po dacie") kolizyjna dla dwóch eksperymentów
+   tego samego dnia.
+4. Resztkowa nadwyżka graniczna ~43–59 µs: `std::string` per token
+   w `readTokenFromFstream` i `payload::setItem` na `std::any`. To drugie
+   pokrywa się z planowanym P1 E4 na `investigation/speed_improvement`.
