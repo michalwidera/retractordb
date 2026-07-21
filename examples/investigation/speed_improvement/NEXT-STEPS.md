@@ -45,11 +45,8 @@ any_caster/any::operator= …).** Payload mówi w `std::any`, evaluator w `descF
 map<string>[] ~13%) i przeliczanie indeksu pola per dostęp.
 
 ### Kandydaci wg profilu (nowa numeracja P*, zastępuje K*-alokacyjne)
-- **P1 — `std::any` → `descFldVT` w interfejsie `payload::getItem/setItem`  ★★ największy lewar**
-  (~30% processRows). Evaluator już używa `descFldVT`; usunięcie konwersji any↔wariant
-  eliminuje cast<std::any>, visit_descFld<_,std::any>, _Manager_internal, any_caster.
-  INWAZYJNE: sygnatury getItem/setItem używane szeroko (payload.cc, streamInstance,
-  testy). Duży, ale to jest realne miejsce czasu. Rozważyć etapami / silniejszy model.
+- **P1 — `std::any` → `descFldVT` w interfejsie `payload::getItem/setItem`  ★★ W TOKU**
+  (~30% processRows). Postęp E0/E1/E2 niżej. E3/E4 pozostają.
 - **P2 — cache indeksu pola (`resolveFieldIndexOrAbort`)  ★ tani szybki zysk** (~8.5%).
   [payload.cc:28] woła `flatIndexToDescriptorPosition` + `flatElementCount` przy KAŻDYM
   getItem/setItem, mimo że deskryptor jest statyczny w obrębie strumienia. Memoizacja
@@ -57,6 +54,38 @@ map<string>[] ~13%) i przeliczanie indeksu pola per dostęp.
 - **P3 — string-keyed lookupy** (~13%): `qSet[id]`, `getPayload(name)`, wewnętrzne
   `map<string,vector<vector<uint8>>>` w storage, `token::getStr_` zwraca string przez
   wartość (kopia). Cache wskaźników strumieni / referencje zamiast kopii stringów.
+
+## P1 — POSTĘP E0/E1/E2 ZROBIONE (2026-07-21)
+
+Migracja `std::any` → `descFldVT` w interfejsie payload, etapami (każdy: ctest
+153/153 Debug **i Release** + callgrind + E1 sparowany).
+- **E0 (e9a75b2):** addytywne `getItemVT`/`setItemVT` w payload + test round-trip
+  (parytet z getItem/setItem dla wszystkich typów + null). Nic nie przełącza.
+- **E1 (49c44ba):** `eval` PUSH_ID/PUSH_ID2 → `getItemVT` (usuwa `any_to_variant_cast`
+  + pośredni any na odczycie). Instr −5.79% (300.8M→283.4M), p50 273.5→266.9 (−2.4%).
+- **E2 (c031ae7):** `constructOutputPayload` → `cast<descFldVT>`+`setItemVT` (usuwa
+  `std::visit→any`, `cast<std::any>`). Instr −10.5% (283.4M→253.6M — największy etap),
+  p50 265.9→256.1 (−3.7%). `_Manager_internal<int>` 18.4M→7.48M.
+
+**Skumulowanie P1 (E0+E1+E2):** instrukcje processRows 300.8M→253.6M (**−15.7%**),
+E1 p50 od baseline C1+C2 282.1→256.1 (**−9.2%**). ctest 153/153 Debug+Release.
+
+**POZOSTAJE:**
+- **E3:** `reduceFieldsToPayload` (fnOp<T> na std::any, valueRet any, castAny,
+  setItem) i `constructAgsePayload` (getItem/setItem w pętli okna) → descFldVT +
+  setItemVT/getItemVT. constructAgse to 31.5% inclusive — dużo per-element any.
+- **E4:** sprzątanie — gdy gorące ścieżki na VT, przejrzeć pozostałych callerów
+  getItem/setItem(any) (presenter, dumpManager, xtrdb/xqry, facctxtsrc, cmdFieldAccess);
+  zimne mogą zostać na any. Nie usuwać any-interfejsu dopóki żywy caller istnieje.
+
+## Reguła pętli: testy w OBU trybach (Debug + Release)
+CI (`.circleci/config.yml:251`) uruchamia ctest w **Release**. Debug+valgrind NIE
+łapie błędów Release-only. Po zmianie: `cd build/Debug && ninja && ctest` ORAZ
+`cd build/Release && ninja && ninja install && cd test && ctest -j $(nproc)`.
+Przykład złapany: ciche logowanie Release (SPDLOG_ACTIVE_LEVEL=ERROR, efektywność)
+wycina INFO → testy trybu usługowego (ut_uxSysTermTools, it_service_idle-*)
+przeasertowywały INFO; naprawione tak, by test PODĄŻAŁ za cichym Release (asercje
+INFO warunkowane build-typem), commit 30998dc. Patrz [[feedback-release-tests-in-loop]].
 
 ## P2 — ZROBIONE (2026-07-21): inline hot-path akcesorów cache deskryptora
 
