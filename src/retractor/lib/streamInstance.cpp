@@ -7,6 +7,7 @@
 #include <memory>   // unique_ptr
 #include <optional>
 #include <utility>
+#include <variant>  // std::get, std::holds_alternative (P1-E3b)
 
 #include "fatalError.hpp"
 
@@ -154,10 +155,12 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
 enum opType : std::uint8_t { maxop, minop, sumop, avgop };
 
+// P1-E3b: operacja redukcji na wariancie zamiast na std::any. Argument przez
+// referencje (byl przez wartosc -> kopia any per element okna redukcji).
 template <typename T>
-void fnOp(opType op, std::any value, std::any &valueRet) {
-  T val1 = std::any_cast<T>(valueRet);
-  T val2 = std::any_cast<T>(value);
+void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
+  T val1 = std::get<T>(valueRet);
+  T val2 = std::get<T>(value);
   switch (op) {
     case maxop:
       if (val1 < val2) valueRet = value;
@@ -202,8 +205,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   // choose aggregate operation
-  cast<std::any> castAny;
-  std::any valueRet;  // ok for sum,avg
+  cast<rdb::descFldVT> castVT;
+  rdb::descFldVT valueRet{std::monostate{}};  // ok for sum,avg; monostate = jeszcze nie ustawione
   opType op;
 
   if (cmd == STREAM_MIN) {
@@ -267,7 +270,8 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     }
   }
 
-  if (!valueRet.has_value()) FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
+  if (std::holds_alternative<std::monostate>(valueRet))
+    FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
 
   auto item{0};
   auto validItemCount{0};
@@ -277,11 +281,11 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     if (it.rtype == rdb::RETENTION) continue;
     if (it.rtype == rdb::RETMEMORY) continue;
 
-    auto valueOpt = outputPayload->getPayload()->getItem(item++);
+    auto valueOpt = outputPayload->getPayload()->getItemVT(item++);
     if (!valueOpt.has_value()) continue;
     validItemCount++;
 
-    std::any value = castAny(valueOpt.value(), maxType_);
+    rdb::descFldVT value = castVT(valueOpt.value(), maxType_);
     switch (maxType_) {
       case rdb::BYTE:
       case rdb::INTEGER:
@@ -303,12 +307,12 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
 
   if (validItemCount == 0) {
     auto postion{0};
-    localPayload->setItem(postion, std::nullopt);
+    localPayload->setItemVT(postion, std::nullopt);
     return *(localPayload);
   }
 
   if (cmd == STREAM_AVG) {
-    std::any value = castAny(static_cast<uint8_t>(validItemCount), maxType_);
+    rdb::descFldVT value = castVT(rdb::descFldVT{static_cast<uint8_t>(validItemCount)}, maxType_);
     switch (maxType_) {
       case rdb::BYTE:
       case rdb::INTEGER:
@@ -330,9 +334,9 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
 
   switch (maxType) {
     case rdb::BYTE: {
-      if (valueRet.type() != typeid(boost::rational<int>))
+      if (!std::holds_alternative<boost::rational<int>>(valueRet))
         FatalError("streamInstance: aggregation result must be rational at finalization");
-      auto tobyte = std::any_cast<boost::rational<int>>(valueRet);
+      auto tobyte = std::get<boost::rational<int>>(valueRet);
       if (tobyte > boost::rational<int>(std::numeric_limits<uint8_t>::max(), 1)) {
         valueRet = uint8_t(std::numeric_limits<uint8_t>::max());
       } else if (tobyte < boost::rational<int>(std::numeric_limits<uint8_t>::min(), 1))
@@ -342,9 +346,9 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::INTEGER: {
-      if (valueRet.type() != typeid(boost::rational<int>))
+      if (!std::holds_alternative<boost::rational<int>>(valueRet))
         FatalError("streamInstance: aggregation result must be rational at finalization");
-      auto toint = std::any_cast<boost::rational<int>>(valueRet);
+      auto toint = std::get<boost::rational<int>>(valueRet);
       if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
         valueRet = std::numeric_limits<int>::max();
       else if (toint < boost::rational<int>(std::numeric_limits<int>::min(), 1))
@@ -354,15 +358,15 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     } break;
 
     case rdb::UINT: {
-      if (valueRet.type() != typeid(boost::rational<int>))
+      if (!std::holds_alternative<boost::rational<int>>(valueRet))
         FatalError("streamInstance: aggregation result must be rational at finalization");
-      auto touint = std::any_cast<boost::rational<int>>(valueRet);
+      auto touint = std::get<boost::rational<int>>(valueRet);
       if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
         valueRet = std::numeric_limits<unsigned>::max();
       else if (touint < boost::rational<int>(0, 1))
         valueRet = unsigned(0);
       else
-        valueRet = rational_cast<unsigned>(std::any_cast<boost::rational<int>>(valueRet));
+        valueRet = rational_cast<unsigned>(touint);
     } break;
 
     case rdb::RATIONAL:
@@ -373,7 +377,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       FatalError("streamInstance: unsupported type in aggregation finalization");
   }
   auto postion{0};
-  localPayload->setItem(postion, valueRet);
+  localPayload->setItemVT(postion, valueRet);
 
   return *(localPayload);
 }
