@@ -599,13 +599,14 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       case PUSH_ID: {
         if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
-        auto anyValueOpt      = payload->getItem(instancePosition.second);
-        if (!anyValueOpt.has_value()) {
+        // P1-E1: odczyt wprost do wariantu (getItemVT) — bez posrednika std::any
+        // i any_to_variant_cast. Parytet z getItem potwierdzony w test_payload.
+        auto valueOpt = payload->getItemVT(instancePosition.second);
+        if (!valueOpt.has_value()) {
           rStack.emplace(std::monostate{});
           break;
         }
-        rdb::descFldVT val = any_to_variant_cast(anyValueOpt.value());
-        rStack.push(val);
+        rStack.push(std::move(*valueOpt));
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");
@@ -622,14 +623,14 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         const std::string sOffset1(what[2]);
         const int offset1(atoi(sOffset1.c_str()));
 
-        auto anyValueOpt = payload->getItem(offset1);
-        if (!anyValueOpt.has_value()) {
+        // P1-E1: odczyt wprost do wariantu (getItemVT) — patrz PUSH_ID wyzej.
+        auto valueOpt = payload->getItemVT(offset1);
+        if (!valueOpt.has_value()) {
           rStack.emplace(std::monostate{});
           break;
         }
 
-        rdb::descFldVT val = any_to_variant_cast(anyValueOpt.value());
-        rStack.push(val);
+        rStack.push(std::move(*valueOpt));
       } break;
       default:
         throw std::runtime_error("Unsupported token in expressionEvaluator");
