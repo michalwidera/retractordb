@@ -58,6 +58,62 @@ map<string>[] ~13%) i przeliczanie indeksu pola per dostęp.
   `map<string,vector<vector<uint8>>>` w storage, `token::getStr_` zwraca string przez
   wartość (kopia). Cache wskaźników strumieni / referencje zamiast kopii stringów.
 
+## P2 — ZROBIONE (2026-07-21): inline hot-path akcesorów cache deskryptora
+
+`flatIndexToDescriptorPosition` / `flatElementCount` / `byteOffsetAtFlatIndex` były
+w descriptor.cc (osobne TU) — każdy getItem/setItem wołał je cross-TU, a każde
+wołało `rebuildFieldMappings()` poza TU tylko po to, by sprawdzić dirty-flag.
+Przeniesione do descriptor.hpp jako `inline` z dirty-checkiem inline (`if(dirty)
+rebuild()`); ciężka przebudowa i zimny błąd (`flatIndexOutOfRange`, [[noreturn]])
+zostają poza TU (bez wciągania fmt/FatalError do szeroko-includowanego nagłówka).
+Czysty refactor, zero zmian logiki.
+
+**Dowód:** instrukcje processRows 312.3M→300.8M (**−3.67%**, deterministyczne;
+flatIndexToDescriptorPosition 6.69M i flatElementCount 1.77M wpięte w callerów,
+byteOffsetAtFlatIndex 4.23M→1.37M). ctest 153/153 bit-identyczny. E1 p50 (sparowany
+probe-clean) 278.0→273.8 µs (**−1.5%, rozkłady w pełni rozdzielone** 272.9-274.8 vs
+276.8-278.8), p99 w szumie. Łącznie od baseline C1+C2: 282.1→273.8 (−2.9%).
+
+## P1 — PLAN migracji `std::any` → `descFldVT` w interfejsie payload (★★ największy lewar ~30%)
+
+**Teza:** payload mówi w `std::any`, evaluator w `descFldVT` (wariant). Każde
+getItem/setItem konwertuje any↔wariant (cast<std::any> 15.9% + visit_descFld<_,any>
+8.5% + _Manager_internal::_S_manage 6.9% + any_caster + any::operator=). To czysty
+narzut CPU. `cast<std::variant<…>>` (wariant→wariant) już ISTNIEJE (0.95% w profilu).
+
+**Cel:** payload udostępnia równoległy interfejs wariantowy czytający/piszący
+bajty↔`descFldVT` bez `std::any`, i przełączenie gorących callerów.
+
+**Etapy (każdy: ctest 153/153 + pomiar callgrind/E1 sparowany PRZED następnym):**
+- **E0 (addytywny, zero ryzyka):** dodać `std::optional<rdb::descFldVT> payload::getItemVT(int)`
+  i `void setItemVT(int, std::optional<rdb::descFldVT>)` OBOK istniejących any-owych.
+  Implementacja: to samo memcpy/getVal<T> + switch po rtype, ale read→wariant,
+  write←wariant. Test round-trip: getItemVT ≡ any_to_variant_cast(getItem) dla
+  każdego typu (nowy ut lub rozszerzenie ut_payload). Nic nie przełączamy.
+- **E1 (ścieżka odczytu eval):** w `expressionEvaluator::eval` PUSH_ID/PUSH_ID2
+  zamienić `any_to_variant_cast(getItem(...))` → `getItemVT(...)`. Usuwa any_caster
+  + any_to_variant_cast po stronie odczytu. Zmierz (any_caster powinien zniknąć).
+- **E2 (ścieżka zapisu SELECT — największa):** w `streamInstance::constructOutputPayload`
+  zamienić `std::visit→std::any→cast<std::any>→setItem(any)` → `cast<descFldVT>` +
+  `setItemVT(i, …)`. Usuwa cast<std::any> 15.9% + visit_descFld<_,std::any> 8.5%.
+  Uwaga: sprawdzić parytet `cast<descFldVT>` z `cast<std::any>` (null-fallback,
+  szerokość stringa, rational) — [expressionEvaluator.cpp castFldVT już używany].
+- **E3 (redukcje/okna):** `reduceFieldsToPayload` i `constructAgsePayload` używają
+  std::any wewnętrznie (valueRet, castAny, setItem, fnOp<T> na any). Zmigrować do
+  descFldVT (fnOp na wariancie). To dotyka constructAgse 31.5% inclusive.
+- **E4 (sprzątanie):** gdy gorące ścieżki są na VT — sprawdzić pozostałych callerów
+  getItem/setItem(any) (grep: presenter, dumpManager, xtrdb/xqry, ut_payload). Zimne
+  ścieżki (wyświetlanie/dump) mogą zostać na any LUB też zmigrować. Nie usuwać
+  any-interfejsu dopóki żywy caller istnieje.
+
+**Ryzyka:** (1) getItem/setItem używane szeroko — grep callerów PRZED E1/E2.
+(2) parytet cast<descFldVT> vs cast<std::any> — kluczowy, przetestować per typ.
+(3) konwencja NULL: getItem→optional (nullopt=null) vs descFldVT monostate; ujednolicić.
+**Szacowany zysk:** ~25-30% instrukcji processRows → przy obserwowanym stosunku
+instr→czas (~1/3) rzędu kilku-kilkunastu % E1 — największy pojedynczy lewar.
+**Model:** P1 dotyka kontraktu typów cross-file, wieloetapowo → implementować na
+Opus 4.8 (silniejszy model), etap po etapie, nie hurtem.
+
 ## Metodyka (potwierdzona)
 
 - Na WSL2 czas jest zaszumiony → **głównym dowodem rób licznik deterministyczny**,

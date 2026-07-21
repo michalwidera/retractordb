@@ -64,16 +64,13 @@ void Descriptor::rebuildFieldMappings() const {
   fieldMappingsDirty_ = false;
 }
 
-std::optional<std::pair<int, int>> Descriptor::flatIndexToDescriptorPosition(const int flatIndex) const {
+// flatIndexToDescriptorPosition / flatElementCount / byteOffsetAtFlatIndex sa
+// teraz inline w descriptor.hpp (P2, speed_improvement) — hot-path bez wywolan
+// cross-TU. Tu zostaje tylko zimna sciezka bledu byteOffsetAtFlatIndex.
+void Descriptor::flatIndexOutOfRange(const int flatIndex) const {
   rebuildFieldMappings();
-  if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) return {};
-  return flatToDescriptorIndexMap_[flatIndex];
+  FatalError("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
 }
-
-int Descriptor::flatElementCount() const {
-  rebuildFieldMappings();
-  return flattenedFieldCount_;
-};
 
 std::vector<rField> Descriptor::dataFields() {
   rebuildFieldMappings();
@@ -234,14 +231,6 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
   }
   FatalError("descriptor: field not found by name");
   return 0;  // ProForma Error
-}
-
-int Descriptor::byteOffsetAtFlatIndex(const int flatIndex) const {
-  rebuildFieldMappings();
-  if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) {
-    FatalError("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
-  }
-  return fieldByteOffsets_[flatIndex];
 }
 
 std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  //
