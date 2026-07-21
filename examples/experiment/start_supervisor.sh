@@ -67,7 +67,6 @@ done
   log "UWAGA: kampania 'clients' uzywa rate-hz=360 (domyslnie). Jesli kampania 'rate' wskazala inna stabilna czestosc, podaj ja przez --rate-hz."
 
 CONFIG_CSV="$SCRIPT_DIR/config/campaign_${CAMPAIGN}.csv"
-[ -f "$CONFIG_CSV" ] || die "Brak pliku konfiguracji: $CONFIG_CSV"
 
 log "=== Kampania '$CAMPAIGN' na branchu $BRANCH (worker=$WORKER_HOST, sink=$SINK) ==="
 
@@ -79,6 +78,19 @@ git checkout master
 [ -z "$(git status --short)" ] || die "Working tree na nadzorcy nie jest czysty -- zacommituj lub odloz zmiany"
 [ "$(git rev-parse master)" = "$(git rev-parse origin/master)" ] || \
   die "master na nadzorcy rozjechal sie z origin/master -- zrob 'git pull' (lub push) przed eksperymentem"
+
+# --- Konfiguracja badan: WCZYTAC TERAZ, na masterze --------------------------
+# Lista badan jest wczytywana do pamieci tutaj, a nie tuz przed petla, bo ponizej
+# przelaczamy drzewo robocze na branch eksperymentu. Gdy branch stoi na starszym
+# masterze i nie zawiera jeszcze tego pliku konfiguracji, plik znika z drzewa --
+# a odczyt tuz przed petla dawal wtedy PUSTA liste, czyli kampanie konczaca sie
+# kodem 0 z pustym katalogiem wynikow. Cicha porazka wygladajaca jak sukces
+# (zaobserwowane przy starcie rate_fine, JOURNAL.md 2026-07-22).
+[ -f "$CONFIG_CSV" ] || die "Brak pliku konfiguracji: $CONFIG_CSV"
+mapfile -t ROWS < <(tail -n +2 "$CONFIG_CSV")
+TOTAL=${#ROWS[@]}
+[ "$TOTAL" -gt 0 ] || die "Plik konfiguracji nie zawiera zadnego badania: $CONFIG_CSV"
+log "Wczytano $TOTAL badan z $(basename "$CONFIG_CSV")."
 
 log "Sprawdzam synchronizacje master <-> origin/master (worker)..."
 ssh_worker "$WORKER_HOST" "
@@ -181,9 +193,7 @@ EOF
 )"
 printf '%s\n' "$CAMPAIGN_README" | ssh_worker "$WORKER_HOST" "mkdir -p '$WORKER_REPO/$CAMPAIGN_RESULTS_DIR' && cat > '$WORKER_REPO/$CAMPAIGN_RESULTS_DIR/README.md'"
 
-# --- Petla badan ------------------------------------------------------------
-mapfile -t ROWS < <(tail -n +2 "$CONFIG_CSV")
-TOTAL=${#ROWS[@]}
+# --- Petla badan (ROWS/TOTAL wczytane na masterze, przed checkoutem brancha) --
 IDX=0
 for row in "${ROWS[@]}"; do
   IDX=$((IDX + 1))
