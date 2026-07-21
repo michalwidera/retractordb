@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <any>
 #include <cstring>
 #include <sstream>
@@ -7,6 +8,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "rdb/convertTypes.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
 
@@ -290,6 +292,70 @@ TEST(payload, stream_operators_support_rational_fields) {
   std::stringstream out;
   out << rdb::singleLineFormat << p;
   EXPECT_EQ(out.str(), "{ ratio:3/4 }");
+}
+
+// P1-E0 (speed_improvement): parytet wariantowego interfejsu getItemVT/setItemVT
+// z any-owym getItem/setItem. getItemVT musi dawac dokladnie any_to_variant_cast(
+// getItem), a setItemVT musi zapisac te same bajty co setItem. To bramka
+// bezpieczenstwa przed przelaczeniem goracych sciezek na interfejs wariantowy.
+TEST(payload, vt_interface_roundtrip_matches_any_interface) {
+  auto desc = rdb::Descriptor("b", 1, 1, rdb::BYTE) +      //
+              rdb::Descriptor("i", 4, 1, rdb::INTEGER) +   //
+              rdb::Descriptor("u", 4, 1, rdb::UINT) +      //
+              rdb::Descriptor("d", 8, 1, rdb::DOUBLE) +    //
+              rdb::Descriptor("f", 4, 1, rdb::FLOAT) +     //
+              rdb::Descriptor("r", 8, 1, rdb::RATIONAL) +  //
+              rdb::Descriptor("s", 1, 8, rdb::STRING);
+
+  // 1. Zapis any-owy, odczyt oboma -> getItemVT == any_to_variant_cast(getItem).
+  rdb::payload a(desc);
+  a.setItem(0, static_cast<uint8_t>(200));
+  a.setItem(1, -12345);
+  a.setItem(2, 54321U);
+  a.setItem(3, 3.14159);
+  a.setItem(4, 2.5F);
+  a.setItem(5, boost::rational<int>(7, 3));
+  a.setItem(6, std::string("hello"));
+
+  for (int i = 0; i <= 6; ++i) {
+    ASSERT_TRUE(a.getItem(i).has_value());
+    ASSERT_TRUE(a.getItemVT(i).has_value());
+    EXPECT_EQ(a.getItemVT(i).value(), any_to_variant_cast(a.getItem(i).value())) << "pole " << i;
+  }
+
+  // 2. Zapis wariantowy tych samych wartosci -> te same bajty i null-bitset co any-owy.
+  rdb::payload v(desc);
+  v.setItemVT(0, rdb::descFldVT{static_cast<uint8_t>(200)});
+  v.setItemVT(1, rdb::descFldVT{-12345});
+  v.setItemVT(2, rdb::descFldVT{54321U});
+  v.setItemVT(3, rdb::descFldVT{3.14159});
+  v.setItemVT(4, rdb::descFldVT{2.5F});
+  v.setItemVT(5, rdb::descFldVT{boost::rational<int>(7, 3)});
+  v.setItemVT(6, rdb::descFldVT{std::string("hello")});
+
+  ASSERT_EQ(v.span().size(), a.span().size());
+  EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
+  EXPECT_EQ(v.getNullBitset(), a.getNullBitset());
+}
+
+TEST(payload, vt_interface_null_matches_any_interface) {
+  auto desc = rdb::Descriptor("i", 4, 1, rdb::INTEGER) + rdb::Descriptor("s", 1, 6, rdb::STRING);
+
+  rdb::payload a(desc);
+  a.setItem(0, std::nullopt);
+  a.setItem(1, std::nullopt);
+
+  rdb::payload v(desc);
+  v.setItemVT(0, std::nullopt);
+  v.setItemVT(1, std::nullopt);
+
+  // nullopt: oba odczyty zwracaja brak wartosci, a fallback-bajty i null-bitset identyczne.
+  EXPECT_FALSE(v.getItemVT(0).has_value());
+  EXPECT_FALSE(v.getItemVT(1).has_value());
+  EXPECT_FALSE(v.getItem(0).has_value());
+  EXPECT_EQ(v.getNullBitset(), a.getNullBitset());
+  ASSERT_EQ(v.span().size(), a.span().size());
+  EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
 }
 
 // NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)

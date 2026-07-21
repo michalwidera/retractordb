@@ -340,6 +340,130 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
   FatalError("payload::getItem: unsupported field type: {}", int(requestedType));
 }
 
+// getItemVT / setItemVT (P1, speed_improvement): rownolegly interfejs wariantowy.
+// Czyta/pisze descFldVT wprost do bajtow, bez posrednika std::any -> eliminuje
+// konwersje any<->wariant, ktore dominuja czas processRows (cast<std::any>,
+// visit_descFld<_,any>, _Manager_internal). Logika bajtowa identyczna z
+// getItem/setItem; parytet potwierdzony testem round-trip w test_payload.cpp.
+// (E0 addytywne: getItem/setItem nietkniete; unifikacja w E4.)
+std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
+  auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Read");
+
+  if (nullBitset_[position]) return std::nullopt;
+
+  const auto requestedType = descriptor[position].rtype;
+  const auto offsetFlat    = descriptor.byteOffsetAtFlatIndex(positionFlat);
+  auto memory              = span();
+
+  auto readStringField = [&]() -> std::string {
+    auto len       = descriptor[position].rlen * descriptor[position].rarray;
+    auto fieldSpan = memory.subspan(offsetFlat, len);
+    auto descLen   = descriptor.getSizeInBytes();
+    if (offsetFlat + static_cast<size_t>(len) > descLen) {
+      FatalError("payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
+    }
+    for (auto i = 0; i < len; i++) {
+      if (fieldSpan[i] == 0) {
+        len = i;
+        break;
+      }
+    }
+    return {fieldSpan.begin(), fieldSpan.begin() + len};
+  };
+
+  switch (requestedType) {
+    case rdb::NULLTYPE:
+      return rdb::descFldVT{std::monostate{}};
+    case rdb::STRING:
+      return rdb::descFldVT{readStringField()};
+    case rdb::BYTE:
+      return rdb::descFldVT{getVal<uint8_t>(memory, offsetFlat)};
+    case rdb::INTEGER:
+      return rdb::descFldVT{getVal<int>(memory, offsetFlat)};
+    case rdb::UINT:
+      return rdb::descFldVT{getVal<unsigned>(memory, offsetFlat)};
+    case rdb::DOUBLE:
+      return rdb::descFldVT{getVal<double>(memory, offsetFlat)};
+    case rdb::FLOAT:
+      return rdb::descFldVT{getVal<float>(memory, offsetFlat)};
+    case rdb::RATIONAL:
+      return rdb::descFldVT{getVal<boost::rational<int>>(memory, offsetFlat)};
+    case rdb::REF:
+    case rdb::TYPE:
+    case rdb::RETENTION:
+    case rdb::RETMEMORY:
+      SPDLOG_ERROR("Configuration field type not supported in getItemVT: {}", static_cast<int>(requestedType));
+      return std::nullopt;
+  }
+
+  FatalError("payload::getItemVT: unsupported field type: {}", int(requestedType));
+}
+
+void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> valueParam) {
+  auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
+
+  const auto requestedType = descriptor[position].rtype;
+
+  rdb::descFldVT value;
+  if (!valueParam.has_value()) {
+    nullBitset_[position] = true;
+    value                 = nullFallbackValue(requestedType);
+  } else {
+    nullBitset_[position] = false;
+    cast<rdb::descFldVT> castVT;
+    value = castVT(valueParam.value(), requestedType);  // gwarantuje alternatywe wariantu = requestedType
+  }
+
+  const auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);
+
+  auto writeScalar = [&](const auto &data) {
+    auto dest = span().subspan(offsetFlat, descriptor[position].rlen);
+    std::memcpy(dest.data(), &data, descriptor[position].rlen);
+  };
+
+  switch (requestedType) {
+    case rdb::NULLTYPE:
+      break;
+    case rdb::STRING: {
+      const auto len  = descriptor[position].rlen * descriptor[position].rarray;
+      const auto data = std::get<std::string>(value);
+      auto lenr       = std::min(len, static_cast<int>(data.length()));
+      auto dest       = span().subspan(offsetFlat, len);
+      if (offsetFlat + len > descriptor.getSizeInBytes()) {
+        FatalError("payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}", offsetFlat, len,
+                   descriptor.getSizeInBytes());
+      }
+      std::ranges::fill(dest, 0);
+      std::copy_n(data.c_str(), lenr, dest.begin());
+    } break;
+    case rdb::BYTE:
+      writeScalar(std::get<uint8_t>(value));
+      break;
+    case rdb::INTEGER:
+      writeScalar(std::get<int>(value));
+      break;
+    case rdb::UINT:
+      writeScalar(std::get<unsigned>(value));
+      break;
+    case rdb::DOUBLE:
+      writeScalar(std::get<double>(value));
+      break;
+    case rdb::FLOAT:
+      writeScalar(std::get<float>(value));
+      break;
+    case rdb::RATIONAL:
+      writeScalar(std::get<boost::rational<int>>(value));
+      break;
+    case rdb::REF:
+    case rdb::TYPE:
+    case rdb::RETENTION:
+    case rdb::RETMEMORY:
+      break;
+    default:
+      FatalError("payload::setItemVT: unsupported field type: {}", (int)requestedType);
+  }
+}
+
 // Friend operators
 
 std::istream &operator>>(std::istream &is, payload &rhs) {
