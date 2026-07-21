@@ -135,10 +135,14 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
     auto locSrc = fp.rem;
     if (locSrc >= 0) {
-      auto valueOpt = source->getPayload()->getItem(locSrc);
-      result.setItem(flip ? lengthAbs - i - 1 : i, valueOpt);
+      // P1-E3: przepisanie elementu okna wprost przez wariant (getItemVT/setItemVT).
+      // Poprzednio kazdy element szedl bajty->std::any->cast<std::any>->bajty; przy
+      // oknach FIR (mwi_long = 180 elementow) to najciezsza per-element konwersja
+      // any<->wariant w processRows. Semantyka bez zmian (nullopt => null).
+      auto valueOpt = source->getPayload()->getItemVT(locSrc);
+      result.setItemVT(flip ? lengthAbs - i - 1 : i, valueOpt);
     } else
-      result.setItem(flip ? lengthAbs - i - 1 : i, std::nullopt);
+      result.setItemVT(flip ? lengthAbs - i - 1 : i, std::nullopt);
   }
 
   // 3. Cleanup source after processing
