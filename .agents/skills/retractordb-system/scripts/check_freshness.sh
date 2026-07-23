@@ -32,6 +32,15 @@ check_repo() {
     return 0
   fi
 
+  local commits_ahead
+  if git -C "$repo" merge-base --is-ancestor "$expected" "$current" 2>/dev/null; then
+    commits_ahead="$(git -C "$repo" rev-list --count "$expected..$current")"
+    if [[ "$commits_ahead" == "1" ]]; then
+      printf '%s FRESH %s\n' "$label" "$current"
+      return 0
+    fi
+  fi
+
   printf '%s STALE indexed=%s current=%s\n' "$label" "$expected" "$current"
   return 1
 }

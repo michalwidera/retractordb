@@ -14,7 +14,10 @@ unchanged from the previously verified commit `48f9b50`. At refresh time all thr
 branches. Code version from `VERSION`: `0.1.8`.
 
 Run `../scripts/check_freshness.sh` from this directory, or the same script through the installed skill link, before
-using the index.
+using the index. The freshness check intentionally accepts either the indexed commit itself or its single direct
+descendant. Committing an index update creates one historical commit after the revision recorded inside the index, so
+this normal one-commit offset is reported simply as `FRESH`. A divergence or a distance of two or more commits remains
+`STALE` and requires inspection.
 
 ## Verification baseline for the indexed code revision
 
