@@ -132,9 +132,21 @@ Never start a new topic on a dirty working tree.
 - **No scope creep** — do not improve adjacent code even if it looks wrong.
 - **Run ctest before reporting done** — never claim success without executing the relevant tests.
 
+### Commits, push and CI
+
+- **`master` in the code repository** — commits and pushes are performed by the human only, after reviewing the diff. The
+  assistant must leave changes uncommitted, show the diff, and wait for the human to commit and push.
+- **Side branches** — the assistant may create local commits autonomously after verification, provided no CI process is
+  triggered.
+- Permission to commit on a side branch does not include permission to push, open a pull request, or invoke CI manually.
+  Those actions require an explicit human request.
+- If an action would trigger CI, stop and hand it over to the human.
+
 ### Session end
 
-Every session ends with a commit or an explicit note why not. No uncommitted progress left behind.
+Every session ends with either a permitted local commit on a side branch, an explicit handoff of the uncommitted diff on
+`master` for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress
+is left behind.
 
 ### Model selection
 
