@@ -32,6 +32,39 @@ Resolve conflicts in this order:
    derivative of Polish documentation.
 5. These indexed notes.
 
+Documentation is explanatory context, not evidence that current code behaves as described. A `FRESH` documentation
+revision only means that the navigation index points at that revision; it does not certify correctness or completeness.
+Verify every behavioral claim against the live implementation and its tests. When documentation and code disagree,
+follow the code and record material drift in `references/provenance.md`.
+
+## Documentation drift warnings
+
+Never silently pass over a documentation-to-code mismatch. When one is found:
+
+1. Base the answer or implementation on current code and tests.
+2. Emit a visible `Documentation drift` warning that identifies:
+   - the documentation file and the stale, incomplete, or incorrect claim;
+   - the current code/test behavior and its source locations;
+   - the practical impact on users or maintainers;
+   - the Polish documentation pages that should be updated.
+3. End the task with a reminder to update canonical Polish documentation and then synchronize the derived English
+   documentation. Do not treat the English translation as the place to originate a behavioral correction.
+4. Add a concise entry to `references/provenance.md` when the drift is material and not already recorded.
+
+Use this compact report shape:
+
+```text
+Documentation drift
+- Documentation: <path and claim>
+- Code/tests: <current behavior and evidence>
+- Impact: <why the difference matters>
+- Documentation update: <Polish pages to change, then synchronize English>
+```
+
+Also emit a documentation-update reminder when a code change alters behavior described by an existing chapter, even if
+that chapter was correct before the change. A warning or reminder does not authorize edits in a documentation
+repository unless the user requested those edits; report the required follow-up instead.
+
 Never edit generated ANTLR files manually. Edit `RQL.g4` or `DESC.g4` and regenerate.
 
 ## Load references by task
@@ -42,6 +75,8 @@ Never edit generated ANTLR files manually. Edit `RQL.g4` or `DESC.g4` and regene
 - For descriptors, payloads, accessors, retention, files, null/gap metadata, shadows, rotation, or `xtrdb`, read `references/storage.md`.
 - For any code change or behavioral claim, read `references/tests.md` and identify the guarding tests.
 - For versions, validation status, source locations, and known documentation drift, read `references/provenance.md`.
+- For locating a subject in the Polish documentation, finding its English counterpart, or choosing code/test anchors
+  that verify a chapter, read `references/documentation-map.md`.
 
 Use `rg` in the live repositories to verify identifiers and line locations. The notes describe ownership and invariants, not stable line numbers.
 
