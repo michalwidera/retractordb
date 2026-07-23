@@ -37,6 +37,5 @@ endif()
 # szeregowo. Makro add_test wykrywa to po -m/-k w argv, ale tu flagi są w
 # skrypcie, dlatego ustawiamy RUN_SERIAL jawnie.
 set_tests_properties(
-  ${TestID}-run ${TestID}-env
-  PROPERTIES RUN_SERIAL TRUE TIMEOUT 60 ENVIRONMENT
-             "RDB_INFO_ACTIVE=${_rdbInfoActive}")
+  ${TestID}-run ${TestID}-env PROPERTIES RUN_SERIAL TRUE TIMEOUT 60 ENVIRONMENT
+                                         "RDB_INFO_ACTIVE=${_rdbInfoActive}")

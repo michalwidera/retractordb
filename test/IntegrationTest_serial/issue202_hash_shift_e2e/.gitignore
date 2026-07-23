@@ -1,0 +1,6 @@
+*.desc
+*.meta
+*.shadow
+CC
+matched
+out_compile.txt

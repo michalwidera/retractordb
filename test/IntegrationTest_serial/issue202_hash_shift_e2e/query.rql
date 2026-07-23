@@ -1,0 +1,12 @@
+SUBSTRAT 'memory'
+
+DECLARE value INTEGER STREAM A, 0.1 FILE 'datafile1.txt'
+DECLARE value INTEGER STREAM B, 0.2 FILE 'datafile2.txt'
+DECLARE value INTEGER STREAM A2, 0.1 FILE 'datafile1.txt'
+DECLARE value INTEGER STREAM B2, 0.2 FILE 'datafile2.txt'
+
+# Optimized path: one hash substrate followed by one shift.
+SELECT * STREAM matched FROM (A>2)#(B>1)
+
+# Explicit right-hand side of the identity, using independent source instances.
+SELECT * STREAM CC FROM (A2#B2)>3

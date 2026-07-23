@@ -1,7 +1,7 @@
 #include "expressionEvaluator.hpp"
 
-#include <boost/container/small_vector.hpp>
 #include <spdlog/spdlog.h>
+#include <boost/container/small_vector.hpp>
 
 #include <cmath>       // sqrt
 #include <functional>  // std::function

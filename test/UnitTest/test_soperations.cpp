@@ -74,6 +74,45 @@ TEST(xSOperations, hash_operations_equal_delta) {
   }
 }
 
+// Dopasowanie przesunięć przeplotu:
+// (A > i) # (B > k) == (A # B) > (i + k), gdy i*deltaA == k*deltaB.
+// Test sprawdza niezależnie od kompilatora zarówno prefiks opóźnienia, jak i
+// późniejszy wybór tej samej gałęzi oraz tego samego indeksu źródła.
+TEST(xSOperations, hash_matched_time_moves) {
+  struct TestCase {
+    boost::rational<int> deltaA;
+    boost::rational<int> deltaB;
+    int shiftA;
+    int shiftB;
+  };
+  const std::vector<TestCase> cases{
+      {{1, 10}, {1, 5}, 2, 1},
+      {{1, 10}, {1, 10}, 3, 3},
+      {{3, 10}, {1, 10}, 1, 3},
+  };
+
+  for (const auto &[deltaA, deltaB, shiftA, shiftB] : cases) {
+    ASSERT_EQ(deltaA * shiftA, deltaB * shiftB);
+    const int outputShift = shiftA + shiftB;
+
+    for (int n = 0; n < 200; ++n) {
+      int shiftedSourceIndex = 0;
+      const bool takeB       = Hash(deltaA, deltaB, n, shiftedSourceIndex);
+      const int sourceShift  = takeB ? shiftB : shiftA;
+
+      if (n < outputShift) {
+        EXPECT_LT(shiftedSourceIndex, sourceShift) << "n=" << n;
+        continue;
+      }
+
+      int originalSourceIndex  = 0;
+      const bool originalTakeB = Hash(deltaA, deltaB, n - outputShift, originalSourceIndex);
+      EXPECT_EQ(takeB, originalTakeB) << "n=" << n;
+      EXPECT_EQ(shiftedSourceIndex - sourceShift, originalSourceIndex) << "n=" << n;
+    }
+  }
+}
+
 TEST(xSOperations, divmod_operations) {
   std::vector<std::vector<int>> testdata{
       {0, 2, 0},    //

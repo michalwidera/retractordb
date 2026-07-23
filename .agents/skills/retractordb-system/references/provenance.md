@@ -24,6 +24,14 @@ embedded key. Exact revision checks remain only for the two external documentati
 - The first test attempt correctly exposed the documented CMake trap: 38 GTest executables were absent after a prior reconfiguration. This was a build-state issue, not a logic failure; `ninja` recreated 88 targets and the repeated suite passed.
 - Test inventory at this revision: 38 `pt_*` compile/file scenarios, 38 `it_*` serial/end-to-end scenarios, and 77 unit-related CTest entries.
 
+## Behavioral changes after the initial baseline
+
+- Issue 202 adds a guarded compiler rewrite for matched interleave shifts:
+  `(A > i) # (B > k) -> (A # B) > (i + k)` only when `i*deltaA == k*deltaB`. The extraction pass now reduces
+  each postfix program to a fixed point, including the unmatched sibling-shift case. Coverage:
+  `pt_issue202_hash_shift_factorization-*`, `ut_soperations`, and the physical/formula E2E comparison
+  `it_issue202_hash_shift_e2e-run`. The E2E case also fixes shift-history sizing to `N+1` records for offset `N`.
+
 ## Source hierarchy and scope
 
 The Polish documentation contains about 7,474 Markdown lines across 68 content/configuration Markdown files. The index was built from its table of contents and all major domains: mathematical foundations, RQL construction, architecture, compiler, execution, examples, CLI appendices, and integration-test catalog.
