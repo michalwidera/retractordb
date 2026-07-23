@@ -1,23 +1,21 @@
 # Provenance and freshness
 
-## Indexed revisions
+## Version basis
 
-| Repository | Role | Branch | Indexed commit |
+| Repository | Role | Branch | Version basis |
 |---|---|---|---|
-| `retractordb` | implementation, tests, examples, packaging | `master` | `07baa27e129485b68ad8c91e85e3c2aea60630c2` |
+| `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
 | `dokumentacja-rdb` | canonical Polish documentation | `main` | `a93427137cc0f96b7ee9fbdab43715250b55901b` |
 | `documentation-rdb` | derived English translation | `main` | `40116d9a32f1eb51d1bd12ad8714992146531969` |
 
-Index prepared on 2026-07-23 in timezone Europe/Warsaw. It was refreshed to code commit `07baa27` after that commit
-added the human-only commit/push policy to `CLAUDE.md`; implementation, tests, and observable system behavior are
-unchanged from the previously verified commit `48f9b50`. At refresh time all three repositories matched their upstream
-branches. Code version from `VERSION`: `0.1.8`.
+Index prepared on 2026-07-23 in timezone Europe/Warsaw from code commit `48f9b50`. Code and the index now live in the
+same repository and are selected by the same checkout, so provenance does not embed a mutable code commit hash. This
+avoids a self-referential update in which committing a new hash immediately makes that hash historical. The initial
+verified product baseline remains `48f9b50`; code version from `VERSION` was `0.1.8`.
 
 Run `../scripts/check_freshness.sh` from this directory, or the same script through the installed skill link, before
-using the index. The freshness check intentionally accepts either the indexed commit itself or its single direct
-descendant. Committing an index update creates one historical commit after the revision recorded inside the index, so
-this normal one-commit offset is reported simply as `FRESH`. A divergence or a distance of two or more commits remains
-`STALE` and requires inspection.
+using the index. For the code repository it reports the checked-out revision as `VERSIONED` without comparing it to an
+embedded key. Exact revision checks remain only for the two external documentation repositories.
 
 ## Verification baseline for the indexed code revision
 
@@ -25,8 +23,6 @@ this normal one-commit offset is reported simply as `FRESH`. A divergence or a d
 - At commit `48f9b50`, full `ctest --output-on-failure -j 4` result: **153/153 passed**, 0 failed, 65.54 seconds.
 - The first test attempt correctly exposed the documented CMake trap: 38 GTest executables were absent after a prior reconfiguration. This was a build-state issue, not a logic failure; `ninja` recreated 88 targets and the repeated suite passed.
 - Test inventory at this revision: 38 `pt_*` compile/file scenarios, 38 `it_*` serial/end-to-end scenarios, and 77 unit-related CTest entries.
-- The only change between that verified baseline and indexed commit `07baa27` is the collaboration policy in
-  `CLAUDE.md`; no product test was rerun for this documentation-only delta.
 
 ## Source hierarchy and scope
 

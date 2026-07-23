@@ -11,9 +11,12 @@ Use this skill as the navigation layer for RetractorDB work. Treat the repositor
 
 1. Run `scripts/check_freshness.sh`. The script discovers repositories cloned as siblings of the code repository.
    For a different layout, pass the three repository paths as arguments or set `RETRACTORDB_CODE_REPO`,
-   `RETRACTORDB_DOCS_PL_REPO`, and `RETRACTORDB_DOCS_EN_REPO`.
-2. If all repositories are `FRESH`, load only the references relevant to the request.
-3. If any repository is `STALE`, inspect `git diff <indexed-commit>..HEAD` for the affected areas before relying on the notes. Update the notes when the change materially alters system behavior.
+   `RETRACTORDB_DOCS_PL_REPO`, and `RETRACTORDB_DOCS_EN_REPO`. Code and its index are versioned together, so the script
+   reports the current code revision without comparing it to a hash embedded in the index.
+2. If both documentation repositories are `FRESH`, load only the references relevant to the request.
+3. If a documentation repository is `STALE`, inspect `git diff <indexed-commit>..HEAD` for the affected areas before
+   relying on the notes. For code, inspect current changes directly with `git status`, `git log`, and `git diff`.
+   Update the notes only when a change materially alters system behavior.
 4. Read the applicable repository's `AGENTS.md` and `CLAUDE.md` for build, editing, and documentation rules. Apply its repository rules; treat Claude-product-specific model-switch instructions as non-applicable to Codex.
 5. Check `git status` before edits. Preserve user changes.
 
@@ -49,7 +52,8 @@ Use `rg` in the live repositories to verify identifiers and line locations. The 
 3. Identify existing unit and integration coverage before changing code.
 4. Make the smallest change consistent with the repository policy.
 5. Rebuild after any CMake reconfiguration, then run focused tests and the appropriate regression set.
-6. Update the relevant reference and `references/provenance.md` when behavior or indexed commits change.
+6. Update the relevant reference and `references/provenance.md` when system behavior or the external documentation
+   basis changes materially. Do not update provenance solely because the code repository received a new commit.
 
 ## Important test trap
 
