@@ -1,0 +1,4 @@
+interface:
+  display_name: "RetractorDB System"
+  short_description: "Architecture, RQL, storage, and test knowledge"
+  default_prompt: "Use $retractordb-system to analyze this RetractorDB task against the indexed code, documentation, and tests."

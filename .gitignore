@@ -45,7 +45,8 @@ docs/
 bin/*
 /lib/
 .venv/
-.codex
+.codex/*
+!.codex/config.toml
 dokumentacja-rdb/
 docker/ci/DockerConan.txt
 205.bin

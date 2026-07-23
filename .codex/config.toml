@@ -1,0 +1,5 @@
+# Repository-scoped Codex configuration.
+#
+# Keep this file free of credentials, access tokens, machine-specific paths, and
+# runtime state. Shared working rules live in ../AGENTS.md, while indexed system
+# knowledge lives in ../.agents/skills/retractordb-system.
