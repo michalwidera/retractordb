@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>   // instrumentacja E3 (RDB_BENCH_PLAN): std::fprintf
 #include <cstdlib>  // instrumentacja E3: std::getenv
 #include <limits>
@@ -201,10 +202,14 @@ std::string compiler::extractIntermediateStreams() {
   if (substratTypeIt != std::end(coreInstance)) substratType_C = substratTypeIt->filename;
   std::ranges::transform(substratType_C, substratType_C.begin(), ::toupper);
 
-  for (auto it = coreInstance.begin(); it != coreInstance.end(); ++it) {
-    // Optimization phase 2
-    if ((*it).isReductionRequired()) {
-      for (auto it2 = (*it).lProgram.begin(); it2 != (*it).lProgram.end(); ++it2) {
+  for (size_t queryIndex = 0; queryIndex < coreInstance.size(); ++queryIndex) {
+    // Optimization phase 2. Redukuj jedno zapytanie do punktu stałego;
+    // push_back() może unieważnić iteratory qTree, dlatego zapytanie jest
+    // pobierane ponownie po indeksie w każdej rundzie.
+    while (coreInstance.at(queryIndex).isReductionRequired()) {
+      bool extracted     = false;
+      auto &currentQuery = coreInstance.at(queryIndex);
+      for (auto it2 = currentQuery.lProgram.begin(); it2 != currentQuery.lProgram.end(); ++it2) {
         if (                                              //
             (*it2).getStrCommandID() != "PUSH_STREAM" &&  //
             (*it2).getStrCommandID() != "PUSH_VAL") {
@@ -216,7 +221,7 @@ std::string compiler::extractIntermediateStreams() {
           newQuery.lProgram.push_front(newVal);
           command_id cmd = (*it2).getCommandID();
 
-          it2 = (*it).lProgram.erase(it2);
+          it2 = currentQuery.lProgram.erase(it2);
           --it2;
 
           {
@@ -225,7 +230,7 @@ std::string compiler::extractIntermediateStreams() {
             std::stringstream s;
             s << (*it2).getStr_();
             arg1 = std::string(s.str());
-            it2  = (*it).lProgram.erase(it2);
+            it2  = currentQuery.lProgram.erase(it2);
             --it2;
           }
           if (cmd != STREAM_TIMEMOVE && cmd != STREAM_SUBTRACT) {
@@ -234,7 +239,7 @@ std::string compiler::extractIntermediateStreams() {
             std::stringstream s;
             s << (*it2).getStr_();
             arg2 = std::string(s.str());
-            it2  = (*it).lProgram.erase(it2);
+            it2  = currentQuery.lProgram.erase(it2);
             --it2;
           }
           ++it2;
@@ -245,15 +250,17 @@ std::string compiler::extractIntermediateStreams() {
           newQuery.policy     = std::make_pair(substratType_C, 1);
           newQuery.id         = composeStreamName(arg1, arg2, cmd);
           newQuery.isSubstrat = true;
-          (*it).lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
+          currentQuery.lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
-          it = coreInstance.begin();
-
+          extracted = true;
           break;
-
         }  // Endif PUSH_STREAM, PUSH_VAL
       }  // Endfor
-    }  // Endif
+      if (!extracted) {
+        FatalError("compiler::extractIntermediateStreams: query '{}' requires reduction but no operator was extracted",
+                   coreInstance.at(queryIndex).id);
+      }
+    }  // Endwhile
   }  // Endfor
   return {"OK"};
 }
@@ -727,7 +734,9 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
 
         const auto nameSrc    = arg1;
         const auto timeOffset = std::get<int>(cmd.getVT());
-        capMap[nameSrc]       = std::max(capMap[nameSrc], timeOffset);
+        // Offset N addresses history slot N (0 is the current record), so the
+        // source buffer must contain N+1 records.
+        capMap[nameSrc] = std::max(capMap[nameSrc], timeOffset + 1);
       } break;
       case STREAM_AGSE: {
         // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -797,6 +806,165 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   return capMap;
 }
 
+void compiler::replaceStreamReferences(const std::string &oldName, const std::string &newName) {
+  for (auto &q : coreInstance)
+    for (auto &tok : q.lProgram)
+      if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == oldName) tok = token(PUSH_STREAM, newName);
+
+  for (auto &q : coreInstance)
+    for (auto &f : q.lSchema)
+      for (auto &tok : f.lProgram) {
+        if (tok.getCommandID() == PUSH_ID) {
+          auto [schema, idx] = std::get<std::pair<std::string, int>>(tok.getVT());
+          if (schema == oldName) tok = token(PUSH_ID, std::make_pair(newName, idx));
+        }
+        if (tok.getCommandID() == PUSH_ID2) {
+          const std::string str = tok.getStr_();  // copy before tok may be replaced
+          if (str.starts_with(oldName + "[")) {
+            const std::string updated = newName + str.substr(oldName.size());
+            if (std::holds_alternative<std::pair<std::string, int>>(tok.getVT()))
+              tok = token(PUSH_ID2, std::make_pair(updated, 0));
+            else
+              tok = token(PUSH_ID2, updated);
+          }
+        }
+      }
+}
+
+std::string compiler::factorMatchedHashTimeMoves() {
+  auto findUniqueQueryIndex = [this](const std::string &id) {
+    size_t found = coreInstance.size();
+    for (size_t i = 0; i < coreInstance.size(); ++i) {
+      if (coreInstance.at(i).id != id) continue;
+      if (found != coreInstance.size()) return coreInstance.size();
+      found = i;
+    }
+    return found;
+  };
+
+  auto matchTimeMove = [](const query &q, std::string &source, int &offset) {
+    if (!q.isSubstrat || q.lProgram.size() != 2) return false;
+    auto it = q.lProgram.begin();
+    if (it->getCommandID() != PUSH_STREAM) return false;
+    source = it->getStr_();
+    ++it;
+    if (it->getCommandID() != STREAM_TIMEMOVE || !std::holds_alternative<int>(it->getVT())) return false;
+    offset = std::get<int>(it->getVT());
+    return offset >= 0;
+  };
+
+  auto matchesHash = [](const query &q, const std::string &left, const std::string &right) {
+    if (q.lProgram.size() != 3) return false;
+    auto it = q.lProgram.begin();
+    if (it->getCommandID() != PUSH_STREAM || it->getStr_() != left) return false;
+    ++it;
+    if (it->getCommandID() != PUSH_STREAM || it->getStr_() != right) return false;
+    ++it;
+    return it->getCommandID() == STREAM_HASH;
+  };
+
+  auto schemasMatch = [](const query &a, const query &b) {
+    if (a.lSchema.size() != b.lSchema.size()) return false;
+    return std::equal(a.lSchema.begin(), a.lSchema.end(), b.lSchema.begin(), [](const field &left, const field &right) {
+      return left.field_.rtype == right.field_.rtype && left.field_.rlen == right.field_.rlen &&
+             left.field_.rarray == right.field_.rarray;
+    });
+  };
+
+  bool optimized = false;
+  bool changed   = true;
+  while (changed) {
+    changed = false;
+    for (size_t queryIndex = 0; queryIndex < coreInstance.size(); ++queryIndex) {
+      auto &q = coreInstance.at(queryIndex);
+      if (q.lProgram.size() != 3) continue;
+
+      auto programIt = q.lProgram.begin();
+      if (programIt->getCommandID() != PUSH_STREAM) continue;
+      const std::string leftShiftName = programIt->getStr_();
+      ++programIt;
+      if (programIt->getCommandID() != PUSH_STREAM) continue;
+      const std::string rightShiftName = programIt->getStr_();
+      ++programIt;
+      if (programIt->getCommandID() != STREAM_HASH || leftShiftName == rightShiftName) continue;
+
+      const size_t leftShiftIndex  = findUniqueQueryIndex(leftShiftName);
+      const size_t rightShiftIndex = findUniqueQueryIndex(rightShiftName);
+      if (leftShiftIndex == coreInstance.size() || rightShiftIndex == coreInstance.size()) continue;
+
+      std::string leftSource;
+      std::string rightSource;
+      int leftOffset  = 0;
+      int rightOffset = 0;
+      if (!matchTimeMove(coreInstance.at(leftShiftIndex), leftSource, leftOffset) ||
+          !matchTimeMove(coreInstance.at(rightShiftIndex), rightSource, rightOffset))
+        continue;
+
+      size_t leftConsumers  = 0;
+      size_t rightConsumers = 0;
+      for (const auto &consumer : coreInstance)
+        for (const auto &tok : consumer.lProgram) {
+          if (tok.getCommandID() != PUSH_STREAM) continue;
+          if (tok.getStr_() == leftShiftName) ++leftConsumers;
+          if (tok.getStr_() == rightShiftName) ++rightConsumers;
+        }
+      if (leftConsumers != 1 || rightConsumers != 1) continue;
+
+      const auto leftDeltaRaw  = coreInstance.getQuery(leftSource).rInterval;
+      const auto rightDeltaRaw = coreInstance.getQuery(rightSource).rInterval;
+      if (leftDeltaRaw <= 0 || rightDeltaRaw <= 0) continue;
+      const boost::rational<std::int64_t> leftDelta(leftDeltaRaw.numerator(), leftDeltaRaw.denominator());
+      const boost::rational<std::int64_t> rightDelta(rightDeltaRaw.numerator(), rightDeltaRaw.denominator());
+      if (leftDelta * static_cast<std::int64_t>(leftOffset) != rightDelta * static_cast<std::int64_t>(rightOffset)) continue;
+
+      const std::int64_t combinedOffset = static_cast<std::int64_t>(leftOffset) + rightOffset;
+      if (combinedOffset > std::numeric_limits<int>::max()) continue;
+
+      const std::string hashName = composeStreamName(rightSource, leftSource, STREAM_HASH);
+      const bool hashNameExists =
+          std::ranges::any_of(coreInstance, [&hashName](const query &candidate) { return candidate.id == hashName; });
+      const size_t hashIndex = findUniqueQueryIndex(hashName);
+      if (hashNameExists && hashIndex == coreInstance.size()) continue;
+      if (hashNameExists) {
+        if (!matchesHash(coreInstance.at(hashIndex), leftSource, rightSource) ||
+            coreInstance.at(hashIndex).rInterval != q.rInterval ||
+            !schemasMatch(coreInstance.at(hashIndex), coreInstance.at(leftShiftIndex)))
+          continue;
+      } else {
+        auto &leftShift     = coreInstance.at(leftShiftIndex);
+        leftShift.id        = hashName;
+        leftShift.rInterval = q.rInterval;
+        leftShift.lProgram  = {
+            token(PUSH_STREAM, leftSource),
+            token(PUSH_STREAM, rightSource),
+            token(STREAM_HASH),
+        };
+        replaceStreamReferences(leftShiftName, hashName);
+      }
+
+      replaceStreamReferences(rightShiftName, hashName);
+      if (combinedOffset == 0)
+        q.lProgram = {token(PUSH_STREAM, hashName)};
+      else
+        q.lProgram = {
+            token(PUSH_STREAM, hashName),
+            token(STREAM_TIMEMOVE, static_cast<int>(combinedOffset)),
+        };
+
+      const std::string removedLeft = hashNameExists ? leftShiftName : std::string{};
+      auto removed                  = std::ranges::remove_if(coreInstance, [&](const query &candidate) {
+        return candidate.id == rightShiftName || (!removedLeft.empty() && candidate.id == removedLeft);
+      });
+      coreInstance.erase(removed.begin(), removed.end());
+      optimized = true;
+      changed   = true;
+      break;
+    }
+  }
+  if (optimized) coreInstance.topologicalSort();
+  return {"OK"};
+}
+
 std::string compiler::deduplicateSubstrats() {
   bool changed = true;
   while (changed) {
@@ -823,27 +991,7 @@ std::string compiler::deduplicateSubstrats() {
 
         const std::string oldName = it->id;
         const std::string newName = it2->id;
-        for (auto &q : coreInstance)
-          for (auto &tok : q.lProgram)
-            if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == oldName) tok = token(PUSH_STREAM, newName);
-        for (auto &q : coreInstance)
-          for (auto &f : q.lSchema)
-            for (auto &tok : f.lProgram) {
-              if (tok.getCommandID() == PUSH_ID) {
-                auto [schema, idx] = std::get<std::pair<std::string, int>>(tok.getVT());
-                if (schema == oldName) tok = token(PUSH_ID, std::make_pair(newName, idx));
-              }
-              if (tok.getCommandID() == PUSH_ID2) {
-                const std::string str = tok.getStr_();  // copy before tok may be replaced
-                if (str.starts_with(oldName + "[")) {
-                  const std::string updated = newName + str.substr(oldName.size());
-                  if (std::holds_alternative<std::pair<std::string, int>>(tok.getVT()))
-                    tok = token(PUSH_ID2, std::make_pair(updated, 0));
-                  else
-                    tok = token(PUSH_ID2, updated);
-                }
-              }
-            }
+        replaceStreamReferences(oldName, newName);
 
         coreInstance.erase(it);
         changed = true;
@@ -901,6 +1049,9 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = resolveStreamIntervals();
+  if (result != "OK") return result;
+
+  result = factorMatchedHashTimeMoves();
   if (result != "OK") return result;
 
 #ifdef RDB_BENCH_PROBE

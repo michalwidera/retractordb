@@ -10,11 +10,11 @@
 
 ## Test architecture
 
-At indexed revision, CTest exposes 153 tests:
+At indexed revision, CTest exposes 157 tests:
 
-- `pt_*` (1-38): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
-- `it_*` (39-76): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
-- unit-related (77-153): GTest binaries, setup fixtures, and data-model comparison.
+- `pt_*` (1-41): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
+- `it_*` (42-80): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
+- unit-related (81-157): GTest binaries, setup fixtures, and data-model comparison.
 
 The serial CMake wrapper detects commands that start the server (`-m`, `-k`, `xqry`, workflow scripts, lock access) and assigns `RUN_SERIAL TRUE`. Some shell-wrapped server tests set it explicitly because CMake cannot see flags inside the script.
 
@@ -32,6 +32,10 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - FIR pipeline with `@`, `[_]`, multiplication and `.sumc`: `pt_dsp`.
 - `.max` reduction and graph: `pt_simple_max-*`, `it_simple_max-*`.
 - Nested stream expressions: `pt_subquery`, `pt_subquery-dot`.
+- Matched hash shifts and the unmatched guard: `pt_issue202_hash_shift_factorization-matched`,
+  `pt_issue202_hash_shift_factorization-unmatched`; the underlying index identity is also checked by
+  `ut_soperations`, while physical execution of both sides and the formula-derived payload are checked by
+  `it_issue202_hash_shift_e2e-run`.
 - Three/four-argument decomposition: `it_issue167_triarg`.
 - Circular dependency rejection: `pt_issue95_loopInCompile-compile`.
 - Generated substrate sharing: `pt_issue96_substrat_reference-*`.

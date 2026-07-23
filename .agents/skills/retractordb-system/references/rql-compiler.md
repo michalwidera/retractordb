@@ -52,15 +52,24 @@ Multi-operator expressions remain postfix token programs immediately after parsi
 1. `extractIntermediateStreams()` — reduce complex stream expressions into generated `STREAM_*` substrate queries with a maximum of one operator and one/two sources.
 2. `expandSchemaWildcards()` — replace `*` with concrete fields and construct schemas for generated operations.
 3. `resolveStreamIntervals()` — repeatedly calculate rational deltas until resolved; detect a stalled pass as a circular dependency.
-4. `deduplicateSubstrats()` — merge only compiler substrates with equal interval, token program, and field shape; rewrite consumer references, including cascades.
-5. `resolveFieldReferences()` — turn symbolic `PUSH_ID1..5` into `(stream,index)` `PUSH_ID`.
-6. `expandIndexWildcards()` — clone a one-field SELECT expression over the minimum flat size of all `[_]` sources.
-7. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
-8. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, and negative DUMP ranges.
-9. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
-10. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
+4. `factorMatchedHashTimeMoves()` — rewrite `(A > i) # (B > k)` as `(A # B) > (i + k)` when `i*deltaA == k*deltaB`; preserve shared/user streams conservatively.
+5. `deduplicateSubstrats()` — merge only compiler substrates with equal interval, token program, and field shape; rewrite consumer references, including cascades.
+6. `resolveFieldReferences()` — turn symbolic `PUSH_ID1..5` into `(stream,index)` `PUSH_ID`.
+7. `expandIndexWildcards()` — clone a one-field SELECT expression over the minimum flat size of all `[_]` sources.
+8. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
+9. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, and negative DUMP ranges; a shift
+   by `N` addresses history slot `N` and therefore requires capacity `N+1`.
+10. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
+11. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
 
 The pipeline invariant after reduction is fewer than four stream-program tokens per query. `dataModel` treats any larger program as a fatal compiler invariant violation.
+
+`extractIntermediateStreams()` reduces each query to a fixed point. This is required for sibling unary expressions such as
+`(A > i) # (B > k)`, where extracting only the first shift would otherwise leave a four-token non-canonical program.
+The matched-shift rewrite runs after interval resolution because equality of physical shifts depends on the exact rational
+source intervals. It runs before structural deduplication so the exposed `A # B` substrate can be shared normally.
+`it_issue202_hash_shift_e2e-run` executes the optimized left-hand side and an explicit right-hand side over independent
+TEXTSOURCE instances, compares the stored payload/metadata bodies, and verifies the complete formula-derived sequence.
 
 ## Generated schemas and intervals
 
