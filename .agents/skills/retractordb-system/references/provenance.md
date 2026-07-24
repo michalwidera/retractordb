@@ -44,6 +44,12 @@ The English repository is treated as derived content. Consult it only for Englis
 
 These are navigation warnings, not necessarily product defects:
 
+- The mathematical documentation defines `tau_m(S)` as the advanced sequence
+  `s_(n+m)`, while runtime `STREAM_TIMEMOVE(N)` reads history slot `N` for
+  computed streams and the issue-202 E2E fixture expects an initial delayed
+  prefix. The formal direction, pre-stream boundary extension, and NULL versus
+  zero semantics must be reconciled before treating the theorem as a complete
+  proof of the compiler rewrite.
 - Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
 - The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
 - Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.
