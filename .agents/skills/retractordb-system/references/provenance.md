@@ -38,6 +38,13 @@ embedded key. Exact revision checks remain only for the two external documentati
   differently grouped three-source expressions are negative cases. Coverage: five `xcompiler` unit cases and
   `it_select_cse_commutative_add-run`, including execution, NULL metadata, public descriptors, result-shape guards, and
   ad-hoc import safety. The post-change Debug suite passed 158/158 tests.
+- Build-time optimizer ablation switches preserve the default pipeline while allowing substrate deduplication, equivalent
+  SELECT sharing, commutative `STREAM_ADD` fingerprints, and matched hash/time-move factorization to be compiled out
+  independently. `it_optimizer_ablation-*` verifies build identity, plan shapes, and semantic comparisons. It also records
+  two material runtime interactions as `expected_ablation_failure`: without matched-shift factorization,
+  `(A>2)#(B>1)` does not produce the same payload as `(A#B)>3`; with both factorization and substrate deduplication disabled,
+  an otherwise equivalent shifted `DA+DB` plan gains one extra zero-valued startup record. These are observable ablation
+  results, not test-harness exemptions from unexplained failures.
 
 ## Source hierarchy and scope
 
@@ -56,9 +63,12 @@ These are navigation warnings, not necessarily product defects:
 - The mathematical documentation defines `tau_m(S)` as the advanced sequence
   `s_(n+m)`, while runtime `STREAM_TIMEMOVE(N)` reads history slot `N` for
   computed streams and the issue-202 E2E fixture expects an initial delayed
-  prefix. The formal direction, pre-stream boundary extension, and NULL versus
-  zero semantics must be reconciled before treating the theorem as a complete
-  proof of the compiler rewrite.
+  prefix. The optimizer ablation fixture additionally proves that the unfactored
+  `(A>2)#(B>1)` runtime plan is not payload-equivalent to `(A#B)>3`, even though
+  the factored default plan is. The formal direction, separate input clocks,
+  pre-stream boundary extension, and NULL versus zero semantics must be
+  reconciled before treating the theorem as a complete proof of the compiler
+  rewrite or the unfactored plan as an equivalent executable form.
 - Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
 - The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
 - Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.

@@ -48,6 +48,25 @@ option(ENABLE_COVERAGE "Enable code coverage" OFF)
 # konflikty nazw między TU (np. anonimowe namespace, statyczne zmienne) — testuj
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
+
+# Przełączniki optymalizatora planu używane w kontrolowanych badaniach
+# ablacyjnych. Domyślna konfiguracja zachowuje dotychczasowe działanie.
+option(RDB_OPT_DEDUP_SUBSTRATES
+       "Deduplicate structurally identical compiler substrates" ON)
+option(RDB_OPT_SHARE_EQUIVALENT_SELECTS
+       "Share equivalent public SELECT computations" ON)
+option(RDB_OPT_COMMUTATIVE_ADD
+       "Use A+B == B+A when fingerprinting equivalent SELECT plans" ON)
+option(RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
+       "Factor matched time moves across the stream hash operator" ON)
+
+if(NOT RDB_OPT_SHARE_EQUIVALENT_SELECTS AND RDB_OPT_COMMUTATIVE_ADD)
+  message(
+    FATAL_ERROR
+      "Invalid optimizer configuration: RDB_OPT_COMMUTATIVE_ADD=ON requires RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON."
+  )
+endif()
+
 # Sonda pomiarowa benchmarku (E1 czas obliczeń, E3 rozmiar planu). Domyślnie
 # WYŁĄCZONA: kod sondy jest wtedy całkowicie wycięty z kompilacji (#ifdef
 # RDB_BENCH_PROBE), zero kosztu. Włączenie tylko do pomiarów wydajności — NIE
@@ -61,6 +80,16 @@ if(RDB_BENCH_PROBE)
       "RDB_BENCH_PROBE=ON — benchmark probe compiled in; NOT a production build."
   )
 endif()
+
+message(STATUS "RDB_OPT_DEDUP_SUBSTRATES=${RDB_OPT_DEDUP_SUBSTRATES}")
+message(
+  STATUS "RDB_OPT_SHARE_EQUIVALENT_SELECTS=${RDB_OPT_SHARE_EQUIVALENT_SELECTS}")
+message(STATUS "RDB_OPT_COMMUTATIVE_ADD=${RDB_OPT_COMMUTATIVE_ADD}")
+message(
+  STATUS
+    "RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=${RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES}"
+)
+message(STATUS "RDB_BENCH_PROBE=${RDB_BENCH_PROBE}")
 
 # mold jest domyślnym linkerem (szybszy niż ld/lld), ale na platformach z
 # ograniczoną pamięcią (np. RPi) potrafi zgłaszać błędy alokacji przy

@@ -1,0 +1,30 @@
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+# Syntaktycznie identyczne i przemiennie równoważne SELECT-y.
+DECLARE value INTEGER STREAM A, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM B, 0.2 FILE 'b.txt'
+
+SELECT A[0]*B[0] STREAM same1 FROM A+B
+SELECT A[0]*B[0] STREAM same2 FROM A+B
+SELECT A[0]*B[0] STREAM commuted FROM B+A
+
+# Dopasowane przesunięcia przed # oraz jawna prawa strona tożsamości.
+DECLARE value INTEGER STREAM FA, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM FB, 0.2 FILE 'b.txt'
+DECLARE value INTEGER STREAM FA2, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM FB2, 0.2 FILE 'b.txt'
+
+SELECT * STREAM factored FROM (FA>2)#(FB>1)
+SELECT * STREAM factor_reference FROM (FA2#FB2)>3
+
+# Powtórzone DA+DB tworzy substrat, który może zostać scalony z dedup_owner.
+DECLARE value INTEGER STREAM DA, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM DB, 0.1 FILE 'b.txt'
+DECLARE value INTEGER STREAM DA2, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM DB2, 0.1 FILE 'b.txt'
+
+SELECT * STREAM dedup_owner FROM DA+DB
+SELECT dedup_shifted[0],dedup_shifted[1] STREAM dedup_shifted FROM (DA+DB)>1
+SELECT * STREAM dedup_reference_owner FROM DA2+DB2
+SELECT dedup_reference[0],dedup_reference[1] STREAM dedup_reference FROM (DA2+DB2)>1

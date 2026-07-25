@@ -33,3 +33,9 @@ add_test(
 \; grep -F 'PUSH_ID(merged[1])' out_compile.txt \
 \; grep -F 'PUSH_ID(merged[2])' out_compile.txt \
 \; if grep -F 'STREAM_ADD_s1_s2(1/1)' out_compile.txt \; then exit 1 \; fi")
+
+if(NOT RDB_OPT_DEDUP_SUBSTRATES)
+  set_tests_properties(
+    ${TestID} PROPERTIES DISABLED TRUE LABELS
+                         "expected_ablation_failure;requires_dedup_substrates")
+endif()

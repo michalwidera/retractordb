@@ -1040,7 +1040,9 @@ std::string compiler::shareEquivalentSelectComputations() {
         // drzewa, bo różne grupowanie może zmienić harmonogram uruchomienia.
         auto leftFingerprint  = sourceFingerprint(left.getStr_());
         auto rightFingerprint = sourceFingerprint(right.getStr_());
+#if RDB_OPT_COMMUTATIVE_ADD
         if (rightFingerprint < leftFingerprint) std::swap(leftFingerprint, rightFingerprint);
+#endif
         result = "ADD{" + leftFingerprint + "}{" + rightFingerprint + "}";
       }
     }
@@ -1209,14 +1211,18 @@ std::string compiler::compile() {
   result = resolveStreamIntervals();
   if (result != "OK") return result;
 
+#if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
   result = factorMatchedHashTimeMoves();
   if (result != "OK") return result;
+#endif
 
 #ifdef RDB_BENCH_PROBE
   const auto preDedup = benchPlan ? planSize() : empty;  // przed eliminacją (E3)
 #endif
+#if RDB_OPT_DEDUP_SUBSTRATES
   result = deduplicateSubstrats();
   if (result != "OK") return result;
+#endif
 #ifdef RDB_BENCH_PROBE
   const auto postDedup = benchPlan ? planSize() : empty;  // po eliminacji (E3)
 #endif
@@ -1229,8 +1235,10 @@ std::string compiler::compile() {
 
   // Podpis pól musi używać źródłowych PUSH_ID, zanim ich offsety zostaną
   // przepisane na lokalny bufor wejściowy publicznego zapytania.
+#if RDB_OPT_SHARE_EQUIVALENT_SELECTS
   result = shareEquivalentSelectComputations();
   if (result != "OK") return result;
+#endif
 
   result = localizeFieldOffsets();
   if (result != "OK") return result;
@@ -1248,7 +1256,13 @@ std::string compiler::compile() {
   if (benchPlan) {
     const auto atExit = planSize();
     std::fprintf(stderr,
-                 "PLAN bench (strumienie/tokeny): wejscie=%zu/%zu  przed-dedup=%zu/%zu  "
+                 "PLAN bench (strumienie/tokeny, dedup="
+#if RDB_OPT_DEDUP_SUBSTRATES
+                 "ON"
+#else
+                 "OFF"
+#endif
+                 "): wejscie=%zu/%zu  przed-dedup=%zu/%zu  "
                  "po-dedup=%zu/%zu  wyjscie=%zu/%zu\n",
                  atEntry.first, atEntry.second, preDedup.first, preDedup.second, postDedup.first, postDedup.second, atExit.first,
                  atExit.second);

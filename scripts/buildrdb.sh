@@ -22,6 +22,24 @@ esac
 
 echo "-- Note: Current folder is [ $foldername ] and will start build in [ $build_folder ]"
 
+rdb_source_dir=$(cd "$build_folder" && pwd)
+
+production_cmake_args=(
+    -DRDB_OPT_DEDUP_SUBSTRATES=ON
+    -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON
+    -DRDB_OPT_COMMUTATIVE_ADD=ON
+    -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=ON
+    -DRDB_BENCH_PROBE=OFF
+)
+
+probe_cmake_args=(
+    -DRDB_OPT_DEDUP_SUBSTRATES=ON
+    -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON
+    -DRDB_OPT_COMMUTATIVE_ADD=ON
+    -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=ON
+    -DRDB_BENCH_PROBE=ON
+)
+
 # Compile and run a small C++23 probe.
 # Tests std::ranges::fold_left, the uz size_t literal and std::println (<print>)
 # — all C++23 and used in the codebase.
@@ -397,7 +415,7 @@ ensure_tools_for_option() {
     fi
 
     case "$opt" in
-        "release"|"debug"|"probe")
+        "release"|"release-ablation"|"debug"|"probe")
             tool_specs=(
                 "gcc:required" "g++:required" "cmake:required"
                 "ninja:required" "conan:required" "make:required"
@@ -774,6 +792,142 @@ ensure_cxx23_gcc() {
     echo "-- C++23 OK — g++ $(g++ -dumpversion)"
 }
 
+toggle_on_off() {
+    if [ "$1" = "ON" ]; then
+        echo "OFF"
+    else
+        echo "ON"
+    fi
+}
+
+require_pristine_source_tree() {
+    local source_status
+
+    if ! git -C "$rdb_source_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "Error: production release requires a Git working tree."
+        return 1
+    fi
+
+    source_status=$(git -C "$rdb_source_dir" status --porcelain=v1 --untracked-files=all)
+    if [ -n "$source_status" ]; then
+        echo "Error: production release rejected because the source tree is not pristine:"
+        printf '%s\n' "$source_status"
+        echo "-- Commit, remove or stash every tracked, staged and untracked change before building release."
+        return 1
+    fi
+}
+
+run_with_sanitized_build_environment() {
+    env \
+        -u CFLAGS \
+        -u CPPFLAGS \
+        -u CXXFLAGS \
+        -u LDFLAGS \
+        -u CMAKE_ARGS \
+        -u CMAKE_GENERATOR \
+        -u CMAKE_TOOLCHAIN_FILE \
+        -u RDB_BENCH_CSV \
+        -u RDB_BENCH_PLAN \
+        "$@"
+}
+
+verify_optimizer_build_info() {
+    local binary="$1"
+    local dedup="$2"
+    local share="$3"
+    local commutative="$4"
+    local factor="$5"
+    local probe="$6"
+    local actual
+    local expected
+
+    if [ ! -x "$binary" ]; then
+        echo "Error: expected xretractor binary not found: $binary"
+        return 1
+    fi
+
+    actual=$("$binary" --optimizer-build-info)
+    expected=$(printf '%s\n' \
+        "RDB_OPT_DEDUP_SUBSTRATES=$dedup" \
+        "RDB_OPT_SHARE_EQUIVALENT_SELECTS=$share" \
+        "RDB_OPT_COMMUTATIVE_ADD=$commutative" \
+        "RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor" \
+        "RDB_BENCH_PROBE=$probe")
+
+    if [ "$actual" != "$expected" ]; then
+        echo "Error: built xretractor configuration does not match the selected build mode."
+        echo "-- Expected:"
+        printf '%s\n' "$expected"
+        echo "-- Actual:"
+        printf '%s\n' "$actual"
+        return 1
+    fi
+
+    echo "-- Verified xretractor build configuration:"
+    printf '%s\n' "$actual"
+}
+
+choose_ablation_options() {
+    local dedup="ON"
+    local share="ON"
+    local commutative="ON"
+    local factor="ON"
+    local probe="OFF"
+    local choice
+
+    while true; do
+        echo ""
+        echo "Release ablation configuration:"
+        echo "  1) RDB_OPT_DEDUP_SUBSTRATES=$dedup"
+        echo "  2) RDB_OPT_SHARE_EQUIVALENT_SELECTS=$share"
+        echo "  3) RDB_OPT_COMMUTATIVE_ADD=$commutative"
+        echo "  4) RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor"
+        echo "  5) RDB_BENCH_PROBE=$probe"
+        echo "  b) Build selected configuration"
+        echo "  q) Cancel"
+
+        if ! read -r -p "-- Toggle option or build [1-5/b/q]: " choice; then
+            choice="q"
+        fi
+
+        case "$choice" in
+            1) dedup=$(toggle_on_off "$dedup") ;;
+            2) share=$(toggle_on_off "$share") ;;
+            3) commutative=$(toggle_on_off "$commutative") ;;
+            4) factor=$(toggle_on_off "$factor") ;;
+            5) probe=$(toggle_on_off "$probe") ;;
+            b|B)
+                if [ "$share" = "OFF" ] && [ "$commutative" = "ON" ]; then
+                    echo "Error: RDB_OPT_COMMUTATIVE_ADD=ON requires RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON."
+                    echo "-- Toggle option 3 to OFF or option 2 back to ON."
+                    continue
+                fi
+
+                ablation_cmake_args=(
+                    "-DRDB_OPT_DEDUP_SUBSTRATES=$dedup"
+                    "-DRDB_OPT_SHARE_EQUIVALENT_SELECTS=$share"
+                    "-DRDB_OPT_COMMUTATIVE_ADD=$commutative"
+                    "-DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor"
+                    "-DRDB_BENCH_PROBE=$probe"
+                )
+                ablation_dedup="$dedup"
+                ablation_share="$share"
+                ablation_commutative="$commutative"
+                ablation_factor="$factor"
+                ablation_probe="$probe"
+                ablation_build_dir="$rdb_source_dir/build/Release-Ablation/dedup-${dedup}_share-${share}_comm-${commutative}_factor-${factor}_probe-${probe}"
+                ablation_conan_dir="$rdb_source_dir/build/Conan-Release-Ablation/dedup-${dedup}_share-${share}_comm-${commutative}_factor-${factor}_probe-${probe}"
+                return 0
+                ;;
+            q|Q)
+                echo "-- Release ablation build cancelled."
+                return 1
+                ;;
+            *) echo "Invalid choice: $choice" ;;
+        esac
+    done
+}
+
 run_option() {
     local opt="$1"
     if [ "$opt" != "help" ] && [ "$opt" != "--help" ] && [ "$opt" != "-h" ]; then
@@ -781,20 +935,61 @@ run_option() {
     fi
     case "$opt" in
         "release")
-            # RDB_BENCH_PROBE wymuszone OFF: sonda dołącza się WYŁĄCZNIE przez target
-            # 'probe'. Bez tego lepki wpis cache po wcześniejszym 'probe' (ten sam katalog
-            # build/Release) przeniknąłby do produkcyjnej binarki/pakietu — option() nie
-            # nadpisuje istniejącej wartości cache. Konfiguracja jawna (jak w 'probe'),
-            # bo 'conan build' nie pozwala wstrzyknąć -D.
+            # Produkcyjny Release powstaje wyłącznie z czystego drzewa źródeł,
+            # świeżego katalogu i jawnej konfiguracji. Typowe zmienne wstrzykujące
+            # flagi są usuwane z procesu, a gotowa binarka jest kontrolowana poniżej.
+            require_pristine_source_tree
+            cmake -E remove_directory "$rdb_source_dir/build/Release"
             sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
-            conan source $build_folder
-            conan install $build_folder -s build_type=Release --build missing
-            cd "$build_folder"
-            cmake --preset conan-release -DRDB_BENCH_PROBE=OFF
-            cd build/Release
+            run_with_sanitized_build_environment conan source "$rdb_source_dir"
+            require_pristine_source_tree
+            run_with_sanitized_build_environment conan install "$rdb_source_dir" -s build_type=Release --build missing
+            run_with_sanitized_build_environment cmake \
+                -S "$rdb_source_dir" \
+                -B "$rdb_source_dir/build/Release" \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE="$rdb_source_dir/build/Release/generators/conan_toolchain.cmake" \
+                "${production_cmake_args[@]}"
             build_jobs=$(compute_build_jobs)
             echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
-            ninja -j "$build_jobs"
+            run_with_sanitized_build_environment cmake --build "$rdb_source_dir/build/Release" --parallel "$build_jobs"
+            verify_optimizer_build_info \
+                "$rdb_source_dir/build/Release/src/retractor/xretractor" \
+                ON ON ON ON OFF
+            require_pristine_source_tree
+            ;;
+        "release-ablation")
+            if ! choose_ablation_options; then
+                return 0
+            fi
+
+            echo "-- Selected ablation build directory: $ablation_build_dir"
+            printf '%s\n' "${ablation_cmake_args[@]}"
+
+            sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
+            conan source "$rdb_source_dir"
+            conan install "$rdb_source_dir" -s build_type=Release --build missing -of "$ablation_conan_dir"
+
+            cmake \
+                -S "$rdb_source_dir" \
+                -B "$ablation_build_dir" \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE="$ablation_conan_dir/build/Release/generators/conan_toolchain.cmake" \
+                "${ablation_cmake_args[@]}"
+
+            build_jobs=$(compute_build_jobs)
+            echo "-- Building ablation variant with -j$build_jobs"
+            cmake --build "$ablation_build_dir" --parallel "$build_jobs"
+
+            verify_optimizer_build_info \
+                "$ablation_build_dir/src/retractor/xretractor" \
+                "$ablation_dedup" \
+                "$ablation_share" \
+                "$ablation_commutative" \
+                "$ablation_factor" \
+                "$ablation_probe"
             ;;
         "debug")
             sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
@@ -808,27 +1003,40 @@ run_option() {
         "probe")
             # Budowa Release z WŁĄCZONĄ sondą pomiarową (benchmark E1/E3). Release, bo
             # sonda służy do pomiarów wydajności — mierzymy kod zoptymalizowany, nie Debug.
-            # UWAGA: sonda jest skompilowana w binarce (xretractor ostrzega w logu i w
-            # 'xretractor -h'). NIE używać produkcyjnie.
+            # Osobny katalog nie pozwala tej binarce przeniknąć do build/Release.
+            probe_build_dir="$rdb_source_dir/build/Release-Probe"
+            probe_conan_dir="$rdb_source_dir/build/Conan-Release-Probe"
             sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
-            conan source $build_folder
-            conan install $build_folder -s build_type=Release --build missing
-            cd "$build_folder"
-            cmake --preset conan-release -DRDB_BENCH_PROBE=ON
-            cd build/Release
+            conan source "$rdb_source_dir"
+            conan install "$rdb_source_dir" -s build_type=Release --build missing -of "$probe_conan_dir"
+            cmake \
+                -S "$rdb_source_dir" \
+                -B "$probe_build_dir" \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_TOOLCHAIN_FILE="$probe_conan_dir/build/Release/generators/conan_toolchain.cmake" \
+                "${probe_cmake_args[@]}"
             build_jobs=$(compute_build_jobs)
             echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
-            ninja -j "$build_jobs"
+            cmake --build "$probe_build_dir" --parallel "$build_jobs"
+            verify_optimizer_build_info \
+                "$probe_build_dir/src/retractor/xretractor" \
+                ON ON ON ON ON
             echo "-- [warning: probe benchmark build] sonda pomiarowa WŁĄCZONA w tej kompilacji (RDB_BENCH_PROBE=ON)."
             ;;
         "package")
             # Pakowanie binarne (DEB;TGZ wg CPACK_GENERATOR) z auto-sprzątaniem
-            # śmieci stagingu. Wybiera istniejący katalog buildu (Release > Debug).
-            cd "$build_folder" || exit 1
+            # śmieci stagingu. Wybiera istniejący katalog buildu (Release > Debug),
+            # jawnie przywraca konfigurację produkcyjną i przebudowuje binaria, aby
+            # lepki cache po badaniu ablacyjnym nie trafił do pakietu.
+            cd "$rdb_source_dir" || exit 1
             if   [ -d build/Release ]; then pkg_dir="build/Release"
             elif [ -d build/Debug ];   then pkg_dir="build/Debug"
             else echo "Error: no build dir found. Run 'debug' or 'release' first."; exit 1
             fi
+            cmake -S "$rdb_source_dir" -B "$pkg_dir" "${production_cmake_args[@]}"
+            build_jobs=$(compute_build_jobs)
+            cmake --build "$pkg_dir" --parallel "$build_jobs"
             cd "$pkg_dir" || exit 1
             cpack || echo "-- cpack zgłosił błędy (np. brak dpkg-deb dla DEB) — sprawdzam wynik."
             # Śmieci po packagingu: katalog stagingu i manifest instalacji. Finalne
@@ -969,9 +1177,10 @@ run_option() {
             echo "Usage: $0 [option ...]"
             echo ""
             echo "Options:"
-            echo "  release    - Build in Release mode (conan source, install, build)"
+            echo "  release    - Build verified production Release from a pristine Git tree"
+            echo "  release-ablation - Select optimizer/probe switches and build an isolated Release variant"
             echo "  debug      - Build in Debug mode (conan source, install, build)"
-            echo "  probe      - Build Release with benchmark probe ENABLED (RDB_BENCH_PROBE); NOT for production"
+            echo "  probe      - Build isolated Release-Probe with RDB_BENCH_PROBE=ON; NOT for production"
             echo "  package    - Build DEB/TGZ packages (cpack) and clean staging artifacts"
             echo "  toolchain  - Install build toolchain (gcc, cmake, ninja, conan, etc.)"
             echo "  toolchain_required - Install minimal CI-like required toolchain from config.yml"
@@ -994,7 +1203,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
+              echo "Valid options: release release-ablation debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -1006,7 +1215,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "release-ablation" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"

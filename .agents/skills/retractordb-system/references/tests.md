@@ -10,11 +10,11 @@
 
 ## Test architecture
 
-At indexed revision, CTest exposes 158 tests:
+At indexed revision, CTest exposes 164 tests:
 
 - `pt_*` (1-41): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
-- `it_*` (42-81): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
-- unit-related (82-158): GTest binaries, setup fixtures, and data-model comparison.
+- `it_*` (42-87): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
+- unit-related (88-164): GTest binaries, setup fixtures, and data-model comparison.
 
 The serial CMake wrapper detects commands that start the server (`-m`, `-k`, `xqry`, workflow scripts, lock access) and assigns `RUN_SERIAL TRUE`. Some shell-wrapped server tests set it explicitly because CMake cannot see flags inside the script.
 
@@ -43,6 +43,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Substrate dedup basics, field-name independence, nonzero offsets, cascades: four `it_issue167_dedup_*` scenarios.
 - Equivalent SELECT computation sharing across commutative `+`, public artifact preservation, NULL metadata, output-order
   guards, and the three-source grouping counterexample: `it_select_cse_commutative_add-run`.
+- Build-time optimizer switches, reported build configuration, configuration-dependent plan shapes, steady-state
+  equivalence, and explicitly labeled ablation failures: six `it_optimizer_ablation-*` tests.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.
@@ -98,7 +100,8 @@ Use these GTest binaries for focused changes:
 `ut_expeval` is especially dense and is the primary executable specification for scalar types, conversions, function calls, string behavior, errors, NULL propagation, and three-valued logic.
 
 `ut_compiler` also covers equivalent SELECT sharing for `a+b` versus `b+a`, order-sensitive negative cases, preservation
-of three-source grouping, and the live/ad-hoc import guard.
+of three-source grouping, syntactically identical sharing without commutativity, substrate deduplication and matched-shift
+factorization switches, and the live/ad-hoc import guard.
 
 ## Standard verification
 
