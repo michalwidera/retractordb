@@ -1,5 +1,6 @@
 #pragma once
 
+#include <set>
 #include <vector>
 
 #include "qTree.hpp"  // for qTree, query, token
@@ -13,6 +14,8 @@ struct compiler {
 
  private:
   qTree &coreInstance;
+  bool restrictSelectSharing_ = false;
+  std::set<std::string> selectSharingScope_;
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd);
   void resolveTokenReferences(std::list<token> &lProgram, query &q);
@@ -31,4 +34,5 @@ struct compiler {
   std::string factorMatchedHashTimeMoves();
   void replaceStreamReferences(const std::string &oldName, const std::string &newName);
   std::string deduplicateSubstrats();
+  std::string shareEquivalentSelectComputations();
 };

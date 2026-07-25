@@ -5,13 +5,14 @@
 | Repository | Role | Branch | Version basis |
 |---|---|---|---|
 | `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
-| `dokumentacja-rdb` | canonical Polish documentation | `main` | `a93427137cc0f96b7ee9fbdab43715250b55901b` |
-| `documentation-rdb` | derived English translation | `main` | `40116d9a32f1eb51d1bd12ad8714992146531969` |
+| `dokumentacja-rdb` | canonical Polish documentation | `main` | `d49bf5ae232f4a0575b698af2d1d03c6162365a4` |
+| `documentation-rdb` | derived English translation | `main` | `f76fb0aa6935e615776fe85fe85e9ebe1b832b7c` |
 
-Index prepared on 2026-07-23 in timezone Europe/Warsaw from code commit `48f9b50`. Code and the index now live in the
-same repository and are selected by the same checkout, so provenance does not embed a mutable code commit hash. This
-avoids a self-referential update in which committing a new hash immediately makes that hash historical. The initial
-verified product baseline remains `48f9b50`; code version from `VERSION` was `0.1.8`.
+Index prepared on 2026-07-23 and its external documentation basis refreshed on 2026-07-25 in timezone Europe/Warsaw.
+The initial code basis was commit `48f9b50`. Code and the index now live in the same repository and are selected by the
+same checkout, so provenance does not embed a mutable current-code commit hash. This avoids a self-referential update in
+which committing a new hash immediately makes that hash historical. The initial verified product baseline remains
+`48f9b50`; code version from `VERSION` was `0.1.8`.
 
 Run `../scripts/check_freshness.sh` from this directory, or the same script through the installed skill link, before
 using the index. For the code repository it reports the checked-out revision as `VERSIONED` without comparing it to an
@@ -31,10 +32,18 @@ embedded key. Exact revision checks remain only for the two external documentati
   each postfix program to a fixed point, including the unmatched sibling-shift case. Coverage:
   `pt_issue202_hash_shift_factorization-*`, `ut_soperations`, and the physical/formula E2E comparison
   `it_issue202_hash_shift_e2e-run`. The E2E case also fixes shift-history sizing to `N+1` records for offset `N`.
+- Equivalent public SELECTs over commutative `STREAM_ADD` nodes can share one generated `STREAM_SELECT_*` computation
+  while retaining their separate public names, descriptors, storage, rules, and artifacts. Fingerprints preserve tree
+  grouping and output-field order; they canonicalize only sibling order at each individual `STREAM_ADD`. Full scans and
+  differently grouped three-source expressions are negative cases. Coverage: five `xcompiler` unit cases and
+  `it_select_cse_commutative_add-run`, including execution, NULL metadata, public descriptors, result-shape guards, and
+  ad-hoc import safety. The post-change Debug suite passed 158/158 tests.
 
 ## Source hierarchy and scope
 
-The Polish documentation contains about 7,474 Markdown lines across 68 content/configuration Markdown files. The index was built from its table of contents and all major domains: mathematical foundations, RQL construction, architecture, compiler, execution, examples, CLI appendices, and integration-test catalog.
+At the indexed Polish documentation commit, the repository contains 73 Markdown files and 7,578 Markdown lines; 70
+content files are linked from `SUMMARY.md`. The index covers all major domains: mathematical foundations, RQL
+construction, architecture, compiler, execution, examples, CLI appendices, and the integration-test catalog.
 
 The implementation index covers all hand-written headers and source files under `src/`, both ANTLR grammars, CMake/build/packaging configuration, all test CMake definitions, RQL fixtures, shell drivers, expected patterns, and unit-test names. Generated `.antlr/` files and build/coverage outputs are not knowledge sources.
 

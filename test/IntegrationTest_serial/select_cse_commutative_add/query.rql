@@ -1,0 +1,69 @@
+# Hipoteza testu
+#
+# Dwa jawne zapytania SELECT sa rownowazne obliczeniowo tylko wtedy, gdy maja:
+# - ten sam interwal oraz te sama liczbe i kolejnosc pol wynikowych;
+# - zgodne typy, rozmiary i licznosci odpowiadajacych pol;
+# - po rozwiazaniu referencji i rozwinieciu [_] te same programy pol, pobierajace
+#   te same pola zrodlowe i wykonujace te same operacje w tej samej kolejnosci;
+# - rownowazne drzewa FROM z zachowaniem grupowania.
+#
+# W pojedynczym wezle STREAM_ADD wolno kanonicznie zamienic dwoje dzieci, np.
+# a+b na b+a. Nie wolno zmieniac grupowania: (a+b)+c nie musi byc rownowazne
+# (c+b)+a, poniewaz inny substrat posredni moze miec inny rytm uruchomienia.
+# SELECT * i zmiana kolejnosci projekcji ujawniaja kolejnosc wejscia, wiec nie
+# sa przypadkami rownowaznymi. Indeksy pol RQL sa liczone od zera.
+#
+# Oczekiwany efekt optymalizacji etapu 1
+#
+# Kazda klasa rownowaznych zapytan dostaje jeden substrat STREAM_SELECT_*,
+# wykonujacy kosztowny program pol raz na slot. Jawne strumienie pozostaja
+# osobnymi lekkimi projekcjami, zachowujac nazwy, deskryptory, pliki, reguly,
+# retencje i polityki storage. Test nie obejmuje pelnego aliasu, ktory usuwalby
+# jeden z publicznych strumieni.
+#
+# Zakres scenariusza
+#
+# - c1/c2: rownowazna projekcja indeksowana dla a+b oraz b+a;
+# - e1/e2: rownowazna jawna lista pol dla a+b oraz b+a;
+# - d1/d2: negatywny przypadek SELECT *, w ktorym kolejnosc wejscia jest istotna;
+# - n1/n2: negatywny przypadek zmienionej kolejnosci pol wynikowych;
+# - x1/x2: rownowazna zamiana dzieci tylko wewnatrz (p+q) oraz (q+p);
+# - x1/x3: negatywny przypadek zmiany grupowania i substratu posredniego.
+#
+# Dane a.txt i b.txt zawieraja NULL. verify.sh najpierw sprawdza plan kompilacji:
+# wspolne STREAM_SELECT_*, usuniecie osieroconego STREAM_ADD_q_p oraz zachowanie
+# nierownowaznego STREAM_ADD_r_q. Nastepnie wykonuje plan i porownuje bajtowo
+# dane oraz ciala metadanych NULL par c1/c2, e1/e2 i x1/x2. Potwierdza tez, ze
+# publiczne deskryptory pozostaja osobne, a wyniki d1/d2, n1/n2 i x1/x3 roznia
+# sie zgodnie z hipoteza.
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE ax INTEGER, ay INTEGER STREAM a, 0.1 FILE 'a.txt'
+DECLARE bx INTEGER, by INTEGER STREAM b, 0.2 FILE 'b.txt'
+DECLARE cx INTEGER, cy INTEGER STREAM c, 0.3 FILE 'c.txt'
+DECLARE px INTEGER, py INTEGER STREAM p, 0.1 FILE 'a.txt'
+DECLARE qx INTEGER, qy INTEGER STREAM q, 0.2 FILE 'b.txt'
+DECLARE rx INTEGER, ry INTEGER STREAM r, 0.3 FILE 'c.txt'
+
+# Positive: the projection names its sources, so swapping one ADD node is safe.
+SELECT a[_]*b[_] STREAM c1 FROM a+b
+SELECT a[_]*b[_] STREAM c2 FROM b+a
+
+SELECT a[0],b[1] STREAM e1 FROM a+b
+SELECT a[0],b[1] STREAM e2 FROM b+a
+
+# Negative: full scan and output-field order expose the input order.
+SELECT * STREAM d1 FROM a+b
+SELECT * STREAM d2 FROM b+a
+
+SELECT a[0],b[1] STREAM n1 FROM a+b
+SELECT b[1],a[0] STREAM n2 FROM b+a
+
+# Positive only inside the same grouped ADD node.
+SELECT p[_]*q[_]+r[_] STREAM x1 FROM (p+q)+r
+SELECT p[_]*q[_]+r[_] STREAM x2 FROM (q+p)+r
+
+# Negative: this changes the intermediate substrate and its startup cadence.
+SELECT p[_]*q[_]+r[_] STREAM x3 FROM (r+q)+p

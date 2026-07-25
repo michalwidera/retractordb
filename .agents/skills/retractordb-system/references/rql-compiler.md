@@ -56,11 +56,14 @@ Multi-operator expressions remain postfix token programs immediately after parsi
 5. `deduplicateSubstrats()` — merge only compiler substrates with equal interval, token program, and field shape; rewrite consumer references, including cascades.
 6. `resolveFieldReferences()` — turn symbolic `PUSH_ID1..5` into `(stream,index)` `PUSH_ID`.
 7. `expandIndexWildcards()` — clone a one-field SELECT expression over the minimum flat size of all `[_]` sources.
-8. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
-9. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, and negative DUMP ranges; a shift
+8. `shareEquivalentSelectComputations()` — fingerprint explicit SELECT field programs and their FROM trees, canonicalize
+   only the two children of each individual `STREAM_ADD`, and move equivalent computation into one generated
+   `STREAM_SELECT_*` substrate while retaining each public SELECT as a pass-through stream.
+9. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
+10. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, and negative DUMP ranges; a shift
    by `N` addresses history slot `N` and therefore requires capacity `N+1`.
-10. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
-11. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
+11. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
+12. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
 
 The pipeline invariant after reduction is fewer than four stream-program tokens per query. `dataModel` treats any larger program as a fatal compiler invariant violation.
 
@@ -70,6 +73,13 @@ The matched-shift rewrite runs after interval resolution because equality of phy
 source intervals. It runs before structural deduplication so the exposed `A # B` substrate can be shared normally.
 `it_issue202_hash_shift_e2e-run` executes the optimized left-hand side and an explicit right-hand side over independent
 TEXTSOURCE instances, compares the stored payload/metadata bodies, and verifies the complete formula-derived sequence.
+
+SELECT computation sharing runs after symbolic references and `[_]` have been expanded, but before field offsets are
+localized to a query's input payload. This lets `FROM a+b` and `FROM b+a` compare the source identities rather than
+different local offsets. The FROM fingerprint sorts the two child fingerprints only at each `STREAM_ADD`; it never
+reassociates `(a+b)+c` into `a+(b+c)`. Full scans, changed output-field order, unresolved/local references, declarations,
+compiler substrates, and singleton equivalence classes remain unchanged. During ad-hoc import the pass is restricted to
+new IDs so an already instantiated live query cannot be rewritten underneath its runtime stream instance.
 
 ## Generated schemas and intervals
 

@@ -5,9 +5,14 @@
 #include <cstdint>
 #include <cstdio>   // instrumentacja E3 (RDB_BENCH_PLAN): std::fprintf
 #include <cstdlib>  // instrumentacja E3: std::getenv
+#include <functional>
 #include <limits>
+#include <map>
+#include <optional>
+#include <set>
 #include <sstream>
 #include <utility>  // instrumentacja E3: std::pair
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
@@ -1003,6 +1008,159 @@ std::string compiler::deduplicateSubstrats() {
   return {"OK"};
 }
 
+std::string compiler::shareEquivalentSelectComputations() {
+  // Współdziel tylko kosztowne programy pól. Publiczne SELECT-y pozostają
+  // osobnymi strumieniami, dzięki czemu zachowują storage, reguły i deskryptory.
+  auto substratType = std::string("DEFAULT");
+  auto directiveIt  = std::ranges::find_if(coreInstance, [](const query &qry) { return qry.id == ":SUBSTRAT"; });
+  if (directiveIt != coreInstance.end()) substratType = directiveIt->filename;
+  std::ranges::transform(substratType, substratType.begin(), ::toupper);
+
+  std::set<std::string> visiting;
+  std::function<std::string(const query &)> programFingerprint;
+  std::function<std::string(const std::string &)> sourceFingerprint;
+
+  sourceFingerprint = [&](const std::string &sourceId) {
+    auto &source = coreInstance.getQuery(sourceId);
+    if (!source.isSubstrat) return std::string("SOURCE{") + sourceId + "}";
+    return programFingerprint(source);
+  };
+
+  programFingerprint = [&](const query &qry) {
+    if (!visiting.insert(qry.id).second) return std::string("CYCLE{") + qry.id + "}";
+
+    std::string result;
+    if (qry.lProgram.size() == 3) {
+      auto it              = qry.lProgram.begin();
+      const token &left    = *it++;
+      const token &right   = *it++;
+      const token &command = *it;
+      if (left.getCommandID() == PUSH_STREAM && right.getCommandID() == PUSH_STREAM && command.getCommandID() == STREAM_ADD) {
+        // STREAM_ADD jest przemienny w obrębie jednego węzła. Nie spłaszczamy
+        // drzewa, bo różne grupowanie może zmienić harmonogram uruchomienia.
+        auto leftFingerprint  = sourceFingerprint(left.getStr_());
+        auto rightFingerprint = sourceFingerprint(right.getStr_());
+        if (rightFingerprint < leftFingerprint) std::swap(leftFingerprint, rightFingerprint);
+        result = "ADD{" + leftFingerprint + "}{" + rightFingerprint + "}";
+      }
+    }
+
+    if (result.empty()) {
+      std::ostringstream out;
+      out << "PROGRAM{";
+      for (const auto &item : qry.lProgram) {
+        if (item.getCommandID() == PUSH_STREAM)
+          out << "STREAM{" << sourceFingerprint(item.getStr_()) << "}";
+        else
+          out << "TOKEN{" << item << "}";
+      }
+      out << "}";
+      result = out.str();
+    }
+
+    visiting.erase(qry.id);
+    return result;
+  };
+
+  auto queryFingerprint = [&](query &qry) -> std::optional<std::string> {
+    if (qry.isDeclaration() || qry.isCompilerDirective() || qry.isSubstrat || qry.lSchema.empty()) return std::nullopt;
+    if (restrictSelectSharing_ && !selectSharingScope_.contains(qry.id)) return std::nullopt;
+
+    const auto fromFingerprint = programFingerprint(qry);
+    if (fromFingerprint.find("ADD{") == std::string::npos) return std::nullopt;
+
+    std::ostringstream out;
+    out << "INTERVAL{" << qry.rInterval.numerator() << "/" << qry.rInterval.denominator() << "}";
+    out << "FROM{" << fromFingerprint << "}";
+    out << "FIELDS{";
+    for (const auto &item : qry.lSchema) {
+      out << "SHAPE{" << static_cast<int>(item.field_.rtype) << ":" << item.field_.rlen << ":" << item.field_.rarray << "}";
+      out << "PROGRAM{";
+      for (const auto &fieldToken : item.lProgram) {
+        switch (fieldToken.getCommandID()) {
+          case PUSH_ID1:
+          case PUSH_ID2:
+          case PUSH_ID3:
+          case PUSH_ID4:
+          case PUSH_ID5:
+          case PUSH_IDX:
+          case PUSH_TSCAN:
+            return std::nullopt;
+          case PUSH_ID: {
+            const auto &[sourceId, offset] = std::get<std::pair<std::string, int>>(fieldToken.getVT());
+            if (sourceId == qry.id) return std::nullopt;
+            out << "FIELD{" << sourceId << ":" << offset << "}";
+          } break;
+          default:
+            out << "TOKEN{" << fieldToken << "}";
+            break;
+        }
+      }
+      out << "}";
+    }
+    out << "}";
+    return out.str();
+  };
+
+  std::map<std::string, std::vector<std::string>> groups;
+  for (auto &qry : coreInstance) {
+    auto fingerprint = queryFingerprint(qry);
+    if (fingerprint.has_value()) groups[*fingerprint].push_back(qry.id);
+  }
+
+  bool changed = false;
+  for (auto &group : groups) {
+    auto &queryIds = group.second;
+    if (queryIds.size() < 2) continue;
+    std::ranges::sort(queryIds);
+
+    const query representative = coreInstance.getQuery(queryIds.front());
+    std::string sharedId       = "STREAM_SELECT_" + representative.id;
+    for (int suffix = 2; coreInstance.exists(sharedId); ++suffix)
+      sharedId = "STREAM_SELECT_" + representative.id + "_" + std::to_string(suffix);
+
+    query shared = representative;
+    shared.id    = sharedId;
+    shared.filename.clear();
+    shared.isDisposable = false;
+    shared.isOneShot    = false;
+    shared.isHold       = false;
+    shared.isSubstrat   = true;
+    shared.lRules.clear();
+    shared.retention      = rdb::retention_t{.segments = 0, .capacity = 0};
+    shared.policy         = std::make_pair(substratType, 1);
+    shared.storage_policy = "DEFAULT";
+    coreInstance.push_back(std::move(shared));
+
+    for (const auto &queryId : queryIds) {
+      auto &qry    = coreInstance.getQuery(queryId);
+      int position = 0;
+      for (auto &item : qry.lSchema)
+        item.lProgram = {token(PUSH_ID, std::make_pair(sharedId, position++))};
+      qry.lProgram = {token(PUSH_STREAM, sharedId)};
+    }
+    changed = true;
+  }
+
+  if (!changed) return {"OK"};
+
+  bool removed = true;
+  while (removed) {
+    std::set<std::string> referenced;
+    for (const auto &qry : coreInstance)
+      for (const auto &item : qry.lProgram)
+        if (item.getCommandID() == PUSH_STREAM) referenced.insert(item.getStr_());
+
+    auto newEnd =
+        std::ranges::remove_if(coreInstance, [&](const query &qry) { return qry.isSubstrat && !referenced.contains(qry.id); });
+    removed = newEnd.begin() != coreInstance.end();
+    coreInstance.erase(newEnd.begin(), newEnd.end());
+  }
+
+  coreInstance.topologicalSort();
+  return {"OK"};
+}
+
 std::string compiler::compile() {
   std::string result;
 
@@ -1069,6 +1227,11 @@ std::string compiler::compile() {
   result = expandIndexWildcards();
   if (result != "OK") return result;
 
+  // Podpis pól musi używać źródłowych PUSH_ID, zanim ich offsety zostaną
+  // przepisane na lokalny bufor wejściowy publicznego zapytania.
+  result = shareEquivalentSelectComputations();
+  if (result != "OK") return result;
+
   result = localizeFieldOffsets();
   if (result != "OK") return result;
 
@@ -1097,11 +1260,16 @@ std::string compiler::compile() {
 
 std::vector<std::string> compiler::importFrom(qTree &source) {
   std::vector<std::string> retVal;
+  // Ponowna kompilacja aktywnego planu nie może przepisać już utworzonych
+  // streamInstance. W trybie ad-hoc analizujemy wyłącznie właśnie importowane ID.
+  restrictSelectSharing_ = true;
+  selectSharingScope_.clear();
   for (auto &q : source) {
     if (q.isCompilerDirective()) continue;
     if (coreInstance.exists(q.id)) continue;
     coreInstance.push_back(q);
     retVal.push_back(q.id);
+    selectSharingScope_.insert(q.id);
   }
   return retVal;
 }
