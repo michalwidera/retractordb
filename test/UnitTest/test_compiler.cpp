@@ -89,6 +89,7 @@ TEST(xcompiler, shares_commutative_add_select_computation) {
   ASSERT_TRUE(instance.exists("c1"));
   ASSERT_TRUE(instance.exists("c2"));
 
+#if RDB_OPT_SHARE_EQUIVALENT_SELECTS && RDB_OPT_COMMUTATIVE_ADD
   auto &c1 = instance.getQuery("c1");
   auto &c2 = instance.getQuery("c2");
   ASSERT_EQ(c1.lProgram.size(), 1);
@@ -100,6 +101,36 @@ TEST(xcompiler, shares_commutative_add_select_computation) {
   ASSERT_TRUE(instance.exists(sharedId));
   EXPECT_TRUE(instance.getQuery(sharedId).isSubstrat);
   EXPECT_EQ(instance.getQuery(sharedId).lSchema.size(), 2);
+#else
+  EXPECT_EQ(instance.getQuery("c1").lProgram.size(), 3);
+  EXPECT_EQ(instance.getQuery("c2").lProgram.size(), 3);
+  EXPECT_EQ(std::ranges::count_if(instance, [](const query &qry) { return qry.id.starts_with("STREAM_SELECT_"); }), 0);
+#endif
+}
+
+TEST(xcompiler, shares_syntactically_identical_add_select_computation) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE ax INTEGER, ay INTEGER STREAM a, 1 FILE 'a.txt'
+        DECLARE bx INTEGER, by INTEGER STREAM b, 2 FILE 'b.txt'
+        SELECT a[_]*b[_] STREAM c1 FROM a+b
+        SELECT a[_]*b[_] STREAM c2 FROM a+b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+#if RDB_OPT_SHARE_EQUIVALENT_SELECTS
+  ASSERT_EQ(instance.getQuery("c1").lProgram.size(), 1);
+  ASSERT_EQ(instance.getQuery("c2").lProgram.size(), 1);
+  EXPECT_EQ(instance.getQuery("c1").lProgram.front().getStr_(), instance.getQuery("c2").lProgram.front().getStr_());
+#else
+  EXPECT_EQ(instance.getQuery("c1").lProgram.size(), 3);
+  EXPECT_EQ(instance.getQuery("c2").lProgram.size(), 3);
+  EXPECT_EQ(std::ranges::count_if(instance, [](const query &qry) { return qry.id.starts_with("STREAM_SELECT_"); }), 0);
+#endif
 }
 
 TEST(xcompiler, does_not_share_order_sensitive_selects) {
@@ -168,6 +199,7 @@ TEST(xcompiler, preserves_add_grouping_in_computation_fingerprint) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
+#if RDB_OPT_SHARE_EQUIVALENT_SELECTS && RDB_OPT_COMMUTATIVE_ADD
   auto &x1 = instance.getQuery("x1");
   auto &x2 = instance.getQuery("x2");
   auto &x3 = instance.getQuery("x3");
@@ -177,6 +209,56 @@ TEST(xcompiler, preserves_add_grouping_in_computation_fingerprint) {
   EXPECT_EQ(x3.lProgram.size(), 3);
   EXPECT_FALSE(instance.exists("STREAM_ADD_b_a"));
   EXPECT_TRUE(instance.exists("STREAM_ADD_c_b"));
+#else
+  EXPECT_EQ(instance.getQuery("x1").lProgram.size(), 3);
+  EXPECT_EQ(instance.getQuery("x2").lProgram.size(), 3);
+  EXPECT_EQ(instance.getQuery("x3").lProgram.size(), 3);
+#endif
+}
+
+TEST(xcompiler, toggles_substrate_deduplication) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE av INTEGER STREAM a, 1 FILE 'a.txt'
+        DECLARE bv INTEGER STREAM b, 1 FILE 'b.txt'
+        SELECT * STREAM sum FROM a+b
+        SELECT shifted[0] STREAM shifted FROM (a+b)>1
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+#if RDB_OPT_DEDUP_SUBSTRATES
+  EXPECT_FALSE(instance.exists("STREAM_ADD_a_b"));
+#else
+  EXPECT_TRUE(instance.exists("STREAM_ADD_a_b"));
+#endif
+}
+
+TEST(xcompiler, toggles_matched_hash_time_move_factorization) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE av INTEGER STREAM A, 0.1 FILE 'a.txt'
+        DECLARE bv INTEGER STREAM B, 0.2 FILE 'b.txt'
+        SELECT * STREAM matched FROM (A>2)#(B>1)
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+#if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
+  EXPECT_TRUE(instance.exists("STREAM_HASH_A_B"));
+  EXPECT_FALSE(instance.exists("STREAM_TIMEMOVE_A"));
+  EXPECT_FALSE(instance.exists("STREAM_TIMEMOVE_B"));
+#else
+  EXPECT_FALSE(instance.exists("STREAM_HASH_A_B"));
+  EXPECT_TRUE(instance.exists("STREAM_TIMEMOVE_A"));
+  EXPECT_TRUE(instance.exists("STREAM_TIMEMOVE_B"));
+#endif
 }
 
 TEST(xcompiler, does_not_rewrite_existing_queries_during_import) {

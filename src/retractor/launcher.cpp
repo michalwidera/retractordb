@@ -174,7 +174,41 @@ static void validateConfiguredStorageDir(const AppConfig &cfg) {
   std::filesystem::remove(probeFile, ec);
 }
 
+static void printOptimizerBuildInfo() {
+#if RDB_OPT_DEDUP_SUBSTRATES
+  std::println("RDB_OPT_DEDUP_SUBSTRATES=ON");
+#else
+  std::println("RDB_OPT_DEDUP_SUBSTRATES=OFF");
+#endif
+#if RDB_OPT_SHARE_EQUIVALENT_SELECTS
+  std::println("RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON");
+#else
+  std::println("RDB_OPT_SHARE_EQUIVALENT_SELECTS=OFF");
+#endif
+#if RDB_OPT_COMMUTATIVE_ADD
+  std::println("RDB_OPT_COMMUTATIVE_ADD=ON");
+#else
+  std::println("RDB_OPT_COMMUTATIVE_ADD=OFF");
+#endif
+#if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
+  std::println("RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=ON");
+#else
+  std::println("RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=OFF");
+#endif
+#ifdef RDB_BENCH_PROBE
+  std::println("RDB_BENCH_PROBE=ON");
+#else
+  std::println("RDB_BENCH_PROBE=OFF");
+#endif
+}
+
 int main(int argc, char *argv[]) {
+  for (int i = 1; i < argc; ++i)
+    if (strcmp(argv[i], "--optimizer-build-info") == 0) {
+      printOptimizerBuildInfo();
+      return boost::system::errc::success;
+    }
+
   qTree coreInstance;
   compiler cm(coreInstance);
 
@@ -237,6 +271,7 @@ int main(int argc, char *argv[]) {
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
+          ("optimizer-build-info", "show optimizer build configuration")             //
           ("onlycompile,c", "compile only mode")                                     // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
@@ -253,6 +288,7 @@ int main(int argc, char *argv[]) {
     } else {
       desc.add_options()                                                          //
           ("help,h", "Show program options")                                      //
+          ("optimizer-build-info", "show optimizer build configuration")          //
           ("onlycompile,c", "compile only mode")                                  // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("quiet,r", "no output on screen, skip presenter")                      //

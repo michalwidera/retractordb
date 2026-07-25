@@ -15,3 +15,11 @@ add_test(
   COMMAND bash verify.sh)
 
 set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+
+if(NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES)
+  set_tests_properties(
+    ${TestID}-run
+    PROPERTIES
+      DISABLED TRUE LABELS
+      "expected_ablation_failure;requires_factor_matched_hash_timemoves")
+endif()

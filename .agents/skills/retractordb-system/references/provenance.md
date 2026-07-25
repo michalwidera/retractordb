@@ -5,8 +5,8 @@
 | Repository | Role | Branch | Version basis |
 |---|---|---|---|
 | `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
-| `dokumentacja-rdb` | canonical Polish documentation | `main` | `d49bf5ae232f4a0575b698af2d1d03c6162365a4` |
-| `documentation-rdb` | derived English translation | `main` | `f76fb0aa6935e615776fe85fe85e9ebe1b832b7c` |
+| `dokumentacja-rdb` | canonical Polish documentation | `main` | `2723e03cabac72fed29eb5e2d82f7275fefd38d6` |
+| `documentation-rdb` | derived English translation | `main` | `93f372882ec5c5b5022e72834a5562b743ba441f` |
 
 Index prepared on 2026-07-23 and its external documentation basis refreshed on 2026-07-25 in timezone Europe/Warsaw.
 The initial code basis was commit `48f9b50`. Code and the index now live in the same repository and are selected by the
@@ -38,10 +38,29 @@ embedded key. Exact revision checks remain only for the two external documentati
   differently grouped three-source expressions are negative cases. Coverage: five `xcompiler` unit cases and
   `it_select_cse_commutative_add-run`, including execution, NULL metadata, public descriptors, result-shape guards, and
   ad-hoc import safety. The post-change Debug suite passed 158/158 tests.
+- Build-time optimizer ablation switches preserve the default pipeline while allowing substrate deduplication, equivalent
+  SELECT sharing, commutative `STREAM_ADD` fingerprints, and matched hash/time-move factorization to be compiled out
+  independently. `it_optimizer_ablation-*` verifies build identity, plan shapes, and semantic comparisons. It also records
+  two material runtime interactions as `expected_ablation_failure`: without matched-shift factorization,
+  `(A>2)#(B>1)` does not produce the same payload as `(A#B)>3`; with factorization, substrate deduplication, and equivalent
+  SELECT sharing all disabled, an otherwise equivalent shifted `DA+DB` plan gains one extra zero-valued startup record.
+  These are observable ablation results, not test-harness exemptions from unexplained failures. The full Release matrix
+  with `RDB_BENCH_PROBE=OFF` matched the expected success-count delta relative to the all-optimizations-enabled baseline
+  in every valid configuration; no unexpected discrepancy remained. The user-facing matrix deliberately reports
+  relative deltas rather than a fixed test inventory.
+- `scripts/buildrdb.sh release` now treats production output as a fail-closed build: it requires a pristine Git tree,
+  recreates `build/Release`, sanitizes common flag-injection environment variables, explicitly enables every production
+  optimizer and disables `RDB_BENCH_PROBE`, then verifies the resulting binary through `--optimizer-build-info`.
+  `release-ablation` and `probe` use separate CMake and Conan output directories and verify their own selected build
+  identity, preventing experimental caches or binaries from being written into `build/Release`.
+- Model-dependent IPC commands now wait for `dataModel` publication after the IPC resources become available, closing a
+  startup race in which an early `xqry get` could receive a response without `db.stream`. The
+  `it_issue121_null_propagation-run` regression starts the client before the server with short readiness polling and
+  cleans up both children on failure, preventing a stale lock from causing a cascade of unrelated integration failures.
 
 ## Source hierarchy and scope
 
-At the indexed Polish documentation commit, the repository contains 73 Markdown files and 7,578 Markdown lines; 70
+At the indexed Polish documentation commit, the repository contains 74 Markdown files and 7,851 Markdown lines; 71
 content files are linked from `SUMMARY.md`. The index covers all major domains: mathematical foundations, RQL
 construction, architecture, compiler, execution, examples, CLI appendices, and the integration-test catalog.
 
@@ -56,9 +75,12 @@ These are navigation warnings, not necessarily product defects:
 - The mathematical documentation defines `tau_m(S)` as the advanced sequence
   `s_(n+m)`, while runtime `STREAM_TIMEMOVE(N)` reads history slot `N` for
   computed streams and the issue-202 E2E fixture expects an initial delayed
-  prefix. The formal direction, pre-stream boundary extension, and NULL versus
-  zero semantics must be reconciled before treating the theorem as a complete
-  proof of the compiler rewrite.
+  prefix. The optimizer ablation fixture additionally proves that the unfactored
+  `(A>2)#(B>1)` runtime plan is not payload-equivalent to `(A#B)>3`, even though
+  the factored default plan is. The formal direction, separate input clocks,
+  pre-stream boundary extension, and NULL versus zero semantics must be
+  reconciled before treating the theorem as a complete proof of the compiler
+  rewrite or the unfactored plan as an equivalent executable form.
 - Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
 - The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
 - Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.

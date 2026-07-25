@@ -1,0 +1,3 @@
+[timing]
+server_startup_wait_s = 10
+server_startup_poll_ms = 1

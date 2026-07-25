@@ -41,3 +41,11 @@ add_test(
     grep -F ':- PUSH_STREAM(STREAM_HASH_A_B)' zero.out ; \
     grep -F 'STREAM_HASH_A_B(1/20)' zero.out ; \
     if grep -F 'STREAM_TIMEMOVE(' zero.out ; then exit 1 ; fi")
+
+if(NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES)
+  set_tests_properties(
+    ${TestID}-matched ${TestID}-zero
+    PROPERTIES
+      DISABLED TRUE LABELS
+      "expected_ablation_failure;requires_factor_matched_hash_timemoves")
+endif()

@@ -126,6 +126,43 @@ To produce your own `.deb` / `.tar.gz` packages locally:
 scripts/buildrdb.sh release package
 ```
 
+### Optimizer ablation build options
+
+The following CMake options control independent query-plan optimizations. All
+are `ON` by default, so a normal build preserves the production optimizer:
+
+| Option | Default | Controlled transformation |
+|--------|---------|---------------------------|
+| `RDB_OPT_DEDUP_SUBSTRATES` | `ON` | Merges structurally identical compiler substrates and rewrites their references. |
+| `RDB_OPT_SHARE_EQUIVALENT_SELECTS` | `ON` | Moves equivalent public `SELECT` computations into a shared `STREAM_SELECT_*` substrate. |
+| `RDB_OPT_COMMUTATIVE_ADD` | `ON` | Treats `A+B` and `B+A` as equivalent while fingerprinting plans for shared `SELECT` computations. |
+| `RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES` | `ON` | Rewrites matched `(A>i)#(B>k)` plans to `(A#B)>(i+k)`. |
+
+`RDB_OPT_COMMUTATIVE_ADD=ON` requires
+`RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON`; CMake rejects the otherwise ineffective
+combination. Disabling commutativity alone still allows syntactically identical
+`A+B` plans to share their computation.
+
+Configure every experimental variant in its own build directory:
+
+```bash
+cmake -S . -B build/abl-no-comm -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=build/Debug/generators/conan_toolchain.cmake \
+  -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON \
+  -DRDB_OPT_COMMUTATIVE_ADD=OFF
+cmake --build build/abl-no-comm
+build/abl-no-comm/src/retractor/xretractor --optimizer-build-info
+```
+
+CMake option values persist in `CMakeCache.txt`. Use a fresh build directory or
+pass every `RDB_OPT_*` value explicitly when changing variants.
+`scripts/buildrdb.sh release` and `scripts/buildrdb.sh package` explicitly
+restore all production optimizer options to `ON`.
+
+`RDB_BENCH_PROBE` is independent measurement instrumentation, not an optimizer
+switch. Any valid optimizer combination can be configured with the probe either
+`ON` or `OFF`; production release and packaging force it to `OFF`.
+
 ## Initial configuration
 
 RetractorDB runs with sensible defaults and **needs no configuration file** to

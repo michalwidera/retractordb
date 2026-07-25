@@ -19,3 +19,10 @@ add_test(
     valgrind --vgdb=no --error-exitcode=1 --leak-check=full
     --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
     queryWithSubstrats.rql -c)
+
+if(NOT RDB_OPT_DEDUP_SUBSTRATES)
+  set_tests_properties(
+    ${TestID}-compile
+    PROPERTIES DISABLED TRUE LABELS
+               "expected_ablation_failure;requires_dedup_substrates")
+endif()
