@@ -56,7 +56,10 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 
 - End-to-end NULL over IPC and rendering: `it_issue113_null_xqry-run`.
 - Skip all-null rows: two `it_issue113_null_skip-*`.
-- NULL propagation through SELECT: `it_issue121_null_propagation-run`.
+- NULL propagation through SELECT and the IPC/model readiness boundary:
+  `it_issue121_null_propagation-run`. Its client starts before the server and polls IPC at a short interval, while its
+  cleanup trap terminates both child processes after any failure so a stale singleton lock cannot cascade into later
+  tests.
 - `isnull`: `it_issue121_isnull-run`.
 - Numeric/string conversions and descriptor width: two `it_issue128_*`.
 - `.meta` internal header/entries/bitsets: `it_issue113_meta_internal`.

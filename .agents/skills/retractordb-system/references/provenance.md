@@ -53,6 +53,10 @@ embedded key. Exact revision checks remain only for the two external documentati
   optimizer and disables `RDB_BENCH_PROBE`, then verifies the resulting binary through `--optimizer-build-info`.
   `release-ablation` and `probe` use separate CMake and Conan output directories and verify their own selected build
   identity, preventing experimental caches or binaries from being written into `build/Release`.
+- Model-dependent IPC commands now wait for `dataModel` publication after the IPC resources become available, closing a
+  startup race in which an early `xqry get` could receive a response without `db.stream`. The
+  `it_issue121_null_propagation-run` regression starts the client before the server with short readiness polling and
+  cleans up both children on failure, preventing a stale lock from causing a cascade of unrelated integration failures.
 
 ## Source hierarchy and scope
 

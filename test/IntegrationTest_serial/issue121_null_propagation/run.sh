@@ -10,6 +10,8 @@ LOCK="${TMPDIR:-/tmp}/xretractor_service.lock"
 # uxSysTermTools.cpp) - ten sam katalog co LOCK, więc respektuje TMPDIR.
 XRETRACTOR_LOG="${TMPDIR:-/tmp}/xretractor.log"
 XQRY_LOG="${TMPDIR:-/tmp}/xqry.log"
+SERVER_PID=""
+CLIENT_PID=""
 
 # Diagnostyka na wypadek timeoutu/awarii (np. CI #187: 60s timeout, brak
 # powtórzenia lokalnie) - dumpuje stan procesów i logi, żeby przy kolejnym
@@ -27,14 +29,50 @@ dump_diagnostics() {
   tail -n 200 "$XQRY_LOG" 2>/dev/null || echo "(missing)"
   echo "=== end diagnostics ==="
 }
-trap dump_diagnostics TERM
-trap '[ $? -ne 0 ] && dump_diagnostics; true' EXIT
+
+stop_child() {
+  local pid="$1"
+  local attempts=0
+
+  if [ -z "$pid" ]; then
+    return
+  fi
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    while kill -0 "$pid" 2>/dev/null && [ "$attempts" -lt 50 ]; do
+      sleep 0.1
+      attempts=$((attempts + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  fi
+  wait "$pid" 2>/dev/null || true
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT TERM
+  if [ "$status" -ne 0 ]; then
+    dump_diagnostics
+  fi
+  stop_child "$CLIENT_PID"
+  stop_child "$SERVER_PID"
+  exit "$status"
+}
+
+trap 'exit 124' TERM
+trap cleanup EXIT
 
 mkdir -p temp
+xqry --config readiness.toml --wait-server -s dst -k -m 3 > out.txt &
+CLIENT_PID=$!
 xretractor query.rql -k -x &
-while [ ! -f "$LOCK" ]; do sleep 0.1; done
-xqry -s dst -k -m 3 > out.txt
-while [ -f "$LOCK" ]; do sleep 0.1; done
+SERVER_PID=$!
+wait "$CLIENT_PID"
+CLIENT_PID=""
+wait "$SERVER_PID"
+SERVER_PID=""
 grep -F '10 null' out.txt
 grep -F 'null 20' out.txt
 grep -F '30 40' out.txt

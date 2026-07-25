@@ -98,7 +98,11 @@ Boost.Interprocess resources:
 - map object `MyMap`, protected by named mutex `RetractorMapMutex`, for request/response control messages keyed by client PID;
 - per-subscriber message queue `brcdbr<PID>` for streamed rows.
 
-The server has a processing thread and `commandProcessorLoop` communication thread. The lock file is acquired only after IPC resources report ready, preventing a client from observing a nominally active but unreachable server.
+The server has a processing thread and `commandProcessorLoop` communication thread. The lock file is acquired only after
+IPC resources report ready. For a non-empty compiled plan, model-dependent commands (`get`, `detail`, `show`, and
+`adhoc`) additionally wait until `dataModel` has been constructed and its pointer safely published; `hello` and `kill`
+remain independent of model readiness. This prevents an early client from receiving an empty response in the short
+interval between IPC creation and model construction.
 
 Control commands include:
 

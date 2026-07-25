@@ -92,6 +92,7 @@ std::condition_variable cv;  // multithreading condition variable
 std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
+std::atomic<bool> dataModelExpected{false};
 
 // variable connected with llimitqry (-m) parameter
 // counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
@@ -112,6 +113,7 @@ void cleanup() {
     iLoopLimitCnt = executorsm::stop_now;
     std::cout << "Cleanup!" << '\n';
   }
+  cv.notify_all();
   if (bt.joinable()) bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
@@ -234,6 +236,16 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
+    const bool requiresDataModel = command == "get" || command == "adhoc" || command == "detail" || command == "show";
+    if (requiresDataModel && dataModelExpected.load()) {
+      std::unique_lock<std::mutex> lock(core_mutex);
+      cv.wait(lock, [] { return pProc != nullptr || iLoopLimitCnt == executorsm::stop_now; });
+      if (pProc == nullptr) {
+        ptRetval.put("db", "server stopping");
+        return ptRetval;
+      }
+    }
+
     //
     // This command return stream identifiers
     //
@@ -550,6 +562,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
   executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
+  dataModelExpected                 = !coreInstance.empty();
 
   std::atexit(cleanup);
 
@@ -572,6 +585,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   if (!guard.acquireLock()) {
     SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
     iLoopLimitCnt = executorsm::stop_now;
+    cv.notify_all();
     bt.join();
     return system::errc::no_lock_available;
   }
@@ -602,7 +616,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       if (iLoopLimitCnt != executorsm::stop_now) _getch();
     } else {
       dataModel proc(*coreInstancePtr);
-      pProc = &proc;
+      {
+        std::scoped_lock lock(core_mutex);
+        pProc = &proc;
+      }
+      cv.notify_all();
 
       if (vm.contains("xqrywait")) {
         if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
@@ -753,6 +771,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     retVal = system::errc::interrupted;
   }
   iLoopLimitCnt = executorsm::stop_now;
+  cv.notify_all();
   boradcastOutOfBussiness();
   bt.join();
   IPC::shared_memory_object::remove("RetractorShmemMap");
