@@ -1,0 +1,3 @@
+[submodule "examples/experiment"]
+	path = examples/experiment
+	url = https://github.com/michalwidera/rdb-experiment.git

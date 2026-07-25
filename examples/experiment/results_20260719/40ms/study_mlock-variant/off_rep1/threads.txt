@@ -1,2 +1,0 @@
-   2185    2185 xretractor      FF      50   3
-   2185    2186 xretractor      TS       -   3
