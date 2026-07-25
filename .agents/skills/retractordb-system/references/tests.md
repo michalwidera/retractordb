@@ -38,7 +38,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
   `it_issue202_hash_shift_e2e-run`.
 - Three/four-argument decomposition: `it_issue167_triarg`.
 - Circular dependency rejection: `pt_issue95_loopInCompile-compile`.
-- Generated substrate sharing: `pt_issue96_substrat_reference-*`.
+- Generated substrate sharing: `pt_issue96_substrat_reference-*`; its exact plan-pattern case is disabled and labeled
+  `requires_dedup_substrates` when substrate deduplication is compiled out, while its Valgrind case remains enabled.
 - User queries must not be deduplicated: `pt_issue96_no_substrat_reduction-*`.
 - Substrate dedup basics, field-name independence, nonzero offsets, cascades: four `it_issue167_dedup_*` scenarios.
 - Equivalent SELECT computation sharing across commutative `+`, public artifact preservation, NULL metadata, output-order

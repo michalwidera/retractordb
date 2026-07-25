@@ -5,8 +5,8 @@
 | Repository | Role | Branch | Version basis |
 |---|---|---|---|
 | `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
-| `dokumentacja-rdb` | canonical Polish documentation | `main` | `d49bf5ae232f4a0575b698af2d1d03c6162365a4` |
-| `documentation-rdb` | derived English translation | `main` | `f76fb0aa6935e615776fe85fe85e9ebe1b832b7c` |
+| `dokumentacja-rdb` | canonical Polish documentation | `main` | `2723e03cabac72fed29eb5e2d82f7275fefd38d6` |
+| `documentation-rdb` | derived English translation | `main` | `93f372882ec5c5b5022e72834a5562b743ba441f` |
 
 Index prepared on 2026-07-23 and its external documentation basis refreshed on 2026-07-25 in timezone Europe/Warsaw.
 The initial code basis was commit `48f9b50`. Code and the index now live in the same repository and are selected by the
@@ -42,13 +42,21 @@ embedded key. Exact revision checks remain only for the two external documentati
   SELECT sharing, commutative `STREAM_ADD` fingerprints, and matched hash/time-move factorization to be compiled out
   independently. `it_optimizer_ablation-*` verifies build identity, plan shapes, and semantic comparisons. It also records
   two material runtime interactions as `expected_ablation_failure`: without matched-shift factorization,
-  `(A>2)#(B>1)` does not produce the same payload as `(A#B)>3`; with both factorization and substrate deduplication disabled,
-  an otherwise equivalent shifted `DA+DB` plan gains one extra zero-valued startup record. These are observable ablation
-  results, not test-harness exemptions from unexplained failures.
+  `(A>2)#(B>1)` does not produce the same payload as `(A#B)>3`; with factorization, substrate deduplication, and equivalent
+  SELECT sharing all disabled, an otherwise equivalent shifted `DA+DB` plan gains one extra zero-valued startup record.
+  These are observable ablation results, not test-harness exemptions from unexplained failures. The full Release matrix
+  with `RDB_BENCH_PROBE=OFF` matched the expected success-count delta relative to the all-optimizations-enabled baseline
+  in every valid configuration; no unexpected discrepancy remained. The user-facing matrix deliberately reports
+  relative deltas rather than a fixed test inventory.
+- `scripts/buildrdb.sh release` now treats production output as a fail-closed build: it requires a pristine Git tree,
+  recreates `build/Release`, sanitizes common flag-injection environment variables, explicitly enables every production
+  optimizer and disables `RDB_BENCH_PROBE`, then verifies the resulting binary through `--optimizer-build-info`.
+  `release-ablation` and `probe` use separate CMake and Conan output directories and verify their own selected build
+  identity, preventing experimental caches or binaries from being written into `build/Release`.
 
 ## Source hierarchy and scope
 
-At the indexed Polish documentation commit, the repository contains 73 Markdown files and 7,578 Markdown lines; 70
+At the indexed Polish documentation commit, the repository contains 74 Markdown files and 7,851 Markdown lines; 71
 content files are linked from `SUMMARY.md`. The index covers all major domains: mathematical foundations, RQL
 construction, architecture, compiler, execution, examples, CLI appendices, and the integration-test catalog.
 

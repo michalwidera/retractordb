@@ -58,11 +58,13 @@ if(NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES)
                "expected_ablation_failure;factor_runtime_semantic_divergence")
 endif()
 
-# Gdy wyłączone są jednocześnie deduplikacja i faktoryzacja, dwa równoważne
-# węzły DA+DB są harmonogramowane osobno. Wartości stanu ustalonego są zgodne,
-# ale badany wynik otrzymuje o jeden rekord zerowego prefiksu więcej niż
-# konfiguracja domyślna.
-if(NOT RDB_OPT_DEDUP_SUBSTRATES AND NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES)
+# Gdy wyłączone są jednocześnie deduplikacja, faktoryzacja i współdzielenie
+# równoważnych SELECT, dwa węzły DA+DB są harmonogramowane osobno. Wartości
+# stanu ustalonego są zgodne, ale badany wynik otrzymuje o jeden rekord zerowego
+# prefiksu więcej niż konfiguracja domyślna.
+if(NOT RDB_OPT_DEDUP_SUBSTRATES
+   AND NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
+   AND NOT RDB_OPT_SHARE_EQUIVALENT_SELECTS)
   set_tests_properties(
     ${TestID}-dedup-exact-semantic
     PROPERTIES WILL_FAIL TRUE LABELS
