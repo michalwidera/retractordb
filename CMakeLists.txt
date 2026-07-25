@@ -203,6 +203,8 @@ include_directories(
   ${fmt_INCLUDE_DIR}
   ${magic_enum_INCLUDE_DIR}
   ${antlr4-runtime_INCLUDE_DIR}
+  ${PROJECT_BINARY_DIR}/generated # config.h, serviceDefaults.h — per katalog
+                                  # build
   src/include)
 
 # toml++ jako include SYSTEMOWY (-isystem) — wycisza ostrzeżenia z jego

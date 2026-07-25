@@ -9,7 +9,7 @@ commutative=$5
 factor=$6
 probe=$7
 
-build_info=$("$xretractor_bin" --optimizer-build-info)
+build_info=$("$xretractor_bin" --build-info)
 expected_info=$(printf '%s\n' \
   "RDB_OPT_DEDUP_SUBSTRATES=$dedup" \
   "RDB_OPT_SHARE_EQUIVALENT_SELECTS=$share" \

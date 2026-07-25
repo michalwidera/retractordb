@@ -50,7 +50,7 @@ embedded key. Exact revision checks remain only for the two external documentati
   relative deltas rather than a fixed test inventory.
 - `scripts/buildrdb.sh release` now treats production output as a fail-closed build: it requires a pristine Git tree,
   recreates `build/Release`, sanitizes common flag-injection environment variables, explicitly enables every production
-  optimizer and disables `RDB_BENCH_PROBE`, then verifies the resulting binary through `--optimizer-build-info`.
+  optimizer and disables `RDB_BENCH_PROBE`, then verifies the resulting binary through `--build-info`.
   `release-ablation` and `probe` use separate CMake and Conan output directories and verify their own selected build
   identity, preventing experimental caches or binaries from being written into `build/Release`.
 - Model-dependent IPC commands now wait for `dataModel` publication after the IPC resources become available, closing a

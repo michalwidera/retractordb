@@ -43,7 +43,7 @@ Paths below are relative to the corresponding repository root.
 | Ad-hoc queries and IPC | `realizacja-zapytan/zapytania-ad-hoc.md`, architecture flow | `qry.cpp`, `executorsm.cpp`, `ipc_transport.*`, `issue6_adhoc` |
 | Artifact inspection and mutation | architecture analysis/storage chapters | `src/rdb/`, `xtrdbLauncher.*`, storage-map and Pattern5 tests |
 | CLI options | `zalaczniki/opcje-wywolania/` | current launcher option construction and CLI tests |
-| Production, probe, and optimizer-ablation builds | `zalaczniki/budowanie-produkcyjne-i-warianty-badawcze.md` | `scripts/buildrdb.sh`, root `CMakeLists.txt`, `--optimizer-build-info`, `it_optimizer_ablation-*` |
+| Production, probe, and optimizer-ablation builds | `zalaczniki/budowanie-produkcyjne-i-warianty-badawcze.md` | `scripts/buildrdb.sh`, root `CMakeLists.txt`, `--build-info`, `it_optimizer_ablation-*` |
 | Integration test catalogue | `zalaczniki/testy-integracyjne.md` | current `test/CMakeLists.txt` and `test/IntegrationTest_*` |
 | Signal-processing examples | `przyklady-zastosowan/` | example RQL, DSP integration tests, current generated plans |
 | History, naming, future directions | `zalaczniki/geneza-systemu/`, `zalaczniki/dalsze-kierunki-rozwoju/` | historical/design context only |

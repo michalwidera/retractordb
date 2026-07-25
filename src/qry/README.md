@@ -18,7 +18,8 @@ Allowed options:
   -s [ --select ] arg         show this stream
   -t [ --detail ] arg         show details of this stream
   -a [ --adhoc ] arg          adhoc query mode
-  -m [ --tlimitqry ] arg (=0) limit of elements, 0 - no limit
+  -m [ --elimitqry ] arg (=0) limit of elements, 0 - no limit
+  -n [ --null ]               if null row appear - skip it in output
   -l [ --hello ]              diagnostic - hello db world
   -k [ --kill ]               kill xretractor server
   -d [ --dir ]                list of queries
@@ -27,9 +28,13 @@ Allowed options:
   -g [ --graphite ]           graphite output mode
   -f [ --influxdb ]           influxDB output mode
   -p [ --gnuplot ] arg        x,y - gnuplot output mode
-      [ --gnuplot-rtl ]        gnuplot scroll right-to-left (new samples on right)
+  -z [ --gnuplot-rtl ]        gnuplot output: newest samples on the right
+                              (right-to-left scroll)
+  -e [ --config ] arg         config file (TOML); overrides search
   -h [ --help ]               produce help message
   -c [ --needctrlc ]          force ctl+c for stop this tool
+  -w [ --wait-server ]        poll until xretractor server is available before
+                              executing command
 Branch: issue_31-doc:eb1aba1, Code compiler: GNU Ver. 13.3.0, Build time: 2512170028, Type: Debug
 Log: /tmp/xqry.log
 This software is licensed under the MIT License and is provided ‘as is’,

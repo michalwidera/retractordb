@@ -186,6 +186,11 @@ else()
   set(GIT_CURRENT_BRANCH Deatached)
   set(GIT_PREV_COMMIT none)
 endif()
-configure_file(config.h.in ${PROJECT_SOURCE_DIR}/src/include/config.h @ONLY)
+# Nagłówki generowane trafiają do katalogu build, nie do drzewa źródeł: ich
+# treść zależy od konfiguracji (CMAKE_BUILD_TYPE, RETRACTOR_QUERY_FILE), a
+# build/Debug i build/Release konfigurowane są niezależnie. Zapis do
+# src/include/ dawał jedną wspólną kopię — wygrywał katalog konfigurowany jako
+# ostatni, więc binarka Debug mogła raportować "Type: Release".
+configure_file(config.h.in ${PROJECT_BINARY_DIR}/generated/config.h @ONLY)
 configure_file(serviceDefaults.h.in
-               ${PROJECT_SOURCE_DIR}/src/include/serviceDefaults.h @ONLY)
+               ${PROJECT_BINARY_DIR}/generated/serviceDefaults.h @ONLY)

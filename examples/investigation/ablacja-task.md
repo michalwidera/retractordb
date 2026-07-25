@@ -147,7 +147,7 @@ Binarka musi umożliwiać jednoznaczne odczytanie wartości wszystkich czterech 
 
 Wykorzystaj istniejący mechanizm `--version` lub informacji o buildzie, jeśli istnieje. Jeśli takiego mechanizmu nie ma, dodaj minimalny argument:
 
-    xretractor --optimizer-build-info
+    xretractor --build-info
 
 Wynik powinien być stabilny i możliwy do przetwarzania automatycznie, np.:
 

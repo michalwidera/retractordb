@@ -203,12 +203,6 @@ static void printOptimizerBuildInfo() {
 }
 
 int main(int argc, char *argv[]) {
-  for (int i = 1; i < argc; ++i)
-    if (strcmp(argv[i], "--optimizer-build-info") == 0) {
-      printOptimizerBuildInfo();
-      return boost::system::errc::success;
-    }
-
   qTree coreInstance;
   compiler cm(coreInstance);
 
@@ -271,7 +265,7 @@ int main(int argc, char *argv[]) {
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
-          ("optimizer-build-info", "show optimizer build configuration")             //
+          ("build-info,b", "show optimizer build configuration")                     //
           ("onlycompile,c", "compile only mode")                                     // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
@@ -288,7 +282,7 @@ int main(int argc, char *argv[]) {
     } else {
       desc.add_options()                                                          //
           ("help,h", "Show program options")                                      //
-          ("optimizer-build-info", "show optimizer build configuration")          //
+          ("build-info,b", "show optimizer build configuration")                  //
           ("onlycompile,c", "compile only mode")                                  // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("quiet,r", "no output on screen, skip presenter")                      //
@@ -308,6 +302,14 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    // Introspekcja binarki (jak --version): tylko odczyt flag kompilacji, obsługiwana przed
+    // wczytaniem i walidacją konfiguracji — na hoście z niepoprawnym storage.dir zapytanie
+    // "czym jest ta binarka" musi nadal dać czysty wynik na stdout.
+    if (vm.contains("build-info")) {
+      printOptimizerBuildInfo();
+      return system::errc::success;
+    }
 
     appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
     if (appCfg.loadedFrom.empty())

@@ -846,7 +846,7 @@ verify_optimizer_build_info() {
         return 1
     fi
 
-    actual=$("$binary" --optimizer-build-info)
+    actual=$("$binary" --build-info)
     expected=$(printf '%s\n' \
         "RDB_OPT_DEDUP_SUBSTRATES=$dedup" \
         "RDB_OPT_SHARE_EQUIVALENT_SELECTS=$share" \

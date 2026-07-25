@@ -151,7 +151,7 @@ cmake -S . -B build/abl-no-comm -G Ninja \
   -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON \
   -DRDB_OPT_COMMUTATIVE_ADD=OFF
 cmake --build build/abl-no-comm
-build/abl-no-comm/src/retractor/xretractor --optimizer-build-info
+build/abl-no-comm/src/retractor/xretractor --build-info
 ```
 
 CMake option values persist in `CMakeCache.txt`. Use a fresh build directory or

@@ -2,7 +2,7 @@
 #define SERVICE_DEFAULTS_H_IN
 
 // Plik generowany przez configure_file() z serviceDefaults.h.in jako
-// src/include/serviceDefaults.h — @RETRACTOR_QUERY_FILE@ podstawiane z CMake.
+// <katalog build>/generated/serviceDefaults.h — @RETRACTOR_QUERY_FILE@ podstawiane z CMake.
 // Nie edytuj wygenerowanej kopii; zmiany nanoś w szablonie .in lub przez -DRETRACTOR_QUERY_FILE.
 //
 // Stabilny (zmienia się tylko gdy zmieni się ścieżka), więc bezpiecznie dołączać go
