@@ -31,6 +31,12 @@ embedded key. Exact revision checks remain only for the two external documentati
   each postfix program to a fixed point, including the unmatched sibling-shift case. Coverage:
   `pt_issue202_hash_shift_factorization-*`, `ut_soperations`, and the physical/formula E2E comparison
   `it_issue202_hash_shift_e2e-run`. The E2E case also fixes shift-history sizing to `N+1` records for offset `N`.
+- Equivalent public SELECTs over commutative `STREAM_ADD` nodes can share one generated `STREAM_SELECT_*` computation
+  while retaining their separate public names, descriptors, storage, rules, and artifacts. Fingerprints preserve tree
+  grouping and output-field order; they canonicalize only sibling order at each individual `STREAM_ADD`. Full scans and
+  differently grouped three-source expressions are negative cases. Coverage: five `xcompiler` unit cases and
+  `it_select_cse_commutative_add-run`, including execution, NULL metadata, public descriptors, result-shape guards, and
+  ad-hoc import safety. The post-change Debug suite passed 158/158 tests.
 
 ## Source hierarchy and scope
 
@@ -56,6 +62,9 @@ These are navigation warnings, not necessarily product defects:
 - The root code `CLAUDE.md` summarizes `[storage] dir`, but current `AppConfig` also exposes IPC sizing, client retry count, startup/no-data timing, real-time priority, lock directory, and service query-file fallback.
 - Documentation sometimes describes ephemerides as having no files. Conceptually they are not materialized results, but declared external sources can still have/generated `.desc` descriptors; `DEVICE` and `TEXTSOURCE` have inert `.meta` persistence.
 - Storage documentation may describe up to four primary files while current shadow-aware metadata also uses `.meta.shadow` to keep null overrides consistent with `.shadow`.
+- The Polish compiler documentation says substrate deduplication requires matching field names. Current
+  `deduplicateSubstrats()` intentionally compares field type, length, and array size but ignores names, as protected by
+  `it_issue167_dedup_field_names`.
 - CLI short options are mode-dependent: for `xretractor`, `-m` is CSV in compile-only option construction and loop limit in execution mode. Verify against `launcher.cpp`, not a single summary table.
 
 When changing documentation, fix only drift relevant to the task unless the user asks for a broader synchronization pass.

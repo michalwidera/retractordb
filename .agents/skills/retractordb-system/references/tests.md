@@ -10,11 +10,11 @@
 
 ## Test architecture
 
-At indexed revision, CTest exposes 157 tests:
+At indexed revision, CTest exposes 158 tests:
 
 - `pt_*` (1-41): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
-- `it_*` (42-80): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
-- unit-related (81-157): GTest binaries, setup fixtures, and data-model comparison.
+- `it_*` (42-81): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
+- unit-related (82-158): GTest binaries, setup fixtures, and data-model comparison.
 
 The serial CMake wrapper detects commands that start the server (`-m`, `-k`, `xqry`, workflow scripts, lock access) and assigns `RUN_SERIAL TRUE`. Some shell-wrapped server tests set it explicitly because CMake cannot see flags inside the script.
 
@@ -41,6 +41,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Generated substrate sharing: `pt_issue96_substrat_reference-*`.
 - User queries must not be deduplicated: `pt_issue96_no_substrat_reduction-*`.
 - Substrate dedup basics, field-name independence, nonzero offsets, cascades: four `it_issue167_dedup_*` scenarios.
+- Equivalent SELECT computation sharing across commutative `+`, public artifact preservation, NULL metadata, output-order
+  guards, and the three-source grouping counterexample: `it_select_cse_commutative_add-run`.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.
@@ -94,6 +96,9 @@ Use these GTest binaries for focused changes:
 | CLI utilities | `ut_uxSysTermTools` |
 
 `ut_expeval` is especially dense and is the primary executable specification for scalar types, conversions, function calls, string behavior, errors, NULL propagation, and three-valued logic.
+
+`ut_compiler` also covers equivalent SELECT sharing for `a+b` versus `b+a`, order-sensitive negative cases, preservation
+of three-source grouping, and the live/ad-hoc import guard.
 
 ## Standard verification
 
