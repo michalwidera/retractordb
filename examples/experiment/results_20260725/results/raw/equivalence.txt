@@ -1,0 +1,28 @@
+== kontrole mutacyjne ==
+  beatty_off_by_one          wykryta na 12/12 przypadkach — OK
+  beatty_a_index             wykryta na 12/12 przypadkach — OK
+  oracle_tie_to_b            wykryta na 11/12 przypadkach — OK
+  csdf_period_minus_one      wykryta na 11/12 przypadkach — OK
+  unreduced_ratio_is_benign  wykryta na  0/12 przypadkach — OK
+
+== wyczerpująco 1 <= a,b <= 64 ==
+
+== losowo 3000 par, a,b <= 256 ==
+
+== losowo 800 par, a,b <= 10^6 (oracle vs beatty_online) ==
+
+== przypadki obowiązkowe ==
+
+== podsumowanie ==
+  exhaustive<=64         4096 przypadków,    802888 pozycji, 0 rozbieżności, 0 błędów okresu
+  random<=256            3000 przypadków,   1697808 pozycji, 0 rozbieżności, 0 błędów okresu
+  random<=1e6             800 przypadków,   1600000 pozycji, 0 rozbieżności, 0 błędów okresu
+  special                  12 przypadków,      6042 pozycji, 0 rozbieżności, 0 błędów okresu
+  nieskrócony 6/4 == 3/2: True
+  koszt reprezentacji dla 160/147 (P=307):
+      beatty_online    phases=    1 static_words=    3 startup_tokens=    1 input_highwater=    1
+      csdf_explicit    phases=  307 static_words=  307 startup_tokens=    1 input_highwater=    1
+      csdf_lookup      phases=  307 static_words=  307 startup_tokens=    1 input_highwater=    1
+      sdf_block        phases=    1 static_words=  309 startup_tokens=  307 input_highwater=  307
+
+WYNIK: zero rozbieżności

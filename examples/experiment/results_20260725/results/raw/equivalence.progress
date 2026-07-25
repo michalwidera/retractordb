@@ -1,0 +1,15 @@
+  exhaustive<=64: 500/4096
+  exhaustive<=64: 1000/4096
+  exhaustive<=64: 1500/4096
+  exhaustive<=64: 2000/4096
+  exhaustive<=64: 2500/4096
+  exhaustive<=64: 3000/4096
+  exhaustive<=64: 3500/4096
+  exhaustive<=64: 4000/4096
+  random<=256: 500/3000
+  random<=256: 1000/3000
+  random<=256: 1500/3000
+  random<=256: 2000/3000
+  random<=256: 2500/3000
+  random<=256: 3000/3000
+  random<=1e6: 500/800

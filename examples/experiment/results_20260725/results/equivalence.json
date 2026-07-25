@@ -1,0 +1,99 @@
+{
+  "seed": 20260725,
+  "quick": false,
+  "mutations": {
+    "beatty_off_by_one": {
+      "should_be_detected": true,
+      "detected_on": 12,
+      "cases": 12,
+      "first_case": "1/1",
+      "verdict": "OK"
+    },
+    "beatty_a_index": {
+      "should_be_detected": true,
+      "detected_on": 12,
+      "cases": 12,
+      "first_case": "1/1",
+      "verdict": "OK"
+    },
+    "oracle_tie_to_b": {
+      "should_be_detected": true,
+      "detected_on": 11,
+      "cases": 12,
+      "first_case": "1/1",
+      "verdict": "OK"
+    },
+    "csdf_period_minus_one": {
+      "should_be_detected": true,
+      "detected_on": 11,
+      "cases": 12,
+      "first_case": "1/1",
+      "verdict": "OK"
+    },
+    "unreduced_ratio_is_benign": {
+      "should_be_detected": false,
+      "detected_on": 0,
+      "cases": 12,
+      "first_case": null,
+      "verdict": "OK"
+    }
+  },
+  "campaigns": [
+    {
+      "label": "exhaustive<=64",
+      "models": [
+        "beatty_online",
+        "csdf_explicit",
+        "csdf_lookup",
+        "sdf_block"
+      ],
+      "cases": 4096,
+      "compared_positions": 802888,
+      "mismatches": [],
+      "period_mismatches": []
+    },
+    {
+      "label": "random<=256",
+      "models": [
+        "beatty_online",
+        "csdf_explicit",
+        "csdf_lookup",
+        "sdf_block"
+      ],
+      "cases": 3000,
+      "compared_positions": 1697808,
+      "mismatches": [],
+      "period_mismatches": []
+    },
+    {
+      "label": "random<=1e6",
+      "models": [
+        "beatty_online"
+      ],
+      "cases": 800,
+      "compared_positions": 1600000,
+      "mismatches": [],
+      "period_mismatches": []
+    },
+    {
+      "label": "special",
+      "models": [
+        "beatty_online",
+        "csdf_explicit",
+        "csdf_lookup",
+        "sdf_block"
+      ],
+      "cases": 12,
+      "compared_positions": 6042,
+      "mismatches": [],
+      "period_mismatches": []
+    }
+  ],
+  "totals": {
+    "cases": 7908,
+    "positions": 4106738,
+    "mismatches": 0,
+    "period_mismatches": 0
+  },
+  "unreduced_ratio_equal": true
+}

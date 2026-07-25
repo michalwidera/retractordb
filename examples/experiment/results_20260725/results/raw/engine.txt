@@ -1,0 +1,12 @@
+xretractor: /home/michal/github/retractordb/build/Debug/src/retractor/xretractor
+
+  p3_engine_test          1/2 P=3     porównano=44     okresów=14.67   OK 
+  p2_equal                1/1 P=2     porównano=59     okresów=29.5    OK 
+  p8_coprime              3/5 P=8     porównano=68     okresów=8.5     OK 
+  p9_skewed               7/2 P=9     porównano=112    okresów=12.44   OK 
+  p17_coprime            7/10 P=17    porównano=159    okresów=9.35    OK 
+  p3_unreduced            1/2 P=3     porównano=44     okresów=14.67   OK 
+  p103_skewed           3/100 P=103   porównano=201    okresów=1.95    OK 
+  p307_audio          160/147 P=307   porównano=1151   okresów=3.75    OK 
+
+WYNIK: 8/8 przypadków zgodnych
