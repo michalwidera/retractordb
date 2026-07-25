@@ -97,6 +97,8 @@ toolchain and drives the build. Run it from the repo root, `scripts/`, or
 ```bash
 git clone https://github.com/michalwidera/retractordb.git
 cd retractordb
+# Note: this does NOT fetch the research data under examples/experiment.
+# That is deliberate — see "Experiments" below if you need it.
 
 # 1. Install build dependencies (apt packages + Python venv + Conan)
 scripts/buildrdb.sh toolchain
@@ -162,6 +164,93 @@ restore all production optimizer options to `ON`.
 `RDB_BENCH_PROBE` is independent measurement instrumentation, not an optimizer
 switch. Any valid optimizer combination can be configured with the probe either
 `ON` or `OFF`; production release and packaging force it to `OFF`.
+
+## Experiments
+
+`examples/experiment` is a **git submodule** pointing at
+[rdb-experiment](https://github.com/michalwidera/rdb-experiment). It is not
+part of the engine and nothing in the build, the test suite, or CI depends on
+it. A normal clone leaves the directory empty, and that is the intended
+default.
+
+### What the experiments are
+
+They are the research record behind the project's publications — not demos and
+not example queries. Two families live there:
+
+- **Performance campaigns.** A supervisor machine drives a worker running
+  RetractorDB on real hardware (a Raspberry Pi 400 under a `PREEMPT_RT`
+  kernel). Each campaign raises the input rate or the number of attached
+  `xqry` clients and records slot-level latency, CPU load, memory, and
+  temperature, so the sustained-rate ceiling of a given platform can be
+  located rather than guessed. These runs supply the *Performance Evaluation*
+  section of the paper.
+- **Semantic experiments.** Machine validation of the algebra against
+  independent oracles — for example the equivalence of the interleave operator
+  with explicit CSDF and block SDF realizations, checked over several million
+  output positions.
+
+Each campaign directory keeps its own `README.md` with the research goal,
+the machine state captured before and after every run, and the raw samples.
+`JOURNAL.md` records the chronological research log, including hypotheses that
+turned out wrong — they are part of the path, not something to be edited out.
+`REQUIREMENTS.md` defines how a campaign must be conducted to stay
+reproducible.
+
+### Why a submodule
+
+Experimental data grows far faster than source code, and it grows
+monotonically: every campaign adds raw samples that must never be rewritten,
+because reproducibility is the point. The current state is roughly **57 MB of
+results across eight campaigns**, the largest single one 23 MB — against about
+12 MB of tracked engine content, of which source and tests are 4 MB. One
+campaign can therefore outweigh the entire engine. Keeping that history in the
+main repository would mean every `git clone`, every CI job, and every packaging
+build pays for measurement data it will never read.
+
+Splitting it out keeps the engine repository small and makes the boundary
+explicit: the engine is the product, the experiments are evidence about it.
+They evolve on different schedules and are versioned independently — the
+engine repository records only *which* commit of the experiment repository a
+given engine state was measured against.
+
+### When you need it
+
+You need the submodule if you want to reproduce a published measurement, audit
+the raw data behind a table in the paper, or run a new campaign. You do not
+need it to build, install, test, or use RetractorDB.
+
+Fetch it into an existing clone:
+
+```bash
+git submodule update --init examples/experiment
+```
+
+Or clone the engine together with it from the start:
+
+```bash
+git clone --recurse-submodules https://github.com/michalwidera/retractordb.git
+```
+
+After a `git pull` that moves the recorded pointer, check the submodule out at
+that revision — this is the state the engine commit was measured against:
+
+```bash
+git submodule update examples/experiment
+```
+
+Deliberately advancing to the newest experiment revision is a separate action,
+and it changes what the engine repository records:
+
+```bash
+git submodule update --remote examples/experiment
+git add examples/experiment && git commit -m "bump experiment pointer"
+```
+
+Working inside the submodule means committing and pushing in `rdb-experiment`
+first, then committing the moved pointer here. The experiment scripts resolve
+paths relative to the engine repository root, so they expect to run from this
+checkout, at this path — not from a standalone clone of `rdb-experiment`.
 
 ## Initial configuration
 
