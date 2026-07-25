@@ -863,8 +863,13 @@ verify_optimizer_build_info() {
         return 1
     fi
 
-    echo "-- Verified xretractor build configuration:"
-    printf '%s\n' "$actual"
+    # Konfiguracja domyślna (wszystkie optymalizacje ON, sonda OFF) jest cicha —
+    # raportujemy tylko odchylenia: wyłączoną optymalizację albo włączoną sondę.
+    if [ "$dedup" != "ON" ] || [ "$share" != "ON" ] || [ "$commutative" != "ON" ] || [ "$factor" != "ON" ] ||
+        [ "$probe" != "OFF" ]; then
+        echo "-- Verified xretractor build configuration (non-default):"
+        printf '%s\n' "$actual"
+    fi
 }
 
 choose_ablation_options() {
