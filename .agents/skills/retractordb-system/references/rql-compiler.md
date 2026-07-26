@@ -80,6 +80,12 @@ source intervals. It runs before structural deduplication so the exposed `A # B`
 TEXTSOURCE instances, compares the stored payload/metadata bodies, verifies the complete formula-derived sequence, and
 checks equal startup tails.
 
+For `STREAM_HASH` with reduced `deltaA/deltaB = p/q`, the own startup tail protects the worst second-input phase, not
+only `B[0]`. The phase definition is
+`max_{0 <= j < p}(ceil((j+1)q/p) - floor(jq/p))`; `computeStartupLatency()` uses its equivalent closed form
+`ceil((p+q-1)/p)` with a 64-bit intermediate. This boundary is required for non-rewritten R1 plans at ratios such as
+`3/5`, `3/2`, `7/11`, and `160/147`.
+
 `STREAM_TIMEMOVE(N)` is a causal delay, not an advance to `s_(n+N)`. It leaves the emitted record sequence intact,
 increases the startup tail by `N`, and reads history slot `N` only after that tail has elapsed. Declared and computed
 sources share the same `fetchBack()` path. Runtime emits no zero or all-null placeholder for a tail slot.

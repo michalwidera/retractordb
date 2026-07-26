@@ -49,7 +49,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
   semantic equivalence with optimizations enabled or disabled: six `it_optimizer_ablation-*` tests. The former
   expected runtime divergences were removed after causal tails and final topological ordering made them invalid.
 - R1 over explicit NULL values and metadata in rewritten, blocked, and explicit-right-hand-side plans:
-  `it_r1_identity_nulls-run`.
+  `it_r1_identity_nulls-run`. Its blocked `3/2` case pins the phase-maximum `STREAM_HASH` tail and compares payload plus
+  metadata against the explicit RHS; `ut_compiler` additionally covers `3/5`, `3/2`, `7/11`, and `160/147`.
 - Scalar divide-by-zero produces NULL without suppressing later records: `it_null_divide_by_zero-run`.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.

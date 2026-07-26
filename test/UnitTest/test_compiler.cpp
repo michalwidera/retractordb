@@ -291,20 +291,31 @@ TEST(xcompiler, does_not_rewrite_existing_queries_during_import) {
 }
 
 // Ogon strumienia (query::startupLatency): liczba poczatkowych slotow wlasnego interwalu bez
-// zdefiniowanego wyniku. Wartosci ponizej sa DEKLAROWANA semantyka docelowa — emisja jest
-// doprowadzana do zgodnosci z nimi osobnym krokiem, wiec runtime moze sie jeszcze roznic.
+// zdefiniowanego wyniku. Jest obserwowalna semantyka runtime, a nie prefiks rekordow-zastepnikow.
 TEST(xcompiler, computes_startup_latency) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE value INTEGER STREAM a, 1/10 FILE 'a.txt'
         DECLARE value INTEGER STREAM b, 1/5  FILE 'b.txt'
         DECLARE value INTEGER STREAM c, 1/10 FILE 'c.txt'
+        DECLARE value INTEGER STREAM a35, 3/100   FILE 'a.txt'
+        DECLARE value INTEGER STREAM b35, 1/20    FILE 'b.txt'
+        DECLARE value INTEGER STREAM a32, 3/100   FILE 'a.txt'
+        DECLARE value INTEGER STREAM b32, 1/50    FILE 'b.txt'
+        DECLARE value INTEGER STREAM a711, 7/100  FILE 'a.txt'
+        DECLARE value INTEGER STREAM b711, 11/100 FILE 'b.txt'
+        DECLARE value INTEGER STREAM a160, 4/25   FILE 'a.txt'
+        DECLARE value INTEGER STREAM b147, 147/1000 FILE 'b.txt'
         SELECT a[0]+0 STREAM mid       FROM a
         SELECT * STREAM shifted        FROM mid>3
         SELECT * STREAM shifted_twice  FROM shifted>2
         SELECT * STREAM hash_slow_snd  FROM a#b
         SELECT * STREAM hash_fast_snd  FROM b#a
         SELECT * STREAM hash_equal     FROM a#c
+        SELECT * STREAM hash_3_5       FROM a35#b35
+        SELECT * STREAM hash_3_2       FROM a32#b32
+        SELECT * STREAM hash_7_11      FROM a711#b711
+        SELECT * STREAM hash_160_147   FROM a160#b147
         SELECT * STREAM added          FROM a+c
       )");
   ASSERT_EQ(parseResult, "OK");
@@ -319,11 +330,15 @@ TEST(xcompiler, computes_startup_latency) {
   // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha.
   EXPECT_EQ(instance.getQuery("shifted").startupLatency, 3);
   EXPECT_EQ(instance.getQuery("shifted_twice").startupLatency, 5);
-  // phi: element drugiego argumentu jest potrzebny ceil(delta2/delta1) slotow wyjsciowych
-  // zanim producent go wyda. Pierwszy argument wypada rownoczesnie.
-  EXPECT_EQ(instance.getQuery("hash_slow_snd").startupLatency, 2);  // ceil((1/5)/(1/10))
-  EXPECT_EQ(instance.getQuery("hash_fast_snd").startupLatency, 1);  // ceil((1/10)/(1/5)) = ceil(1/2)
-  EXPECT_EQ(instance.getQuery("hash_equal").startupLatency, 1);     // ceil(1)
+  // phi: ogon obejmuje najgorsza faze odczytu drugiego argumentu w jednym okresie.
+  // Dla zredukowanego delta1/delta2=p/q wynosi ceil((p+q-1)/p).
+  EXPECT_EQ(instance.getQuery("hash_slow_snd").startupLatency, 2);
+  EXPECT_EQ(instance.getQuery("hash_fast_snd").startupLatency, 1);
+  EXPECT_EQ(instance.getQuery("hash_equal").startupLatency, 1);
+  EXPECT_EQ(instance.getQuery("hash_3_5").startupLatency, 3);
+  EXPECT_EQ(instance.getQuery("hash_3_2").startupLatency, 2);
+  EXPECT_EQ(instance.getQuery("hash_7_11").startupLatency, 3);
+  EXPECT_EQ(instance.getQuery("hash_160_147").startupLatency, 2);
   // Suma o zgodnych interwalach i zerowych ogonach zrodel nie wnosi opoznienia.
   EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
 }

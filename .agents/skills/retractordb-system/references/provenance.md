@@ -82,6 +82,19 @@ These are navigation warnings, not necessarily product defects:
   and matches `computeStartupLatency()`. Until the human commits the external
   documentation changes and this table's version basis is advanced, freshness
   correctly remains stale and the working-tree diff is part of the evidence.
+- The K2/G3 independent oracle campaign in
+  `examples/experiment/results_20260726_G3` first found that the former
+  `ceil(deltaB/deltaA)` own-tail term was insufficient for some interleave
+  phases. The K2 working tree now uses the phase maximum
+  `ceil((p+q-1)/p)` for reduced `deltaA/deltaB=p/q`. Unit regressions cover
+  `3/5`, `3/2`, `7/11`, and `160/147`; the blocked `3/2` integration case
+  compares payload and NULL metadata against explicit R1 RHS. Debug CTest
+  passes 166/166, and the repeated full campaign passes 13/13 engine cases
+  plus 75,548 model cases / 143,065,922 positions with zero mismatch. The
+  report records the base commits and SHA-256 hashes of the uncommitted
+  worktree diffs. K2/G3 meets its experimental criterion; canonical Polish
+  documentation still needs the phase-tail formula, followed by English
+  synchronization.
 - Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
 - The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
 - Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.
