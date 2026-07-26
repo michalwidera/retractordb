@@ -75,6 +75,38 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   return qSet[instance]->outputPayload->getPayload();
 }
 
+rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffset) {
+  // Odczyt wsteczny o revOffset rekordów — nośnik konwencji operatora przesunięcia.
+  //
+  // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
+  // Konwencja wybrana świadomie, bo odczyt w przód (s_{n+m}) jest nieprzyczynowy dla źródła
+  // pracującego na żywo — nie da się wydać próbki, która jeszcze nie powstała.
+  //
+  // Wcześniej offset był honorowany wyłącznie dla strumieni obliczanych, więc dla źródeł
+  // deklarowanych operator przesunięcia był operacją pustą (dwie różne konwencje w jednym
+  // silniku). Historia deklaracji leży w buforze kołowym, a jego pojemność zapewnia
+  // compiler::computeRequiredCapacities() (capMap[src] >= offset + 1).
+  auto &out = *(qSet[instance]->outputPayload);
+  out.releaseOnHold();
+
+  if (!out.isDeclared()) {
+    out.revRead(static_cast<size_t>(std::max(revOffset, 0)));
+    return *out.getPayload();
+  }
+
+  const auto available = static_cast<int>(out.getRecordsCount());
+  if (revOffset < 0 || revOffset >= available || revOffset >= static_cast<int>(out.historySize())) {
+    // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
+    // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
+    // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
+    SPDLOG_WARN("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
+    rdb::payload nullRecord(out.descriptor);
+    nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
+    return nullRecord;
+  }
+  return out.history(static_cast<size_t>(revOffset));
+}
+
 rdb::payload dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
   auto &out = *(qSet[instance]->outputPayload);
   out.releaseOnHold();
@@ -188,7 +220,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
 
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = fetchBack(nameSrc, timeOffset);
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
@@ -243,7 +275,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto timeOffset =
           Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
 
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = fetchBack(nameSrc, timeOffset);
     } break;
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)
