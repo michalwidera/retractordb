@@ -348,3 +348,42 @@ TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
   EXPECT_EQ(instance.getQuery("lhs").startupLatency, instance.getQuery("rhs").startupLatency);
   EXPECT_EQ(instance.getQuery("rhs").startupLatency, 5);  // ogon przeplotu 2 + przesuniecie 3
 }
+
+// Niezmiennik D3: przepisania planu nie zmieniaja nazw pol nazwanych strumieni uzytkownika.
+//
+// Scenariusz najbardziej narazony: deduplikacja scala substrat STREAM_ADD_s1_s2 z uzytkownikowym
+// `mysum`, mimo ze ich schematy roznia sie NAZWAMI pol (predykat scalania porownuje tylko typ,
+// dlugosc i krotnosc — i ma do tego prawo, bo scala wezly wewnetrzne). Po scaleniu `out` czyta
+// z `mysum`, ale jego wlasny deskryptor musi pozostac nietkniety.
+//
+// Kontrola niepustosci sprawdzana mutacyjnie: wstrzykniecie zmiany nazwy pola w
+// deduplicateSubstrats() konczy kompilacje bledem "changed observable field names".
+TEST(xcompiler, rewrites_preserve_observable_field_names) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM s1, 1 FILE 'd1.dat'
+        DECLARE b INTEGER STREAM s2, 1 FILE 'd2.dat'
+        SELECT s1[0], s2[0] STREAM mysum FROM s1+s2
+        SELECT out[0] STREAM out FROM (s1+s2)>1
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  auto fieldNames = [&instance](const std::string &id) {
+    std::vector<std::string> names;
+    for (const auto &f : instance.getQuery(id).lSchema)
+      names.push_back(f.field_.rname);
+    return names;
+  };
+
+  EXPECT_EQ(fieldNames("mysum"), (std::vector<std::string>{"mysum_0", "mysum_1"}));
+  EXPECT_EQ(fieldNames("out"), (std::vector<std::string>{"out_0"}));
+
+#if RDB_OPT_DEDUP_SUBSTRATES
+  // Scalenie faktycznie zaszlo — inaczej test nie sprawdzalby niczego o przepisaniu.
+  ASSERT_EQ(instance.getQuery("out").lProgram.front().getStr_(), "mysum");
+  EXPECT_EQ(std::ranges::count_if(instance, [](const query &q) { return q.id.starts_with("STREAM_ADD_"); }), 0);
+#endif
+}

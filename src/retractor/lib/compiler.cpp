@@ -837,6 +837,50 @@ void compiler::replaceStreamReferences(const std::string &oldName, const std::st
       }
 }
 
+std::map<std::string, std::vector<std::string>> compiler::snapshotUserFieldNames() const {
+  // Nazwy pól nazwanych strumieni użytkownika — to one trafiają do pliku .desc, więc są
+  // obserwowalne. Substraty i deklaracje pomijamy: substrat nie ma odrębnej tożsamości
+  // obserwowalnej (na tym opiera się deduplikacja), a deklaracja nie jest wynikiem planu.
+  std::map<std::string, std::vector<std::string>> snapshot;
+  for (const auto &q : coreInstance) {
+    if (q.isSubstrat || q.isDeclaration() || q.isCompilerDirective()) continue;
+    auto &names = snapshot[q.id];
+    for (const auto &f : q.lSchema)
+      names.push_back(f.field_.rname);
+  }
+  return snapshot;
+}
+
+std::string compiler::verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const {
+  // Niezmiennik D3: przepisania planu (faktoryzacja, deduplikacja, współdzielenie SELECT) nie mogą
+  // zmienić deskryptora żadnego nazwanego strumienia użytkownika.
+  //
+  // Predykaty scalania celowo porównują schematy BEZ nazw — scalają węzły wewnętrzne, więc mają do
+  // tego prawo, a zawężenie ich o nazwy zmniejszyłoby liczbę scaleń, czyli sam mierzony wynik.
+  // Nazwy są jednak obserwowalne (plik .desc), więc zamiast osłabiać scalanie, pilnujemy skutku:
+  // to, co widzi użytkownik, ma być takie samo przed optymalizacją i po niej.
+  const auto after = snapshotUserFieldNames();
+
+  for (const auto &[id, names] : before) {
+    const auto it = after.find(id);
+    if (it == after.end()) {
+      return "Optimization removed user-named stream '" + id + "'";
+    }
+    if (it->second != names) {
+      const auto asText = [](const std::vector<std::string> &list) {
+        std::string out;
+        for (const auto &name : list)
+          out += (out.empty() ? "" : ", ") + name;
+        return out;
+      };
+      SPDLOG_ERROR("compiler: optimization changed observable field names of '{}': [{}] -> [{}]", id, asText(names),
+                   asText(it->second));
+      return "Optimization changed observable field names of stream '" + id + "'";
+    }
+  }
+  return {"OK"};
+}
+
 std::string compiler::computeStartupLatency() {
   // Ogon strumienia (query::startupLatency) — liczba początkowych slotów własnego interwału, w których
   // wynik nie jest jeszcze zdefiniowany. Zasada brzegu: te sloty nie są rekordami. NULL zostaje wyłącznie
@@ -1302,8 +1346,17 @@ std::string compiler::compile() {
   result = resolveStreamIntervals();
   if (result != "OK") return result;
 
+  // Niezmiennik D3 sprawdzany wokół KAŻDEGO przebiegu przepisującego z osobna. Jednego snapshotu
+  // "przed optymalizacjami" zrobić się nie da, bo przebiegi przepisujące są przeplecione
+  // z przebiegami dopełniającymi schemat (resolveFieldReferences, expandIndexWildcards) — te
+  // legalnie zmieniają listę pól, np. rozwijając [_].
+  std::map<std::string, std::vector<std::string>> namesBeforeRewrite;
+
 #if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
-  result = factorMatchedHashTimeMoves();
+  namesBeforeRewrite = snapshotUserFieldNames();
+  result             = factorMatchedHashTimeMoves();
+  if (result != "OK") return result;
+  result = verifyUserFieldNamesPreserved(namesBeforeRewrite);
   if (result != "OK") return result;
 #endif
 
@@ -1311,7 +1364,10 @@ std::string compiler::compile() {
   const auto preDedup = benchPlan ? planSize() : empty;  // przed eliminacją (E3)
 #endif
 #if RDB_OPT_DEDUP_SUBSTRATES
-  result = deduplicateSubstrats();
+  namesBeforeRewrite = snapshotUserFieldNames();
+  result             = deduplicateSubstrats();
+  if (result != "OK") return result;
+  result = verifyUserFieldNamesPreserved(namesBeforeRewrite);
   if (result != "OK") return result;
 #endif
 #ifdef RDB_BENCH_PROBE
@@ -1327,7 +1383,10 @@ std::string compiler::compile() {
   // Podpis pól musi używać źródłowych PUSH_ID, zanim ich offsety zostaną
   // przepisane na lokalny bufor wejściowy publicznego zapytania.
 #if RDB_OPT_SHARE_EQUIVALENT_SELECTS
-  result = shareEquivalentSelectComputations();
+  namesBeforeRewrite = snapshotUserFieldNames();
+  result             = shareEquivalentSelectComputations();
+  if (result != "OK") return result;
+  result = verifyUserFieldNamesPreserved(namesBeforeRewrite);
   if (result != "OK") return result;
 #endif
 
