@@ -1,4 +1,8 @@
 :STORAGE	temp/
+core0(1/10)	datafile2.dat
+	a: INTEGER
+core1(1/5)	datafile3.dat
+	b: INTEGER
 STREAM_ADD_core0_core1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
@@ -7,7 +11,7 @@ STREAM_ADD_core0_core1(1/10)
 		PUSH_ID(STREAM_ADD_core0_core1[0])
 	core1_1: INTEGER
 		PUSH_ID(STREAM_ADD_core0_core1[1])
-str1(1/10)
+str1(1/10)	tail=5
 	:- PUSH_STREAM(STREAM_ADD_core0_core1)
 	:- STREAM_TIMEMOVE(5)
 	str1_0: INTEGER
@@ -24,7 +28,3 @@ str1(1/10)
 		MULTIPLY
 		PUSH_VAL(20)
 		ADD
-core0(1/10)	datafile2.dat
-	a: INTEGER
-core1(1/5)	datafile3.dat
-	b: INTEGER

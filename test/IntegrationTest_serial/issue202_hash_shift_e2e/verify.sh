@@ -30,21 +30,22 @@ xretractor query.rql -r -k -m 48
 cmp matched CC
 cmp <(tail -c +9 matched.meta) <(tail -c +9 CC.meta)
 
+# Both sides must declare the same tail: interleave latency 2 plus shift 3.
+# The shift is latency, not records — an equal payload with an unequal tail
+# would still be an unequal result.
+grep -F 'matched(1/15)	tail=5' out_compile.txt
+grep -F 'CC(1/15)	tail=5' out_compile.txt
+
 # Formula-derived payload for delta(A)=1/10 and delta(B)=1/5:
-# A#B has the repeating order B,A,A. The equivalent shift is 2+1=3 output
-# slots, followed by B[0],A[0],A[1],B[1],...
+# A#B has the repeating order B,A,A. The equivalent shift of 2+1=3 output slots
+# is carried by the stream tail, so no placeholder records precede the data —
+# record k is interleave element k: B[0],A[0],A[1],B[1],...
 actual=$(od -An -v -td4 matched | xargs)
 expected=$(
   record_count=$(($(stat -c %s matched) / 4))
-  for slot in $(seq 0 $((record_count - 1))); do
-    if [ "$slot" -lt 3 ]; then
-      echo 0
-      continue
-    fi
-
-    source_slot=$((slot - 3))
-    cycle=$((source_slot / 3))
-    case $((source_slot % 3)) in
+  for element in $(seq 0 $((record_count - 1))); do
+    cycle=$((element / 3))
+    case $((element % 3)) in
       0) echo $((100 * (cycle + 1))) ;;
       1) echo $((2 * cycle + 1)) ;;
       2) echo $((2 * cycle + 2)) ;;

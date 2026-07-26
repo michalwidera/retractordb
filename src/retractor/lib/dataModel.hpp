@@ -31,6 +31,7 @@ class dataModel {
    * poza pojemnością historii) daje rekord all-null.
    */
   rdb::payload fetchForward(const std::string &instance, int forwardIndex);
+  rdb::payload fetchBack(const std::string &instance, int revOffset);
 
   /*
    * This function creates Input payload for ConstructOutputPayload data source

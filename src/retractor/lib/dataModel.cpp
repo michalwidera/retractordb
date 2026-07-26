@@ -75,6 +75,38 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   return qSet[instance]->outputPayload->getPayload();
 }
 
+rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffset) {
+  // Odczyt wsteczny o revOffset rekordów — nośnik konwencji operatora przesunięcia.
+  //
+  // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
+  // Konwencja wybrana świadomie, bo odczyt w przód (s_{n+m}) jest nieprzyczynowy dla źródła
+  // pracującego na żywo — nie da się wydać próbki, która jeszcze nie powstała.
+  //
+  // Wcześniej offset był honorowany wyłącznie dla strumieni obliczanych, więc dla źródeł
+  // deklarowanych operator przesunięcia był operacją pustą (dwie różne konwencje w jednym
+  // silniku). Historia deklaracji leży w buforze kołowym, a jego pojemność zapewnia
+  // compiler::computeRequiredCapacities() (capMap[src] >= offset + 1).
+  auto &out = *(qSet[instance]->outputPayload);
+  out.releaseOnHold();
+
+  if (!out.isDeclared()) {
+    out.revRead(static_cast<size_t>(std::max(revOffset, 0)));
+    return *out.getPayload();
+  }
+
+  const auto available = static_cast<int>(out.getRecordsCount());
+  if (revOffset < 0 || revOffset >= available || revOffset >= static_cast<int>(out.historySize())) {
+    // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
+    // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
+    // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
+    SPDLOG_WARN("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
+    rdb::payload nullRecord(out.descriptor);
+    nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
+    return nullRecord;
+  }
+  return out.history(static_cast<size_t>(revOffset));
+}
+
 rdb::payload dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
   auto &out = *(qSet[instance]->outputPayload);
   out.releaseOnHold();
@@ -126,6 +158,12 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
   for (const auto &q : coreInstance_) {
     if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;      // Declarations already processed
+
+    // Ogon strumienia: w tych slotach wynik nie jest jeszcze zdefiniowany, więc strumień NIE emituje
+    // rekordu — ani zerowego, ani all-null. NULL jest wartością pochłaniającą (dane oczekiwane a
+    // nieobecne, wynik nieistniejący w zbiorze wartości), nigdy rezerwacją miejsca na dane. Długość
+    // ogona jest zadeklarowana w planie (query::startupLatency) i raportowana jako 'tail'.
+    if (qSet[q.id]->elapsedSlots++ < static_cast<size_t>(std::max(q.startupLatency, 0))) continue;
 
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
@@ -182,7 +220,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
 
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = fetchBack(nameSrc, timeOffset);
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
@@ -205,11 +243,12 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       int fwdPos = -1;
       if (cmd == STREAM_DEHASH_DIV) {
-        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} — element c o tym indeksie powstaje
-        // dopiero PO slocie n strumienia wynikowego (definicja jest o jeden
-        // slot nieprzyczynowa). Realizacja przyczynowa: opóźnienie o jeden
-        // slot — rekord n zawiera a_{n-1}, rekord 0 jest all-null.
-        fwdPos = (n == 0) ? -1 : Div(qry.rInterval, rationalArgument, n - 1);
+        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} — element c o tym indeksie powstaje dopiero PO slocie n
+        // strumienia wynikowego (definicja jest o jeden slot nieprzyczynowa). Przyczynowość
+        // zapewnia ogon strumienia (query::startupLatency zawiera dla Θ dodatkowy slot): przez ten
+        // slot strumień nie emituje niczego. Rekord n jest więc już a_n, bez przesunięcia o jeden
+        // i bez rekordu-zastępnika — placeholder byłby użyciem NULL/zera jako rezerwacji miejsca.
+        fwdPos = Div(qry.rInterval, rationalArgument, n);
       } else {
         // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} — dostępny w swoim slocie.
         fwdPos = Mod(rationalArgument, qry.rInterval, n);
@@ -236,7 +275,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto timeOffset =
           Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
 
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = fetchBack(nameSrc, timeOffset);
     } break;
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)

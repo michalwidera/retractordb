@@ -1,0 +1,17 @@
+# Tozsamosc R1 nad dziedzina z NULL-ami:
+#   phi(tau_i(A), tau_k(B)) == tau_(i+k)(phi(A, B))   gdy i*deltaA == k*deltaB
+#
+# Cala pozostala weryfikacja reguly biegnie na danych bez NULL-i, wiec twierdzenie
+# o zachowaniu obserwowalnego wyniku nie obejmowaloby tej dziedziny. NULL jest
+# wartoscia POCHLANIAJACA, wiec musi przejsc przez przeplot i przesuniecie tak samo
+# po obu stronach — razem z mapa null w pliku .meta, nie tylko z bajtami.
+
+STORAGE 'temp'
+
+DECLARE v INTEGER STREAM A,  1/10 FILE 'datafile1.txt'
+DECLARE v INTEGER STREAM B,  1/5  FILE 'datafile2.txt'
+DECLARE v INTEGER STREAM A2, 1/10 FILE 'datafile1b.txt'
+DECLARE v INTEGER STREAM B2, 1/5  FILE 'datafile2b.txt'
+
+SELECT * STREAM lhs FROM (A>2)#(B>1)
+SELECT * STREAM rhs FROM (A2#B2)>3

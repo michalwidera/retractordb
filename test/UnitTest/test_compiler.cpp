@@ -289,3 +289,101 @@ TEST(xcompiler, does_not_rewrite_existing_queries_during_import) {
   ASSERT_TRUE(live.exists("c2"));
   EXPECT_EQ(live.getQuery("c2").lProgram.size(), 3);
 }
+
+// Ogon strumienia (query::startupLatency): liczba poczatkowych slotow wlasnego interwalu bez
+// zdefiniowanego wyniku. Wartosci ponizej sa DEKLAROWANA semantyka docelowa — emisja jest
+// doprowadzana do zgodnosci z nimi osobnym krokiem, wiec runtime moze sie jeszcze roznic.
+TEST(xcompiler, computes_startup_latency) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM a, 1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM b, 1/5  FILE 'b.txt'
+        DECLARE value INTEGER STREAM c, 1/10 FILE 'c.txt'
+        SELECT a[0]+0 STREAM mid       FROM a
+        SELECT * STREAM shifted        FROM mid>3
+        SELECT * STREAM shifted_twice  FROM shifted>2
+        SELECT * STREAM hash_slow_snd  FROM a#b
+        SELECT * STREAM hash_fast_snd  FROM b#a
+        SELECT * STREAM hash_equal     FROM a#c
+        SELECT * STREAM added          FROM a+c
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Zrodlo deklarowane emituje od pierwszego slotu.
+  EXPECT_EQ(instance.getQuery("a").startupLatency, 0);
+  // Przepisanie bez operatora nie wnosi opoznienia.
+  EXPECT_EQ(instance.getQuery("mid").startupLatency, 0);
+  // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha.
+  EXPECT_EQ(instance.getQuery("shifted").startupLatency, 3);
+  EXPECT_EQ(instance.getQuery("shifted_twice").startupLatency, 5);
+  // phi: element drugiego argumentu jest potrzebny ceil(delta2/delta1) slotow wyjsciowych
+  // zanim producent go wyda. Pierwszy argument wypada rownoczesnie.
+  EXPECT_EQ(instance.getQuery("hash_slow_snd").startupLatency, 2);  // ceil((1/5)/(1/10))
+  EXPECT_EQ(instance.getQuery("hash_fast_snd").startupLatency, 1);  // ceil((1/10)/(1/5)) = ceil(1/2)
+  EXPECT_EQ(instance.getQuery("hash_equal").startupLatency, 1);     // ceil(1)
+  // Suma o zgodnych interwalach i zerowych ogonach zrodel nie wnosi opoznienia.
+  EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
+}
+
+// Tozsamosc R1 musi zachowywac ogon — inaczej przepisanie zmienialoby obserwowalna
+// deklaracje opoznienia, nawet gdyby sekwencja rekordow byla identyczna.
+TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM fa,  1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM fb,  1/5  FILE 'b.txt'
+        DECLARE value INTEGER STREAM fa2, 1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM fb2, 1/5  FILE 'b.txt'
+        SELECT * STREAM lhs FROM (fa>2)#(fb>1)
+        SELECT * STREAM rhs FROM (fa2#fb2)>3
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  EXPECT_EQ(instance.getQuery("lhs").startupLatency, instance.getQuery("rhs").startupLatency);
+  EXPECT_EQ(instance.getQuery("rhs").startupLatency, 5);  // ogon przeplotu 2 + przesuniecie 3
+}
+
+// Niezmiennik D3: przepisania planu nie zmieniaja nazw pol nazwanych strumieni uzytkownika.
+//
+// Scenariusz najbardziej narazony: deduplikacja scala substrat STREAM_ADD_s1_s2 z uzytkownikowym
+// `mysum`, mimo ze ich schematy roznia sie NAZWAMI pol (predykat scalania porownuje tylko typ,
+// dlugosc i krotnosc — i ma do tego prawo, bo scala wezly wewnetrzne). Po scaleniu `out` czyta
+// z `mysum`, ale jego wlasny deskryptor musi pozostac nietkniety.
+//
+// Kontrola niepustosci sprawdzana mutacyjnie: wstrzykniecie zmiany nazwy pola w
+// deduplicateSubstrats() konczy kompilacje bledem "changed observable field names".
+TEST(xcompiler, rewrites_preserve_observable_field_names) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM s1, 1 FILE 'd1.dat'
+        DECLARE b INTEGER STREAM s2, 1 FILE 'd2.dat'
+        SELECT s1[0], s2[0] STREAM mysum FROM s1+s2
+        SELECT out[0] STREAM out FROM (s1+s2)>1
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  auto fieldNames = [&instance](const std::string &id) {
+    std::vector<std::string> names;
+    for (const auto &f : instance.getQuery(id).lSchema)
+      names.push_back(f.field_.rname);
+    return names;
+  };
+
+  EXPECT_EQ(fieldNames("mysum"), (std::vector<std::string>{"mysum_0", "mysum_1"}));
+  EXPECT_EQ(fieldNames("out"), (std::vector<std::string>{"out_0"}));
+
+#if RDB_OPT_DEDUP_SUBSTRATES
+  // Scalenie faktycznie zaszlo — inaczej test nie sprawdzalby niczego o przepisaniu.
+  ASSERT_EQ(instance.getQuery("out").lProgram.front().getStr_(), "mysum");
+  EXPECT_EQ(std::ranges::count_if(instance, [](const query &q) { return q.id.starts_with("STREAM_ADD_"); }), 0);
+#endif
+}

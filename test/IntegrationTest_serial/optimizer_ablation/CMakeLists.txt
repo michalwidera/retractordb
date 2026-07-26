@@ -48,25 +48,20 @@ set_tests_properties(
   ${TestID}-semantic ${TestID}-factor-semantic ${TestID}-dedup-steady-semantic
   ${TestID}-dedup-exact-semantic PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
 
-# Bez przebiegu faktoryzacji obecny runtime wykonuje przesunięcia na osobnych
-# zegarach wejściowych i nie daje tego samego payloadu co (A#B)>(i+k). Test
-# zachowujemy jako jawnie oczekiwaną porażkę ablacyjną, zamiast ją ukrywać.
-if(NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES)
-  set_tests_properties(
-    ${TestID}-factor-semantic
-    PROPERTIES WILL_FAIL TRUE LABELS
-               "expected_ablation_failure;factor_runtime_semantic_divergence")
-endif()
-
-# Gdy wyłączone są jednocześnie deduplikacja, faktoryzacja i współdzielenie
-# równoważnych SELECT, dwa węzły DA+DB są harmonogramowane osobno. Wartości
-# stanu ustalonego są zgodne, ale badany wynik otrzymuje o jeden rekord zerowego
-# prefiksu więcej niż konfiguracja domyślna.
-if(NOT RDB_OPT_DEDUP_SUBSTRATES
-   AND NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
-   AND NOT RDB_OPT_SHARE_EQUIVALENT_SELECTS)
-  set_tests_properties(
-    ${TestID}-dedup-exact-semantic
-    PROPERTIES WILL_FAIL TRUE LABELS
-               "expected_ablation_failure;dedup_startup_prefix_divergence")
-endif()
+# Do 2026-07-26 dwa testy tej macierzy były oznaczone WILL_FAIL jako jawnie
+# oczekiwane porażki ablacyjne:
+#
+#   factor_runtime_semantic_divergence  — bez przebiegu faktoryzacji runtime
+#       wykonywał przesunięcia na osobnych zegarach wejściowych i nie dawał tego
+#       samego payloadu co (A#B)>(i+k);
+#   dedup_startup_prefix_divergence     — przy jednocześnie wyłączonych dedup,
+#       faktoryzacji i współdzieleniu SELECT badany wynik dostawał o jeden rekord
+#       zerowego prefiksu więcej niż konfiguracja domyślna.
+#
+# Obie przyczyny zostały usunięte (porządek topologiczny planu, przyczynowe
+# opóźnienie przeplotu, jedna konwencja tau, ogon zamiast prefiksu), więc oba
+# testy przechodzą w KAŻDEJ konfiguracji przełączników. Adnotacje WILL_FAIL są
+# tym samym nieaktualne — a test oznaczony WILL_FAIL, który przechodzi, jest
+# raportowany jako porażka, więc ich pozostawienie psułoby macierz.
+#
+# Zweryfikowane przebiegiem w profilu wszystkich przełączników OFF.
