@@ -325,14 +325,42 @@ TEST(xExpressionEval, not_null_is_null) {
   EXPECT_TRUE(std::holds_alternative<std::monostate>(result));
 }
 
-TEST(xExpressionEval, divide_by_zero_throws) {
+// Dzielenie przez zero nie ma wyniku w zbiorze wartosci, wiec jest wartoscia POCHLANIAJACA,
+// a nie bledem: strumien oddaje NULL i pracuje dalej. Wczesniej lecial std::domain_error, czyli
+// jedna probka o zerowym mianowniku przerywala przetwarzanie calego zapytania.
+TEST(xExpressionEval, divide_by_zero_yields_null) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 5);
   program.emplace_back(PUSH_VAL, 0);
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::domain_error);
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+// NULL jest pochlaniajacy takze wtedy, gdy pojawi sie po stronie dzielnej.
+TEST(xExpressionEval, divide_null_by_zero_yields_null) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, std::monostate{});
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(DIVIDE);
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+// Zero w LICZNIKU to zwykla dana — wynik istnieje i musi pozostac wartoscia, nie NULL-em.
+// Kontrola odroznia "pochlanianie braku wyniku" od "pochlaniania wszystkiego, co zawiera zero".
+TEST(xExpressionEval, zero_divided_by_value_stays_a_value) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(PUSH_VAL, 5);
+  program.emplace_back(DIVIDE);
+
+  expressionEvaluator test;
+  auto result = test.eval(program);
+  ASSERT_FALSE(std::holds_alternative<std::monostate>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 TEST(xExpressionEval, malformed_stack_throws) {

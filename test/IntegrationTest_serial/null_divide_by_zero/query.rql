@@ -1,0 +1,11 @@
+# Dzielenie przez zero nie ma wyniku w zbiorze wartosci, wiec jest wartoscia
+# POCHLANIAJACA: strumien oddaje NULL i pracuje dalej. Wczesniej lecial
+# std::domain_error, czyli jedna probka o zerowym mianowniku przerywala
+# przetwarzanie calego zapytania.
+# make install && ctest -R null_divide_by_zero -V
+
+STORAGE 'temp'
+
+DECLARE d INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT 100/src[0] STREAM dst FROM src

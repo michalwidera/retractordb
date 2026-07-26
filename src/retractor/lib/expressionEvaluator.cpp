@@ -186,7 +186,15 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  b);
 
   if (divisorIsZero) {
-    throw std::domain_error("Division by zero in expressionEvaluator");
+    // Dzielenie przez zero nie ma wyniku w zbiorze wartości, więc jest wartością POCHŁANIAJĄCĄ —
+    // tym samym, czym dane oczekiwane a nieobecne. Strumień oddaje NULL i pracuje dalej.
+    //
+    // Wcześniej leciał tu std::domain_error, czyli pojedyncza próbka o zerowym mianowniku
+    // przerywała przetwarzanie całego zapytania. To była niezgodność z semantyką NULL: silnik
+    // ma pochłaniać brak wyniku, a nie zatrzymywać strumień. Rozróżnienie względem pozostałych
+    // wyjątków w tym pliku: tamte sygnalizują błędy TYPÓW i programu (np. '/' na łańcuchach),
+    // które nie zależą od danych i muszą pozostać błędami.
+    return std::monostate{};
   }
 
   if (typeid(a) != typeid(b)) FatalError("expressionEvaluator: operand types do not match after normalization");
