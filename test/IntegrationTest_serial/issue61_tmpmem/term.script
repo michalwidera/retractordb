@@ -2,6 +2,6 @@ storage temp
 open str1
 size
 desc
-list 9
+list 4
 dropfile { str1 str1.desc }
 quit

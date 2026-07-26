@@ -127,6 +127,12 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
     if (q.isDeclaration()) continue;      // Declarations already processed
 
+    // Ogon strumienia: w tych slotach wynik nie jest jeszcze zdefiniowany, więc strumień NIE emituje
+    // rekordu — ani zerowego, ani all-null. NULL jest wartością pochłaniającą (dane oczekiwane a
+    // nieobecne, wynik nieistniejący w zbiorze wartości), nigdy rezerwacją miejsca na dane. Długość
+    // ogona jest zadeklarowana w planie (query::startupLatency) i raportowana jako 'tail'.
+    if (qSet[q.id]->elapsedSlots++ < static_cast<size_t>(std::max(q.startupLatency, 0))) continue;
+
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
@@ -205,11 +211,12 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       int fwdPos = -1;
       if (cmd == STREAM_DEHASH_DIV) {
-        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} — element c o tym indeksie powstaje
-        // dopiero PO slocie n strumienia wynikowego (definicja jest o jeden
-        // slot nieprzyczynowa). Realizacja przyczynowa: opóźnienie o jeden
-        // slot — rekord n zawiera a_{n-1}, rekord 0 jest all-null.
-        fwdPos = (n == 0) ? -1 : Div(qry.rInterval, rationalArgument, n - 1);
+        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} — element c o tym indeksie powstaje dopiero PO slocie n
+        // strumienia wynikowego (definicja jest o jeden slot nieprzyczynowa). Przyczynowość
+        // zapewnia ogon strumienia (query::startupLatency zawiera dla Θ dodatkowy slot): przez ten
+        // slot strumień nie emituje niczego. Rekord n jest więc już a_n, bez przesunięcia o jeden
+        // i bez rekordu-zastępnika — placeholder byłby użyciem NULL/zera jako rezerwacji miejsca.
+        fwdPos = Div(qry.rInterval, rationalArgument, n);
       } else {
         // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} — dostępny w swoim slocie.
         fwdPos = Mod(rationalArgument, qry.rInterval, n);

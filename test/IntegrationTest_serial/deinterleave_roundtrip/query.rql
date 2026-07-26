@@ -2,7 +2,7 @@
 # c = sa#sb (delty 1/16 i 1/8 -> delta_c = 1/24, wzorzec B,A,A dla z = 2/3),
 # a2 = c & 1/8  -> odzyskuje sa (argument = delta strumienia USUWANEGO),
 # b2 = c % 1/16 -> odzyskuje sb.
-# Theta (&) jest realizowana z jednoslotowym opoznieniem (rekord 0 all-null).
+# Theta (&) jest o slot nieprzyczynowa - opoznienie jest ogonem strumienia (tail), nie rekordem.
 
 DECLARE a UINT STREAM sa, 1/16 FILE 'datafile1.txt'
 DECLARE a UINT STREAM sb, 1/8 FILE 'datafile2.txt'

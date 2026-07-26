@@ -26,6 +26,14 @@ struct streamInstance {
   std::unique_ptr<rdb::payload> inputPayload;   // payload used for computation in select
                                                 // clause - created by from clause.
 
+  /// @brief Liczba slotów własnego interwału, które upłynęły od startu strumienia.
+  ///
+  /// Potrzebna, bo od czasu wprowadzenia ogona (query::startupLatency) liczba rekordów NIE jest już równa
+  /// numerowi slotu: przez pierwsze startupLatency slotów strumień nie emituje niczego. Licznik rozdziela
+  /// te dwie wielkości — outputPayload->getRecordsCount() pozostaje indeksem elementu, ten licznik jest
+  /// pozycją na siatce slotów.
+  size_t elapsedSlots = 0;
+
   // This constructor will create data based on query
   explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
 
