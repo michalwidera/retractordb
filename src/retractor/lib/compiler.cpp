@@ -930,7 +930,7 @@ std::string compiler::computeStartupLatency() {
         result = w1;  // czysty PUSH_STREAM — ten sam interwał, ten sam ogon
       } else if (op == STREAM_TIMEMOVE) {
         // Konwencja opóźnienia (>N odsuwa wynik o N slotów) — zgodna z runtime i testami.
-        // Rozjazd z definicją tau w dokumentacji jest osobnym zagadnieniem (audyt tau/phi).
+        // Formalna definicja tau w dokumentacji używa tej samej realizacji przyczynowej i ogona W.
         result = w1 + std::get<int>(q.lProgram.back().getVT());
       } else if (op == STREAM_HASH) {
         auto second = std::next(q.lProgram.begin());

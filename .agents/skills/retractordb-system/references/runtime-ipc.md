@@ -21,6 +21,13 @@
 
 Construction creates stream instances after compiler capacities have been assigned. A declared stream receives gap detection based on its rational interval and its output storage can be marked disposable.
 
+Every executable query also carries `query::startupLatency`, reported as
+`tail=` in plan listings. It counts initial slots of that query's own
+interval for which the output is not yet causally defined. `dataModel`
+advances the slot counter but emits no record during the tail. Record index
+0 therefore always denotes the first defined value, not a zero or all-null
+placeholder.
+
 ## Timeline and processing cycle
 
 `CRationalStreamMath::TimeLine` accepts all positive stream deltas, removes rates that are integer multiples of smaller basis rates, and advances to the smallest next exact rational slot. A stream is due when `current_slot / stream_delta` is an integer.
@@ -58,7 +65,11 @@ Each later slot:
 - reductions call `streamInstance::reduceFieldsToPayload`;
 - AGSE calls `constructAgsePayload`.
 
-Unavailable forward records become an all-null payload. Left deinterleave is mathematically one slot non-causal, so runtime makes it causal by emitting all-null at output record 0 and reconstructing `a_(n-1)` thereafter. Right deinterleave is available from record 0.
+An unavailable record read during normal evaluation becomes an all-null
+payload and remains distinct from startup waiting. Left deinterleave is
+mathematically one slot non-causal, so its compiler-computed tail adds one
+slot; runtime emits nothing in that slot and the first emitted record is
+`a_0`. Right deinterleave has no additional own tail.
 
 AGSE flattens the source record history. It caches descriptors by absolute window width, reads each source record at most once per constructed window, preserves per-element null, and reverses element order for negative width.
 

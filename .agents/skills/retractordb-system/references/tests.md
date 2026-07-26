@@ -10,11 +10,11 @@
 
 ## Test architecture
 
-At indexed revision, CTest exposes 164 tests:
+At the current G1 revision, CTest exposes 166 tests:
 
 - `pt_*` (1-41): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
-- `it_*` (42-87): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
-- unit-related (88-164): GTest binaries, setup fixtures, and data-model comparison.
+- `it_*` (42-89): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
+- unit-related (90-166): GTest binaries, setup fixtures, and data-model comparison.
 
 The serial CMake wrapper detects commands that start the server (`-m`, `-k`, `xqry`, workflow scripts, lock access) and assigns `RUN_SERIAL TRUE`. Some shell-wrapped server tests set it explicitly because CMake cannot see flags inside the script.
 
@@ -27,7 +27,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Basic SELECT/scalar arithmetic and stream join: `pt_simple-*`, `it_simple-*`, `it_Data-workflow`.
 - Full operator workflow (`+`, `#`, `&`, `%`, `-`, shifts): `it_Data-all-operators`.
 - Exact `#` scheduling ratio: `it_operations-run`.
-- Bit-exact deinterleave inverse and left-side causal delay: `it_deinterleave_roundtrip-run`.
+- Bit-exact deinterleave inverse and left-side causal tail with no placeholder record:
+  `it_deinterleave_roundtrip-run`.
 - AGSE direction, mirror, field widths, faster/slower rates: `it_agse1`, `it_agse2`, `it_agse3`, `pt_Pattern6*`.
 - FIR pipeline with `@`, `[_]`, multiplication and `.sumc`: `pt_dsp`.
 - `.max` reduction and graph: `pt_simple_max-*`, `it_simple_max-*`.
@@ -35,7 +36,7 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Matched hash shifts and the unmatched guard: `pt_issue202_hash_shift_factorization-matched`,
   `pt_issue202_hash_shift_factorization-unmatched`; the underlying index identity is also checked by
   `ut_soperations`, while physical execution of both sides and the formula-derived payload are checked by
-  `it_issue202_hash_shift_e2e-run`.
+  `it_issue202_hash_shift_e2e-run`, including equal `tail=`.
 - Three/four-argument decomposition: `it_issue167_triarg`.
 - Circular dependency rejection: `pt_issue95_loopInCompile-compile`.
 - Generated substrate sharing: `pt_issue96_substrat_reference-*`; its exact plan-pattern case is disabled and labeled
@@ -44,8 +45,12 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Substrate dedup basics, field-name independence, nonzero offsets, cascades: four `it_issue167_dedup_*` scenarios.
 - Equivalent SELECT computation sharing across commutative `+`, public artifact preservation, NULL metadata, output-order
   guards, and the three-source grouping counterexample: `it_select_cse_commutative_add-run`.
-- Build-time optimizer switches, reported build configuration, configuration-dependent plan shapes, steady-state
-  equivalence, and explicitly labeled ablation failures: six `it_optimizer_ablation-*` tests.
+- Build-time optimizer switches, reported build configuration, configuration-dependent plan shapes, and full
+  semantic equivalence with optimizations enabled or disabled: six `it_optimizer_ablation-*` tests. The former
+  expected runtime divergences were removed after causal tails and final topological ordering made them invalid.
+- R1 over explicit NULL values and metadata in rewritten, blocked, and explicit-right-hand-side plans:
+  `it_r1_identity_nulls-run`.
+- Scalar divide-by-zero produces NULL without suppressing later records: `it_null_divide_by_zero-run`.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.

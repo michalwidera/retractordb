@@ -40,14 +40,10 @@ embedded key. Exact revision checks remain only for the two external documentati
   ad-hoc import safety. The post-change Debug suite passed 158/158 tests.
 - Build-time optimizer ablation switches preserve the default pipeline while allowing substrate deduplication, equivalent
   SELECT sharing, commutative `STREAM_ADD` fingerprints, and matched hash/time-move factorization to be compiled out
-  independently. `it_optimizer_ablation-*` verifies build identity, plan shapes, and semantic comparisons. It also records
-  two material runtime interactions as `expected_ablation_failure`: without matched-shift factorization,
-  `(A>2)#(B>1)` does not produce the same payload as `(A#B)>3`; with factorization, substrate deduplication, and equivalent
-  SELECT sharing all disabled, an otherwise equivalent shifted `DA+DB` plan gains one extra zero-valued startup record.
-  These are observable ablation results, not test-harness exemptions from unexplained failures. The full Release matrix
-  with `RDB_BENCH_PROBE=OFF` matched the expected success-count delta relative to the all-optimizations-enabled baseline
-  in every valid configuration; no unexpected discrepancy remained. The user-facing matrix deliberately reports
-  relative deltas rather than a fixed test inventory.
+  independently. `it_optimizer_ablation-*` verifies build identity, plan shapes, and semantic comparisons. Two former
+  runtime divergences — unequal R1 payload without factorization and an extra zero-valued startup record with structural
+  passes disabled — were removed by G1. They are no longer expected ablation outcomes: every valid optimizer
+  configuration must preserve the observable result.
 - `scripts/buildrdb.sh release` now treats production output as a fail-closed build: it requires a pristine Git tree,
   recreates `build/Release`, sanitizes common flag-injection environment variables, explicitly enables every production
   optimizer and disables `RDB_BENCH_PROBE`, then verifies the resulting binary through `--build-info`.
@@ -57,6 +53,13 @@ embedded key. Exact revision checks remain only for the two external documentati
   startup race in which an early `xqry get` could receive a response without `db.stream`. The
   `it_issue121_null_propagation-run` regression starts the client before the server with short readiness polling and
   cleans up both children on failure, preventing a stale lock from causing a cascade of unrelated integration failures.
+- G1 replaces startup prefix records with an explicit causal tail `query::startupLatency`. Tail slots are not records;
+  `dataModel` emits nothing until the tail expires. `STREAM_TIMEMOVE(N)` is one causal delay convention for declared and
+  computed streams, using `fetchBack()` after adding `N` to the tail. Interleave combines converted producer tails with
+  its own look-ahead on the second argument; left de-interleave adds one slot and no longer emits an all-null placeholder.
+  Compiler rewrites preserve public field names through `verifyUserFieldNamesPreserved()`, and compilation ends with an
+  unconditional topological sort. The current Debug inventory is 166/166 passing; the G1 realization record also
+  captured 165/165 Debug and Release before the final additional regression.
 
 ## Source hierarchy and scope
 
@@ -72,15 +75,13 @@ The English repository is treated as derived content. Consult it only for Englis
 
 These are navigation warnings, not necessarily product defects:
 
-- The mathematical documentation defines `tau_m(S)` as the advanced sequence
-  `s_(n+m)`, while runtime `STREAM_TIMEMOVE(N)` reads history slot `N` for
-  computed streams and the issue-202 E2E fixture expects an initial delayed
-  prefix. The optimizer ablation fixture additionally proves that the unfactored
-  `(A>2)#(B>1)` runtime plan is not payload-equivalent to `(A#B)>3`, even though
-  the factored default plan is. The formal direction, separate input clocks,
-  pre-stream boundary extension, and NULL versus zero semantics must be
-  reconciled before treating the theorem as a complete proof of the compiler
-  rewrite or the unfactored plan as an equivalent executable form.
+- The former `tau_m(S)=s_(n+m)` documentation drift has been corrected in the
+  current Polish and English documentation working trees. Both now define a
+  causal realization `((s_n,Delta),W)` and `tau_m` as increasing `W` by `m`
+  without prefix records. The matched-shift proof uses exact tail conversion
+  and matches `computeStartupLatency()`. Until the human commits the external
+  documentation changes and this table's version basis is advanced, freshness
+  correctly remains stale and the working-tree diff is part of the evidence.
 - Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
 - The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
 - Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.

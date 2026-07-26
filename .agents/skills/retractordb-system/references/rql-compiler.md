@@ -64,6 +64,11 @@ Multi-operator expressions remain postfix token programs immediately after parsi
    by `N` addresses history slot `N` and therefore requires capacity `N+1`.
 11. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
 12. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
+13. `computeStartupLatency()` — calculate causal startup tails for the final plan. Tail slots are not records; `>N` adds
+   `N`, `#` combines converted input tails with its own look-ahead on the second argument, `+` takes the maximum,
+   and left de-interleave adds one slot.
+14. `topologicalSort()` — unconditionally restore producer-before-consumer execution order after interval sorting and
+   all rewrites.
 
 The pipeline invariant after reduction is fewer than four stream-program tokens per query. `dataModel` treats any larger program as a fatal compiler invariant violation.
 
@@ -72,7 +77,19 @@ The pipeline invariant after reduction is fewer than four stream-program tokens 
 The matched-shift rewrite runs after interval resolution because equality of physical shifts depends on the exact rational
 source intervals. It runs before structural deduplication so the exposed `A # B` substrate can be shared normally.
 `it_issue202_hash_shift_e2e-run` executes the optimized left-hand side and an explicit right-hand side over independent
-TEXTSOURCE instances, compares the stored payload/metadata bodies, and verifies the complete formula-derived sequence.
+TEXTSOURCE instances, compares the stored payload/metadata bodies, verifies the complete formula-derived sequence, and
+checks equal startup tails.
+
+`STREAM_TIMEMOVE(N)` is a causal delay, not an advance to `s_(n+N)`. It leaves the emitted record sequence intact,
+increases the startup tail by `N`, and reads history slot `N` only after that tail has elapsed. Declared and computed
+sources share the same `fetchBack()` path. Runtime emits no zero or all-null placeholder for a tail slot.
+
+Every rewriting pass snapshots field names of user-named outputs and calls `verifyUserFieldNamesPreserved()` afterward.
+Internal substrate names may change, but a rewrite that changes a public `.desc` field name fails compilation.
+
+Current audit boundary: `STREAM_DEHASH_MOD`, `STREAM_SUBTRACT`, `STREAM_AGSE`, and reductions propagate producer tails
+but have no separately derived own-tail term. Do not generalize the proven R1 boundary semantics to those operators
+without completing the index/look-ahead audit and adding regressions.
 
 SELECT computation sharing runs after symbolic references and `[_]` have been expanded, but before field offsets are
 localized to a query's input payload. This lets `FROM a+b` and `FROM b+a` compare the source identities rather than
