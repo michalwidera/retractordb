@@ -937,13 +937,18 @@ std::string compiler::computeStartupLatency() {
         int w2      = 0;
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
         const auto delta2 = deltaOf(second->getStr_());
-        // Własny ogon przeplotu: element DRUGIEGO argumentu jest potrzebny ceil(delta2/delta1) slotów
-        // wyjściowych zanim jego producent go wyda. Pierwszy argument wypada równocześnie, więc nie
-        // wnosi opóźnienia. Wyprzedzenie dotyczy odczytu drugiego argumentu, więc DODAJE się do jego
-        // własnego ogonu — nie konkuruje z nim przez max. Bez tego tożsamość R1 nie zachowywałaby ogonu:
-        // phi(tau_i A, tau_k B) wyszłoby 3, a tau_(i+k) phi(A,B) — 5.
-        const int own = ceilR(delta2 / delta1);
-        result        = std::max(toSlots(w1, delta1, q.rInterval), toSlots(w2, delta2, q.rInterval) + own);
+        // Własny ogon przeplotu musi zabezpieczyć najgorszą fazę odczytu DRUGIEGO argumentu,
+        // nie tylko jego pierwszy element. Dla zredukowanego delta1/delta2=p/q maksimum
+        // ceil((j+1)q/p)-floor(jq/p), 0<=j<p, ma zamkniętą postać ceil((p+q-1)/p).
+        // Liczymy w 64 bitach, bo p+q może przekroczyć zakres typu używanego przez rational.
+        const auto ratio    = delta2 / delta1;
+        const auto period   = static_cast<std::int64_t>(ratio.denominator());
+        const auto bAdvance = static_cast<std::int64_t>(ratio.numerator());
+        const int own       = static_cast<int>((period + bAdvance - 2) / period + 1);
+
+        // Pierwszy argument wypada równocześnie, więc nie wnosi własnego opóźnienia. Wyprzedzenie
+        // dotyczy drugiego argumentu, dlatego dodaje się do jego ogona zamiast konkurować z nim przez max.
+        result = std::max(toSlots(w1, delta1, q.rInterval), toSlots(w2, delta2, q.rInterval) + own);
       } else if (op == STREAM_ADD) {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;

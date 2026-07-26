@@ -15,3 +15,15 @@ DECLARE v INTEGER STREAM B2, 1/5  FILE 'datafile2b.txt'
 
 SELECT * STREAM lhs FROM (A>2)#(B>1)
 SELECT * STREAM rhs FROM (A2#B2)>3
+
+# Regresja K2/G3 dla delta_C/delta_D=3/2. Publiczne przesuniecia blokuja
+# faktoryzacje R1 i wymuszaja wykonanie LHS z najgorsza faza przeplotu.
+DECLARE v INTEGER STREAM C,  3/10 FILE 'datafile1.txt'
+DECLARE v INTEGER STREAM D,  1/5  FILE 'datafile2.txt'
+DECLARE v INTEGER STREAM C2, 3/10 FILE 'datafile1b.txt'
+DECLARE v INTEGER STREAM D2, 1/5  FILE 'datafile2b.txt'
+
+SELECT * STREAM shifted_c FROM C>2
+SELECT * STREAM shifted_d FROM D>3
+SELECT * STREAM phase_lhs FROM shifted_c#shifted_d
+SELECT * STREAM phase_rhs FROM (C2#D2)>5
