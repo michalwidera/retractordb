@@ -1,5 +1,9 @@
 :STORAGE	temp/
 :SUBSTRAT	memory
+core0(1/10)	datafile2.dat
+	a: INTEGER
+core1(1/5)	datafile3.dat
+	b: INTEGER
 STREAM_ADD_core0_core1(1/10)
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
@@ -25,7 +29,3 @@ str1(1/10)
 		MULTIPLY
 		PUSH_VAL(20)
 		ADD
-core0(1/10)	datafile2.dat
-	a: INTEGER
-core1(1/5)	datafile3.dat
-	b: INTEGER

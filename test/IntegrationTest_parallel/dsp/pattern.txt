@@ -1,4 +1,6 @@
 :STORAGE	temp/
+source(1/50)	/dev/urandom
+	data: BYTE
 signalRow(1/50)
 	:- PUSH_STREAM(source)
 	:- STREAM_AGSE(1,25)
@@ -52,6 +54,8 @@ signalRow(1/50)
 		PUSH_ID(signalRow[23])
 	source_24: BYTE
 		PUSH_ID(signalRow[24])
+filter(1/1)	filterremez.txt
+	coef: INTEGER
 accRow(1/50)
 	:- PUSH_STREAM(signalRow)
 	:- PUSH_STREAM(filter)
@@ -173,7 +177,3 @@ outputAll(1/50)
 		DIVIDE
 	outputAll_1: INTEGER
 		PUSH_ID(outputAll[1])
-source(1/50)	/dev/urandom
-	data: BYTE
-filter(1/1)	filterremez.txt
-	coef: INTEGER

@@ -34,11 +34,17 @@ void qTree::topologicalSort() {
   for (const auto &q : coreInstance)
     if (!visited_[q.id]) dfs(q.id);
 
-  qTree tempInstance;
-  // for (auto qname : ans_) tempInstance.push_back(coreInstance[qname]); -> same:
-  std::ranges::for_each(ans_, [&tempInstance, &coreInstance](const std::string &qname)  //
-                        { tempInstance.push_back(coreInstance[qname]); });
-  coreInstance = tempInstance;
+  std::vector<query> reordered;
+  reordered.reserve(ans_.size());
+  // for (auto qname : ans_) reordered.push_back(coreInstance[qname]); -> same:
+  std::ranges::for_each(ans_, [&reordered, &coreInstance](const std::string &qname)  //
+                        { reordered.push_back(coreInstance[qname]); });
+
+  // Podmieniana jest wyłącznie zawartość wektora. Przypisanie całego qTree
+  // (coreInstance = tempInstance) nadpisywało też pola składowe klasy — w tym
+  // maxCapacity — wartościami domyślnymi. Było to nieszkodliwe dopóki sortowanie
+  // wywoływano wyłącznie przed computeRequiredCapacities().
+  static_cast<std::vector<query> &>(coreInstance) = std::move(reordered);
 }
 
 bool qTree::exists(const std::string &query_name) {

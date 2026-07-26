@@ -1,3 +1,5 @@
+core(1/1)	/dev/urandom
+	b: BYTE
 test_1(1/1)
 	:- PUSH_STREAM(core)
 	:- STREAM_AGSE(1,10)
@@ -44,5 +46,3 @@ test_2(1/1)
 		PUSH_ID(test_2[8])
 	core_9: BYTE
 		PUSH_ID(test_2[9])
-core(1/1)	/dev/urandom
-	b: BYTE

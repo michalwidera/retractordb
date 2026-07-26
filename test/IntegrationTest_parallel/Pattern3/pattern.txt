@@ -1,3 +1,6 @@
+datasrc(1/2)	datafile2.dat
+	a: INTEGER
+	b: INTEGER
 out1(1/2)	out1_file.dat
 	:- PUSH_STREAM(datasrc)
 	datasrc_0: INTEGER
@@ -12,6 +15,3 @@ out2(1/2)
 		PUSH_ID(out2[0])
 	out2_2: INTEGER
 		PUSH_ID(out2[1])
-datasrc(1/2)	datafile2.dat
-	a: INTEGER
-	b: INTEGER

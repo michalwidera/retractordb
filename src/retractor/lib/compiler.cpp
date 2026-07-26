@@ -1251,6 +1251,17 @@ std::string compiler::compile() {
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
   if (result != "OK") return result;
 
+  // Kolejność elementów qTree jest kolejnością przetwarzania w takcie
+  // (dataModel::processRows). Musi być topologiczna: producent przed
+  // konsumentem. resolveStreamIntervals() sortuje qTree po rInterval
+  // (qTree::sort, operator< na query), co ten porządek niszczy — a przywracał
+  // go dotąd wyłącznie factorMatchedHashTimeMoves(), i tylko gdy reguła
+  // faktycznie coś przepisała. Skutkiem była zależność semantyki planu od tego,
+  // czy odpaliła niezwiązana optymalizacja. Najdotkliwiej dla przeplotu:
+  // delta wyniku # jest mniejsza od delt argumentów, więc sortowanie po
+  // interwale stawia konsumenta PRZED jego producentami.
+  coreInstance.topologicalSort();
+
 #ifdef RDB_BENCH_PROBE
   // Raport instrumentacji E3 (tylko gdy RDB_BENCH_PLAN). Format: strumienie/tokeny.
   if (benchPlan) {

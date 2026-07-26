@@ -1,4 +1,6 @@
 :STORAGE	temp/
+core0(1/10)	datafile2.dat
+	a: INTEGER
 str1(1/10)
 	:- PUSH_STREAM(core0)
 	str1_0: INTEGER
@@ -22,5 +24,3 @@ str1(1/10)
 		CMP_EQUAL
 		OR
 		DO SYSTEM 'echo "systemcall"'
-core0(1/10)	datafile2.dat
-	a: INTEGER
