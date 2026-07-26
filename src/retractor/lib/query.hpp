@@ -30,10 +30,20 @@ class query {
   std::string id;
   std::string filename;
   boost::rational<int> rInterval = 0;
-  bool isDisposable              = false;
-  bool isOneShot                 = false;
-  bool isHold                    = false;
-  bool isSubstrat                = false;
+
+  /// @brief Ogon strumienia: liczba początkowych slotów WŁASNEGO interwału, w których wynik nie jest jeszcze zdefiniowany.
+  ///
+  /// Zasada brzegu strumienia: te sloty NIE są rekordami — ani zerami, ani NULL-ami. Strumień po prostu jeszcze nie
+  /// emituje, a system raportuje ogon. NULL jest zarezerwowany dla wartości pochłaniającej: danych oczekiwanych
+  /// a nieobecnych albo wyniku nieistniejącego w zbiorze wartości (np. dzielenie przez zero). NULL nigdy nie oznacza
+  /// „system przewiduje tu miejsce na dane”.
+  ///
+  /// Wyliczane dokładną arytmetyką wymierną przez compiler::computeStartupLatency().
+  int startupLatency = 0;
+  bool isDisposable  = false;
+  bool isOneShot     = false;
+  bool isHold        = false;
+  bool isSubstrat    = false;
 
   std::list<field> lSchema;
   std::list<token> lProgram;

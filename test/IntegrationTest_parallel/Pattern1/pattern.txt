@@ -4,7 +4,7 @@ core0(1/1)	datafile2.dat
 core1(1/2)	datafile3.dat
 	c: INTEGER
 	d: INTEGER
-str1(1/3)
+str1(1/3)	tail=1
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_HASH

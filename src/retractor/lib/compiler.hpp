@@ -31,6 +31,7 @@ struct compiler {
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
+  std::string computeStartupLatency();
   std::string factorMatchedHashTimeMoves();
   void replaceStreamReferences(const std::string &oldName, const std::string &newName);
   std::string deduplicateSubstrats();

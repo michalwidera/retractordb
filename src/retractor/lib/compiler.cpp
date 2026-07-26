@@ -20,6 +20,7 @@
 #include <boost/regex.hpp>
 
 #include "fatalError.hpp"
+#include "SOperations.hpp"  // ceilR
 
 using boost::lexical_cast;
 
@@ -836,6 +837,93 @@ void compiler::replaceStreamReferences(const std::string &oldName, const std::st
       }
 }
 
+std::string compiler::computeStartupLatency() {
+  // Ogon strumienia (query::startupLatency) — liczba początkowych slotów własnego interwału, w których
+  // wynik nie jest jeszcze zdefiniowany. Zasada brzegu: te sloty nie są rekordami. NULL zostaje wyłącznie
+  // wartością pochłaniającą (dane oczekiwane a nieobecne, wynik nieistniejący w zbiorze wartości), nigdy
+  // rezerwacją miejsca na dane.
+  //
+  // UWAGA: ten przebieg wyłącznie WYLICZA i udostępnia ogon. Doprowadzenie emisji do zgodności z nim
+  // (zaprzestanie emitowania rekordów w slotach ogona) jest osobnym krokiem.
+
+  // Ogon źródła przeliczony na sloty konsumenta: w slotów źródła to w*dSrc sekund, czyli ceil(w*dSrc/dDst)
+  // slotów konsumenta. Zaokrąglamy w górę — pół slotu opóźnienia to wciąż slot, w którym nie ma czego wydać.
+  auto toSlots = [](int w, const boost::rational<int> &dSrc, const boost::rational<int> &dDst) -> int {
+    if (w <= 0) return 0;
+    return ceilR(boost::rational<int>(w) * dSrc / dDst);
+  };
+
+  std::map<std::string, int> latency;
+  for (const auto &q : coreInstance)
+    if (q.isDeclaration() || q.isCompilerDirective()) latency[q.id] = 0;  // źródło emituje od pierwszego slotu
+
+  auto deltaOf   = [this](const std::string &id) { return coreInstance.getQuery(id).rInterval; };
+  auto latencyOf = [&latency](const std::string &id, int &out) {
+    auto it = latency.find(id);
+    if (it == latency.end()) return false;
+    out = it->second;
+    return true;
+  };
+
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (const auto &q : coreInstance) {
+      if (latency.contains(q.id)) continue;
+      if (q.lProgram.empty()) continue;
+
+      auto it = q.lProgram.begin();
+      if (it->getCommandID() != PUSH_STREAM) continue;
+      const std::string src1 = it->getStr_();
+      int w1                 = 0;
+      if (!latencyOf(src1, w1)) continue;  // producent jeszcze nierozwiązany
+
+      const auto op     = q.lProgram.back().getCommandID();
+      const auto delta1 = deltaOf(src1);
+      int result        = toSlots(w1, delta1, q.rInterval);
+
+      if (q.lProgram.size() == 1) {
+        result = w1;  // czysty PUSH_STREAM — ten sam interwał, ten sam ogon
+      } else if (op == STREAM_TIMEMOVE) {
+        // Konwencja opóźnienia (>N odsuwa wynik o N slotów) — zgodna z runtime i testami.
+        // Rozjazd z definicją tau w dokumentacji jest osobnym zagadnieniem (audyt tau/phi).
+        result = w1 + std::get<int>(q.lProgram.back().getVT());
+      } else if (op == STREAM_HASH) {
+        auto second = std::next(q.lProgram.begin());
+        int w2      = 0;
+        if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
+        const auto delta2 = deltaOf(second->getStr_());
+        // Własny ogon przeplotu: element drugiego argumentu jest potrzebny delta2/delta1 slotów wyjściowych
+        // zanim jego producent go wyda. Pierwszy argument wypada równocześnie, więc nie wnosi opóźnienia.
+        const int own = ceilR(delta2 / delta1);
+        result        = std::max({toSlots(w1, delta1, q.rInterval), toSlots(w2, delta2, q.rInterval), own});
+      } else if (op == STREAM_ADD) {
+        auto second = std::next(q.lProgram.begin());
+        int w2      = 0;
+        if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
+        result = std::max(toSlots(w1, delta1, q.rInterval), toSlots(w2, deltaOf(second->getStr_()), q.rInterval));
+      } else if (op == STREAM_DEHASH_DIV) {
+        result += 1;  // Theta jest o jeden slot nieprzyczynowa — realizacja przyczynowa kosztuje slot
+      }
+      // Pozostałe operatory (MOD, SUBTRACT, AGSE, redukcje): własnego ogonu na razie nie przypisujemy,
+      // przenosimy wyłącznie ogon producenta. Rozstrzygnięcie należy do audytu modelu indeksowania.
+
+      latency[q.id] = result;
+      changed       = true;
+    }
+  }
+
+  for (auto &q : coreInstance) {
+    auto it = latency.find(q.id);
+    if (it == latency.end()) {
+      SPDLOG_WARN("compiler::computeStartupLatency: unresolved startup latency for '{}'", q.id);
+      continue;
+    }
+    q.startupLatency = it->second;
+  }
+  return {"OK"};
+}
+
 std::string compiler::factorMatchedHashTimeMoves() {
   auto findUniqueQueryIndex = [this](const std::string &id) {
     size_t found = coreInstance.size();
@@ -1249,6 +1337,10 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
+  if (result != "OK") return result;
+
+  // Po wszystkich przepisaniach planu — ogon liczymy dla planu, który faktycznie pójdzie do wykonania.
+  result = computeStartupLatency();
   if (result != "OK") return result;
 
   // Kolejność elementów qTree jest kolejnością przetwarzania w takcie

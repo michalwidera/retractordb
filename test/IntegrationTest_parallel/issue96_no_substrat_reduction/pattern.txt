@@ -1,11 +1,11 @@
 core0(1/10)	datafile1.dat
 	a: INTEGER
-str1(1/10)
+str1(1/10)	tail=2
 	:- PUSH_STREAM(core0)
 	:- STREAM_TIMEMOVE(2)
 	str1_0: INTEGER
 		PUSH_ID(str1[0])
-str2(1/10)
+str2(1/10)	tail=2
 	:- PUSH_STREAM(core0)
 	:- STREAM_TIMEMOVE(2)
 	str2_0: INTEGER

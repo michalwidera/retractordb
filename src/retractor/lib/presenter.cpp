@@ -340,6 +340,9 @@ void presenter::onlyCompileShowProgram() {
   for (const auto &q : coreInstance) {
     std::cout << q.id;
     if (!q.isCompilerDirective()) std::cout << "(" << q.rInterval << ")";
+    // Ogon zapytania: ile początkowych slotów nie ma jeszcze zdefiniowanego wyniku. Raportowany
+    // tylko gdy niezerowy, żeby listing planów bez opóźnienia pozostał niezmieniony.
+    if (q.startupLatency > 0) std::cout << "\ttail=" << q.startupLatency;
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << '\n';
     for (auto t : q.lProgram)

@@ -289,3 +289,62 @@ TEST(xcompiler, does_not_rewrite_existing_queries_during_import) {
   ASSERT_TRUE(live.exists("c2"));
   EXPECT_EQ(live.getQuery("c2").lProgram.size(), 3);
 }
+
+// Ogon strumienia (query::startupLatency): liczba poczatkowych slotow wlasnego interwalu bez
+// zdefiniowanego wyniku. Wartosci ponizej sa DEKLAROWANA semantyka docelowa — emisja jest
+// doprowadzana do zgodnosci z nimi osobnym krokiem, wiec runtime moze sie jeszcze roznic.
+TEST(xcompiler, computes_startup_latency) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM a, 1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM b, 1/5  FILE 'b.txt'
+        DECLARE value INTEGER STREAM c, 1/10 FILE 'c.txt'
+        SELECT a[0]+0 STREAM mid       FROM a
+        SELECT * STREAM shifted        FROM mid>3
+        SELECT * STREAM shifted_twice  FROM shifted>2
+        SELECT * STREAM hash_slow_snd  FROM a#b
+        SELECT * STREAM hash_fast_snd  FROM b#a
+        SELECT * STREAM hash_equal     FROM a#c
+        SELECT * STREAM added          FROM a+c
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Zrodlo deklarowane emituje od pierwszego slotu.
+  EXPECT_EQ(instance.getQuery("a").startupLatency, 0);
+  // Przepisanie bez operatora nie wnosi opoznienia.
+  EXPECT_EQ(instance.getQuery("mid").startupLatency, 0);
+  // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha.
+  EXPECT_EQ(instance.getQuery("shifted").startupLatency, 3);
+  EXPECT_EQ(instance.getQuery("shifted_twice").startupLatency, 5);
+  // phi: element drugiego argumentu jest potrzebny ceil(delta2/delta1) slotow wyjsciowych
+  // zanim producent go wyda. Pierwszy argument wypada rownoczesnie.
+  EXPECT_EQ(instance.getQuery("hash_slow_snd").startupLatency, 2);  // ceil((1/5)/(1/10))
+  EXPECT_EQ(instance.getQuery("hash_fast_snd").startupLatency, 1);  // ceil((1/10)/(1/5)) = ceil(1/2)
+  EXPECT_EQ(instance.getQuery("hash_equal").startupLatency, 1);     // ceil(1)
+  // Suma o zgodnych interwalach i zerowych ogonach zrodel nie wnosi opoznienia.
+  EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
+}
+
+// Tozsamosc R1 musi zachowywac ogon — inaczej przepisanie zmienialoby obserwowalna
+// deklaracje opoznienia, nawet gdyby sekwencja rekordow byla identyczna.
+TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM fa,  1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM fb,  1/5  FILE 'b.txt'
+        DECLARE value INTEGER STREAM fa2, 1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM fb2, 1/5  FILE 'b.txt'
+        SELECT * STREAM lhs FROM (fa>2)#(fb>1)
+        SELECT * STREAM rhs FROM (fa2#fb2)>3
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  EXPECT_EQ(instance.getQuery("lhs").startupLatency, instance.getQuery("rhs").startupLatency);
+  EXPECT_EQ(instance.getQuery("rhs").startupLatency, 5);  // ogon przeplotu 2 + przesuniecie 3
+}
