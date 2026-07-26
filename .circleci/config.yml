@@ -135,8 +135,13 @@ commands:
           condition: << parameters.enabled >>
           steps:
             - run:
-                name: Check for [skipci] in commit message
+                name: Check whether commit-triggered CI can be skipped
                 command: |
+                  changed_paths="$(git diff-tree --no-commit-id --name-only -r HEAD)"
+                  if [ "$changed_paths" = "examples/experiment" ]; then
+                    echo "Only the experiment submodule pointer changed — skipping CI."
+                    circleci step halt
+                  fi
                   if git log -1 --pretty=%B | grep -qF '[skipci]'; then
                     echo "Commit message contains [skipci] — skipping CI."
                     circleci step halt
@@ -145,8 +150,8 @@ commands:
           condition: << parameters.enabled >>
           steps:
             - run:
-                name: "[skipci] check disabled (scheduled/manual workflow)"
-                command: echo "Ignoring [skipci] — this is not a commit-triggered workflow."
+                name: Commit skip check disabled (scheduled/manual workflow)
+                command: echo "Ignoring automatic submodule and [skipci] checks — this is not a commit-triggered workflow."
 
   prep-env-ci:
     parameters:

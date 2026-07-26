@@ -259,12 +259,13 @@ checkout, at this path — not from a standalone clone of `rdb-experiment`.
 | Commit and push inside `examples/experiment` (i.e. to `rdb-experiment`) | **does not run** — that repository has no CI configuration, and the CircleCI project watches this repository only |
 | Commit here that moves the submodule pointer | **runs**, on `master`, `issue_*`, and `<number>-*` branches — it is an ordinary commit to the engine repository |
 
-A pointer bump therefore costs a full pipeline while changing nothing the
+A pointer bump would otherwise repeat a full build while changing nothing the
 pipeline can see: CircleCI's `checkout` does not initialize submodules, so the
-build and the test suite are byte-for-byte the same work as on the preceding
-commit. To skip it, put `[skipci]` in the commit message — the commit-triggered
-workflow halts on that marker, while scheduled and manual workflows ignore it
-and run regardless.
+build and the test suite would be byte-for-byte the same work as on the
+preceding commit. The commit-triggered workflow therefore halts automatically
+when the commit changes only the `examples/experiment` pointer. The `[skipci]`
+commit message marker remains available for other explicit skips. Scheduled
+and manual workflows ignore both conditions and run regardless.
 
 This is also why measurement data can grow without bounds in the other
 repository: no amount of experimental output can slow the engine's pipeline
