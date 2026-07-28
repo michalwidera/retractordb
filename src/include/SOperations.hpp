@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <numeric>
 
 #include <boost/rational.hpp>
 
@@ -55,8 +56,41 @@ constexpr int Mod(const boost::rational<int> &deltaA, const boost::rational<int>
   return i + floorR(i * deltaB / deltaA);
 }
 
-constexpr int Subtract(const rational<int> &deltaA, const rational<int> &deltaB, const int i) {
-  return ceilR(i * deltaA / deltaB);
+// Różnica C-Delta wybiera z C składową o docelowym interwale Delta.
+// Delta nie może być mniejsza od interwału C (wynik nie może wymagać
+// rekordów szybszych niż źródło). Dla równych interwałów wybór jest
+// tożsamością, a dla wolniejszego wyniku wybieramy indeks ceil(i*Delta/Dc).
+constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int i) {
+  if (deltaSource == deltaTarget) return i;
+  return ceilR(i * deltaTarget / deltaSource);
 }
 
 constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(offset) / boost::rational<int>(step)); }
+
+// Dla kolejnych okien reszta (n*step) mod sourceWidth przebiega przez
+// wielokrotności gcd(step, sourceWidth). Największe wyprzedzenie ostatniego
+// pola okna względem jego slotu wynosi:
+//   floor((abs(length)-1)/gcd(step, sourceWidth))*gcd(step, sourceWidth).
+// Do tej fazy dochodzi ogon producenta przeliczony na pola. Odczyt historii
+// odbywa się przed domknięciem wszystkich producentów aktywnych w tym samym
+// takcie (również przy różnych interwałach), stąd nierówność ostra.
+constexpr int AgseStartupLatency(const int sourceWidth, const int step, const int length, const int sourceLatency) {
+  const int lengthAbs  = length < 0 ? -length : length;
+  const int phaseUnit  = std::gcd(sourceWidth, step);
+  const int phaseBound = ((lengthAbs - 1) / phaseUnit) * phaseUnit;
+  const int numerator  = sourceLatency * sourceWidth + phaseBound;
+  return floorR(boost::rational<int>(numerator, step)) + 1;
+}
+
+// C-Delta wybiera c_{ceil(n*Delta/Dc)}. Ułamkowa faza może wyprzedzać
+// fizyczny slot najwyżej o (q-1)/q rekordu źródła, gdzie q jest mianownikiem
+// Delta/Dc. Dla deklaracji również faza całkowita wymaga jednego slotu,
+// ponieważ źródło jest publikowane po konsumentach w tym samym takcie.
+constexpr int SubtractStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency,
+                                     const bool sourceDeclared) {
+  const auto ratio = deltaTarget / deltaSource;
+  const int q      = ratio.denominator();
+  const rational<int> phase(q - 1, q);
+  if (sourceDeclared) return floorR(phase / ratio) + 1;
+  return ceilR((rational<int>(sourceLatency) + phase) / ratio);
+}

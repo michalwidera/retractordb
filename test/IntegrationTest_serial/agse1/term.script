@@ -15,7 +15,7 @@ echo This looks OK
 open signalText1
 size
 descc
-list 6
+list 4
 echo SELECT * STREAM signalText3 FROM core1@(2,2)
 echo This looks OK
 open signalText3

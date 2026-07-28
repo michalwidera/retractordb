@@ -1,0 +1,7 @@
+DECLARE value INTEGER STREAM source, 1/100 FILE 'data.txt'
+
+SELECT * STREAM agse        FROM source@(1,3)
+SELECT * STREAM agse_mirror FROM source@(1,-3)
+SELECT * STREAM sub_same    FROM source-1/100
+SELECT * STREAM sub2        FROM source-1/50
+SELECT * STREAM sum3        FROM agse.sumc

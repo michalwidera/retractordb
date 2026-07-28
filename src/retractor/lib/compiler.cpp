@@ -118,12 +118,16 @@ std::string compiler::resolveStreamIntervals() {
         } break;
         case STREAM_SUBTRACT: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
+          boost::rational<int> delta2 = op.getRI();
           if (delta1 == 0) {
             bOnceAgain = true;
             unresolvedCount++;
             continue;
           }
-          delta = delta1;  // deltaSubtract(delta1);
+          if (delta2 <= 0) {
+            FatalError("compiler: SUBTRACT target interval must be positive for '{}'", q.id);
+          }
+          delta = delta2;
         } break;
         case STREAM_ADD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -672,11 +676,19 @@ std::string compiler::validateConstraints() {
           return std::string("HASH operation constraint failed on " + q.id);
         }
       } break;
+      case STREAM_SUBTRACT: {
+        const auto deltaSource = coreInstance.getQuery(arg1).rInterval;
+        const auto deltaTarget = cmd.getRI();
+        if (deltaTarget < deltaSource) {
+          SPDLOG_ERROR("SUBTRACT target interval must not be faster than its source. q.id={} source={} target={}", q.id,
+                       boost::lexical_cast<std::string>(deltaSource), boost::lexical_cast<std::string>(deltaTarget));
+          return std::string("SUBTRACT interval constraint failed on " + q.id);
+        }
+      } break;
       case PUSH_STREAM:
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
       case STREAM_ADD:
-      case STREAM_SUBTRACT:
       case STREAM_TIMEMOVE:
       case STREAM_AGSE:
       case STREAM_AVG:
@@ -753,17 +765,26 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
                      q.lProgram.size(), q.id);
         }
 
-        const auto nameSrc  = arg1;
-        auto [step, length] = get<std::pair<int, int>>(cmd.getVT());
+        const auto nameSrc = arg1;
+        const auto step    = get<std::pair<int, int>>(cmd.getVT()).first;
         if (step <= 0) {
           FatalError("compiler: AGSE step must be > 0, got {} for query '{}' in computeRequiredCapacities", step, q.id);
         }
-        length                 = abs(length);
-        const auto lengthOfSrc = coreInstance[nameSrc].descriptorStorage().flatElementCount();
-        const auto timeBufferSize =
-            static_cast<int>(ceil(static_cast<double>(length + step) / static_cast<double>(lengthOfSrc))) + 2;
-
-        capMap[nameSrc] = std::max(capMap[nameSrc], timeBufferSize);
+        auto &source          = coreInstance[nameSrc];
+        const int sourceWidth = source.descriptorStorage().flatElementCount();
+        const int phaseUnit   = std::gcd(sourceWidth, step);
+        const auto ratio      = q.rInterval / source.rInterval;
+        // Liczba rekordów pozostających za najstarszym polem okna:
+        // ceil(Wout*ratio-Wsrc + max frac(n*step/sourceWidth)).
+        // Osiągalne reszty są wielokrotnościami gcd(step, sourceWidth),
+        // więc największa faza to (sourceWidth-gcd)/sourceWidth.
+        const auto phase    = boost::rational<int>(sourceWidth - phaseUnit, sourceWidth);
+        const auto retained = boost::rational<int>(q.startupLatency) * ratio - source.startupLatency + phase;
+        // Deklaracja ma dwa rekordy przed pierwszym wykonaniem konsumenta:
+        // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch. Oba
+        // zwiększają odległość w buforze od indeksu logicznego okna.
+        const int required = source.isDeclaration() ? floorR(retained) + 2 : ceilR(retained);
+        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
       } break;
       case STREAM_HASH:
         // Przeplot/rozplot czytają elementy składowych po indeksie
@@ -773,23 +794,42 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // potrzebny rekord to bieżący element składowej, cofnięty najwyżej
         // o jeden okres źródła (<=1) + prefetch źródła deklarowanego (+1);
         // kJunctionHistory = bound 2 + margines 2.
-        capMap[arg1] = std::max(capMap[arg1], kJunctionHistory);
-        capMap[arg2] = std::max(capMap[arg2], kJunctionHistory);
+        for (const auto &nameSrc : {arg1, arg2}) {
+          const auto &source = coreInstance[nameSrc];
+          const int delayed =
+              ceilR(boost::rational<int>(q.startupLatency) * q.rInterval / source.rInterval) - source.startupLatency + 2;
+          capMap[nameSrc] = std::max(capMap[nameSrc], std::max(kJunctionHistory, delayed));
+        }
         break;
       case STREAM_DEHASH_DIV:
       case STREAM_DEHASH_MOD:
         // Rozplot: jak wyżej, historia tylko dla strumienia rozplatanego
         // (arg2 to argument wymierny, nie strumień).
-        capMap[arg1] = std::max(capMap[arg1], kJunctionHistory);
+        {
+          const auto &source = coreInstance[arg1];
+          const int delayed =
+              ceilR(boost::rational<int>(q.startupLatency) * q.rInterval / source.rInterval) - source.startupLatency + 2;
+          capMap[arg1] = std::max(capMap[arg1], std::max(kJunctionHistory, delayed));
+        }
         break;
       case STREAM_ADD:
-      case STREAM_SUBTRACT:
       case STREAM_AVG:
       case STREAM_MIN:
       case STREAM_MAX:
       case STREAM_SUM:
         // These commands do not increase source history requirement here.
         break;
+      case STREAM_SUBTRACT: {
+        const auto &source = coreInstance[arg1];
+        const auto ratio   = q.rInterval / source.rInterval;
+        // Dla deklaracji maksimum odległości od c_{ceil(n*ratio)}
+        // występuje w fazie całkowitej. Dwa rekordy startowe mają tę samą
+        // genezę co w AGSE (uzbrojenie storage i zerowy prefetch).
+        const int required = source.isDeclaration()
+                                 ? floorR(boost::rational<int>(q.startupLatency) * ratio) + 2
+                                 : ceilR(boost::rational<int>(q.startupLatency) * ratio - source.startupLatency);
+        capMap[arg1]       = std::max(capMap[arg1], std::max(required, 1));
+      } break;
       default:
         FatalError("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
                    GetStringcommand_id(cmd.getCommandID()), q.id);
@@ -955,10 +995,21 @@ std::string compiler::computeStartupLatency() {
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
         result = std::max(toSlots(w1, delta1, q.rInterval), toSlots(w2, deltaOf(second->getStr_()), q.rInterval));
       } else if (op == STREAM_DEHASH_DIV) {
-        result += 1;  // Theta jest o jeden slot nieprzyczynowa — realizacja przyczynowa kosztuje slot
+        // Θ zawsze wyprzedza swój slot o mniej niż jeden okres wyjścia.
+        // Jeden slot jest dokładnym własnym ogonem operatora.
+        ++result;
+      } else if (op == STREAM_DEHASH_MOD) {
+        // ~Theta wybiera pozycję floor(n*DeltaOut/DeltaSource), dostępną
+        // najpóźniej w bieżącym slocie — własny ogon wynosi zero.
+      } else if (op == STREAM_SUBTRACT) {
+        result = SubtractStartupLatency(delta1, q.rInterval, w1, coreInstance[src1].isDeclaration());
+      } else if (op == STREAM_AGSE) {
+        const auto [step, length] = std::get<std::pair<int, int>>(q.lProgram.back().getVT());
+        const int sourceWidth     = coreInstance[src1].descriptorStorage().flatElementCount();
+        result                    = AgseStartupLatency(sourceWidth, step, length, w1);
+      } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
+        // Redukcje działają wyłącznie na bieżącej krotce producenta.
       }
-      // Pozostałe operatory (MOD, SUBTRACT, AGSE, redukcje): własnego ogonu na razie nie przypisujemy,
-      // przenosimy wyłącznie ogon producenta. Rozstrzygnięcie należy do audytu modelu indeksowania.
 
       latency[q.id] = result;
       changed       = true;
@@ -1398,16 +1449,18 @@ std::string compiler::compile() {
   result = localizeFieldOffsets();
   if (result != "OK") return result;
 
+  // Po wszystkich przepisaniach planu — ogon liczymy dla planu, który faktycznie pójdzie do wykonania.
+  // Pojemność historii zależy od tej wartości: opóźniony konsument może nadal
+  // potrzebować wczesnych rekordów szybszego producenta.
+  result = computeStartupLatency();
+  if (result != "OK") return result;
+
   coreInstance.maxCapacity = computeRequiredCapacities();
 
   result = validateConstraints();
   if (result != "OK") return result;
 
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
-  if (result != "OK") return result;
-
-  // Po wszystkich przepisaniach planu — ogon liczymy dla planu, który faktycznie pójdzie do wykonania.
-  result = computeStartupLatency();
   if (result != "OK") return result;
 
   // Kolejność elementów qTree jest kolejnością przetwarzania w takcie

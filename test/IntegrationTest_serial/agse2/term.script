@@ -21,12 +21,12 @@ echo serial7
 open serial7
 size
 descc
-list 6
+list 4
 
 echo serial8
 open serial8
 size
 descc
-list 6
+list 4
 
 quit

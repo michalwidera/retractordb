@@ -115,8 +115,8 @@ TEST_F(xschema, check_construct_payload) {
   //  13, 14
   //  15, 16
 
-  // @(4,1)  15,14,13,12
-  // @(-4,1) 12,13,14,15
+  // Trzeci logiczny slot @(1,4): pola 13..16.
+  // Dodatnia szerokosc uklada najnowsze pole jako pierwsze.
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 2));
     std::stringstream coutstring1;
@@ -125,7 +125,7 @@ TEST_F(xschema, check_construct_payload) {
     coutstring2 << rdb::singleLineFormat << *payload;
     std::cerr << rdb::singleLineFormat << *(payload) << '\n';
 
-    EXPECT_TRUE(coutstring2.str() == "{ str1_0:11 str1_1:null str1_2:null str1_3:null }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:16 str1_1:15 str1_2:14 str1_3:13 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
@@ -140,8 +140,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
   //  13, 14
   //  15, 16
 
-  // @(4,1)  15,14,13,12
-  // @(-4,1) 12,13,14,15
+  // Ujemna szerokosc jest odbiciem lustrzanym tego samego pelnego okna.
   {
     std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 2));
     std::stringstream coutstring1;
@@ -151,7 +150,7 @@ TEST_F(xschema, check_construct_payload_mirror) {
     coutstring2 << rdb::singleLineFormat << *payload;
     std::cout << rdb::singleLineFormat << *payload << '\n';
 
-    EXPECT_TRUE(coutstring2.str() == "{ str1_0:null str1_1:null str1_2:null str1_3:11 }");
+    EXPECT_TRUE(coutstring2.str() == "{ str1_0:13 str1_1:14 str1_2:15 str1_3:16 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
   }
 }
