@@ -774,16 +774,19 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         const int sourceWidth = source.descriptorStorage().flatElementCount();
         const int phaseUnit   = std::gcd(sourceWidth, step);
         const auto ratio      = q.rInterval / source.rInterval;
-        // Liczba rekordów pozostających za najstarszym polem okna:
-        // ceil(Wout*ratio-Wsrc + max frac(n*step/sourceWidth)).
+        // Odległość (w rekordach źródła) od rekordu najnowszego do najstarszego pola okna:
+        // Wout*ratio-Wsrc + max frac(n*step/sourceWidth).
         // Osiągalne reszty są wielokrotnościami gcd(step, sourceWidth),
         // więc największa faza to (sourceWidth-gcd)/sourceWidth.
         const auto phase    = boost::rational<int>(sourceWidth - phaseUnit, sourceWidth);
         const auto retained = boost::rational<int>(q.startupLatency) * ratio - source.startupLatency + phase;
-        // Deklaracja ma dwa rekordy przed pierwszym wykonaniem konsumenta:
-        // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch. Oba
-        // zwiększają odległość w buforze od indeksu logicznego okna.
-        const int required = source.isDeclaration() ? floorR(retained) + 2 : ceilR(retained);
+        // Bufor musi pomieścić oba końce zakresu, więc pojemność to odległość + 1.
+        // ceilR() dawało o jeden za mało zawsze, gdy odległość wypada całkowita
+        // (m.in. dla każdego źródła o szerokości 1) — kołowy bufor MEMORY nadpisywał
+        // wtedy najstarsze pole okna i AGSE czytało zamiast niego rekord najnowszy.
+        // Deklaracja ma dodatkowo dwa rekordy przed pierwszym wykonaniem konsumenta:
+        // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch.
+        const int required = floorR(retained) + (source.isDeclaration() ? 2 : 1);
         capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
       } break;
       case STREAM_HASH:

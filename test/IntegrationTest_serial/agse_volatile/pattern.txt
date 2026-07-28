@@ -1,0 +1,12 @@
+ AGSE_OVER_VOLATILE
+8 Record(s)
+12 Byte(s) per record.
+{ INTEGER win_out_0 INTEGER win_out_1 INTEGER win_out_2 }
+{ win_out_0:50 win_out_1:40 win_out_2:30 }
+{ win_out_0:60 win_out_1:50 win_out_2:40 }
+{ win_out_0:70 win_out_1:60 win_out_2:50 }
+{ win_out_0:80 win_out_1:70 win_out_2:60 }
+{ win_out_0:90 win_out_1:80 win_out_2:70 }
+{ win_out_0:100 win_out_1:90 win_out_2:80 }
+{ win_out_0:110 win_out_1:100 win_out_2:90 }
+{ win_out_0:120 win_out_1:110 win_out_2:100 }

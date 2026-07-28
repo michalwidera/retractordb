@@ -1,0 +1,7 @@
+echo AGSE_OVER_VOLATILE
+open win_out
+size
+descc
+list 8
+
+quit

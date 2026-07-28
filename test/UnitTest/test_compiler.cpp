@@ -371,6 +371,33 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.maxCapacity.at("subsrc"), 3);
 }
 
+// Pojemnosc bufora zrodla okna to odleglosc do najstarszego pola okna PLUS jeden:
+// w buforze musza sie zmiescic oba konce zakresu. Regresja (plaski wykres detekcji
+// QRS w examples/ecg): dla zrodla o szerokosci 1 odleglosc wypada calkowita, wiec
+// zaokraglenie w gore dawalo o jeden rekord za malo — kolowy bufor MEMORY
+// nadpisywal najstarsze pole okna rekordem najnowszym.
+TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM src, 1 FILE 'a.txt'
+        SELECT * STREAM win1     FROM src@(1,3)
+        SELECT win1[0] STREAM mid FROM win1
+        SELECT * STREAM win2     FROM mid@(1,3)
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Okno 3-polowe nad deklaracja ma ogon 3; przepisanie go nie zmienia.
+  EXPECT_EQ(instance.getQuery("win1").startupLatency, 3);
+  EXPECT_EQ(instance.getQuery("mid").startupLatency, 3);
+  // Okno nad producentem z ogonem 3: 3 + (3-1) pol fazy + 1.
+  EXPECT_EQ(instance.getQuery("win2").startupLatency, 6);
+  // win2 czyta rekordy mid o indeksach n..n+2, gdy mid ma juz wydany rekord n+3.
+  EXPECT_EQ(instance.maxCapacity.at("mid"), 4);
+}
+
 // Tozsamosc R1 musi zachowywac ogon — inaczej przepisanie zmienialoby obserwowalna
 // deklaracje opoznienia, nawet gdyby sekwencja rekordow byla identyczna.
 TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
