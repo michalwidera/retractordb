@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <set>
 #include <vector>
 
@@ -16,6 +17,11 @@ struct compiler {
   qTree &coreInstance;
   bool restrictSelectSharing_ = false;
   std::set<std::string> selectSharingScope_;
+#ifdef RDB_BENCH_PROBE
+  // Liczniki K4 są obecne wyłącznie w wariantach pomiarowych.
+  std::size_t rewriteAppliedR1_ = 0;
+  std::set<std::string> rewriteAppliedR2Nodes_;
+#endif
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd);
   void resolveTokenReferences(std::list<token> &lProgram, query &q);
