@@ -1152,6 +1152,9 @@ std::string compiler::factorMatchedHashTimeMoves() {
         return candidate.id == rightShiftName || (!removedLeft.empty() && candidate.id == removedLeft);
       });
       coreInstance.erase(removed.begin(), removed.end());
+#ifdef RDB_BENCH_PROBE
+      ++rewriteAppliedR1_;
+#endif
       optimized = true;
       changed   = true;
       break;
@@ -1232,7 +1235,12 @@ std::string compiler::shareEquivalentSelectComputations() {
         auto leftFingerprint  = sourceFingerprint(left.getStr_());
         auto rightFingerprint = sourceFingerprint(right.getStr_());
 #if RDB_OPT_COMMUTATIVE_ADD
-        if (rightFingerprint < leftFingerprint) std::swap(leftFingerprint, rightFingerprint);
+        if (rightFingerprint < leftFingerprint) {
+          std::swap(leftFingerprint, rightFingerprint);
+#ifdef RDB_BENCH_PROBE
+          rewriteAppliedR2Nodes_.insert(qry.id);
+#endif
+        }
 #endif
         result = "ADD{" + leftFingerprint + "}{" + rightFingerprint + "}";
       }
@@ -1358,6 +1366,9 @@ std::string compiler::compile() {
   std::string result;
 
 #ifdef RDB_BENCH_PROBE
+  rewriteAppliedR1_ = 0;
+  rewriteAppliedR2Nodes_.clear();
+
   //
   // Instrumentacja efektu optymalizacji planu (eksperyment E3).
   // Cały kod jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON (scripts/buildrdb.sh probe);
@@ -1489,6 +1500,7 @@ std::string compiler::compile() {
                  "po-dedup=%zu/%zu  wyjscie=%zu/%zu\n",
                  atEntry.first, atEntry.second, preDedup.first, preDedup.second, postDedup.first, postDedup.second, atExit.first,
                  atExit.second);
+    std::fprintf(stderr, "REWRITE_APPLIED r1=%zu r2=%zu\n", rewriteAppliedR1_, rewriteAppliedR2Nodes_.size());
   }
 #endif
 

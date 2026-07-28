@@ -32,10 +32,21 @@ if [ "$mode" = "build-info" ]; then
 fi
 
 rm -rf temp
-rm -f ./*.desc out_compile.txt
+rm -f ./*.desc out_compile.txt out_probe.txt
 mkdir -p temp
 
-"$xretractor_bin" query.rql -c > out_compile.txt
+RDB_BENCH_PLAN=1 "$xretractor_bin" query.rql -c > out_compile.txt 2> out_probe.txt
+
+expected_r1=0
+expected_r2=0
+[ "$factor" = "ON" ] && expected_r1=1
+[ "$commutative" = "ON" ] && expected_r2=1
+
+if [ "$probe" = "ON" ]; then
+  grep -Fx "REWRITE_APPLIED r1=$expected_r1 r2=$expected_r2" out_probe.txt
+else
+  ! grep -F "REWRITE_APPLIED" out_probe.txt
+fi
 
 stream_source() {
   awk -v stream="$1" '
