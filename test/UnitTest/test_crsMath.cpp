@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <variant>
 
 #include "config.h"
@@ -237,20 +238,20 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
       " Dlt:|      1/1|      1/3|      2/3|      1/3|      1/1|      1/1|      1/1|      2/3|      2/3|\n"
       "Name:|       cx|      s1x|      s2x|      s3x|      s4x|      s5x|      s6x|      s7x|      s8x|\n"
       " 000 |    1,2,3|         |         |         |         |         |         |         |         |\n"
-      " 333 |         |        1|         |      1,0|         |         |         |         |         |\n"
-      " 333 |         |        2|      2,1|      2,1|         |         |         |    2,1,0|  2,1,0,0|\n"
-      " 333 |    4,5,6|        3|         |      3,2|      3,2|    3,2,1|    1,2,3|         |         |\n"
-      " 333 |         |        4|      4,3|      4,3|         |         |         |    4,3,2|  4,3,2,1|\n"
-      " 333 |         |        5|         |      5,4|         |         |         |         |         |\n"
-      " 333 |    7,8,9|        6|      6,5|      6,5|      6,5|    6,5,4|    4,5,6|    6,5,4|  6,5,4,3|\n"
-      " 333 |         |        7|         |      7,6|         |         |         |         |         |\n"
-      " 333 |         |        8|      8,7|      8,7|         |         |         |    8,7,6|  8,7,6,5|\n"
-      " 333 |    1,2,3|        9|         |      9,8|      9,8|    9,8,7|    7,8,9|         |         |\n"
-      " 333 |         |        1|      1,9|      1,9|         |         |         |    1,9,8|  1,9,8,7|\n"
-      " 333 |         |        2|         |      2,1|         |         |         |         |         |\n"
-      " 333 |    4,5,6|        3|      3,2|      3,2|      3,2|    3,2,1|    1,2,3|    3,2,1|  3,2,1,9|\n"
+      " 333 |         |         |         |         |         |         |         |         |         |\n"
+      " 333 |         |        1|         |         |         |         |         |         |         |\n"
+      " 333 |    4,5,6|        2|         |      2,1|         |         |         |         |         |\n"
+      " 333 |         |        3|      2,1|      3,2|         |         |         |         |         |\n"
       " 333 |         |        4|         |      4,3|         |         |         |         |         |\n"
-      " 333 |         |        5|      5,4|      5,4|         |         |         |    5,4,3|  5,4,3,2|\n";
+      " 333 |    7,8,9|        5|      4,3|      5,4|      2,1|    3,2,1|    1,2,3|    3,2,1|  4,3,2,1|\n"
+      " 333 |         |        6|         |      6,5|         |         |         |         |         |\n"
+      " 333 |         |        7|      6,5|      7,6|         |         |         |    5,4,3|  6,5,4,3|\n"
+      " 333 |    1,2,3|        8|         |      8,7|      5,4|    6,5,4|    4,5,6|         |         |\n"
+      " 333 |         |        9|      8,7|      9,8|         |         |         |    7,6,5|  8,7,6,5|\n"
+      " 333 |         |        1|         |      1,9|         |         |         |         |         |\n"
+      " 333 |    4,5,6|        2|      1,9|      2,1|      8,7|    9,8,7|    7,8,9|    9,8,7|  1,9,8,7|\n"
+      " 333 |         |        3|         |      3,2|         |         |         |         |         |\n"
+      " 333 |         |        4|      3,2|      4,3|         |         |         |    2,1,9|  3,2,1,9|\n";
   std::stringstream strstream;
 
   dataModel proc(coreInstance);
@@ -300,10 +301,17 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
     for (const auto &it : coreInstance)
       if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
 
+    std::map<std::string, size_t> recordsBefore;
+    for (const auto &x : procSet)
+      recordsBefore.emplace(x, proc.qSet.at(x)->outputPayload->getRecordsCount());
+
     proc.processRows(procSet);
 
     for (const auto &x : allStreams)
-      strstream << "|" << std::setw(colSize) << (procSet.contains(x) ? print(x, proc) : "");
+      strstream << "|" << std::setw(colSize)
+                << (procSet.contains(x) && proc.qSet.at(x)->outputPayload->getRecordsCount() > recordsBefore.at(x)
+                        ? print(x, proc)
+                        : "");
     strstream << "|" << '\n';
   }
 

@@ -306,6 +306,8 @@ TEST(xcompiler, computes_startup_latency) {
         DECLARE value INTEGER STREAM b711, 11/100 FILE 'b.txt'
         DECLARE value INTEGER STREAM a160, 4/25   FILE 'a.txt'
         DECLARE value INTEGER STREAM b147, 147/1000 FILE 'b.txt'
+        DECLARE x INTEGER, y INTEGER, z INTEGER STREAM wide, 1/10 FILE 'a.txt'
+        DECLARE value INTEGER STREAM subsrc, 1/10 FILE 'a.txt'
         SELECT a[0]+0 STREAM mid       FROM a
         SELECT * STREAM shifted        FROM mid>3
         SELECT * STREAM shifted_twice  FROM shifted>2
@@ -317,6 +319,15 @@ TEST(xcompiler, computes_startup_latency) {
         SELECT * STREAM hash_7_11      FROM a711#b711
         SELECT * STREAM hash_160_147   FROM a160#b147
         SELECT * STREAM added          FROM a+c
+        SELECT * STREAM agse4          FROM a@(1,4)
+        SELECT * STREAM agse4_mirror   FROM a@(1,-4)
+        SELECT * STREAM sub_declared   FROM a-1/5
+        SELECT * STREAM sub_computed   FROM mid-1/5
+        SELECT * STREAM sub_fractional FROM mid-3/20
+        SELECT * STREAM reduced        FROM agse4.sumc
+        SELECT * STREAM wide_shifted   FROM wide>1
+        SELECT * STREAM wide_nested    FROM wide_shifted@(1,2)
+        SELECT * STREAM sub_same       FROM subsrc-1/10
       )");
   ASSERT_EQ(parseResult, "OK");
 
@@ -341,6 +352,23 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("hash_160_147").startupLatency, 2);
   // Suma o zgodnych interwalach i zerowych ogonach zrodel nie wnosi opoznienia.
   EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
+  // AGSE nie emituje niepelnych okien. Deklaracja jest publikowana po
+  // konsumentach w tym samym takcie, wiec pelne okno 4-polowe ma ogon 4.
+  EXPECT_EQ(instance.getQuery("agse4").startupLatency, 4);
+  EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 4);
+  // Różnica ma jeden slot dla deklaracji; całkowita faza producenta
+  // obliczanego jest dostępna topologicznie, a faza 3/2 wymaga slotu.
+  EXPECT_EQ(instance.getQuery("sub_declared").startupLatency, 1);
+  EXPECT_EQ(instance.getQuery("sub_computed").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("sub_fractional").startupLatency, 1);
+  // Redukcja działa na bieżącej pełnej krotce i tylko propaguje ogon.
+  EXPECT_EQ(instance.getQuery("reduced").startupLatency, 4);
+  // Regresja K19: dla F=3, step=1 i ogona producenta 1 najgorsza
+  // faza wymaga dwóch rekordów historii, mimo że pierwszy slot potrzebuje 1.
+  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 5);
+  EXPECT_EQ(instance.maxCapacity.at("wide_shifted"), 2);
+  EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 1);
+  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 3);
 }
 
 // Tozsamosc R1 musi zachowywac ogon — inaczej przepisanie zmienialoby obserwowalna

@@ -89,13 +89,9 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
   auto &out = *(qSet[instance]->outputPayload);
   out.releaseOnHold();
 
-  if (!out.isDeclared()) {
-    out.revRead(static_cast<size_t>(std::max(revOffset, 0)));
-    return *out.getPayload();
-  }
-
-  const auto available = static_cast<int>(out.getRecordsCount());
-  if (revOffset < 0 || revOffset >= available || revOffset >= static_cast<int>(out.historySize())) {
+  const auto available              = static_cast<int>(out.getRecordsCount());
+  const bool outsideRetainedHistory = out.isDeclared() && revOffset >= static_cast<int>(out.historySize());
+  if (revOffset < 0 || revOffset >= available || outsideRetainedHistory) {
     // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
     // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
     // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
@@ -103,6 +99,10 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
+  }
+  if (!out.isDeclared()) {
+    out.revRead(static_cast<size_t>(revOffset));
+    return *out.getPayload();
   }
   return out.history(static_cast<size_t>(revOffset));
 }
@@ -271,11 +271,10 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto lengthOfSrc      = qSet[nameSrc]->outputPayload->getRecordsCount();
-      const auto timeOffset =
-          Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, static_cast<int>(lengthOfSrc));
+      const auto n                = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+      const auto forwardIndex     = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, n);
 
-      *(qSet[instance]->inputPayload) = fetchBack(nameSrc, timeOffset);
+      *(qSet[instance]->inputPayload) = fetchForward(nameSrc, forwardIndex);
     } break;
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)

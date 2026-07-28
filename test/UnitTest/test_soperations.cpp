@@ -159,3 +159,38 @@ TEST(xSOperations, divmod_inverts_hash) {
     }
   }
 }
+
+TEST(xSOperations, subtract_uses_forward_target_index) {
+  const boost::rational<int> source{1, 2};
+
+  for (int i = 0; i < 20; ++i) {
+    EXPECT_EQ(i, Subtract(source, source, i));
+    EXPECT_EQ(2 * i, Subtract(source, boost::rational<int>{1}, i));
+  }
+
+  const std::vector<int> expected{0, 2, 3, 5, 6, 8};
+  for (int i = 0; i < static_cast<int>(expected.size()); ++i)
+    EXPECT_EQ(expected[i], Subtract(source, boost::rational<int>{3, 4}, i));
+}
+
+TEST(xSOperations, agse_startup_latency_covers_every_phase) {
+  // Deklaracja publikuje rekord po konsumentach w tym samym takcie.
+  EXPECT_EQ(4, AgseStartupLatency(1, 1, 4, 0));
+  EXPECT_EQ(5, AgseStartupLatency(5, 1, 5, 0));
+
+  // Dla producenta obliczanego obowiązuje ta sama ostra granica; fazę
+  // wszystkich kolejnych okien wyznacza gcd.
+  EXPECT_EQ(4, AgseStartupLatency(1, 1, 4, 0));
+  EXPECT_EQ(2, AgseStartupLatency(2, 3, 5, 0));
+  EXPECT_EQ(1, AgseStartupLatency(6, 4, 4, 0));
+  EXPECT_EQ(3, AgseStartupLatency(2, 3, 5, 2));
+}
+
+TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {
+  const boost::rational<int> source{1, 2};
+
+  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{1}, 0, true));
+  EXPECT_EQ(0, SubtractStartupLatency(source, boost::rational<int>{1}, 0, false));
+  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 0, false));
+  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 1, false));
+}

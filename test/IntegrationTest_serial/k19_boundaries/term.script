@@ -1,0 +1,31 @@
+echo AGSE
+open agse
+size
+descc
+list 5
+
+echo AGSE_MIRROR
+open agse_mirror
+size
+descc
+list 5
+
+echo SUBTRACT
+open sub_same
+size
+descc
+list 4
+
+echo SUBTRACT_SLOWER
+open sub2
+size
+descc
+list 4
+
+echo REDUCTION
+open sum3
+size
+descc
+list 5
+
+quit

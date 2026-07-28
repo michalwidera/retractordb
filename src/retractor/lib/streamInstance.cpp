@@ -103,31 +103,22 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   //    on return).
   rdb::payload result(descriptor);
 
-  auto deltaDst = boost::rational<int>(step) / descriptorSrcSize;
+  const auto windowStart = storedRecordCountDst * step;
 
-  auto storedRecordCountDst_{storedRecordCountDst};
-
-  // This fix look's like heuristic. More investigation need here.
-  // There is zerostep with prefetch on declared streams
-  // in case of the rest there are latency due missing zero step.
-  if (!source->isDeclared()) storedRecordCountDst_ -= descriptorSrcSize;
-
-  storedRecordCountDst_ += 1;
-  storedRecordCountDst_ *= descriptorSrcSize * deltaDst.numerator();
-  storedRecordCountDst_ /= deltaDst.denominator();
-  storedRecordCountDst_ -= 1;
-
-  // Przy descriptorSrcSize > 1 kolejne i trafiaja w ten sam rekord zrodlowy (rozni sie
-  // tylko fp.rem) — rekord siedzi juz w storagePayload_, wiec nie czytamy go ponownie.
+  // Okno n obejmuje spłaszczone pozycje n*step ... n*step+length-1.
+  // Ogon wyliczony przez compiler::computeStartupLatency() gwarantuje,
+  // że cały ten zakres jest dostępny; kontrola poniżej pozostaje ochroną
+  // przed uszkodzonym planem albo bezpośrednim wywołaniem jednostkowym.
   std::optional<size_t> lastReadPosition;
   for (auto i = 0; i < lengthAbs; ++i) {
-    auto fp = std::div(storedRecordCountDst_ - i, descriptorSrcSize);
-    auto readPosition{recordsCountSrc - fp.quot - 1};
-    // Guard negative quotient before revRead: out-of-range windows must stay null, not stale 0.
-    if (fp.quot >= 0 && std::cmp_less(fp.quot, recordsCountSrc)) {
-      if (lastReadPosition != static_cast<size_t>(readPosition)) {
-        if (source->revRead(static_cast<size_t>(readPosition)))
-          lastReadPosition = static_cast<size_t>(readPosition);
+    const auto flatPosition = windowStart + i;
+    auto fp                 = std::div(flatPosition, descriptorSrcSize);
+    const auto recordIndex  = fp.quot;
+    if (recordIndex >= 0 && std::cmp_less(recordIndex, recordsCountSrc)) {
+      const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
+      if (lastReadPosition != reversePosition) {
+        if (source->revRead(reversePosition))
+          lastReadPosition = reversePosition;
         else
           fp.rem = -1;
       }
@@ -141,9 +132,12 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
       // oknach FIR (mwi_long = 180 elementow) to najciezsza per-element konwersja
       // any<->wariant w processRows. Semantyka bez zmian (nullopt => null).
       auto valueOpt = source->getPayload()->getItemVT(locSrc);
-      result.setItemVT(flip ? lengthAbs - i - 1 : i, valueOpt);
+      // Dodatnia szerokość zachowuje historyczną semantykę RetractorDB:
+      // najnowsze pole okna jest pierwsze. Znak minus daje odbicie lustrzane,
+      // czyli kolejność napływu.
+      result.setItemVT(flip ? i : lengthAbs - i - 1, valueOpt);
     } else
-      result.setItemVT(flip ? lengthAbs - i - 1 : i, std::nullopt);
+      result.setItemVT(flip ? i : lengthAbs - i - 1, std::nullopt);
   }
 
   // 3. Cleanup source after processing

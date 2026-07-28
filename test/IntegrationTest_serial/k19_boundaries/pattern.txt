@@ -1,0 +1,43 @@
+ AGSE
+8 Record(s)
+12 Byte(s) per record.
+{ INTEGER source_0 INTEGER source_1 INTEGER source_2 }
+{ source_0:null source_1:20 source_2:10 }
+{ source_0:40 source_1:null source_2:20 }
+{ source_0:50 source_1:40 source_2:null }
+{ source_0:60 source_1:50 source_2:40 }
+{ source_0:70 source_1:60 source_2:50 }
+ AGSE_MIRROR
+8 Record(s)
+12 Byte(s) per record.
+{ INTEGER source_0 INTEGER source_1 INTEGER source_2 }
+{ source_0:10 source_1:20 source_2:null }
+{ source_0:20 source_1:null source_2:40 }
+{ source_0:null source_1:40 source_2:50 }
+{ source_0:40 source_1:50 source_2:60 }
+{ source_0:50 source_1:60 source_2:70 }
+ SUBTRACT
+10 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:10 }
+{ value:20 }
+{ value:null }
+{ value:40 }
+ SUBTRACT_SLOWER
+4 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:10 }
+{ value:null }
+{ value:50 }
+{ value:70 }
+ REDUCTION
+8 Record(s)
+8 Byte(s) per record.
+{ RATIONAL sum }
+{ sum:30/1 }
+{ sum:60/1 }
+{ sum:90/1 }
+{ sum:150/1 }
+{ sum:180/1 }
