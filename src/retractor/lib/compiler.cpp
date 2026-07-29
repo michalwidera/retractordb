@@ -1143,7 +1143,13 @@ std::string compiler::factorMatchedHashTimeMoves() {
       const size_t hashIndex = findUniqueQueryIndex(hashName);
       if (hashNameExists && hashIndex == coreInstance.size()) continue;
       if (hashNameExists) {
-        if (!matchesHash(coreInstance.at(hashIndex), leftSource, rightSource) ||
+        // Ponownie użyć wolno wyłącznie substratu. Konwencja nazewnicza kompilatora
+        // nie jest zarezerwowana dla nazw użytkownika, więc zapytanie publiczne może
+        // nazywać się jak węzeł przeplotu i mieć program {PUSH X, PUSH Y, STREAM_HASH}.
+        // Jego wyjściem jest wtedy projekcja, a nie surowy przeplot — a schemasMatch
+        // porównuje tylko typy, długości i liczności pól, więc projekcja zgodna
+        // typowo, lecz o innej kolejności pól przechodzi tę kontrolę.
+        if (!coreInstance.at(hashIndex).isSubstrat || !matchesHash(coreInstance.at(hashIndex), leftSource, rightSource) ||
             coreInstance.at(hashIndex).rInterval != queryInterval ||
             !schemasMatch(coreInstance.at(hashIndex), coreInstance.at(leftShiftIndex)))
           continue;

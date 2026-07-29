@@ -116,6 +116,12 @@ if [ "$factor" = "ON" ]; then
   ! grep -F 'STREAM_TIMEMOVE_QA(' out_compile.txt
   ! grep -F 'STREAM_TIMEMOVE_QB(' out_compile.txt
   [ "$(grep -c '^STREAM_HASH_QA_QB(' out_compile.txt)" = "1" ]
+
+  # Kolizja nazw: węzeł o nazwie przeplotu jest zapytaniem publicznym, więc
+  # reguła musi go pominąć i zostawić collide_user na własnych przesunięciach.
+  [ "$(stream_source collide_user)" = "STREAM_TIMEMOVE_CA" ]
+  grep -F 'STREAM_TIMEMOVE_CA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_CB(' out_compile.txt
 else
   ! grep -F 'STREAM_HASH_MA_MB(' out_compile.txt
   grep -F 'STREAM_TIMEMOVE_MA(' out_compile.txt
@@ -123,6 +129,7 @@ else
   ! grep -F 'STREAM_HASH_QA_QB(' out_compile.txt
   grep -F 'STREAM_TIMEMOVE_QA(' out_compile.txt
   grep -F 'STREAM_TIMEMOVE_QB(' out_compile.txt
+  [ "$(stream_source collide_user)" = "STREAM_TIMEMOVE_CA" ]
 fi
 
 if [ "$mode" = "plan" ]; then
@@ -140,6 +147,11 @@ elif [ "$mode" = "factor-shared-substrate-semantic" ]; then
   # substrat przesunięcia nie jest z nikim dzielony.
   cmp temp/mixed_shift temp/mixed_shift_reference
   cmp <(tail -c +9 temp/mixed_shift.meta) <(tail -c +9 temp/mixed_shift_reference.meta)
+elif [ "$mode" = "factor-name-collision-semantic" ]; then
+  # Gdyby reguła użyła ponownie cudzej projekcji, collide_user dostałby pola
+  # w odwrotnej kolejności — różnica jest widoczna bajtowo.
+  cmp temp/collide_user temp/collide_reference
+  cmp <(tail -c +9 temp/collide_user.meta) <(tail -c +9 temp/collide_reference.meta)
 elif [ "$mode" = "factor-multiquery-semantic" ]; then
   cmp temp/multi1 temp/multi2
   cmp temp/multi1 temp/multi_reference
