@@ -415,7 +415,7 @@ ensure_tools_for_option() {
     fi
 
     case "$opt" in
-        "release"|"release-ablation"|"debug"|"probe")
+        "release"|"release-dirty"|"release-ablation"|"debug"|"probe")
             tool_specs=(
                 "gcc:required" "g++:required" "cmake:required"
                 "ninja:required" "conan:required" "make:required"
@@ -813,7 +813,39 @@ require_pristine_source_tree() {
         echo "Error: production release rejected because the source tree is not pristine:"
         printf '%s\n' "$source_status"
         echo "-- Commit, remove or stash every tracked, staged and untracked change before building release."
+        echo "-- To build a NON-production Release from the tree as it is, use 'release-dirty'."
         return 1
+    fi
+}
+
+# Wariant kontroli dla 'release-dirty'. Drzewo wolno mieć zmiany, ale sam build
+# nadal nie może go ruszać — dlatego zamiast pustego statusu porównujemy stan
+# z migawką wykonaną przed pierwszym krokiem.
+release_dirty_baseline=""
+
+require_unmodified_source_tree() {
+    local source_status
+
+    if ! git -C "$rdb_source_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "Error: release build requires a Git working tree."
+        return 1
+    fi
+
+    source_status=$(git -C "$rdb_source_dir" status --porcelain=v1 --untracked-files=all)
+    if [ "$source_status" != "$release_dirty_baseline" ]; then
+        echo "Error: the build modified the source tree:"
+        diff <(printf '%s\n' "$release_dirty_baseline") <(printf '%s\n' "$source_status") || true
+        return 1
+    fi
+}
+
+# Bramka wybierana przez tryb: 'release' wymaga czystego drzewa,
+# 'release-dirty' wyłącznie niezmienionego.
+release_source_tree_guard() {
+    if [ "$release_allow_dirty" = "ON" ]; then
+        require_unmodified_source_tree
+    else
+        require_pristine_source_tree
     fi
 }
 
@@ -939,15 +971,27 @@ run_option() {
         ensure_tools_for_option "$opt"
     fi
     case "$opt" in
-        "release")
+        "release"|"release-dirty")
             # Produkcyjny Release powstaje wyłącznie z czystego drzewa źródeł,
             # świeżego katalogu i jawnej konfiguracji. Typowe zmienne wstrzykujące
             # flagi są usuwane z procesu, a gotowa binarka jest kontrolowana poniżej.
-            require_pristine_source_tree
+            # Wariant 'release-dirty' buduje z drzewa takiego, jakie jest — służy do
+            # weryfikacji zmian przed commitem i NIE jest wydaniem produkcyjnym.
+            if [ "$opt" = "release-dirty" ]; then
+                release_allow_dirty=ON
+                release_dirty_baseline=$(git -C "$rdb_source_dir" status --porcelain=v1 --untracked-files=all)
+                echo "-- release-dirty: building from a MODIFIED source tree; the result is NOT a production release."
+                if [ -n "$release_dirty_baseline" ]; then
+                    printf '%s\n' "$release_dirty_baseline"
+                fi
+            else
+                release_allow_dirty=OFF
+            fi
+            release_source_tree_guard
             cmake -E remove_directory "$rdb_source_dir/build/Release"
             sed 's/Debug/Release/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             run_with_sanitized_build_environment conan source "$rdb_source_dir"
-            require_pristine_source_tree
+            release_source_tree_guard
             run_with_sanitized_build_environment conan install "$rdb_source_dir" -s build_type=Release --build missing
             run_with_sanitized_build_environment cmake \
                 -S "$rdb_source_dir" \
@@ -962,7 +1006,7 @@ run_option() {
             verify_optimizer_build_info \
                 "$rdb_source_dir/build/Release/src/retractor/xretractor" \
                 ON ON ON ON OFF
-            require_pristine_source_tree
+            release_source_tree_guard
             ;;
         "release-ablation")
             if ! choose_ablation_options; then
@@ -1183,6 +1227,7 @@ run_option() {
             echo ""
             echo "Options:"
             echo "  release    - Build verified production Release from a pristine Git tree"
+            echo "  release-dirty - Build Release from the tree as it is (uncommitted changes allowed); NOT a production release"
             echo "  release-ablation - Select optimizer/probe switches and build an isolated Release variant"
             echo "  debug      - Build in Debug mode (conan source, install, build)"
             echo "  probe      - Build isolated Release-Probe with RDB_BENCH_PROBE=ON; NOT for production"
@@ -1208,7 +1253,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release release-ablation debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
+              echo "Valid options: release release-dirty release-ablation debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -1220,7 +1265,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "release-ablation" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "release-dirty" "release-ablation" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"

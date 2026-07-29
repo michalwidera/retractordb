@@ -39,7 +39,9 @@ RDB_BENCH_PLAN=1 "$xretractor_bin" query.rql -c > out_compile.txt 2> out_probe.t
 
 expected_r1=0
 expected_r2=0
-[ "$factor" = "ON" ] && expected_r1=1
+# Cztery przepisania przy factor=ON: factored, mixed_hash oraz multi1 i multi2.
+# Dwa ostatnie są możliwe dopiero od zniesienia warunku jednego konsumenta.
+[ "$factor" = "ON" ] && expected_r1=4
 [ "$commutative" = "ON" ] && expected_r2=1
 
 if [ "$probe" = "ON" ]; then
@@ -98,6 +100,31 @@ else
   grep -F 'STREAM_TIMEMOVE_FB(' out_compile.txt
 fi
 
+if [ "$factor" = "ON" ]; then
+  # Substrat przesunięcia dzielony przez konsumenta pasującego do wzorca reguły
+  # i niepasującego. Przepisany zostaje wyłącznie pierwszy; drugi musi nadal
+  # czytać przesunięcie, a nie przeplot.
+  grep -F 'STREAM_HASH_MA_MB(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_MA(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_MB(' out_compile.txt
+  [ "$(stream_source mixed_hash)" = "STREAM_HASH_MA_MB" ]
+  [ "$(stream_source mixed_shift)" = "STREAM_TIMEMOVE_MA" ]
+
+  # Wiele zapytań nad tym samym przesuniętym przeplotem: jeden wspólny węzeł
+  # przeplotu, oba substraty przesunięć osierocone i usunięte.
+  grep -F 'STREAM_HASH_QA_QB(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_QA(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_QB(' out_compile.txt
+  [ "$(grep -c '^STREAM_HASH_QA_QB(' out_compile.txt)" = "1" ]
+else
+  ! grep -F 'STREAM_HASH_MA_MB(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_MA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_MB(' out_compile.txt
+  ! grep -F 'STREAM_HASH_QA_QB(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_QA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_QB(' out_compile.txt
+fi
+
 if [ "$mode" = "plan" ]; then
   echo OK
   exit 0
@@ -108,6 +135,16 @@ fi
 if [ "$mode" = "factor-semantic" ]; then
   cmp temp/factored temp/factor_reference
   cmp <(tail -c +9 temp/factored.meta) <(tail -c +9 temp/factor_reference.meta)
+elif [ "$mode" = "factor-shared-substrate-semantic" ]; then
+  # Konsument niepasujący do wzorca musi dawać ten sam wynik co plan, w którym
+  # substrat przesunięcia nie jest z nikim dzielony.
+  cmp temp/mixed_shift temp/mixed_shift_reference
+  cmp <(tail -c +9 temp/mixed_shift.meta) <(tail -c +9 temp/mixed_shift_reference.meta)
+elif [ "$mode" = "factor-multiquery-semantic" ]; then
+  cmp temp/multi1 temp/multi2
+  cmp temp/multi1 temp/multi_reference
+  cmp <(tail -c +9 temp/multi1.meta) <(tail -c +9 temp/multi2.meta)
+  cmp <(tail -c +9 temp/multi1.meta) <(tail -c +9 temp/multi_reference.meta)
 elif [ "$mode" = "dedup-exact-semantic" ]; then
   cmp temp/dedup_shifted temp/dedup_reference
   cmp <(tail -c +9 temp/dedup_shifted.meta) <(tail -c +9 temp/dedup_reference.meta)

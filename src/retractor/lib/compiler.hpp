@@ -41,6 +41,7 @@ struct compiler {
   std::string verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const;
   std::string computeStartupLatency();
   std::string factorMatchedHashTimeMoves();
+  void retargetSchemaReferences(query &q, const std::string &oldName, const std::string &newName);
   void replaceStreamReferences(const std::string &oldName, const std::string &newName);
   std::string deduplicateSubstrats();
   std::string shareEquivalentSelectComputations();

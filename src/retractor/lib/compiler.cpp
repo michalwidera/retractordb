@@ -855,29 +855,33 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   return capMap;
 }
 
+void compiler::retargetSchemaReferences(query &q, const std::string &oldName, const std::string &newName) {
+  for (auto &f : q.lSchema)
+    for (auto &tok : f.lProgram) {
+      if (tok.getCommandID() == PUSH_ID) {
+        auto [schema, idx] = std::get<std::pair<std::string, int>>(tok.getVT());
+        if (schema == oldName) tok = token(PUSH_ID, std::make_pair(newName, idx));
+      }
+      if (tok.getCommandID() == PUSH_ID2) {
+        const std::string str = tok.getStr_();  // copy before tok may be replaced
+        if (str.starts_with(oldName + "[")) {
+          const std::string updated = newName + str.substr(oldName.size());
+          if (std::holds_alternative<std::pair<std::string, int>>(tok.getVT()))
+            tok = token(PUSH_ID2, std::make_pair(updated, 0));
+          else
+            tok = token(PUSH_ID2, updated);
+        }
+      }
+    }
+}
+
 void compiler::replaceStreamReferences(const std::string &oldName, const std::string &newName) {
   for (auto &q : coreInstance)
     for (auto &tok : q.lProgram)
       if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == oldName) tok = token(PUSH_STREAM, newName);
 
   for (auto &q : coreInstance)
-    for (auto &f : q.lSchema)
-      for (auto &tok : f.lProgram) {
-        if (tok.getCommandID() == PUSH_ID) {
-          auto [schema, idx] = std::get<std::pair<std::string, int>>(tok.getVT());
-          if (schema == oldName) tok = token(PUSH_ID, std::make_pair(newName, idx));
-        }
-        if (tok.getCommandID() == PUSH_ID2) {
-          const std::string str = tok.getStr_();  // copy before tok may be replaced
-          if (str.starts_with(oldName + "[")) {
-            const std::string updated = newName + str.substr(oldName.size());
-            if (std::holds_alternative<std::pair<std::string, int>>(tok.getVT()))
-              tok = token(PUSH_ID2, std::make_pair(updated, 0));
-            else
-              tok = token(PUSH_ID2, updated);
-          }
-        }
-      }
+    retargetSchemaReferences(q, oldName, newName);
 }
 
 std::map<std::string, std::vector<std::string>> compiler::snapshotUserFieldNames() const {
@@ -1062,6 +1066,27 @@ std::string compiler::factorMatchedHashTimeMoves() {
     return it->getCommandID() == STREAM_HASH;
   };
 
+  // Liczba OBCYCH odwołań do strumienia. Musi obejmować programy pól, bo
+  // przekierowanie odwołań jest punktowe (zmienia się wyłącznie dopasowane
+  // zapytanie), więc substrat wolno usunąć dopiero, gdy nie używa go już nikt —
+  // a odwołanie potrafi siedzieć wyłącznie w PUSH_ID/PUSH_ID2 programu pola.
+  // Odwołania własne są pomijane: każdy substrat czyta sam siebie w programie
+  // pola i bez tego wyłączenia żaden nie zostałby nigdy uznany za osierocony.
+  auto countConsumers = [this](const std::string &name) {
+    size_t count = 0;
+    for (const auto &q : coreInstance) {
+      if (q.id == name) continue;
+      for (const auto &tok : q.lProgram)
+        if (tok.getCommandID() == PUSH_STREAM && tok.getStr_() == name) ++count;
+      for (const auto &f : q.lSchema)
+        for (const auto &tok : f.lProgram) {
+          if (tok.getCommandID() == PUSH_ID && std::get<std::pair<std::string, int>>(tok.getVT()).first == name) ++count;
+          if (tok.getCommandID() == PUSH_ID2 && tok.getStr_().starts_with(name + "[")) ++count;
+        }
+    }
+    return count;
+  };
+
   auto schemasMatch = [](const query &a, const query &b) {
     if (a.lSchema.size() != b.lSchema.size()) return false;
     return std::equal(a.lSchema.begin(), a.lSchema.end(), b.lSchema.begin(), [](const field &left, const field &right) {
@@ -1099,16 +1124,6 @@ std::string compiler::factorMatchedHashTimeMoves() {
           !matchTimeMove(coreInstance.at(rightShiftIndex), rightSource, rightOffset))
         continue;
 
-      size_t leftConsumers  = 0;
-      size_t rightConsumers = 0;
-      for (const auto &consumer : coreInstance)
-        for (const auto &tok : consumer.lProgram) {
-          if (tok.getCommandID() != PUSH_STREAM) continue;
-          if (tok.getStr_() == leftShiftName) ++leftConsumers;
-          if (tok.getStr_() == rightShiftName) ++rightConsumers;
-        }
-      if (leftConsumers != 1 || rightConsumers != 1) continue;
-
       const auto leftDeltaRaw  = coreInstance.getQuery(leftSource).rInterval;
       const auto rightDeltaRaw = coreInstance.getQuery(rightSource).rInterval;
       if (leftDeltaRaw <= 0 || rightDeltaRaw <= 0) continue;
@@ -1119,6 +1134,9 @@ std::string compiler::factorMatchedHashTimeMoves() {
       const std::int64_t combinedOffset = static_cast<std::int64_t>(leftOffset) + rightOffset;
       if (combinedOffset > std::numeric_limits<int>::max()) continue;
 
+      // Kopia przed ewentualnym push_back: dopisanie węzła unieważnia referencję q.
+      const auto queryInterval = q.rInterval;
+
       const std::string hashName = composeStreamName(rightSource, leftSource, STREAM_HASH);
       const bool hashNameExists =
           std::ranges::any_of(coreInstance, [&hashName](const query &candidate) { return candidate.id == hashName; });
@@ -1126,35 +1144,56 @@ std::string compiler::factorMatchedHashTimeMoves() {
       if (hashNameExists && hashIndex == coreInstance.size()) continue;
       if (hashNameExists) {
         if (!matchesHash(coreInstance.at(hashIndex), leftSource, rightSource) ||
-            coreInstance.at(hashIndex).rInterval != q.rInterval ||
+            coreInstance.at(hashIndex).rInterval != queryInterval ||
             !schemasMatch(coreInstance.at(hashIndex), coreInstance.at(leftShiftIndex)))
           continue;
       } else {
-        auto &leftShift     = coreInstance.at(leftShiftIndex);
-        leftShift.id        = hashName;
-        leftShift.rInterval = q.rInterval;
-        leftShift.lProgram  = {
+        // Węzeł przeplotu powstaje jako NOWY element planu. Dawniej reguła
+        // przemianowywała substrat A>i w miejscu i przekierowywała wszystkie
+        // odwołania globalnie — poprawne wyłącznie dlatego, że wcześniejszy
+        // strażnik dopuszczał dokładnie jednego konsumenta. Ten strażnik był
+        // zarazem warunkiem "brak współdzielenia", więc wyłączał regułę dokładnie
+        // w planach wielozapytaniowych. Mutacja w miejscu bez niego psuje plan,
+        // w którym A>i karmi także konsumenta niepasującego do wzorca reguły.
+        query hashQuery      = coreInstance.at(leftShiftIndex);
+        hashQuery.id         = hashName;
+        hashQuery.rInterval  = queryInterval;
+        hashQuery.isSubstrat = true;
+        hashQuery.lProgram   = {
             token(PUSH_STREAM, leftSource),
             token(PUSH_STREAM, rightSource),
             token(STREAM_HASH),
         };
-        replaceStreamReferences(leftShiftName, hashName);
+        // Kopia niesie odwołanie programu pola do starej nazwy — przenieść je na nową.
+        retargetSchemaReferences(hashQuery, leftShiftName, hashName);
+        coreInstance.push_back(hashQuery);  // unieważnia referencje do elementów qTree
       }
 
-      replaceStreamReferences(rightShiftName, hashName);
+      // Przekierowanie jest punktowe: zmienia się wyłącznie dopasowane zapytanie.
+      // Pozostali konsumenci substratów przesunięć zachowują swoje odwołania.
+      // Obok drzewa FROM trzeba przenieść także schemat — przy SELECT * pola
+      // dopasowanego zapytania odwołują się do substratów przesunięć przez
+      // PUSH_ID2, a po przepisaniu ich źródłem jest węzeł przeplotu.
+      auto &matched = coreInstance.at(queryIndex);
       if (combinedOffset == 0)
-        q.lProgram = {token(PUSH_STREAM, hashName)};
+        matched.lProgram = {token(PUSH_STREAM, hashName)};
       else
-        q.lProgram = {
+        matched.lProgram = {
             token(PUSH_STREAM, hashName),
             token(STREAM_TIMEMOVE, static_cast<int>(combinedOffset)),
         };
+      retargetSchemaReferences(matched, leftShiftName, hashName);
+      retargetSchemaReferences(matched, rightShiftName, hashName);
 
-      const std::string removedLeft = hashNameExists ? leftShiftName : std::string{};
-      auto removed                  = std::ranges::remove_if(coreInstance, [&](const query &candidate) {
-        return candidate.id == rightShiftName || (!removedLeft.empty() && candidate.id == removedLeft);
-      });
-      coreInstance.erase(removed.begin(), removed.end());
+      // Substrat przesunięcia znika dopiero, gdy stracił ostatniego konsumenta.
+      const bool leftOrphaned  = countConsumers(leftShiftName) == 0;
+      const bool rightOrphaned = countConsumers(rightShiftName) == 0;
+      if (leftOrphaned || rightOrphaned) {
+        auto removed = std::ranges::remove_if(coreInstance, [&](const query &candidate) {
+          return (leftOrphaned && candidate.id == leftShiftName) || (rightOrphaned && candidate.id == rightShiftName);
+        });
+        coreInstance.erase(removed.begin(), removed.end());
+      }
 #ifdef RDB_BENCH_PROBE
       ++rewriteAppliedR1_;
 #endif
@@ -1381,9 +1420,17 @@ std::string compiler::compile() {
   // (zero kosztu i efektów ubocznych). Kod jest przenośny (tylko getenv/fprintf),
   // więc — w odróżnieniu od sondy E1 — nie wymaga #ifdef __linux__.
   //
-  // planSize() liczy łączną liczbę strumieni i tokenów (operatorów) w programach
-  // zapytań (query::lProgram), z pominięciem dyrektyw kompilatora. Migawki bierzemy
-  // na czterech etapach:
+  // planSize() opisuje plan czwórką liczb, z pominięciem dyrektyw kompilatora:
+  //   * strumienie publiczne i substraty osobno — substrat nie ma tożsamości
+  //     obserwowalnej, więc to on jest właściwą jednostką redukcji strukturalnej;
+  //   * tokeny drzewa FROM (query::lProgram) — tam widać efekt R1 i deduplikacji;
+  //   * tokeny programów pól (field::lProgram) — tam i TYLKO tam widać efekt R2.
+  // Ostatni składnik jest konieczny: shareEquivalentSelectComputations() przenosi
+  // kosztowny program pól do jednego substratu STREAM_SELECT_*, zostawiając
+  // zapytaniom publicznym lekkie projekcje, i nie zmienia przy tym ani jednego
+  // tokenu w lProgram. Metryka licząca same lProgram dawała identyczny odczyt dla
+  // programu pól i dla programu pięciokrotnie droższego.
+  // Migawki bierzemy na czterech etapach:
   //   * wejście            — surowy plan po parsowaniu,
   //   * przed deduplikacją — po kanonizacji do postaci pośredniej (dekompozycja),
   //   * po deduplikacji    — po eliminacji zdublowanych substratów (wspólne
@@ -1394,16 +1441,24 @@ std::string compiler::compile() {
   // tabelę E3 manuskryptu.
   //
   const bool benchPlan = std::getenv("RDB_BENCH_PLAN") != nullptr;
-  auto planSize        = [this]() {
-    std::pair<size_t, size_t> acc{0, 0};  // {strumienie, tokeny}
+  struct planShape {
+    size_t publicStreams = 0;
+    size_t substrates    = 0;
+    size_t fromTokens    = 0;
+    size_t fieldTokens   = 0;
+  };
+  auto planSize = [this]() {
+    planShape acc;
     for (const auto &q : coreInstance) {
       if (q.isCompilerDirective()) continue;
-      ++acc.first;
-      acc.second += q.lProgram.size();
+      ++(q.isSubstrat ? acc.substrates : acc.publicStreams);
+      acc.fromTokens += q.lProgram.size();
+      for (const auto &f : q.lSchema)
+        acc.fieldTokens += f.lProgram.size();
     }
     return acc;
   };
-  const std::pair<size_t, size_t> empty{0, 0};
+  const planShape empty{};
   const auto atEntry = benchPlan ? planSize() : empty;
 #endif
 
@@ -1489,20 +1544,23 @@ std::string compiler::compile() {
   coreInstance.topologicalSort();
 
 #ifdef RDB_BENCH_PROBE
-  // Raport instrumentacji E3 (tylko gdy RDB_BENCH_PLAN). Format: strumienie/tokeny.
+  // Raport instrumentacji E3 (tylko gdy RDB_BENCH_PLAN).
+  // Format: publiczne/substraty/tokeny-from/tokeny-pol.
   if (benchPlan) {
     const auto atExit = planSize();
     std::fprintf(stderr,
-                 "PLAN bench (strumienie/tokeny, dedup="
+                 "PLAN bench (publiczne/substraty/tokeny-from/tokeny-pol, dedup="
 #if RDB_OPT_DEDUP_SUBSTRATES
                  "ON"
 #else
                  "OFF"
 #endif
-                 "): wejscie=%zu/%zu  przed-dedup=%zu/%zu  "
-                 "po-dedup=%zu/%zu  wyjscie=%zu/%zu\n",
-                 atEntry.first, atEntry.second, preDedup.first, preDedup.second, postDedup.first, postDedup.second, atExit.first,
-                 atExit.second);
+                 "): wejscie=%zu/%zu/%zu/%zu  przed-dedup=%zu/%zu/%zu/%zu  "
+                 "po-dedup=%zu/%zu/%zu/%zu  wyjscie=%zu/%zu/%zu/%zu\n",
+                 atEntry.publicStreams, atEntry.substrates, atEntry.fromTokens, atEntry.fieldTokens, preDedup.publicStreams,
+                 preDedup.substrates, preDedup.fromTokens, preDedup.fieldTokens, postDedup.publicStreams, postDedup.substrates,
+                 postDedup.fromTokens, postDedup.fieldTokens, atExit.publicStreams, atExit.substrates, atExit.fromTokens,
+                 atExit.fieldTokens);
     std::fprintf(stderr, "REWRITE_APPLIED r1=%zu r2=%zu\n", rewriteAppliedR1_, rewriteAppliedR2Nodes_.size());
   }
 #endif
