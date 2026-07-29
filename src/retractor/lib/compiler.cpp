@@ -37,10 +37,10 @@ using namespace localContext;
 
 /** This procedure computes time delays (delta) for generated streams */
 std::string compiler::resolveStreamIntervals() {
-  size_t prevUnresolved = std::numeric_limits<size_t>::max();
   while (true) {
     bool bOnceAgain(false);
-    size_t unresolvedCount = 0;
+    size_t unresolvedCount  = 0;
+    size_t resolvedThisPass = 0;
     coreInstance.sort();
     for (auto &q : coreInstance) {
       if (q.lProgram.empty()) {
@@ -48,7 +48,17 @@ std::string compiler::resolveStreamIntervals() {
       }
       if (q.lProgram.size() == 1) {
         token tInstance(*(q.lProgram.begin()));
-        q.rInterval = coreInstance.getDelta(tInstance.getStr_());
+        // Źródło nierozwiązane w tym przebiegu daje deltę 0. Bez tej kontroli
+        // strumień dostawał interwał 0 na stałe i NIKT nie prosił o kolejny
+        // przebieg — o wyniku decydowała kolejność po coreInstance.sort().
+        const boost::rational<int> sourceDelta = coreInstance.getDelta(tInstance.getStr_());
+        if (sourceDelta == 0) {
+          bOnceAgain = true;
+          unresolvedCount++;
+          continue;
+        }
+        if (q.rInterval == 0) resolvedThisPass++;
+        q.rInterval = sourceDelta;
         continue;  // Just one stream
       }
       if (q.lProgram.size() != 3 && q.lProgram.size() != 2) {
@@ -159,8 +169,13 @@ std::string compiler::resolveStreamIntervals() {
           // push_stream core0 -> deltaSrc
           // stream agse <5,3> -> step_of_window,size_of_window
           boost::rational<int> coreDelta = coreInstance.getDelta(t1.getStr_());
-          int coreWindow                 = static_cast<int>(coreInstance.getQuery(t1.getStr_()).lSchema.size());
-          auto [step, windowSize]        = std::get<std::pair<int, int>>(op.getVT());
+          if (coreDelta == 0) {
+            bOnceAgain = true;
+            unresolvedCount++;
+            continue;
+          }
+          int coreWindow          = static_cast<int>(coreInstance.getQuery(t1.getStr_()).lSchema.size());
+          auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
           if (step <= 0) {
             FatalError("compiler::prepareFields: AGSE step must be > 0, got {} for query '{}'", step, q.id);
           }
@@ -181,14 +196,19 @@ std::string compiler::resolveStreamIntervals() {
       if (delta == -1) {
         FatalError("compiler::prepareFields: stream interval (delta) not resolved for query '{}'", q.id);
       }
+      if (q.rInterval == 0) resolvedThisPass++;
       q.rInterval = delta;  // There is established delta value - return value
     }  // BOOST_FOREACH ( query & q , coreInstance )
     if (!bOnceAgain) break;
-    if (unresolvedCount >= prevUnresolved) {
+    // Cyklem jest dopiero BRAK POSTĘPU: przebieg, w którym nie rozwiązano ani
+    // jednego strumienia. Dawny warunek (unresolvedCount >= prevUnresolved)
+    // wymagał ŚCISŁEGO spadku licznika w każdym przebiegu, więc był heurystyką
+    // postępu, a nie detektorem cykli — i odrzucał plany bezcykliczne zależnie
+    // od tego, jak coreInstance.sort() ustawił kolejność oceny.
+    if (resolvedThisPass == 0) {
       SPDLOG_ERROR("Circular dependency: stream interval resolution stalled with {} unresolved streams", unresolvedCount);
       return {"Circular dependency in stream definitions"};
     }
-    prevUnresolved = unresolvedCount;
     coreInstance.sort();
   }  // while(true)
   coreInstance.sort();

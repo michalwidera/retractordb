@@ -457,3 +457,59 @@ TEST(xcompiler, rewrites_preserve_observable_field_names) {
   EXPECT_EQ(std::ranges::count_if(instance, [](const query &q) { return q.id.starts_with("STREAM_ADD_"); }), 0);
 #endif
 }
+
+// Rozwiazywanie interwalow nie moze zalezec od kolejnosci planu.
+//
+// resolveStreamIntervals() liczy interwaly iteracyjnie; nierozwiazane zrodlo daje delte 0.
+// Dwie sciezki przyjmowaly to zero bez zadania kolejnego przebiegu — program jednoelementowy
+// (SELECT expr STREAM x FROM y) oraz STREAM_AGSE — wiec strumien dostawal interwal 0 na stale.
+// Zaleznie od kolejnosci po coreInstance.sort() konczylo sie to albo zerowym mianownikiem,
+// albo falszywym "Circular dependency": warunek konca (unresolvedCount >= prevUnresolved)
+// wymagal SCISLEGO spadku licznika w kazdym przebiegu, czyli byl heurystyka postepu.
+//
+// Ten sam plan z 3 lancuchami kompilowal sie poprawnie, z 4, 5, 6, 8 i 12 — nie; z 7, 9, 10,
+// 16, 20 i 32 znowu tak. Niemonotonicznosc w liczbie zapytan jest wlasnie objawem zaleznosci
+// od kolejnosci, a nie od poprawnosci planu.
+TEST(xcompiler, resolves_intervals_independently_of_plan_order) {
+  // Liczby lancuchow dobrane tak, by trafic w defekt: przy dyrektywach planu zawodzily
+  // 4, 5, 6, 8 i 12, a 1, 2, 3, 7, 9, 10 i 11 przechodzily. Ta niemonotonicznosc jest
+  // objawem zaleznosci od kolejnosci; pojedyncza liczba lancuchow bylaby krucha.
+  for (int chains : {4, 5, 6, 8, 12}) {
+    std::string source = "STORAGE 'temp'\nSUBSTRAT 'memory'\n";
+    source += "DECLARE value INTEGER STREAM a, 1/10 FILE 'a.txt'\n";
+    source += "DECLARE value INTEGER STREAM b, 1/5  FILE 'b.txt'\n";
+    for (int j = 0; j < chains; ++j) {
+      const std::string n = std::to_string(j);
+      source += "SELECT * STREAM out" + n + " FROM (a>2)#(b>1)\n";
+      source += "SELECT out" + n + "[0] STREAM proj" + n + " FROM out" + n + "\n";
+      source += "SELECT * STREAM win" + n + " FROM proj" + n + "@(1,30)\n";
+      source += "SELECT win" + n + "[0] STREAM avg" + n + " FROM win" + n + ".avg\n";
+    }
+
+    qTree instance;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, source);
+    ASSERT_EQ(parseResult, "OK") << "lancuchow: " << chains;
+
+    compiler compilerInstance(instance);
+    EXPECT_EQ(compilerInstance.compile(), "OK") << "lancuchow: " << chains;
+
+    // Zerowy interwal jest drugim objawem tej samej wady: strumien nigdy nie zostal
+    // rozwiazany, a mimo to przepuszczono go dalej — konczylo sie zerowym mianownikiem.
+    for (const auto &q : instance)
+      if (!q.isCompilerDirective()) EXPECT_NE(q.rInterval, 0) << "nierozwiazany interwal: " << q.id << ", lancuchow: " << chains;
+  }
+}
+
+// Zluzowanie warunku konca nie moze uczynic detektora cykli slepym.
+// str2 czyta samo siebie, wiec zaden przebieg nie rozwiaze go nigdy.
+TEST(xcompiler, still_reports_true_circular_dependency) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM src, 1 FILE 'a.txt'
+        SELECT * STREAM loop FROM src + loop
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_EQ(compilerInstance.compile(), "Circular dependency in stream definitions");
+}
