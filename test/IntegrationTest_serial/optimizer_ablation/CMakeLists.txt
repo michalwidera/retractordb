@@ -33,6 +33,24 @@ add_test(
           factor-semantic ${OPTIMIZER_EXPECTED})
 
 add_test(
+  NAME ${TestID}-factor-shared-substrate-semantic
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash verify.sh ${CMAKE_BINARY_DIR}/src/retractor/xretractor
+          factor-shared-substrate-semantic ${OPTIMIZER_EXPECTED})
+
+add_test(
+  NAME ${TestID}-factor-name-collision-semantic
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash verify.sh ${CMAKE_BINARY_DIR}/src/retractor/xretractor
+          factor-name-collision-semantic ${OPTIMIZER_EXPECTED})
+
+add_test(
+  NAME ${TestID}-factor-multiquery-semantic
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash verify.sh ${CMAKE_BINARY_DIR}/src/retractor/xretractor
+          factor-multiquery-semantic ${OPTIMIZER_EXPECTED})
+
+add_test(
   NAME ${TestID}-dedup-steady-semantic
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash verify.sh ${CMAKE_BINARY_DIR}/src/retractor/xretractor
@@ -45,8 +63,14 @@ add_test(
           dedup-exact-semantic ${OPTIMIZER_EXPECTED})
 
 set_tests_properties(
-  ${TestID}-semantic ${TestID}-factor-semantic ${TestID}-dedup-steady-semantic
-  ${TestID}-dedup-exact-semantic PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+  ${TestID}-semantic
+  ${TestID}-factor-semantic
+  ${TestID}-factor-shared-substrate-semantic
+  ${TestID}-factor-name-collision-semantic
+  ${TestID}-factor-multiquery-semantic
+  ${TestID}-dedup-steady-semantic
+  ${TestID}-dedup-exact-semantic
+  PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
 
 # Do 2026-07-26 dwa testy tej macierzy były oznaczone WILL_FAIL jako jawnie
 # oczekiwane porażki ablacyjne:

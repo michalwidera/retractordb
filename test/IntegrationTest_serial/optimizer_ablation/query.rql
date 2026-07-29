@@ -18,6 +18,46 @@ DECLARE value INTEGER STREAM FB2, 0.2 FILE 'b.txt'
 SELECT * STREAM factored FROM (FA>2)#(FB>1)
 SELECT * STREAM factor_reference FROM (FA2#FB2)>3
 
+# Substrat przesunięcia z dwoma konsumentami: jeden pasuje do wzorca reguły,
+# drugi nie. Reguła wolno przepisać wyłącznie pierwszego. Dawniej cały ten
+# przypadek był poza zasięgiem reguły, bo wymagała ona dokładnie jednego
+# konsumenta; przepisanie w miejscu podstawiłoby tu przeplot pod mixed_shift.
+DECLARE value INTEGER STREAM MA, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM MB, 0.2 FILE 'b.txt'
+DECLARE value INTEGER STREAM MA2, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM MB2, 0.2 FILE 'b.txt'
+
+SELECT * STREAM mixed_hash FROM (MA>2)#(MB>1)
+SELECT * STREAM mixed_shift FROM (MA>2)+MB
+SELECT * STREAM mixed_shift_reference FROM (MA2>2)+MB2
+
+# Dwa zapytania nad tym samym przesuniętym przeplotem. Warunek jednego
+# konsumenta wyłączał tu regułę całkowicie, czyli dokładnie w reżimie
+# wielozapytaniowym, o który pyta krok K5 planu badawczego.
+DECLARE value INTEGER STREAM QA, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM QB, 0.2 FILE 'b.txt'
+DECLARE value INTEGER STREAM QA2, 0.1 FILE 'a.txt'
+DECLARE value INTEGER STREAM QB2, 0.2 FILE 'b.txt'
+
+SELECT * STREAM multi1 FROM (QA>2)#(QB>1)
+SELECT * STREAM multi2 FROM (QA>2)#(QB>1)
+SELECT * STREAM multi_reference FROM (QA2#QB2)>3
+
+# Zapytanie publiczne nazwane wewnętrzną konwencją kompilatora, o programie
+# węzła przeplotu i o schemacie zgodnym typowo, lecz z zamienionymi polami.
+# Konwencja nazewnicza nie jest zarezerwowana, a schemasMatch porównuje tylko
+# typy, długości i liczności, więc sama kontrola schematu tego nie odróżnia.
+# Reguła nie może użyć ponownie takiego węzła: jego wyjściem jest projekcja,
+# a nie surowy przeplot. collide_user musi zostać nieprzepisany.
+DECLARE cax INTEGER, cay INTEGER STREAM CA, 0.1 FILE 'p.txt'
+DECLARE cbx INTEGER, cby INTEGER STREAM CB, 0.2 FILE 'q.txt'
+DECLARE cax INTEGER, cay INTEGER STREAM CA2, 0.1 FILE 'p.txt'
+DECLARE cbx INTEGER, cby INTEGER STREAM CB2, 0.2 FILE 'q.txt'
+
+SELECT CA[1],CA[0] STREAM STREAM_HASH_CA_CB FROM CA#CB
+SELECT * STREAM collide_user FROM (CA>2)#(CB>1)
+SELECT * STREAM collide_reference FROM (CA2#CB2)>3
+
 # Powtórzone DA+DB tworzy substrat, który może zostać scalony z dedup_owner.
 DECLARE value INTEGER STREAM DA, 0.1 FILE 'a.txt'
 DECLARE value INTEGER STREAM DB, 0.1 FILE 'b.txt'
