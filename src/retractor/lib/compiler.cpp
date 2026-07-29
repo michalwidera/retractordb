@@ -1,6 +1,7 @@
 #include "compiler.hpp"
 
 #include <algorithm>
+#include <chrono>  // instrumentacja E3: pomiar czasu kompilacji
 #include <cmath>
 #include <cstdint>
 #include <cstdio>   // instrumentacja E3 (RDB_BENCH_PLAN): std::fprintf
@@ -1473,7 +1474,7 @@ std::string compiler::compile() {
     size_t fromTokens    = 0;
     size_t fieldTokens   = 0;
   };
-  auto planSize = [this]() {
+  auto planSizeRaw = [this]() {
     planShape acc;
     for (const auto &q : coreInstance) {
       if (q.isCompilerDirective()) continue;
@@ -1484,8 +1485,23 @@ std::string compiler::compile() {
     }
     return acc;
   };
+
+  // Czas instrumentacji jest ODEJMOWANY od czasu kompilacji. Migawka planu
+  // iteruje cały plan, więc jej koszt zależy od rozmiaru planu, a ten różni się
+  // między profilami ablacyjnymi — bez odjęcia profil o większym planie
+  // wyglądałby na wolniejszy częściowo z powodu własnego pomiaru.
+  long probeOverheadNs = 0;
+  auto planSize        = [&]() {
+    const auto probeStart = std::chrono::steady_clock::now();
+    const auto shape      = planSizeRaw();
+    probeOverheadNs +=
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - probeStart).count();
+    return shape;
+  };
+
   const planShape empty{};
-  const auto atEntry = benchPlan ? planSize() : empty;
+  const auto compileStart = std::chrono::steady_clock::now();
+  const auto atEntry      = benchPlan ? planSize() : empty;
 #endif
 
   result = extractIntermediateStreams();
@@ -1574,6 +1590,10 @@ std::string compiler::compile() {
   // Format: publiczne/substraty/tokeny-from/tokeny-pol.
   if (benchPlan) {
     const auto atExit = planSize();
+    // Zegar zatrzymywany PO ostatniej migawce, żeby jej koszt trafił do
+    // probeOverheadNs i został odjęty tak samo jak koszt pozostałych trzech.
+    const long compileNs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - compileStart).count();
     std::fprintf(stderr,
                  "PLAN bench (publiczne/substraty/tokeny-from/tokeny-pol, dedup="
 #if RDB_OPT_DEDUP_SUBSTRATES
@@ -1588,6 +1608,25 @@ std::string compiler::compile() {
                  postDedup.fromTokens, postDedup.fieldTokens, atExit.publicStreams, atExit.substrates, atExit.fromTokens,
                  atExit.fieldTokens);
     std::fprintf(stderr, "REWRITE_APPLIED r1=%zu r2=%zu\n", rewriteAppliedR1_, rewriteAppliedR2Nodes_.size());
+
+    // Czas kompilacji (K6, §9.2). Mierzony jest WYŁĄCZNIE compile(), bez
+    // parsowania RQL i bez startu procesu — te są niezależne od profilu
+    // ablacyjnego i dla planów rzędu kilkudziesięciu węzłów całkowicie
+    // zdominowałyby różnicę, której kampania szuka.
+    std::fprintf(stderr, "COMPILE_NS %ld sonda=%ld\n", compileNs - probeOverheadNs, probeOverheadNs);
+
+    // Rozmiar buforów (K6, §9.2). maxCapacity jest wynikiem
+    // computeRequiredCapacities(): wymagana głębokość historii per strumień.
+    // Suma jest proporcjonalna do zajętości pamięci planu, maksimum wskazuje
+    // najgłębszy bufor, czyli ten decydujący o najgorszym przypadku.
+    size_t capacityTotal = 0;
+    int capacityMax      = 0;
+    for (const auto &[name, capacity] : coreInstance.maxCapacity) {
+      capacityTotal += static_cast<size_t>(capacity);
+      capacityMax = std::max(capacityMax, capacity);
+    }
+    std::fprintf(stderr, "PLAN capacity: strumieni=%zu suma=%zu maks=%d\n", coreInstance.maxCapacity.size(), capacityTotal,
+                 capacityMax);
   }
 #endif
 

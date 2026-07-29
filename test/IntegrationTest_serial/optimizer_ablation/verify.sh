@@ -46,8 +46,27 @@ expected_r2=0
 
 if [ "$probe" = "ON" ]; then
   grep -Fx "REWRITE_APPLIED r1=$expected_r1 r2=$expected_r2" out_probe.txt
+
+  # Czas kompilacji (K6). Wartość musi być dodatnia, a narzut sondy odjęty —
+  # mutacja usuwająca odjęcie zostawia sonda=0 i wtedy ten test nie zabija,
+  # dlatego sprawdzany jest osobno warunek narzut > 0.
+  compile_ns=$(sed -n 's/^COMPILE_NS \([0-9]*\) sonda=\([0-9]*\)$/\1/p' out_probe.txt)
+  probe_ns=$(sed -n 's/^COMPILE_NS \([0-9]*\) sonda=\([0-9]*\)$/\2/p' out_probe.txt)
+  [ -n "$compile_ns" ] && [ "$compile_ns" -gt 0 ]
+  [ -n "$probe_ns" ] && [ "$probe_ns" -gt 0 ]
+
+  # Rozmiar buforów (K6). Plan ablacyjny ma strumienie z historią, więc suma
+  # pojemności i maksimum muszą być dodatnie; zero oznaczałoby, że raport nie
+  # czyta maxCapacity.
+  cap_streams=$(sed -n 's/^PLAN capacity: strumieni=\([0-9]*\) suma=\([0-9]*\) maks=\([0-9]*\)$/\1/p' out_probe.txt)
+  cap_total=$(sed -n 's/^PLAN capacity: strumieni=\([0-9]*\) suma=\([0-9]*\) maks=\([0-9]*\)$/\2/p' out_probe.txt)
+  cap_max=$(sed -n 's/^PLAN capacity: strumieni=\([0-9]*\) suma=\([0-9]*\) maks=\([0-9]*\)$/\3/p' out_probe.txt)
+  [ -n "$cap_streams" ] && [ "$cap_streams" -gt 0 ]
+  [ "$cap_total" -ge "$cap_max" ] && [ "$cap_max" -gt 0 ]
 else
   ! grep -F "REWRITE_APPLIED" out_probe.txt
+  ! grep -F "COMPILE_NS" out_probe.txt
+  ! grep -F "PLAN capacity" out_probe.txt
 fi
 
 stream_source() {
@@ -137,7 +156,23 @@ if [ "$mode" = "plan" ]; then
   exit 0
 fi
 
-"$xretractor_bin" query.rql -r -k -m 48
+RDB_BENCH_MATERIALIZE=1 "$xretractor_bin" query.rql -r -k -m 48 2> out_run.txt
+
+if [ "$probe" = "ON" ]; then
+  # Licznik materializacji (K6) ma wyrocznię: zadeklarowana objętość trwała musi
+  # równać się sumie rozmiarów plików danych na dysku. Plan ma SUBSTRAT 'memory',
+  # więc część zapisów NIE trafia na dysk — bez rozdzielenia trwałych od
+  # pamięciowych ta równość by nie zachodziła.
+  reported=$(sed -n 's/^MATERIALIZED trwale: dopisania=[0-9]* nadpisania=[0-9]* bajty=\([0-9]*\) .*$/\1/p' out_run.txt)
+  on_disk=$(find temp -type f ! -name '*.desc' ! -name '*.meta' ! -name '*.shadow' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
+  [ -n "$reported" ] && [ "$reported" = "$on_disk" ]
+
+  # Substraty pamięciowe muszą być policzone, ale nie jako trwałe.
+  mem_bytes=$(sed -n 's/^MATERIALIZED .*pamieciowe: dopisania=[0-9]* nadpisania=[0-9]* bajty=\([0-9]*\)$/\1/p' out_run.txt)
+  [ -n "$mem_bytes" ] && [ "$mem_bytes" -gt 0 ]
+else
+  ! grep -F "MATERIALIZED" out_run.txt
+fi
 
 if [ "$mode" = "factor-semantic" ]; then
   cmp temp/factored temp/factor_reference

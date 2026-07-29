@@ -31,6 +31,7 @@
 #include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/storage.hpp"  // raport materializacji (RDB_BENCH_MATERIALIZE)
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -755,6 +756,19 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       }
 #if defined(__linux__) && defined(RDB_BENCH_PROBE)
       if (benchFile) std::fclose(benchFile);  // domknięcie sondy E1/E2E
+
+      // Raport materializacji (K6, §9.2). Wypisywany po zakończeniu mierzonej
+      // pętli, żeby zliczanie nie obciążało budżetu slotu. Osobna zmienna
+      // środowiskowa, bo materializacja jest metryką runtime — RDB_BENCH_PLAN
+      // dotyczy kompilacji, a RDB_BENCH_CSV szeregu czasowego.
+      if (std::getenv("RDB_BENCH_MATERIALIZE")) {
+        const auto counters = rdb::storage::materializationReport();
+        std::fprintf(stderr,
+                     "MATERIALIZED trwale: dopisania=%llu nadpisania=%llu bajty=%llu  "
+                     "pamieciowe: dopisania=%llu nadpisania=%llu bajty=%llu\n",
+                     counters.appends, counters.overwrites, counters.bytes, counters.memoryAppends, counters.memoryOverwrites,
+                     counters.memoryBytes);
+      }
 #endif
       //
       // End of data processing loop

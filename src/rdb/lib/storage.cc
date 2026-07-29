@@ -14,6 +14,28 @@
 
 namespace rdb {
 
+#ifdef RDB_BENCH_PROBE
+namespace {
+// Liczniki materializacji (K6). Procesowe, bo kampania mierzy objętość
+// materializacji całego planu. Wątek komunikacyjny executorsm nie zapisuje
+// rekordów — zapisy idą wyłącznie z pętli przetwarzania — więc zwykłe liczniki
+// wystarczają i nie wnoszą kosztu synchronizacji do mierzonej ścieżki.
+storage::materializationCounters materialization{};
+}  // namespace
+
+storage::materializationCounters storage::materializationReport() { return materialization; }
+
+void storage::materializationReset() { materialization = {}; }
+
+bool storage::isMemoryBackedStorage() const {
+  // To samo źródło prawdy, którym posługuje się makeAccessor() przy wyborze
+  // implementacji FileInterface (accessorFactory.cc): storageType_ pochodzi
+  // z pola TYPE deskryptora. Dzięki temu podział trwałe/pamięciowe nie może
+  // rozjechać się z faktycznie użytym magazynem.
+  return storageType_ == "MEMORY";
+}
+#endif
+
 storage::storage(const std::string_view qryID,         //
                  const std::string_view fileName,      //
                  const std::string_view storageParam,  //
@@ -299,6 +321,15 @@ bool storage::write(const size_t recordIndex) {
       FatalError("storage::write: append to '{}' failed (result={})", paths_.storageFile(), result);
     }
     recordsCount_++;
+#ifdef RDB_BENCH_PROBE
+    if (isMemoryBackedStorage()) {
+      materialization.memoryAppends++;
+      materialization.memoryBytes += descriptor.getSizeInBytes();
+    } else {
+      materialization.appends++;
+      materialization.bytes += descriptor.getSizeInBytes();
+    }
+#endif
 
     metaData_->onRecordAppended(nullInfo);
     metaData_->flushCurrentEntry();
@@ -307,6 +338,13 @@ bool storage::write(const size_t recordIndex) {
     if (result != 0) {
       FatalError("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(), recordIndex, result);
     }
+#ifdef RDB_BENCH_PROBE
+    // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`.
+    if (isMemoryBackedStorage())
+      materialization.memoryOverwrites++;
+    else
+      materialization.overwrites++;
+#endif
 
     metaData_->onRecordModified(recordIndex, nullInfo);  // polimorficznie: cień indeksu albo główny indeks
   }
