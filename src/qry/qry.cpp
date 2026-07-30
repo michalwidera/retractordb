@@ -25,9 +25,9 @@ using boost::property_tree::ptree;
 // Musi pomieścić jedną sformatowaną linię z nazwami wszystkich kolumn strumienia.
 constexpr int kDirLineBufferSize = 1024;
 
-qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails)
+qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails, int responseQueueOpenMaxFails)
     : serverNoDataTimeoutMs_(std::max(1, serverNoDataTimeoutMs)),
-      transport_(std::make_unique<IpcTransport>(clientResponseMaxFails)),
+      transport_(std::make_unique<IpcTransport>(clientResponseMaxFails, responseQueueOpenMaxFails)),
       formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 
@@ -52,13 +52,28 @@ bool qry::adhoc(const std::string &sAdhoc) {
   return false;
 }
 
-bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
-                 std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
+selectResult qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
+                         std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
   elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
   ptree pt     = netClient("get", "");
 
-  const auto stream = pt.get_child("db.stream");
-  const bool found  = std::ranges::any_of(stream, [input, this](const auto &node) {
+  // Brak odpowiedzi serwera jest ODPOWIEDZIĄ, a nie niespodzianką w strukturze
+  // danych. `netClient` po wyczerpaniu prób zwraca ptree z samym
+  // `error.response`; poprzednia wersja szła prosto do `get_child("db.stream")`
+  // i wywracała się wyjątkiem „No such node (db.stream)". Operator dostawał
+  // komunikat o brakującym węźle zamiast informacji, że serwer nie zdążył
+  // odpowiedzieć — a to dwie różne awarie i dwie różne naprawy (issue_215).
+  if (pt.get_optional<std::string>("error.response")) {
+    SPDLOG_ERROR("serwer nie odpowiedzial na komende 'get' w wyznaczonym czasie (strumien: {})", input);
+    return selectResult::serverNoResponse;
+  }
+  const auto streamNode = pt.get_child_optional("db.stream");
+  if (!streamNode) {
+    SPDLOG_ERROR("odpowiedz serwera nie zawiera listy strumieni (strumien: {})", input);
+    return selectResult::serverNoResponse;
+  }
+
+  const bool found = std::ranges::any_of(*streamNode, [input, this](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[input] = netClient("show", input);
@@ -67,7 +82,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
 
   if (!found) {
     SPDLOG_ERROR("not found: {}", input);
-    return found;
+    return selectResult::streamNotFound;
   }
 
   std::jthread producer_thread([this] { transport_->producer(); });
@@ -78,6 +93,9 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
   if (outputFormatMode != formatMode::RAW) schema = netClient("detail", input);
 
   int noDataCounter = 0;
+  // Liczba faktycznie wyrenderowanych elementów. Bez niej „koniec pętli" i „nic
+  // nie przyszło" były nieodróżnialne, a klient meldował sukces po zerze danych.
+  long long rendered = 0;
 
   ptree e_value;
   try {
@@ -110,6 +128,7 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
               Formatter::renderInfluxDB(e_value, nullmap, input, schema);
 
             if (elemLimitCnt > 1) --elemLimitCnt;
+            ++rendered;
             noDataCounter = 0;
           }
       }
@@ -130,7 +149,35 @@ bool qry::select(boost::program_options::variables_map &vm, const int iElemLimit
   }
 
   transport_->done = true;
-  return found;
+
+  // Reguła: klient, który nie przeczytał ani jednego elementu, nie kończy się
+  // sukcesem. Rozróżniamy przy tym DLACZEGO nic nie przyszło, bo „serwer nie
+  // utworzył mojej kolejki" i „kolejka była, ale pusta" to dwie różne awarie.
+  if (rendered == 0) {
+    if (transport_->responseQueueMissing) {
+      SPDLOG_ERROR("serwer nie utworzyl kolejki odpowiedzi tego klienta (strumien: {})", input);
+      return selectResult::clientQueueMissing;
+    }
+    SPDLOG_ERROR("strumien '{}' nie dostarczyl ani jednego elementu", input);
+    return selectResult::noData;
+  }
+  return selectResult::ok;
+}
+
+const char *toString(selectResult result) {
+  switch (result) {
+    case selectResult::ok:
+      return "ok";
+    case selectResult::streamNotFound:
+      return "strumien nieznany serwerowi";
+    case selectResult::serverNoResponse:
+      return "serwer nie odpowiedzial w wyznaczonym czasie";
+    case selectResult::clientQueueMissing:
+      return "serwer nie utworzyl kolejki odpowiedzi klienta";
+    case selectResult::noData:
+      return "brak danych w strumieniu";
+  }
+  return "nieznany";
 }
 
 int qry::hello() {

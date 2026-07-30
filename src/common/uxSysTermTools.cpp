@@ -65,6 +65,13 @@ class SdPriorityFlag : public spdlog::custom_flag_formatter {
 
 bool _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return false;
+  // Bez terminala nie ma czego nacisnąć. Gdy stdin jest plikiem albo potokiem,
+  // `getchar()` zwraca pierwszy bajt WEJŚCIA, a nie klawisz operatora — pętla
+  // czytająca dane kończyła się wtedy natychmiast i, co gorsza, wyglądało to na
+  // normalne zakończenie. Wykryte w kampanii K6b (issue_215): `xqry` ze stdin
+  // przekierowanym z pliku konsumował ten plik i wychodził kodem 0, nie
+  // przeczytawszy ani jednego elementu strumienia.
+  if (isatty(STDIN_FILENO) == 0) return false;
   struct termios oldt = {};
   struct termios newt = {};
   int ch;
