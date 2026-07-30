@@ -70,6 +70,69 @@ TEST(FixArgcv, only_strips_last_character_if_cr) {
 
 TEST(KbHit, returns_zero_when_ignore_any_key) { EXPECT_EQ(_kbhit(true), 0); }
 
+// Regresja defektu wykrytego w kampanii K6b (issue_215).
+//
+// `_kbhit` woła `getchar()` na stdin. Gdy stdin nie jest terminalem, pierwszy
+// bajt WEJŚCIA był brany za klawisz operatora: pętla czytająca dane kończyła
+// się natychmiast i wyglądało to na normalne zakończenie. Klient `xqry`
+// uruchamiany ze stdin przekierowanym z pliku wychodził kodem 0, nie
+// przeczytawszy ani jednego elementu strumienia.
+//
+// Podmieniamy stdin na plik z zawartością — czyli dokładnie ten przypadek,
+// w którym stara implementacja meldowała „naciśnięto klawisz".
+class KbHitRedirectedStdin : public ::testing::Test {
+ protected:
+  int savedStdin{-1};
+  std::filesystem::path path;
+
+  void redirectStdinFrom(const std::string &content) {
+    path = std::filesystem::temp_directory_path() /
+           ("kbhit_" + std::to_string(::getpid()) + "_" + ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    std::ofstream(path) << content;
+    savedStdin = ::dup(STDIN_FILENO);
+    ASSERT_NE(savedStdin, -1);
+    const int fd = ::open(path.c_str(), O_RDONLY);
+    ASSERT_NE(fd, -1);
+    ASSERT_NE(::dup2(fd, STDIN_FILENO), -1);
+    ::close(fd);
+  }
+
+  void TearDown() override {
+    if (savedStdin != -1) {
+      ::dup2(savedStdin, STDIN_FILENO);
+      ::close(savedStdin);
+    }
+    if (!path.empty()) std::filesystem::remove(path);
+  }
+};
+
+TEST_F(KbHitRedirectedStdin, non_tty_with_pending_bytes_is_not_a_keypress) {
+  redirectStdinFrom("W2_Q08\tSTRUCT\t5\tw2_out_000\n");
+  ASSERT_EQ(::isatty(STDIN_FILENO), 0) << "test wymaga stdin, ktory nie jest terminalem";
+  EXPECT_FALSE(_kbhit(false));
+}
+
+TEST_F(KbHitRedirectedStdin, non_tty_does_not_consume_stdin) {
+  redirectStdinFrom("pierwsza linia\ndruga linia\n");
+  ASSERT_EQ(::isatty(STDIN_FILENO), 0);
+
+  EXPECT_FALSE(_kbhit(false));
+
+  // Drugi skutek defektu, gorszy od pierwszego: `_kbhit` KONSUMOWAŁ bajt
+  // wejścia. Proces potomny dziedziczący stdin po pętli `while read < plik`
+  // gubił przez to dane, bez jednego komunikatu.
+  std::array<char, 16> buffer{};
+  const ssize_t got = ::read(STDIN_FILENO, buffer.data(), buffer.size() - 1);
+  ASSERT_GT(got, 0);
+  EXPECT_EQ(std::string(buffer.data(), static_cast<std::size_t>(got)).substr(0, 8), "pierwsza");
+}
+
+TEST_F(KbHitRedirectedStdin, non_tty_at_eof_is_not_a_keypress) {
+  redirectStdinFrom("");
+  ASSERT_EQ(::isatty(STDIN_FILENO), 0);
+  EXPECT_FALSE(_kbhit(false));
+}
+
 // --- setupLoggerMain tests ---
 
 class SetupLoggerMainTest : public ::testing::Test {

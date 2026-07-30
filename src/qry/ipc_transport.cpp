@@ -6,6 +6,7 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <memory>
 #include <print>
 #include <sstream>
 #include <string>
@@ -27,21 +28,44 @@
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-IpcTransport::IpcTransport(int clientResponseMaxFails) : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)) {}
+IpcTransport::IpcTransport(int clientResponseMaxFails, int responseQueueOpenMaxFails)
+    : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
+      responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)) {}
 
 bool IpcTransport::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
 void IpcTransport::producer() {
+  const std::string queueName = std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid());
+
+  // Kolejkę odpowiedzi tworzy SERWER w reakcji na rejestrację klienta, więc
+  // `open_only` wołane natychmiast po starcie wątku bywa o krok za wcześnie.
+  // Poprzednia wersja poddawała się po pierwszej nieudanej próbie i ustawiała
+  // `done`, przez co pętla `select()` nie wykonywała ani jednego obrotu,
+  // a klient kończył się kodem 0 bez jednego przeczytanego elementu (issue_215).
+  std::unique_ptr<IPC::message_queue> mq;
+  for (int attempt = 0; attempt < responseQueueOpenMaxFails_ && !done; ++attempt) {
+    try {
+      mq = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
+      break;
+    } catch (const IPC::interprocess_exception &) {
+      std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
+    }
+  }
+  if (!mq) {
+    SPDLOG_ERROR("ipc_transport: kolejka odpowiedzi '{}' nie powstala po {} probach", queueName, responseQueueOpenMaxFails_);
+    responseQueueMissing = true;
+    done                 = true;
+    return;
+  }
+
   try {
-    std::string queueName = std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid());
-    IPC::message_queue mq(IPC::open_only, queueName.c_str());
     std::array<char, ipc::kResponseQueueMaxMessageSize> message;
     unsigned int priority{0};
     IPC::message_queue::size_type recvd_size = ipc::kResponseQueueMaxMessageSize;
     while (!done) {
       bool messageReceived = false;
       while (!messageReceived && !done) {
-        messageReceived = mq.try_receive(message.data(), ipc::kResponseQueueMaxMessageSize, recvd_size, priority);
+        messageReceived = mq->try_receive(message.data(), ipc::kResponseQueueMaxMessageSize, recvd_size, priority);
         std::this_thread::sleep_for(ipc::kQueuePollInterval);
       }
       if (done) continue;

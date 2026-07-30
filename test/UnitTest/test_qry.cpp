@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <set>
+#include <string>
+
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
 
@@ -353,4 +357,126 @@ TEST(xqry, test_format_mode_set) {
 
   obj_detail.outputFormatMode = formatMode::GNUPLOT;
   EXPECT_TRUE(obj_detail.outputFormatMode == formatMode::GNUPLOT);
+}
+
+// === Regresje defektu klienta wykrytego w kampanii K6b (issue_215) ===
+//
+// Wspólny mianownik trzech trybów awarii: klient, który nie przeczytał ani
+// jednego elementu, kończył się kodem 0 albo komunikatem o zupełnie innym
+// błędzie. Dla harnessu i dla CI wyglądało to jak poprawny przebieg.
+//
+// Odtworzone tu z pomiarów na workerze: `xqry -s mon_000 -r` przy serwerze
+// obciążonym rodziną W8 (Q=32) ginął po ~3 s przy serwerze pracującym 12 s.
+
+// Serwer nie zdążył odpowiedzieć: `netClient` po wyczerpaniu prób zwraca ptree
+// z samym `error.response` (ipc_transport.cpp, gałąź "server not found").
+class qry_fake_no_response : public qry {
+ public:
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    retval.put("error.response", "server not found");
+    return retval;
+  }
+};
+
+// Serwer odpowiedział, ale odpowiedź nie niesie listy strumieni.
+class qry_fake_malformed : public qry {
+ public:
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    retval.put("db.message", "get");
+    return retval;
+  }
+};
+
+// Serwer odpowiedział poprawnie, ale nie zna żądanego strumienia.
+class qry_fake_other_stream : public qry {
+ public:
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    retval.put("db.stream.core0", "core0");
+    retval.put("db.stream.core0.duration", "1");
+    retval.put("db.stream.core0.size", "123");
+    retval.put("db.stream.core0.count", "345");
+    retval.put("db.stream.core0.location", "/dev/location");
+    retval.put("db.stream.core0.cap", "789");
+    return retval;
+  }
+};
+
+// Serwer zna strumień, więc `select()` wchodzi w pętlę i uruchamia producenta.
+// W teście jednostkowym nie ma serwera IPC, więc kolejka odpowiedzi nigdy nie
+// powstanie — to jest dokładnie tryb, który wcześniej dawał cichy sukces.
+class qry_fake_known_stream : public qry {
+ public:
+  explicit qry_fake_known_stream(int responseQueueOpenMaxFails)
+      : qry(kDefaultServerNoDataTimeoutMs, kDefaultClientResponseMaxFails, responseQueueOpenMaxFails) {}
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    retval.put("db.stream.core0", "core0");
+    retval.put("db.stream.core0.duration", "1");
+    retval.put("db.stream.core0.size", "123");
+    retval.put("db.stream.core0.count", "345");
+    retval.put("db.stream.core0.location", "/dev/location");
+    retval.put("db.stream.core0.cap", "789");
+    return retval;
+  }
+};
+
+// B: brak odpowiedzi serwera musi być własnym trybem, a nie wyjątkiem
+// „No such node (db.stream)". Stara wersja rzucała z `get_child`, launcher
+// łapał to jako std::exception i zwracał `interrupted` — operator dostawał
+// informację o przerwaniu zamiast o przeciążonym serwerze.
+TEST(xqry, select_reports_server_no_response_instead_of_throwing) {
+  qry_fake_no_response obj_no_response;
+  boost::program_options::variables_map vm;
+  EXPECT_NO_THROW({
+    const selectResult result = obj_no_response.select(vm, 0, "core0", {0, 0, 0});
+    EXPECT_EQ(result, selectResult::serverNoResponse);
+  });
+}
+
+// B: odpowiedź bez listy strumieni jest tym samym trybem — serwer nie dostarczył
+// tego, o co pytano.
+TEST(xqry, select_reports_server_no_response_on_malformed_answer) {
+  qry_fake_malformed obj_malformed;
+  boost::program_options::variables_map vm;
+  EXPECT_NO_THROW({
+    const selectResult result = obj_malformed.select(vm, 0, "core0", {0, 0, 0});
+    EXPECT_EQ(result, selectResult::serverNoResponse);
+  });
+}
+
+// Nieznany strumień musi pozostać odróżnialny od przeciążonego serwera: to inna
+// diagnoza (literówka w nazwie) i inna naprawa.
+TEST(xqry, select_reports_stream_not_found_separately) {
+  qry_fake_other_stream obj_other;
+  boost::program_options::variables_map vm;
+  const selectResult result = obj_other.select(vm, 0, "nieistniejacy", {0, 0, 0});
+  EXPECT_EQ(result, selectResult::streamNotFound);
+}
+
+// A: sedno defektu. Kolejka odpowiedzi klienta nie powstaje, więc nie przychodzi
+// ani jeden element. Wcześniej `select()` zwracał `true` i klient kończył się
+// ZEREM; teraz musi zameldować, że kolejki nie było.
+TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
+  qry_fake_known_stream obj_known(2);  // dwie proby otwarcia, zeby test byl szybki
+  boost::program_options::variables_map vm;
+  const selectResult result = obj_known.select(vm, 0, "core0", {0, 0, 0});
+  EXPECT_NE(result, selectResult::ok) << "klient bez ani jednego przeczytanego elementu nie moze konczyc sie sukcesem";
+  EXPECT_EQ(result, selectResult::clientQueueMissing);
+}
+
+// Każdy tryb ma własny, niepusty opis — komunikat operatora nie może być pusty
+// ani wspólny dla różnych awarii.
+TEST(xqry, select_result_descriptions_are_distinct) {
+  const std::array<selectResult, 5> all{selectResult::ok, selectResult::streamNotFound, selectResult::serverNoResponse,
+                                        selectResult::clientQueueMissing, selectResult::noData};
+  std::set<std::string> seen;
+  for (const auto result : all) {
+    const std::string text = toString(result);
+    EXPECT_FALSE(text.empty());
+    seen.insert(text);
+  }
+  EXPECT_EQ(seen.size(), all.size()) << "tryby awarii musza byc rozroznialne w komunikacie";
 }

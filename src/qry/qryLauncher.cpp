@@ -169,8 +169,27 @@ int main(int argc, char *argv[]) {
       } else
         return system::errc::no_such_file_or_directory;
     } else if (vm.contains("select") && sInputStream != "none") {
-      if (!obj.select(vm, elemLimit, sInputStream, gnuplotDim, obj.gnuplotRightToLeft))
-        return system::errc::no_such_file_or_directory;
+      // Tryby porażki są rozróżnialne po kodzie wyjścia (issue_215). Przedtem
+      // wszystkie kończyły się albo zerem, albo `no_such_file_or_directory`,
+      // więc harness nie umiał odróżnić przeciążonego serwera od literówki
+      // w nazwie strumienia — a to inna diagnoza i inna naprawa.
+      const selectResult result = obj.select(vm, elemLimit, sInputStream, gnuplotDim, obj.gnuplotRightToLeft);
+      switch (result) {
+        case selectResult::ok:
+          break;
+        case selectResult::streamNotFound:
+          std::println("xqry: {}: {}", sInputStream, toString(result));
+          return system::errc::no_such_file_or_directory;
+        case selectResult::serverNoResponse:
+          std::println("xqry: {}: {}", sInputStream, toString(result));
+          return system::errc::timed_out;
+        case selectResult::clientQueueMissing:
+          std::println("xqry: {}: {}", sInputStream, toString(result));
+          return system::errc::no_stream_resources;
+        case selectResult::noData:
+          std::println("xqry: {}: {}", sInputStream, toString(result));
+          return system::errc::no_message_available;
+      }
     } else {
       SPDLOG_ERROR("no argument.");
       return EPERM;  // ERROR defined in errno-base.h
