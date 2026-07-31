@@ -7,6 +7,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cinttypes>
 #include <cstdlib>
 #include <cstring>
@@ -138,6 +139,61 @@ bool rtActivate(int priority) {
     ok = false;
   }
   return ok;
+}
+
+bool rtKeepThreadOffRtCpus(pthread_t handle) {
+  // Dlaczego to istnieje. Wątek komunikacyjny (`commandProcessorLoop`) powstaje
+  // PRZED `rtActivate`, a `sched_setscheduler(0, …)` dotyczy wyłącznie wątku
+  // wołającego — wątek komunikacyjny zostaje więc SCHED_OTHER. Gdy operator
+  // przypina CAŁY proces do jednego rdzenia (`taskset -c 3`, zwykle rdzeń
+  // izolowany przez `isolcpus`), oba wątki lądują na tym samym rdzeniu. Dopóki
+  // pętla przetwarzania mieści się w slocie, wątek RT oddaje rdzeń na czas snu
+  // i wszystko działa. Gdy jednak obciążenie przekroczy 100 % slotu, wątek RT
+  // jest bez przerwy runnable i wątek komunikacyjny NIE JEST SZEREGOWANY WCALE:
+  // klient nie może się zarejestrować, a serwer wygląda na zawieszony.
+  //
+  // Dławienie RT tego nie ratuje: kolejka RT przypiętego rdzenia pożycza
+  // niewykorzystany budżet z pozostałych rdzeni, na których nie ma zadań RT,
+  // więc `sched_rt_runtime_us` faktycznie nie odbiera czasu (zmierzone: duty
+  // 212 %, klient bez odpowiedzi przez pełne 3 s budżetu).
+  //
+  // Naprawa: wątek pomocniczy dostaje dopełnienie maski wątku RT. Gdy wątek RT
+  // nie jest przypięty, dopełnienie jest puste i nie robimy nic — planista sam
+  // rozłoży wątki i zagłodzenia nie ma.
+  cpu_set_t rtCpus;
+  CPU_ZERO(&rtCpus);
+  if (sched_getaffinity(0, sizeof(rtCpus), &rtCpus) != 0) {
+    std::cout << "[WARN] RT: nie odczytano powinowactwa watku RT: " << strerror(errno) << "\n";
+    return false;
+  }
+
+  const long online = sysconf(_SC_NPROCESSORS_ONLN);
+  if (online <= 0) {
+    std::cout << "[WARN] RT: nie ustalono liczby rdzeni online\n";
+    return false;
+  }
+
+  cpu_set_t auxCpus;
+  CPU_ZERO(&auxCpus);
+  for (long cpu = 0; cpu < online && cpu < CPU_SETSIZE; ++cpu)
+    if (!CPU_ISSET(static_cast<int>(cpu), &rtCpus)) CPU_SET(static_cast<int>(cpu), &auxCpus);
+
+  if (CPU_COUNT(&auxCpus) == 0) {
+    // Wątek RT widzi wszystkie rdzenie — nie ma dokąd przenieść, i nie trzeba.
+    return false;
+  }
+
+  if (const int rc = pthread_setaffinity_np(handle, sizeof(auxCpus), &auxCpus); rc != 0) {
+    std::cout << "[WARN] RT: nie przeniesiono watku komunikacyjnego poza rdzenie RT: " << strerror(rc) << "\n";
+    return false;
+  }
+
+  // Komunikat na stdout, nie przez spdlog: w Release SPDLOG_ACTIVE_LEVEL to
+  // SPDLOG_LEVEL_ERROR, więc SPDLOG_WARN/INFO znikają na etapie kompilacji, a
+  // zmiana powinowactwa musi być widoczna w logu przebiegu pomiarowego.
+  std::cout << "[INFO] RT: watek komunikacyjny przeniesiony poza rdzenie RT (rdzeni pomocniczych: " << CPU_COUNT(&auxCpus)
+            << ")\n";
+  return true;
 }
 
 void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {

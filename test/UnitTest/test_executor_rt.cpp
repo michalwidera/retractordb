@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <pthread.h>
+#include <sched.h>
 #include <unistd.h>
+
+#include <atomic>
+#include <chrono>
 #include <ctime>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 #include "retractor/lib/executor_rt.hpp"
 
@@ -135,6 +141,83 @@ TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
   }
   bool result = rtActivate();
   EXPECT_FALSE(result);
+}
+
+// --- rtKeepThreadOffRtCpus (issue_217, badanie W8) ---
+//
+// Wątek komunikacyjny silnika jest SCHED_OTHER i dzieli rdzeń z wątkiem
+// SCHED_FIFO, gdy operator przypina cały proces (`taskset -c 3`). Powyżej 100 %
+// obciążenia slotu wątek RT nigdy nie oddaje rdzenia i wątek komunikacyjny nie
+// jest szeregowany wcale — klient nie zdąży się zarejestrować.
+//
+// Samego zagłodzenia nie da się odtworzyć w teście jednostkowym bez CAP_SYS_NICE
+// i bez ryzyka zawieszenia rdzenia biegaczowi testów, więc testowany jest
+// mechanizm, który mu zapobiega: rozdział rdzeni.
+
+TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
+  if (sysconf(_SC_NPROCESSORS_ONLN) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
+
+  cpu_set_t original;
+  CPU_ZERO(&original);
+  ASSERT_EQ(sched_getaffinity(0, sizeof(original), &original), 0);
+
+  // Udajemy wątek RT przypięty do jednego rdzenia — to konfiguracja kampanii.
+  cpu_set_t pinned;
+  CPU_ZERO(&pinned);
+  CPU_SET(0, &pinned);
+  ASSERT_EQ(sched_setaffinity(0, sizeof(pinned), &pinned), 0);
+
+  std::atomic<bool> stop{false};
+  std::thread aux([&stop] {
+    while (!stop)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  });
+
+  const bool moved = rtKeepThreadOffRtCpus(aux.native_handle());
+
+  cpu_set_t auxMask;
+  CPU_ZERO(&auxMask);
+  const int rc = pthread_getaffinity_np(aux.native_handle(), sizeof(auxMask), &auxMask);
+
+  stop = true;
+  aux.join();
+  ASSERT_EQ(sched_setaffinity(0, sizeof(original), &original), 0);
+
+  ASSERT_TRUE(moved) << "watek pomocniczy nie zostal przeniesiony poza przypiety rdzen RT";
+  ASSERT_EQ(rc, 0);
+  EXPECT_FALSE(CPU_ISSET(0, &auxMask)) << "watek pomocniczy nadal dzieli rdzen z watkiem RT";
+  EXPECT_GT(CPU_COUNT(&auxMask), 0) << "watek pomocniczy zostal bez zadnego rdzenia";
+}
+
+// Bez przypięcia nie ma zagłodzenia i nie ma czego naprawiać — funkcja musi
+// wtedy zostawić powinowactwo w spokoju, zamiast zawężać je na własną rękę.
+TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
+  const long online = sysconf(_SC_NPROCESSORS_ONLN);
+  if (online < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
+
+  cpu_set_t original;
+  CPU_ZERO(&original);
+  ASSERT_EQ(sched_getaffinity(0, sizeof(original), &original), 0);
+
+  cpu_set_t all;
+  CPU_ZERO(&all);
+  for (long cpu = 0; cpu < online && cpu < CPU_SETSIZE; ++cpu)
+    CPU_SET(static_cast<int>(cpu), &all);
+  if (sched_setaffinity(0, sizeof(all), &all) != 0) GTEST_SKIP() << "brak prawa do rozszerzenia powinowactwa";
+
+  std::atomic<bool> stop{false};
+  std::thread aux([&stop] {
+    while (!stop)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  });
+
+  const bool moved = rtKeepThreadOffRtCpus(aux.native_handle());
+
+  stop = true;
+  aux.join();
+  ASSERT_EQ(sched_setaffinity(0, sizeof(original), &original), 0);
+
+  EXPECT_FALSE(moved) << "bez przypiecia watku RT nie wolno ruszac powinowactwa watku pomocniczego";
 }
 
 }  // namespace

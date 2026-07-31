@@ -656,7 +656,14 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       struct timespec loop_anchor{};
       const bool rt_mode = vm.contains("realtime");
       if (rt_mode) {
-        if (rtCheckAndPrint()) rtActivate(cfgRtPriority);
+        if (rtCheckAndPrint()) {
+          rtActivate(cfgRtPriority);
+          // Dopiero TERAZ znana jest maska wątku RT, więc dopiero teraz można z
+          // niej wyliczyć rdzenie dla wątku komunikacyjnego. Bez tego przy
+          // obciążeniu powyżej 100 % slotu wątek komunikacyjny nie dostaje CPU
+          // i żaden klient nie zdąży się zarejestrować (issue_217, badanie W8).
+          rtKeepThreadOffRtCpus(bt.native_handle());
+        }
       }
 
 #ifdef RDB_BENCH_PROBE
