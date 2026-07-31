@@ -9,7 +9,9 @@
 namespace appcfg {
 inline constexpr int kDefaultIpcQueueBufferSeconds{10};
 inline constexpr int kDefaultIpcMinQueueElements{100};
-inline constexpr int kDefaultIpcClientResponseMaxFails{10};
+// 300 × ipc::kClientResponsePollInterval = 3 s. Powód wartości: patrz
+// kIpcTransportDefaultClientResponseMaxFails w src/qry/ipc_transport.hpp.
+inline constexpr int kDefaultIpcClientResponseMaxFails{300};
 inline constexpr int kDefaultTimingServerStartupWaitSeconds{30};
 inline constexpr int kDefaultTimingServerStartupPollIntervalMs{100};
 inline constexpr int kDefaultTimingQueryNoDataTimeoutMs{10'000};

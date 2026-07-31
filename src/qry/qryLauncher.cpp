@@ -178,16 +178,16 @@ int main(int argc, char *argv[]) {
         case selectResult::ok:
           break;
         case selectResult::streamNotFound:
-          std::println("xqry: {}: {}", sInputStream, toString(result));
+          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
           return system::errc::no_such_file_or_directory;
         case selectResult::serverNoResponse:
-          std::println("xqry: {}: {}", sInputStream, toString(result));
+          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
           return system::errc::timed_out;
         case selectResult::clientQueueMissing:
-          std::println("xqry: {}: {}", sInputStream, toString(result));
+          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
           return system::errc::no_stream_resources;
         case selectResult::noData:
-          std::println("xqry: {}: {}", sInputStream, toString(result));
+          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
           return system::errc::no_message_available;
       }
     } else {

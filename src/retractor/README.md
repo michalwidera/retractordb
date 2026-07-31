@@ -152,10 +152,14 @@ If any of those checks fail, xretractor reports a configuration error and stops.
 - `ipc.min_queue_elements` (int, default: `100`, must be `> 0`)
   - Minimum queue capacity regardless of stream interval.
 
-- `ipc.client_response_max_fails` (int, default: `10`, must be `> 0`)
-  - Number of xqry retries while waiting for response in shared memory.
-  - Effective wait time is roughly:
-    `client_response_max_fails * kClientResponsePollInterval`.
+- `ipc.client_response_max_fails` (int, default: `300`, must be `> 0`)
+  - Budget for xqry waiting for a response in shared memory.
+  - Effective wait time is a wall-clock deadline of
+    `client_response_max_fails * kClientResponsePollInterval` (300 × 10 ms = 3 s).
+  - The default is measured in seconds, not milliseconds, on purpose: the
+    server's command thread is SCHED_OTHER while its processing thread may run
+    SCHED_FIFO on the same pinned core, so it can wait a whole RT throttling
+    period before being scheduled (issue_217).
 
 #### [timing]
 
@@ -197,7 +201,7 @@ dir = "/var/lib/retractor/data"
 [ipc]
 queue_buffer_seconds = 10
 min_queue_elements = 100
-client_response_max_fails = 10
+client_response_max_fails = 300
 
 [timing]
 server_startup_wait_s = 30

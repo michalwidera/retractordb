@@ -7,7 +7,6 @@
 #include <chrono>
 #include <cstring>
 #include <memory>
-#include <print>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -124,15 +123,18 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
       it = mymap->find(processId);
     }
 
-    int cntr(clientResponseMaxFails_);
-    while (it == mymap->end() && cntr != 0) {
+    // Budżet liczony ZEGAREM, a nie liczbą obrotów pętli. Obrót to sen plus
+    // `lock` na muteksie współdzielonym z wątkiem emisji serwera, więc na
+    // obciążonej maszynie trwa dłużej niż sam interwał — a wtedy liczenie prób
+    // skracało faktyczne czekanie dokładnie w sytuacji, w której potrzebne było
+    // najdłuższe (issue_217).
+    const auto deadline = std::chrono::steady_clock::now() + clientResponseMaxFails_ * ipc::kClientResponsePollInterval;
+    while (it == mymap->end() && std::chrono::steady_clock::now() < deadline) {
       std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
       IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
       it = mymap->find(processId);
-      --cntr;
     }
     if (it == mymap->end()) {
-      std::println("server not found");
       SPDLOG_ERROR("server not found");
       done = true;
       pt_response.put("error.response", "server not found");

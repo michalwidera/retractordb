@@ -160,7 +160,13 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
   constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";
 
   if (dual) {
-    auto console_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+    // Diagnostyka na STDERR, nie na STDOUT. Stdout jest u klienta strumieniem
+    // DANYCH (`std::print` w formatterach), więc mieszanie z nim komunikatów
+    // błędu psuło jedno i drugie: dane były zanieczyszczone, a błędy nie do
+    // znalezienia. Harness pomiarowy uruchamia klienta jako `>/dev/null 2>err`,
+    // przez co każda awaria wyglądała jak zniknięcie bez komunikatu i zatrzymała
+    // dwie kampanie na fałszywej hipotezie o crashu (issue_217).
+    auto console_sink = std::make_shared<spdlog::sinks::stderr_sink_mt>();
 
     console_sink->set_pattern("%v%$");
     console_sink->set_level(spdlog::level::trace);
