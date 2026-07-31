@@ -7,8 +7,19 @@
 
 // Pojemność wewnętrznej kolejki SPSC między wątkiem producenta (IPC) a wątkiem select().
 // Wartość musi być potęgą 2 i wystarczająco duża by zaabsorbować burstowe dane strumieniowe.
-constexpr int kSpscQueueCapacity                         = 1024;
-constexpr int kIpcTransportDefaultClientResponseMaxFails = 10;
+constexpr int kSpscQueueCapacity = 1024;
+
+// Budżet klienta na odpowiedź serwera; efektywny czas to ta liczba razy
+// ipc::kClientResponsePollInterval (300 × 10 ms = 3 s).
+//
+// Poprzednie 10 prób (100 ms) było za mało. Wątek komunikacyjny serwera powstaje
+// przed `rtActivate`, więc zostaje SCHED_OTHER, podczas gdy wątek przetwarzania
+// dostaje SCHED_FIFO; przy pracy pod `taskset` na jednym rdzeniu wątek
+// komunikacyjny dostaje CPU dopiero w oknie throttlingu RT, którego okres jest
+// rzędu sekundy. Klient poddawał się, zanim serwer w ogóle został zaszeregowany
+// — i kończył się kodem `timed_out`, co harness pomiarowy odczytywał jako
+// zniknięcie klienta (issue_217).
+constexpr int kIpcTransportDefaultClientResponseMaxFails = 300;
 
 // Ile razy producent ponawia otwarcie własnej kolejki odpowiedzi, zanim uzna, że
 // serwer jej nie utworzy. Kolejka powstaje po stronie serwera w reakcji na

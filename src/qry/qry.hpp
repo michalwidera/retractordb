@@ -10,7 +10,7 @@
 #include "ipc_transport.hpp"
 
 inline constexpr int kDefaultServerNoDataTimeoutMs{10'000};
-inline constexpr int kDefaultClientResponseMaxFails{10};
+inline constexpr int kDefaultClientResponseMaxFails{kIpcTransportDefaultClientResponseMaxFails};
 
 /// Wynik `qry::select`. Rozróżnia tryby porażki, bo wszystkie trzy dawały
 /// wcześniej albo kod 0, albo mylący komunikat o innym błędzie (issue_215).
