@@ -33,6 +33,7 @@
 #include "rdb/convertTypes.hpp"
 #include "rdb/storage.hpp"  // raport materializacji (RDB_BENCH_MATERIALIZE)
 #include "uxSysTermTools.hpp"
+#include "workProbe.hpp"  // raport pracy na slot (RDB_BENCH_WORK)
 
 // #include "antlr4-runtime/tree/ParseTree.h"
 
@@ -775,6 +776,18 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
                      "pamieciowe: dopisania=%llu nadpisania=%llu bajty=%llu\n",
                      counters.appends, counters.overwrites, counters.bytes, counters.memoryAppends, counters.memoryOverwrites,
                      counters.memoryBytes);
+      }
+
+      // Raport pracy na slot (E4, issue_219). Osobna zmienna środowiskowa i osobny wiersz,
+      // bo to inna wielkość niż materializacja: tam objętość zapisów, tu liczba odwiedzin
+      // elementów. Wypisywany po pętli, żeby zliczanie nie obciążało budżetu slotu.
+      // Analiza dzieli te sumy przez liczbę slotów przebiegu.
+      if (std::getenv("RDB_BENCH_WORK")) {
+        const auto w = rdb::probe::workReport();
+        std::fprintf(stderr,
+                     "WORK agse: okna=%llu elementy=%llu odczyty=%llu  eval: wywolania=%llu tokeny=%llu  "
+                     "hash: wybory=%llu  add: scalenia=%llu\n",
+                     w.agseWindows, w.agseElements, w.agseReads, w.evalCalls, w.evalTokens, w.hashPicks, w.addMerges);
       }
 #endif
       //

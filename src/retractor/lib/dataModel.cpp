@@ -11,6 +11,7 @@
 #include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "SOperations.hpp"
+#include "workProbe.hpp"
 
 // ctest -R '^ut-dataModel' -V
 
@@ -289,6 +290,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
+      RDB_BENCH_WORK_ADD(addMerges, 1);  // sonda E4: scalenie payloadów sumy strumieni
       *(qSet[instance]->inputPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
     } break;
     case STREAM_AGSE: {
@@ -321,6 +323,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // przeplotu); Hash zwraca indeks POSTĘPUJĄCY elementu składowej.
       const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
 
+      RDB_BENCH_WORK_ADD(hashPicks, 1);  // sonda E4: wybór składowej przeplotu w tym slocie
       int fwdPos                      = 0;
       const bool takeSecond           = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
       *(qSet[instance]->inputPayload) = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
