@@ -955,8 +955,9 @@ std::string compiler::computeStartupLatency() {
   // wartością pochłaniającą (dane oczekiwane a nieobecne, wynik nieistniejący w zbiorze wartości), nigdy
   // rezerwacją miejsca na dane.
   //
-  // UWAGA: ten przebieg wyłącznie WYLICZA i udostępnia ogon. Doprowadzenie emisji do zgodności z nim
-  // (zaprzestanie emitowania rekordów w slotach ogona) jest osobnym krokiem.
+  // Ten przebieg WYLICZA ogon i zapisuje go w query::startupLatency. Emisję doprowadza do zgodności
+  // z nim dataModel::processRows() — przez pierwsze startupLatency slotów strumień nie emituje niczego
+  // (porównanie z streamInstance::elapsedSlots). Wartość jest raportowana jako 'tail' przez presenter.
 
   // Ogon źródła przeliczony na sloty konsumenta: w slotów źródła to w*dSrc sekund, czyli ceil(w*dSrc/dDst)
   // slotów konsumenta. Zaokrąglamy w górę — pół slotu opóźnienia to wciąż slot, w którym nie ma czego wydać.
