@@ -1,5 +1,5 @@
  AGSE_OVER_VOLATILE
-8 Record(s)
+10 Record(s)
 12 Byte(s) per record.
 { INTEGER win_out_0 INTEGER win_out_1 INTEGER win_out_2 }
 { win_out_0:50 win_out_1:40 win_out_2:30 }

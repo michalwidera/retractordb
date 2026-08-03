@@ -1093,7 +1093,11 @@ std::string compiler::computeStartupLatency() {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
-        result = std::max(toSlots(w1, delta1, q.rInterval), toSlots(w2, deltaOf(second->getStr_()), q.rInterval));
+        // Ogon musi zabezpieczyć dostępność rekordu KAŻDEJ składowej pod indeksem
+        // z Definicji sumy strumieni, a nie tylko przeliczyć ogon składowej przez takt —
+        // patrz AddStartupLatency() w SOperations.hpp.
+        result =
+            std::max(AddStartupLatency(delta1, q.rInterval, w1), AddStartupLatency(deltaOf(second->getStr_()), q.rInterval, w2));
       } else if (op == STREAM_DEHASH_DIV) {
         // Θ zawsze wyprzedza swój slot o mniej niż jeden okres wyjścia.
         // Jeden slot jest dokładnym własnym ogonem operatora.

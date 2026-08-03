@@ -3,7 +3,7 @@ core0(1/10)	datafile2.dat
 	a: INTEGER
 core1(1/5)	datafile3.dat
 	b: INTEGER
-str0(1/10)
+str0(1/10)	tail=1
 	:- PUSH_STREAM(core0)
 	:- PUSH_STREAM(core1)
 	:- STREAM_ADD
@@ -17,12 +17,12 @@ str0(1/10)
 		ADD
 		PUSH_VAL(10)
 		MULTIPLY
-str1(1/10)
+str1(1/10)	tail=1
 	:- PUSH_STREAM(str0)
 	:- STREAM_MAX
 	str1_0: INTEGER
 		PUSH_ID(str1[0])
-str2(1/10)
+str2(1/10)	tail=1
 	:- PUSH_STREAM(str0)
 	:- PUSH_STREAM(str1)
 	:- STREAM_ADD

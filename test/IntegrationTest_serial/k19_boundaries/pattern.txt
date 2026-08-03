@@ -1,5 +1,5 @@
  AGSE
-8 Record(s)
+9 Record(s)
 12 Byte(s) per record.
 { INTEGER source_0 INTEGER source_1 INTEGER source_2 }
 { source_0:null source_1:20 source_2:10 }
@@ -8,7 +8,7 @@
 { source_0:60 source_1:50 source_2:40 }
 { source_0:70 source_1:60 source_2:50 }
  AGSE_MIRROR
-8 Record(s)
+9 Record(s)
 12 Byte(s) per record.
 { INTEGER source_0 INTEGER source_1 INTEGER source_2 }
 { source_0:10 source_1:20 source_2:null }
@@ -33,7 +33,7 @@
 { value:50 }
 { value:70 }
  REDUCTION
-8 Record(s)
+9 Record(s)
 8 Byte(s) per record.
 { RATIONAL sum }
 { sum:30/1 }
