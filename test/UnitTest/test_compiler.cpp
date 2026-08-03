@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
+#include <boost/rational.hpp>
 #include <boost/system/error_code.hpp>
 
 #include "retractor/lib/compiler.hpp"
@@ -512,4 +513,50 @@ TEST(xcompiler, still_reports_true_circular_dependency) {
 
   compiler compilerInstance(instance);
   EXPECT_EQ(compilerInstance.compile(), "Circular dependency in stream definitions");
+}
+
+// Iloczyn interwalow wychodzil poza int juz dla licznikow rzedu 10^4, a
+// boost::rational<int> nie wykrywa przepelnienia. Objawem byl niezwiazany
+// komunikat walidacji planu ("faster div from slower source") dla planu, ktory
+// jest poprawny. Interwaly liczone sa teraz w 64 bitach.
+TEST(xcompiler, deep_dehash_chain_does_not_overflow_interval) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE value INTEGER STREAM src, 147/1000 FILE 'a.txt'
+        SELECT * STREAM d1 FROM src&441/1000
+        SELECT * STREAM d2 FROM d1&1029/2000
+        SELECT * STREAM d3 FROM d2&9261/16000
+        SELECT * STREAM d4 FROM d3&27783/16000
+        SELECT * STREAM d5 FROM d4&83349/8000
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  EXPECT_EQ(instance.getQuery("d5").rInterval, boost::rational<int>(83349, 16000));
+}
+
+// Interwal, ktorego nie da sie zapisac w typie interwalu, musi dawac komunikat
+// o zakresie — a nie cichy smiec ani komunikat o innej wadzie planu.
+TEST(xcompiler, unrepresentable_interval_reports_range_error) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE value INTEGER STREAM src, 46341/46339 FILE 'a.txt'
+        SELECT * STREAM wide FROM src&46342/46339
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_THROW(
+      {
+        try {
+          compilerInstance.compile();
+        } catch (const std::out_of_range &error) {
+          EXPECT_NE(std::string(error.what()).find("out of representable range"), std::string::npos);
+          throw;
+        }
+      },
+      std::out_of_range);
 }

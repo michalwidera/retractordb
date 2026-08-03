@@ -23,6 +23,33 @@
 
 using boost::lexical_cast;
 
+namespace {
+/// Wyliczanie interwałów w szerszym typie, z kontrolą zakresu.
+///
+/// Wzory operatorów mnożą licznik przez licznik i mianownik przez mianownik
+/// ((D_a*D_b)/(D_a+D_b) dla przeplotu, (D_a*D_b)/|D_a-D_b| dla rozplotu), więc
+/// dla interwałów o licznikach rzędu 10^4 iloczyn wychodzi poza int.
+/// boost::rational<int> nie wykrywa przepełnienia — wynik jest wtedy cichym
+/// śmieciem, który ujawnia się dopiero jako niezwiązany błąd walidacji planu
+/// ("You cannot make faster div from slower source"). Liczymy więc w 64 bitach
+/// i sprawdzamy, czy wynik daje się w ogóle zapisać w typie interwału.
+using wideRational = boost::rational<std::int64_t>;
+
+wideRational widen(const boost::rational<int> &value) { return wideRational{value.numerator(), value.denominator()}; }
+
+wideRational widen(int value) { return wideRational{value, 1}; }
+
+boost::rational<int> narrowInterval(const wideRational &value, const std::string &id, const char *formula) {
+  constexpr std::int64_t limit = std::numeric_limits<int>::max();
+  if (value.numerator() > limit || value.numerator() < std::numeric_limits<int>::min() || value.denominator() > limit) {
+    SPDLOG_ERROR("compiler: interval {}/{} of stream '{}' ({}) is out of representable range", value.numerator(),
+                 value.denominator(), id, formula);
+    throw std::out_of_range("Stream interval out of representable range — simplify the plan or use coarser intervals");
+  }
+  return boost::rational<int>{static_cast<int>(value.numerator()), static_cast<int>(value.denominator())};
+}
+}  // namespace
+
 namespace localContext {
 boost::regex xprFieldId5(R"((\w*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
 boost::regex xprFieldId4(R"((\w*)\[(\d*)\,(\d*)\])");    // something[1,1]
@@ -82,7 +109,8 @@ std::string compiler::resolveStreamIntervals() {
             unresolvedCount++;
             continue;
           }
-          delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
+          delta = narrowInterval((widen(delta1) * widen(delta2)) / (widen(delta1) + widen(delta2)), q.id,
+                                 "(D_a*D_b)/(D_a+D_b)");  // deltaHash(delta1, delta2);
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -98,7 +126,8 @@ std::string compiler::resolveStreamIntervals() {
           }  //           D_c * D_b
           //   D_a = --------------
           //         abs(D_c - D_b)
-          delta = (delta1 * delta2) / abs(delta1 - delta2);  // deltaDivMod(delta1, delta2);
+          delta = narrowInterval((widen(delta1) * widen(delta2)) / abs(widen(delta1) - widen(delta2)), q.id,
+                                 "(D_c*D_b)/|D_c-D_b|");  // deltaDivMod(delta1, delta2);
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
@@ -118,7 +147,8 @@ std::string compiler::resolveStreamIntervals() {
           }  //           D_c * D_a
           //   D_b = --------------
           //         abs(D_c - D_a)
-          delta = (delta2 * delta1) / abs(delta2 - delta1);  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
+          delta = narrowInterval((widen(delta2) * widen(delta1)) / abs(widen(delta2) - widen(delta1)), q.id,
+                                 "(D_c*D_a)/|D_c-D_a|");  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
@@ -186,7 +216,7 @@ std::string compiler::resolveStreamIntervals() {
           // } else
           // delta = (deltaSrc / windowSizeSrc) * step;
 
-          delta = (coreDelta * step) / coreWindow;
+          delta = narrowInterval((widen(coreDelta) * widen(step)) / widen(coreWindow), q.id, "(D_src*k)/F");
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}", op.getStrCommandID());
