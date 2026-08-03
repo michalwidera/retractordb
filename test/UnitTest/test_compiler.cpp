@@ -369,7 +369,12 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 5);
   EXPECT_EQ(instance.maxCapacity.at("wide_shifted"), 2);
   EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 1);
-  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 3);
+  // K24/P1: pojemnosc zrodla roznicy wzrosla z 3 na 4. Wartosc 3 pokrywala
+  // odleglosc wsteczna tylko dla ilorazu 1 i 2; od ilorazu 3 odczyt wypadal
+  // poza historia i dawal cichy rekord all-NULL. Nowy czlon to
+  // floor((1+Wout)*ratio) + prefetch deklaracji, brany jako maksimum ze stara
+  // formula — pojemnosc nigdy nie maleje.
+  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 4);
 }
 
 // Pojemnosc bufora zrodla okna to odleglosc do najstarszego pola okna PLUS jeden:

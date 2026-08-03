@@ -769,6 +769,9 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) — stała
   // w jednostkach rekordów, patrz komentarz przy STREAM_HASH poniżej.
   constexpr int kJunctionHistory = 4;
+  // Deklaracja wyprzedza konsumenta o rekord uzbrojony przy otwarciu storage
+  // i o zerowy prefetch, wiec jej czolo jest dalej, niz wynika z czasu.
+  constexpr int kDeclarationPrefetch = 2;
 
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
@@ -835,8 +838,20 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // wtedy najstarsze pole okna i AGSE czytało zamiast niego rekord najnowszy.
         // Deklaracja ma dodatkowo dwa rekordy przed pierwszym wykonaniem konsumenta:
         // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch.
-        const int required = floorR(retained) + (source.isDeclaration() ? 2 : 1);
-        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
+        int required = floorR(retained) + (source.isDeclaration() ? 2 : 1);
+        // K24/P1: powyższa formuła zaniżała pojemność dla 10,4% par (konsument,
+        // deklaracja) w korpusie 10 010 planów — odczyt poza historią kończył się
+        // przerwaniem procesu w storage::revRead. Odległość wsteczna wyprowadzona
+        // z modelu zdarzeniowego wynosi dla deklaracji (Wsrc=0)
+        //   max_n [ floor((n+1+Wout)*step/F) - floor(n*step/F) ] = ceil((1+Wout)*step/F),
+        // co potwierdzono wyczerpująco na 1152 kombinacjach (step, F, Wout).
+        // Bierzemy maksimum obu wartości: naprawa nie ma prawa zmniejszyć
+        // pojemności żadnemu strumieniowi, który działa dziś poprawnie.
+        if (source.isDeclaration()) {
+          const auto perSlot = boost::rational<int>(1 + q.startupLatency) * boost::rational<int>(step, sourceWidth);
+          required           = std::max(required, ceilR(perSlot) + kDeclarationPrefetch);
+        }
+        capMap[nameSrc] = std::max(capMap[nameSrc], std::max(required, 1));
       } break;
       case STREAM_HASH:
         // Przeplot/rozplot czytają elementy składowych po indeksie
@@ -877,10 +892,21 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // Dla deklaracji maksimum odległości od c_{ceil(n*ratio)}
         // występuje w fazie całkowitej. Dwa rekordy startowe mają tę samą
         // genezę co w AGSE (uzbrojenie storage i zerowy prefetch).
-        const int required = source.isDeclaration()
-                                 ? floorR(boost::rational<int>(q.startupLatency) * ratio) + 2
-                                 : ceilR(boost::rational<int>(q.startupLatency) * ratio - source.startupLatency);
-        capMap[arg1]       = std::max(capMap[arg1], std::max(required, 1));
+        int required = source.isDeclaration() ? floorR(boost::rational<int>(q.startupLatency) * ratio) + 2
+                                              : ceilR(boost::rational<int>(q.startupLatency) * ratio - source.startupLatency);
+        // K24/P1: formuła dla deklaracji zaniżała pojemność dla 39,1% par
+        // (konsument, deklaracja) w korpusie 10 010 planów. Przy ilorazie
+        // całkowitym >= 3 odczyt wypadał poza historią i dawał CICHY rekord
+        // all-NULL — cały strumień wyjściowy był pusty przy poprawnej liczbie
+        // rekordów. Odległość wsteczna z modelu zdarzeniowego wynosi dla
+        // deklaracji (Wsrc=0)
+        //   max_n [ floor((n+1+Wout)*ratio) - ceil(n*ratio) ] = floor((1+Wout)*ratio),
+        // co potwierdzono wyczerpująco na 2070 parach (ratio, Wout).
+        // Maksimum obu wartości — patrz komentarz przy STREAM_AGSE.
+        if (source.isDeclaration()) {
+          required = std::max(required, floorR(boost::rational<int>(1 + q.startupLatency) * ratio) + kDeclarationPrefetch);
+        }
+        capMap[arg1] = std::max(capMap[arg1], std::max(required, 1));
       } break;
       default:
         FatalError("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
