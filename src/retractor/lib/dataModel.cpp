@@ -96,7 +96,10 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
     // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
     // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
     // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
-    SPDLOG_WARN("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
+    //
+    // Poziom ERROR, choć proces nie ginie: defekt D1 (K24) przeżył niezauważony właśnie
+    // dlatego, że ten komunikat był na WARN, a Release kompiluje WARN na wylot.
+    SPDLOG_ERROR("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
@@ -123,7 +126,8 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   if (outOfRange) {
     // Rekord niedostępny (przyszłość na osi czasu źródła albo poza historią
     // bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
-    SPDLOG_WARN("fetchForward {}: record {} not available (count={})", instance, forwardIndex, count);
+    // Poziom ERROR z tego samego powodu co w fetchBack powyżej.
+    SPDLOG_ERROR("fetchForward {}: record {} not available (count={})", instance, forwardIndex, count);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
