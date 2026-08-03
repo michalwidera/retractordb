@@ -879,7 +879,24 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
           capMap[arg1] = std::max(capMap[arg1], std::max(kJunctionHistory, delayed));
         }
         break;
-      case STREAM_ADD:
+      case STREAM_ADD: {
+        // K24/P2 wariant A: suma strumieni czyta składową po indeksie postępującym
+        // ⌊n·Δout/Δsrc⌋ (Definicja sumy strumieni), więc — inaczej niż przed poprawką,
+        // gdy brała bieżący payload — wchodzi do modelu pojemności.
+        // Odległość wsteczna w chwili slotu n wynosi
+        //   count_src(t_n) - 1 - ⌊n·ratio⌋,  ratio = Δout/Δsrc <= 1,
+        // a potrzebna pojemność to maksimum po n z count_src(t_n) - ⌊n·ratio⌋, czyli
+        //   max_n [ ⌊(n+1+Wout)·ratio⌋ - ⌊n·ratio⌋ ] - Wsrc = ⌈(1+Wout)·ratio⌉ - Wsrc.
+        // Dla deklaracji dochodzi wyprzedzenie czoła (uzbrojenie storage i zerowy
+        // prefetch) — ten sam człon co w STREAM_SUBTRACT i STREAM_AGSE.
+        for (const auto &nameSrc : {arg1, arg2}) {
+          const auto &source = coreInstance[nameSrc];
+          const auto ratio   = q.rInterval / source.rInterval;
+          int required       = ceilR(boost::rational<int>(1 + q.startupLatency) * ratio) - source.startupLatency;
+          if (source.isDeclaration()) required += kDeclarationPrefetch;
+          capMap[nameSrc] = std::max(capMap[nameSrc], std::max(required, 1));
+        }
+      } break;
       case STREAM_AVG:
       case STREAM_MIN:
       case STREAM_MAX:

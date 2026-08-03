@@ -65,6 +65,17 @@ constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &de
   return ceilR(i * deltaTarget / deltaSource);
 }
 
+// Suma strumieni (definicja formalna): dla C = A+B, gdzie Delta_c = min(Delta_a, Delta_b):
+//   c_n = (a_n, b_{⌊n·Delta_a/Delta_b⌋})   gdy Delta_a <= Delta_b
+//   c_n = (a_{⌊n·Delta_b/Delta_a⌋}, b_n)   w przeciwnym razie
+// Oba przypadki mają jedną postać: indeks składowej o interwale deltaSrc to
+// ⌊n·Delta_c/deltaSrc⌋ — dla składowej szybszej (deltaSrc == Delta_c) daje n.
+// Wynik jest indeksem POSTĘPUJĄCYM (0-bazowym) w strumieniu składowej.
+constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, const int n) {
+  if (deltaOut == deltaSrc) return n;
+  return floorR(n * deltaOut / deltaSrc);
+}
+
 constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(offset) / boost::rational<int>(step)); }
 
 // Dla kolejnych okien reszta (n*step) mod sourceWidth przebiega przez

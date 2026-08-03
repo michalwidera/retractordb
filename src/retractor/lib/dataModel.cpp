@@ -287,11 +287,22 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
 
+      // K24/P2 wariant A: składowe są czytane po indeksie POSTĘPUJĄCYM z Definicji sumy
+      // strumieni (c_n = (a_n, b_{⌊nΔa/Δb⌋})), a nie jako bieżący payload obu składowych.
+      // Bieżący payload dawał b_{⌊(n+1)Δa/Δb⌋} — rekord wolniejszej składowej domknięty
+      // dopiero na koniec slotu, czyli w slocie n jeszcze nieokreślony.
+      //
+      // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji).
+      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+
+      const auto fwdPos1 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc1).rInterval, n);
+      const auto fwdPos2 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc2).rInterval, n);
+
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
       rdb::probe::onAddMerge();
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
+      *(qSet[instance]->inputPayload) = fetchForward(nameSrc1, fwdPos1) + fetchForward(nameSrc2, fwdPos2);
     } break;
     case STREAM_AGSE: {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
