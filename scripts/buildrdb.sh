@@ -3,26 +3,22 @@
 # https://zfredenburg.medium.com/force-a-bash-script-to-exit-on-error-ec50b374c98d
 set -o errexit
 
-foldername=${PWD##*/}          # to assign to a variable
-foldername=${foldername:-/}    # to correct for the case where PWD=/
-
 echo "-- Last two lines of ~/.bashrc are:"
 tail -n 2 ~/.bashrc
 
-case "$foldername" in
-  "retractordb") build_folder=".";;
-  "scripts")     build_folder="..";;
-  "build")       build_folder="..";;
-  "Release")     build_folder="../..";;
-  "Debug")       build_folder="../..";;
-  *)             echo "Unknown current build folder << $foldername >>"
-                 exit
-                 ;;
-esac
+# The source tree is located from this script's own path, not from the name of the
+# current directory. Matching directory names ("retractordb", "build", "Release", …)
+# refused to work in a checkout cloned under any other name — which is exactly what a
+# second pinned build tree needs.
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+rdb_source_dir=$(cd "$script_dir/.." && pwd)
 
-echo "-- Note: Current folder is [ $foldername ] and will start build in [ $build_folder ]"
+if [ ! -f "$rdb_source_dir/CMakeLists.txt" ] || [ ! -d "$rdb_source_dir/src" ]; then
+    echo "Not a RetractorDB source tree: $rdb_source_dir"
+    exit 1
+fi
 
-rdb_source_dir=$(cd "$build_folder" && pwd)
+echo "-- Note: Current folder is [ ${PWD##*/} ] and will start build in [ $rdb_source_dir ]"
 
 production_cmake_args=(
     -DRDB_OPT_DEDUP_SUBSTRATES=ON
@@ -1042,12 +1038,12 @@ run_option() {
             ;;
         "debug")
             sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
-            conan source $build_folder
-            conan install $build_folder -s build_type=Debug --build missing
+            conan source "$rdb_source_dir"
+            conan install "$rdb_source_dir" -s build_type=Debug --build missing
             build_jobs=$(compute_build_jobs)
             echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
             export CMAKE_BUILD_PARALLEL_LEVEL="$build_jobs"
-            conan build $build_folder -s build_type=Debug --build missing
+            conan build "$rdb_source_dir" -s build_type=Debug --build missing
             ;;
         "probe")
             # Budowa Release z WŁĄCZONĄ sondą pomiarową (benchmark E1/E3). Release, bo
@@ -1141,8 +1137,7 @@ run_option() {
             echo "-- Manual override CLEARED: build parallelism reverts to the automatic RAM-aware default (always applied unless RDB_BUILD_JOBS is set) for subsequent options in this invocation."
             ;;
         "bashrc")
-            cd $build_folder
-            if [ "${PWD##*/}" != "retractordb" ] ; then echo "Error: Current folder is not retractordb" ; exit ; fi 
+            cd "$rdb_source_dir"
             bashrc_file="$HOME/.bashrc"
             # Binaria instalują się do ~/.local/bin (prefiks ustawiany w CMakeLists).
             # Tworzymy katalog, by wpis PATH był poprawny nawet przed pierwszym 'ninja
@@ -1183,7 +1178,7 @@ run_option() {
                 pip3 install gcovr || { echo "Error: Failed to install gcovr"; exit 1; }
             fi
 
-            cd $build_folder
+            cd "$rdb_source_dir"
             cmake --preset conan-debug -DENABLE_COVERAGE=ON
             cd build/Debug
             find . -name '*.gcda' -delete -o -name '*.gcno' -delete
@@ -1200,8 +1195,8 @@ run_option() {
         "vimsyntax")
             vim_dir="${HOME}/.vim"
             mkdir -p "$vim_dir/syntax" "$vim_dir/ftdetect"
-            cp "$build_folder/scripts/.vim/syntax/rql.vim"   "$vim_dir/syntax/"
-            cp "$build_folder/scripts/.vim/ftdetect/rql.vim" "$vim_dir/ftdetect/"
+            cp "$rdb_source_dir/scripts/.vim/syntax/rql.vim"   "$vim_dir/syntax/"
+            cp "$rdb_source_dir/scripts/.vim/ftdetect/rql.vim" "$vim_dir/ftdetect/"
             echo "-- RetractorQL vim syntax installed to $vim_dir"
             ;;
         "batsyntax")
@@ -1210,7 +1205,7 @@ run_option() {
                 echo "Error: neither 'batcat' nor 'bat' found. Install bat first."
                 exit 1
             fi
-            syntax_src="$build_folder/scripts/sublime/retractorql.sublime-syntax"
+            syntax_src="$rdb_source_dir/scripts/sublime/retractorql.sublime-syntax"
             syntax_dir="$("$BAT" --config-dir)/syntaxes"
             mkdir -p "$syntax_dir"
             cp "$syntax_src" "$syntax_dir/"
