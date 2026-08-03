@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "descriptor.hpp"
@@ -12,6 +13,7 @@ namespace rdb {
 /// Obiekt binaryDeviceRO powinien:
 /// - odczytywać kolejne porcje surowych danych binarnych o długości wyznaczonej przez Descriptor,
 /// - używać Descriptor wyłącznie do określenia długości rekordu i rozmiaru wektora nullBitset,
+/// - składać rekord z krótkich odczytów i ponawiać wywołanie systemowe przerwane przez EINTR,
 /// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca EXIT_FAILURE,
 /// - obsługiwać wyłącznie sekwencyjny odczyt, w którym jedyną poprawną pozycją jest 0,
 /// - przy poprawnym odczycie ustawiać nullBitset na same wartości false,
@@ -23,6 +25,8 @@ namespace rdb {
 /// @note Klasa nie interpretuje semantyki pól opisanych w Descriptor; przekazuje jedynie surowe bajty do bufora wyjściowego.
 /// @note Mechanizm powrotu do początku zakłada źródło wspierające lseek; dla urządzeń nieseekowalnych zachowanie zależy od systemowego deskryptora.
 class binaryDeviceRO : public FileInterface {
+  enum class readOutcome : std::uint8_t { complete, endOfFile, error };
+
   std::string filename_;
   const ssize_t recordSize_;
   Descriptor descriptor_;
@@ -35,6 +39,9 @@ class binaryDeviceRO : public FileInterface {
 
   bool loopToBeginningIfEOF_ = true;
   std::vector<bool> lastNullBitset_;
+
+  /// @brief Wypełnia cały rekord, sklejając krótkie odczyty i ponawiając wywołanie przerwane przez EINTR.
+  readOutcome readExact(uint8_t *ptrData);
 
  public:
   explicit binaryDeviceRO(std::string_view fileName,          //

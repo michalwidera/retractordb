@@ -145,6 +145,15 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     if (item.rlen != 0) {
       if (item.rtype == rdb::STRING) {
         myFile_ >> std::ws;
+        // Powrót na początek musi nastąpić PRZED rozpoznaniem cudzysłowu. Inaczej na końcu pliku
+        // peek() zwraca EOF, sterowanie wchodzi w ścieżkę tokenu, ta zawija plik i konsumuje jego
+        // pierwszy napis, a skan poniżej sięga po następny — pierwszy rekord pliku wypadał wtedy
+        // z cyklu przy każdym zawinięciu (dla "aa","bb","cc" ciąg odczytów był aa,bb,cc,bb,cc,...).
+        if (myFile_.eof() && loopToBeginningIfEOF_) {
+          myFile_.clear();
+          myFile_.seekg(0, std::ios::beg);
+          myFile_ >> std::ws;
+        }
         if (myFile_.peek() != '"') {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
           if (!token.has_value() || isNullToken(*token)) {
@@ -194,7 +203,10 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
       }
 
       // rdb::RATIONAL - deprecate ?
-      i++;
+      // STRING zajmuje jedną pozycję płaską, a tablica liczbowa po jednej pozycji na element. Stałe
+      // i++ ustawiało kolejne pole na pozycji wewnątrz poprzedniej tablicy: przy DECLARE a INTEGER[3],
+      // b INTEGER wartość b lądowała w a[1], a własne pole b zostawało niezapisane.
+      i += (item.rtype == rdb::STRING) ? 1 : item.rarray;
     }
   }
 

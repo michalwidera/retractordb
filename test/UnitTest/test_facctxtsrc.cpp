@@ -476,4 +476,86 @@ TEST_F(TextSourceROTest, test_read_string_no_loop_eof_zero_padded) {
   EXPECT_EQ(buffer[2], 0);
 }
 
+// Regression: the end-of-file branch used to consume the first string of the file before
+// rescanning for a quote, so after each wrap the sequence skipped record #0 (aa,bb,cc,bb,cc,...).
+TEST_F(TextSourceROTest, test_read_string_loop_keeps_first_record) {
+  auto filename = createTestFile("test_str_loop_multi.txt", "\"aa\"\n\"bb\"\n\"cc\"\n");
+
+  rdb::Descriptor desc{{"s", 2, 1, rdb::STRING}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, true);
+
+  auto buffer                             = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  const std::vector<std::string> expected = {"aa", "bb", "cc", "aa", "bb", "cc", "aa"};
+
+  for (size_t i = 0; i < expected.size(); ++i) {
+    GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS) << "read #" << i;
+    EXPECT_EQ(std::string(reinterpret_cast<char *>(buffer.get()), 2), expected[i]) << "read #" << i;
+  }
+}
+
+// The same wrap, but with a string followed by a numeric field: both fields of a record
+// must come from the same line after looping back.
+TEST_F(TextSourceROTest, test_read_string_and_int_loop_stays_aligned) {
+  auto filename = createTestFile("test_str_int_loop.txt", "\"aa\" 1\n\"bb\" 2\n");
+
+  rdb::Descriptor desc{{"s", 2, 1, rdb::STRING}, {"v", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, true);
+
+  auto buffer                                             = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  const std::vector<std::pair<std::string, int>> expected = {{"aa", 1}, {"bb", 2}, {"aa", 1}, {"bb", 2}, {"aa", 1}};
+
+  for (size_t i = 0; i < expected.size(); ++i) {
+    GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS) << "read #" << i;
+    EXPECT_EQ(std::string(reinterpret_cast<char *>(buffer.get()), 2), expected[i].first) << "read #" << i;
+    int value;
+    std::memcpy(&value, buffer.get() + 2, sizeof(int));
+    EXPECT_EQ(value, expected[i].second) << "read #" << i;
+  }
+}
+
+// A single-record file must keep returning that record, not run out of data.
+TEST_F(TextSourceROTest, test_read_string_loop_single_record) {
+  auto filename = createTestFile("test_str_loop1.txt", "\"zz\"\n");
+
+  rdb::Descriptor desc{{"s", 2, 1, rdb::STRING}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, true);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  for (int i = 0; i < 4; ++i) {
+    GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS) << "read #" << i;
+    EXPECT_EQ(std::string(reinterpret_cast<char *>(buffer.get()), 2), "zz") << "read #" << i;
+  }
+}
+
+// Regression: a field following an array used the flat position of the array's second element,
+// so with DECLARE a INTEGER[3], b INTEGER the value of b landed in a[1] and b stayed unwritten.
+TEST_F(TextSourceROTest, test_read_integer_array_followed_by_scalar) {
+  auto filename = createTestFile("test_arr_scalar.txt", "1 2 3 4\n5 6 7 NULL\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 3, rdb::INTEGER},
+                       {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  int values[4];
+  std::memcpy(values, buffer.get(), 4 * sizeof(int));
+  EXPECT_EQ(values[0], 1);
+  EXPECT_EQ(values[1], 2);
+  EXPECT_EQ(values[2], 3);
+  EXPECT_EQ(values[3], 4);
+
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  std::memcpy(values, buffer.get(), 4 * sizeof(int));
+  EXPECT_EQ(values[0], 5);
+  EXPECT_EQ(values[1], 6);
+  EXPECT_EQ(values[2], 7);
+}
+
 // NOLINTEND(modernize-avoid-c-arrays)

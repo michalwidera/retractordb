@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>  // ::read, ::open ...
 
+#include <cerrno>
 #include <cstring>
 #include "fatalError.hpp"
 
@@ -34,6 +35,24 @@ binaryDeviceRO::~binaryDeviceRO() {
 
 auto binaryDeviceRO::name() -> std::string & { return filename_; }
 
+// Krótki odczyt NIE oznacza końca danych: ::read na FIFO, potoku czy urządzeniu wolno zwrócić mniej
+// bajtów, niż zażądano, a EINTR przerywa wywołanie bez utraty czegokolwiek. Rekord składamy więc
+// z kolejnych porcji i ponawiamy przerwane wywołanie.
+binaryDeviceRO::readOutcome binaryDeviceRO::readExact(uint8_t *ptrData) {
+  ssize_t done = 0;
+  while (done < recordSize_) {
+    const ssize_t readSize = ::read(fd_, ptrData + done, static_cast<size_t>(recordSize_ - done));
+    if (readSize > 0) {
+      done += readSize;
+      continue;
+    }
+    if (readSize == 0) return readOutcome::endOfFile;
+    if (errno == EINTR) continue;
+    return readOutcome::error;
+  }
+  return readOutcome::complete;
+}
+
 ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   auto markAllNullAndZero = [&](ssize_t status) {
     lastNullBitset_.assign(descriptor_.size(), true);
@@ -52,15 +71,12 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
     return markAllNullAndZero(EXIT_FAILURE);
   }
 
-  auto read_size = ::read(fd_, ptrData, recordSize_);  // /dev/random no seek supported
-  if (read_size != recordSize_) {                      // dev/random has no seek - but binary files should loop?
-    if (loopToBeginningIfEOF_) {
-      ::lseek(fd_, 0, SEEK_SET);
-      auto read_size_sh = ::read(fd_, ptrData, recordSize_);
-      if (read_size_sh != recordSize_) return markAllNullAndZero(EXIT_FAILURE);
-    } else {
-      return markAllNullAndZero(EXIT_SUCCESS);
-    }
+  auto outcome = readExact(ptrData);  // /dev/random no seek supported
+  if (outcome == readOutcome::error) return markAllNullAndZero(EXIT_FAILURE);
+  if (outcome == readOutcome::endOfFile) {  // dev/random has no seek - but binary files should loop?
+    if (!loopToBeginningIfEOF_) return markAllNullAndZero(EXIT_SUCCESS);
+    if (::lseek(fd_, 0, SEEK_SET) < 0) return markAllNullAndZero(EXIT_FAILURE);
+    if (readExact(ptrData) != readOutcome::complete) return markAllNullAndZero(EXIT_FAILURE);
   }
   lastNullBitset_.assign(descriptor_.size(), false);
   nullBitset = lastNullBitset_;
