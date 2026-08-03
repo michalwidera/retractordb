@@ -15,7 +15,7 @@
 #include "fatalError.hpp"
 
 #include "rdb/convertTypes.hpp"
-#include "workProbe.hpp"
+#include "rdb/probe.hpp"
 
 static cast<rdb::descFldVT> castFldVT;
 
@@ -493,10 +493,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
     return v;
   };
 
-  // Sonda E4: praca arytmetyczna slotu to LICZBA WYKONAŃ tokenów, nie rozmiar programu
-  // w planie — ten sam program wykonuje się raz na slot na każdy strumień, który go używa.
-  RDB_BENCH_WORK_ADD(evalCalls, 1);
-  RDB_BENCH_WORK_ADD(evalTokens, program.size());
+  rdb::probe::onEval(program.size());
 
   // S1: token przez referencje (byl przez wartosc -> kopia tokena per iteracja, a token
   // trzyma descFldVT, ktory moze zawierac std::string). getStr_() liczone LENIWIE — tylko

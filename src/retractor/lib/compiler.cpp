@@ -1,18 +1,15 @@
 #include "compiler.hpp"
 
 #include <algorithm>
-#include <chrono>  // instrumentacja E3: pomiar czasu kompilacji
 #include <cmath>
 #include <cstdint>
-#include <cstdio>   // instrumentacja E3 (RDB_BENCH_PLAN): std::fprintf
-#include <cstdlib>  // instrumentacja E3: std::getenv
 #include <functional>
 #include <limits>
 #include <map>
 #include <optional>
 #include <set>
 #include <sstream>
-#include <utility>  // instrumentacja E3: std::pair
+#include <utility>  // std::pair
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -21,6 +18,7 @@
 #include <boost/regex.hpp>
 
 #include "fatalError.hpp"
+#include "rdb/probe.hpp"    // sonda E3: rozmiar planu, czas kompilacji
 #include "SOperations.hpp"  // ceilR
 
 using boost::lexical_cast;
@@ -1222,9 +1220,7 @@ std::string compiler::factorMatchedHashTimeMoves() {
         });
         coreInstance.erase(removed.begin(), removed.end());
       }
-#ifdef RDB_BENCH_PROBE
-      ++rewriteAppliedR1_;
-#endif
+      rdb::probe::onRewriteR1();
       optimized = true;
       changed   = true;
       break;
@@ -1307,9 +1303,7 @@ std::string compiler::shareEquivalentSelectComputations() {
 #if RDB_OPT_COMMUTATIVE_ADD
         if (rightFingerprint < leftFingerprint) {
           std::swap(leftFingerprint, rightFingerprint);
-#ifdef RDB_BENCH_PROBE
-          rewriteAppliedR2Nodes_.insert(qry.id);
-#endif
+          rdb::probe::onRewriteR2(qry.id);
         }
 #endif
         result = "ADD{" + leftFingerprint + "}{" + rightFingerprint + "}";
@@ -1435,75 +1429,13 @@ std::string compiler::shareEquivalentSelectComputations() {
 std::string compiler::compile() {
   std::string result;
 
-#ifdef RDB_BENCH_PROBE
-  rewriteAppliedR1_ = 0;
-  rewriteAppliedR2Nodes_.clear();
-
-  //
-  // Instrumentacja efektu optymalizacji planu (eksperyment E3).
-  // Cały kod jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON (scripts/buildrdb.sh probe);
-  // w zwykłej kompilacji znika bez śladu.
-  // Aktywna w runtime wyłącznie, gdy ustawiona jest zmienna środowiskowa RDB_BENCH_PLAN.
-  // Bez niej benchPlan == false i funkcja zachowuje się dokładnie jak wcześniej
-  // (zero kosztu i efektów ubocznych). Kod jest przenośny (tylko getenv/fprintf),
-  // więc — w odróżnieniu od sondy E1 — nie wymaga #ifdef __linux__.
-  //
-  // planSize() opisuje plan czwórką liczb, z pominięciem dyrektyw kompilatora:
-  //   * strumienie publiczne i substraty osobno — substrat nie ma tożsamości
-  //     obserwowalnej, więc to on jest właściwą jednostką redukcji strukturalnej;
-  //   * tokeny drzewa FROM (query::lProgram) — tam widać efekt R1 i deduplikacji;
-  //   * tokeny programów pól (field::lProgram) — tam i TYLKO tam widać efekt R2.
-  // Ostatni składnik jest konieczny: shareEquivalentSelectComputations() przenosi
-  // kosztowny program pól do jednego substratu STREAM_SELECT_*, zostawiając
-  // zapytaniom publicznym lekkie projekcje, i nie zmienia przy tym ani jednego
-  // tokenu w lProgram. Metryka licząca same lProgram dawała identyczny odczyt dla
-  // programu pól i dla programu pięciokrotnie droższego.
-  // Migawki bierzemy na czterech etapach:
-  //   * wejście            — surowy plan po parsowaniu,
-  //   * przed deduplikacją — po kanonizacji do postaci pośredniej (dekompozycja),
-  //   * po deduplikacji    — po eliminacji zdublowanych substratów (wspólne
-  //                          podwyrażenia) — to właściwa redukcja planu,
-  //   * wyjście            — końcowy, zoptymalizowany plan.
-  // Spadek liczby tokenów/strumieni (zwłaszcza na etapie deduplikacji) to
-  // mierzalny efekt optymalizacji z sekcji E3. Wynik trafia na stderr i zasila
-  // tabelę E3 manuskryptu.
-  //
-  const bool benchPlan = std::getenv("RDB_BENCH_PLAN") != nullptr;
-  struct planShape {
-    size_t publicStreams = 0;
-    size_t substrates    = 0;
-    size_t fromTokens    = 0;
-    size_t fieldTokens   = 0;
-  };
-  auto planSizeRaw = [this]() {
-    planShape acc;
-    for (const auto &q : coreInstance) {
-      if (q.isCompilerDirective()) continue;
-      ++(q.isSubstrat ? acc.substrates : acc.publicStreams);
-      acc.fromTokens += q.lProgram.size();
-      for (const auto &f : q.lSchema)
-        acc.fieldTokens += f.lProgram.size();
-    }
-    return acc;
-  };
-
-  // Czas instrumentacji jest ODEJMOWANY od czasu kompilacji. Migawka planu
-  // iteruje cały plan, więc jej koszt zależy od rozmiaru planu, a ten różni się
-  // między profilami ablacyjnymi — bez odjęcia profil o większym planie
-  // wyglądałby na wolniejszy częściowo z powodu własnego pomiaru.
-  long probeOverheadNs = 0;
-  auto planSize        = [&]() {
-    const auto probeStart = std::chrono::steady_clock::now();
-    const auto shape      = planSizeRaw();
-    probeOverheadNs +=
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - probeStart).count();
-    return shape;
-  };
-
-  const planShape empty{};
-  const auto compileStart = std::chrono::steady_clock::now();
-  const auto atEntry      = benchPlan ? planSize() : empty;
-#endif
+  // Sonda E3 (rdb/probe.hpp): rozmiar planu na czterech etapach, czas kompilacji i
+  // liczba zastosowanych przepisań. Migawki są nieaktywne, dopóki nie ustawiono
+  // RDB_BENCH_PLAN; bez wkompilowanej sondy znika cały obiekt razem z migawkami.
+  // Kolejność etapów jest istotna dla wyniku: wejście to plan surowy po parsowaniu,
+  // a właściwą redukcję strukturalną widać dopiero w parze przed/po deduplikacji.
+  rdb::probe::planProbe planBench;
+  planBench.capture(rdb::probe::planStage::entry, coreInstance);
 
   result = extractIntermediateStreams();
   if (result != "OK") return result;
@@ -1528,9 +1460,7 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 #endif
 
-#ifdef RDB_BENCH_PROBE
-  const auto preDedup = benchPlan ? planSize() : empty;  // przed eliminacją (E3)
-#endif
+  planBench.capture(rdb::probe::planStage::preDedup, coreInstance);
 #if RDB_OPT_DEDUP_SUBSTRATES
   namesBeforeRewrite = snapshotUserFieldNames();
   result             = deduplicateSubstrats();
@@ -1538,9 +1468,7 @@ std::string compiler::compile() {
   result = verifyUserFieldNamesPreserved(namesBeforeRewrite);
   if (result != "OK") return result;
 #endif
-#ifdef RDB_BENCH_PROBE
-  const auto postDedup = benchPlan ? planSize() : empty;  // po eliminacji (E3)
-#endif
+  planBench.capture(rdb::probe::planStage::postDedup, coreInstance);
 
   result = resolveFieldReferences();
   if (result != "OK") return result;
@@ -1586,50 +1514,8 @@ std::string compiler::compile() {
   // interwale stawia konsumenta PRZED jego producentami.
   coreInstance.topologicalSort();
 
-#ifdef RDB_BENCH_PROBE
-  // Raport instrumentacji E3 (tylko gdy RDB_BENCH_PLAN).
-  // Format: publiczne/substraty/tokeny-from/tokeny-pol.
-  if (benchPlan) {
-    const auto atExit = planSize();
-    // Zegar zatrzymywany PO ostatniej migawce, żeby jej koszt trafił do
-    // probeOverheadNs i został odjęty tak samo jak koszt pozostałych trzech.
-    const long compileNs =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - compileStart).count();
-    std::fprintf(stderr,
-                 "PLAN bench (publiczne/substraty/tokeny-from/tokeny-pol, dedup="
-#if RDB_OPT_DEDUP_SUBSTRATES
-                 "ON"
-#else
-                 "OFF"
-#endif
-                 "): wejscie=%zu/%zu/%zu/%zu  przed-dedup=%zu/%zu/%zu/%zu  "
-                 "po-dedup=%zu/%zu/%zu/%zu  wyjscie=%zu/%zu/%zu/%zu\n",
-                 atEntry.publicStreams, atEntry.substrates, atEntry.fromTokens, atEntry.fieldTokens, preDedup.publicStreams,
-                 preDedup.substrates, preDedup.fromTokens, preDedup.fieldTokens, postDedup.publicStreams, postDedup.substrates,
-                 postDedup.fromTokens, postDedup.fieldTokens, atExit.publicStreams, atExit.substrates, atExit.fromTokens,
-                 atExit.fieldTokens);
-    std::fprintf(stderr, "REWRITE_APPLIED r1=%zu r2=%zu\n", rewriteAppliedR1_, rewriteAppliedR2Nodes_.size());
-
-    // Czas kompilacji (K6, §9.2). Mierzony jest WYŁĄCZNIE compile(), bez
-    // parsowania RQL i bez startu procesu — te są niezależne od profilu
-    // ablacyjnego i dla planów rzędu kilkudziesięciu węzłów całkowicie
-    // zdominowałyby różnicę, której kampania szuka.
-    std::fprintf(stderr, "COMPILE_NS %ld sonda=%ld\n", compileNs - probeOverheadNs, probeOverheadNs);
-
-    // Rozmiar buforów (K6, §9.2). maxCapacity jest wynikiem
-    // computeRequiredCapacities(): wymagana głębokość historii per strumień.
-    // Suma jest proporcjonalna do zajętości pamięci planu, maksimum wskazuje
-    // najgłębszy bufor, czyli ten decydujący o najgorszym przypadku.
-    size_t capacityTotal = 0;
-    int capacityMax      = 0;
-    for (const auto &[name, capacity] : coreInstance.maxCapacity) {
-      capacityTotal += static_cast<size_t>(capacity);
-      capacityMax = std::max(capacityMax, capacity);
-    }
-    std::fprintf(stderr, "PLAN capacity: strumieni=%zu suma=%zu maks=%d\n", coreInstance.maxCapacity.size(), capacityTotal,
-                 capacityMax);
-  }
-#endif
+  // Migawka końcowa + raport E3 na stderr (tylko gdy RDB_BENCH_PLAN).
+  planBench.report(coreInstance, coreInstance.maxCapacity, RDB_OPT_DEDUP_SUBSTRATES);
 
   return {"OK"};
 }

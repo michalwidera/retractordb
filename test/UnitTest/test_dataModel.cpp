@@ -12,10 +12,10 @@
 #include "config.h"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
+#include "rdb/probe.hpp"  // sonda E4 (liczy tylko w buildzie RDB_BENCH_PROBE)
 #include "rdb/storage.hpp"
 #include "retractor/lib/dataModel.hpp"
-#include "retractor/lib/qTree.hpp"      // coreInstance
-#include "retractor/lib/workProbe.hpp"  // sonda E4 (aktywna tylko w buildzie RDB_BENCH_PROBE)
+#include "retractor/lib/qTree.hpp"  // coreInstance
 
 // ctest -R '^ut-test_dataModel' -V
 
@@ -156,7 +156,6 @@ TEST_F(xschema, check_construct_payload_mirror) {
   }
 }
 
-#ifdef RDB_BENCH_PROBE
 // Sonda E4 (issue_219). Test o ZNANEJ ODPOWIEDZI, nie o "jakiejś liczbie": dla okna
 // @(1,4) nad strumieniem str1 o trzech rekordach po dwa pola liczby wynikają z geometrii
 // okna, nie z pomiaru.
@@ -173,6 +172,11 @@ TEST_F(xschema, check_construct_payload_mirror) {
 //                      odczyty z czterech odwiedzin — dlatego odczyty i odwiedziny są
 //                      liczone ROZDZIELNIE)
 TEST_F(xschema, probe_e4_agse_window_work_counts) {
+  // Test kompiluje się i URUCHAMIA w obu wariantach — to jest sens stałych rdb_probe_*
+  // zamiast #ifdef. Mnożnik `on` koduje drugą połowę kontraktu: w buildzie bez sond
+  // przejście przez to samo okno nie ma prawa ruszyć żadnego licznika.
+  constexpr unsigned long long on = rdb_probe_work ? 1 : 0;
+
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
 
@@ -180,9 +184,9 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   { auto payload = data.constructAgsePayload(4, 1, "str1", 2); }
   const auto after = rdb::probe::workReport();
 
-  EXPECT_EQ(after.agseWindows, 1u);
-  EXPECT_EQ(after.agseElements, 4u);
-  EXPECT_EQ(after.agseReads, 2u);
+  EXPECT_EQ(after.agseWindows, 1 * on);
+  EXPECT_EQ(after.agseElements, 4 * on);
+  EXPECT_EQ(after.agseReads, 2 * on);
 
   // Drugie okno musi DOŁOŻYĆ dokładnie tyle samo — liczniki są procesowe i akumulują,
   // a analiza dzieli je przez liczbę slotów. Gdyby akumulacja gubiła wywołania, model
@@ -191,9 +195,9 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   { auto payload = data.constructAgsePayload(4, 1, "str1", 2); }
   const auto twice = rdb::probe::workReport();
 
-  EXPECT_EQ(twice.agseWindows, 2u);
-  EXPECT_EQ(twice.agseElements, 8u);
-  EXPECT_EQ(twice.agseReads, 4u);
+  EXPECT_EQ(twice.agseWindows, 2 * on);
+  EXPECT_EQ(twice.agseElements, 8 * on);
+  EXPECT_EQ(twice.agseReads, 4 * on);
 
   // Okno lustrzane ma tę samą geometrię, więc tę samą pracę — znak steruje kolejnością
   // pól w wyniku, nie liczbą odwiedzin.
@@ -201,8 +205,8 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   { auto payload = data.constructAgsePayload(-4, 1, "str1", 2); }
   const auto mirrored = rdb::probe::workReport();
 
-  EXPECT_EQ(mirrored.agseElements, 4u);
-  EXPECT_EQ(mirrored.agseReads, 2u);
+  EXPECT_EQ(mirrored.agseElements, 4 * on);
+  EXPECT_EQ(mirrored.agseReads, 2 * on);
 
   // Reset musi naprawdę zerować — bez tego przebiegi kampanii sumowałyby się nawzajem.
   rdb::probe::workReset();
@@ -214,6 +218,8 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
 // rośnie z pracą wykonywaną w slocie, a nie z rozmiarem planu (który dla obu tych okien
 // jest identyczny: jeden token STREAM_AGSE).
 TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
+  constexpr unsigned long long on = rdb_probe_work ? 1 : 0;
+
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
 
@@ -225,11 +231,10 @@ TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
   { auto payload = data.constructAgsePayload(6, 1, "str1", 2); }
   const auto longWindow = rdb::probe::workReport().agseElements;
 
-  EXPECT_EQ(shortWindow, 2u);
-  EXPECT_EQ(longWindow, 6u);
+  EXPECT_EQ(shortWindow, 2 * on);
+  EXPECT_EQ(longWindow, 6 * on);
   EXPECT_EQ(longWindow, shortWindow * 3u);
 }
-#endif  // RDB_BENCH_PROBE
 
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance, coreInstance["str1"]};

@@ -29,6 +29,7 @@
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
 #include "lib/serviceControl.hpp"
+#include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
 #include "uxSysTermTools.hpp"
 
 /// @brief Główny plik uruchamiający program, odpowiedzialny za parsowanie argumentów, obsługę sygnałów i koordynację działania programu.
@@ -195,11 +196,7 @@ static void printOptimizerBuildInfo() {
 #else
   std::println("RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=OFF");
 #endif
-#ifdef RDB_BENCH_PROBE
-  std::println("RDB_BENCH_PROBE=ON");
-#else
-  std::println("RDB_BENCH_PROBE=OFF");
-#endif
+  std::println("RDB_BENCH_PROBE={}", rdb::probe::enabled ? "ON" : "OFF");
 }
 
 int main(int argc, char *argv[]) {
@@ -220,11 +217,10 @@ int main(int argc, char *argv[]) {
 
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
-#ifdef RDB_BENCH_PROBE
-  // Kompilacja z włączoną sondą pomiarową (E1/E3). Ostrzeżenie trafia do logu, a w trybie
+  // Kompilacja z włączoną sondą pomiarową. Ostrzeżenie trafia do logu, a w trybie
   // usługowym (-j) do journald — operator usługi widzi, że to build benchmarkowy, nie produkcyjny.
-  SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
-#endif
+  if constexpr (rdb::probe::enabled)
+    SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
 
   // Wczesny skan argumentów: ścieżka --config musi być znana przed konstruowaniem FlockServiceGuard,
   // aby lock dir z config trafił do guard przed acquireLock().
@@ -328,9 +324,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (vm.contains("help")) {
-#ifdef RDB_BENCH_PROBE
-      std::println("[warning: probe benchmark build]\n");
-#endif
+      if constexpr (rdb::probe::enabled) std::println("[warning: probe benchmark build]\n");
       std::println("{} - compiler & data processing tool.\n", argv[0]);
       std::print("Usage: {}", argv[0]);
       if (onlyCompile) std::print(" -c");

@@ -3,9 +3,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
-#include <cstdio>   // sonda benchmarku E1 (RDB_BENCH_CSV): std::fopen/fprintf/fclose
-#include <cstdlib>  // sonda benchmarku E1: std::getenv
-#include <ctime>    // sonda benchmarku E1: clock_gettime, timespec
+#include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -31,9 +29,8 @@
 #include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
-#include "rdb/storage.hpp"  // raport materializacji (RDB_BENCH_MATERIALIZE)
+#include "rdb/probe.hpp"  // sondy E1/E2E, K6, E4
 #include "uxSysTermTools.hpp"
-#include "workProbe.hpp"  // raport pracy na slot (RDB_BENCH_WORK)
 
 // #include "antlr4-runtime/tree/ParseTree.h"
 
@@ -653,7 +650,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       // Loop of data processing
       boost::rational<int> prev_interval(0);
 
-#ifdef __linux__
+      // Sonda E1/E2E: czas obliczeń slotu i latencja end-to-end (rdb/probe.hpp).
+      // Uzbrajana dopiero zmienną RDB_BENCH_CSV; bez wkompilowanej sondy znika w całości.
+      rdb::probe::slotProbe slotBench;
+
       struct timespec loop_anchor{};
       const bool rt_mode = vm.contains("realtime");
       if (rt_mode) {
@@ -667,40 +667,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         }
       }
 
-#ifdef RDB_BENCH_PROBE
-      //
-      // Sonda pomiarowa E1 + E2E (benchmark budżetu czasowego i latencji end-to-end).
-      // Cały kod sondy jest kompilowany tylko przy -DRDB_BENCH_PROBE=ON
-      // (scripts/buildrdb.sh probe); w zwykłej kompilacji znika bez śladu.
-      // Dodatkowo aktywna w runtime tylko, gdy ustawiona jest zmienna środowiskowa
-      // RDB_BENCH_CSV wskazująca plik wyjściowy. W normalnym działaniu (brak zmiennej)
-      // benchFile == nullptr i sonda nie ma żadnego wpływu na przetwarzanie.
-      // Format CSV analizuje examples/ecg/e1_stats.py. Kolumny:
-      //   compute_ns  — czas processRows() (E1, czysty rdzeń obliczeń),
-      //   wake_lag_ns — spóźnienie pobudki względem deadline'u interwału
-      //                 (loop_anchor + interval; ten sam cel, do którego dąży
-      //                 rtAbsoluteSleep) — jitter planisty,
-      //   e2e_ns      — od deadline'u (nominalny moment pojawienia się krotki
-      //                 wejściowej w modelu czasowym) do końca boradcast()
-      //                 (emisja wyniku do kolejek IPC klientów).
-      // Uwaga: bez -t (realtime) pętla śpi względnie, więc dryf kumuluje się
-      // w wake_lag/e2e — do CDF E2E miarodajny jest przebieg z -t.
-      //
-      const char *benchPath = std::getenv("RDB_BENCH_CSV");
-      std::FILE *benchFile  = benchPath ? std::fopen(benchPath, "w") : nullptr;
-      if (benchFile) std::fprintf(benchFile, "iter,compute_ns,wake_lag_ns,e2e_ns\n");
-      long benchIter             = 0;
-      constexpr auto benchTimeNs = [](const struct timespec &ts) { return ts.tv_sec * 1'000'000'000L + ts.tv_nsec; };
-#endif
-      // Kotwica osi czasu ustawiana PO rtActivate (mlockall/SCHED_FIFO) i po
-      // otwarciu pliku sondy: koszty inicjalizacji nie obciazaja budzetu
-      // pierwszych slotow (transjent startowy ~20-47 ms w wake_lag --
-      // sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3).
+      // Sonda E1/E2E otwierana PRZED kotwicą osi czasu: koszt otwarcia pliku nie może
+      // obciążyć budżetu pierwszych slotów (transjent startowy ~20-47 ms w wake_lag --
+      // sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3). Tak samo rtActivate
+      // (mlockall/SCHED_FIFO) musi wykonać się przed kotwicą.
+      slotBench.open();
       clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
-#ifdef RDB_BENCH_PROBE
-      const long loop_anchor_ns = loop_anchor.tv_sec * 1'000'000'000L + loop_anchor.tv_nsec;
-#endif
-#endif
+      slotBench.anchor(loop_anchor);
 
       while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
         if (iLoopLimitCnt != executorsm::inifitie_loop) {
@@ -728,68 +701,24 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         //
         // Waiting given miliseconds time that is computed
         //
-#ifdef __linux__
         if (rt_mode)
           rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
         else
-#endif
           std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
-#if defined(__linux__) && defined(RDB_BENCH_PROBE)
-        struct timespec t0{}, t1{}, tWake{};
-        long deadline_ns = 0;
-        if (benchFile) {
-          clock_gettime(CLOCK_MONOTONIC, &tWake);
-          deadline_ns = loop_anchor_ns + rational_cast<long>(interval) * 1'000'000L;  // ms -> ns
-        }
-#endif
+        slotBench.beginSlot(rational_cast<long>(interval));
         inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-#if defined(__linux__) && defined(RDB_BENCH_PROBE)
-        if (benchFile) clock_gettime(CLOCK_MONOTONIC, &t0);
-#endif
+        slotBench.beginCompute();
         proc.processRows(inSet);  // mierzony rdzeń obliczeń jednego interwału (E1)
-#if defined(__linux__) && defined(RDB_BENCH_PROBE)
-        if (benchFile) clock_gettime(CLOCK_MONOTONIC, &t1);
-#endif
+        slotBench.endCompute();
         boradcast(inSet);
-#if defined(__linux__) && defined(RDB_BENCH_PROBE)
-        if (benchFile) {
-          struct timespec tEmit{};
-          clock_gettime(CLOCK_MONOTONIC, &tEmit);  // koniec emisji wyniku (E2E)
-          std::fprintf(benchFile, "%ld,%ld,%ld,%ld\n", benchIter++, benchTimeNs(t1) - benchTimeNs(t0),
-                       benchTimeNs(tWake) - deadline_ns, benchTimeNs(tEmit) - deadline_ns);
-        }
-#endif
+        slotBench.endSlot();
         // End of loop while( ! _kbhit(ignoreanykey) )
       }
-#if defined(__linux__) && defined(RDB_BENCH_PROBE)
-      if (benchFile) std::fclose(benchFile);  // domknięcie sondy E1/E2E
 
-      // Raport materializacji (K6, §9.2). Wypisywany po zakończeniu mierzonej
-      // pętli, żeby zliczanie nie obciążało budżetu slotu. Osobna zmienna
-      // środowiskowa, bo materializacja jest metryką runtime — RDB_BENCH_PLAN
-      // dotyczy kompilacji, a RDB_BENCH_CSV szeregu czasowego.
-      if (std::getenv("RDB_BENCH_MATERIALIZE")) {
-        const auto counters = rdb::storage::materializationReport();
-        std::fprintf(stderr,
-                     "MATERIALIZED trwale: dopisania=%llu nadpisania=%llu bajty=%llu  "
-                     "pamieciowe: dopisania=%llu nadpisania=%llu bajty=%llu\n",
-                     counters.appends, counters.overwrites, counters.bytes, counters.memoryAppends, counters.memoryOverwrites,
-                     counters.memoryBytes);
-      }
-
-      // Raport pracy na slot (E4, issue_219). Osobna zmienna środowiskowa i osobny wiersz,
-      // bo to inna wielkość niż materializacja: tam objętość zapisów, tu liczba odwiedzin
-      // elementów. Wypisywany po pętli, żeby zliczanie nie obciążało budżetu slotu.
-      // Analiza dzieli te sumy przez liczbę slotów przebiegu.
-      if (std::getenv("RDB_BENCH_WORK")) {
-        const auto w = rdb::probe::workReport();
-        std::fprintf(stderr,
-                     "WORK agse: okna=%llu elementy=%llu odczyty=%llu  eval: wywolania=%llu tokeny=%llu  "
-                     "hash: wybory=%llu  add: scalenia=%llu\n",
-                     w.agseWindows, w.agseElements, w.agseReads, w.evalCalls, w.evalTokens, w.hashPicks, w.addMerges);
-      }
-#endif
+      // Raport liczników runtime (K6 materializacja, E4 praca na slot) po zakończeniu
+      // mierzonej pętli, żeby zliczanie nie obciążało budżetu slotu.
+      rdb::probe::reportRuntimeCounters();
       //
       // End of data processing loop
       //

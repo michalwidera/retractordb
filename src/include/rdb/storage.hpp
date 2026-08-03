@@ -67,6 +67,12 @@ class storage {
   void abortIfStorageNotPrepared();
   void initializeAccessor();
 
+  /// @brief Czy magazyn trzyma dane w pamięci, a nie na dysku (polityka TYPE deskryptora).
+  ///
+  /// Rozróżnienie potrzebne sondzie materializacji (K6): plan z `SUBSTRAT 'memory'`
+  /// nie może raportować objętości, której nigdy nie zapisał na dysk.
+  [[nodiscard]] bool isMemoryBackedStorage() const;
+
   std::unique_ptr<rdb::metaData> metaData_;
 
  public:
@@ -88,36 +94,6 @@ class storage {
   void attachDescriptor(const Descriptor *descriptor = nullptr);
 
   bool write(size_t recordIndex = std::numeric_limits<size_t>::max());
-
-#ifdef RDB_BENCH_PROBE
-  /// @brief Licznik materializacji (K6, §9.2): ile rekordów i bajtów trafiło do magazynu.
-  ///
-  /// Liczniki są procesowe, bo kampania pyta o objętość materializacji CAŁEGO planu,
-  /// a nie pojedynczego strumienia. Zliczane są wyłącznie zapisy, które faktycznie
-  /// dotarły do accessor_; rekord all-null pochłonięty przez detekcję gap nie jest
-  /// materializacją i nie jest liczony. Rozdzielenie dopisań od nadpisań jest istotne:
-  /// nadpisanie nie zwiększa objętości magazynu, tylko koszt zapisu.
-  ///
-  /// Magazyn trwały i pamięciowy są liczone ROZDZIELNIE. Bez tego rozdzielenia
-  /// plan z `SUBSTRAT 'memory'` raportowałby objętość materializacji, której nigdy
-  /// nie zapisał na dysk — a to jest dokładnie ta liczba, którą artykuł nazwałby
-  /// „objętością materializacji". Podział wynika z polityki `TYPE` deskryptora.
-  struct materializationCounters {
-    unsigned long long appends          = 0;
-    unsigned long long overwrites       = 0;
-    unsigned long long bytes            = 0;
-    unsigned long long memoryAppends    = 0;
-    unsigned long long memoryOverwrites = 0;
-    unsigned long long memoryBytes      = 0;
-  };
-  static materializationCounters materializationReport();
-  static void materializationReset();
-
- private:
-  [[nodiscard]] bool isMemoryBackedStorage() const;
-
- public:
-#endif
 
   bool revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
   bool read(size_t recordIndexFromFront, uint8_t *destination = nullptr);

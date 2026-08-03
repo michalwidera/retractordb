@@ -194,3 +194,5 @@ endif()
 configure_file(config.h.in ${PROJECT_BINARY_DIR}/generated/config.h @ONLY)
 configure_file(serviceDefaults.h.in
                ${PROJECT_BINARY_DIR}/generated/serviceDefaults.h @ONLY)
+configure_file(probeConfig.h.in ${PROJECT_BINARY_DIR}/generated/probeConfig.h
+               @ONLY)

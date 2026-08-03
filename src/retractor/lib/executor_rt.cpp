@@ -1,5 +1,3 @@
-#ifdef __linux__
-
 #include "executor_rt.hpp"
 
 #include <sched.h>
@@ -207,5 +205,3 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
   }
   clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, nullptr);
 }
-
-#endif  // __linux__

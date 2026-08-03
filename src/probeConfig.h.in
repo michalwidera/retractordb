@@ -1,0 +1,27 @@
+#ifndef PROBE_CONFIG_H_IN
+#define PROBE_CONFIG_H_IN
+
+// Plik generowany przez configure_file() z probeConfig.h.in jako
+// <katalog build>/generated/probeConfig.h. Nie edytuj wygenerowanej kopii;
+// zmiany nanoś w szablonie .in albo przez -DRDB_BENCH_PROBE.
+//
+// Stabilny: zmienia się wyłącznie wtedy, gdy przełączysz sondy. Dlatego stałe
+// sond mieszkają tutaj, a nie w config.h — ten drugi zawiera znacznik czasu
+// budowania, więc każde `cmake .` wymuszałoby przebudowę wszystkich jednostek
+// kompilacji z sondami (dokładnie tak samo osobno stoi serviceDefaults.h.in).
+//
+// Sondy pomiarowe (rdb/probe.hpp) włącza opcja CMake RDB_BENCH_PROBE
+// (scripts/buildrdb.sh probe) — jedna opcja ustawia wszystkie cztery stałe, bo
+// tak sondy wprowadzają eksperymenty. Rozbicie na osobne stałe pozwala
+// w przyszłości zbudować wariant z jedną sondą, bez kosztu pozostałych.
+//
+// Stała false wycina kod sondy na etapie kompilacji (if constexpr), ale sam kod
+// przechodzi przez kompilator w KAŻDYM buildzie — to jest różnica wobec #ifdef,
+// pod którym sondy gniły niezauważone aż do włączenia wariantu pomiarowego.
+
+constexpr bool rdb_probe_slot        = @RDB_PROBE_SLOT@;         // E1/E2E: czas slotu i latencja end-to-end (RDB_BENCH_CSV)
+constexpr bool rdb_probe_plan        = @RDB_PROBE_PLAN@;         // E3: rozmiar planu, czas kompilacji (RDB_BENCH_PLAN)
+constexpr bool rdb_probe_materialize = @RDB_PROBE_MATERIALIZE@;  // K6: objętość materializacji (RDB_BENCH_MATERIALIZE)
+constexpr bool rdb_probe_work        = @RDB_PROBE_WORK@;         // E4: praca na slot (RDB_BENCH_WORK)
+
+#endif  // PROBE_CONFIG_H_IN

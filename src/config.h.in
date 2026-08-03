@@ -16,4 +16,9 @@ constexpr auto build_id = "@GIT_CURRENT_BUILDTIME@";
 constexpr auto warranty = "This software is licensed under the MIT License and is provided ‘as is’,\n"
                           "without warranty of any kind. For more information, see the LICENSE file.";
 
+// Stałe sond pomiarowych są w osobnym, STABILNYM nagłówku probeConfig.h.in —
+// nie tutaj. Ten plik zmienia się przy każdej konfiguracji (Build time), więc
+// dołączenie go do jednostek kompilacji z sondami wymuszałoby ich przebudowę
+// po każdym `cmake .`.
+
 #endif // CONFIG_H_IN
