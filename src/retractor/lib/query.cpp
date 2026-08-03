@@ -135,7 +135,8 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
     case STREAM_MAX:
     case STREAM_MIN:
     case STREAM_SUM: {
-      auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
+      auto [sourceType, sourceLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
+      auto [maxType, maxLen]       = reductionResultField(sourceType, sourceLen);
       retVal += rdb::Descriptor(id + "_0", maxLen, 1, maxType);
     } break;
     case STREAM_HASH: {

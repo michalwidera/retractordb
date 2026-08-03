@@ -323,41 +323,44 @@ TEST_F(xschema, getRow_1) {
 TEST_F(xschema, reduceFieldsToPayload_max) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
-  // str1 last record: {15, 16} → MAX = 16
+  // str1 last record: {15, 16} → MAX = 16 (pole RATIONAL, patrz K24/D4)
   auto result = data.reduceFieldsToPayload(STREAM_MAX, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:16 }");
+  EXPECT_EQ(ss.str(), "{ str1:16/1 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_min) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
-  // str1 last record: {15, 16} → MIN = 15
+  // str1 last record: {15, 16} → MIN = 15 (pole RATIONAL, patrz K24/D4)
   auto result = data.reduceFieldsToPayload(STREAM_MIN, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:15 }");
+  EXPECT_EQ(ss.str(), "{ str1:15/1 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_sum) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
-  // str1 last record: {15, 16} → SUM = 31
+  // str1 last record: {15, 16} → SUM = 31 (pole RATIONAL, patrz K24/D4)
   auto result = data.reduceFieldsToPayload(STREAM_SUM, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:31 }");
+  EXPECT_EQ(ss.str(), "{ str1:31/1 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_avg) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
-  // str1 last record: {15, 16} → AVG = 31/2 = 15 (obcięcie do int)
+  // str1 last record: {15, 16} → AVG = 31/2.
+  // K24/D4: wynik redukcji jest polem RATIONAL i pozostaje dokladny. Wczesniej
+  // przechodzil przez rational_cast<int> i dawal 15, mimo ze pole wyjsciowe
+  // zadeklarowane przez kompilator bylo RATIONAL — stad mianownik zawsze 1.
   auto result = data.reduceFieldsToPayload(STREAM_AVG, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:15 }");
+  EXPECT_EQ(ss.str(), "{ str1:31/2 }");
 }
 
 TEST_F(xschema, constructOutputPayload_expression) {
@@ -383,7 +386,7 @@ TEST_F(xschema, reduceFieldsToPayload_single_field) {
   auto result = data.reduceFieldsToPayload(STREAM_MAX, "str2");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str2:333 }");
+  EXPECT_EQ(ss.str(), "{ str2:333/1 }");
 }
 
 std::unique_ptr<dataModel> dataArea_rules;
@@ -491,7 +494,7 @@ TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_sum) {
   auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_SUM, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:10 }");
+  EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_avg) {
@@ -499,21 +502,21 @@ TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_avg) {
   auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:10 }");
+  EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_min) {
   auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MIN, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:10 }");
+  EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_max) {
   auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MAX, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:10 }");
+  EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 // Regression: null bits must survive flush to disk so a second storage reader
@@ -534,7 +537,7 @@ TEST_F(xschema_partial_null, null_bits_flushed_to_disk_second_reader_ignores_nul
   auto result = second.reduceFieldsToPayload(STREAM_SUM, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
-  EXPECT_EQ(ss.str(), "{ str1:10 }");
+  EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 // Restore fixture: the null-test fixtures above delete and recreate str1/str2,

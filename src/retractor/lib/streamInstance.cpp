@@ -189,8 +189,13 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // First construct descriptor
   outputPayload->revRead(0);
 
-  auto [maxType_, maxLen] = outputPayload->descriptor.widestFieldType();
-  auto const maxType      = maxType_;
+  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
+
+  // K24/D4: typ wyniku redukcji wyprowadzany jest jedną regułą, wspólną
+  // z query::descriptorFrom — patrz reductionResultField() w query.hpp.
+  auto [maxType, maxLen] = reductionResultField(sourceType, sourceLen);
+  auto maxType_          = maxType;
+
   rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
   rdb::Descriptor descriptor{x};
   // same as core[instance].descriptorFrom()
@@ -333,50 +338,16 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
     }
   }
 
-  switch (maxType) {
-    case rdb::BYTE: {
-      if (!std::holds_alternative<boost::rational<int>>(valueRet))
-        FatalError("streamInstance: aggregation result must be rational at finalization");
-      auto tobyte = std::get<boost::rational<int>>(valueRet);
-      if (tobyte > boost::rational<int>(std::numeric_limits<uint8_t>::max(), 1)) {
-        valueRet = uint8_t(std::numeric_limits<uint8_t>::max());
-      } else if (tobyte < boost::rational<int>(std::numeric_limits<uint8_t>::min(), 1))
-        valueRet = uint8_t(std::numeric_limits<uint8_t>::min());
-      else
-        valueRet = uint8_t(rational_cast<int>(tobyte));
-    } break;
-
-    case rdb::INTEGER: {
-      if (!std::holds_alternative<boost::rational<int>>(valueRet))
-        FatalError("streamInstance: aggregation result must be rational at finalization");
-      auto toint = std::get<boost::rational<int>>(valueRet);
-      if (toint > boost::rational<int>(std::numeric_limits<int>::max(), 1))
-        valueRet = std::numeric_limits<int>::max();
-      else if (toint < boost::rational<int>(std::numeric_limits<int>::min(), 1))
-        valueRet = std::numeric_limits<int>::min();
-      else
-        valueRet = int(rational_cast<int>(toint));
-    } break;
-
-    case rdb::UINT: {
-      if (!std::holds_alternative<boost::rational<int>>(valueRet))
-        FatalError("streamInstance: aggregation result must be rational at finalization");
-      auto touint = std::get<boost::rational<int>>(valueRet);
-      if (touint > boost::rational<int>(std::numeric_limits<unsigned>::max(), 1))
-        valueRet = std::numeric_limits<unsigned>::max();
-      else if (touint < boost::rational<int>(0, 1))
-        valueRet = unsigned(0);
-      else
-        valueRet = rational_cast<unsigned>(touint);
-    } break;
-
-    case rdb::RATIONAL:
-    case rdb::FLOAT:
-    case rdb::DOUBLE:
-      break;
-    default:
-      FatalError("streamInstance: unsupported type in aggregation finalization");
+  // K24/D4: gałęzie BYTE/INTEGER/UINT usunięte razem z rozjazdem typów. Typ
+  // arytmetyczny jest tu zawsze promowany do RATIONAL (patrz komentarz przy
+  // budowie deskryptora), więc te gałęzie były nieosiągalne po promocji, a
+  // przed nią realizowały obcięcie i nasycenie wyniku do zakresu typu ŹRÓDŁA —
+  // czyli sam defekt. Pole wyjściowe jest typu RATIONAL i nie ma do czego
+  // nasycać: wynik zostaje dokładny.
+  if (maxType != rdb::RATIONAL && maxType != rdb::FLOAT && maxType != rdb::DOUBLE) {
+    FatalError("streamInstance: unsupported type in aggregation finalization");
   }
+
   auto postion{0};
   localPayload.setItemVT(postion, valueRet);
 
