@@ -14,7 +14,7 @@
 #include "expressionEvaluator.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
-#include "workProbe.hpp"
+#include "rdb/probe.hpp"
 
 extern std::unique_ptr<PersistentCounter> pCounterPtr;
 
@@ -110,10 +110,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // Ogon wyliczony przez compiler::computeStartupLatency() gwarantuje,
   // że cały ten zakres jest dostępny; kontrola poniżej pozostaje ochroną
   // przed uszkodzonym planem albo bezpośrednim wywołaniem jednostkowym.
-  // Sonda E4: okno odwiedza dokładnie lengthAbs elementów w KAŻDYM slocie, niezależnie od
-  // tego, ile z nich trafi w dostępny zakres. To jest praca, której liczniki planu nie widzą.
-  RDB_BENCH_WORK_ADD(agseWindows, 1);
-  RDB_BENCH_WORK_ADD(agseElements, lengthAbs);
+  rdb::probe::onAgseWindow(lengthAbs);
 
   std::optional<size_t> lastReadPosition;
   for (auto i = 0; i < lengthAbs; ++i) {
@@ -123,7 +120,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     if (recordIndex >= 0 && std::cmp_less(recordIndex, recordsCountSrc)) {
       const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
       if (lastReadPosition != reversePosition) {
-        RDB_BENCH_WORK_ADD(agseReads, 1);  // odczyt rekordu źródła; cache lastReadPosition go omija
+        rdb::probe::onAgseRead();
         if (source->revRead(reversePosition))
           lastReadPosition = reversePosition;
         else

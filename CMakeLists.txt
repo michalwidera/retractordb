@@ -67,18 +67,33 @@ if(NOT RDB_OPT_SHARE_EQUIVALENT_SELECTS AND RDB_OPT_COMMUTATIVE_ADD)
   )
 endif()
 
-# Sonda pomiarowa benchmarku (E1 czas obliczeń, E3 rozmiar planu). Domyślnie
-# WYŁĄCZONA: kod sondy jest wtedy całkowicie wycięty z kompilacji (#ifdef
-# RDB_BENCH_PROBE), zero kosztu. Włączenie tylko do pomiarów wydajności — NIE
-# dla produkcji. Użycie: scripts/buildrdb.sh probe
-option(RDB_BENCH_PROBE
-       "Build with benchmark measurement probe (E1/E3); NOT for production" OFF)
+# Sondy pomiarowe benchmarku (E1 czas slotu, E3 rozmiar planu, E4 praca na slot,
+# K6 materializacja). Domyślnie WYŁĄCZONE: kod sond jest wtedy wycinany przez
+# kompilator (if constexpr na stałych rdb_probe_* z probeConfig.h), zero kosztu
+# — ale nadal PRZECHODZI przez kompilator, więc nie może zgnić niezauważony.
+# Włączenie tylko do pomiarów wydajności — NIE dla produkcji. Użycie:
+# scripts/buildrdb.sh probe
+#
+# Jedna opcja steruje wszystkimi sondami, bo tak wprowadzają je eksperymenty.
+# Stałe są osobne, żeby dało się w przyszłości zbudować wariant z jedną sondą.
+option(
+  RDB_BENCH_PROBE
+  "Build with benchmark measurement probes (E1/E3/E4/K6); NOT for production"
+  OFF)
 if(RDB_BENCH_PROBE)
-  add_compile_definitions(RDB_BENCH_PROBE)
+  set(RDB_PROBE_SLOT true)
+  set(RDB_PROBE_PLAN true)
+  set(RDB_PROBE_MATERIALIZE true)
+  set(RDB_PROBE_WORK true)
   message(
     WARNING
-      "RDB_BENCH_PROBE=ON — benchmark probe compiled in; NOT a production build."
+      "RDB_BENCH_PROBE=ON — benchmark probes compiled in; NOT a production build."
   )
+else()
+  set(RDB_PROBE_SLOT false)
+  set(RDB_PROBE_PLAN false)
+  set(RDB_PROBE_MATERIALIZE false)
+  set(RDB_PROBE_WORK false)
 endif()
 
 message(STATUS "RDB_OPT_DEDUP_SUBSTRATES=${RDB_OPT_DEDUP_SUBSTRATES}")
@@ -203,8 +218,8 @@ include_directories(
   ${fmt_INCLUDE_DIR}
   ${magic_enum_INCLUDE_DIR}
   ${antlr4-runtime_INCLUDE_DIR}
-  ${PROJECT_BINARY_DIR}/generated # config.h, serviceDefaults.h — per katalog
-                                  # build
+  ${PROJECT_BINARY_DIR}/generated # config.h, serviceDefaults.h, probeConfig.h —
+                                  # per katalog build
   src/include)
 
 # toml++ jako include SYSTEMOWY (-isystem) — wycisza ostrzeżenia z jego

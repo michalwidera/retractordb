@@ -11,21 +11,9 @@
 #include "fatalError.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptorIO.hpp"
+#include "rdb/probe.hpp"  // sonda K6: objętość materializacji
 
 namespace rdb {
-
-#ifdef RDB_BENCH_PROBE
-namespace {
-// Liczniki materializacji (K6). Procesowe, bo kampania mierzy objętość
-// materializacji całego planu. Wątek komunikacyjny executorsm nie zapisuje
-// rekordów — zapisy idą wyłącznie z pętli przetwarzania — więc zwykłe liczniki
-// wystarczają i nie wnoszą kosztu synchronizacji do mierzonej ścieżki.
-storage::materializationCounters materialization{};
-}  // namespace
-
-storage::materializationCounters storage::materializationReport() { return materialization; }
-
-void storage::materializationReset() { materialization = {}; }
 
 bool storage::isMemoryBackedStorage() const {
   // To samo źródło prawdy, którym posługuje się makeAccessor() przy wyborze
@@ -34,7 +22,6 @@ bool storage::isMemoryBackedStorage() const {
   // rozjechać się z faktycznie użytym magazynem.
   return storageType_ == "MEMORY";
 }
-#endif
 
 storage::storage(const std::string_view qryID,         //
                  const std::string_view fileName,      //
@@ -321,15 +308,10 @@ bool storage::write(const size_t recordIndex) {
       FatalError("storage::write: append to '{}' failed (result={})", paths_.storageFile(), result);
     }
     recordsCount_++;
-#ifdef RDB_BENCH_PROBE
-    if (isMemoryBackedStorage()) {
-      materialization.memoryAppends++;
-      materialization.memoryBytes += descriptor.getSizeInBytes();
-    } else {
-      materialization.appends++;
-      materialization.bytes += descriptor.getSizeInBytes();
-    }
-#endif
+    // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
+    // sondzie z gorącej ścieżki zapisu musi zniknąć także wyliczenie argumentów
+    // (isMemoryBackedStorage() porównuje napisy).
+    if constexpr (rdb_probe_materialize) probe::onMaterializedAppend(isMemoryBackedStorage(), descriptor.getSizeInBytes());
 
     metaData_->onRecordAppended(nullInfo);
     metaData_->flushCurrentEntry();
@@ -338,13 +320,8 @@ bool storage::write(const size_t recordIndex) {
     if (result != 0) {
       FatalError("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(), recordIndex, result);
     }
-#ifdef RDB_BENCH_PROBE
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`.
-    if (isMemoryBackedStorage())
-      materialization.memoryOverwrites++;
-    else
-      materialization.overwrites++;
-#endif
+    if constexpr (rdb_probe_materialize) probe::onMaterializedOverwrite(isMemoryBackedStorage());
 
     metaData_->onRecordModified(recordIndex, nullInfo);  // polimorficznie: cień indeksu albo główny indeks
   }
