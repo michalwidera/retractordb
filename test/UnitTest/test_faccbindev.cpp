@@ -1,7 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <string>
 #include <vector>
 
@@ -163,6 +169,36 @@ TEST_F(BinaryDeviceROTest, name_and_write_contract) {
 
   EXPECT_EQ(dev.name(), path);
   EXPECT_EQ(dev.write(out, 0), EXIT_FAILURE);
+}
+
+// Regression: ::read on a FIFO may return fewer bytes than requested. The old code treated any
+// short read as end of stream, so a record arriving in two writes was lost and the reader
+// desynchronised.
+TEST_F(BinaryDeviceROTest, combines_short_fifo_reads_into_one_record) {
+  auto path = sandboxPath("short-read.fifo");
+  ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
+  const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
+  ASSERT_GE(writer, 0);
+
+  auto desc = fixedIntDescriptor();
+  rdb::binaryDeviceRO dev(path, desc, false);
+  uint8_t out[4] = {0, 0, 0, 0};
+  std::promise<void> started;
+  auto readResult = std::async(std::launch::async, [&] {
+    started.set_value();
+    return dev.read(out, 0);
+  });
+
+  started.get_future().wait();
+  const uint8_t firstHalf[2] = {0x11, 0x22};
+  EXPECT_EQ(::write(writer, firstHalf, sizeof(firstHalf)), static_cast<ssize_t>(sizeof(firstHalf)));
+  EXPECT_EQ(readResult.wait_for(std::chrono::milliseconds(20)), std::future_status::timeout);
+
+  const uint8_t secondHalf[2] = {0x33, 0x44};
+  EXPECT_EQ(::write(writer, secondHalf, sizeof(secondHalf)), static_cast<ssize_t>(sizeof(secondHalf)));
+  ::close(writer);
+  EXPECT_EQ(readResult.get(), EXIT_SUCCESS);
+  EXPECT_EQ(std::vector<uint8_t>(std::begin(out), std::end(out)), std::vector<uint8_t>({0x11, 0x22, 0x33, 0x44}));
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)
