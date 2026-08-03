@@ -173,17 +173,64 @@ TEST(xSOperations, subtract_uses_forward_target_index) {
     EXPECT_EQ(expected[i], Subtract(source, boost::rational<int>{3, 4}, i));
 }
 
-TEST(xSOperations, agse_startup_latency_covers_every_phase) {
-  // Deklaracja publikuje rekord po konsumentach w tym samym takcie.
-  EXPECT_EQ(4, AgseStartupLatency(1, 1, 4, 0));
-  EXPECT_EQ(5, AgseStartupLatency(5, 1, 5, 0));
+// Definicja sumy strumieni (def:sum): c_n = (a_n, b_{⌊n·Δa/Δb⌋}) dla Δa <= Δb.
+// Silnik odwzorowywał wcześniej b_{⌊(n+1)·Δa/Δb⌋} (bieżący payload składowej) —
+// stąd wartości oczekiwane wypisane wprost, a nie wyprowadzone drugą kopią wzoru.
+TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
+  const boost::rational<int> fast{1, 2};
 
-  // Dla producenta obliczanego obowiązuje ta sama ostra granica; fazę
-  // wszystkich kolejnych okien wyznacza gcd.
-  EXPECT_EQ(4, AgseStartupLatency(1, 1, 4, 0));
-  EXPECT_EQ(2, AgseStartupLatency(2, 3, 5, 0));
+  // Składowa o interwale wyjścia jest indeksowana wprost n.
+  for (int n = 0; n < 20; ++n)
+    EXPECT_EQ(n, Add(fast, fast, n));
+
+  // Iloraz całkowity: Δsrc = 2·Δout — b_0, b_0, b_1, b_1, ...
+  const std::vector<int> ratioTwo{0, 0, 1, 1, 2, 2, 3, 3};
+  for (int n = 0; n < static_cast<int>(ratioTwo.size()); ++n)
+    EXPECT_EQ(ratioTwo[n], Add(fast, boost::rational<int>{1}, n));
+
+  // Iloraz niecałkowity: Δsrc = 3/4, Δout = 1/2 — ⌊2n/3⌋.
+  const std::vector<int> ratioThreeQuarters{0, 0, 1, 2, 2, 3, 4, 4};
+  for (int n = 0; n < static_cast<int>(ratioThreeQuarters.size()); ++n)
+    EXPECT_EQ(ratioThreeQuarters[n], Add(fast, boost::rational<int>{3, 4}, n));
+}
+
+// K24/H10a: wartości oczekiwane zmienione razem z postacią zamkniętą ogona `@`.
+// Każda jest tu wyprowadzona wprost z warunku dostępności: okno rekordu n sięga
+// pola n*step+|len|-1, czyli rekordu źródła floor((n*step+|len|-1)/F), a ten
+// jest określony dopiero w chwili (floor(...)+1+W_src)*Delta_src.
+TEST(xSOperations, agse_startup_latency_covers_every_phase) {
+  // F=1, step=1, len=4: rekord 0 potrzebuje źródła 0..3, czyli chwili 4*D.
+  // Slot n kończy się w (n+1+W)*D, więc W = 3. Poprzednia postać dawała 4 —
+  // o slot za dużo, ogon tłumił rekord już określony.
+  EXPECT_EQ(3, AgseStartupLatency(1, 1, 4, 0));
+  // F=5, step=1, len=5: maksimum wypada dla n=1 (okno wchodzi w rekord 1
+  // źródła, a slot przesuwa się tylko o 1/5 rekordu) i wynosi 8. Poprzednia
+  // postać dawała 5 — trzy sloty za mało, więc strumień emitował okna
+  // z polami jeszcze nieokreślonymi.
+  EXPECT_EQ(8, AgseStartupLatency(5, 1, 5, 0));
+
+  // Dla producenta obliczanego obowiązuje ta sama granica; fazę wszystkich
+  // kolejnych okien wyznacza gcd(F, step).
+  EXPECT_EQ(1, AgseStartupLatency(2, 3, 5, 0));
   EXPECT_EQ(1, AgseStartupLatency(6, 4, 4, 0));
   EXPECT_EQ(3, AgseStartupLatency(2, 3, 5, 2));
+}
+
+// Ogon sumy strumieni musi objąć dostępność rekordu KAŻDEJ składowej pod
+// indeksem floor(n*D_out/D_src), a nie tylko przeliczyć ogon składowej.
+TEST(xSOperations, add_startup_latency_covers_slower_component) {
+  const boost::rational<int> fast{1, 2};
+
+  // Składowa o interwale wyjścia i zerowym ogonie nie wnosi opóźnienia.
+  EXPECT_EQ(0, AddStartupLatency(fast, fast, 0));
+  // Składowa dwa razy wolniejsza: jej rekord 0 powstaje w chwili 1*D_src,
+  // czyli po dwóch slotach wyjścia — ogon 1. Poprzednia postać dawała 0.
+  EXPECT_EQ(1, AddStartupLatency(boost::rational<int>{1}, fast, 0));
+  // Ta sama składowa z własnym ogonem 2: rekord 0 dopiero w chwili 3*D_src.
+  EXPECT_EQ(5, AddStartupLatency(boost::rational<int>{1}, fast, 2));
+  // Składowa szybsza od wyjścia nie może wystąpić (D_out = min), ale wzór
+  // pozostaje zdefiniowany i nie schodzi poniżej zera.
+  EXPECT_EQ(0, AddStartupLatency(boost::rational<int>{1, 4}, fast, 0));
 }
 
 TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {

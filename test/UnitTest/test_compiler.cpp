@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
+#include <boost/rational.hpp>
 #include <boost/system/error_code.hpp>
 
 #include "retractor/lib/compiler.hpp"
@@ -352,23 +353,31 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("hash_160_147").startupLatency, 2);
   // Suma o zgodnych interwalach i zerowych ogonach zrodel nie wnosi opoznienia.
   EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
-  // AGSE nie emituje niepelnych okien. Deklaracja jest publikowana po
-  // konsumentach w tym samym takcie, wiec pelne okno 4-polowe ma ogon 4.
-  EXPECT_EQ(instance.getQuery("agse4").startupLatency, 4);
-  EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 4);
+  // AGSE nie emituje niepelnych okien: pelne okno 4-polowe nad deklaracja
+  // o szerokosci 1 potrzebuje rekordow 0..3, czyli chwili 4*D, a slot n konczy
+  // sie w (n+1+W)*D — stad ogon 3. K24/H10a: bylo 4, bo poprzednia postac
+  // dodawala slot na publikacje deklaracji, ktory jest juz w czlonie (1+W_src).
+  EXPECT_EQ(instance.getQuery("agse4").startupLatency, 3);
+  EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 3);
   // Różnica ma jeden slot dla deklaracji; całkowita faza producenta
   // obliczanego jest dostępna topologicznie, a faza 3/2 wymaga slotu.
   EXPECT_EQ(instance.getQuery("sub_declared").startupLatency, 1);
   EXPECT_EQ(instance.getQuery("sub_computed").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("sub_fractional").startupLatency, 1);
   // Redukcja działa na bieżącej pełnej krotce i tylko propaguje ogon.
-  EXPECT_EQ(instance.getQuery("reduced").startupLatency, 4);
-  // Regresja K19: dla F=3, step=1 i ogona producenta 1 najgorsza
-  // faza wymaga dwóch rekordów historii, mimo że pierwszy slot potrzebuje 1.
-  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 5);
+  EXPECT_EQ(instance.getQuery("reduced").startupLatency, 3);
+  // Regresja K19: dla F=3, step=1 i ogona producenta 1 najgorsza faza wypada
+  // dla n=2 (okno wchodzi w kolejny rekord producenta) i daje 6, nie 5.
+  // K24/H10a: poprzednia postać zaniżała tu ogon o jeden slot.
+  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 6);
   EXPECT_EQ(instance.maxCapacity.at("wide_shifted"), 2);
   EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 1);
-  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 3);
+  // K24/P1: pojemnosc zrodla roznicy wzrosla z 3 na 4. Wartosc 3 pokrywala
+  // odleglosc wsteczna tylko dla ilorazu 1 i 2; od ilorazu 3 odczyt wypadal
+  // poza historia i dawal cichy rekord all-NULL. Nowy czlon to
+  // floor((1+Wout)*ratio) + prefetch deklaracji, brany jako maksimum ze stara
+  // formula — pojemnosc nigdy nie maleje.
+  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 4);
 }
 
 // Pojemnosc bufora zrodla okna to odleglosc do najstarszego pola okna PLUS jeden:
@@ -389,13 +398,16 @@ TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Okno 3-polowe nad deklaracja ma ogon 3; przepisanie go nie zmienia.
-  EXPECT_EQ(instance.getQuery("win1").startupLatency, 3);
-  EXPECT_EQ(instance.getQuery("mid").startupLatency, 3);
-  // Okno nad producentem z ogonem 3: 3 + (3-1) pol fazy + 1.
-  EXPECT_EQ(instance.getQuery("win2").startupLatency, 6);
-  // win2 czyta rekordy mid o indeksach n..n+2, gdy mid ma juz wydany rekord n+3.
-  EXPECT_EQ(instance.maxCapacity.at("mid"), 4);
+  // Okno 3-polowe nad deklaracja o szerokosci 1 potrzebuje rekordow 0..2,
+  // czyli chwili 3*D; slot n konczy sie w (n+1+W)*D, stad ogon 2.
+  // Przepisanie go nie zmienia. K24/H10a: bylo 3.
+  EXPECT_EQ(instance.getQuery("win1").startupLatency, 2);
+  EXPECT_EQ(instance.getQuery("mid").startupLatency, 2);
+  // Okno nad producentem z ogonem 2: rekord n czyta mid n..n+2, a mid n+2
+  // jest okreslone w chwili (n+2+1+2)*D — stad ogon 4.
+  EXPECT_EQ(instance.getQuery("win2").startupLatency, 4);
+  // win2 czyta rekordy mid o indeksach n..n+2, gdy mid ma juz wydany rekord n+2.
+  EXPECT_EQ(instance.maxCapacity.at("mid"), 3);
 }
 
 // Tozsamosc R1 musi zachowywac ogon — inaczej przepisanie zmienialoby obserwowalna
@@ -512,4 +524,50 @@ TEST(xcompiler, still_reports_true_circular_dependency) {
 
   compiler compilerInstance(instance);
   EXPECT_EQ(compilerInstance.compile(), "Circular dependency in stream definitions");
+}
+
+// Iloczyn interwalow wychodzil poza int juz dla licznikow rzedu 10^4, a
+// boost::rational<int> nie wykrywa przepelnienia. Objawem byl niezwiazany
+// komunikat walidacji planu ("faster div from slower source") dla planu, ktory
+// jest poprawny. Interwaly liczone sa teraz w 64 bitach.
+TEST(xcompiler, deep_dehash_chain_does_not_overflow_interval) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE value INTEGER STREAM src, 147/1000 FILE 'a.txt'
+        SELECT * STREAM d1 FROM src&441/1000
+        SELECT * STREAM d2 FROM d1&1029/2000
+        SELECT * STREAM d3 FROM d2&9261/16000
+        SELECT * STREAM d4 FROM d3&27783/16000
+        SELECT * STREAM d5 FROM d4&83349/8000
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  EXPECT_EQ(instance.getQuery("d5").rInterval, boost::rational<int>(83349, 16000));
+}
+
+// Interwal, ktorego nie da sie zapisac w typie interwalu, musi dawac komunikat
+// o zakresie — a nie cichy smiec ani komunikat o innej wadzie planu.
+TEST(xcompiler, unrepresentable_interval_reports_range_error) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE value INTEGER STREAM src, 46341/46339 FILE 'a.txt'
+        SELECT * STREAM wide FROM src&46342/46339
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_THROW(
+      {
+        try {
+          compilerInstance.compile();
+        } catch (const std::out_of_range &error) {
+          EXPECT_NE(std::string(error.what()).find("out of representable range"), std::string::npos);
+          throw;
+        }
+      },
+      std::out_of_range);
 }

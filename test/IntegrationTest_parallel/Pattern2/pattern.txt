@@ -8,7 +8,7 @@ str1(1/2)
 		ADD
 core0(1/1)	/dev/urandom
 	a: BYTE
-str2(1/2)
+str2(1/2)	tail=1
 	:- PUSH_STREAM(core1)
 	:- PUSH_STREAM(core0)
 	:- STREAM_ADD

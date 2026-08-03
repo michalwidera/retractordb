@@ -1,5 +1,5 @@
  serial1
-13 Record(s)
+12 Record(s)
 4 Byte(s) per record.
 { INTEGER core_0 }
 { core_0:10 }
@@ -19,7 +19,7 @@
 { core_0:19 core_1:18 }
 { core_0:21 core_1:20 }
  serial3
-12 Record(s)
+11 Record(s)
 8 Byte(s) per record.
 { INTEGER core_0 INTEGER core_1 }
 { core_0:11 core_1:10 }

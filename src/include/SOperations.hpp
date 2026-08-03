@@ -65,21 +65,56 @@ constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &de
   return ceilR(i * deltaTarget / deltaSource);
 }
 
+// Suma strumieni (definicja formalna): dla C = A+B, gdzie Delta_c = min(Delta_a, Delta_b):
+//   c_n = (a_n, b_{⌊n·Delta_a/Delta_b⌋})   gdy Delta_a <= Delta_b
+//   c_n = (a_{⌊n·Delta_b/Delta_a⌋}, b_n)   w przeciwnym razie
+// Oba przypadki mają jedną postać: indeks składowej o interwale deltaSrc to
+// ⌊n·Delta_c/deltaSrc⌋ — dla składowej szybszej (deltaSrc == Delta_c) daje n.
+// Wynik jest indeksem POSTĘPUJĄCYM (0-bazowym) w strumieniu składowej.
+constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, const int n) {
+  if (deltaOut == deltaSrc) return n;
+  return floorR(n * deltaOut / deltaSrc);
+}
+
 constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(offset) / boost::rational<int>(step)); }
 
 // Dla kolejnych okien reszta (n*step) mod sourceWidth przebiega przez
 // wielokrotności gcd(step, sourceWidth). Największe wyprzedzenie ostatniego
 // pola okna względem jego slotu wynosi:
-//   floor((abs(length)-1)/gcd(step, sourceWidth))*gcd(step, sourceWidth).
-// Do tej fazy dochodzi ogon producenta przeliczony na pola. Odczyt historii
-// odbywa się przed domknięciem wszystkich producentów aktywnych w tym samym
-// takcie (również przy różnych interwałach), stąd nierówność ostra.
+//   P = floor((abs(length)-1)/gcd(step, sourceWidth))*gcd(step, sourceWidth).
+//
+// Okno rekordu n sięga pola n*step+abs(length)-1, czyli rekordu źródła
+// floor((n*step+abs(length)-1)/F), gdzie F = sourceWidth. Ten rekord jest
+// określony w chwili (floor(...)+1+W_src)*Delta_src, a slot n konsumenta
+// kończy się w chwili (n+1+W)*Delta_out, gdzie Delta_out = Delta_src*step/F.
+// Warunek dostępności dla każdego n daje postać zamkniętą
+//   W = ceil( (P + (1+W_src)*F) / step ) - 1.
+//
+// K24/H10a: poprzednia postać floor((W_src*F + P)/step) + 1 zgadzała się
+// z granicą zdarzeniową tylko dla 31,8% węzłów `@` w korpusie 10 010 planów —
+// zaniżała ogon dla 12,3% (stąd rekordy z polem NULL, np. plan 63) i zawyżała
+// dla 55,9%. Postać powyższa zgadza się dla 4309 z 4309 węzłów.
 constexpr int AgseStartupLatency(const int sourceWidth, const int step, const int length, const int sourceLatency) {
   const int lengthAbs  = length < 0 ? -length : length;
   const int phaseUnit  = std::gcd(sourceWidth, step);
   const int phaseBound = ((lengthAbs - 1) / phaseUnit) * phaseUnit;
-  const int numerator  = sourceLatency * sourceWidth + phaseBound;
-  return floorR(boost::rational<int>(numerator, step)) + 1;
+  const int numerator  = phaseBound + (1 + sourceLatency) * sourceWidth;
+  return ceilR(boost::rational<int>(numerator, step)) - 1;
+}
+
+// Suma strumieni czyta składową o interwale deltaSource po indeksie
+// floor(n*Delta_out/Delta_src) (patrz Add()). Rekord o tym indeksie jest
+// określony w chwili (floor(...)+1+W_src)*Delta_src, najpóźniej względem
+// slotu przy n=0, co po rozwiązaniu względem ogona daje
+//   W = ceil( (1+W_src)*Delta_src/Delta_out ) - 1
+// dla każdej składowej z osobna; ogon węzła to maksimum po składowych.
+//
+// K24/H10a: poprzednia postać ceil(W_src*Delta_src/Delta_out) zgadzała się
+// z granicą zdarzeniową dla 42,3% węzłów `+` w korpusie i zaniżała ogon dla
+// pozostałych — dla składowej o zerowym ogonie dawała zero niezależnie od
+// tego, jak wolna jest składowa. Postać powyższa zgadza się dla 2527 z 2527.
+constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency) {
+  return ceilR(rational<int>(1 + sourceLatency) * deltaSource / deltaTarget) - 1;
 }
 
 // C-Delta wybiera c_{ceil(n*Delta/Dc)}. Ułamkowa faza może wyprzedzać

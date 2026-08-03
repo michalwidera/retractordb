@@ -18,6 +18,22 @@ class qTree;
 
 inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
 
+/// Typ i długość pola, w którym mieści się wynik redukcji (AVG/MIN/MAX/SUMC).
+///
+/// K24/D4: schemat wyjścia redukcji budowany przez kompilator jest zawsze
+/// RATIONAL, a rachunek redukcji idzie po boost::rational<int>. Deskryptor
+/// wejściowy (query::descriptorFrom) i payload wyniku
+/// (streamInstance::reduceFieldsToPayload) używały typu ŹRÓDŁA, więc wartość
+/// przechodziła przez rational_cast<int> — średnia z dwóch pól o sumie
+/// nieparzystej dawała 2000003/2 jako 1000001/1. Reguła jest tu jedna dla obu
+/// miejsc właśnie po to, żeby nie mogły się ponownie rozjechać.
+inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType, int sourceLength) {
+  const bool arithmetic =
+      sourceType == rdb::BYTE || sourceType == rdb::INTEGER || sourceType == rdb::UINT || sourceType == rdb::RATIONAL;
+  if (!arithmetic) return {sourceType, sourceLength};
+  return {rdb::RATIONAL, static_cast<int>(sizeof(boost::rational<int>))};
+}
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 

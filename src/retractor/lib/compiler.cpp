@@ -23,6 +23,33 @@
 
 using boost::lexical_cast;
 
+namespace {
+/// Wyliczanie interwałów w szerszym typie, z kontrolą zakresu.
+///
+/// Wzory operatorów mnożą licznik przez licznik i mianownik przez mianownik
+/// ((D_a*D_b)/(D_a+D_b) dla przeplotu, (D_a*D_b)/|D_a-D_b| dla rozplotu), więc
+/// dla interwałów o licznikach rzędu 10^4 iloczyn wychodzi poza int.
+/// boost::rational<int> nie wykrywa przepełnienia — wynik jest wtedy cichym
+/// śmieciem, który ujawnia się dopiero jako niezwiązany błąd walidacji planu
+/// ("You cannot make faster div from slower source"). Liczymy więc w 64 bitach
+/// i sprawdzamy, czy wynik daje się w ogóle zapisać w typie interwału.
+using wideRational = boost::rational<std::int64_t>;
+
+wideRational widen(const boost::rational<int> &value) { return wideRational{value.numerator(), value.denominator()}; }
+
+wideRational widen(int value) { return wideRational{value, 1}; }
+
+boost::rational<int> narrowInterval(const wideRational &value, const std::string &id, const char *formula) {
+  constexpr std::int64_t limit = std::numeric_limits<int>::max();
+  if (value.numerator() > limit || value.numerator() < std::numeric_limits<int>::min() || value.denominator() > limit) {
+    SPDLOG_ERROR("compiler: interval {}/{} of stream '{}' ({}) is out of representable range", value.numerator(),
+                 value.denominator(), id, formula);
+    throw std::out_of_range("Stream interval out of representable range — simplify the plan or use coarser intervals");
+  }
+  return boost::rational<int>{static_cast<int>(value.numerator()), static_cast<int>(value.denominator())};
+}
+}  // namespace
+
 namespace localContext {
 boost::regex xprFieldId5(R"((\w*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
 boost::regex xprFieldId4(R"((\w*)\[(\d*)\,(\d*)\])");    // something[1,1]
@@ -82,7 +109,8 @@ std::string compiler::resolveStreamIntervals() {
             unresolvedCount++;
             continue;
           }
-          delta = (delta1 * delta2) / (delta1 + delta2);  // deltaHash(delta1, delta2);
+          delta = narrowInterval((widen(delta1) * widen(delta2)) / (widen(delta1) + widen(delta2)), q.id,
+                                 "(D_a*D_b)/(D_a+D_b)");  // deltaHash(delta1, delta2);
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
@@ -98,7 +126,8 @@ std::string compiler::resolveStreamIntervals() {
           }  //           D_c * D_b
           //   D_a = --------------
           //         abs(D_c - D_b)
-          delta = (delta1 * delta2) / abs(delta1 - delta2);  // deltaDivMod(delta1, delta2);
+          delta = narrowInterval((widen(delta1) * widen(delta2)) / abs(widen(delta1) - widen(delta2)), q.id,
+                                 "(D_c*D_b)/|D_c-D_b|");  // deltaDivMod(delta1, delta2);
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
@@ -118,7 +147,8 @@ std::string compiler::resolveStreamIntervals() {
           }  //           D_c * D_a
           //   D_b = --------------
           //         abs(D_c - D_a)
-          delta = (delta2 * delta1) / abs(delta2 - delta1);  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
+          delta = narrowInterval((widen(delta2) * widen(delta1)) / abs(widen(delta2) - widen(delta1)), q.id,
+                                 "(D_c*D_a)/|D_c-D_a|");  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
@@ -186,7 +216,7 @@ std::string compiler::resolveStreamIntervals() {
           // } else
           // delta = (deltaSrc / windowSizeSrc) * step;
 
-          delta = (coreDelta * step) / coreWindow;
+          delta = narrowInterval((widen(coreDelta) * widen(step)) / widen(coreWindow), q.id, "(D_src*k)/F");
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}", op.getStrCommandID());
@@ -739,6 +769,9 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) — stała
   // w jednostkach rekordów, patrz komentarz przy STREAM_HASH poniżej.
   constexpr int kJunctionHistory = 4;
+  // Deklaracja wyprzedza konsumenta o rekord uzbrojony przy otwarciu storage
+  // i o zerowy prefetch, wiec jej czolo jest dalej, niz wynika z czasu.
+  constexpr int kDeclarationPrefetch = 2;
 
   std::map<std::string, int> capMap;  // <- This var goes to qTree class instance
 
@@ -805,8 +838,20 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // wtedy najstarsze pole okna i AGSE czytało zamiast niego rekord najnowszy.
         // Deklaracja ma dodatkowo dwa rekordy przed pierwszym wykonaniem konsumenta:
         // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch.
-        const int required = floorR(retained) + (source.isDeclaration() ? 2 : 1);
-        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
+        int required = floorR(retained) + (source.isDeclaration() ? 2 : 1);
+        // K24/P1: powyższa formuła zaniżała pojemność dla 10,4% par (konsument,
+        // deklaracja) w korpusie 10 010 planów — odczyt poza historią kończył się
+        // przerwaniem procesu w storage::revRead. Odległość wsteczna wyprowadzona
+        // z modelu zdarzeniowego wynosi dla deklaracji (Wsrc=0)
+        //   max_n [ floor((n+1+Wout)*step/F) - floor(n*step/F) ] = ceil((1+Wout)*step/F),
+        // co potwierdzono wyczerpująco na 1152 kombinacjach (step, F, Wout).
+        // Bierzemy maksimum obu wartości: naprawa nie ma prawa zmniejszyć
+        // pojemności żadnemu strumieniowi, który działa dziś poprawnie.
+        if (source.isDeclaration()) {
+          const auto perSlot = boost::rational<int>(1 + q.startupLatency) * boost::rational<int>(step, sourceWidth);
+          required           = std::max(required, ceilR(perSlot) + kDeclarationPrefetch);
+        }
+        capMap[nameSrc] = std::max(capMap[nameSrc], std::max(required, 1));
       } break;
       case STREAM_HASH:
         // Przeplot/rozplot czytają elementy składowych po indeksie
@@ -834,7 +879,24 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
           capMap[arg1] = std::max(capMap[arg1], std::max(kJunctionHistory, delayed));
         }
         break;
-      case STREAM_ADD:
+      case STREAM_ADD: {
+        // K24/P2 wariant A: suma strumieni czyta składową po indeksie postępującym
+        // ⌊n·Δout/Δsrc⌋ (Definicja sumy strumieni), więc — inaczej niż przed poprawką,
+        // gdy brała bieżący payload — wchodzi do modelu pojemności.
+        // Odległość wsteczna w chwili slotu n wynosi
+        //   count_src(t_n) - 1 - ⌊n·ratio⌋,  ratio = Δout/Δsrc <= 1,
+        // a potrzebna pojemność to maksimum po n z count_src(t_n) - ⌊n·ratio⌋, czyli
+        //   max_n [ ⌊(n+1+Wout)·ratio⌋ - ⌊n·ratio⌋ ] - Wsrc = ⌈(1+Wout)·ratio⌉ - Wsrc.
+        // Dla deklaracji dochodzi wyprzedzenie czoła (uzbrojenie storage i zerowy
+        // prefetch) — ten sam człon co w STREAM_SUBTRACT i STREAM_AGSE.
+        for (const auto &nameSrc : {arg1, arg2}) {
+          const auto &source = coreInstance[nameSrc];
+          const auto ratio   = q.rInterval / source.rInterval;
+          int required       = ceilR(boost::rational<int>(1 + q.startupLatency) * ratio) - source.startupLatency;
+          if (source.isDeclaration()) required += kDeclarationPrefetch;
+          capMap[nameSrc] = std::max(capMap[nameSrc], std::max(required, 1));
+        }
+      } break;
       case STREAM_AVG:
       case STREAM_MIN:
       case STREAM_MAX:
@@ -847,10 +909,21 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // Dla deklaracji maksimum odległości od c_{ceil(n*ratio)}
         // występuje w fazie całkowitej. Dwa rekordy startowe mają tę samą
         // genezę co w AGSE (uzbrojenie storage i zerowy prefetch).
-        const int required = source.isDeclaration()
-                                 ? floorR(boost::rational<int>(q.startupLatency) * ratio) + 2
-                                 : ceilR(boost::rational<int>(q.startupLatency) * ratio - source.startupLatency);
-        capMap[arg1]       = std::max(capMap[arg1], std::max(required, 1));
+        int required = source.isDeclaration() ? floorR(boost::rational<int>(q.startupLatency) * ratio) + 2
+                                              : ceilR(boost::rational<int>(q.startupLatency) * ratio - source.startupLatency);
+        // K24/P1: formuła dla deklaracji zaniżała pojemność dla 39,1% par
+        // (konsument, deklaracja) w korpusie 10 010 planów. Przy ilorazie
+        // całkowitym >= 3 odczyt wypadał poza historią i dawał CICHY rekord
+        // all-NULL — cały strumień wyjściowy był pusty przy poprawnej liczbie
+        // rekordów. Odległość wsteczna z modelu zdarzeniowego wynosi dla
+        // deklaracji (Wsrc=0)
+        //   max_n [ floor((n+1+Wout)*ratio) - ceil(n*ratio) ] = floor((1+Wout)*ratio),
+        // co potwierdzono wyczerpująco na 2070 parach (ratio, Wout).
+        // Maksimum obu wartości — patrz komentarz przy STREAM_AGSE.
+        if (source.isDeclaration()) {
+          required = std::max(required, floorR(boost::rational<int>(1 + q.startupLatency) * ratio) + kDeclarationPrefetch);
+        }
+        capMap[arg1] = std::max(capMap[arg1], std::max(required, 1));
       } break;
       default:
         FatalError("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
@@ -1020,7 +1093,11 @@ std::string compiler::computeStartupLatency() {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
-        result = std::max(toSlots(w1, delta1, q.rInterval), toSlots(w2, deltaOf(second->getStr_()), q.rInterval));
+        // Ogon musi zabezpieczyć dostępność rekordu KAŻDEJ składowej pod indeksem
+        // z Definicji sumy strumieni, a nie tylko przeliczyć ogon składowej przez takt —
+        // patrz AddStartupLatency() w SOperations.hpp.
+        result =
+            std::max(AddStartupLatency(delta1, q.rInterval, w1), AddStartupLatency(deltaOf(second->getStr_()), q.rInterval, w2));
       } else if (op == STREAM_DEHASH_DIV) {
         // Θ zawsze wyprzedza swój slot o mniej niż jeden okres wyjścia.
         // Jeden slot jest dokładnym własnym ogonem operatora.

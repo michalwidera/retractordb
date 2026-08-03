@@ -96,7 +96,10 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
     // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
     // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
     // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
-    SPDLOG_WARN("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
+    //
+    // Poziom ERROR, choć proces nie ginie: defekt D1 (K24) przeżył niezauważony właśnie
+    // dlatego, że ten komunikat był na WARN, a Release kompiluje WARN na wylot.
+    SPDLOG_ERROR("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
@@ -123,7 +126,8 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   if (outOfRange) {
     // Rekord niedostępny (przyszłość na osi czasu źródła albo poza historią
     // bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
-    SPDLOG_WARN("fetchForward {}: record {} not available (count={})", instance, forwardIndex, count);
+    // Poziom ERROR z tego samego powodu co w fetchBack powyżej.
+    SPDLOG_ERROR("fetchForward {}: record {} not available (count={})", instance, forwardIndex, count);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
@@ -287,11 +291,22 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc1 = arg[0].getStr_();
       const auto nameSrc2 = arg[1].getStr_();
 
+      // K24/P2 wariant A: składowe są czytane po indeksie POSTĘPUJĄCYM z Definicji sumy
+      // strumieni (c_n = (a_n, b_{⌊nΔa/Δb⌋})), a nie jako bieżący payload obu składowych.
+      // Bieżący payload dawał b_{⌊(n+1)Δa/Δb⌋} — rekord wolniejszej składowej domknięty
+      // dopiero na koniec slotu, czyli w slocie n jeszcze nieokreślony.
+      //
+      // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji).
+      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+
+      const auto fwdPos1 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc1).rInterval, n);
+      const auto fwdPos2 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc2).rInterval, n);
+
       // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
       rdb::probe::onAddMerge();
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc1) + *getPayload(nameSrc2);
+      *(qSet[instance]->inputPayload) = fetchForward(nameSrc1, fwdPos1) + fetchForward(nameSrc2, fwdPos2);
     } break;
     case STREAM_AGSE: {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation

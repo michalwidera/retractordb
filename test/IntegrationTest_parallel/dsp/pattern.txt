@@ -1,7 +1,7 @@
 :STORAGE	temp/
 source(1/50)	/dev/urandom
 	data: BYTE
-signalRow(1/50)	tail=25
+signalRow(1/50)	tail=24
 	:- PUSH_STREAM(source)
 	:- STREAM_AGSE(1,25)
 	source_0: BYTE
@@ -56,7 +56,7 @@ signalRow(1/50)	tail=25
 		PUSH_ID(signalRow[24])
 filter(1/1)	filterremez.txt
 	coef: INTEGER
-accRow(1/50)	tail=25
+accRow(1/50)	tail=49
 	:- PUSH_STREAM(signalRow)
 	:- PUSH_STREAM(filter)
 	:- STREAM_ADD
@@ -160,12 +160,12 @@ accRow(1/50)	tail=25
 		PUSH_ID(accRow[24])
 		PUSH_ID(accRow[49])
 		MULTIPLY
-output(1/50)	tail=25
+output(1/50)	tail=49
 	:- PUSH_STREAM(accRow)
 	:- STREAM_SUM
 	output_0: INTEGER
 		PUSH_ID(output[0])
-outputAll(1/50)	tail=25
+outputAll(1/50)	tail=49
 	:- PUSH_STREAM(output)
 	:- PUSH_STREAM(source)
 	:- STREAM_ADD

@@ -1,0 +1,25 @@
+echo SUB_RATIO3
+open sub3
+size
+descc
+list 5
+
+echo SUB_RATIO4
+open sub4
+size
+descc
+list 4
+
+echo AGSE_WINDOW
+open win
+size
+descc
+list 4
+
+echo SHIFT_UNDER_HASH
+open mix
+size
+descc
+list 4
+
+quit

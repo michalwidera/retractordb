@@ -209,8 +209,8 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   } else {
     std::memset(destination, 0, size);
     storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
-    SPDLOG_WARN("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
-                recordsCount_);
+    SPDLOG_ERROR("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
+                 recordsCount_);
   }
   return result == 0;
 }
@@ -272,8 +272,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     if (destination == nullptr) FatalError("storage::revRead: destination pointer is null in buffer fallback path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
-    SPDLOG_WARN("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
-                buffer_.capacity(), buffer_.size());
+    SPDLOG_ERROR("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
+                 buffer_.capacity(), buffer_.size());
     return true;
   }
 

@@ -1,6 +1,6 @@
  SELECT * STREAM signalText0 FROM core1@(1,4)
  This looks OK
-10 Record(s)
+11 Record(s)
 16 Byte(s) per record.
 { INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
 { core1_0:13 core1_1:12 core1_2:11 core1_3:10 }
@@ -11,7 +11,7 @@
 { core1_0:18 core1_1:17 core1_2:16 core1_3:15 }
  SELECT * STREAM signalTextR FROM core1@(1,-4)
  This looks OK
-10 Record(s)
+11 Record(s)
 16 Byte(s) per record.
 { INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
 { core1_0:10 core1_1:11 core1_2:12 core1_3:13 }
@@ -22,7 +22,7 @@
 { core1_0:15 core1_1:16 core1_2:17 core1_3:18 }
  SELECT * STREAM signalText1 FROM core1@(2,4)
  This looks OK
-5 Record(s)
+6 Record(s)
 16 Byte(s) per record.
 { INTEGER core1_0 INTEGER core1_1 INTEGER core1_2 INTEGER core1_3 }
 { core1_0:13 core1_1:12 core1_2:11 core1_3:10 }
@@ -31,7 +31,7 @@
 { core1_0:19 core1_1:18 core1_2:17 core1_3:16 }
  SELECT * STREAM signalText3 FROM core1@(2,2)
  This looks OK
-6 Record(s)
+7 Record(s)
 8 Byte(s) per record.
 { INTEGER core1_0 INTEGER core1_1 }
 { core1_0:11 core1_1:10 }
@@ -42,7 +42,7 @@
 { core1_0:11 core1_1:10 }
  SELECT * STREAM signalText5 FROM signalText3@(1,1)
  Investigation here
-11 Record(s)
+13 Record(s)
 4 Byte(s) per record.
 { INTEGER signalText3_0 }
 { signalText3_0:11 }
