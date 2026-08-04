@@ -80,7 +80,7 @@ add_custom_target(
 add_custom_target(
   ecg-detect-qrs-warmup
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
-          720,-400,400 "--gnuplot-rtl --warmup 360"
+          720,-50,400 "--gnuplot-rtl --warmup 360"
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
@@ -94,7 +94,7 @@ add_custom_target(
 add_custom_target(
   ecg-detect-qrs
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
-          720,-400,400 "--gnuplot-rtl"
+          720,-50,400 "--gnuplot-rtl"
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
